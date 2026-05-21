@@ -2,7 +2,7 @@
 
 ### Requirement: `/tour` 路由提供 6 段 scroll-snap 體驗
 
-系統 SHALL 在 `/tour` 路由依序渲染 6 個 stage：CourtSize、PlayerGrowth、TwoBounce、KitchenViolation、MaterialsSpectrum、Closing。外層 `<main>` element SHALL 套用 `scroll-snap-type: y mandatory`、`overflow-y-scroll`，作為內部 scroll container，且其高度 SHALL 為 `calc(100vh - var(--site-nav-h))`、`margin-top: var(--site-nav-h)`，使可視 snap 區完全位於 `SiteNavbar` 下方、避免 stage 標題與主圖被 fixed navbar 遮擋。每個 stage SHALL 為 `h-full`（即 main 可視高度）的 scroll container，並套用 `scroll-snap-align: start` 強制停靠；stage 內以 `flex items-center justify-center` 維持垂直置中。
+系統 SHALL 在 `/tour` 路由依序渲染 6 個 stage：CourtSize、PlayerGrowth、TwoBounce、KitchenViolation、MaterialsSpectrum、Closing。外層 `<main>` element SHALL 套用 `scroll-snap-type: y mandatory`、`overflow-y-scroll`，作為內部 scroll container，且其高度 SHALL 為 `calc(100dvh - var(--site-nav-h))`、`margin-top: var(--site-nav-h)`，使可視 snap 區完全位於 `SiteNavbar` 下方、避免 stage 標題與主圖被 fixed navbar 遮擋。height 與 margin-top SHALL 以 inline `style` 形式套用（而非 Tailwind arbitrary value），確保 `var()` 與 `calc()` 在 build pipeline 上被瀏覽器正確處理。每個 stage SHALL 為 `h-full`（即 main 可視高度）的 scroll container，並套用 `scroll-snap-align: start` 強制停靠；stage 內以 `flex items-center justify-center` 維持垂直置中。
 
 #### Scenario: 訪問 `/tour` 可見第一個 stage 標題
 

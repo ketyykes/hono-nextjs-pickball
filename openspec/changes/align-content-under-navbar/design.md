@@ -105,11 +105,17 @@ className="absolute top-[calc(var(--site-nav-h)+var(--toc-bar-h)+15%)] right-[12
 ```tsx
 <main
   ref={mainRef}
-  className="relative h-[calc(100vh-var(--site-nav-h))] mt-[var(--site-nav-h)] snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white"
+  style={{
+    height: "calc(100dvh - var(--site-nav-h))",
+    marginTop: "var(--site-nav-h)",
+  }}
+  className="relative snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white"
 >
 ```
 
-stage 維持 `h-screen` —— 改成 `h-full` 也可（每個 stage 都填滿 main 即可），但 `h-screen` 在 snap 機制下對 IntersectionObserver 的 root margin 計算較直觀。**選用 `h-full`** 讓 stage 自動 = main 的可視高度，避免 stage 超出 main 造成 snap 點偏移。
+stage 改用 `h-full` 讓 stage 自動 = main 的可視高度，避免 stage 超出 main 造成 snap 點偏移。
+
+**Inline style 而非 Tailwind arbitrary value**：原本嘗試 `h-[calc(100vh-var(--site-nav-h))]` 與 `mt-[var(--site-nav-h)]`，視覺驗收實測在 Next.js 16 dev pipeline 下沒有把 main 推到 SiteNavbar 下方（stage 標題被白色 solid navbar 覆蓋）。雖然 Tailwind v4 官方範例支援這類寫法，但在這個專案的實際 build path 上不穩——改用 inline style 100% 確保 `var()` 解析與 `calc()` 運算都被瀏覽器正確處理。同時以 `100dvh` 取代 `100vh` 處理行動瀏覽器位址列收合造成的高度跳動。
 
 **Alternatives considered**：
 
