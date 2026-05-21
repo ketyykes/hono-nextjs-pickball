@@ -21,7 +21,7 @@ export function TourShell({ children }: TourShellProps) {
 			<TourSkipButton />
 			<main
 				ref={mainRef}
-				className="relative h-screen snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white"
+				className="relative h-[calc(100vh-var(--site-nav-h))] mt-[var(--site-nav-h)] snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white"
 			>
 				{children}
 			</main>

@@ -26,9 +26,9 @@
 
 ## 5. TourShell main 高度與位置（入口/元件例外層）
 
-- [ ] 5.1 將 `components/tour/TourShell.tsx` `<main>` 的 className 從 `relative h-screen snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white` 改為 `relative h-[calc(100vh-var(--site-nav-h))] mt-[var(--site-nav-h)] snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white`
-- [ ] 5.2 視需要將 `components/tour/TourStage.tsx` `<section>` 從 `h-screen` 改為 `h-full`（讓 stage = main 可視高度，避免 snap 點偏移）。**先評估**：若 TourStage 改 h-full 後 stage 高度仍正確（因 main 已縮短），則改；若改後造成其他 stage 元件（CourtSizeStage 等）內以 `h-full` 嵌套出問題，則保留 `h-screen` 並接受第一段比 main 高 56px 的微差
-- [ ] 5.3 確認 `TourSkipButton`、`TourProgressRail` 兩個 fixed 元素位置不受 main 縮短影響（兩者都用 `fixed` 對 viewport 定位，不掛在 main 內）
+- [x] 5.1 將 `components/tour/TourShell.tsx` `<main>` 的 className 從 `relative h-screen snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white` 改為 `relative h-[calc(100vh-var(--site-nav-h))] mt-[var(--site-nav-h)] snap-y snap-mandatory overflow-y-scroll bg-slate-900 text-white`
+- [x] 5.2 視需要將 `components/tour/TourStage.tsx` `<section>` 從 `h-screen` 改為 `h-full`（讓 stage = main 可視高度，避免 snap 點偏移）。**先評估**：若 TourStage 改 h-full 後 stage 高度仍正確（因 main 已縮短），則改；若改後造成其他 stage 元件（CourtSizeStage 等）內以 `h-full` 嵌套出問題，則保留 `h-screen` 並接受第一段比 main 高 56px 的微差
+- [x] 5.3 確認 `TourSkipButton`、`TourProgressRail` 兩個 fixed 元素位置不受 main 縮短影響（兩者都用 `fixed` 對 viewport 定位，不掛在 main 內）
 - [ ] 5.4 驗收：`pnpm dev` 開啟 `/tour`，肉眼確認 stage 1 標題未被 SiteNavbar 遮、捲動 6 段 snap 行為正常、Skip 按鈕仍在右上、左側 ProgressRail 仍正常切換
 
 ## 6. E2E smoke 驗收（E2E 例外層）

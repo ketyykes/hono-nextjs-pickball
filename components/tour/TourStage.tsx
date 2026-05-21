@@ -25,7 +25,7 @@ export function TourStage({ id, ariaLabel, children, stageRef }: TourStageProps)
 			ref={stageRef}
 			data-stage-id={id}
 			aria-label={ariaLabel}
-			className="relative h-screen w-full snap-start overflow-hidden"
+			className="relative h-full w-full snap-start overflow-hidden"
 		>
 			{children}
 		</section>
