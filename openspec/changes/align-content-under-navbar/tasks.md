@@ -18,10 +18,10 @@
 
 ## 4. Hero nav 偏移層（入口/元件例外層）
 
-- [ ] 4.1 改寫 `components/guide/Hero.tsx` JSX：在背景光暈與 scroll indicator 之間插入一層 `<div className="relative flex min-h-screen flex-col items-center justify-center pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]">`
-- [ ] 4.2 將既有「浮球」與「主內容 motion.div」搬入此偏移層內；浮球的 `top-[15%]`、`right-[12%]`、`max-md:top-[10%]`、`max-md:right-[8%]` 維持不變（現在相對偏移層而非 section）
-- [ ] 4.3 確認 `min-h-screen` 從 section 移到偏移層（section 改為僅 `relative overflow-hidden bg-slate-900`），或保留 section `min-h-screen` 並把偏移層改 `flex-1 flex flex-col items-center justify-center pt-[...]`——二擇一，視排版實際結果挑乾淨者
-- [ ] 4.4 ScrollIndicator (`absolute bottom-8 left-1/2`) 維持在 section 層級，不搬入偏移層
+- [x] 4.1 改寫 `components/guide/Hero.tsx` JSX：在背景光暈與 scroll indicator 之間插入一層 `<div className="relative flex min-h-screen flex-col items-center justify-center pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]">`
+- [x] 4.2 將既有「浮球」與「主內容 motion.div」搬入此偏移層內；浮球的 `top-[15%]`、`right-[12%]`、`max-md:top-[10%]`、`max-md:right-[8%]` 維持不變（現在相對偏移層而非 section）
+- [x] 4.3 確認 `min-h-screen` 從 section 移到偏移層（section 改為僅 `relative overflow-hidden bg-slate-900`），或保留 section `min-h-screen` 並把偏移層改 `flex-1 flex flex-col items-center justify-center pt-[...]`——二擇一，視排版實際結果挑乾淨者
+- [x] 4.4 ScrollIndicator (`absolute bottom-8 left-1/2`) 維持在 section 層級，不搬入偏移層
 - [ ] 4.5 驗收：`pnpm dev` 開啟 `/`，把瀏覽器拉到 600px / 800px / 1080px 三種高度，浮球皆位於 TocBar 之下、主標題置中
 
 ## 5. TourShell main 高度與位置（入口/元件例外層）
