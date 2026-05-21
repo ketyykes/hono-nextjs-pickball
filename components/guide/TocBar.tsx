@@ -16,10 +16,10 @@ export function TocBar() {
 	return (
 		<nav
 			className={cn(
-				"fixed top-14 right-0 left-0 z-[100] border-b transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300",
+				"fixed top-14 right-0 left-0 z-[100] transition-[background-color,box-shadow,backdrop-filter] duration-300",
 				pastHero
-					? "border-border bg-background/90 shadow-md backdrop-blur"
-					: "border-white/10 bg-slate-900/20 backdrop-blur-sm",
+					? "bg-background/90 shadow-sm backdrop-blur"
+					: "bg-slate-900/30 backdrop-blur-sm",
 			)}
 		>
 			<div className="mx-auto flex max-w-[1200px] items-center gap-2 overflow-x-auto px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

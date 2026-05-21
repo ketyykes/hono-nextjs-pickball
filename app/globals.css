@@ -44,6 +44,8 @@
 
 :root {
   --radius: 0.625rem;
+  --site-nav-h: 3.5rem;
+  --toc-bar-h: 3.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);

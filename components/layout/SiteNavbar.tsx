@@ -30,8 +30,8 @@ export function SiteNavbar() {
 			className={cn(
 				"fixed top-0 right-0 left-0 z-[110] h-14 border-b transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300",
 				solid
-					? "border-border bg-background/90 shadow-sm backdrop-blur"
-					: "border-white/10 bg-slate-900/20 backdrop-blur-sm",
+					? "border-border bg-background/85 shadow-sm backdrop-blur-md"
+					: "border-white/5 bg-slate-900/20 backdrop-blur-sm",
 			)}
 		>
 			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-6 px-6">
