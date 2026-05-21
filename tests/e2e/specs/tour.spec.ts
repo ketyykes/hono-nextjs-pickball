@@ -31,7 +31,8 @@ test.describe("/tour 體驗", () => {
 	test("首頁有 CTA 並能導向 /tour", async ({ page }) => {
 		await page.goto("/");
 		// CTA 內嵌於 Hero 內部主內容末段、由 staggerChildren 帶出後永遠可見
-		const cta = page.getByRole("button", { name: /進入完整體驗/ });
+		// HeroTourCta 使用 Button asChild + Link，DOM 渲染為 <a>（role=link）走 Next.js view transition
+		const cta = page.getByRole("link", { name: /進入完整體驗/ });
 		await expect(cta).toBeVisible();
 		await cta.click();
 		await expect(page).toHaveURL(/\/tour$/);
