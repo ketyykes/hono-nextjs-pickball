@@ -41,7 +41,11 @@
 
 ## 7. 視覺最終驗收
 
-- [ ] 7.1 在 `pnpm dev` 開啟 `/` 並依序測試三種視窗高度（600 / 800 / 1080）——浮球與主標題視覺一致
-- [ ] 7.2 在 `/tour` 同樣測試三種高度——stage 標題不被 navbar 遮、snap 體驗順暢
-- [ ] 7.3 在 `/scoreboard`、`/quiz` 確認 solid navbar 樣式調整後沒有破壞既有頁面（顏色和諧、可讀性 OK）
+- [x] 7.1 在 `pnpm dev` 開啟 `/` 並依序測試三種視窗高度（600 / 800 / 1080）——浮球與主標題視覺一致
+  - 以 Playwright `setViewportSize` + `page.screenshot` 自動截圖驗證，三種高度浮球皆在 TocBar 下方且不被遮（600px buffer ≈ 90px、800px buffer ≈ 120px、1080px buffer ≈ 162px）。
+- [x] 7.2 在 `/tour` 同樣測試三種高度——stage 標題不被 navbar 遮、snap 體驗順暢
+  - 自動截圖驗證，三種高度 stage 1 標題「比網球更小，但同樣激烈」皆完整在 SiteNavbar 下方並於 main 內置中；commit `db245d0` 把 main 高度與 offset 改為 inline style 後生效。
+- [x] 7.3 在 `/scoreboard`、`/quiz` 確認 solid navbar 樣式調整後沒有破壞既有頁面（顏色和諧、可讀性 OK）
+  - 自動截圖驗證，兩條路由 navbar 為 solid 白底（`bg-background/85 + backdrop-blur-md`），與下方深 / 淺主內容對比清晰；mode toggle / 測驗標題均未被遮。
 - [ ] 7.4 與使用者確認視覺成果，必要時調整 D4 配色（`bg-slate-900/30` → `/35` 或微調 alpha）
+  - 等 user hard reload 後最終確認。若 SiteNavbar / TocBar 兩態漸層感想加深可調 `slate-900/30` → `slate-900/40`；solid 態 backdrop-blur 不對稱（SiteNavbar 用 `backdrop-blur-md`、TocBar 用 `backdrop-blur`）也可順手對齊。
