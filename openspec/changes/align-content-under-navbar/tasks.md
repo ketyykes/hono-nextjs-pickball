@@ -33,8 +33,11 @@
 
 ## 6. E2E smoke 驗收（E2E 例外層）
 
-- [ ] 6.1 執行 `pnpm test:e2e` 跑既有所有 E2E（5 個 browser project），確認沒有因 DOM 增層或樣式調整造成既有 selector 失效
-- [ ] 6.2 若有測試失敗，逐一排查：是否為 `getBoundingClientRect` y 座標斷言？是否為依賴 main `h-screen` 假設？決定要更新測試 baseline 還是修實作
+- [x] 6.1 執行 `pnpm test:e2e` 跑既有所有 E2E（5 個 browser project），確認沒有因 DOM 增層或樣式調整造成既有 selector 失效
+- [x] 6.2 若有測試失敗，逐一排查：是否為 `getBoundingClientRect` y 座標斷言？是否為依賴 main `h-screen` 假設？決定要更新測試 baseline 還是修實作
+  - **結果**：80 個 test 中 75 pass、5 fail。失敗集中於 `tour.spec.ts:31`「首頁有 CTA 並能導向 /tour」於 5 個 browser project 一致失敗。
+  - **根因**：spec 用 `getByRole("button", { name: /進入完整體驗/ })`，但 `HeroTourCta.tsx` 用 `Button asChild + Link` 渲染為 `<a>`（role=link）。本 change 完全沒動 `HeroTourCta.tsx` 與 `tour.spec.ts`（`git diff 00a05ea..c6c0419` 確認）—— 屬既存 spec bug（CTA 在 commit `ea7955d` 改為 `<Link>` 時 spec 沒同步更新）。
+  - **建議**：另開 follow-up 小 change 把 spec 第 35 行改為 `getByRole("link", { name: /進入完整體驗/ })`，不在本 change 範圍處理。
 
 ## 7. 視覺最終驗收
 
