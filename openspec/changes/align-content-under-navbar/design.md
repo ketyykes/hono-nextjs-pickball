@@ -84,9 +84,17 @@ navbar 顏色現狀：
 </section>
 ```
 
-**Rationale**：背景光暈鋪滿整個 viewport 維持深色背景延伸到 nav 之下（讓透明 nav 有底色），但所有「主視覺元素」起算點都在 nav 之下。浮球的 `top-[15%]` 仍是百分比、但相對的是「nav 之下的可用區」。
+**Rationale**：背景光暈鋪滿整個 viewport 維持深色背景延伸到 nav 之下（讓透明 nav 有底色），但所有「主視覺元素」起算點都在 nav 之下。
 
 **Trade-off**：主內容垂直中心會略微下移（112px / 2 ≈ 56px 偏離原始幾何中心），但實測在 hero 視覺感受上反而更平衡（原本主標題其實偏上）。如果視覺上發現過於下沉，再以 `pb-` 或 inner `pt-0` 微調。
+
+**Implementation correction**（視覺驗收後補）：偏移層的 `pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]` 只影響 **flow children**（即主內容 motion.div），對 **absolute children**（浮球）無效——CSS 規範：absolute 子元素的 `top: %` 是相對 containing block 的 padding-box 頂端起算，padding 區域被算進「可用範圍」。因此浮球的 top 必須明確含 nav offset：
+
+```tsx
+className="absolute top-[calc(var(--site-nav-h)+var(--toc-bar-h)+15%)] right-[12%] ... max-md:top-[calc(var(--site-nav-h)+var(--toc-bar-h)+10%)] ..."
+```
+
+主內容 motion.div 維持由偏移層 `pt-[...]` + `flex flex-col items-center justify-center` 處理（flow child 受 padding 影響）。
 
 ---
 

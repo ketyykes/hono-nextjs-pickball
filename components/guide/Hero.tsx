@@ -56,10 +56,11 @@ export function Hero() {
 
 			{/* nav 偏移層：浮球與主內容掛在這層，padding-top 讓可用區從 nav 底部開始 */}
 			<div className="relative flex min-h-screen flex-col items-center justify-center pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]">
-				{/* 浮球：top-[15%] / right-[12%] 現在相對偏移層 */}
+				{/* 浮球：absolute child 的 top% 不受偏移層 pt 影響，需明確把 nav 高度加到 top calc 內，
+				    確保矮視窗下不會被 SiteNavbar + TocBar (合計 112px) 蓋到 */}
 				<div
 					aria-hidden
-					className="absolute top-[15%] right-[12%] h-[60px] w-[60px] animate-float-ball rounded-full bg-lime-400 shadow-[0_0_60px_rgba(163,230,53,0.4)] max-md:top-[10%] max-md:right-[8%] max-md:h-10 max-md:w-10"
+					className="absolute top-[calc(var(--site-nav-h)+var(--toc-bar-h)+15%)] right-[12%] h-[60px] w-[60px] animate-float-ball rounded-full bg-lime-400 shadow-[0_0_60px_rgba(163,230,53,0.4)] max-md:top-[calc(var(--site-nav-h)+var(--toc-bar-h)+10%)] max-md:right-[8%] max-md:h-10 max-md:w-10"
 				>
 					<div className="absolute inset-2 rounded-full border-2 border-dashed border-black/15" />
 				</div>

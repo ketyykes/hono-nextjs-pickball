@@ -33,7 +33,7 @@
 
 ### Requirement: Hero 浮球與主內容避開 fixed nav 合計高度
 
-`components/guide/Hero.tsx` 的浮球（`aria-hidden` 的右上 lime 圓球）與主內容（含 badge、主標題、副標、統計、CTA）SHALL 全部落在 `SiteNavbar (56px) + TocBar (56px)` = 112px 之下的可用視覺區。具體實作方式：浮球與主內容掛在 Hero 內一層 `pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]` 的偏移層之內，浮球的 `top-[15%]` SHALL 相對該偏移層而非 section 全高，使其在矮視窗（≤ 700px viewport height）下不被 fixed nav 遮擋。
+`components/guide/Hero.tsx` 的浮球（`aria-hidden` 的右上 lime 圓球）與主內容（含 badge、主標題、副標、統計、CTA）SHALL 全部落在 `SiteNavbar (56px) + TocBar (56px)` = 112px 之下的可用視覺區。具體實作方式：浮球與主內容掛在 Hero 內一層 `pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]` 的偏移層之內。**主內容**（motion.div）為 flow child、由偏移層的 `pt-` + `flex flex-col items-center justify-center` 自動推到 nav 之下置中。**浮球**為 absolute child、不受 padding 影響，其 `top` SHALL 明確含 nav offset：`top-[calc(var(--site-nav-h)+var(--toc-bar-h)+15%)]`、`max-md:top-[calc(var(--site-nav-h)+var(--toc-bar-h)+10%)]`，確保在矮視窗（≤ 700px viewport height）下不被 fixed nav 遮擋。
 
 背景光暈 SHALL 仍鋪滿整個 section（含 nav 區），維持透明 navbar 之下的深色背景延伸感。Hero section 本身仍維持 `min-h-screen overflow-hidden bg-slate-900` 不變。
 
