@@ -21,6 +21,12 @@ skills:
 
 ## 核心工作流程
 
+任務開始前先分類路徑：
+
+- **執行 / debug 既有測試** → §1–§5
+- **撰寫新測試（複雜 UI、不熟悉的頁面、selector 不確定）** → 先走 §6 spec-driven 產出 spec，再走 §1–§5
+- **撰寫新測試（簡單流程、role-based selector 可靠）** → 直接寫 spec 後走 §1–§5
+
 ### 1. 執行前評估
 
 - 先確認使用者要執行的測試範圍：全部測試、特定檔案、或特定測試案例
@@ -70,6 +76,69 @@ page.on("pageerror", (error) => console.error("Page error:", error.message));
 - 若是 flaky test 嫌疑（單次執行偶發失敗），建議使用 `--retries=2` 或 `--repeat-each=3` 重試確認
 - 若 dev server 啟動失敗，先檢查 port 3000 是否被佔用、`pnpm install` 是否完成
 - 遇到 timeout 錯誤時，分析是網路慢、selector 錯誤、還是元件未正確渲染
+
+### 6. 撰寫新測試（spec-driven 模式）
+
+當 UI 複雜、selector 不確定、或第一次接觸某頁面時，採用 spec-driven 流程避免「靠猜寫 selector」的紅燈：
+
+1. **確認 seed test**
+
+   `tests/e2e/` 需有導頁到 baseURL 的最小 seed（或 fixture）。無則先建立：
+
+   ```ts
+   // tests/e2e/seed.spec.ts
+   import { test } from "@playwright/test";
+   test("seed", async ({ page }) => { await page.goto("/"); });
+   ```
+
+2. **啟動 debug session 並 attach**
+
+   ```bash
+   # 背景啟動，等 stdout 印出 "Debugging Instructions" 與 tw-XXXX session 名
+   PLAYWRIGHT_HTML_OPEN=never npx playwright test tests/e2e/seed.spec.ts --debug=cli &
+
+   # attach 進入互動 session
+   playwright-cli attach tw-XXXX
+   ```
+
+3. **逐情境探索並收集 code**
+
+   - `playwright-cli resume` 讓 seed 跑完抵達起點
+   - 對每個測試步驟用 `playwright-cli snapshot` 取得當前 element refs，再用 `click` / `fill` / `press` 等指令操作
+   - **觀察 stdout 自動 emit 的 Playwright TypeScript code**——這是測試碼的基底
+   - 期望值用 `playwright-cli --raw eval` / `--raw snapshot` 取得，搭 `toBeVisible` / `toHaveText` / `toMatchAriaSnapshot` 寫斷言
+
+4. **組合最終 spec**
+
+   把 emit 的 code 組進 `tests/e2e/specs/<feature>.spec.ts`：
+
+   - 一情境一 `test()`，互不依賴（每個 test 從 seed 狀態重新開始）
+   - 步驟前加 `// N. <step text>` 註解標記
+   - 引用 `import { test, expect } from "@playwright/test"`（無 fixture）或 `from "./fixtures"`（有）
+   - 加上 `page.on("console", ...)` + `page.on("pageerror", ...)` 監聽（§3 規範）
+
+5. **驗證 + 收尾**
+
+   ```bash
+   # 停掉背景 debug 程序（避免 port / session 殘留）
+   # Chromium 先驗證測試本身可跑
+   pnpm test:e2e --project=chromium tests/e2e/specs/<feature>.spec.ts
+
+   # 全綠後再跑全 5 browsers 確認跨瀏覽器相容
+   pnpm test:e2e tests/e2e/specs/<feature>.spec.ts
+   ```
+
+   後續執行、console 監控、失敗回報走 §3–§5。
+
+**何時走 spec-driven、何時直接寫：**
+
+| 訊號 | 建議 |
+|------|------|
+| UI 複雜（modal、動態 list、custom dropdown）、selector 沒 testid 又難猜 | spec-driven |
+| 動畫 / async 時序敏感 | spec-driven |
+| 第一次接觸的頁面、不確定 element 結構 | spec-driven |
+| 簡單按鈕 / 文字 / 連結，role-based selector 明顯可用 | 直接寫 spec |
+| 你已熟悉的頁面、近期才寫過類似 spec | 直接寫 spec |
 
 ## 品質標準
 

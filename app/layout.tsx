@@ -31,6 +31,9 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "匹克球新手完全入門：規則與球拍選購一次搞懂",
   description: "規則與球拍選購一次搞懂的匹克球新手完整指南",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
