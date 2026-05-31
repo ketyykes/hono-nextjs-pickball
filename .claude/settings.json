@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm exec tsc --noEmit 1>&2 || exit 2",
+            "command": "export PATH=\"/opt/homebrew/bin:$HOME/.local/bin:$PATH\"; eval \"$(fnm env)\" 2>/dev/null; cd \"$CLAUDE_PROJECT_DIR\" 2>/dev/null && fnm use 2>/dev/null; corepack pnpm exec tsc --noEmit 1>&2 || exit 2",
             "timeout": 120,
             "statusMessage": "TypeScript 型別檢查中…"
           }
