@@ -1,0 +1,18 @@
+{
+  "name": "hono-nextjs-pickball",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.17.0",
+  "engines": {
+    "node": "22.22.1"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./nextjs-pickball --filter ./hono-pickball dev",
+    "dev:web": "pnpm --filter ./nextjs-pickball dev",
+    "dev:api": "pnpm --filter ./hono-pickball dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm --filter ./nextjs-pickball lint",
+    "test": "pnpm --filter ./nextjs-pickball test",
+    "test:e2e": "pnpm --filter ./nextjs-pickball test:e2e"
+  }
+}

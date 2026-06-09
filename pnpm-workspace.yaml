@@ -1,0 +1,7 @@
+packages:
+  - nextjs-pickball
+  - hono-pickball
+
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver

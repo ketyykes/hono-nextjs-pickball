@@ -1,0 +1,54 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# pnpm / node
+node_modules/
+.pnpm-store/
+/.pnp
+.pnp.*
+
+# next.js
+.next/
+.swc/
+next-env.d.ts
+
+# wrangler / cloudflare workers
+.wrangler/
+.dev.vars
+
+# build / test artifacts
+build/
+dist/
+out/
+coverage/
+test-results/
+playwright-report/
+.playwright/
+.playwright-cli/
+blob-report/
+playwright/.cache/
+
+# env
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# typescript
+*.tsbuildinfo
+
+# vercel
+.vercel
