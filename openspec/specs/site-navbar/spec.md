@@ -50,4 +50,4 @@
 #### Scenario: E2E 從 Navbar 進入測驗
 
 - **WHEN** 從首頁點擊 Navbar 的「測驗」連結
-- **THEN** 導向 `/quiz` 並顯示第 1 題（對應 `tests/e2e/specs/quiz.spec.ts` 第一個情境）
+- **THEN** 導向 `/quiz` 並顯示第 1 題（對應 `nextjs-pickball/tests/e2e/specs/quiz.spec.ts` 第一個情境）

@@ -24,10 +24,10 @@
 
 #### Scenario: main 縮短後 IntersectionObserver 仍以 mainRef 為 root
 
-- **WHEN** 檢查 `components/tour/TourShell.tsx` 與 `components/tour/TourProgressRail.tsx`
+- **WHEN** 檢查 `nextjs-pickball/components/tour/TourShell.tsx` 與 `nextjs-pickball/components/tour/TourProgressRail.tsx`
 - **THEN** `<ScrollTimelineProvider>` 接收 `containerRef={mainRef}`；`TourProgressRail` 透過 `useTourScrollContainer()` 取得同一個 ref 作為 observer root（與既有實作一致，僅 main 容器尺寸改變）
 
 #### Scenario: 對應 E2E 驗收
 
-- **WHEN** 執行 `pnpm test:e2e -- tests/e2e/specs/tour.spec.ts`
+- **WHEN** 執行 `pnpm --filter ./nextjs-pickball test:e2e -- tests/e2e/specs/tour.spec.ts`
 - **THEN** 上述情境之 Playwright 測試案例全數通過

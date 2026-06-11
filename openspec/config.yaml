@@ -1,0 +1,28 @@
+schema: spec-driven
+
+context: |
+  本 repo 為 pnpm monorepo：
+    - 前端：nextjs-pickball/（Next.js；本 config 的 TDD 規則適用範圍）
+    - 後端：hono-pickball/（Hono on Cloudflare Workers；後端 change 的 TDD 規範待後端功能開發時補充）
+  openspec CLI 一律從 repo root 執行，以下路徑皆以 repo root 為基準。
+
+  本專案對 nextjs-pickball/app/**、nextjs-pickball/components/**、nextjs-pickball/hooks/**、
+  nextjs-pickball/lib/**、nextjs-pickball/data/** 下所有具備行為邏輯的模組採通用 TDD：
+  先寫 failing Vitest 測試 → 實作至通過 → refactor。
+  例外（不強制 TDD，但鼓勵補 smoke/E2E）：
+    - 純樣式檔（*.css / *.scss）
+    - 型別檔（*.d.ts、next-env.d.ts）
+    - 入口與配置（nextjs-pickball/app/layout.tsx、nextjs-pickball/app/page.tsx、nextjs-pickball/next.config.ts、nextjs-pickball/postcss.config.mjs）
+    - Playwright E2E（nextjs-pickball/tests/e2e/**）
+  測試工具：Vitest + @testing-library/react（已啟用 globals）、Playwright。
+  單元測試鄰近程式碼以 *.test.ts(x) 形式放置；E2E 放 nextjs-pickball/tests/e2e/specs/。
+
+rules:
+  specs:
+    - 情境用 Given/When/Then；行為邏輯情境須可直接對應到 Vitest test case（附測試檔路徑與 it 名稱）
+  design:
+    - 明確標註哪些模組屬行為邏輯（必 TDD），哪些屬例外層（樣式／型別／入口／E2E，選配）
+  tasks:
+    - 行為邏輯 task 必須拆三步：① 新增失敗測試（附檔路徑與 it 名稱），並執行 `pnpm --filter ./nextjs-pickball test -- --run <path>` 於 shell 實際看到紅燈後才進入下一步（從 repo root 執行；<path> 維持 workspace 相對路徑，因 filter 執行時 cwd 位於 workspace）② 最小實作至 green ③ refactor（檢視實作，若無壞味道則註記 skipped；若有則重構並保持測試通過）
+    - 每步需可用 `pnpm --filter ./nextjs-pickball test -- --run <path>` 驗證
+    - 例外層（樣式／型別／入口／E2E）task 不強制三步拆分，但至少要指定驗收方式

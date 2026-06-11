@@ -11,8 +11,8 @@
 
 主要 layout 行為：
 
-- `app/page.tsx`：`<Hero />` 用 `min-h-screen flex items-center`；浮球用 `absolute top-[15%]`（相對 hero 區塊）→ 視窗越矮，浮球絕對 y 越小，最終鑽到 nav 之下
-- `app/tour/page.tsx` → `TourShell`：`<main h-screen overflow-y-scroll snap-y snap-mandatory>`；每個 `TourStage` 為 `h-screen flex items-center` → SiteNavbar 直接蓋在 main 上方
+- `nextjs-pickball/app/page.tsx`：`<Hero />` 用 `min-h-screen flex items-center`；浮球用 `absolute top-[15%]`（相對 hero 區塊）→ 視窗越矮，浮球絕對 y 越小，最終鑽到 nav 之下
+- `nextjs-pickball/app/tour/page.tsx` → `TourShell`：`<main h-screen overflow-y-scroll snap-y snap-mandatory>`；每個 `TourStage` 為 `h-screen flex items-center` → SiteNavbar 直接蓋在 main 上方
 - 既有 specs 中，`pickleball-guide-page` 已明確要求 TocBar 以 `top-14` 跟 SiteNavbar 對齊；本次改動將進一步要求**內容區也避開兩條 nav 的合計高度**
 
 navbar 顏色現狀：
@@ -41,7 +41,7 @@ navbar 顏色現狀：
 
 ### D1：以「navbar 偏移層」概念重構 layout，而非個別擠 padding
 
-**Decision**：在 `app/globals.css` 的 `:root` 引入兩條 CSS variable
+**Decision**：在 `nextjs-pickball/app/globals.css` 的 `:root` 引入兩條 CSS variable
 
 ```css
 :root {
@@ -163,9 +163,9 @@ stage 改用 `h-full` 讓 stage 自動 = main 的可視高度，避免 stage 超
 
 **Decision**：本次改動全部落在「樣式 / 入口 layout / 元件容器 className」三個免 TDD 例外類別。不新增 Vitest 測試。
 
-- 既有 `tests/e2e/specs/` 若使用 `toBeVisible()` 或 `data-testid` 斷言（而非絕對 y 座標），不受影響
+- 既有 `nextjs-pickball/tests/e2e/specs/` 若使用 `toBeVisible()` 或 `data-testid` 斷言（而非絕對 y 座標），不受影響
 - 改動完成後執行 `pnpm dev` 在 600px / 800px / 1080px 三種高度視窗肉眼驗收
-- 視需要在 `tests/e2e/specs/` 補一條 smoke test：「浮球的 `getBoundingClientRect().top` 不小於 nav 合計高度」——若 user 要求再補
+- 視需要在 `nextjs-pickball/tests/e2e/specs/` 補一條 smoke test：「浮球的 `getBoundingClientRect().top` 不小於 nav 合計高度」——若 user 要求再補
 
 ## Risks / Trade-offs
 

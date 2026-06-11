@@ -33,14 +33,14 @@
 
 ### Requirement: 全域 navbar 高度以 CSS variable 暴露
 
-`app/globals.css` 的 `:root` SHALL 定義 `--site-nav-h: 3.5rem`（= 56px，對應 `h-14`）；其他 layout 元件（Hero、TourShell 等）SHALL 透過 `var(--site-nav-h)` 取用此高度做偏移計算，避免高度數值散落各處。
+`nextjs-pickball/app/globals.css` 的 `:root` SHALL 定義 `--site-nav-h: 3.5rem`（= 56px，對應 `h-14`）；其他 layout 元件（Hero、TourShell 等）SHALL 透過 `var(--site-nav-h)` 取用此高度做偏移計算，避免高度數值散落各處。
 
 #### Scenario: globals.css 定義 --site-nav-h
 
-- **WHEN** 檢查 `app/globals.css`
+- **WHEN** 檢查 `nextjs-pickball/app/globals.css`
 - **THEN** `:root` 區塊內存在 `--site-nav-h: 3.5rem;` 一條 CSS variable
 
 #### Scenario: SiteNavbar 元件高度仍維持 h-14
 
-- **WHEN** 檢查 `components/layout/SiteNavbar.tsx`
+- **WHEN** 檢查 `nextjs-pickball/components/layout/SiteNavbar.tsx`
 - **THEN** `<header>` 套用 Tailwind class `h-14`（與 `--site-nav-h` 在數值上一致）

@@ -27,13 +27,13 @@
 ## Impact
 
 - 受影響檔案：
-  - `components/guide/Hero.tsx`（浮球、主內容定位）
-  - `components/guide/TocBar.tsx`（border / 背景配色）
-  - `components/layout/SiteNavbar.tsx`（兩態配色）
-  - `components/tour/TourShell.tsx`（main 高度 / top offset）
-  - 可能需調整：`components/tour/stages/*.tsx` 內以 `h-full` 自適應的元素（多數已 `h-full` 故不需）
+  - `nextjs-pickball/components/guide/Hero.tsx`（浮球、主內容定位）
+  - `nextjs-pickball/components/guide/TocBar.tsx`（border / 背景配色）
+  - `nextjs-pickball/components/layout/SiteNavbar.tsx`（兩態配色）
+  - `nextjs-pickball/components/tour/TourShell.tsx`（main 高度 / top offset）
+  - 可能需調整：`nextjs-pickball/components/tour/stages/*.tsx` 內以 `h-full` 自適應的元素（多數已 `h-full` 故不需）
 - 配置變數：可考慮以 Tailwind arbitrary value 或 CSS variable 統一管理 `--site-nav-height` / `--toc-bar-height`，由 design.md 決定
 - 測試影響：
-  - 既有 E2E（`tests/e2e/specs/`）若有以絕對 y 座標斷言之處需檢視；以 `data-testid` 斷言者不受影響
+  - 既有 E2E（`nextjs-pickball/tests/e2e/specs/`）若有以絕對 y 座標斷言之處需檢視；以 `data-testid` 斷言者不受影響
   - 既有 `pickleball-guide-page` spec 中「TocBar 位置（有 SiteNavbar 時）」、「Navbar 樣式」相關 scenario 需 delta 更新
 - 風險：浮球位置改動需確保「進入完整體驗 → CTA」與「主標題」的視覺重心仍維持
