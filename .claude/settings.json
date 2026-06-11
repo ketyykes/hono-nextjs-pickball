@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(openspec status:*)",
+      "Bash(openspec list:*)",
+      "Bash(openspec validate:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test:unit --run 2>&1)",
+      "Bash(pnpm format:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm preview:*)",
+      "Bash(pnpm cf-typegen:*)",
+      "Bash(npx vitest:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git remote:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(pwd:*)",
+      "Bash(which:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(echo:*)",
+      "Bash(pnpm test:unit)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_response.filePath // .tool_input.file_path'); case \"$FILE\" in */nextjs-pickball/*.ts|*/nextjs-pickball/*.tsx|*/nextjs-pickball/*.js|*/nextjs-pickball/*.jsx|*/nextjs-pickball/*.mjs|*/nextjs-pickball/*.cjs) pnpm --filter ./nextjs-pickball lint \"$FILE\" 1>&2 || exit 2 ;; esac",
+            "statusMessage": "ESLint 檢查中…"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); echo \"$f\" | grep -qE 'wrangler\\.(jsonc|json|toml)$' || exit 0; case \"$f\" in */hono-pickball/*) dir=\"hono-pickball\" ;; */nextjs-pickball/*) dir=\"nextjs-pickball\" ;; *) exit 0 ;; esac; cd \"$CLAUDE_PROJECT_DIR/$dir\" || exit 0; if command -v fnm >/dev/null 2>&1; then fnm exec --using=\"$(cat .node-version 2>/dev/null || echo 22)\" -- pnpm cf-typegen >&2 || true; else pnpm cf-typegen >&2 || true; fi",
+            "statusMessage": "重新產生 Cloudflare binding 型別…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm -r exec tsc --noEmit 1>&2 || exit 2",
+            "timeout": 120,
+            "statusMessage": "TypeScript 型別檢查中…"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "codex@openai-codex": true
+  }
+}

@@ -2,12 +2,12 @@
 
 # CLAUDE.md
 
-本檔指引 Claude Code 在此 repository 中工作。
+本檔描述 **nextjs-pickball workspace**（monorepo 前端）。以下指令除特別標註外皆假設 cwd 在 `nextjs-pickball/`；從 repo root 執行請用 `pnpm --filter ./nextjs-pickball <script>`。
 
 ## 環境
 
-- Node 版本固定為 `.node-version` 中的 `22.22.1`（可搭配 fnm／nvm／volta 等版本管理工具）
-- 套件管理工具為 pnpm（見 `pnpm-lock.yaml`）
+- Node 版本固定為 `.node-version` 中的 `22.22.1`（可搭配 fnm／nvm／volta 等版本管理工具）；repo root 與本 workspace 各有一份 `.node-version`，**以 root 為準**
+- 套件管理工具為 pnpm；`pnpm-lock.yaml` 已整併至 repo root（本 workspace 不再有自己的 lockfile）
 
 ## 常用指令
 
@@ -36,13 +36,13 @@
 
 - 設定檔：`components.json`（style: `new-york`、baseColor: `slate`、iconLibrary: `lucide`、`rsc: true`）
 - UI 元件位置：`components/ui/`（已含 badge、button、card、input、label、separator、table、textarea 共 8 個）
-- 新增元件：`pnpm dlx shadcn@latest add <component>`
+- 新增元件：`pnpm dlx shadcn@latest add <component>`（**必須在 `nextjs-pickball/` 內執行**，`components.json` 在此）
 - `lib/utils.ts` 的 `cn()` 是 `clsx` + `tailwind-merge` 組合工具
 - shadcn 元件頂部統一標註 `"use client"`，避免父層 event handler 觸發 RSC 邊界錯誤
 
 ### 路徑別名
 
-`@/*` 對應根目錄 `./*`（不使用 `src/`）。於 `tsconfig.json` 與 `vitest.config.ts` 兩處同步設定。
+`@/*` 對應 workspace 根（`nextjs-pickball/`，不使用 `src/`）。於 `tsconfig.json` 與 `vitest.config.ts` 兩處同步設定。
 
 ### 測試架構
 
@@ -55,6 +55,8 @@
 
 ### 目錄約定
 
+以下路徑皆相對 `nextjs-pickball/`：
+
 - `app/` — Next.js App Router 進入點（layout、page、globals.css）
 - `components/ui/` — shadcn/ui 原生元件（不自行修改結構，更新請用 shadcn CLI）
 - `components/guide/` — 自訂指南元件（Hero、TocBar、11 個 Section、shared/ 下 6 個共用元件；統一標 `"use client"`）
@@ -66,7 +68,7 @@
 
 ### OpenSpec 工作流程（spec-driven TDD）
 
-根目錄的 `openspec/`（`config.yaml`、`changes/`、`specs/`）定義 spec-driven 開發流程：
+`openspec/`（`config.yaml`、`changes/`、`specs/`）已搬到 **repo root**，openspec CLI 一律從 repo root 執行；規格內引用本 workspace 的檔案路徑須帶 `nextjs-pickball/` 前綴。其定義的 spec-driven 開發流程：
 
 - `app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**` 下的行為邏輯模組採通用 TDD：先寫 failing Vitest 測試 → 實作至通過 → refactor
 - 例外（不強制 TDD，但鼓勵補 smoke / E2E）：
@@ -77,6 +79,29 @@
 - 單元測試鄰近程式碼以 `*.test.ts(x)` 形式放置；E2E 放 `tests/e2e/specs/`
 - 行為邏輯 task 須拆三步：① 新增失敗測試並用 `pnpm test -- --run <path>` 確認紅燈 ② 最小實作至 green ③ refactor（無壞味道可註記 skipped）
 - 規格情境用 Given/When/Then 撰寫，行為邏輯情境須可直接對應到 Vitest test case
+
+## Cloudflare Workers 部署（OpenNext）
+
+本 workspace 經 `@opennextjs/cloudflare` 建置為 Cloudflare Worker（Worker 名稱 `nextjs-pickball`），正式部署走 CF Dashboard Workers Builds。
+
+### 相關檔案
+
+- `open-next.config.ts` — OpenNext 設定；目前為空設定（純靜態＋client 互動，無 ISR / data cache 需求）
+- `wrangler.jsonc` — Worker 設定；`main` 指向 `.open-next/worker.js`，並宣告 service binding `HONO_API → hono-pickball`
+- `cloudflare-env.d.ts` — `cf-typegen` 產物（`CloudflareEnv` 介面）；改 `wrangler.jsonc` 後需重跑 `pnpm cf-typegen`
+- `types/cloudflare-fetcher.d.ts` — 最小 `Fetcher` 宣告；`cf-typegen` 以 `--include-runtime=false` 產生，因 workers runtime 型別會與 DOM lib 衝突（HTMLRewriter 的 `Element` 會污染全域）
+- `.open-next/` — build 產物，已 .gitignore
+
+### Scripts
+
+- `pnpm preview` — OpenNext build 後在本機 workerd runtime 預覽（整合驗證用）
+- `pnpm run deploy` — OpenNext build 後手動部署（注意：`deploy` 與 pnpm 內建指令撞名，必須加 `run`；正式環境走 Workers Builds，平常不手動 deploy）
+- `pnpm upload` — OpenNext build 後僅上傳新版本（不切流量）
+- `pnpm cf-typegen` — 重新產生 `cloudflare-env.d.ts`
+
+### API 約定
+
+`app/api/[[...route]]/route.ts` 是 service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball Worker（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball。**
 
 ## 專案規範提醒
 

@@ -9,8 +9,8 @@
 
 - 工作目錄：`/path/to/project`
 - 分支：`{{branch}}`
-- Dev server 啟動：`pnpm dev`（會在 :3000；Playwright config 含 webServer 會自動啟動）
-- 既有 Playwright spec 範例：`tests/e2e/specs/` 下其他 spec 可參考
+- Dev server 啟動：`pnpm --filter ./nextjs-pickball dev`（會在 :3000；Playwright config 含 webServer 會自動啟動）
+- 既有 Playwright spec 範例：`nextjs-pickball/tests/e2e/specs/` 下其他 spec 可參考
 - 5 個 browser project：Chromium / Firefox / WebKit / Mobile Chrome / Mobile Safari
 - testIdAttribute: `data-testid`
 
@@ -36,7 +36,7 @@ F. **{{Responsive 排版}}**（可選）：viewport 切換、提示顯示
 
 ## 規範
 
-- 寫成乾淨可重跑的 Playwright spec：`tests/e2e/specs/{{feature}}.spec.ts`
+- 寫成乾淨可重跑的 Playwright spec：`nextjs-pickball/tests/e2e/specs/{{feature}}.spec.ts`（建檔時 cwd 在 repo root，須含 `nextjs-pickball/` 前綴；用 `--filter` 跑測試時路徑參數則維持 workspace 相對）
 - `test.beforeEach` 清 localStorage / sessionStorage 避免測試污染
 - 每個情境一個 `test()`
 - Tab 縮排、雙引號、中文 test 描述
@@ -54,7 +54,7 @@ F. **{{Responsive 排版}}**（可選）：viewport 切換、提示顯示
 
 完成後：
 ```bash
-git add tests/e2e/specs/{{feature}}.spec.ts
+git add nextjs-pickball/tests/e2e/specs/{{feature}}.spec.ts
 git commit -m "test({{scope}}): E2E 涵蓋 {{核心情境列表}}"
 ```
 
@@ -86,10 +86,10 @@ git commit -m "test({{scope}}): E2E 涵蓋 {{核心情境列表}}"
 ```
 E2E agent 回報後：
 
-1. 全 PASS 且無 console error → 跑最終 sweep：
-   - pnpm test -- --run  （unit）
-   - pnpm lint
-   - pnpm build
+1. 全 PASS 且無 console error → 跑最終 sweep（從 repo root 用 --filter 執行）：
+   - pnpm --filter ./nextjs-pickball test -- --run  （unit）
+   - pnpm --filter ./nextjs-pickball lint
+   - pnpm --filter ./nextjs-pickball build
    全綠 → 向使用者交付總結
 
 2. 有 fail 或 console error：

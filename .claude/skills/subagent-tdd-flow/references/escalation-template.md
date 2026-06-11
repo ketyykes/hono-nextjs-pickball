@@ -4,11 +4,11 @@
 
 ## 路徑
 
-`docs/superpowers/review-escalations/YYYY-MM-DD-<feature-name>-task-<N>.md`
+`nextjs-pickball/docs/superpowers/review-escalations/YYYY-MM-DD-<feature-name>-task-<N>.md`
 
 例：
-- `docs/superpowers/review-escalations/2026-05-12-scoreboard-task-12.md`
-- `docs/superpowers/review-escalations/2026-05-12-checkout-task-04.md`
+- `nextjs-pickball/docs/superpowers/review-escalations/2026-05-12-scoreboard-task-12.md`
+- `nextjs-pickball/docs/superpowers/review-escalations/2026-05-12-checkout-task-04.md`
 
 如目錄不存在直接 `mkdir -p`。
 
@@ -23,8 +23,8 @@
 
 - **日期：** {{YYYY-MM-DD}}
 - **Feature：** {{feature-name}}
-- **Plan：** `docs/superpowers/plans/{{plan-file}}.md`
-- **Spec：** `docs/superpowers/specs/{{spec-file}}.md`（§{{section}}）
+- **Plan：** `nextjs-pickball/docs/superpowers/plans/{{plan-file}}.md`
+- **Spec：** `nextjs-pickball/docs/superpowers/specs/{{spec-file}}.md`（§{{section}}）
 - **SHA 範圍：** `{{base SHA}}..{{最後 commit SHA}}`
 - **改動檔案：**
   - `{{file path 1}}`
@@ -144,7 +144,7 @@ _本檔由 `subagent-tdd-flow` skill 自動產生。修改後請保留歷史，�
 
 ### 1. (中) TeamPanel 接受整個 ScoreboardState，prop surface 過大
 
-- **位置：** `components/scoreboard/TeamPanel.tsx` L11
+- **位置：** `nextjs-pickball/components/scoreboard/TeamPanel.tsx` L11
 - **Reviewer 原話摘要：**
 
   > state: ScoreboardState 這個 prop 實際只用到 4 個欄位...重新渲染浪費。
