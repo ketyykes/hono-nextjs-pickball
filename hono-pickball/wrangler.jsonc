@@ -1,21 +1,23 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "hono-ts-template",
+  // 名稱必須與 CF Dashboard（Workers Builds）的 Worker 名稱一致，否則 build 會失敗
+  "name": "hono-pickball",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-08",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "hono-ts-template-db",
-      "database_id": "local-dev"
-    }
-  ]
-  // "compatibility_flags": [
-  //   "nodejs_compat"
+  // better-auth / drizzle 依賴 node:crypto 等模組，先行啟用
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+  // 之後實作會員／揪團功能時再以 `wrangler d1 create hono-pickball-db` 建立真實資料庫，
+  // 將產生的 UUID 填回 database_id（placeholder 值會讓遠端部署直接失敗）：
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "hono-pickball-db",
+  //     "database_id": "<wrangler d1 create 產生的 UUID>"
+  //   }
   // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -28,11 +30,7 @@
   //     "bucket_name": "my-bucket"
   //   }
   // ],
-  // "ai": {
-  //   "binding": "AI"
-  // },
-  // "observability": {
-  //   "enabled": true,
-  //   "head_sampling_rate": 1
+  // "vars": {
+  //   "MY_VAR": "my-variable"
   // }
 }
