@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // OpenNext build 產物與 wrangler 本地狀態
+    ".open-next/**",
+    ".wrangler/**",
+    "cloudflare-env.d.ts",
     // 專案自訂排除
     "legacy-react-pickball/**",
     "docs/**",

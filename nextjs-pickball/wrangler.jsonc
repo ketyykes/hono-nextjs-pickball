@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 名稱必須與 CF Dashboard（Workers Builds）的 Worker 名稱一致，否則 build 會失敗
+  "name": "nextjs-pickball",
+  // OpenNext build（opennextjs-cloudflare build）的產物進入點
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-08",
+  // nodejs_compat 為 OpenNext 必要；global_fetch_strictly_public 讓 app 內的
+  // fetch 一律走公網解析（OpenNext 官方建議）
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Service binding：/api/* 由 app/api/[[...route]]/route.ts 原樣轉發給後端
+  // Worker（hono-pickball）。首次部署順序必須先 hono-pickball 後 nextjs-pickball，
+  // 否則 binding 目標不存在會部署失敗。
+  "services": [
+    {
+      "binding": "HONO_API",
+      "service": "hono-pickball"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

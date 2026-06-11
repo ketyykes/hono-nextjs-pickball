@@ -5,3 +5,9 @@ packages:
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# wrangler / OpenNext 依賴的 postinstall：esbuild 下載 binary、workerd 下載 runtime，
+# 不允許的話 wrangler dev 與 opennextjs-cloudflare build 都會失敗（本機與 CI 皆然）
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

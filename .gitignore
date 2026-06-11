@@ -29,6 +29,9 @@ next-env.d.ts
 .wrangler/
 .dev.vars
 
+# opennext（@opennextjs/cloudflare build 產物）
+.open-next/
+
 # build / test artifacts
 build/
 dist/

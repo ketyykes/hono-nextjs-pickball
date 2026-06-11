@@ -12,6 +12,7 @@ export default defineConfig({
     exclude: [
       "node_modules",
       ".next",
+      ".open-next",
       "legacy-react-pickball",
       "**/node_modules/**",
       "**/e2e/**",
@@ -25,6 +26,7 @@ export default defineConfig({
         "**/*.d.ts",
         "**/*.config.*",
         ".next/**",
+        ".open-next/**",
         "legacy-react-pickball/**",
       ],
     },
