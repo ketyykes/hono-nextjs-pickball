@@ -18,7 +18,7 @@ export function TocBar() {
 			className={cn(
 				"fixed top-14 right-0 left-0 z-[100] transition-[background-color,box-shadow,backdrop-filter] duration-300",
 				pastHero
-					? "bg-background/90 shadow-sm backdrop-blur"
+					? "bg-background/90 shadow-sm backdrop-blur-md"
 					: "bg-slate-900/30 backdrop-blur-sm",
 			)}
 		>
