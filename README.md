@@ -1,61 +1,53 @@
-# nextjs-pickball
+# hono-nextjs-pickball
 
-匹克球新手完全入門：規則與球拍選購一次搞懂。Next.js 16 App Router + React 19 + Tailwind v4 + shadcn/ui 打造的單頁指南。
+匹克球指南專案的 monorepo，使用 pnpm workspaces 管理前後端。
 
-## 技術棧
-
-- Next.js 16 (App Router)
-- React 19
-- TypeScript（strict、verbatimModuleSyntax）
-- Tailwind CSS v4 (`@tailwindcss/postcss`)
-- shadcn/ui（new-york 風格、slate base color）
-- Vitest 4 + happy-dom + @testing-library/react（單元測試）
-- Playwright（E2E，五個 browser project）
-- pnpm（套件管理）
-- OpenSpec（spec-driven TDD 治理）
-
-## 快速開始
-
-```bash
-pnpm install
-cp .env.local.example .env.local
-pnpm dev        # http://localhost:3000
-```
-
-## 常用指令
-
-| 指令 | 用途 |
-| --- | --- |
-| `pnpm dev` | 啟動開發伺服器 |
-| `pnpm build` | 正式建置 |
-| `pnpm start` | 執行正式建置產物 |
-| `pnpm lint` | ESLint 檢查 |
-| `pnpm test` | Vitest watch 模式 |
-| `pnpm test:coverage` | v8 覆蓋率報告 |
-| `pnpm test:e2e` | Playwright E2E |
-
-## 專案結構
+## 結構
 
 ```
-app/              # Next.js App Router 進入點
-├── layout.tsx    # Root Layout（含 next/font/google 三家族）
-├── page.tsx      # 首頁（/）
-└── globals.css   # Tailwind + 自訂 keyframes + OKLCH 主題
-
-components/
-├── ui/           # shadcn/ui 元件（8 個）
-└── guide/        # 指南專用元件（Hero、TocBar、11 個 Section、shared/）
-
-hooks/            # 4 支 scroll/observer hooks + tests
-lib/utils.ts      # cn() = clsx + tailwind-merge
-data/guide/       # 7 個 TS 資料檔
-tests/            # Vitest setup 與 Playwright E2E
-docs/             # 設計原型（pickleball-guide.html）
-openspec/         # 規格驅動流程檔
-
-legacy-react-pickball/  # 原 Vite 版本保留為對照組（驗證完成後可刪除）
+hono-nextjs-pickball/
+├─ nextjs-pickball/        ← 前端：Next.js 16 + React 19 + Tailwind v4 + shadcn/ui
+│  └─ wrangler.jsonc       ← Worker「nextjs-pickball」設定（OpenNext + service binding）
+├─ hono-pickball/          ← 後端：Hono on Cloudflare Workers
+│  └─ wrangler.jsonc       ← Worker「hono-pickball」設定
+├─ openspec/               ← OpenSpec 規格與變更（CLI 從 root 執行）
+├─ .claude/                ← Claude Code 專案設定
+└─ .agents/                ← agent 相關設定
 ```
 
-## 開發指引
+## 環境
 
-專案採 OpenSpec spec-driven TDD。新增功能前請參考 `openspec/specs/` 與 `CLAUDE.md`。
+- Node `22.22.1`（見 `.node-version`）
+- pnpm `10.17.0`
+
+## 常用指令（在 root 執行）
+
+| 指令 | 行為 |
+|---|---|
+| `pnpm install` | 一次安裝兩個 workspace 的依賴 |
+| `pnpm dev` | 同時起前端（:3000）與後端（:8787） |
+| `pnpm dev:web` | 只啟動 Next.js dev server |
+| `pnpm dev:api` | 只啟動 wrangler dev |
+| `pnpm build` | 兩個 workspace 都跑 build |
+| `pnpm lint` | 跑 Next.js ESLint |
+| `pnpm test` | 跑 nextjs-pickball Vitest |
+| `pnpm test:e2e` | 跑 Playwright E2E（5 個 browser project） |
+| `pnpm --filter ./nextjs-pickball preview` | OpenNext build 後在本機 workerd runtime 驗證 |
+| `pnpm --filter ./<workspace> cf-typegen` | 改 `wrangler.jsonc` 後重新產生 Cloudflare binding 型別 |
+
+## 部署
+
+部署目標為 Cloudflare Workers，經 CF Dashboard 的 **Workers Builds**（Git 整合）自動部署；兩個 Worker 連同一個 repo、各設 root directory：
+
+| Worker 名稱 | 來源 | 說明 |
+|---|---|---|
+| `hono-pickball` | `hono-pickball/` | Hono API（wrangler） |
+| `nextjs-pickball` | `nextjs-pickball/` | Next.js（@opennextjs/cloudflare），service binding `HONO_API` 指向 hono-pickball |
+
+- 部署順序：**先 hono-pickball、後 nextjs-pickball**（service binding 目標必須先存在）
+- 部署後 URL 形式：`<worker>.<subdomain>.workers.dev`
+
+## 各 workspace 細節
+
+- 前端規範：見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)、[`nextjs-pickball/AGENTS.md`](./nextjs-pickball/AGENTS.md)
+- 後端規範：見 [`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md)

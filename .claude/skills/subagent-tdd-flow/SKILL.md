@@ -1,6 +1,6 @@
 ---
 name: subagent-tdd-flow
-description: 用 subagent-driven 流程逐項執行實作 plan，每個 task 派 nextjs-expert 走 TDD（測試先行），再派 code-reviewer-readonly 按低/中/高分級審查，必要時派 nextjs-expert 修正（連續兩次只剩「低」或累計 3 次修正即停），最後派 playwright-e2e-runner 跑 E2E。當使用者說「用這個 workflow 執行 plan」、「subagent driven 走 TDD」、「跑完 plan 並做 review 與 E2E」、「按 plan 分派 nextjs-expert 並 code review」等情境時觸發。也適用於已有 docs/superpowers/plans/ 下的 plan 檔、想用既定 multi-agent pipeline 推進實作的情境。
+description: 用 subagent-driven 流程逐項執行實作 plan，每個 task 派 nextjs-expert 走 TDD（測試先行），再派 code-reviewer-readonly 按低/中/高分級審查，必要時派 nextjs-expert 修正（連續兩次只剩「低」或累計 3 次修正即停），最後派 playwright-e2e-runner 跑 E2E。當使用者說「用這個 workflow 執行 plan」、「subagent driven 走 TDD」、「跑完 plan 並做 review 與 E2E」、「按 plan 分派 nextjs-expert 並 code review」等情境時觸發。也適用於已有 nextjs-pickball/docs/superpowers/plans/ 下的 plan 檔、想用既定 multi-agent pipeline 推進實作的情境。
 disable-model-invocation: true
 ---
 
@@ -18,7 +18,7 @@ disable-model-invocation: true
 
 當以下任一情境出現：
 
-- 使用者已準備好 plan 檔（例如 `docs/superpowers/plans/<date>-<feature>.md`）並要求「執行」、「按 plan 跑」、「完成這些 task」
+- 使用者已準備好 plan 檔（例如 `nextjs-pickball/docs/superpowers/plans/<date>-<feature>.md`）並要求「執行」、「按 plan 跑」、「完成這些 task」
 - 使用者明確說「用這個 workflow / subagent driven / TDD pipeline 跑」
 - 使用者剛跑完 `writing-plans` 或 `superpowers:subagent-driven-development`，要進入實作階段
 - 使用者想要「先測後實作 + code review + E2E」的完整流程，但不想每次都打字描述細節
@@ -107,7 +107,7 @@ disable-model-invocation: true
 
 當第 3 次 fix 結束、re-review 仍含「中」或「高」issues 時，**必須**把未解問題寫成 markdown 給人類審查，不能默默吞掉。
 
-**檔案路徑：** `docs/superpowers/review-escalations/YYYY-MM-DD-<feature-name>-task-<N>.md`（如目錄不存在直接 mkdir）
+**檔案路徑：** `nextjs-pickball/docs/superpowers/review-escalations/YYYY-MM-DD-<feature-name>-task-<N>.md`（如目錄不存在直接 mkdir）
 
 **內容必含：**
 
@@ -125,9 +125,7 @@ disable-model-invocation: true
 
 寫完後**在主對話中明確點名告知使用者**：
 
-> Task {{N}} 達 3 次 fix 上限仍有未解 issues，已寫到 `docs/superpowers/review-escalations/{{file}}.md`，請審閱後告知處理方式。我會先標記 DONE_WITH_CONCERNS 並繼續下個 task。
-
-派 fix 時：
+> Task {{N}} 達 3 次 fix 上限仍有未解 issues，已寫到 `nextjs-pickball/docs/superpowers/review-escalations/{{file}}.md`，請審閱後告知處理方式。我會先標記 DONE_WITH_CONCERNS 並繼續下個 task。
 
 派 fix 時：
 
@@ -173,7 +171,7 @@ Sub-agent 沒有上下文，讓它去讀 plan 是浪費 token 又容易讀偏。
 
 ### TDD 紅綠燈輸出要驗證
 
-實作者報告 DONE 但沒貼紅燈輸出時，不要直接相信。要嘛要求補貼，要嘛你自己跑 `pnpm test -- --run <path>` 確認。
+實作者報告 DONE 但沒貼紅燈輸出時，不要直接相信。要嘛要求補貼，要嘛你自己跑 `pnpm --filter ./nextjs-pickball test -- --run <path>` 確認（filter 執行時 cwd 在 workspace 內，`<path>` 維持 workspace 相對路徑即可）。
 
 ### Reviewer 不會擅自改 code
 

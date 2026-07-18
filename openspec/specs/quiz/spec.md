@@ -6,7 +6,7 @@
 
 ### Requirement: 題庫資料結構
 
-系統 SHALL 提供位於 `data/quiz/questions.ts` 的 readonly 題庫，包含至少 25 題、混合 `multiple-choice` 與 `true-false` 兩種題型。每題 MUST 具備唯一 `id`、`text`（題目文字）、`explanation`（解說），並依題型提供 `options`+`correctIndex`（單選）或 `correct`（是非）。
+系統 SHALL 提供位於 `nextjs-pickball/data/quiz/questions.ts` 的 readonly 題庫，包含至少 25 題、混合 `multiple-choice` 與 `true-false` 兩種題型。每題 MUST 具備唯一 `id`、`text`（題目文字）、`explanation`（解說），並依題型提供 `options`+`correctIndex`（單選）或 `correct`（是非）。
 
 #### Scenario: 題庫提供足夠題目
 
@@ -25,7 +25,7 @@
 #### Scenario: 初始化抽出 10 題
 
 - **WHEN** 呼叫 `useQuiz()`
-- **THEN** `questions.length === 10`、無重複 id（對應 `hooks/useQuiz.test.ts` 之「應抽出 10 題且不重複」）
+- **THEN** `questions.length === 10`、無重複 id（對應 `nextjs-pickball/hooks/useQuiz.test.ts` 之「應抽出 10 題且不重複」）
 
 #### Scenario: 單選題選項已洗牌且 shuffledCorrectIndex 正確
 
@@ -96,4 +96,4 @@
 #### Scenario: 進入 /quiz 無 hydration error
 
 - **WHEN** Playwright 開啟 `/quiz` 並監聽 console
-- **THEN** 收集到的 hydration 相關錯誤陣列長度為 0（對應 `tests/e2e/specs/quiz.spec.ts`）
+- **THEN** 收集到的 hydration 相關錯誤陣列長度為 0（對應 `nextjs-pickball/tests/e2e/specs/quiz.spec.ts`）

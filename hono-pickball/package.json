@@ -1,0 +1,25 @@
+{
+  "name": "hono-pickball",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.14",
+    "@hono/zod-validator": "^0.8.0",
+    "better-auth": "^1.6.14",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.23",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.13",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "wrangler": "^4.99.0"
+  }
+}

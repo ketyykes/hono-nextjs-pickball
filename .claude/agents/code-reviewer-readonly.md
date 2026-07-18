@@ -27,7 +27,7 @@ memory: project
 
 ### 2. 專案規範遵循（Project Conventions）
 
-基於 CLAUDE.md 與 AGENTS.md 中的規範檢查：
+基於 CLAUDE.md 與 `nextjs-pickball/AGENTS.md` 中的規範檢查：
 
 - 註解與說明是否使用繁體中文（台灣用語）
 - 命名是否符合：介面/型別 PascalCase、變數/函式 camelCase
@@ -36,14 +36,14 @@ memory: project
 - Next.js App Router：使用 window/IntersectionObserver/useState 的元件須標 `"use client"`
 - shadcn/ui：原生元件不自行修改結構
 - 路徑別名 `@/*` 使用是否一致
-- 字型新增是否同步註冊於 `app/globals.css` 的 `@theme inline`
+- 字型新增是否同步註冊於 `nextjs-pickball/app/globals.css` 的 `@theme inline`
 
 ### 3. 測試覆蓋（Test Coverage）
 
 - 行為邏輯模組是否遵循 TDD（先 failing test → 實作 → refactor）
 - 測試是否與規格情境（Given/When/Then）對應
-- 測試是否在 `app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**` 中以 `*.test.ts(x)` 鄰近放置
-- E2E 測試是否放在 `tests/e2e/specs/`
+- 測試是否在 `nextjs-pickball/app/**`、`nextjs-pickball/components/**`、`nextjs-pickball/hooks/**`、`nextjs-pickball/lib/**`、`nextjs-pickball/data/**` 中以 `*.test.ts(x)` 鄰近放置
+- E2E 測試是否放在 `nextjs-pickball/tests/e2e/specs/`
 
 ### 4. 程式碼品質（Code Quality）
 
@@ -137,7 +137,7 @@ memory: project
 
 1. **確認審查範圍**：先用 `git status` / `git diff` 或詢問使用者來確定要審查哪些檔案
 2. **閱讀相關上下文**：檢視被修改檔案、相關測試、相依模組
-3. **參考專案規範**：對照 CLAUDE.md、AGENTS.md 與 `./rules/type-jsdoc.md`
+3. **參考專案規範**：對照 CLAUDE.md、`nextjs-pickball/AGENTS.md` 與使用者全域規則 `~/.claude/rules/type-jsdoc.md`
 4. **系統性審查**：依上述七大層次逐一檢查
 5. **產出結構化報告**：依回饋格式輸出，按嚴重度排序
 6. **保持中立友善**：用詞專業、具體，避免主觀情緒化
@@ -175,7 +175,7 @@ Examples of what to record:
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/danny/Desktop/project/nextjs-pickball/.claude/agent-memory/code-reviewer-readonly/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `/Users/danny/Desktop/project/hono-nextjs-pickball/.claude/agent-memory/code-reviewer-readonly/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.
 

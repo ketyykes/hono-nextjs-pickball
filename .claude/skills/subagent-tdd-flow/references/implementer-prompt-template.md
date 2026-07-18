@@ -19,7 +19,8 @@
 
 ### Step 2: Run red
 
-Run: `pnpm test -- --run {{test path}}`
+Run: `pnpm --filter ./nextjs-pickball test -- --run {{test path}}`
+（從 repo root 執行；filter 執行時 cwd 在 workspace 內，{{test path}} 維持 workspace 相對路徑，不需加 `nextjs-pickball/` 前綴）
 Expected: FAIL（{{預期錯誤訊息}}）
 
 ### Step 3: {{動作，如「最小實作」}}
@@ -30,7 +31,7 @@ Expected: FAIL（{{預期錯誤訊息}}）
 
 ### Step 4: Run green
 
-Run: `pnpm test -- --run {{test path}}`
+Run: `pnpm --filter ./nextjs-pickball test -- --run {{test path}}`
 Expected: PASS {{N}} tests
 
 ### Step 5: Commit
@@ -86,7 +87,7 @@ git commit -m "{{conventional commit message}}"
 ## 常見問題
 
 **Q: agent 沒貼紅燈/綠燈輸出怎辦？**
-A: 在 prompt 內加一句「**請貼出 `pnpm test` 完整輸出**證明真的 FAIL/PASS」。如果還是省略，自己跑一次驗證。
+A: 在 prompt 內加一句「**請貼出 `pnpm --filter ./nextjs-pickball test` 完整輸出**證明真的 FAIL/PASS」。如果還是省略，自己跑一次驗證。
 
 **Q: agent 越界做了下個 task 的內容？**
 A: prompt 中「重要」段必須明示邊界。若已發生，請使用者決定是 revert 還是接受並 skip 下一 task。

@@ -1,0 +1,72 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+.swc/
+
+# build tools cache
+.turbo/
+
+# production
+/build
+
+# misc
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.pem
+
+# editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# playwright
+/playwright-report/
+/test-results/
+/playwright/.cache/
+/blob-report/
+.playwright-cli/
+
+# design prototype (design reference, not source)
+docs/pickleball-guide.html
+
+# legacy reference project (kept outside source tree)
+/legacy-react-pickball/node_modules/
+/legacy-react-pickball/dist/
+/legacy-react-pickball/.vite/
+/legacy-react-pickball/*

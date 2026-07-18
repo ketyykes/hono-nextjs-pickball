@@ -1,72 +1,57 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-.swc/
-
-# build tools cache
-.turbo/
-
-# production
-/build
-
-# misc
+# OS / editor
 .DS_Store
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-*.pem
-
-# editor / IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 
-# debug
+# logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# pnpm / node
+node_modules/
+.pnpm-store/
+/.pnp
+.pnp.*
 
-# vercel
-.vercel
+# next.js
+.next/
+.swc/
+next-env.d.ts
+
+# wrangler / cloudflare workers
+.wrangler/
+.dev.vars
+
+# opennext（@opennextjs/cloudflare build 產物）
+.open-next/
+
+# build / test artifacts
+build/
+dist/
+out/
+coverage/
+test-results/
+playwright-report/
+.playwright/
+.playwright-cli/
+blob-report/
+playwright/.cache/
+
+# env
+.env
+.env.*
+!.env.example
+!.env.local.example
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
-# playwright
-/playwright-report/
-/test-results/
-/playwright/.cache/
-/blob-report/
-.playwright-cli/
-
-# design prototype (design reference, not source)
-docs/pickleball-guide.html
-
-# legacy reference project (kept outside source tree)
-/legacy-react-pickball/node_modules/
-/legacy-react-pickball/dist/
-/legacy-react-pickball/.vite/
-/legacy-react-pickball/*
+# vercel
+.vercel
