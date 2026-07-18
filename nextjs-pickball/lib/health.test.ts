@@ -59,4 +59,39 @@ describe("checkHonoHealth", () => {
 			expect(result.error).toBe("no upstream");
 		}
 	});
+
+	it("回應 200 但 status 不為 ok 時回傳 ok:false 與 unexpected status 錯誤", async () => {
+		const binding = fakeBinding(
+			() =>
+				new Response(
+					JSON.stringify({
+						status: "degraded",
+						service: "hono-pickball",
+						timestamp: "2026-07-18T00:00:00.000Z",
+						requestUrl: "https://hono-pickball.internal/api/health",
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+		);
+
+		const result = await checkHonoHealth(binding);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toBe("unexpected status: degraded");
+		}
+	});
+
+	it("回應 200 但 body 不是合法 JSON 時回傳 ok:false 與解析錯誤", async () => {
+		const binding = fakeBinding(
+			() => new Response("not json", { status: 200 }),
+		);
+
+		const result = await checkHonoHealth(binding);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toBeTruthy();
+		}
+	});
 });
