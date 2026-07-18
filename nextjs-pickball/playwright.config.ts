@@ -26,10 +26,18 @@ export default defineConfig({
     { name: "mobile-chrome", use: { ...devices["Pixel 5"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 12"] } },
   ],
-  webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3005",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  webServer: [
+    {
+      command: "pnpm --filter hono-pickball dev",
+      url: "http://localhost:8787",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+    {
+      command: "pnpm dev",
+      url: "http://localhost:3005",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+  ],
 });
