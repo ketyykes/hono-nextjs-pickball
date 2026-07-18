@@ -21,7 +21,9 @@ export default async function HealthPage() {
 					<CardTitle className="flex items-center gap-2">
 						API 連線狀態
 						{result.ok ? (
-							<Badge>ok</Badge>
+							<Badge className="bg-green-600 text-white dark:bg-green-500">
+								ok
+							</Badge>
 						) : (
 							<Badge variant="destructive">fail</Badge>
 						)}
