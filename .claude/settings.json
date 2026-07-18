@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(jq -r '.tool_response.filePath // .tool_input.file_path'); case \"$FILE\" in */nextjs-pickball/*.ts|*/nextjs-pickball/*.tsx|*/nextjs-pickball/*.js|*/nextjs-pickball/*.jsx|*/nextjs-pickball/*.mjs|*/nextjs-pickball/*.cjs) if command -v fnm >/dev/null 2>&1; then fnm exec -- corepack pnpm --filter ./nextjs-pickball lint \"$FILE\" 1>&2 || exit 2; else corepack pnpm --filter ./nextjs-pickball lint \"$FILE\" 1>&2 || exit 2; fi ;; esac",
+            "command": "FILE=$(jq -r '.tool_response.filePath // .tool_input.file_path'); case \"$FILE\" in */nextjs-pickball/*.ts|*/nextjs-pickball/*.tsx|*/nextjs-pickball/*.js|*/nextjs-pickball/*.jsx|*/nextjs-pickball/*.mjs|*/nextjs-pickball/*.cjs) if command -v fnm >/dev/null 2>&1; then fnm exec --using=\"$(cat .node-version 2>/dev/null || echo 22)\" -- corepack pnpm --filter ./nextjs-pickball lint \"$FILE\" 1>&2 || exit 2; else corepack pnpm --filter ./nextjs-pickball lint \"$FILE\" 1>&2 || exit 2; fi ;; esac",
             "statusMessage": "ESLint 檢查中…"
           }
         ]
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v fnm >/dev/null 2>&1; then fnm exec -- corepack pnpm -r exec tsc --noEmit 1>&2 || exit 2; else corepack pnpm -r exec tsc --noEmit 1>&2 || exit 2; fi",
+            "command": "if command -v fnm >/dev/null 2>&1; then fnm exec --using=\"$(cat .node-version 2>/dev/null || echo 22)\" -- corepack pnpm -r exec tsc --noEmit 1>&2 || exit 2; else corepack pnpm -r exec tsc --noEmit 1>&2 || exit 2; fi",
             "timeout": 120,
             "statusMessage": "TypeScript 型別檢查中…"
           }
