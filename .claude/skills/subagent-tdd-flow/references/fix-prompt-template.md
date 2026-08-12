@@ -43,7 +43,7 @@
 
 1. 跑相關 unit test 確認無 regression：
    ```bash
-   pnpm --filter ./nextjs-pickball test -- --run {{path}}
+   pnpm --filter ./nextjs-pickball test --run {{path}}
    ```
 2. Lint：
    ```bash

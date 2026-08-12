@@ -19,8 +19,8 @@
 
 ### Step 2: Run red
 
-Run: `pnpm --filter ./nextjs-pickball test -- --run {{test path}}`
-（從 repo root 執行；filter 執行時 cwd 在 workspace 內，{{test path}} 維持 workspace 相對路徑，不需加 `nextjs-pickball/` 前綴）
+Run: `pnpm --filter ./nextjs-pickball test --run {{test path}}`
+（從 repo root 執行；filter 執行時 cwd 在 workspace 內，{{test path}} 維持 workspace 相對路徑，不需加 `nextjs-pickball/` 前綴。**`--run` 前不可加 `--`**，否則 vitest 收不到路徑會跑完整套，紅燈會被既有綠燈淹沒）
 Expected: FAIL（{{預期錯誤訊息}}）
 
 ### Step 3: {{動作，如「最小實作」}}
@@ -31,7 +31,7 @@ Expected: FAIL（{{預期錯誤訊息}}）
 
 ### Step 4: Run green
 
-Run: `pnpm --filter ./nextjs-pickball test -- --run {{test path}}`
+Run: `pnpm --filter ./nextjs-pickball test --run {{test path}}`
 Expected: PASS {{N}} tests
 
 ### Step 5: Commit

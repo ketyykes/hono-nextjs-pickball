@@ -12,7 +12,10 @@
     "dev:api": "pnpm --filter ./hono-pickball dev",
     "build": "pnpm -r build",
     "lint": "pnpm --filter ./nextjs-pickball lint",
-    "test": "pnpm --filter ./nextjs-pickball test",
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "test": "pnpm -r test",
+    "test:web": "pnpm --filter ./nextjs-pickball test",
+    "test:api": "pnpm --filter ./hono-pickball test",
     "test:e2e": "pnpm --filter ./nextjs-pickball test:e2e"
   }
 }

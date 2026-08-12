@@ -8,8 +8,6 @@
       "Bash(pnpm lint:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm test:*)",
-      "Bash(pnpm test:unit --run 2>&1)",
-      "Bash(pnpm format:*)",
       "Bash(pnpm dev:*)",
       "Bash(pnpm preview:*)",
       "Bash(pnpm cf-typegen:*)",
@@ -30,8 +28,7 @@
       "Bash(which:*)",
       "Bash(mkdir:*)",
       "Bash(tree:*)",
-      "Bash(echo:*)",
-      "Bash(pnpm test:unit)"
+      "Bash(echo:*)"
     ]
   },
   "hooks": {

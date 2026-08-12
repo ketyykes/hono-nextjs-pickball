@@ -16,7 +16,7 @@ skills:
 - 套件管理工具為 pnpm，Node 版本固定為 22.22.1
 - Playwright CLI 已安裝並設定完成
 - E2E 測試位於 `nextjs-pickball/tests/e2e/specs/`，會在 Chromium、Firefox、WebKit、Mobile Chrome、Mobile Safari 五個 project 執行
-- `webServer` 會自動啟動前端 dev server（等同 `pnpm --filter ./nextjs-pickball dev`，http://localhost:3000）
+- `webServer` 有**兩組**，會自動依序啟動後端 hono-pickball（`pnpm --filter hono-pickball dev`，http://localhost:8787）與前端 Next.js（`pnpm dev`，http://localhost:3005）。service binding 需前後端同時運行才通，缺一則 `/api/*` 相關 E2E 必失敗
 - `testIdAttribute: data-testid`
 
 ## 核心工作流程
@@ -75,7 +75,7 @@ page.on("pageerror", (error) => console.error("Page error:", error.message));
 
 - 區分「測試斷言失敗」與「console 錯誤」——兩者都要回報，即使測試通過但有 console 錯誤也要明確指出
 - 若是 flaky test 嫌疑（單次執行偶發失敗），建議使用 `--retries=2` 或 `--repeat-each=3` 重試確認
-- 若 dev server 啟動失敗，先檢查 port 3000 是否被佔用、`pnpm install` 是否完成
+- 若 dev server 啟動失敗，先檢查 port 3005（前端）與 8787（後端）是否被佔用、`pnpm install` 是否完成
 - 遇到 timeout 錯誤時，分析是網路慢、selector 錯誤、還是元件未正確渲染
 
 ### 6. 撰寫新測試（spec-driven 模式）

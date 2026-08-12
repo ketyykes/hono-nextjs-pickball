@@ -1,5 +1,14 @@
 # Health check 頁面 + 通路驗證測試 — 設計
 
+> 📌 **本文件已由 openspec 取代。**
+> `/health` 與 `/api/*` 通路的正式規格見 `openspec/specs/api-connectivity/spec.md`
+> （change `add-api-connectivity-spec`）。本檔僅保留為當時的設計脈絡紀錄，不再更新。
+
+> ⚠️ 本檔為歷史紀錄，指令原文刻意保留未改。
+> 文中 `pnpm ... test -- --run <path>` 已知失效：那個 `--` 會讓 vitest 收不到路徑而跑完整套，
+> 紅燈證據會被既有綠燈淹沒。正確寫法為 `pnpm --filter ./<workspace> test --run <path>`，
+> 見 `openspec/config.yaml`。（change: fix-tdd-toolchain-and-config）
+
 - 日期：2026-07-18
 - 範圍：`nextjs-pickball` workspace（前端）
 - 後端 `hono-pickball`：**不需改動**

@@ -9,7 +9,7 @@
 
 - 工作目錄：`/path/to/project`
 - 分支：`{{branch}}`
-- Dev server 啟動：`pnpm --filter ./nextjs-pickball dev`（會在 :3000；Playwright config 含 webServer 會自動啟動）
+- Dev server 啟動：Playwright config 的 `webServer` 有**兩組**，會自動先起 hono-pickball（:8787）再起 Next.js（:3005）。service binding 需前後端同時運行才通
 - 既有 Playwright spec 範例：`nextjs-pickball/tests/e2e/specs/` 下其他 spec 可參考
 - 5 個 browser project：Chromium / Firefox / WebKit / Mobile Chrome / Mobile Safari
 - testIdAttribute: `data-testid`
@@ -87,7 +87,7 @@ git commit -m "test({{scope}}): E2E 涵蓋 {{核心情境列表}}"
 E2E agent 回報後：
 
 1. 全 PASS 且無 console error → 跑最終 sweep（從 repo root 用 --filter 執行）：
-   - pnpm --filter ./nextjs-pickball test -- --run  （unit）
+   - pnpm --filter ./nextjs-pickball test --run  （unit）
    - pnpm --filter ./nextjs-pickball lint
    - pnpm --filter ./nextjs-pickball build
    全綠 → 向使用者交付總結

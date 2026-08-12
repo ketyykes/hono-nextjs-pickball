@@ -171,7 +171,9 @@ Sub-agent 沒有上下文，讓它去讀 plan 是浪費 token 又容易讀偏。
 
 ### TDD 紅綠燈輸出要驗證
 
-實作者報告 DONE 但沒貼紅燈輸出時，不要直接相信。要嘛要求補貼，要嘛你自己跑 `pnpm --filter ./nextjs-pickball test -- --run <path>` 確認（filter 執行時 cwd 在 workspace 內，`<path>` 維持 workspace 相對路徑即可）。
+實作者報告 DONE 但沒貼紅燈輸出時，不要直接相信。要嘛要求補貼，要嘛你自己跑 `pnpm --filter ./nextjs-pickball test --run <path>` 確認（filter 執行時 cwd 在 workspace 內，`<path>` 維持 workspace 相對路徑即可）。
+
+若貼出的輸出顯示跑了十幾個測試檔，代表對方用了 `test -- --run` —— 那個 `--` 會讓 vitest 收不到路徑而跑完整套，紅燈會混在既有綠燈裡。要求用 `test --run` 重跑。
 
 ### Reviewer 不會擅自改 code
 

@@ -48,7 +48,7 @@ Next.js 演進極快，你的訓練資料可能落後。你**必須**遵守以�
 - **路徑別名**：`@/*` 對應 `nextjs-pickball/` 工作區根目錄（不使用 `src/`）
 - **Client 元件邊界**：使用 `window` / `IntersectionObserver` / `useState` / event handlers 的元件務必加 `"use client"`；shadcn/ui 元件頂部已統一標註
 - **TDD 流程**：對 `nextjs-pickball/app/**`、`nextjs-pickball/components/**`、`nextjs-pickball/hooks/**`、`nextjs-pickball/lib/**`、`nextjs-pickball/data/**` 的行為邏輯，遵循 OpenSpec spec-driven TDD：先寫失敗的 Vitest 測試 → 最小實作至綠燈 → refactor
-- **測試指令**（從 repo root 執行）：`pnpm --filter ./nextjs-pickball test -- --run <path>` 跑單檔；E2E 用 `pnpm --filter ./nextjs-pickball test:e2e`。注意：filter 執行時 cwd 在 workspace 內，`<path>` 維持 workspace 相對路徑（如 `lib/foo.test.ts`），不需加 `nextjs-pickball/` 前綴
+- **測試指令**（從 repo root 執行）：`pnpm --filter ./nextjs-pickball test --run <path>` 跑單檔；E2E 用 `pnpm --filter ./nextjs-pickball test:e2e`。注意：filter 執行時 cwd 在 workspace 內，`<path>` 維持 workspace 相對路徑（如 `lib/foo.test.ts`），不需加 `nextjs-pickball/` 前綴。**`--run` 前不可加 `--`**，否則 vitest 收不到路徑會跑完整套
 - **套件管理**：使用 pnpm，不要建議 npm/yarn 指令
 - **元件新增**：shadcn 元件以 `pnpm -C nextjs-pickball dlx shadcn@latest add <component>` 新增（`dlx` 不吃 `--filter`，改用 `-C` 指定 workspace 目錄），不直接手寫
 
