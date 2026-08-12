@@ -1,11 +1,10 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 
-const app = new Hono()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+// 刻意不定義 root path：對外 API 一律掛在 /api/* 之下（前端 catch-all proxy 只轉發 /api/*），
+// 因此 GET / 回 404 是預期行為，不代表部署失敗。
 
 // 部署冒煙測試端點：驗證 Next.js（OpenNext）→ service binding → Hono 的通路正常
 app.get('/api/health', (c) => {

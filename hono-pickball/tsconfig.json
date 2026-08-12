@@ -11,4 +11,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
+  // 限定範圍，避免加入 test/ 之後 `tsc --noEmit`（= build 的型別檢查段）
+  // 把測試檔一起編進來而汙染 build 語意；測試檔由 test/tsconfig.json 負責。
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
 }

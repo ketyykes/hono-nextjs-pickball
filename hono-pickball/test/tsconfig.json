@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/vitest-pool-workers/types"]
+  },
+  // 官方範例寫 ../src/worker-configuration.d.ts，但本 repo 的該檔在 workspace 根目錄而非 src/。
+  "include": ["./**/*.ts", "../worker-configuration.d.ts"]
+}
