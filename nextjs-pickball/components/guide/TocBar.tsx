@@ -3,14 +3,15 @@
 import { tocItems } from "@/data/guide/tocItems";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
 import { useScrollSpy } from "@/hooks/useScrollSpy";
+import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
 
 const tocIds = tocItems.map((item) => item.id);
-const NAV_HEIGHT = 56;
 
 // 對應原型 .toc-bar：fixed overlay、橫向 scroll、依是否捲離 Hero 切換雙視覺狀態。
 export function TocBar() {
-	const pastHero = useScrolledPast(() => window.innerHeight - NAV_HEIGHT);
+	// 與 SiteNavbar 共用 --site-nav-h，避免高度數值散落各處。
+	const pastHero = useScrolledPast(() => window.innerHeight - getNavHeightPx());
 	const activeId = useScrollSpy(tocIds);
 
 	return (

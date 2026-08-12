@@ -116,4 +116,36 @@ describe('useQuiz', () => {
     expect(result.current.currentIndex).toBe(1)
     expect(result.current.phase).toBe('answering')
   })
+
+  it('洗牌後 options[shuffledCorrectIndex] 等於原題正解選項', () => {
+    const { result } = renderHook(() => useQuiz())
+    const multipleChoice = result.current.questions.filter(
+      (q) => q.type === 'multiple-choice',
+    )
+    expect(multipleChoice.length).toBeGreaterThan(0)
+
+    multipleChoice.forEach((q) => {
+      const original = QUESTION_BANK.find((b) => b.id === q.id)
+      // 型別窄化：同 id 的題庫題目必為 multiple-choice
+      if (!original || original.type !== 'multiple-choice') {
+        throw new Error(`題庫找不到對應的單選題：${q.id}`)
+      }
+      expect(q.options[q.shuffledCorrectIndex]).toBe(
+        original.options[original.correctIndex],
+      )
+    })
+  })
+
+  it('true-false 題的 shuffledCorrectIndex 依 correct 決定', () => {
+    const { result } = renderHook(() => useQuiz())
+    const trueFalse = result.current.questions.filter(
+      (q) => q.type === 'true-false',
+    )
+
+    trueFalse.forEach((q) => {
+      // 是非題不攜帶 options；顯示用的兩個選項由 QuestionCard 渲染時提供。
+      expect('options' in q).toBe(false)
+      expect(q.shuffledCorrectIndex).toBe(q.correct ? 0 : 1)
+    })
+  })
 })

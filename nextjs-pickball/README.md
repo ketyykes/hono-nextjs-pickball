@@ -18,8 +18,7 @@
 
 ```bash
 pnpm install
-cp .env.local.example .env.local
-pnpm dev        # http://localhost:3000
+pnpm dev        # http://localhost:3005
 ```
 
 ## 常用指令
@@ -43,18 +42,18 @@ app/              # Next.js App Router 進入點
 └── globals.css   # Tailwind + 自訂 keyframes + OKLCH 主題
 
 components/
-├── ui/           # shadcn/ui 元件（8 個）
-└── guide/        # 指南專用元件（Hero、TocBar、11 個 Section、shared/）
+├── ui/           # shadcn/ui 元件（11 個）
+└── guide/        # 指南專用元件（Hero、TocBar、10 個 Section、HeroTourCta、shared/）
 
-hooks/            # 4 支 scroll/observer hooks + tests
+hooks/            # 9 支 hooks + tests（scroll/observer、quiz、scoreboard、tour）
 lib/utils.ts      # cn() = clsx + tailwind-merge
 data/guide/       # 7 個 TS 資料檔
 tests/            # Vitest setup 與 Playwright E2E
-docs/             # 設計原型（pickleball-guide.html）
-openspec/         # 規格驅動流程檔
-
-legacy-react-pickball/  # 原 Vite 版本保留為對照組（驗證完成後可刪除）
+docs/             # 設計原型（pickleball-guide.html，已 .gitignore）
 ```
+
+> 規格（`openspec/`）、設計文件（`docs/superpowers/`）與 agent 資產（`.agents/`、`skills-lock.json`）
+> 皆位於 **repo root**，不在本 workspace 內。openspec CLI 一律從 repo root 執行。
 
 ## 開發指引
 

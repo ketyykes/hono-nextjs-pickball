@@ -9,6 +9,19 @@ interface HonoHealthPayload {
 	requestUrl: string;
 }
 
+// 只檢查 status 不足以保證回應可用：上游若少給 service / timestamp / requestUrl，
+// 頁面會顯示三個 undefined 卻自稱 ok。因此成功分支前先驗形狀。
+function isValidPayload(value: unknown): value is HonoHealthPayload {
+	if (typeof value !== "object" || value === null) return false;
+	const payload = value as Record<string, unknown>;
+	return (
+		typeof payload.status === "string" &&
+		typeof payload.service === "string" &&
+		typeof payload.timestamp === "string" &&
+		typeof payload.requestUrl === "string"
+	);
+}
+
 export type HealthResult =
 	| {
 			ok: true;
@@ -34,7 +47,11 @@ export async function checkHonoHealth(binding: Fetcher): Promise<HealthResult> {
 			return { ok: false, error: `HTTP ${res.status}`, latencyMs };
 		}
 
-		const payload = (await res.json()) as HonoHealthPayload;
+		const payload = await res.json();
+		if (!isValidPayload(payload)) {
+			return { ok: false, error: "invalid payload", latencyMs };
+		}
+
 		if (payload.status !== "ok") {
 			return {
 				ok: false,

@@ -65,8 +65,5 @@ next-env.d.ts
 # design prototype (design reference, not source)
 docs/pickleball-guide.html
 
-# legacy reference project (kept outside source tree)
-/legacy-react-pickball/node_modules/
-/legacy-react-pickball/dist/
-/legacy-react-pickball/.vite/
-/legacy-react-pickball/*
+# .env.local.example 已於 change fix-tdd-toolchain-and-config 刪除：
+# 本專案不透過 NEXT_PUBLIC_* base URL 呼叫後端，一律走 same-origin /api/* + HONO_API service binding

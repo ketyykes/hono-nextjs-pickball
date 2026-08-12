@@ -29,7 +29,9 @@ export default defineConfig({
   webServer: [
     {
       command: "pnpm --filter hono-pickball dev",
-      url: "http://localhost:8787",
+      // 必須指向真的回 2xx 的端點：hono-pickball 的 root path 刻意回 404
+      // （對外 API 一律掛 /api/*），拿 "/" 當 readiness 探測會永遠等不到而逾時。
+      url: "http://localhost:8787/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },

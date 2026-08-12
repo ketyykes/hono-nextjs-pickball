@@ -11,7 +11,7 @@
 
 ## 常用指令
 
-- `pnpm dev` — 啟動 Next.js 開發伺服器（預設 http://localhost:3000）
+- `pnpm dev` — 啟動 Next.js 開發伺服器（http://localhost:3005，埠號由 `package.json` 的 `next dev --port 3005` 固定）
 - `pnpm build` — Next.js 正式建置
 - `pnpm start` — 執行正式建置產物
 - `pnpm lint` — 執行 ESLint 檢查
@@ -19,7 +19,7 @@
 - `pnpm test:ui` — 開啟 Vitest UI 介面
 - `pnpm test:coverage` — 產生 v8 測試覆蓋率報告
 - `pnpm test:e2e` — 執行 Playwright E2E 測試（含五個 browser project）
-- 執行單一測試檔：`pnpm test -- --run hooks/useScrollSpy.test.ts`
+- 執行單一測試檔：`pnpm test --run hooks/useScrollSpy.test.ts`（**`--run` 前不可加 `--`**，否則 vitest 收不到路徑會跑完整套）
 - 以關鍵字過濾測試：`pnpm test -t "應回傳目前可視 section 的 id"`
 
 ## 架構總覽
@@ -35,7 +35,7 @@
 ### shadcn/ui 元件
 
 - 設定檔：`components.json`（style: `new-york`、baseColor: `slate`、iconLibrary: `lucide`、`rsc: true`）
-- UI 元件位置：`components/ui/`（已含 badge、button、card、input、label、separator、table、textarea 共 8 個）
+- UI 元件位置：`components/ui/`（共 11 個：alert-dialog、badge、button、card、dialog、input、label、select、separator、table、textarea）
 - 新增元件：`pnpm dlx shadcn@latest add <component>`（**必須在 `nextjs-pickball/` 內執行**，`components.json` 在此）
 - `lib/utils.ts` 的 `cn()` 是 `clsx` + `tailwind-merge` 組合工具
 - shadcn 元件頂部統一標註 `"use client"`，避免父層 event handler 觸發 RSC 邊界錯誤
@@ -48,10 +48,11 @@
 
 - **單元測試（Vitest）**：設定於 `vitest.config.ts`，使用 `happy-dom` 環境、globals 啟用（不需 import `describe`/`it`/`expect`）
   - 全域 setup：`tests/setup.ts` 每個測試後自動 `cleanup()`
-  - Include 模式：`**/*.{test,spec}.{ts,tsx}`，排除 `**/e2e/**`、`.next`、`legacy-react-pickball`
+  - Include 模式：`**/*.{test,spec}.{ts,tsx}`，排除 `**/e2e/**`、`.next`
   - 使用 `@testing-library/react`
-- **E2E 測試（Playwright）**：`tests/e2e/specs/` 下的測試會跑 Chromium、Firefox、WebKit、Mobile Chrome、Mobile Safari 五個 project；`webServer` 自動執行 `pnpm dev`
-  - `baseURL: http://localhost:3000`、`testIdAttribute: data-testid`
+- **E2E 測試（Playwright）**：`tests/e2e/specs/` 下的測試會跑 Chromium、Firefox、WebKit、Mobile Chrome、Mobile Safari 五個 project
+  - `webServer` 為**兩組**（`playwright.config.ts:29-42`）：先起 hono-pickball（`pnpm --filter hono-pickball dev`，:8787），再起 Next.js（`pnpm dev`，:3005）。service binding 需前後端同時運行才通，缺一則 `/api/*` 相關 E2E 必失敗
+  - `baseURL: http://localhost:3005`、`testIdAttribute: data-testid`
 
 ### 目錄約定
 
@@ -59,12 +60,16 @@
 
 - `app/` — Next.js App Router 進入點（layout、page、globals.css）
 - `components/ui/` — shadcn/ui 原生元件（不自行修改結構，更新請用 shadcn CLI）
-- `components/guide/` — 自訂指南元件（Hero、TocBar、11 個 Section、shared/ 下 6 個共用元件；統一標 `"use client"`）
-- `hooks/` — scroll / observer 類 hooks（4 支）與對應 `.test.ts`
+- `components/guide/` — 自訂指南元件（頂層 16 個：10 個 `*Section`、Hero、TocBar、PartDivider、Conclusion、CourtDiagram、HeroTourCta；`shared/` 下 6 個共用元件；統一標 `"use client"`）
+  - `HeroTourCta` 雖放在 guide/ 下，其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
+- `hooks/` — 共 9 支與對應測試，依 capability 分組：
+  - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
+  - quiz：`useQuiz`
+  - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`
+  - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
 - `lib/` — 共用工具（`utils.ts` 的 `cn()`）
 - `data/guide/` — 純 TS 資料檔（7 個，tocItems、brands 等）
 - `docs/` — 非原始碼文件；包含 `pickleball-guide.html` 原型參考（已 .gitignore）
-- `legacy-react-pickball/` — 舊版 Vite 專案保留為對照組，遷移驗證完成後可刪除
 
 ### OpenSpec 工作流程（spec-driven TDD）
 
@@ -77,7 +82,7 @@
   - 入口與配置（`app/layout.tsx`、`app/page.tsx`、`next.config.ts`、`postcss.config.mjs`）
   - Playwright E2E（`tests/e2e/**`）
 - 單元測試鄰近程式碼以 `*.test.ts(x)` 形式放置；E2E 放 `tests/e2e/specs/`
-- 行為邏輯 task 須拆三步：① 新增失敗測試並用 `pnpm test -- --run <path>` 確認紅燈 ② 最小實作至 green ③ refactor（無壞味道可註記 skipped）
+- 行為邏輯 task 須拆三步：① 新增失敗測試並用 `pnpm test --run <path>` 確認紅燈 ② 最小實作至 green ③ refactor（無壞味道可註記 skipped）
 - 規格情境用 Given/When/Then 撰寫，行為邏輯情境須可直接對應到 Vitest test case
 
 ## Cloudflare Workers 部署（OpenNext）

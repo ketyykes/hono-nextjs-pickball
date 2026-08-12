@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { cn } from "@/lib/utils";
 
 interface SectionProps {
@@ -14,13 +15,17 @@ interface SectionProps {
 
 // 共用 section 容器：scroll-triggered fade-in、錨點 id、tag + h3 標題。
 export function Section({ id, tag, title, children, className }: SectionProps) {
+	// globals.css 的 @media (prefers-reduced-motion: reduce) 只作用於 ::view-transition-*，
+	// 管不到 motion 打在元素上的 inline transform，因此降級必須在這裡自己判定。
+	const reduced = useReducedMotion();
+
 	return (
 		<motion.section
 			id={id}
-			initial={{ opacity: 0, y: 24 }}
-			whileInView={{ opacity: 1, y: 0 }}
+			initial={reduced ? false : { opacity: 0, y: 24 }}
+			whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
 			viewport={{ once: true, amount: 0.1, margin: "0px 0px -40px 0px" }}
-			transition={{ duration: 0.7, ease: "easeOut" }}
+			transition={reduced ? { duration: 0 } : { duration: 0.7, ease: "easeOut" }}
 			className={cn("py-16 scroll-mt-[70px]", className)}
 		>
 			<div className="mb-8">

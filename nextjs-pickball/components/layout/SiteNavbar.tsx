@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
+import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
 
 interface NavLink {
@@ -22,7 +23,8 @@ const NAV_LINKS: readonly NavLink[] = [
 export function SiteNavbar() {
 	const pathname = usePathname();
 	const isHome = pathname === "/";
-	const pastHero = useScrolledPast(() => window.innerHeight - 56);
+	// 高度的單一事實來源是 --site-nav-h，不在此硬寫數值。
+	const pastHero = useScrolledPast(() => window.innerHeight - getNavHeightPx());
 	const solid = !isHome || pastHero;
 
 	return (
@@ -34,18 +36,20 @@ export function SiteNavbar() {
 					: "border-white/5 bg-slate-900/20 backdrop-blur-sm",
 			)}
 		>
-			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-6 px-6">
+			{/* 窄螢幕：收合 logo 文字並縮小間距，讓 4 個連結維持單行。
+			    不做漢堡選單——只有 4 個連結，藏起來等於替每次導航多加一次點擊。 */}
+			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-3 px-4 sm:gap-6 sm:px-6">
 				<Link
 					href="/"
 					transitionTypes={["nav-back"]}
 					className={cn(
-						"font-outfit text-sm font-extrabold tracking-[2px] uppercase",
+						"font-outfit shrink-0 text-sm font-extrabold tracking-[2px] whitespace-nowrap uppercase",
 						solid ? "text-slate-900" : "text-white",
 					)}
 				>
-					🏓 匹克球指南
+					🏓<span className="hidden sm:inline"> 匹克球指南</span>
 				</Link>
-				<nav className="ml-auto flex items-center gap-1">
+				<nav className="ml-auto flex items-center gap-0.5 sm:gap-1">
 					{NAV_LINKS.map((link) => {
 						const active = pathname === link.href;
 						return (
@@ -54,7 +58,7 @@ export function SiteNavbar() {
 								href={link.href}
 								transitionTypes={[link.href === "/" ? "nav-back" : "nav-forward"]}
 								className={cn(
-									"rounded-md px-3 py-2 text-sm font-medium transition-colors",
+									"rounded-md px-2 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-3",
 									solid
 										? "text-muted-foreground hover:text-slate-900"
 										: "text-white/70 hover:text-white",

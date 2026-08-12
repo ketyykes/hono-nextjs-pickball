@@ -1,15 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { checkHonoHealth } from "./health";
 
-// 用假的 Fetcher 注入不同回應，驗證三種分支。
+// 用假的 Fetcher 注入不同回應，驗證各分支。
 // respond 若 throw，async fetch 會 reject，交由 checkHonoHealth 的 catch 處理。
-function fakeBinding(respond: () => Response): Fetcher {
-	return { fetch: async () => respond() } as unknown as Fetcher;
+// calls 記錄每次呼叫的第一個參數，供「檢查路徑」的斷言使用。
+function fakeBinding(respond: () => Response): {
+	binding: Fetcher;
+	calls: unknown[];
+} {
+	const calls: unknown[] = [];
+	const binding = {
+		fetch: async (input: unknown) => {
+			calls.push(input);
+			return respond();
+		},
+	} as unknown as Fetcher;
+	return { binding, calls };
 }
 
 describe("checkHonoHealth", () => {
 	it("回應 200 且 status=ok 時回傳 ok:true 與各欄位", async () => {
-		const binding = fakeBinding(
+		const { binding } = fakeBinding(
 			() =>
 				new Response(
 					JSON.stringify({
@@ -37,7 +48,7 @@ describe("checkHonoHealth", () => {
 	});
 
 	it("非 2xx 狀態碼時回傳 ok:false 與 HTTP 錯誤", async () => {
-		const binding = fakeBinding(() => new Response("boom", { status: 500 }));
+		const { binding } = fakeBinding(() => new Response("boom", { status: 500 }));
 
 		const result = await checkHonoHealth(binding);
 
@@ -48,7 +59,7 @@ describe("checkHonoHealth", () => {
 	});
 
 	it("binding.fetch 例外時回傳 ok:false 與例外訊息", async () => {
-		const binding = fakeBinding(() => {
+		const { binding } = fakeBinding(() => {
 			throw new Error("no upstream");
 		});
 
@@ -61,7 +72,7 @@ describe("checkHonoHealth", () => {
 	});
 
 	it("回應 200 但 status 不為 ok 時回傳 ok:false 與 unexpected status 錯誤", async () => {
-		const binding = fakeBinding(
+		const { binding } = fakeBinding(
 			() =>
 				new Response(
 					JSON.stringify({
@@ -83,7 +94,7 @@ describe("checkHonoHealth", () => {
 	});
 
 	it("回應 200 但 body 不是合法 JSON 時回傳 ok:false 與解析錯誤", async () => {
-		const binding = fakeBinding(
+		const { binding } = fakeBinding(
 			() => new Response("not json", { status: 200 }),
 		);
 
@@ -93,5 +104,58 @@ describe("checkHonoHealth", () => {
 		if (!result.ok) {
 			expect(result.error).toBeTruthy();
 		}
+	});
+
+	it("payload 缺少 service 或 timestamp 時回傳 ok:false", async () => {
+		// 只有 status 欄位：若不驗形狀，會走到成功分支並回傳三個 undefined 欄位。
+		const { binding } = fakeBinding(
+			() =>
+				new Response(JSON.stringify({ status: "ok" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+
+		const result = await checkHonoHealth(binding);
+
+		expect(result.ok).toBe(false);
+	});
+
+	it("binding.fetch 被呼叫時路徑為 /api/health", async () => {
+		const { binding, calls } = fakeBinding(
+			() =>
+				new Response(
+					JSON.stringify({
+						status: "ok",
+						service: "hono-pickball",
+						timestamp: "2026-07-18T00:00:00.000Z",
+						requestUrl: "https://hono-pickball.internal/api/health",
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+		);
+
+		await checkHonoHealth(binding);
+
+		expect(calls).toHaveLength(1);
+		expect(new URL(calls[0] as string).pathname).toBe("/api/health");
+	});
+
+	it("失敗分支也會回報 latencyMs", async () => {
+		const httpError = fakeBinding(() => new Response("boom", { status: 500 }));
+		const thrown = fakeBinding(() => {
+			throw new Error("no upstream");
+		});
+
+		const results = [
+			await checkHonoHealth(httpError.binding),
+			await checkHonoHealth(thrown.binding),
+		];
+
+		results.forEach((result) => {
+			expect(result.ok).toBe(false);
+			expect(typeof result.latencyMs).toBe("number");
+			expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+		});
 	});
 });
