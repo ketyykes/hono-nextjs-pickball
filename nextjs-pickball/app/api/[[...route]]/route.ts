@@ -4,12 +4,27 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 // 瀏覽器視角為 same-origin（請求的 URL host 不會被改寫），未來 better-auth
 // 的 Set-Cookie 會直接落在前端 origin，沒有跨域 cookie 問題。
 //
-// 注意：不能把 NextRequest 實例直接傳給 binding 的 fetch——Next.js 對 fetch
-// 做了 instrumentation，非同 realm 的 Request 會被當成 URL 字串化而拋出
-// 「Invalid URL: [object Request]」。先以 new Request() 重建再轉發。
+// 注意：不能把任何 Request 實例（連 new Request() 重建的也不行）傳給 binding
+// 的 fetch。`next dev` 下 getCloudflareContext() 的 service binding 是 miniflare
+// proxy，跨 realm 的 Request 物件會被字串化成「[object Request]」而拋 Invalid URL。
+// 因此改傳「URL 字串 + init」，dev（miniflare）與正式（workerd）皆可通。
 const proxyToHono = async (request: Request): Promise<Response> => {
   const { env } = getCloudflareContext();
-  return env.HONO_API.fetch(new Request(request.url, request));
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const upstream = await env.HONO_API.fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: hasBody ? request.body : undefined,
+    // 串流 request body 時 undici/workerd 要求 duplex: "half"
+    ...(hasBody ? { duplex: "half" } : {}),
+  });
+  // 同理，`next dev` 下 miniflare 回傳的是跨 realm 的 Response（Next.js 認不得的
+  // 「_Response」），需在本 realm 重建一份，Next 才會接受為合法 Response。
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: upstream.headers,
+  });
 };
 
 export const GET = proxyToHono;
