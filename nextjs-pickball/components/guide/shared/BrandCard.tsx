@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import type { BrandCardData } from "@/data/guide/brands";
+import { PriceStars } from "./PriceStars";
 
 interface BrandCardProps {
 	brand: BrandCardData;
@@ -18,8 +19,8 @@ export function BrandCard({ brand }: BrandCardProps) {
 			<p className="mt-2 text-sm leading-relaxed text-foreground/70">
 				{brand.description}
 			</p>
-			<div className="mt-2 inline-block w-fit rounded-md bg-slate-900/[0.06] px-3 py-1 text-xs font-semibold text-slate-900">
-				{brand.price}
+			<div className="mt-2 inline-block w-fit rounded-md bg-slate-900/[0.06] px-3 py-1">
+				<PriceStars stars={brand.priceStars} />
 			</div>
 		</Card>
 	);

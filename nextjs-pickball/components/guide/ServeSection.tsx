@@ -20,8 +20,7 @@ export function ServeSection() {
 			</p>
 
 			<TipCard label="新手友善選項">
-				<strong>落地發球（Drop Serve）</strong>自 2025
-				年起已成為永久合法選項。你只需將球自然釋放讓球落地彈跳一次後再擊球，上述三項揮拍限制全部免除，大幅降低初學者的發球門檻。
+				<strong>落地發球（Drop Serve）</strong>現已成為永久合法選項。你只需將球自然釋放讓球落地彈跳一次後再擊球，上述三項揮拍限制全部免除，大幅降低初學者的發球門檻。
 			</TipCard>
 
 			<p>

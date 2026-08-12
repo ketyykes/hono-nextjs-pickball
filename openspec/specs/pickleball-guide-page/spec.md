@@ -13,7 +13,7 @@
 #### Scenario: 訪問首頁可看到 Hero badge 與主標題
 - **GIVEN** 使用者開啟 `/`
 - **WHEN** 頁面載入完成
-- **THEN** 畫面顯示「2025 完全入門指南」badge、主標題「匹克球新手完全入門」與三項統計數字（14萬+、¼、11）
+- **THEN** 畫面顯示「完全入門指南」badge、主標題「匹克球新手完全入門」與三項統計數字（14萬+、¼、11）
 
 #### Scenario: TocBar 於頁面載入即顯示並列出 10 個 section 連結
 - **GIVEN** 使用者開啟 `/`
@@ -198,7 +198,7 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 
 - `nextjs-pickball/app/page.tsx`：純組合，不含資料宣告
 - `nextjs-pickball/components/guide/`：頂層至少包含 10 個 `*Section`（`CourtSection`、`ServeSection`、`ScoringSection`、`FoulsSection`、`KitchenSection`、`MaterialsSection`、`SpecsSection`、`BrandsSection`、`TwMarketSection`、`StarterSection`）與 `Hero`、`TocBar`、`PartDivider`、`Conclusion`、`CourtDiagram`；另有 `HeroTourCta`，其行為由 tour-experience capability 規範
-- `nextjs-pickball/components/guide/shared/`：6 個共用元件（`BrandCard`、`TipCard`、`HighlightBox`、`MythRow`、`Section`、`ComparisonTable`）
+- `nextjs-pickball/components/guide/shared/`：7 個共用元件（`BrandCard`、`TipCard`、`HighlightBox`、`MythRow`、`Section`、`ComparisonTable`、`PriceStars`）
 - `nextjs-pickball/data/guide/`：7 個資料檔（tocItems、courtComparison、paddleMaterials、paddleWeights、brands、twMarketPrices、kitchenMyths）
 - `nextjs-pickball/hooks/`：本 capability 擁有 3 支（useScrollShadow、useScrollSpy、useScrolledPast）+ 各自 `.test.ts`；目錄下另有 6 支歸屬其他 capability
 
@@ -216,11 +216,11 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 - **WHEN** 檢查 `nextjs-pickball/data/guide/` 下任一檔案
 - **THEN** 提供至少一個具型別標註的 named export 常數，可被 section 元件 import
 
-#### Scenario: shared 目錄含六個共用元件
+#### Scenario: shared 目錄含全部必要共用元件
 
 - **GIVEN** 完成實作
 - **WHEN** 列出 `nextjs-pickball/components/guide/shared/` 下的 `.tsx` 檔（不含 `*.test.tsx`）
-- **THEN** 恰好存在 `BrandCard.tsx`、`TipCard.tsx`、`HighlightBox.tsx`、`MythRow.tsx`、`Section.tsx`、`ComparisonTable.tsx` 六個檔
+- **THEN** `BrandCard.tsx`、`TipCard.tsx`、`HighlightBox.tsx`、`MythRow.tsx`、`Section.tsx`、`ComparisonTable.tsx`、`PriceStars.tsx` 皆存在
 
 #### Scenario: guide 目錄頂層含全部必要元件檔
 

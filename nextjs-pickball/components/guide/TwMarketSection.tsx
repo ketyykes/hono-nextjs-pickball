@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { twMarketHeaders, twMarketPrices } from "@/data/guide/twMarketPrices";
 import { ComparisonTable } from "./shared/ComparisonTable";
+import { PriceStars } from "./shared/PriceStars";
 import { Section } from "./shared/Section";
 import { TipCard } from "./shared/TipCard";
 
@@ -11,7 +12,7 @@ export function TwMarketSection() {
 		<Section
 			id="tw-market"
 			tag="台灣市場"
-			title="台灣購買管道與 2024–2025 實際價格帶"
+			title="台灣購買管道與價位參考"
 		>
 			<p>
 				台灣主要購買管道包含：<strong>momo 購物網</strong>（最齊全電商）、
@@ -31,7 +32,7 @@ export function TwMarketSection() {
 							</Badge>
 						)}
 					</>,
-					row.recommended ? <strong>{row.priceRange}</strong> : row.priceRange,
+					<PriceStars key={`${row.tier}-price`} stars={row.priceStars} />,
 					row.example,
 				])}
 			/>

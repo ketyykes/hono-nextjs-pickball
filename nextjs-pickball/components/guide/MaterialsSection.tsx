@@ -6,6 +6,7 @@ import {
 	paddleMaterialsHeaders,
 } from "@/data/guide/paddleMaterials";
 import { ComparisonTable } from "./shared/ComparisonTable";
+import { PriceStars } from "./shared/PriceStars";
 import { Section } from "./shared/Section";
 
 export function MaterialsSection() {
@@ -21,7 +22,7 @@ export function MaterialsSection() {
 					row.material,
 					row.weight,
 					row.feel,
-					row.price,
+					<PriceStars key={`${row.material}-price`} stars={row.priceStars} />,
 					<>
 						{row.suitable}
 						{row.recommended && (
@@ -35,7 +36,7 @@ export function MaterialsSection() {
 
 			<p>
 				球拍內芯同樣重要。
-				<strong>聚丙烯蜂巢芯</strong>是目前最主流的芯材，柔軟安靜、甜區大、容錯率高，最適合新手。Nomex 芯較硬力量大但噪音也大；2024–2025 年崛起的
+				<strong>聚丙烯蜂巢芯</strong>是目前最主流的芯材，柔軟安靜、甜區大、容錯率高，最適合新手。Nomex 芯較硬力量大但噪音也大；近年崛起的
 				<strong>泡棉芯</strong>提供極致控球手感，屬進階玩家的新選擇。
 			</p>
 		</Section>

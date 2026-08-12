@@ -34,7 +34,7 @@ export function ScoringSection() {
 				<strong>領先對手 2 分</strong>才能獲勝。錦標賽可能設定為 15 或 21 分，但同樣須領先 2 分。沒有固定分數上限——雙方打到 10-10 時比賽持續到某一方領先 2 分為止。
 			</p>
 
-			<TipCard label="2025 新增規則">
+			<TipCard label="新增規則">
 				新增了
 				<strong>拉力計分法（Rally Scoring）</strong>作為選擇性規則，每回合勝方皆可得分，但決勝分仍須由發球方取得。此制度目前僅限部分錦標賽使用。
 			</TipCard>

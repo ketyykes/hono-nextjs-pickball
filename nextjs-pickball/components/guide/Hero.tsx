@@ -76,7 +76,7 @@ export function Hero() {
 						variants={heroItemVariants}
 						className="mb-8 inline-block rounded-full bg-lime-400 px-6 py-2 font-outfit text-xs font-bold uppercase tracking-[3px] text-slate-900"
 					>
-						2025 完全入門指南
+						完全入門指南
 					</motion.div>
 
 					<motion.h1

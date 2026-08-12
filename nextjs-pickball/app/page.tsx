@@ -51,7 +51,7 @@ export default function HomePage() {
       <Conclusion />
 
       <footer className="border-t border-border px-8 py-8 text-center text-xs text-muted-foreground">
-        本指南僅供參考，價格與規則可能隨時間變動。建議以 USA Pickleball
+        本指南僅供參考，市場資訊與規則可能隨時間變動。建議以 USA Pickleball
         官方規則書與各品牌官網為準。
       </footer>
     </div>

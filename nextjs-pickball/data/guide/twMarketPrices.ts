@@ -1,42 +1,43 @@
 export interface MarketPriceRow {
 	tier: string;
-	priceRange: string;
+	/** 價位星級：1 = 最平價、10 = 頂級，依台灣市場行情相對定位 */
+	priceStars: number;
 	example: string;
 	recommended?: boolean;
 }
 
-export const twMarketHeaders = ["等級", "價格區間", "代表產品"] as const;
+export const twMarketHeaders = ["等級", "價位", "代表產品"] as const;
 
 export const twMarketPrices: readonly MarketPriceRow[] = [
 	{
 		tier: "木拍 / 最入門",
-		priceRange: "NT$320–800",
+		priceStars: 1,
 		example: "INFMARC 木拍",
 	},
 	{
 		tier: "入門（玻纖/複合）",
-		priceRange: "NT$1,500–3,000",
+		priceStars: 3,
 		example: "HEAD Kickstarter、INFMARC MARC001",
 		recommended: true,
 	},
 	{
 		tier: "中階（碳纖維）",
-		priceRange: "NT$3,000–5,000",
+		priceStars: 5,
 		example: "HEAD Radical PRO、JOOLA 入門款",
 	},
 	{
 		tier: "進階 / 選手級",
-		priceRange: "NT$5,000–8,000+",
+		priceStars: 7,
 		example: "HEAD Gravity Tour、adidas Adipower PRO",
 	},
 	{
 		tier: "精品 / 頂級",
-		priceRange: "NT$8,000–15,000+",
+		priceStars: 10,
 		example: "MON CARBONE 設計師款",
 	},
 	{
 		tier: "入門雙拍套組",
-		priceRange: "NT$1,500–5,000",
+		priceStars: 4,
 		example: "HEICK 入門組、HEAD Pack Spark",
 		recommended: true,
 	},
