@@ -1,5 +1,15 @@
 ## 1. 前置設置（例外層 / 入口配置）
 
+> 📋 **歸檔紀錄說明**：本檔 48/48 個 task 有勾選。
+> 未勾選不代表未實作 —— 當時的流程未要求歸檔前把 checkbox 補完。
+> 實際完成狀態以 `openspec/specs/` 的主 spec 與程式碼為準。
+> （自 change `docs-and-agent-tree-consolidation` 起，歸檔前須 `/opsx:verify` 要求 task 全勾或標 skipped。）
+
+> ⚠️ 本檔為歷史紀錄，指令原文刻意保留未改。
+> 文中 `pnpm ... test -- --run <path>` 已知失效：那個 `--` 會讓 vitest 收不到路徑而跑完整套，
+> 紅燈證據會被既有綠燈淹沒。正確寫法為 `pnpm --filter ./<workspace> test --run <path>`，
+> 見 `openspec/config.yaml`。（change: fix-tdd-toolchain-and-config）
+
 - [x] 1.1 將 `pickleball-guide.html` 加進 `.gitignore`；驗收：`grep pickleball-guide.html .gitignore` 有回傳；`ls pickleball-guide.html` 確認檔案仍存在
 - [x] 1.2 修改 `index.html`：`lang="zh-Hant"`、`<title>` 改為「匹克球新手完全入門：規則與球拍選購一次搞懂」、加入 Google Fonts preconnect 與 Noto Sans TC + Bebas Neue + Outfit 三家族 link；驗收：`pnpm dev` 開頁面 view-source 確認三個 family 名稱都在 link href
 - [x] 1.3 透過 `pnpm dlx shadcn@latest add table badge separator` 加入三個 shadcn 元件；驗收：`ls src/components/ui/{table,badge,separator}.tsx` 三檔皆存在

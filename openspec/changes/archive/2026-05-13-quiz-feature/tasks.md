@@ -1,3 +1,13 @@
+> ⚠️ 本檔為歷史紀錄，指令原文刻意保留未改。
+> 文中 `pnpm ... test -- --run <path>` 已知失效：那個 `--` 會讓 vitest 收不到路徑而跑完整套，
+> 紅燈證據會被既有綠燈淹沒。正確寫法為 `pnpm --filter ./<workspace> test --run <path>`，
+> 見 `openspec/config.yaml`。（change: fix-tdd-toolchain-and-config）
+
+> 📋 **歸檔紀錄說明**：本檔 20/20 個 task 有勾選。
+> 未勾選不代表未實作 —— 當時的流程未要求歸檔前把 checkbox 補完。
+> 實際完成狀態以 `openspec/specs/` 的主 spec 與程式碼為準。
+> （自 change `docs-and-agent-tree-consolidation` 起，歸檔前須 `/opsx:verify` 要求 task 全勾或標 skipped。）
+
 > 註：本變更為「事後紀錄」既有實作，所有任務皆已完成。對應 commits 範圍：`045b713` ~ `e2a4dc4`。
 
 ## 1. 題庫資料（例外層：型別 + 純資料）

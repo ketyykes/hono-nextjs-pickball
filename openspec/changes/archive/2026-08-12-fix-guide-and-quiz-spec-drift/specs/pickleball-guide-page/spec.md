@@ -1,67 +1,4 @@
-## Purpose
-
-定義匹克球新手指南頁面（`/`）的完整規格，包含頁面結構、元件架構、資料層、互動行為與視覺動畫。
-
-本頁為站台首頁，內容涵蓋 Part 01 規則（場地、發球、計分、犯規、非截擊區）與 Part 02 選購
-（材質、規格、品牌、台灣市場、入門套組）共 10 個 section，並提供 fixed overlay 的 TocBar
-快速導覽、捲動觸發的進場動畫，以及通往 `/tour` 完整體驗的 CTA。
-## Requirements
-### Requirement: 首頁顯示完整匹克球指南
-
-系統 SHALL 在路由 `/` 直接渲染完整匹克球新手指南，包含 Hero、TOC、Part 01（規則 5 段）、Part 02（選購 5 段）、Conclusion 區塊，與原型 `pickleball-guide.html` 結構一致。TocBar SHALL 以 fixed overlay 方式於頁面載入即顯示於視窗頂端，而非 sticky（非捲動後才出現）。TocBar SHALL 使用 `top-14`，固定在 SiteNavbar（高度 h-14 = 56px）下方，不與 Navbar 重疊。TocBar 在透明態 SHALL 採用 `bg-slate-900/30 backdrop-blur-sm` 且不再渲染 `border-b`，與 SiteNavbar 的 `slate-900/20` 形成自然漸深階序，避免兩條 nav 視覺切割。
-
-#### Scenario: 訪問首頁可看到 Hero badge 與主標題
-- **GIVEN** 使用者開啟 `/`
-- **WHEN** 頁面載入完成
-- **THEN** 畫面顯示「2025 完全入門指南」badge、主標題「匹克球新手完全入門」與三項統計數字（14萬+、¼、11）
-
-#### Scenario: TocBar 於頁面載入即顯示並列出 10 個 section 連結
-- **GIVEN** 使用者開啟 `/`
-- **WHEN** 頁面載入完成且 `window.scrollY === 0`
-- **THEN** TocBar 即時可見於視窗頂端，列出 court / serve / scoring / fouls / kitchen / materials / specs / brands / tw-market / starter 共 10 個錨點連結
-
-#### Scenario: TocBar 位置（有 SiteNavbar 時）
-
-- **WHEN** 使用者瀏覽首頁（`/`）
-- **THEN** TocBar 顯示在 viewport top + 56px 的位置，SiteNavbar 佔據最上方 56px
-
-#### Scenario: TocBar 透明態無 border-b 切割
-
-- **WHEN** 路由為 `/`，且 `window.scrollY === 0`
-- **THEN** `TocBar` 不渲染 `border-b` 樣式，背景為 `bg-slate-900/30 backdrop-blur-sm`
-
-#### Scenario: 每個 section 都有對應錨點 id
-- **GIVEN** 頁面渲染完成
-- **WHEN** DOM 解析完成
-- **THEN** 存在 `#court`、`#serve`、`#scoring`、`#fouls`、`#kitchen`、`#materials`、`#specs`、`#brands`、`#tw-market`、`#starter` 共 10 個 id
-
-### Requirement: Hero 浮球與主內容避開 fixed nav 合計高度
-
-`nextjs-pickball/components/guide/Hero.tsx` 的浮球（`aria-hidden` 的右上 lime 圓球）與主內容（含 badge、主標題、副標、統計、CTA）SHALL 全部落在 `SiteNavbar (56px) + TocBar (56px)` = 112px 之下的可用視覺區。具體實作方式：浮球與主內容掛在 Hero 內一層 `pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]` 的偏移層之內。**主內容**（motion.div）為 flow child、由偏移層的 `pt-` + `flex flex-col items-center justify-center` 自動推到 nav 之下置中。**浮球**為 absolute child、不受 padding 影響，其 `top` SHALL 明確含 nav offset：`top-[calc(var(--site-nav-h)+var(--toc-bar-h)+15%)]`、`max-md:top-[calc(var(--site-nav-h)+var(--toc-bar-h)+10%)]`，確保在矮視窗（≤ 700px viewport height）下不被 fixed nav 遮擋。
-
-背景光暈 SHALL 仍鋪滿整個 section（含 nav 區），維持透明 navbar 之下的深色背景延伸感。Hero section 本身仍維持 `min-h-screen overflow-hidden bg-slate-900` 不變。
-
-#### Scenario: globals.css 定義 --toc-bar-h
-
-- **WHEN** 檢查 `nextjs-pickball/app/globals.css`
-- **THEN** `:root` 區塊內存在 `--toc-bar-h: 3.5rem;` 一條 CSS variable
-
-#### Scenario: Hero 浮球與主內容包在 nav 偏移層內
-
-- **WHEN** 檢查 `nextjs-pickball/components/guide/Hero.tsx` 的 JSX
-- **THEN** 浮球與 motion.div 主內容皆為「nav 偏移層」之子節點；該偏移層套用 `pt-[calc(var(--site-nav-h)+var(--toc-bar-h))]`
-
-#### Scenario: 矮視窗下浮球不被 fixed nav 遮擋
-
-- **GIVEN** 使用者開啟 `/`，viewport height 為 700px
-- **WHEN** 頁面載入完成、`window.scrollY === 0`
-- **THEN** 浮球元素 `getBoundingClientRect().top` 大於等於 112px（fixed nav 合計高度）
-
-#### Scenario: 主標題仍位於視窗可視區內
-
-- **GIVEN** 使用者開啟 `/`，viewport height 為 800px
-- **WHEN** 頁面載入完成
-- **THEN** 主標題 `<h1>匹克球新手完全入門</h1>` 完整位於視窗範圍內且未被遮擋
+## MODIFIED Requirements
 
 ### Requirement: 共用展示元件全部建構於 shadcn 元件之上
 
@@ -78,29 +15,6 @@
 - **GIVEN** 完成實作
 - **WHEN** 檢查 `nextjs-pickball/components/ui/badge.tsx`
 - **THEN** 檔案內容與 `pnpm dlx shadcn@latest add badge` 當前產出一致（本專案未自行新增 variant）；所有顏色變化由使用端 className 控制
-
-### Requirement: 色票全對應 Tailwind palette 或 shadcn token
-
-系統 SHALL NOT 在 `nextjs-pickball/app/globals.css` 的 `@theme inline` 內新增任何匹克球專用色票變數（例如 `--color-pickle-green`）。所有色彩 SHALL 透過既有 Tailwind palette utility（如 `lime-400`、`slate-900`、`orange-500`、`emerald-700`、`amber-400`）或既有 shadcn semantic token（`background`、`foreground`、`muted`、`muted-foreground`、`border`、`card`）表達。
-
-#### Scenario: index.css 不新增品牌色變數
-- **GIVEN** 完成實作
-- **WHEN** 檢查 `nextjs-pickball/app/globals.css` 的 `@theme inline` 區塊
-- **THEN** 不存在 `--color-pickle-green`、`--color-court-blue`、`--color-court-surface`、`--color-accent-coral`、`--color-accent-yellow` 任何一條
-
-### Requirement: 字型保留三套並由 nextjs-pickball/app/layout.tsx 以 next/font/google 載入
-
-系統 SHALL 在 `nextjs-pickball/app/layout.tsx` 使用 `next/font/google` 匯入 Noto Sans TC、Bebas Neue、Outfit 三家族，並以 CSS variable（`--font-noto-sans-tc`、`--font-bebas-neue`、`--font-outfit`）掛載到 `<html>`。元件 SHALL 透過 Tailwind utility class（如 `font-bebas`、`font-outfit`）套用。
-
-#### Scenario: nextjs-pickball/app/layout.tsx 使用 next/font/google 載入三家族
-- **GIVEN** 完成實作
-- **WHEN** 檢查 `nextjs-pickball/app/layout.tsx`
-- **THEN** 檔案匯入 `Noto_Sans_TC`、`Bebas_Neue`、`Outfit`，各自指定 `variable` 並附加到 `<html>` 的 `className`
-
-#### Scenario: HTML lang 與 metadata title 已設定
-- **GIVEN** 完成實作
-- **WHEN** 檢查 `nextjs-pickball/app/layout.tsx`
-- **THEN** `<html>` 的 `lang` 屬性為 `zh-Hant`，`metadata.title` 內含「匹克球新手完全入門」
 
 ### Requirement: keyframes 與對應 utility 寫在 nextjs-pickball/app/globals.css
 
@@ -244,14 +158,7 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 - **WHEN** 執行本 capability 的所有驗收
 - **THEN** 沒有任何一條因 `nextjs-pickball/docs/pickleball-guide.html` 不存在而失敗
 
-### Requirement: HomePage 移除 starter 樣板內容
-
-系統 SHALL 從 `nextjs-pickball/app/page.tsx` 移除既有的 starter Card / Button import 與「React + Express Template」歡迎內容。
-
-#### Scenario: HomePage 不再 import starter 用 Card / Button
-- **GIVEN** 完成實作
-- **WHEN** 檢查 `nextjs-pickball/app/page.tsx`
-- **THEN** 不存在 `import ... from "@/components/ui/card"` 或 `import ... from "@/components/ui/button"` 用於展示「React + Express Template」歡迎卡片之用法
+## ADDED Requirements
 
 ### Requirement: section 捲入視窗時以 motion whileInView 淡入
 
@@ -280,4 +187,3 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 - **WHEN** 渲染 `Section` 並傳入 `id`、`tag`、`title`、`children`
 - **THEN** 四者皆正確輸出，與 reduced motion 與否無關
 - **驗收**：`nextjs-pickball/components/guide/shared/Section.test.tsx`，it 名稱「渲染 id、tag 與 title，children 原樣輸出」
-

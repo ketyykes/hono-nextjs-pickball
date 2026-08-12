@@ -1,12 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-定義匹克球計分板功能（`/scoreboard`）的完整規格，包含計分規則、Undo 機制、持久化、RWD 排版、全螢幕模式、視覺回饋 Toast 與版面穩定性。
-
-本頁為場邊實際計分用的工具頁：使用者多半以手機橫放、在比賽空檔快速連點操作。
-因此除了 2026 USA Pickleball Traditional（side-out）規則的正確性之外，
-誤觸防護（版面穩定、重置二次確認）、狀態不遺失（localStorage 持久化）
-與賽前設定的階段鎖定，同樣視為功能需求而非體驗優化。
-## Requirements
 ### Requirement: 計分規則 — Traditional Side-Out
 
 系統 SHALL 依 2026 USA Pickleball 官方 Traditional（side-out）規則計分：僅發球方可得分；比賽到 11 分，需贏 2 分（延長賽持續到差距 ≥ 2）。
@@ -190,6 +183,8 @@
 - **WHEN** 發球權在兩隊之間切換（ServeIndicator 顯示/隱藏）
 - **THEN** 「贏這球+」按鈕位置不上下跳動（indicator 永遠佔位，非發球方用 invisible 隱藏）
 
+## ADDED Requirements
+
 ### Requirement: 賽前設定與階段鎖定
 
 系統 SHALL 於 `status === "setup"` 期間允許調整比賽形式（`mode`：單打／雙打）與先發球方（`firstServer`），並 MUST 在 `playing` 與 `finished` 階段忽略這兩個 action，避免比賽中途改變規則造成分數失去意義。
@@ -232,15 +227,3 @@ UI MUST 以原生 `disabled` 屬性表達鎖定狀態（`nextjs-pickball/compone
 - **WHEN** 使用者按下「重置」
 - **THEN** 先顯示標題為「確定要重置比賽？」的 AlertDialog；確認後分數與 history 清空、`status` 回到 `setup`、設定控制項恢復 enabled，且 `mode` 與 `firstServer` 維持不變
 - **驗收**：`nextjs-pickball/lib/scoreboard/reducer.test.ts`，it 名稱「RESET 保留 mode 與 firstServer，清空分數與 history、status 回 setup」；E2E 為 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「重置含二次確認；確認後 mode toggle 解鎖（enabled）」
-
-### Requirement: `/scoreboard` 之 metadata
-
-系統 SHALL 為 `nextjs-pickball/app/scoreboard/page.tsx` 提供獨立 metadata：title 為「計分板 | 匹克球指南」、description 為「支援單打與雙打的匹克球 Traditional 計分器」。
-
-`/scoreboard` 為公開內容頁，SHALL 對搜尋引擎開放索引，SHALL NOT 設定 `robots.index: false` —— noindex 只適用於 `/health` 這類內部診斷路由（見 `api-connectivity` capability）。
-
-#### Scenario: `/scoreboard` 匯出 metadata 且開放索引
-
-- **WHEN** 檢查 `nextjs-pickball/app/scoreboard/page.tsx` 的模組匯出
-- **THEN** 存在 `export const metadata`，title 與 description 如上；未設定 `robots.index: false`
-

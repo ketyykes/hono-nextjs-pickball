@@ -1,5 +1,10 @@
 ## 1. globals.css 引入 layout 變數（樣式例外層）
 
+> 📋 **歸檔紀錄說明**：本檔 24/24 個 task 有勾選。
+> 未勾選不代表未實作 —— 當時的流程未要求歸檔前把 checkbox 補完。
+> 實際完成狀態以 `openspec/specs/` 的主 spec 與程式碼為準。
+> （自 change `docs-and-agent-tree-consolidation` 起，歸檔前須 `/opsx:verify` 要求 task 全勾或標 skipped。）
+
 - [x] 1.1 於 `nextjs-pickball/app/globals.css` 的 `:root` 區塊新增 `--site-nav-h: 3.5rem;` 與 `--toc-bar-h: 3.5rem;`（緊接既有 `--radius` 後）
 - [x] 1.2 驗收：`grep -n "--site-nav-h\|--toc-bar-h" nextjs-pickball/app/globals.css` 各出現一次
 

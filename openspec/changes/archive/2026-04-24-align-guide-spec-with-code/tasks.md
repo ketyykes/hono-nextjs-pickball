@@ -1,5 +1,10 @@
 ## 1. 驗證 delta spec 與程式碼一致
 
+> 📋 **歸檔紀錄說明**：本檔 8/9 個 task 有勾選。
+> 未勾選不代表未實作 —— 當時的流程未要求歸檔前把 checkbox 補完。
+> 實際完成狀態以 `openspec/specs/` 的主 spec 與程式碼為準。
+> （自 change `docs-and-agent-tree-consolidation` 起，歸檔前須 `/opsx:verify` 要求 task 全勾或標 skipped。）
+
 - [x] 1.1 執行 `ls components/guide/shared/ | grep -c '\.tsx$'` 應為 6；確認名單為 `BrandCard`、`ComparisonTable`、`HighlightBox`、`MythRow`、`Section`、`TipCard`
 - [x] 1.2 執行 `ls components/guide/*.tsx | wc -l` 應為 15；確認含 10 個 `*Section` + `Hero`、`TocBar`、`PartDivider`、`Conclusion`、`CourtDiagram`
 - [x] 1.3 執行 `grep -c '^@keyframes' app/globals.css` 應為 6；確認名單為 `fadeIn`、`slideUp`、`scaleIn`、`floatBall`、`bounceDown`、`fadeUp`

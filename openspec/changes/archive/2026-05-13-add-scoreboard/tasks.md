@@ -1,5 +1,10 @@
 ## 1. 純邏輯層 — Types / Rules / Reducer / Storage
 
+> 📋 **歸檔紀錄說明**：本檔 33/33 個 task 有勾選。
+> 未勾選不代表未實作 —— 當時的流程未要求歸檔前把 checkbox 補完。
+> 實際完成狀態以 `openspec/specs/` 的主 spec 與程式碼為準。
+> （自 change `docs-and-agent-tree-consolidation` 起，歸檔前須 `/opsx:verify` 要求 task 全勾或標 skipped。）
+
 - [x] 1.1 建立 `lib/scoreboard/types.ts`：zod schemas（ModeSchema、TeamSchema 等）+ z.infer 推導 TS 型別 + Action union
 - [x] 1.2 TDD：`lib/scoreboard/rules.ts` — `getServeSide`（偶→right、奇→left）
 - [x] 1.3 TDD：`lib/scoreboard/rules.ts` — `isGameWon`（11 分 + 贏 2 分判定）

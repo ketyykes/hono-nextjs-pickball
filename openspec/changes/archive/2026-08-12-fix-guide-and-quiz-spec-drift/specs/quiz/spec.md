@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-定義 `/quiz` 匹克球規則測驗功能的規格，涵蓋題庫資料結構、抽題與洗牌邏輯、`useQuiz` 作答狀態機、計分與重玩流程、測驗 UI 呈現，以及避免 hydration mismatch 的 client-only 渲染策略。
-## Requirements
 ### Requirement: 題庫資料結構
 
 系統 SHALL 提供位於 `nextjs-pickball/data/quiz/questions.ts` 的 readonly 題庫，以 named export `QUESTION_BANK` 匯出，包含至少 25 題、混合 `multiple-choice` 與 `true-false` 兩種題型。每題 MUST 具備唯一 `id`、非空 `text`（題目文字）、非空 `explanation`（解說），並依題型提供 `options`+`correctIndex`（單選）或 `correct`（是非）。
@@ -113,43 +111,3 @@
 - **WHEN** 在 `finished` 階段呼叫 `restart()`
 - **THEN** `phase === 'answering'`、`currentIndex === 0`、`answers` 長度為 0、`questions` 重新抽題
 - **驗收**：`nextjs-pickball/hooks/useQuiz.test.ts`，it 名稱「restart 後 currentIndex 歸零、answers 清空、phase 為 answering」
-
-### Requirement: 測驗 UI 呈現
-
-`/quiz` 路由 MUST 顯示進度條（目前題號 / 總題數）與當前題目。`QuestionCard` MUST 提供 `answering` 與 `revealed` 兩種視覺態：`revealed` 時正確選項以綠色標示、所選錯誤選項以紅色標示，並顯示 `explanation`。`ResultScreen` MUST 顯示最終分數、依分數區間的鼓勵文字，及「再試一次」「回到指南」兩個行動按鈕。
-
-#### Scenario: 顯示進度
-
-- **WHEN** 使用者位於第 3 題
-- **THEN** 進度條顯示 `3 / 10`
-
-#### Scenario: 答題後顯示對錯與解說
-
-- **WHEN** 使用者點擊任一選項
-- **THEN** 該選項與正確選項以對應顏色標示；`explanation` 文字顯示於選項區下方
-
-#### Scenario: 結果頁按鈕
-
-- **WHEN** 完成全部 10 題
-- **THEN** 畫面顯示分數、鼓勵文字、以及「再試一次」（觸發 restart）與「回到指南」（連回 `/`）兩按鈕
-
-### Requirement: Client-only 渲染避免 hydration mismatch
-
-`/quiz` 之 QuizShell MUST 以 `dynamic(import(...), { ssr: false })` 載入，且該 `dynamic` 呼叫 MUST 位於 Client Component。E2E 測試 MUST 包含 hydration error 為 0 的斷言以防退化。
-
-#### Scenario: 進入 /quiz 無 hydration error
-
-- **WHEN** Playwright 開啟 `/quiz` 並監聽 console
-- **THEN** 收集到的 hydration 相關錯誤陣列長度為 0（對應 `nextjs-pickball/tests/e2e/specs/quiz.spec.ts`）
-
-### Requirement: `/quiz` 之 metadata
-
-系統 SHALL 為 `nextjs-pickball/app/quiz/page.tsx` 提供獨立 metadata：title 為「規則隨堂測驗 | 匹克球指南」、description 為「從 25 道題庫中隨機抽 10 題，測驗你對匹克球規則的掌握程度」。
-
-`/quiz` 為公開內容頁，SHALL 對搜尋引擎開放索引，SHALL NOT 設定 `robots.index: false` —— noindex 只適用於 `/health` 這類內部診斷路由（見 `api-connectivity` capability）。
-
-#### Scenario: `/quiz` 匯出 metadata 且開放索引
-
-- **WHEN** 檢查 `nextjs-pickball/app/quiz/page.tsx` 的模組匯出
-- **THEN** 存在 `export const metadata`，title 與 description 如上；未設定 `robots.index: false`
-

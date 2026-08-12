@@ -5,9 +5,7 @@
 定義 `/tour` 互動體驗路由：6 段 100vh stage 的 scroll-snap 沉浸式介紹，每段在使用者進入 viewport 時觸發一次性進場動畫，搭配 `/` ↔ `/tour` 之 React 19 `<ViewTransition>` 方向性過場。本 capability 也包含 `/` 首頁的「進入完整體驗 →」CTA、`prefers-reduced-motion` 全域降級，以及配合 stage 動畫所需的 helper hook 與資料模組。
 
 > **實作注意**：原始 design doc（`nextjs-pickball/docs/superpowers/specs/2026-05-08-scroll-driven-tour-design.md`）規劃為「CSS scroll-timeline + motion useScroll fallback」雙路徑、Hero scroll-driven 升級。實作期間因 hydration mismatch、snap-mandatory 下無捲動進度中間態等實際限制，已調整為「IntersectionObserver 進場動畫」單一路徑、Hero 改為 staggerChildren 直接全部載入。詳見 design doc 末尾 Implementation Changelog。
-
 ## Requirements
-
 ### Requirement: `/tour` 路由提供 6 段 scroll-snap 體驗
 
 系統 SHALL 在 `/tour` 路由依序渲染 6 個 stage：CourtSize、PlayerGrowth、TwoBounce、KitchenViolation、MaterialsSpectrum、Closing。外層 `<main>` element SHALL 套用 `scroll-snap-type: y mandatory`、`overflow-y-scroll`，作為內部 scroll container，且其高度 SHALL 為 `calc(100dvh - var(--site-nav-h))`、`margin-top: var(--site-nav-h)`，使可視 snap 區完全位於 `SiteNavbar` 下方、避免 stage 標題與主圖被 fixed navbar 遮擋。height 與 margin-top SHALL 以 inline `style` 形式套用（而非 Tailwind arbitrary value），確保 `var()` 與 `calc()` 在 build pipeline 上被瀏覽器正確處理。每個 stage SHALL 為 `h-full`（即 main 可視高度）的 scroll container，並套用 `scroll-snap-align: start` 強制停靠；stage 內以 `flex items-center justify-center` 維持垂直置中。
@@ -143,13 +141,23 @@
 
 ### Requirement: `/tour` 之 metadata
 
-系統 SHALL 為 `nextjs-pickball/app/tour/page.tsx` 提供獨立 metadata：title 為「匹克球新手完全入門 · 互動體驗 | 匹克球指南」、description 為「用捲動的方式快速看完匹克球規則與器材重點，6 個互動場景帶你 5 分鐘上手」。對搜尋引擎開放索引；sitemap 不給高 priority。
+系統 SHALL 為 `nextjs-pickball/app/tour/page.tsx` 提供獨立 metadata：title 為「匹克球新手完全入門 · 互動體驗 | 匹克球指南」、description 為「用捲動的方式快速看完匹克球規則與器材重點，6 個互動場景帶你 5 分鐘上手」。`/tour` 為公開內容頁，SHALL 對搜尋引擎開放索引，SHALL NOT 設定 `robots.index: false`。
+
+本站目前不提供 `sitemap.xml`（`nextjs-pickball/app/` 下無 `sitemap.ts` 亦無 `robots.ts`）。若日後新增，`/tour` 不給高 priority。
+
+> 先前版本寫「sitemap 不給高 priority」，描述了一個不存在的產物。規格不得描述未實作的東西 ——
+> 那會讓讀者以為 sitemap 已存在而去找設定。
 
 #### Scenario: `/tour` head 中 title 與 description 設定正確
 
 - **GIVEN** 完成實作
 - **WHEN** 訪問 `/tour` 並檢查 document head
 - **THEN** title 含「匹克球新手完全入門 · 互動體驗」、meta description 為上述定義之文字
+
+#### Scenario: 目前不提供 sitemap
+
+- **WHEN** 列出 `nextjs-pickball/app/` 下的檔案
+- **THEN** 不存在 `sitemap.ts` 與 `robots.ts`；規格中關於 sitemap priority 的敘述為條件式（「若日後新增」）而非現況描述
 
 ### Requirement: stage 2 玩家成長資料純資料化
 
@@ -161,3 +169,4 @@
 - **WHEN** 執行對應 Vitest
 - **THEN** 匯出之常數為 readonly array、長度 ≥ 6、年份從 2020 起遞增不重複、`players` 數值遞增
 - **TEST** `nextjs-pickball/data/tour/playerGrowth.test.ts` 中 `it('提供至少 6 筆年度資料且年份與人數均遞增')`
+
