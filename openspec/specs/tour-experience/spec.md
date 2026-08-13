@@ -4,7 +4,7 @@
 
 定義 `/tour` 互動體驗路由：6 段 100vh stage 的 scroll-snap 沉浸式介紹，每段在使用者進入 viewport 時觸發一次性進場動畫，搭配 `/` ↔ `/tour` 之 React 19 `<ViewTransition>` 方向性過場。本 capability 也包含 `/` 首頁的「進入完整體驗 →」CTA、`prefers-reduced-motion` 全域降級，以及配合 stage 動畫所需的 helper hook 與資料模組。
 
-> **實作注意**：原始 design doc（`nextjs-pickball/docs/superpowers/specs/2026-05-08-scroll-driven-tour-design.md`）規劃為「CSS scroll-timeline + motion useScroll fallback」雙路徑、Hero scroll-driven 升級。實作期間因 hydration mismatch、snap-mandatory 下無捲動進度中間態等實際限制，已調整為「IntersectionObserver 進場動畫」單一路徑、Hero 改為 staggerChildren 直接全部載入。詳見 design doc 末尾 Implementation Changelog。
+> **實作注意**：原始 design doc（`docs/superpowers/specs/2026-05-08-scroll-driven-tour-design.md`，位於 repo root）規劃為「CSS scroll-timeline + motion useScroll fallback」雙路徑、Hero scroll-driven 升級。實作期間因 hydration mismatch、snap-mandatory 下無捲動進度中間態等實際限制，已調整為「IntersectionObserver 進場動畫」單一路徑、Hero 改為 staggerChildren 直接全部載入。詳見 design doc 末尾 Implementation Changelog。
 ## Requirements
 ### Requirement: `/tour` 路由提供 6 段 scroll-snap 體驗
 
@@ -64,7 +64,11 @@
 
 系統 SHALL 提供 `nextjs-pickball/hooks/useReducedMotion.ts`：監聽 `(prefers-reduced-motion: reduce)` media query，回傳目前值；media query 變動時 SHALL 觸發 React 重新渲染；元件卸載時 SHALL 移除事件監聽。
 
-當 `useReducedMotion()` 為 true 時，`useStageProgress` SHALL 回傳 `null`；stage 元件 SHALL 以 `useMotionValue(1)` fallback 配 `useTransform` 直接呈現動畫終點狀態（counter=81、廚房紅區 0.85、CTA opacity=1 等），確保使用者看到完整內容而非空白起點。`scroll-snap` 與 progress rail SHALL 保留以利使用者控制節奏與感知位置。
+當 `useReducedMotion()` 為 true 時，`useStageProgress` SHALL 回傳 `null`；stage 元件 SHALL 以 `useMotionValue(1)` fallback 配 `useTransform` 直接呈現動畫終點狀態（球場尺寸 counter 收斂至最終值、廚房犯規印章落定且警示紅常駐、CTA 完全可見等），確保使用者看到完整內容而非空白起點。`scroll-snap` 與 progress rail SHALL 保留以利使用者控制節奏與感知位置。
+
+本 Requirement 約束的是「reduced-motion 下終點畫面可讀」這件事，SHALL NOT 以動畫實作常數（特定 opacity、座標、緩動參數）表述終點狀態 —— 那些值會隨每次動畫重做而變動，把它們寫進規格只會製造規格漂移。可驗證性改由 stage 的場景純函式在 `p=1` 的行為承載。
+
+> 前一版本此處寫「（counter=81、廚房紅區 0.85、CTA opacity=1 等）」。其中「廚房紅區 0.85」來自舊版 `KitchenViolationStage.tsx` 的 `useTransform(source, [0, 0.35], [0, 0.85])`（一塊俯視廚房紅區矩形），該物件已於 commit `49ed54a` 的側視場景重做中刪除，現行終點值為 `kitchenScene.ts` 的 `kitchenFlashOpacity(1) = 0.28`。讀者依規格去程式碼找 0.85 的廚房紅區會找不到對應物 —— 這正是「規格不該釘實作常數」的實例。
 
 #### Scenario: useReducedMotion 在 reduce 設定時回 true
 
@@ -92,6 +96,20 @@
 - **GIVEN** 使用者瀏覽器 `prefers-reduced-motion: reduce` 設定為啟用
 - **WHEN** 使用者開啟 `/tour` 並捲動
 - **THEN** 6 個 stage 之內容文字皆可讀取，scroll-snap 仍生效，progress rail 仍正常更新
+
+#### Scenario: 廚房 stage 於 p=1 保留可讀的犯規終點畫面
+
+- **GIVEN** reduced-motion 啟用，`KitchenViolationStage` 以 `useMotionValue(1)` fallback 取代進度來源
+- **WHEN** 以 `p=1` 求值 `kitchenScene.ts` 的場景純函式
+- **THEN** 廚房警戒區保留警示紅色調（`> 0`）、幽靈軌跡與落點標記維持可見，使違規事實在無動畫下仍可判讀
+- **TEST** `nextjs-pickball/components/tour/stages/kitchenScene.test.ts` 中 `it('p=1 廚房區保留警示紅色調（終點狀態傳達違規）')` 與 `it('p=1 幽靈軌跡與落點標記保持可見（reduced-motion 終點可讀）')`
+
+#### Scenario: 廚房 stage 於 p=1 不殘留過程中的動態元素
+
+- **GIVEN** reduced-motion 啟用
+- **WHEN** 以 `p=1` 求值震動位移、撞擊波紋與全畫面紅閃
+- **THEN** 三者皆歸零（位移為 `{ x: 0, y: 0 }`、波紋與紅閃 opacity 為 0），終點畫面乾淨不殘留過場效果
+- **TEST** `nextjs-pickball/components/tour/stages/kitchenScene.test.ts` 中 `it('撞擊前（p=0）與 p=1 皆無位移')`、`it('p=1 所有波紋已淡出（終點畫面乾淨）')` 與 `it('p=1 紅閃已完全退去（終點畫面乾淨）')`
 
 ### Requirement: Hero 入場動畫直接顯示全部內容
 

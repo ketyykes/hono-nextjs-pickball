@@ -281,3 +281,57 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 - **THEN** 四者皆正確輸出，與 reduced motion 與否無關
 - **驗收**：`nextjs-pickball/components/guide/shared/Section.test.tsx`，it 名稱「渲染 id、tag 與 title，children 原樣輸出」
 
+### Requirement: 價位以 1~10 星級呈現，不揭露實際金額
+
+系統 SHALL 以 1~10 顆星表達 guide 內的所有價位資訊，SHALL NOT 於 guide 的資料檔、元件與首頁原始碼中出現實際金額字樣。理由：金額具時效性，寫死金額會使內容隨市場與匯率變動而過期；星級表達的是**相對價位帶**，不因幣值調整而失效。
+
+`nextjs-pickball/data/guide/` 的 `brands`、`paddleMaterials`、`twMarketPrices` SHALL 各自以 `priceStars` 欄位承載價位，其值 SHALL 為 1（最平價）至 10（頂級）的整數。
+
+系統 SHALL 提供共用元件 `nextjs-pickball/components/guide/shared/PriceStars.tsx`：接受 `stars: number`，一律渲染 10 顆星形元素，實心星數為 `clamp(round(stars), 1, 10)`；`stars` 為非有限數（`NaN`、`Infinity`）時 SHALL 收斂至最小值 1，SHALL NOT 產生含 `NaN` 的標籤。元件 SHALL 以 `role="img"` 搭配 `aria-label="價位 N／10 顆星"` 提供輔助科技語意，個別星形元素 SHALL 標記 `aria-hidden` 並以 `data-star="filled" | "empty"` 區分。
+
+金額字樣的守門範圍 SHALL 涵蓋 `nextjs-pickball/data/guide/`、`nextjs-pickball/components/guide/`、`nextjs-pickball/components/guide/shared/` 與 `nextjs-pickball/app/`（各目錄下的 `.ts` / `.tsx`，不含 `*.test.*`），比對 pattern SHALL 為 `/NT\$|US\$|NTD|TWD|USD/`。
+
+> ⚠️ `nextjs-pickball/app/` **不屬本 capability 的專屬領地**（`app/layout.tsx`、`app/tour/`、`app/quiz/` 等歸其他 capability）。其他 capability 於該目錄寫入金額字樣同樣會使本守門測試轉紅 —— 這是刻意的跨檔耦合，與 `data/guide/tocItems.ts` 的 id 守衛同一性質，故在此明寫，避免對方看到一個沒頭沒尾的失敗。
+
+#### Scenario: PriceStars 以 aria-label 表達星級語意
+
+- **GIVEN** 以 `stars={7}` 渲染 `PriceStars`
+- **WHEN** 以 `role="img"` 查詢該元素
+- **THEN** 其 accessible name 為「價位 7／10 顆星」
+- **驗收**：`nextjs-pickball/components/guide/shared/PriceStars.test.tsx`，it 名稱「以 aria-label 表達 1~10 星的價位語意」
+
+#### Scenario: 一律渲染 10 顆星且實心數等於 stars
+
+- **GIVEN** 以 `stars={4}` 渲染 `PriceStars`
+- **WHEN** 計算 `[data-star='filled']` 與 `[data-star='empty']` 的元素數
+- **THEN** 實心 4 顆、空心 6 顆，總數恆為 10
+- **驗收**：`nextjs-pickball/components/guide/shared/PriceStars.test.tsx`，it 名稱「渲染 10 顆星，其中實心星數量等於 stars」
+
+#### Scenario: 超出 1~10 範圍的 stars 收斂至邊界
+
+- **GIVEN** 分別以 `stars={12}` 與 `stars={0}` 渲染 `PriceStars`
+- **WHEN** 計算實心星數
+- **THEN** 分別為 10 與 1，不會出現 12 顆星或 0 顆星
+- **驗收**：`nextjs-pickball/components/guide/shared/PriceStars.test.tsx`，it 名稱「stars 超出範圍時收斂至 1~10 的邊界」
+
+#### Scenario: 非有限數不產生 NaN 標籤
+
+- **GIVEN** 以 `stars={Number.NaN}` 渲染 `PriceStars`
+- **WHEN** 以 `role="img"` 查詢該元素
+- **THEN** accessible name 為「價位 1／10 顆星」，不含 `NaN` 字樣
+- **驗收**：`nextjs-pickball/components/guide/shared/PriceStars.test.tsx`，it 名稱「stars 為 NaN 時仍收斂至最小值，不產生 NaN 標籤」
+
+#### Scenario: 三個資料檔的 priceStars 皆為 1~10 整數
+
+- **GIVEN** `brands`、`paddleMaterials`、`twMarketPrices` 三個資料檔
+- **WHEN** 逐筆檢查 `priceStars`
+- **THEN** 每筆皆為整數且落在 1~10 之間
+- **驗收**：`nextjs-pickball/data/guide/priceStars.test.ts`，it 名稱「每筆資料的 priceStars 都是 1~10 的整數」
+
+#### Scenario: guide 與 app 原始碼不得殘留金額字樣
+
+- **GIVEN** `data/guide`、`components/guide`、`components/guide/shared`、`app` 四個目錄下的 `.ts` / `.tsx`（不含 `*.test.*`）
+- **WHEN** 以 pattern `/NT\$|US\$|NTD|TWD|USD/` 掃描檔案內容
+- **THEN** 命中檔案清單為空陣列（改單邊即靜默失效的跨檔耦合，需有測試守住）
+- **驗收**：`nextjs-pickball/data/guide/priceStars.test.ts`，it 名稱「guide 原始碼（資料檔、元件、首頁）不得殘留金額字樣」
+

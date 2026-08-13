@@ -60,7 +60,7 @@
 
 - `app/` — Next.js App Router 進入點（layout、page、globals.css）
 - `components/ui/` — shadcn/ui 原生元件（不自行修改結構，更新請用 shadcn CLI）
-- `components/guide/` — 自訂指南元件（頂層 16 個：10 個 `*Section`、Hero、TocBar、PartDivider、Conclusion、CourtDiagram、HeroTourCta；`shared/` 下 6 個共用元件；統一標 `"use client"`）
+- `components/guide/` — 自訂指南元件（頂層 16 個：10 個 `*Section`、Hero、TocBar、PartDivider、Conclusion、CourtDiagram、HeroTourCta；`shared/` 下為 `BrandCard`、`TipCard`、`HighlightBox`、`MythRow`、`Section`、`ComparisonTable`、`PriceStars`；統一標 `"use client"`）
   - `HeroTourCta` 雖放在 guide/ 下，其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 共 9 支與對應測試，依 capability 分組：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
