@@ -20,6 +20,9 @@ node_modules/
 /.pnp
 .pnp.*
 
+# git worktree（本機隔離工作區，不入版控）
+.worktrees/
+
 # next.js
 .next/
 .swc/
