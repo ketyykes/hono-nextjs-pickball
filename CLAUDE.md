@@ -94,6 +94,18 @@ hono-nextjs-pickball/
 - 後端測試跑在真正的 workerd runtime；在受限沙箱中會噴 `listen EPERM 127.0.0.1`，
   那是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
 - E2E 的 `webServer` 有兩組，會自動先起後端再起前端；service binding 需兩者同時運行才通
+- macOS 的 BSD `uniq` 在預設 locale 下會把**內容不同的中文標題誤判為重複**。稽核 spec／文件
+  有無重複條目時**不要用 `sort | uniq -d`**（實測它同時謊報主 spec 的某個 Requirement 與某個
+  Scenario 重複，但兩者 `grep -c` 皆為 1），改用 `LC_ALL=C sort | LC_ALL=C uniq -d`，
+  或直接逐標題計數：
+  ```bash
+  python3 -c "
+  import collections,sys
+  lines=open(sys.argv[1],encoding='utf-8').read().splitlines()
+  c=collections.Counter(l for l in lines if l.startswith(('### Requirement:','#### Scenario:')))
+  print([(k,v) for k,v in c.items() if v>1] or '無重複')
+  " openspec/specs/<capability>/spec.md
+  ```
 
 ## Workspace 細節
 

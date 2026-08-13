@@ -69,5 +69,7 @@ pnpm --filter ./nextjs-pickball preview          # 5. workerd runtime 整合驗�
 
 ## 各 workspace 細節
 
-- 前端規範：見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)、[`nextjs-pickball/AGENTS.md`](./nextjs-pickball/AGENTS.md)
-- 後端規範：見 [`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md)
+規範內文的單一來源是各層的 `CLAUDE.md`；同層 `AGENTS.md` 只是非 Claude agent 的入口指標，不含規範內文。
+
+- 前端：規範見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)；入口指標 [`nextjs-pickball/AGENTS.md`](./nextjs-pickball/AGENTS.md)
+- 後端：規範見 [`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md)；入口指標 [`hono-pickball/AGENTS.md`](./hono-pickball/AGENTS.md)
