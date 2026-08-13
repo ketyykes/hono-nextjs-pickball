@@ -30,7 +30,9 @@ export function SiteNavbar() {
 	return (
 		<header
 			className={cn(
-				"fixed top-0 right-0 left-0 z-[110] h-14 border-b transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300",
+				// [.sb-focus_&]:hidden：/scoreboard 專注模式（useFocusMode 在 html 掛
+				// sb-focus class）時整條隱藏；純 CSS 回應，不引入 scoreboard 狀態依賴。
+				"fixed top-0 right-0 left-0 z-[110] h-14 border-b transition-[background-color,box-shadow,backdrop-filter,border-color] duration-300 [.sb-focus_&]:hidden",
 				solid
 					? "border-border bg-background/85 shadow-sm backdrop-blur-md"
 					: "border-white/5 bg-slate-900/20 backdrop-blur-sm",

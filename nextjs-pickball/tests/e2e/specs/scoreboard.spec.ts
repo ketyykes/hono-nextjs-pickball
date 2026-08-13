@@ -94,6 +94,73 @@ test.describe("/scoreboard 計分器", () => {
 		},
 	);
 
+	test("多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見", async ({
+		page,
+	}) => {
+		// overflow-hidden 讓排版錯誤的失敗模式從「可捲動」變成「內容被裁切」，
+		// 一般的 toBeVisible 斷言抓不到，此測試是唯一防線。
+		const viewports = [
+			{ width: 390, height: 844 }, // 手機直向
+			{ width: 844, height: 390 }, // 手機橫向
+			{ width: 768, height: 1024 }, // 平板直向
+			{ width: 1024, height: 600 }, // 桌機臨界（修正前恰在此高度開始溢出）
+		];
+		for (const vp of viewports) {
+			await page.setViewportSize(vp);
+			await page.goto("/scoreboard");
+			await expect(page.getByText("我方", { exact: true })).toBeVisible();
+
+			// 整頁不可垂直捲動（容許 1px 次像素誤差）
+			const { scrollHeight, clientHeight } = await page.evaluate(() => ({
+				scrollHeight: document.scrollingElement!.scrollHeight,
+				clientHeight: document.scrollingElement!.clientHeight,
+			}));
+			expect(
+				scrollHeight,
+				`${vp.width}x${vp.height} 不應有垂直捲動`,
+			).toBeLessThanOrEqual(clientHeight + 1);
+
+			// 核心按鈕 boundingBox 完整落在 viewport 內
+			const coreButtons = [
+				page.getByRole("button", { name: /我方贏這一球/ }),
+				page.getByRole("button", { name: /對方贏這一球/ }),
+				page.getByRole("button", { name: "撤銷上一分" }),
+				page.getByRole("button", { name: "重置比賽" }),
+			];
+			for (const button of coreButtons) {
+				const box = await button.boundingBox();
+				expect(box, `${vp.width}x${vp.height} 按鈕應可見`).not.toBeNull();
+				if (box) {
+					expect(box.y).toBeGreaterThanOrEqual(0);
+					expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+					expect(box.x).toBeGreaterThanOrEqual(0);
+					expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+				}
+			}
+		}
+	});
+
+	test("專注模式：進入後隱藏 navbar 與設定列、退出後恢復", async ({ page }) => {
+		await page.goto("/scoreboard");
+		await expect(page.getByRole("link", { name: "計分板" })).toBeVisible();
+
+		// 進入專注模式：navbar 與設定列消失，浮動退出鈕出現
+		await page.getByRole("button", { name: "進入專注模式" }).click();
+		await expect(page.getByRole("link", { name: "計分板" })).toBeHidden();
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeHidden();
+		const exitButton = page.getByRole("button", { name: "退出專注模式" });
+		await expect(exitButton).toBeVisible();
+
+		// 專注模式中計分照常運作
+		await page.getByRole("button", { name: /我方贏這一球/ }).click();
+		await expect(page.getByLabel(/我方目前 1 分/)).toBeVisible();
+
+		// 退出後 navbar 與設定列恢復
+		await exitButton.click();
+		await expect(page.getByRole("link", { name: "計分板" })).toBeVisible();
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeVisible();
+	});
+
 	test("直式 viewport 顯示「💡 建議橫向使用」提示橫幅", async ({ page }) => {
 		// 進頁前先清 sessionStorage 避免「關閉提示」狀態殘留
 		await page.addInitScript(() => {

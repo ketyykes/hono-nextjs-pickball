@@ -5,6 +5,9 @@ import { useState } from "react";
 import { useScoreboardStore } from "@/hooks/useScoreboardStore";
 import { useOrientation } from "@/hooks/useOrientation";
 import { useFullscreen } from "@/hooks/useFullscreen";
+import { useFocusMode } from "@/hooks/useFocusMode";
+import { Button } from "@/components/ui/button";
+import { Minimize } from "lucide-react";
 import { ScoreboardSetup } from "@/components/scoreboard/ScoreboardSetup";
 import { TeamPanel } from "@/components/scoreboard/TeamPanel";
 import { ActionBar } from "@/components/scoreboard/ActionBar";
@@ -48,6 +51,20 @@ export function Scoreboard() {
 	const [state, dispatch] = useScoreboardStore();
 	const orientation = useOrientation();
 	const { isSupported, isFullscreen, toggle } = useFullscreen();
+	const { focusMode, toggleFocusMode } = useFocusMode({ isFullscreen });
+
+	// 專注模式切換：版面永遠切；瀏覽器支援 Fullscreen API 時附帶全螢幕
+	// 作 progressive enhancement（iPhone Safari 不支援時只切版面）。
+	// 只在「目標方向」與當前 fullscreen 狀態不一致時才呼叫 toggle——
+	// 若先前 requestFullscreen 曾失敗（focusMode=true 但 isFullscreen=false），
+	// 按退出鈕時盲目 toggle 會反而發出 request，進入全螢幕。
+	const handleToggleFocus = () => {
+		const entering = !focusMode;
+		toggleFocusMode();
+		if (isSupported && entering !== isFullscreen) {
+			void toggle();
+		}
+	};
 
 	// 用 React 認可的 "previous render state" pattern 偵測轉換，無需 useEffect
 	const [prevState, setPrevState] = useState(state);
@@ -68,21 +85,47 @@ export function Scoreboard() {
 	const isLandscape = orientation === "landscape";
 
 	return (
-		<div className="flex min-h-screen flex-col bg-background pt-14">
+		// 頁面鎖高（h-dvh + overflow-hidden）：任何 viewport 零垂直捲動。
+		// 此容器「不可長高」——往盒內加新內容不會撐出捲軸，只會被裁切，
+		// 需重新分配高度預算。dvh 而非 vh：行動瀏覽器工具列展開時 100vh 大於可視高。
+		// 專注模式時 navbar 已隱藏（sb-focus），頂部 padding 歸零讓分數吃滿。
+		<div
+			className={cn(
+				"flex h-dvh flex-col overflow-hidden bg-background",
+				!focusMode && "pt-(--site-nav-h)",
+				// 直向的浮動 ActionBar 與下面板按鈕同一水平中線，保留底部空間避免重疊；
+				// 橫向兩顆按鈕在左右半場中央，浮動列落在中間空帶，不需讓位
+				focusMode && "portrait:pb-16",
+			)}
+		>
 			<OrientationHint visible={!isLandscape} />
-			<ScoreboardSetup
-				mode={state.mode}
-				firstServer={state.firstServer}
-				locked={locked}
-				fullscreenSupported={isSupported}
-				isFullscreen={isFullscreen}
-				onModeChange={(mode) => dispatch({ type: "SET_MODE", mode })}
-				onFirstServerChange={(team) => dispatch({ type: "SET_FIRST_SERVER", team })}
-				onToggleFullscreen={toggle}
-			/>
+			{focusMode ? (
+				// 浮動退出鈕：z-40 低於 portal dialog（z-50），不會蓋住確認框
+				<Button
+					variant="outline"
+					size="icon"
+					onClick={handleToggleFocus}
+					aria-pressed={focusMode}
+					aria-label="退出專注模式"
+					className="fixed top-2 right-2 z-40"
+				>
+					<Minimize className="size-4" />
+				</Button>
+			) : (
+				<ScoreboardSetup
+					mode={state.mode}
+					firstServer={state.firstServer}
+					locked={locked}
+					isFocusMode={focusMode}
+					onModeChange={(mode) => dispatch({ type: "SET_MODE", mode })}
+					onFirstServerChange={(team) => dispatch({ type: "SET_FIRST_SERVER", team })}
+					onToggleFocus={handleToggleFocus}
+				/>
+			)}
 			<div
 				className={cn(
-					"flex flex-1",
+					// min-h-0 讓此 flex item 可縮到內容尺寸以下，缺了它大字級會撐破鎖高
+					"flex min-h-0 flex-1",
 					isLandscape ? "flex-row divide-x" : "flex-col divide-y",
 					"divide-border",
 				)}
@@ -106,6 +149,7 @@ export function Scoreboard() {
 				canUndo={state.history.length > 0}
 				onUndo={() => dispatch({ type: "UNDO" })}
 				onReset={() => dispatch({ type: "RESET" })}
+				focusMode={focusMode}
 			/>
 			<GameOverDialog state={state} onPlayAgain={() => dispatch({ type: "RESET" })} />
 			{feedback && (

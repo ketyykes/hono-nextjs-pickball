@@ -15,23 +15,25 @@ interface ScoreboardSetupProps {
 	mode: Mode;
 	firstServer: Team;
 	locked: boolean;
-	fullscreenSupported: boolean;
-	isFullscreen: boolean;
+	isFocusMode: boolean;
 	onModeChange: (mode: Mode) => void;
 	onFirstServerChange: (team: Team) => void;
-	onToggleFullscreen: () => void;
+	onToggleFocus: () => void;
 }
 
-// 頂部設定列：mode 與 firstServer toggle，比賽中為 disabled；右側全螢幕按鈕
+// 頂部設定列：mode 與 firstServer toggle，比賽中為 disabled；右側專注模式按鈕。
+// 專注模式按鈕永遠渲染（不依 Fullscreen API 支援與否隱藏）——
+// 是否附帶 requestFullscreen 由父層（Scoreboard）決定。
+// aria-pressed／label／icon 皆綁 isFocusMode：目前專注模式下整列不渲染
+// （實際只會看到「進入」態），但綁定讓未來改為保留設定列時不需回頭修。
 export function ScoreboardSetup({
 	mode,
 	firstServer,
 	locked,
-	fullscreenSupported,
-	isFullscreen,
+	isFocusMode,
 	onModeChange,
 	onFirstServerChange,
-	onToggleFullscreen,
+	onToggleFocus,
 }: ScoreboardSetupProps) {
 	return (
 		<div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
@@ -62,17 +64,19 @@ export function ScoreboardSetup({
 				</SelectContent>
 			</Select>
 			<div className="ml-auto">
-				{fullscreenSupported && (
-					<Button
-						variant="outline"
-						size="icon"
-						onClick={onToggleFullscreen}
-						aria-pressed={isFullscreen}
-						aria-label={isFullscreen ? "退出全螢幕" : "進入全螢幕"}
-					>
-						{isFullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
-					</Button>
-				)}
+				<Button
+					variant="outline"
+					size="icon"
+					onClick={onToggleFocus}
+					aria-pressed={isFocusMode}
+					aria-label={isFocusMode ? "退出專注模式" : "進入專注模式"}
+				>
+					{isFocusMode ? (
+						<Minimize className="size-4" />
+					) : (
+						<Maximize className="size-4" />
+					)}
+				</Button>
 			</div>
 		</div>
 	);

@@ -18,7 +18,14 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 	const score = state.scores[team];
 	const isServing = state.servingTeam === team;
 	return (
-		<div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+		// @container-size（需 tailwindcss >= 4.3）：panel 為 size container，
+		// 「後代」的 cqh/cqw 以 panel 內容盒為基準——分數字級因此跟隨面板實際
+		// 可用高度，直向（panel≈可用高一半）與橫向（panel≈全高）共用同一組參數，
+		// 並自動吸收 OrientationHint 顯示/關閉等高度變因。禁用寬度斷點字級
+		// （md:text-[14rem] 會讓平板直向、橫向手機誤中大字而溢出）。
+		// gap/padding 掛在 panel 自身，cq 單位查不到自己、只會 fallback 到視口，
+		// 故明確用 dvh（隨視窗高縮放，與外層 h-dvh 鎖高一致）。
+		<div className="@container-size flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-[clamp(0.375rem,2dvh,1.5rem)] p-[clamp(0.375rem,2dvh,1.5rem)]">
 			<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
 				{label}
 			</div>
@@ -26,7 +33,7 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 				aria-live="polite"
 				aria-label={`${label}目前 ${score} 分`}
 				className={cn(
-					"font-bebas text-[10rem] leading-none md:text-[14rem]",
+					"font-bebas leading-none text-[clamp(2.5rem,min(37cqh,38cqw),14rem)]",
 					isServing ? "text-lime-400" : "text-foreground",
 				)}
 			>
