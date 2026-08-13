@@ -45,7 +45,7 @@ components/
 ├── ui/           # shadcn/ui 元件（11 個）
 └── guide/        # 指南專用元件（Hero、TocBar、10 個 Section、HeroTourCta、shared/）
 
-hooks/            # 9 支 hooks + tests（scroll/observer、quiz、scoreboard、tour）
+hooks/            # 各 capability 的 hooks + tests（scroll/observer、quiz、scoreboard、tour）
 lib/utils.ts      # cn() = clsx + tailwind-merge
 data/guide/       # 7 個 TS 資料檔
 tests/            # Vitest setup 與 Playwright E2E

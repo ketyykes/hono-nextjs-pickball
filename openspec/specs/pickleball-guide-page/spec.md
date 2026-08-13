@@ -136,7 +136,9 @@ Hero 的 badge / 標題 / 統計區進場 SHALL 由 motion 的 `staggerChildren`
 
 系統 SHALL 提供三支 scroll / observer React hooks：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`，分別位於 `nextjs-pickball/hooks/`。每支 hook SHALL 有對應 `*.test.ts` 檔，包含至少一個 happy-path scenario。`useScrolledPast` SHALL 接受 `threshold: number | (() => number)`：為 `number` 時以該值為固定門檻，為 function 時於每次 scroll 事件呼叫以取得當前門檻（供動態讀取 `window.innerHeight - navHeight` 等情境）。
 
-本 capability 只擁有上述三支；`nextjs-pickball/hooks/` 下其餘 hook 歸屬其他 capability（`useQuiz` → quiz；`useScoreboardStore`、`useFullscreen`、`useOrientation` → scoreboard；`useEnterAnimationProgress`、`useReducedMotion` → tour-experience）。
+本 capability 只擁有上述三支；`nextjs-pickball/hooks/` 下其餘 hook 歸屬其他 capability（`useQuiz` → quiz；`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode` → scoreboard；`useEnterAnimationProgress`、`useReducedMotion` → tour-experience）。
+
+此歸屬清單為 `nextjs-pickball/hooks/` 跨 capability 分工的**單一來源**。其他 capability 於該目錄新增 hook 時，其 change SHALL 一併更新此清單 —— 否則本 capability 的規格會單邊失真（先例：`4c5b724` 新增 `useFocusMode` 時只更新了 `scoreboard` 規格，此處漏更新）。
 
 #### Scenario: useScrollShadow 在 scrollY 超過 threshold 時回傳 true
 - **GIVEN** 測試環境呼叫 `useScrollShadow(100)`
@@ -200,7 +202,7 @@ section 的捲入淡入不再由 hook 提供，改由 motion `whileInView` 負�
 - `nextjs-pickball/components/guide/`：頂層至少包含 10 個 `*Section`（`CourtSection`、`ServeSection`、`ScoringSection`、`FoulsSection`、`KitchenSection`、`MaterialsSection`、`SpecsSection`、`BrandsSection`、`TwMarketSection`、`StarterSection`）與 `Hero`、`TocBar`、`PartDivider`、`Conclusion`、`CourtDiagram`；另有 `HeroTourCta`，其行為由 tour-experience capability 規範
 - `nextjs-pickball/components/guide/shared/`：7 個共用元件（`BrandCard`、`TipCard`、`HighlightBox`、`MythRow`、`Section`、`ComparisonTable`、`PriceStars`）
 - `nextjs-pickball/data/guide/`：7 個資料檔（tocItems、courtComparison、paddleMaterials、paddleWeights、brands、twMarketPrices、kitchenMyths）
-- `nextjs-pickball/hooks/`：本 capability 擁有 3 支（useScrollShadow、useScrollSpy、useScrolledPast）+ 各自 `.test.ts`；目錄下另有 6 支歸屬其他 capability
+- `nextjs-pickball/hooks/`：本 capability 擁有 3 支（useScrollShadow、useScrollSpy、useScrolledPast）+ 各自 `.test.ts`；目錄下另有歸屬其他 capability 的 hook，清單見「互動行為由三支 hooks 提供且各有 smoke test」Requirement。該數量會隨其他 capability 增修而變動，SHALL NOT 於此寫死
 
 驗收 SHALL 以「必要檔案是否存在」表述，SHALL NOT 使用「恰好 N 個檔」的數量斷言 —— 後者會在其他 capability 於同目錄新增檔案時誤報。
 

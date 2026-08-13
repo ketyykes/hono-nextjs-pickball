@@ -62,10 +62,10 @@
 - `components/ui/` — shadcn/ui 原生元件（不自行修改結構，更新請用 shadcn CLI）
 - `components/guide/` — 自訂指南元件（頂層 16 個：10 個 `*Section`、Hero、TocBar、PartDivider、Conclusion、CourtDiagram、HeroTourCta；`shared/` 下為 `BrandCard`、`TipCard`、`HighlightBox`、`MythRow`、`Section`、`ComparisonTable`、`PriceStars`；統一標 `"use client"`）
   - `HeroTourCta` 雖放在 guide/ 下，其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
-- `hooks/` — 共 9 支與對應測試，依 capability 分組：
+- `hooks/` — 各 hook 與對應測試，依 capability 分組（歸屬的單一來源為 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供」Requirement，新增 hook 時須一併更新該處）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
   - quiz：`useQuiz`
-  - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`
+  - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
 - `lib/` — 共用工具（`utils.ts` 的 `cn()`）
 - `data/guide/` — 純 TS 資料檔（7 個，tocItems、brands 等）
