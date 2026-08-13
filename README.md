@@ -14,7 +14,7 @@ hono-nextjs-pickball/
 ├─ docs/superpowers/       ← 設計文件與實作計畫（歷史紀錄；正式規格在 openspec/）
 ├─ .claude/                ← Claude Code 專案設定
 ├─ .agents/                ← agent 相關設定（唯一來源，不在 workspace 內複製）
-├─ AGENTS.md               ← 給所有 coding agent 的入口文件
+├─ AGENTS.md               ← 非 Claude agent 的入口（只放指標；規範內文見 CLAUDE.md）
 └─ skills-lock.json        ← 外部 skill 版本鎖定（root 單一份）
 ```
 

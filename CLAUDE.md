@@ -12,13 +12,30 @@ hono-nextjs-pickball/
 ├─ docs/              ← 設計文件與實作計畫（superpowers/）；已被 openspec 取代者於頁首標註
 ├─ .claude/           ← Claude Code 專案設定（settings.json 含 lint / cf-typegen hooks）
 ├─ .agents/           ← agent 相關設定（**唯一來源，不在 workspace 內複製**）
-├─ AGENTS.md          ← 給所有 coding agent 的入口文件
+├─ AGENTS.md          ← 非 Claude agent 的入口；**只放指標不放內容**，規則以本檔為準
 └─ skills-lock.json   ← 外部 skill 的版本鎖定（root 單一份）
 ```
 
 > `docs/` 與 `openspec/` 的分工：`openspec/specs/` 是**正式規格**，
 > `docs/superpowers/` 是設計脈絡與實作計畫的歷史紀錄。
 > 任何行為變更以 openspec change 為準，不要在 `docs/` 下新增平行規格。
+
+## 不可省略的規則
+
+本節是所有 coding agent（不限 Claude Code）的行為約束，root `AGENTS.md` 以引用方式指向這裡；
+要改規則只改本檔，不要在 `AGENTS.md` 內另寫一份。
+
+**任何行為變更都先走 openspec change 流程**，不要直接改 `openspec/specs/` 下的主 spec。
+流程為 propose → 產出 proposal / design / tasks / delta spec → 實作 → verify → archive。
+歷史上主 spec 曾被直接編輯（commit `e5b709c`、`c7f4f7e`、`ea7955d`），
+導致 `changes/archive/` 無法用來重建主 spec —— 不要再製造這種情況。
+
+**行為邏輯一律 TDD 三步**：① 先寫失敗測試並在 shell 實際看到紅燈 ② 最小實作至綠
+③ refactor（無壞味道註記 skipped）。適用範圍、例外層與測試工具的權威來源是
+[`openspec/config.yaml`](./openspec/config.yaml)。單檔測試指令見下方「常用指令」。
+
+**紅燈要是真的**。若某項行為早已實作，先寫測試會直接綠燈 —— 那是 regression guard 不是 TDD，
+請在 tasks.md 誠實標註，**不要用 mutation check（改斷言看紅再改回）偽造紅燈**。
 
 ## 環境
 
@@ -66,8 +83,17 @@ hono-nextjs-pickball/
 
 ## OpenSpec 慣例
 
-- `openspec/` 位於 repo root；openspec CLI 與 Claude Code session **一律從 repo root 執行**
-- 工作流程細節（TDD 規則等）見 `openspec/config.yaml` 與 `nextjs-pickball/CLAUDE.md`
+- `openspec/` 位於 repo root；openspec CLI 與 Claude Code session **一律從 repo root 執行**，建議帶 `DO_NOT_TRACK=1`
+- [`openspec/config.yaml`](./openspec/config.yaml) 是 TDD 規則（適用範圍、例外層、三步驟、測試工具）的權威來源
+- [`openspec/specs/`](./openspec/specs/) 是各 capability 的正式規格；主 spec 不可直接編輯，見上方「不可省略的規則」
+- 前端補充見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)
+
+## 執行環境注意
+
+- 前端 dev server 在 **:3005**（不是 3000），後端在 **:8787**
+- 後端測試跑在真正的 workerd runtime；在受限沙箱中會噴 `listen EPERM 127.0.0.1`，
+  那是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
+- E2E 的 `webServer` 有兩組，會自動先起後端再起前端；service binding 需兩者同時運行才通
 
 ## Workspace 細節
 
