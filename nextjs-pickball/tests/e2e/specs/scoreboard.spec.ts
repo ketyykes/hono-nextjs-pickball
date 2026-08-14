@@ -242,4 +242,51 @@ test.describe("/scoreboard 計分器", () => {
 		// 兩個隊伍面板皆顯示分制；strict mode 下需用 toHaveCount(2) 而非 toBeVisible()
 		await expect(page.getByText(/21 分制/)).toHaveCount(2);
 	});
+
+	// scoreboard-target-score change：面板流體間距重新調校後的餘量迴歸防線。
+	// 過去的教訓（commit 1cba147 review）：只驗證「boundingBox 落在 viewport
+	// 內」與「可點擊」驗不出餘量被壓縮到只剩不到 1px——外層又有
+	// overflow-hidden，未來若 clamp 參數被再次壓縮，失敗模式會是靜默裁切，
+	// 不會有任何既有斷言變紅。此測試直接斷言頂部／底部餘量的絕對值。
+	test("面板內容不得貼齊邊界：底部餘量須保留安全值", async ({ page }) => {
+		// 固定量測 390x664：這是 mobile-safari project 的預設 viewport
+		// （devices["iPhone 12"] 的 viewport 是 390x664，非 844），也是本
+		// change 調校前 review 實測餘量僅 0.94px 的臨界尺寸。顯式設定可讓
+		// 全部 5 個 browser project 都在同一個已知最脆弱的尺寸下驗證，
+		// 不受各 project 各自的預設 viewport 影響。
+		await page.setViewportSize({ width: 390, height: 664 });
+		await page.goto("/scoreboard");
+		await expect(page.getByText("我方", { exact: true })).toBeVisible();
+
+		// 調校後於 chromium/firefox/webkit 三種引擎現場實測皆為 ~12–13px，
+		// 這裡斷言 4px（對應本次調校「目標 1：底部餘量 ≥ 4px」的必達門檻），
+		// 保留約 3 倍緩衝：clamp 參數若被調整到只剩個位數 px 級的餘量會直接
+		// 紅燈，但不會對日後合理的微調反應過敏。
+		const SAFE_MARGIN_PX = 4;
+		const margins = await page.evaluate(() => {
+			const panels = Array.from(document.querySelectorAll(".\\@container-size"));
+			return panels.map((panel) => {
+				const wrapper = panel.firstElementChild as HTMLElement;
+				const labelRow = wrapper.firstElementChild as HTMLElement;
+				const button = panel.querySelector("button") as HTMLElement;
+				const panelBox = panel.getBoundingClientRect();
+				const labelBox = labelRow.getBoundingClientRect();
+				const buttonBox = button.getBoundingClientRect();
+				return {
+					topMargin: labelBox.top - panelBox.top,
+					bottomMargin: panelBox.bottom - buttonBox.bottom,
+				};
+			});
+		});
+
+		expect(margins, "應找到兩個 TeamPanel 容器").toHaveLength(2);
+		for (const { topMargin, bottomMargin } of margins) {
+			expect(topMargin, "label 行與面板頂部的餘量").toBeGreaterThanOrEqual(
+				SAFE_MARGIN_PX,
+			);
+			expect(bottomMargin, "按鈕與面板底部的餘量").toBeGreaterThanOrEqual(
+				SAFE_MARGIN_PX,
+			);
+		}
+	});
 });

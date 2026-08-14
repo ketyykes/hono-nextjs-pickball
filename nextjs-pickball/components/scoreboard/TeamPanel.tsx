@@ -40,7 +40,7 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 			向上下對稱溢出，沒有 overflow-hidden 會直接吃進相鄰面板的版面；有了它，
 			即使 fluid 公式仍有極小殘差，溢出也只會被裁在「自己這格」的邊界，不會
 			再侵犯到另一隊的可點擊區域。 */}
-			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.125rem,1cqh,1.5rem)] p-[clamp(0.125rem,1cqh,1.5rem)]">
+			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.25rem,3cqh,1.5rem)] p-[clamp(0.25rem,3cqh,1.5rem)]">
 				<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
 					<span>{label}</span>
 					<span className="opacity-70"> · {state.targetScore} 分制</span>
@@ -49,7 +49,14 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 					aria-live="polite"
 					aria-label={`${label}目前 ${score} 分`}
 					className={cn(
-						"font-bebas leading-none text-[clamp(2.5rem,min(37cqh,38cqw),14rem)]",
+						// leading-none 必須排在 text-[clamp(...)] 之後：twMerge 會把帶
+						// 逗號的 arbitrary text-[] 值誤判為與 leading 同一 class group
+						// （Tailwind 的 text-{size} utility 本身可能連帶設定
+						// line-height），若 leading-none 排在前面會被判定衝突而整個被
+						// twMerge 丟棄——結果是分數實際套用瀏覽器/字型預設的
+						// line-height（約 1.5×字級），而非預期的 1×，白白多吃約
+						// 0.5×字級的垂直空間（已用 twMerge() 現場驗證此排序修法）。
+						"font-bebas text-[clamp(2.5rem,min(37cqh,38cqw),14rem)] leading-none",
 						isServing ? "text-lime-400" : "text-foreground",
 					)}
 				>
