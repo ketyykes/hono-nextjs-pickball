@@ -27,6 +27,8 @@ export function createInitialState(
 		status: "setup",
 		winner: null,
 		firstServer,
+		// Task 3 會改為可由 overrides 設定；本 task 僅讓型別成立
+		targetScore: 11,
 	};
 }
 
