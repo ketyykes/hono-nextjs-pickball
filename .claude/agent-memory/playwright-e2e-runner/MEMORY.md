@@ -1,1 +1,2 @@
 - [/quiz Hydration Mismatch（已修復）](project-quiz-hydration-mismatch.md) — Math.random() 造成 SSR/CSR 不一致；以 QuizClient.tsx（"use client"）包裝 dynamic+ssr:false 解決
+- [scoreboard mobile-safari 版面重疊 bug](project_scoreboard-mobile-safari-overlap-bug.md) — iPhone 12 viewport 下 TeamPanel 互相遮蔽導致按鈕不可點；非瀏覽器版本問題，勿與 tour 的版本落後結論混用
