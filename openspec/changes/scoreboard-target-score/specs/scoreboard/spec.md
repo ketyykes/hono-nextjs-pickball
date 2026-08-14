@@ -146,6 +146,8 @@
 
 分數字級 SHALL 隨面板實際可用高度流體縮放：每個 TeamPanel MUST 為 size container（`@container-size`，需 tailwindcss >= 4.3），分數字級 MUST 以容器查詢單位（cqh/cqw）搭配 `clamp()` 表達，`gap`／`padding` 同步流體化；SHALL NOT 以寬度斷點決定字級（如 `md:text-[14rem]` —— 平板直向與橫向手機以寬度誤中大字級正是溢出根因）。
 
+上述禁令**僅及於字級**。`gap`／`padding` MAY 以 orientation 疊加寬度斷點分流密度：直向兩面板垂直對切、橫向並排，同一 cqh 係數在兩種形態下的「面板高度佔比」需求相差近兩倍（平板直向約 5.15%、桌機橫向約 2.83%），單一線性係數只能擇一。分流條件 MUST 精確到不牽動其他形態（實作採 `portrait:md:`，只命中「直向且寬 ≥768px」，手機直向與橫向手機皆不受影響）。字級 SHALL NOT 比照辦理 —— 字級已用 `min(37cqh,38cqw)` 讓兩種形態共用同一組平滑曲線，重新引入斷點正是先前的溢出根因。
+
 實作位於 `nextjs-pickball/hooks/useOrientation.ts` 與 `nextjs-pickball/components/scoreboard/`。
 
 #### Scenario: 橫式排版（landscape）
@@ -211,6 +213,8 @@
 
 UI MUST 以原生 `disabled` 屬性表達鎖定狀態（`nextjs-pickball/components/scoreboard/ScoreboardSetup.tsx` 的 `disabled={locked}`），三個控制項 MUST 各有 `aria-label`（「比賽形式」、「先發球方」與「目標分數」）。
 
+目標分數 MUST 以 `role="radiogroup"` + 三顆 `role="radio"`（帶 `aria-checked`）表達 —— 三個分制為互斥單選，此語意使讀屏能告知「三選一」而非三個獨立開關。該群組 MUST 實作 WAI-ARIA APG 的 radio group 鍵盤模式：roving tabindex（僅選中項 `tabIndex=0`，使 Tab 進入群組即落在選中項、再按 Tab 離開整組）、方向鍵移動即選取並循環。索引計算 MUST 抽為純函式（`nextjs-pickball/lib/scoreboard/radio-navigation.ts`）並於該層 TDD，SHALL NOT 只寫在元件內 —— 依專案分層規範，元件的行為邏輯須下放到可單元測試的層級。
+
 重置（RESET）MUST 保留 `mode`、`firstServer` 與 `targetScore`、清空分數與 history、將 `status` 回到 `setup`，且 MUST 經二次確認才執行 —— 誤觸重置會讓整場比賽的分數消失且無法 Undo。
 
 UNDO 同樣 MUST 保留 `targetScore`：`UNDO` 以「重建初始 state 後 replay」實作（見「Undo 機制」Requirement），重建時若未帶入 `targetScore`，目標分數會靜默退回 11，使 15／21 分制的比賽在 Undo 後可能立即誤判為結束。此失效路徑僅在使用者按下 Undo 時顯現，正常計分完全正常，MUST 有獨立測試覆蓋。
@@ -263,6 +267,21 @@ UNDO 同樣 MUST 保留 `targetScore`：`UNDO` 以「重建初始 state 後 repl
 - **WHEN** 使用者按下「重置」
 - **THEN** 先顯示標題為「確定要重置比賽？」的 AlertDialog；確認後分數與 history 清空、`status` 回到 `setup`、三個設定控制項恢復 enabled，且 `mode`、`firstServer` 與 `targetScore` 維持不變
 - **驗收**：`nextjs-pickball/lib/scoreboard/reducer.test.ts`，it 名稱「RESET 保留 mode、firstServer 與 targetScore，清空分數與 history、status 回 setup」；E2E 為 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「重置含二次確認；確認後 mode toggle 解鎖（enabled）」
+
+#### Scenario: 目標分數群組支援方向鍵導覽與 roving tabindex
+
+- **GIVEN** `status === "setup"`、目前選中 11 分制
+- **WHEN** 焦點位於目標分數群組並按下 ArrowRight 或 ArrowDown
+- **THEN** 選取移至 15 分制、焦點同步移到該按鈕；再按兩次依序到 21 並循環回 11。ArrowLeft／ArrowUp 反向循環；Home／End 跳至首／末項
+- **AND** 任一時刻僅選中項的 `tabIndex` 為 0，其餘為 -1
+- **驗收**：`nextjs-pickball/lib/scoreboard/radio-navigation.test.ts`（索引計算的純函式層）；E2E 為 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」
+
+#### Scenario: 比賽中方向鍵不得變更目標分數
+
+- **GIVEN** `status === "playing"`（三個控制項皆為 disabled）
+- **WHEN** 於目標分數群組按下任一方向鍵
+- **THEN** 選取不變 —— 按鈕雖為原生 `disabled`，但 `onKeyDown` 掛在群組容器上仍會收到事件，實作 MUST 自行 guard `locked` 狀態
+- **驗收**：同上 E2E test 的後段
 
 #### Scenario: 目標分數控制項於比賽中為 disabled
 
