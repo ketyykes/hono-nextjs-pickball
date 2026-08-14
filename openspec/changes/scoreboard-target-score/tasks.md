@@ -47,9 +47,10 @@
 
 ## 6. 收尾驗證
 
-- [ ] 6.1 `pnpm lint` 通過
-- [ ] 6.2 `pnpm typecheck` 通過（`isGameWon` 改必填參數後，所有呼叫點皆須已更新）
-- [ ] 6.3 `pnpm test` 全套通過
-- [ ] 6.4 `pnpm --filter ./nextjs-pickball preview` 於 workerd runtime 確認 `/scoreboard` 可正常操作三種分制
-- [ ] 6.5 手動驗證向後相容：於瀏覽器 devtools 寫入一份**不含 `targetScore`** 的舊格式 state 到 `localStorage["scoreboard:current:v1"]`，重整 `/scoreboard`，確認分數與 history 完整保留且以 11 分制運作（對應 design Decision 2）
-- [ ] 6.6 `DO_NOT_TRACK=1 openspec verify scoreboard-target-score`（或 `/opsx:verify`）通過
+- [x] 6.1 `pnpm lint` 通過
+- [x] 6.2 `pnpm typecheck` 通過（`isGameWon` 改必填參數後，所有呼叫點皆須已更新）
+- [x] 6.3 `pnpm test` 全套通過
+- [x] 6.4 `pnpm --filter ./nextjs-pickball preview` 於 workerd runtime 確認 `/scoreboard` 可正常操作三種分制
+- [x] 6.5 手動驗證向後相容：於瀏覽器 devtools 寫入一份**不含 `targetScore`** 的舊格式 state 到 `localStorage["scoreboard:current:v1"]`，重整 `/scoreboard`，確認分數與 history 完整保留且以 11 分制運作（對應 design Decision 2）
+- [x] 6.6 `DO_NOT_TRACK=1 openspec validate scoreboard-target-score` 與 `/opsx:verify` 通過
+  - ⚠️ **指令更正**：openspec CLI（本機 1.2.x）**沒有 `verify` 子指令**，可用的是 `validate`（結構／格式驗證，已通過）。三維度驗證（Completeness／Correctness／Coherence）由 Claude Code 的 `/opsx:verify` slash command 執行，不是 CLI 功能
