@@ -3,9 +3,10 @@
 
 ## 1. 型別與 schema（`lib/scoreboard/types.ts` — 行為邏輯，必 TDD）
 
-- [ ] 1.1 **紅**：於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 新增 it「舊版資料缺 targetScore 時補為 11 且不清除 key」——寫入一份不含 `targetScore` 的合法 state 到 `localStorage["scoreboard:current:v1"]`，斷言 `readScoreboard()?.targetScore === 11` 且該 key 未被移除。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/storage.test.ts` 於 shell 實際看到紅燈（此為**真紅燈**：schema 尚無該欄位，回傳物件的 `targetScore` 為 `undefined`）
-- [ ] 1.2 **綠**：於 `types.ts` 新增 `TargetScoreSchema = z.union([z.literal(11), z.literal(15), z.literal(21)]).default(11)`，加入 `ScoreboardStateSchema` 的 `targetScore` 欄位，匯出 `TargetScore` 型別；於 `Action` union 新增 `{ type: "SET_TARGET_SCORE"; targetScore: TargetScore }`。重跑 1.1 指令至綠
-- [ ] 1.3 **refactor**：檢視 schema 定義是否與既有 `ServerNumberSchema` 的 union-of-literals 風格一致、註解是否說明 `.default()` 的相容性用途（見 design Decision 2）。無壞味道則註記 skipped
+- [x] 1.1 **紅**：於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 新增 it「舊版資料缺 targetScore 時補為 11 且不清除 key」——寫入一份不含 `targetScore` 的合法 state 到 `localStorage["scoreboard:current:v1"]`，斷言 `readScoreboard()?.targetScore === 11` 且該 key 未被移除。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/storage.test.ts` 於 shell 實際看到紅燈（此為**真紅燈**：schema 尚無該欄位，回傳物件的 `targetScore` 為 `undefined`）
+- [x] 1.2 **綠**：於 `types.ts` 新增 `TargetScoreSchema = z.union([z.literal(11), z.literal(15), z.literal(21)]).default(11)`，加入 `ScoreboardStateSchema` 的 `targetScore` 欄位，匯出 `TargetScore` 型別；於 `Action` union 新增 `{ type: "SET_TARGET_SCORE"; targetScore: TargetScore }`。重跑 1.1 指令至綠
+  - **連帶改動（型別系統逼出，非越界）**：`targetScore` 在 output type 為必填，`createInitialState` 的回傳物件字面值與 `rules.test.ts` 的 4 處手寫 fixture 若不補此欄位則 `tsc` 不過。故本步驟一併在 `reducer.ts` 的 `createInitialState` 加硬編碼 `targetScore: 11`（Task 3.4 才改為由 settings 帶入），並在 `rules.test.ts` 的 fixture 補欄位（不動任何 it 名稱與斷言）。`reducer.test.ts` 因兩處皆用 `...createInitialState()` spread 而不需修改
+- [x] 1.3 **refactor**：檢視 schema 定義是否與既有 `ServerNumberSchema` 的 union-of-literals 風格一致、註解是否說明 `.default()` 的相容性用途（見 design Decision 2）。**skipped** —— code review 確認風格已一致、註解已載明相容性理由，無壞味道
 
 ## 2. 勝利判定（`lib/scoreboard/rules.ts` — 行為邏輯，必 TDD）
 
