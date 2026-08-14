@@ -289,4 +289,61 @@ test.describe("/scoreboard 計分器", () => {
 			);
 		}
 	});
+
+	// scoreboard-target-score change：code review 指出目標分數 radiogroup 缺少 WAI-ARIA
+	// APG 慣用的方向鍵導覽，補上 roving tabindex + 方向鍵移動即選取（見
+	// lib/scoreboard/radio-navigation.ts 的純函式與 ScoreboardSetup.tsx 的 onKeyDown）。
+	test("目標分數 radiogroup 支援方向鍵導覽與 roving tabindex", async ({ page }) => {
+		await page.goto("/scoreboard");
+
+		const radio11 = page.getByRole("radio", { name: "11" });
+		const radio15 = page.getByRole("radio", { name: "15" });
+		const radio21 = page.getByRole("radio", { name: "21" });
+
+		// 初始只有選中項（11）的 tabIndex 為 0，另兩顆為 -1
+		await expect(radio11).toHaveAttribute("tabindex", "0");
+		await expect(radio15).toHaveAttribute("tabindex", "-1");
+		await expect(radio21).toHaveAttribute("tabindex", "-1");
+
+		// 聚焦 11 後按 ArrowRight → 15 被選中且取得焦點
+		await radio11.focus();
+		await page.keyboard.press("ArrowRight");
+		await expect(radio15).toHaveAttribute("aria-checked", "true");
+		await expect(radio15).toBeFocused();
+		await expect(radio15).toHaveAttribute("tabindex", "0");
+		await expect(radio11).toHaveAttribute("tabindex", "-1");
+
+		// 再按 ArrowRight → 21
+		await page.keyboard.press("ArrowRight");
+		await expect(radio21).toHaveAttribute("aria-checked", "true");
+		await expect(radio21).toBeFocused();
+
+		// 再按一次 → 循環回 11
+		await page.keyboard.press("ArrowRight");
+		await expect(radio11).toHaveAttribute("aria-checked", "true");
+		await expect(radio11).toBeFocused();
+
+		// 按 ArrowLeft → 循環回 21
+		await page.keyboard.press("ArrowLeft");
+		await expect(radio21).toHaveAttribute("aria-checked", "true");
+		await expect(radio21).toBeFocused();
+
+		// 比賽開始（按一次「贏這球+」）後按方向鍵 → 選取不變（仍鎖定）。
+		// 按鈕開賽後為原生 disabled，無法真正取得鍵盤焦點（瀏覽器會直接拒絕聚焦），
+		// 因此改用 dispatchEvent 讓 keydown 確實冒泡到掛在容器上的 onKeyDown，
+		// 藉此驗證 handleTargetScoreKeyDown 內的 locked guard 本身有效，
+		// 而不是只仰賴原生 disabled 順帶擋掉（原生 disabled 已由另一測試驗證）。
+		await page.getByRole("button", { name: /我方贏這一球/ }).click();
+		await expect(radio21).toBeDisabled();
+		await radio21.evaluate((el) => {
+			el.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "ArrowLeft",
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+		});
+		await expect(radio21).toHaveAttribute("aria-checked", "true");
+	});
 });

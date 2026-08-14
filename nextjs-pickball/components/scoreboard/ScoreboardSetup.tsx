@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import {
 	Select,
 	SelectContent,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
+import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
 import type { Mode, Team, TargetScore } from "@/lib/scoreboard/types";
 
 // 2026 USA Pickleball 的三種官方分制，皆為 win by 2
@@ -28,8 +30,9 @@ interface ScoreboardSetupProps {
 
 // 頂部設定列：mode、firstServer 兩個 Select 與 targetScore radiogroup，比賽中三者皆為
 // disabled（賽中變更設定會使已累積的分數失去意義，見 scoreboard spec）；右側專注模式按鈕。
-// targetScore 以 role="radio" on button 實作而非 Radix ToggleGroup，代價是沒有 APG 慣用的
-// 方向鍵導覽——鍵盤仍可 Tab 逐顆抵達並以 Enter/Space 選取，WCAG 2.1.1／4.1.2 皆滿足。
+// targetScore 以 role="radio" on button 實作而非 Radix ToggleGroup，因此自行補上 WAI-ARIA
+// APG radio group pattern 的 roving tabindex 與方向鍵導覽（見下方 onKeyDown 與
+// lib/scoreboard/radio-navigation.ts）：Tab 進入群組落在選中項，方向鍵在選項間移動並選取。
 // 專注模式按鈕永遠渲染（不依 Fullscreen API 支援與否隱藏）——
 // 是否附帶 requestFullscreen 由父層（Scoreboard）決定。
 // aria-pressed／label／icon 皆綁 isFocusMode：目前專注模式下整列不渲染
@@ -45,6 +48,25 @@ export function ScoreboardSetup({
 	onTargetScoreChange,
 	onToggleFocus,
 }: ScoreboardSetupProps) {
+	// 目標分數 radiogroup 的三顆按鈕 DOM 參照，供方向鍵導覽後 .focus() 新選中項
+	const targetScoreButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+	// WAI-ARIA APG radio group：方向鍵移動即選取，尾端／開頭循環；locked 時比賽進行中，
+	// 方向鍵不得改變選取（按鈕本身雖已 disabled，但 onKeyDown 掛在容器上仍會收到事件）
+	function handleTargetScoreKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+		if (locked) return;
+		const currentIndex = TARGET_SCORE_OPTIONS.indexOf(targetScore);
+		const nextIndex = nextRadioIndex(
+			currentIndex,
+			TARGET_SCORE_OPTIONS.length,
+			event.key,
+		);
+		if (nextIndex === null) return;
+		event.preventDefault();
+		onTargetScoreChange(TARGET_SCORE_OPTIONS[nextIndex]);
+		targetScoreButtonRefs.current[nextIndex]?.focus();
+	}
+
 	return (
 		<div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
 			<Select
@@ -77,13 +99,18 @@ export function ScoreboardSetup({
 				role="radiogroup"
 				aria-label="目標分數"
 				className="flex items-center gap-1 rounded-md border border-input p-1"
+				onKeyDown={handleTargetScoreKeyDown}
 			>
-				{TARGET_SCORE_OPTIONS.map((score) => (
+				{TARGET_SCORE_OPTIONS.map((score, index) => (
 					<Button
 						key={score}
+						ref={(el) => {
+							targetScoreButtonRefs.current[index] = el;
+						}}
 						type="button"
 						role="radio"
 						aria-checked={targetScore === score}
+						tabIndex={targetScore === score ? 0 : -1}
 						disabled={locked}
 						variant={targetScore === score ? "default" : "ghost"}
 						size="sm"
