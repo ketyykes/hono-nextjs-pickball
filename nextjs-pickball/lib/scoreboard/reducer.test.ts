@@ -25,22 +25,35 @@ describe("createInitialState", () => {
 	});
 });
 
-describe("scoreboardReducer — SET_MODE / SET_FIRST_SERVER", () => {
+describe("scoreboardReducer — 賽前設定", () => {
 	it("setup 階段可切換 mode；切換到 singles 時 serverNumber=1、isFirstService=false", () => {
-		const state = createInitialState();
+		const state = createInitialState({ targetScore: 15 });
 		const next = scoreboardReducer(state, { type: "SET_MODE", mode: "singles" });
 		expect(next.mode).toBe("singles");
 		expect(next.serverNumber).toBe(1);
 		expect(next.isFirstServiceOfGame).toBe(false);
+		// 切換比賽形式不應連帶重設目標分數
+		expect(next.targetScore).toBe(15);
 	});
 
 	it("setup 階段可切換 firstServer", () => {
-		const state = createInitialState();
+		const state = createInitialState({ targetScore: 21 });
 		const next = scoreboardReducer(state, {
 			type: "SET_FIRST_SERVER",
 			team: "them",
 		});
 		expect(next.servingTeam).toBe("them");
+		// 切換先發球方不應連帶重設目標分數
+		expect(next.targetScore).toBe(21);
+	});
+
+	it("setup 階段可切換 targetScore 且保留 mode 與 firstServer", () => {
+		const state = createInitialState({ mode: "singles", firstServer: "them" });
+		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 15 });
+		expect(next.targetScore).toBe(15);
+		expect(next.mode).toBe("singles");
+		expect(next.firstServer).toBe("them");
+		expect(next.scores).toEqual({ us: 0, them: 0 });
 	});
 
 	it("playing 階段 ignore SET_MODE", () => {

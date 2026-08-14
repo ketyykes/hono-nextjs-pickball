@@ -1,4 +1,4 @@
-import type { Action, Mode, ScoreboardState, Team } from "./types";
+import type { Action, Mode, ScoreboardState, Team, TargetScore } from "./types";
 import { applyRallyResult, isGameWon } from "./rules";
 
 /**
@@ -9,10 +9,11 @@ import { applyRallyResult, isGameWon } from "./rules";
  * 單打規則：直接從 1 號發球員開始，無特殊規則。
  */
 export function createInitialState(
-	overrides: { mode?: Mode; firstServer?: Team } = {},
+	overrides: { mode?: Mode; firstServer?: Team; targetScore?: TargetScore } = {},
 ): ScoreboardState {
 	const mode: Mode = overrides.mode ?? "doubles";
 	const firstServer: Team = overrides.firstServer ?? "us";
+	const targetScore: TargetScore = overrides.targetScore ?? 11;
 	const isDoubles = mode === "doubles";
 
 	return {
@@ -27,8 +28,7 @@ export function createInitialState(
 		status: "setup",
 		winner: null,
 		firstServer,
-		// Task 3 會改為可由 overrides 設定；本 task 僅讓型別成立
-		targetScore: 11,
+		targetScore,
 	};
 }
 
@@ -43,19 +43,31 @@ export function scoreboardReducer(
 		case "SET_MODE": {
 			// playing/finished 階段不允許變更設定
 			if (state.status !== "setup") return state;
-			// 重新建立初始狀態，保留現有的先發球隊設定
+			// 重新建立初始狀態，保留現有的先發球隊與目標分數設定
 			return createInitialState({
 				mode: action.mode,
 				firstServer: state.firstServer,
+				targetScore: state.targetScore,
 			});
 		}
 		case "SET_FIRST_SERVER": {
 			// playing/finished 階段不允許變更設定
 			if (state.status !== "setup") return state;
-			// 重新建立初始狀態，保留現有的模式設定
+			// 重新建立初始狀態，保留現有的模式與目標分數設定
 			return createInitialState({
 				mode: state.mode,
 				firstServer: action.team,
+				targetScore: state.targetScore,
+			});
+		}
+		case "SET_TARGET_SCORE": {
+			// playing/finished 階段不允許變更設定
+			if (state.status !== "setup") return state;
+			// 重新建立初始狀態，保留現有的模式與先發球隊設定
+			return createInitialState({
+				mode: state.mode,
+				firstServer: state.firstServer,
+				targetScore: action.targetScore,
 			});
 		}
 		case "RALLY_WON": {
