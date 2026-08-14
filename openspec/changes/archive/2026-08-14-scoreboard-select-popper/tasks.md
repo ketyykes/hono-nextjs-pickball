@@ -7,15 +7,15 @@
 
 ## 2. 驗收（例外層 — 不強制三步）
 
-- [ ] 2.1 於 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 新增 test「下拉選單展開時不被 navbar 遮擋」——分別對「比賽形式」與「先發球方」：先選到第二個選項、再次展開，量測 `[role="listbox"]` 的 `top` 與 navbar 的 `bottom`，斷言 `listboxTop >= navbarBottom`
+- [x] 2.1 於 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 新增 test「下拉選單展開時不被 navbar 遮擋」——分別對「比賽形式」與「先發球方」：先選到第二個選項、再次展開，量測 `[role="listbox"]` 的 `top` 與 navbar 的 `bottom`，斷言 `listboxTop >= navbarBottom`
   - ⚠️ **不可改用「點得到就算過」的驗收方式**：面板被遮一半時選項仍可點擊，Playwright 的 `.click()` 會照常通過。必須直接比較幾何座標（見 delta spec 的 Scenario 理由）
-- [ ] 2.2 執行 `pnpm --filter ./nextjs-pickball exec playwright test tests/e2e/specs/scoreboard.spec.ts --reporter=line` 全數通過（現況 80 passed，加新 test 後應為 85）
-- [ ] 2.3 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 與 `pnpm lint` 通過
+- [x] 2.2 執行 `pnpm --filter ./nextjs-pickball exec playwright test tests/e2e/specs/scoreboard.spec.ts --reporter=line` 全數通過（現況 80 passed，加新 test 後應為 85）
+- [x] 2.3 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 與 `pnpm lint` 通過
 
 ## 3. 收尾
 
-- [ ] 3.1 `DO_NOT_TRACK=1 openspec validate scoreboard-select-popper` 通過
-- [ ] 3.2 `/opsx:verify` 三維度驗證通過
+- [x] 3.1 `DO_NOT_TRACK=1 openspec validate scoreboard-select-popper` 通過
+- [x] 3.2 `/opsx:verify` 三維度驗證通過
 
 ---
 
