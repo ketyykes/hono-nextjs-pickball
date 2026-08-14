@@ -117,11 +117,17 @@ createInitialState({                type MatchSettings = {
   firstServer?: Team                  firstServer: Team
 })                                    targetScore: TargetScore
   ▲ 4 處呼叫各自列舉欄位            }
-    漏一處 → 該設定被靜默重置       createInitialState(settings: MatchSettings)
+    漏一處 → 該設定被靜默重置       createInitialState(
+                                        o: Partial<MatchSettings> = {}
+                                      )
                                       ▲ 欄位清單只有一份
 ```
 
 四處呼叫（`reducer.ts` 的 `SET_MODE`、`SET_FIRST_SERVER`、`UNDO`、`RESET`）改為以「取出目前 settings → 套用差異」的方式呼叫，新增設定值時不需再巡視每一處。這同時是 rally scoring 那個後續 change 的鋪路：加 `scoringSystem` 只要動 `MatchSettings` 的定義。
+
+參數採 `Partial<MatchSettings> = {}` 而非必填的 `settings: MatchSettings`：既有測試有多處無參數呼叫 `createInitialState()` 取預設局面，改為必填會逼出十餘處與本 change 無關的呼叫點改動，收益卻只是型別上的嚴格性。收斂的目的是「欄位清單只有一份」，`Partial` 同樣達成——真正防止遺漏的是 `settingsOf(state)` helper，它讓每個重建點都帶齊三項設定，而不是靠簽章強制。
+
+三個 `SET_*` case MUST 各自保持獨立分支（`createInitialState({ ...settingsOf(state), <該項> })`），SHALL NOT 合併為共用 fallthrough —— 專案慣例是清晰度優先於精簡，且合併後每個 action 各自改哪一項會變得不明顯。
 
 此項屬 TDD 三步的 **refactor 階段**，MUST 在對應測試轉綠之後才進行。
 
