@@ -136,7 +136,11 @@
 
 版面 SHALL 鎖定於視口高度且零垂直捲動：外層容器 MUST 使用 `h-dvh` + `overflow-hidden`（SHALL NOT 使用 `min-h-screen`／100vh —— 行動瀏覽器工具列展開時 100vh 大於可視高度），flex 鏈 MUST 補 `min-h-0` 使子項可收縮。手機直向、手機橫向、平板直向與桌機（含 1024x600 臨界尺寸）MUST 滿足 `scrollHeight <= clientHeight + 1`（容許 1px 次像素誤差），且「贏這球+」與 Undo／重置按鈕的 boundingBox MUST 完整落在 viewport 內（水平與垂直兩軸皆須檢查） —— `overflow-hidden` 使排版錯誤的失敗模式從「可捲動」變成「內容被裁切」，此驗收是唯一防線。
 
-設定列（`ScoreboardSetup`）在窄視口下 MAY 折行為多列：三個控制項加上專注模式按鈕於 390px 寬視口無法單列容納，此折行為**預期行為而非缺陷**。折行後設定列高度增加，MUST 由上述多 viewport 零捲動驗收確認分數面板仍完整可見；SHALL NOT 為避免折行而縮減橫向（主要使用姿勢）的控制項可讀性。
+設定列（`ScoreboardSetup`）在窄視口下 MAY 折行為多列：三個控制項加上專注模式按鈕於 390px 寬視口無法單列容納，此折行為**預期行為而非缺陷**（實測折行後設定列約 115px，單列時約 60px）。折行後設定列高度增加，MUST 由多 viewport 零捲動驗收確認分數面板仍完整可見；SHALL NOT 為避免折行而縮減控制項尺寸或控制項間距 —— 縮減設定列容器自身的上下 padding 不在此限。
+
+面板內的**所有**流體尺寸（分數字級、`gap`、`padding`）MUST 以同一基準收斂，即容器查詢單位（cqh/cqw）而非 `dvh`：`dvh` 反映整個視口高度，不會隨設定列折行擠壓掉的面板可用高度而縮小，與會縮小的分數字級步調不一致，內容總高度將超出面板實際可用高度。`justify-content: center` 在無 `safe` 關鍵字時會向頭尾**對稱溢出**，使相鄰面板在分隔線處互相重疊。
+
+由於容器查詢單位在容器**自身**查不到自己（規格上會 fallback 回視口），`gap`／`padding` MUST 掛在 `@container-size` 容器的**內層 wrapper** 而非容器自身。容器自身 MUST 加 `overflow-hidden` 作為次像素殘差的最後防線，使溢出裁切在自己格內而不侵犯相鄰面板的可點擊區域。
 
 分數字級 SHALL 隨面板實際可用高度流體縮放：每個 TeamPanel MUST 為 size container（`@container-size`，需 tailwindcss >= 4.3），分數字級 MUST 以容器查詢單位（cqh/cqw）搭配 `clamp()` 表達，`gap`／`padding` 同步流體化；SHALL NOT 以寬度斷點決定字級（如 `md:text-[14rem]` —— 平板直向與橫向手機以寬度誤中大字級正是溢出根因）。
 
@@ -171,6 +175,15 @@
 - **WHEN** 開啟 `/scoreboard`
 - **THEN** 仍滿足零捲動驗收，且兩顆「贏這球+」與 Undo／重置按鈕的 boundingBox 完整落在 viewport 內
 - **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見」（既有 test 涵蓋，本情境為其在三控制項下的再確認）
+
+#### Scenario: 核心按鈕不得被其他元素遮蔽
+
+- **GIVEN** 任一支援的 viewport，**特別是高度最受限者**（Playwright `mobile-safari` project 的預設 viewport 為 390x664，是五個 project 中最矮；`mobile-chrome` 為 390x727）
+- **WHEN** 點擊「贏這球+」、Undo 或重置按鈕
+- **THEN** 點擊 MUST 實際命中目標按鈕，SHALL NOT 被隊伍面板名稱行或其他元素的 subtree 攔截
+- **理由**：boundingBox 落在 viewport 內**不等於**可點擊 —— 兩個元素可以各自都在 viewport 內卻互相重疊。本 change 曾因設定列折行增高使 TeamPanel 內容溢出自身 box 約 10px、在分隔線處與相鄰面板碰頭，當時「多 viewport 零捲動」驗收全數通過卻仍無法點擊按鈕，即為此缺口的實例
+- **與瀏覽器引擎無關**：同一組 390x664 尺寸下，webkit 與 chromium 引擎量測到的 `panelRect`／`buttonRect` 數值完全相同。`mobile-safari` 之所以是唯一失敗的 project，純粹因其預設 viewport 比 `mobile-chrome` 矮 63px，headroom 不足以吸收折行擠壓。驗收 SHALL NOT 僅跑高度較寬裕的 project 就宣告通過
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 的既有互動測試（Undo、重置二次確認、localStorage 持久化、連贏觸發 GameOverDialog）在 `--project=mobile-safari` 下 MUST 全數通過；Playwright 的 `subtree intercepts pointer events` 錯誤即為此情境失效的訊號
 
 #### Scenario: 分數字級隨面板高度縮放而非寬度斷點
 
