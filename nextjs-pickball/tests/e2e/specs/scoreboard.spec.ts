@@ -110,6 +110,17 @@ test.describe("/scoreboard 計分器", () => {
 			await page.goto("/scoreboard");
 			await expect(page.getByText("我方", { exact: true })).toBeVisible();
 
+			// 橫式 viewport（width > height）與 SSR 預設的 portrait 不同，需等
+			// hydration 完成後 client orientation 才會切換；OrientationHint 的
+			// visible prop 與下方面板的 flex-row/flex-col 共用同一個 isLandscape
+			// 變數（見 Scoreboard.tsx），等待它確實隱藏即可確認版面已穩定，避免
+			// 量測落在切換前的過渡態（同「橫式 viewport 兩隊面板左右並排」test）
+			if (vp.width > vp.height) {
+				await expect(
+					page.getByRole("status").filter({ hasText: "建議橫向使用" }),
+				).toBeHidden();
+			}
+
 			// 整頁不可垂直捲動（容許 1px 次像素誤差）
 			const { scrollHeight, clientHeight } = await page.evaluate(() => ({
 				scrollHeight: document.scrollingElement!.scrollHeight,
@@ -263,30 +274,43 @@ test.describe("/scoreboard 計分器", () => {
 		// 保留約 3 倍緩衝：clamp 參數若被調整到只剩個位數 px 級的餘量會直接
 		// 紅燈，但不會對日後合理的微調反應過敏。
 		const SAFE_MARGIN_PX = 4;
-		const margins = await page.evaluate(() => {
-			const panels = Array.from(document.querySelectorAll(".\\@container-size"));
-			return panels.map((panel) => {
-				const wrapper = panel.firstElementChild as HTMLElement;
-				const labelRow = wrapper.firstElementChild as HTMLElement;
-				const button = panel.querySelector("button") as HTMLElement;
-				const panelBox = panel.getBoundingClientRect();
-				const labelBox = labelRow.getBoundingClientRect();
-				const buttonBox = button.getBoundingClientRect();
-				return {
-					topMargin: labelBox.top - panelBox.top,
-					bottomMargin: panelBox.bottom - buttonBox.bottom,
-				};
-			});
-		});
 
-		expect(margins, "應找到兩個 TeamPanel 容器").toHaveLength(2);
-		for (const { topMargin, bottomMargin } of margins) {
-			expect(topMargin, "label 行與面板頂部的餘量").toBeGreaterThanOrEqual(
-				SAFE_MARGIN_PX,
-			);
-			expect(bottomMargin, "按鈕與面板底部的餘量").toBeGreaterThanOrEqual(
-				SAFE_MARGIN_PX,
-			);
+		// 抽成函式讓 expect.poll 每次重試都重新讀取 DOM，而非用同一份快照反覆
+		// 斷言——此頁面雖無 orientation 切換（390x664 為直式，與 SSR 預設一致，
+		// 不需切換），但量測手法仍是「切換 viewport 後一次性 evaluate」的同一類
+		// 脆弱寫法，故比照橫式排版 test 補上重試防線。
+		const measureMargins = () =>
+			page.evaluate(() => {
+				const panels = Array.from(document.querySelectorAll(".\\@container-size"));
+				return panels.map((panel) => {
+					const wrapper = panel.firstElementChild as HTMLElement;
+					const labelRow = wrapper.firstElementChild as HTMLElement;
+					const button = panel.querySelector("button") as HTMLElement;
+					const panelBox = panel.getBoundingClientRect();
+					const labelBox = labelRow.getBoundingClientRect();
+					const buttonBox = button.getBoundingClientRect();
+					return {
+						topMargin: labelBox.top - panelBox.top,
+						bottomMargin: panelBox.bottom - buttonBox.bottom,
+					};
+				});
+			});
+
+		// 面板本身的存在不受版面時序影響，不需重試
+		const initialMargins = await measureMargins();
+		expect(initialMargins, "應找到兩個 TeamPanel 容器").toHaveLength(2);
+
+		for (let i = 0; i < initialMargins.length; i++) {
+			await expect
+				.poll(async () => (await measureMargins())[i].topMargin, {
+					message: "label 行與面板頂部的餘量",
+				})
+				.toBeGreaterThanOrEqual(SAFE_MARGIN_PX);
+			await expect
+				.poll(async () => (await measureMargins())[i].bottomMargin, {
+					message: "按鈕與面板底部的餘量",
+				})
+				.toBeGreaterThanOrEqual(SAFE_MARGIN_PX);
 		}
 	});
 
@@ -366,27 +390,52 @@ test.describe("/scoreboard 計分器", () => {
 		await page.goto("/scoreboard");
 		await expect(page.getByText("我方", { exact: true })).toBeVisible();
 
-		// 沿用「面板內容不得貼齊邊界」test 的 selector 手法取得兩個 TeamPanel 容器
-		const boxes = await page.evaluate(() => {
-			const panels = Array.from(document.querySelectorAll(".\\@container-size"));
-			return panels.map((panel) => {
-				const rect = panel.getBoundingClientRect();
-				return { x: rect.x, y: rect.y };
-			});
-		});
+		// 橫式 viewport 與 SSR 預設的 portrait 不同，需等 hydration 完成後
+		// client orientation 才會切到 landscape；OrientationHint 的 visible
+		// prop 與下方面板的 flex-row/flex-col 共用同一個 isLandscape 變數
+		// （見 Scoreboard.tsx），等待它確實隱藏即可確認版面已切換為橫式，
+		// 避免量測落在切換前、面板仍上下堆疊的過渡態。
+		await expect(
+			page.getByRole("status").filter({ hasText: "建議橫向使用" }),
+		).toBeHidden();
 
-		expect(boxes, "應找到兩個 TeamPanel 容器").toHaveLength(2);
-		const [first, second] = boxes;
-		// 並排（flex-row）：兩面板應落在同一水平帶，y 座標相近
-		expect(
-			Math.abs(first.y - second.y),
-			"橫式排版下兩面板應在同一水平帶（並排而非上下堆疊）",
-		).toBeLessThan(5);
+		// 沿用「面板內容不得貼齊邊界」test 的 selector 手法取得兩個 TeamPanel 容器；
+		// 抽成函式讓 expect.poll 每次重試都重新讀取 DOM
+		const measurePositions = () =>
+			page.evaluate(() => {
+				const panels = Array.from(document.querySelectorAll(".\\@container-size"));
+				return panels.map((panel) => {
+					const rect = panel.getBoundingClientRect();
+					return { x: rect.x, y: rect.y };
+				});
+			});
+
+		// 面板本身的存在不受版面時序影響，不需重試
+		const initialBoxes = await measurePositions();
+		expect(initialBoxes, "應找到兩個 TeamPanel 容器").toHaveLength(2);
+
+		// 並排（flex-row）：兩面板應落在同一水平帶，y 座標相近。改用
+		// expect.poll 重試量測本身（而非只等 OrientationHint 消失），涵蓋 hint
+		// 消失後版面仍可能還在收斂的其他過渡狀態。
+		await expect
+			.poll(
+				async () => {
+					const [first, second] = await measurePositions();
+					return Math.abs(first.y - second.y);
+				},
+				{ message: "橫式排版下兩面板應在同一水平帶（並排而非上下堆疊）" },
+			)
+			.toBeLessThan(5);
 		// 並排（flex-row）：兩面板應左右分開，x 座標須有明顯差距
-		expect(
-			Math.abs(first.x - second.x),
-			"橫式排版下兩面板應左右分開排列",
-		).toBeGreaterThan(100);
+		await expect
+			.poll(
+				async () => {
+					const [first, second] = await measurePositions();
+					return Math.abs(first.x - second.x);
+				},
+				{ message: "橫式排版下兩面板應左右分開排列" },
+			)
+			.toBeGreaterThan(100);
 	});
 
 	// scoreboard-target-score change：spec「橫直式排版」Requirement 的「提示橫幅可關閉」
