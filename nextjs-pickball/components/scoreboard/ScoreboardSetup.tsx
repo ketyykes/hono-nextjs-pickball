@@ -77,7 +77,11 @@ export function ScoreboardSetup({
 				<SelectTrigger className="w-32" aria-label="比賽形式">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				{/* position="popper"：shadcn 預設的 "item-aligned" 會把面板上移、讓目前
+				選中項對齊觸發器——設定列緊貼在 navbar 下方，選到第二個選項時面板上緣會
+				壓進 navbar 而把第一個選項切掉一半（實測面板 top 33.8 < navbar bottom 56）。
+				popper 固定在觸發器下方展開並自帶碰撞偵測，不會被上方元素吃掉。 */}
+				<SelectContent position="popper">
 					<SelectItem value="doubles">雙打</SelectItem>
 					<SelectItem value="singles">單打</SelectItem>
 				</SelectContent>
@@ -90,7 +94,8 @@ export function ScoreboardSetup({
 				<SelectTrigger className="w-36" aria-label="先發球方">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				{/* 同上：先發球方選到第二項時會有相同的上移遮擋問題 */}
+				<SelectContent position="popper">
 					<SelectItem value="us">先發：我方</SelectItem>
 					<SelectItem value="them">先發：對方</SelectItem>
 				</SelectContent>
