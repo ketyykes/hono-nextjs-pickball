@@ -76,6 +76,7 @@ describe("isGameWon", () => {
 		expect(isGameWon({ us: 21, them: 20 }, 21)).toEqual({ won: false, winner: null });
 		// 20-18 在 11 分制下會判勝，21 分制下未達門檻——這是本 task 的核心行為差異
 		expect(isGameWon({ us: 20, them: 18 }, 21)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 19, them: 21 }, 21)).toEqual({ won: true, winner: "them" });
 	});
 });
 
