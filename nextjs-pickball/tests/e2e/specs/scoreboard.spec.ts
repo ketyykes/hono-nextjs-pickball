@@ -346,4 +346,77 @@ test.describe("/scoreboard 計分器", () => {
 		});
 		await expect(radio21).toHaveAttribute("aria-checked", "true");
 	});
+
+	// scoreboard-target-score change：spec「目標分數可見性」Requirement 的「名稱行顯示
+	// 目標分數」Scenario 目前只被「專注模式下隊伍面板仍顯示目標分數」間接覆蓋，
+	// 補上對稱的一般模式版本。
+	test("一般模式下隊伍面板顯示目標分數", async ({ page }) => {
+		await page.goto("/scoreboard");
+		await page.getByRole("radio", { name: "15" }).click();
+
+		// 兩個隊伍面板皆顯示分制；strict mode 下需用 toHaveCount(2) 而非 toBeVisible()
+		await expect(page.getByText(/15 分制/)).toHaveCount(2);
+	});
+
+	// scoreboard-target-score change：spec「橫直式排版」Requirement 的「橫式排版
+	// （landscape）」Scenario 要求「兩隊面板左右並排（flex-row）」，但先前只有零捲動
+	// 測試涵蓋此尺寸，沒有斷言排列方向——即使排版誤植成 flex-col，零捲動測試仍可能通過。
+	test("橫式 viewport 兩隊面板左右並排", async ({ page }) => {
+		await page.setViewportSize({ width: 844, height: 390 });
+		await page.goto("/scoreboard");
+		await expect(page.getByText("我方", { exact: true })).toBeVisible();
+
+		// 沿用「面板內容不得貼齊邊界」test 的 selector 手法取得兩個 TeamPanel 容器
+		const boxes = await page.evaluate(() => {
+			const panels = Array.from(document.querySelectorAll(".\\@container-size"));
+			return panels.map((panel) => {
+				const rect = panel.getBoundingClientRect();
+				return { x: rect.x, y: rect.y };
+			});
+		});
+
+		expect(boxes, "應找到兩個 TeamPanel 容器").toHaveLength(2);
+		const [first, second] = boxes;
+		// 並排（flex-row）：兩面板應落在同一水平帶，y 座標相近
+		expect(
+			Math.abs(first.y - second.y),
+			"橫式排版下兩面板應在同一水平帶（並排而非上下堆疊）",
+		).toBeLessThan(5);
+		// 並排（flex-row）：兩面板應左右分開，x 座標須有明顯差距
+		expect(
+			Math.abs(first.x - second.x),
+			"橫式排版下兩面板應左右分開排列",
+		).toBeGreaterThan(100);
+	});
+
+	// scoreboard-target-score change：spec「橫直式排版」Requirement 的「提示橫幅可關閉」
+	// Scenario 先前完全沒有驗收，既有的「直式 viewport 顯示提示橫幅」test 只驗證顯示。
+	test("直式提示橫幅可關閉並記入 sessionStorage", async ({ page }) => {
+		// beforeEach 已 goto("/")；在此清 sessionStorage 而非用 addInitScript——
+		// addInitScript 會在每次 navigation（含本測試稍後的 reload）前重新執行，
+		// 若用它清 sessionStorage 會在 reload 時把剛寫入的 dismissed flag 也清掉，
+		// 讓「reload 後仍不顯示」的持久化驗證失去意義。
+		await page.evaluate(() => {
+			window.sessionStorage.clear();
+		});
+		await page.setViewportSize({ width: 400, height: 800 });
+		await page.goto("/scoreboard");
+
+		const hint = page.getByRole("status").filter({ hasText: "建議橫向使用" });
+		await expect(hint).toBeVisible();
+
+		await page.getByRole("button", { name: "關閉提示" }).click();
+		await expect(hint).toBeHidden();
+
+		const dismissed = await page.evaluate(() =>
+			window.sessionStorage.getItem("scoreboard:hint-dismissed"),
+		);
+		expect(dismissed).toBe("1");
+
+		// reload 後（分頁存活期間）橫幅仍不再顯示
+		await page.reload();
+		await expect(
+			page.getByRole("status").filter({ hasText: "建議橫向使用" }),
+		).toBeHidden();
+	});
 });
