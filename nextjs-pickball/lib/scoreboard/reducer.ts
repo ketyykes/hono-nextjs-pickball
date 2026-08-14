@@ -93,6 +93,7 @@ export function scoreboardReducer(
 			let rebuilt = createInitialState({
 				mode: state.mode,
 				firstServer: state.firstServer,
+				targetScore: state.targetScore,
 			});
 			for (const event of newHistory) {
 				rebuilt = scoreboardReducer(rebuilt, event);
@@ -103,6 +104,7 @@ export function scoreboardReducer(
 			return createInitialState({
 				mode: state.mode,
 				firstServer: state.firstServer,
+				targetScore: state.targetScore,
 			});
 		}
 		case "HYDRATE": {

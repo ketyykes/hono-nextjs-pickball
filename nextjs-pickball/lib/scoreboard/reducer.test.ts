@@ -85,6 +85,18 @@ describe("scoreboardReducer — 賽前設定", () => {
 		});
 		expect(next).toBe(state);
 	});
+
+	it("playing 階段 ignore SET_TARGET_SCORE", () => {
+		const state: ScoreboardState = { ...createInitialState(), status: "playing" };
+		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 15 });
+		expect(next).toBe(state);
+	});
+
+	it("finished 階段 ignore SET_TARGET_SCORE", () => {
+		const state: ScoreboardState = { ...createInitialState(), status: "finished" };
+		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 15 });
+		expect(next).toBe(state);
+	});
 });
 
 describe("scoreboardReducer — RALLY_WON", () => {
@@ -145,12 +157,29 @@ describe("scoreboardReducer — UNDO", () => {
 		expect(undone.status).toBe("setup");
 		expect(undone.history).toEqual([]);
 	});
+
+	it("UNDO 後保留 targetScore，不退回預設 11", () => {
+		// 21 分制打到 12-0：這個比分在 11 分制下早已結束，21 分制下仍在進行
+		let state = createInitialState({ targetScore: 21 });
+		for (let i = 0; i < 12; i++) {
+			state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+		}
+		expect(state.scores).toEqual({ us: 12, them: 0 });
+		expect(state.status).toBe("playing");
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+
+		expect(undone.targetScore).toBe(21);
+		expect(undone.scores).toEqual({ us: 11, them: 0 });
+		// targetScore 若在 replay 時被重設為 11，11-0 會被誤判為比賽結束
+		expect(undone.status).toBe("playing");
+	});
 });
 
 describe("scoreboardReducer — RESET", () => {
-	it("RESET 保留 mode 與 firstServer，清空分數與 history、status 回 setup", () => {
+	it("RESET 保留 mode、firstServer 與 targetScore，清空分數與 history、status 回 setup", () => {
 		const state: ScoreboardState = {
-			...createInitialState({ mode: "singles", firstServer: "them" }),
+			...createInitialState({ mode: "singles", firstServer: "them", targetScore: 15 }),
 			scores: { us: 11, them: 7 },
 			status: "finished",
 			winner: "us",
@@ -163,6 +192,7 @@ describe("scoreboardReducer — RESET", () => {
 		expect(next.mode).toBe("singles");
 		expect(next.firstServer).toBe("them");
 		expect(next.servingTeam).toBe("them");
+		expect(next.targetScore).toBe(15);
 		expect(next.scores).toEqual({ us: 0, them: 0 });
 		expect(next.status).toBe("setup");
 		expect(next.winner).toBeNull();
