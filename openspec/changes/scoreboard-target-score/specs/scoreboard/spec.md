@@ -142,6 +142,8 @@
 
 由於容器查詢單位在容器**自身**查不到自己（規格上會 fallback 回視口），`gap`／`padding` MUST 掛在 `@container-size` 容器的**內層 wrapper** 而非容器自身。容器自身 MUST 加 `overflow-hidden` 作為次像素殘差的最後防線，使溢出裁切在自己格內而不侵犯相鄰面板的可點擊區域。
 
+**支援範圍下限為 390px 寬**（下方 Scenario 列出的四個 viewport 之最小寬度）。實測 320x568（初代 iPhone SE 尺寸）下名稱行會溢出面板頂部約 0.83px 並被裁切；該尺寸不在支援清單內，**此為已知且接受的限制**。成因是固定尺寸元素（名稱行 + 分數 + 發球指示 + 按鈕）的總高超出面板可用高度，屬結構性問題，SHALL NOT 以調整 `gap`／`padding` 係數嘗試補救 —— 真要支援 390px 以下需重新設計面板組成（例如在極矮面板隱藏發球指示文字），應另案提出。
+
 分數字級 SHALL 隨面板實際可用高度流體縮放：每個 TeamPanel MUST 為 size container（`@container-size`，需 tailwindcss >= 4.3），分數字級 MUST 以容器查詢單位（cqh/cqw）搭配 `clamp()` 表達，`gap`／`padding` 同步流體化；SHALL NOT 以寬度斷點決定字級（如 `md:text-[14rem]` —— 平板直向與橫向手機以寬度誤中大字級正是溢出根因）。
 
 實作位於 `nextjs-pickball/hooks/useOrientation.ts` 與 `nextjs-pickball/components/scoreboard/`。
