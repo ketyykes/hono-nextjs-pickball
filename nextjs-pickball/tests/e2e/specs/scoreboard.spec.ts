@@ -171,4 +171,75 @@ test.describe("/scoreboard 計分器", () => {
 		const hint = page.getByRole("status").filter({ hasText: "建議橫向使用" });
 		await expect(hint).toBeVisible();
 	});
+
+	// scoreboard-target-score change：15 分制下 11-0 不該判勝（舊的 11 分制寫死門檻已移除）
+	test("15 分制下連贏 11 球不觸發 GameOverDialog", async ({ page }) => {
+		page.on("console", (msg) => {
+			if (msg.type() === "error")
+				console.error("Browser console error:", msg.text());
+		});
+		page.on("pageerror", (error) => console.error("Page error:", error.message));
+
+		await page.goto("/scoreboard");
+		await page.getByRole("radio", { name: "15" }).click();
+
+		// 按 11 次。aria-label 會隨分數更新，因此用 role+name 正則重新查詢
+		for (let i = 0; i < 11; i++) {
+			await page.getByRole("button", { name: /我方贏這一球/ }).click();
+		}
+
+		await expect(page.getByLabel(/我方目前 11 分/)).toBeVisible();
+		await expect(page.getByLabel(/對方目前 0 分/)).toBeVisible();
+		await expect(page.getByRole("dialog", { name: /我方獲勝/ })).toBeHidden();
+		await expect(
+			page.getByRole("button", { name: /我方贏這一球/ }),
+		).toBeEnabled();
+	});
+
+	// scoreboard-target-score change：目標分數與比賽形式、先發球方同屬賽前設定，開賽後三者一律鎖定
+	test("比賽開始後三個賽前設定控制項皆為 disabled", async ({ page }) => {
+		page.on("console", (msg) => {
+			if (msg.type() === "error")
+				console.error("Browser console error:", msg.text());
+		});
+		page.on("pageerror", (error) => console.error("Page error:", error.message));
+
+		await page.goto("/scoreboard");
+
+		// 開賽前三者皆為 enabled
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeEnabled();
+		await expect(page.getByRole("combobox", { name: "先發球方" })).toBeEnabled();
+		for (const score of ["11", "15", "21"] as const) {
+			await expect(page.getByRole("radio", { name: score })).toBeEnabled();
+		}
+
+		// 按一次「贏這球+」使 status 進入 playing
+		await page.getByRole("button", { name: /我方贏這一球/ }).click();
+
+		// 開賽後三者全數 disabled
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeDisabled();
+		await expect(page.getByRole("combobox", { name: "先發球方" })).toBeDisabled();
+		for (const score of ["11", "15", "21"] as const) {
+			await expect(page.getByRole("radio", { name: score })).toBeDisabled();
+		}
+	});
+
+	// scoreboard-target-score change：專注模式不渲染設定列，分制須改由隊伍面板顯示，否則使用者無從得知比賽何時結束
+	test("專注模式下隊伍面板仍顯示目標分數", async ({ page }) => {
+		page.on("console", (msg) => {
+			if (msg.type() === "error")
+				console.error("Browser console error:", msg.text());
+		});
+		page.on("pageerror", (error) => console.error("Page error:", error.message));
+
+		await page.goto("/scoreboard");
+		await page.getByRole("radio", { name: "21" }).click();
+		await page.getByRole("button", { name: "進入專注模式" }).click();
+
+		// 設定列已隱藏
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeHidden();
+
+		// 兩個隊伍面板皆顯示分制；strict mode 下需用 toHaveCount(2) 而非 toBeVisible()
+		await expect(page.getByText(/21 分制/)).toHaveCount(2);
+	});
 });
