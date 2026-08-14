@@ -197,6 +197,21 @@ twMerge 把所有 `text-{size}` 與 `leading-*` 歸為同一衝突群組並套�
 
 390x664 的面板內容餘量由 **0.94px／-0.06px** 提升至 **13.13px／12.13px**。
 
+### Decision 9（實作中追加）：切換 viewport 後的量測必須用 auto-retrying 斷言
+
+本 change 新增的「橫式 viewport 兩隊面板左右並排」E2E 一度為 **flaky**：四輪實測中失敗兩次（`[firefox]` 一次、`[webkit]` 一次），且**序列執行（`--workers=1`）也會失敗**，排除了並行資源競爭的解釋。
+
+根因：排版方向由 `useOrientation` 以 client-side `matchMedia` 決定，`getServerSnapshot` 永遠回傳 `"portrait"`，故 SSR 首次輸出為直式（`flex-col`，上下堆疊），hydration 後才切成橫式。而 `await expect(locator).toBeVisible()` 只保證文字節點渲染，不保證 orientation 已切換；`expect(純值)` 又沒有 Playwright 的 auto-retry —— `page.evaluate` 量到什麼就是什麼，剛好量在切換前就會誤判成上下堆疊。
+
+規則：**凡切換 viewport 後量測幾何的 E2E，MUST 具備兩層防護** ——
+
+1. 等待一個與目標狀態同源的明確信號。此處用 `OrientationHint` 消失：它的 `visible={!isLandscape}` 與 TeamPanel 的 `flex-row`／`flex-col` 在同一個 render 中共用同一個 `isLandscape` 變數，因此是對同一狀態的直接 proxy，而非時序猜測。
+2. 量測本身包進 `expect.poll(...)`，每次重試都重新讀 DOM。
+
+SHALL NOT 以單次執行的綠燈作為測試穩定性的證據 —— 這個 flaky 測試最初正是以「80 passed」通過回報的，其約 25% 的失敗率要靠多輪執行才會顯現。
+
+**未解的環境現象（不在本 change 處理）**：冷啟動跑完整 E2E 時，dev server 會輸出約 19 次 `ChunkLoadError`（Turbopack HMR chunk，`unhandledRejection`）。最終驗證中它**未**造成任何測試失敗（冷啟動 80 passed），但本 change 第一次全量執行時曾有 3 個 chromium 既有測試失敗，其完整 log 已遺失、**無法證實與此有關**，後續五輪亦未重現。屬測試基礎建設（`dev-workflow` capability）範疇，建議另案追查。
+
 **已知限制（不在本 change 處理）**：
 
 - **平板直向密度未完全恢復**：768x1024 僅回到 11.91px（原約 20.5px）。直向兩面板垂直對切、橫向並排，同一個 `cqh` 係數要命中兩種形態所需值相差近兩倍（平板約 5.15%、桌機約 2.83%），單一線性係數無法兼顧，取中間值 3cqh 讓桌機與橫向命中最好。若要進一步改善，可用 `portrait:` 只分流 `gap`／`padding`（spec 禁止的是「以寬度斷點決定**字級**」，未及於 orientation 或 gap），屬 follow-up。
