@@ -1,1 +1,1 @@
-- [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay 設計、firstServer 持久化決策、history 只記 RALLY_WON
+- [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界

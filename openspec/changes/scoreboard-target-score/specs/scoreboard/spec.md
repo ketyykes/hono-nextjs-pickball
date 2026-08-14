@@ -185,6 +185,14 @@
 - **與瀏覽器引擎無關**：同一組 390x664 尺寸下，webkit 與 chromium 引擎量測到的 `panelRect`／`buttonRect` 數值完全相同。`mobile-safari` 之所以是唯一失敗的 project，純粹因其預設 viewport 比 `mobile-chrome` 矮 63px，headroom 不足以吸收折行擠壓。驗收 SHALL NOT 僅跑高度較寬裕的 project 就宣告通過
 - **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 的既有互動測試（Undo、重置二次確認、localStorage 持久化、連贏觸發 GameOverDialog）在 `--project=mobile-safari` 下 MUST 全數通過；Playwright 的 `subtree intercepts pointer events` 錯誤即為此情境失效的訊號
 
+#### Scenario: 面板內容須保留邊界安全餘量
+
+- **GIVEN** viewport 為 390x664（`mobile-safari` project 的預設尺寸，五個 project 中最矮）
+- **WHEN** 量測兩個 TeamPanel 的 boundingBox 與其內容（名稱行、「贏這球+」按鈕）的 boundingBox
+- **THEN** 內容距面板頂部與底部的餘量 MUST ≥ 4px
+- **理由**：「有沒有重疊」是布林判定，餘量被壓到 0.94px 時它仍然回答「沒有」。本 change 曾一度處於這個狀態 —— 全部驗收皆綠，但任何 label 文案加長、按鈕 padding 微調或平台字型 hinting 差異都會使版面重新破裂，且因面板帶 `overflow-hidden` 而表現為靜默裁切。量化餘量使「防護正在變薄」本身成為可偵測的事件，SHALL NOT 僅以「目前沒有重疊」作為通過條件
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「面板內容不得貼齊邊界：底部餘量須保留安全值」。該 test MUST 自行 `setViewportSize(390, 664)` 而非依賴 project 預設值，使五個引擎都在已知最脆弱尺寸下受驗
+
 #### Scenario: 分數字級隨面板高度縮放而非寬度斷點
 
 - **GIVEN** TeamPanel 的可用高度因 orientation 切換、提示橫幅顯示／關閉而改變

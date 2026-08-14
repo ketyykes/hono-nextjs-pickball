@@ -172,6 +172,37 @@ createInitialState({                type MatchSettings = {
 
 - **[E2E 既有劇本假設 11 分制]** → `scoreboard.spec.ts` 的「連贏 11 球觸發 GameOverDialog」依賴預設值。預設仍為 11，該測試不受影響；新增的 15 分制劇本需顯式切換分制後再計分。
 
+### Decision 8（實作中追加）：面板流體間距改以 cqh 為基準，並修正 `leading-none` 被 twMerge 丟棄
+
+設定列新增第三個控制項後，窄視口下折行使設定列由約 60px 增為約 115px。原本 `gap`／`padding` 用 `clamp(0.375rem, 2dvh, 1.5rem)`，`dvh` 基準不隨面板被擠壓而縮小，但分數字級（`cqh` 基準）會縮 —— 兩者步調不一致使內容溢出面板，`justify-content: center` 在無 `safe` 關鍵字時向頭尾對稱溢出，相鄰面板在分隔線處重疊、按鈕被攔截無法點擊。
+
+診斷過程另外發現一個**既有缺陷**（非本 change 引入，自 TeamPanel 首次實作即存在）：
+
+```
+twMerge("leading-none text-[14rem]")  →  "text-[14rem]"        // leading-none 被丟棄
+twMerge("text-[14rem] leading-none")  →  "text-[14rem] leading-none"
+```
+
+twMerge 把所有 `text-{size}` 與 `leading-*` 歸為同一衝突群組並套用「後者覆蓋前者」（刻意設計，因為 Tailwind 的 `text-{size}` 本身即可連帶設定 line-height），與是否 arbitrary 值、值內有無逗號皆無關。分數因此長期套用約 1.5× 的預設 line-height 而非宣告的 1×，白白多吃約 0.5×字級的垂直空間 —— 這是面板餘量長期吃緊的根因。
+
+兩項修正的效果（實測，非推算）：
+
+| Viewport | 面板高 | 原 `2dvh` | 中途 `1cqh` | 定案 `3cqh` |
+|---|---|---|---|---|
+| 1024x600 | 424px | 12px | 4.24px | 12.72px |
+| 1280x800 | 624px | 16px | 6.24px | 18.72px |
+| 768x1024 | 398px | ~20.5px | 3.97px | 11.91px |
+| 844x390 | 214px | 7.8px | 2.14px | 6.42px |
+| 390x664 | 194px | — | 2px（floor） | 5.79px |
+
+390x664 的面板內容餘量由 **0.94px／-0.06px** 提升至 **13.13px／12.13px**。
+
+**已知限制（不在本 change 處理）**：
+
+- **平板直向密度未完全恢復**：768x1024 僅回到 11.91px（原約 20.5px）。直向兩面板垂直對切、橫向並排，同一個 `cqh` 係數要命中兩種形態所需值相差近兩倍（平板約 5.15%、桌機約 2.83%），單一線性係數無法兼顧，取中間值 3cqh 讓桌機與橫向命中最好。若要進一步改善，可用 `portrait:` 只分流 `gap`／`padding`（spec 禁止的是「以寬度斷點決定**字級**」，未及於 orientation 或 gap），屬 follow-up。
+- **320x568（舊 iPhone SE）會破版**：實測 `topMargin` 約 -0.83px，label 行溢出面板頂部並被裁切。該尺寸不在 spec 的 viewport 清單（最小寬 390）也不在任何 CI project 內，**目前不算違規**。這是固定尺寸元素（label + 分數 + 發球指示 + 按鈕）總高超出面板的結構性問題，調整 gap 係數救不回來；若日後要支援 320 寬需重新設計版面。
+- **`PriceStars.tsx` 有同類 twMerge 潛伏風險**：`cn("… text-[0.8rem] leading-none …", className)` 目前順序安全且三個呼叫端都未傳 `className`，但 `className` 會被 append 在最後，一旦有呼叫端傳入覆蓋字級的 class（如 `text-lg`）就會吃掉 `leading-none`。該檔案屬 `pickleball-guide-page` capability，不在本 change 範圍，另案處理。
+
 ## Migration Plan
 
 無資料庫、無 API、無部署順序相依。使用者端的既有 `localStorage["scoreboard:current:v1"]` 由 Decision 2 的 schema 預設值向後相容，**不需要任何遷移動作**，也不需清除使用者資料。

@@ -49,13 +49,17 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 					aria-live="polite"
 					aria-label={`${label}目前 ${score} 分`}
 					className={cn(
-						// leading-none 必須排在 text-[clamp(...)] 之後：twMerge 會把帶
-						// 逗號的 arbitrary text-[] 值誤判為與 leading 同一 class group
-						// （Tailwind 的 text-{size} utility 本身可能連帶設定
-						// line-height），若 leading-none 排在前面會被判定衝突而整個被
-						// twMerge 丟棄——結果是分數實際套用瀏覽器/字型預設的
-						// line-height（約 1.5×字級），而非預期的 1×，白白多吃約
-						// 0.5×字級的垂直空間（已用 twMerge() 現場驗證此排序修法）。
+						// leading-none 必須排在 text-* 之後。twMerge 把「所有 text-{size}」
+						// 與「所有 leading-*」歸為同一衝突群組並套用「後者覆蓋前者」——
+						// 這是刻意設計（Tailwind 的 text-{size} 本身即可連帶設定
+						// line-height），不是 bug。條件與是否為 arbitrary 值、值裡有無
+						// 逗號都無關：`leading-none text-sm`、`leading-none text-[14rem]`、
+						// `leading-none text-[clamp(...)]` 三者的 leading 全會被丟棄
+						// （已對專案安裝的 tailwind-merge 現場驗證）。
+						// 被丟棄時分數會套用瀏覽器/字型預設 line-height（約 1.5×字級）
+						// 而非預期的 1×，白白多吃約 0.5×字級的垂直空間——這正是本頁
+						// 面板長期餘量吃緊的根因。稽核同類問題時要找的是「leading-* 排在
+						// 任何 text-* 之前」，不要只找 arbitrary 值。
 						"font-bebas text-[clamp(2.5rem,min(37cqh,38cqw),14rem)] leading-none",
 						isServing ? "text-lime-400" : "text-foreground",
 					)}
