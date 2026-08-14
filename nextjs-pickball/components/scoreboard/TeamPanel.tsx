@@ -39,8 +39,21 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 			仍超出（例如極端視窗高度、不同平台字體 metrics 造成的次像素差異）時會
 			向上下對稱溢出，沒有 overflow-hidden 會直接吃進相鄰面板的版面；有了它，
 			即使 fluid 公式仍有極小殘差，溢出也只會被裁在「自己這格」的邊界，不會
-			再侵犯到另一隊的可點擊區域。 */}
-			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.25rem,3cqh,1.5rem)] p-[clamp(0.25rem,3cqh,1.5rem)]">
+			再侵犯到另一隊的可點擊區域。
+
+			`portrait:md:` 疊加斷點只調 gap/padding 密度，不觸碰分數字級：直向
+			兩面板垂直對切，同一 cqh 係數在「面板高度佔比」上，平板直向（例如
+			768×1024，面板約 398px）與手機直向（例如 390×664，面板約 194px）
+			差近一倍，單一係數只能挑一邊安全——3cqh 對手機直向剛好卡在安全餘量
+			下限，加大係數會讓手機直向的餘量被壓縮甚至變負值。單獨用 `portrait:`
+			不夠，因為兩者同為 portrait；改疊加 `md:`（寬度 ≥768px）縮小命中
+			範圍到「直向且夠寬」，只有平板直向會進入這組加密係數，手機直向
+			（寬度 <768px）與橫向手機（md 寬度達標但 orientation 非 portrait）
+			都不受影響。字級 SHALL NOT 比照辦理：分數字級的 cqh/cqw 已用 min()
+			讓兩種形態共用同一組平滑曲線，用寬度斷點分流字級正是先前平板直向／
+			橫向手機誤中過大字級而溢出的根因（見上方字級註解）；gap/padding
+			是版面密度而非內容本身，用斷點分流不會重蹈覆轍。 */}
+			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.25rem,3cqh,1.5rem)] p-[clamp(0.25rem,3cqh,1.5rem)] portrait:md:gap-[clamp(0.25rem,5.15cqh,2rem)] portrait:md:p-[clamp(0.25rem,5.15cqh,2rem)]">
 				<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
 					<span>{label}</span>
 					<span className="opacity-70"> · {state.targetScore} 分制</span>
