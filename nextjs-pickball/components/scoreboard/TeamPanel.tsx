@@ -27,7 +27,8 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 		// 故明確用 dvh（隨視窗高縮放，與外層 h-dvh 鎖高一致）。
 		<div className="@container-size flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-[clamp(0.375rem,2dvh,1.5rem)] p-[clamp(0.375rem,2dvh,1.5rem)]">
 			<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
-				{label}
+				<span>{label}</span>
+				<span className="opacity-70"> · {state.targetScore} 分制</span>
 			</div>
 			<div
 				aria-live="polite"

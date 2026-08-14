@@ -115,10 +115,14 @@ export function Scoreboard() {
 				<ScoreboardSetup
 					mode={state.mode}
 					firstServer={state.firstServer}
+					targetScore={state.targetScore}
 					locked={locked}
 					isFocusMode={focusMode}
 					onModeChange={(mode) => dispatch({ type: "SET_MODE", mode })}
 					onFirstServerChange={(team) => dispatch({ type: "SET_FIRST_SERVER", team })}
+					onTargetScoreChange={(targetScore) =>
+						dispatch({ type: "SET_TARGET_SCORE", targetScore })
+					}
 					onToggleFocus={handleToggleFocus}
 				/>
 			)}

@@ -9,15 +9,20 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
-import type { Mode, Team } from "@/lib/scoreboard/types";
+import type { Mode, Team, TargetScore } from "@/lib/scoreboard/types";
+
+// 2026 USA Pickleball 的三種官方分制，皆為 win by 2
+const TARGET_SCORE_OPTIONS = [11, 15, 21] as const;
 
 interface ScoreboardSetupProps {
 	mode: Mode;
 	firstServer: Team;
+	targetScore: TargetScore;
 	locked: boolean;
 	isFocusMode: boolean;
 	onModeChange: (mode: Mode) => void;
 	onFirstServerChange: (team: Team) => void;
+	onTargetScoreChange: (targetScore: TargetScore) => void;
 	onToggleFocus: () => void;
 }
 
@@ -29,10 +34,12 @@ interface ScoreboardSetupProps {
 export function ScoreboardSetup({
 	mode,
 	firstServer,
+	targetScore,
 	locked,
 	isFocusMode,
 	onModeChange,
 	onFirstServerChange,
+	onTargetScoreChange,
 	onToggleFocus,
 }: ScoreboardSetupProps) {
 	return (
@@ -63,6 +70,26 @@ export function ScoreboardSetup({
 					<SelectItem value="them">先發：對方</SelectItem>
 				</SelectContent>
 			</Select>
+			<div
+				role="radiogroup"
+				aria-label="目標分數"
+				className="flex items-center gap-1 rounded-md border border-input p-1"
+			>
+				{TARGET_SCORE_OPTIONS.map((score) => (
+					<Button
+						key={score}
+						type="button"
+						role="radio"
+						aria-checked={targetScore === score}
+						disabled={locked}
+						variant={targetScore === score ? "default" : "ghost"}
+						size="sm"
+						onClick={() => onTargetScoreChange(score)}
+					>
+						{score}
+					</Button>
+				))}
+			</div>
 			<div className="ml-auto">
 				<Button
 					variant="outline"
