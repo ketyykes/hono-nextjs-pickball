@@ -10,11 +10,12 @@
 
 ## 2. 勝利判定（`lib/scoreboard/rules.ts` — 行為邏輯，必 TDD）
 
-- [ ] 2.1 **紅**：於 `nextjs-pickball/lib/scoreboard/rules.test.ts` 新增 it「15 分制：11-0 尚未達標 → 未贏」，斷言 `isGameWon({ us: 11, them: 0 }, 15)` 回傳 `{ won: false, winner: null }`。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/rules.test.ts` 看到紅燈（**真紅燈**：現行實作只看 `max < 11`，11-0 會誤判為我方獲勝）
-- [ ] 2.2 **綠**：`isGameWon(scores, targetScore)` 新增**必填**第二參數（SHALL NOT 給預設值，見 design Decision 3），判定改為 `max < targetScore` 即未勝；同步更新 `reducer.ts` 的呼叫點使其可編譯。重跑 2.1 指令至綠
-- [ ] 2.3 更新既有 5 個 it 的呼叫，補上第二參數 `11`（**更新而非刪除**：這些案例仍是 11 分制的有效驗收）。新增 it「15 分制：達 15 且差距 ≥ 2 → 勝，差距 1 → 延長」與「21 分制：達 21 且差距 ≥ 2 → 勝，差距 1 → 延長」。重跑 2.1 指令確認全綠
-  - ⚠️ **誠實標註**：2.3 新增的這兩個 it 在 2.2 實作前即會通過（15-13、21-19 在舊實作下同樣達 `max >= 11` 且差距 ≥ 2），屬 **regression guard 而非 TDD 紅燈**。真正的紅燈由 2.1 的「未達目標分數」案例提供。**不得**以修改斷言看紅再改回的方式偽造紅燈
-- [ ] 2.4 **refactor**：檢視 `isGameWon` 的註解是否已更新（現行註解寫死「任一方達 11 分」）。無其他壞味道則註記 skipped
+- [x] 2.1 **紅**：於 `nextjs-pickball/lib/scoreboard/rules.test.ts` 新增 it「15 分制：11-0 尚未達標 → 未贏」，斷言 `isGameWon({ us: 11, them: 0 }, 15)` 回傳 `{ won: false, winner: null }`。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/rules.test.ts` 看到紅燈（**真紅燈**：現行實作只看 `max < 11`，11-0 會誤判為我方獲勝）
+- [x] 2.2 **綠**：`isGameWon(scores, targetScore)` 新增**必填**第二參數（SHALL NOT 給預設值，見 design Decision 3），判定改為 `max < targetScore` 即未勝；同步更新 `reducer.ts` 的呼叫點使其可編譯。重跑 2.1 指令至綠
+- [x] 2.3 更新既有 5 個 it 的呼叫，補上第二參數 `11`（**更新而非刪除**：這些案例仍是 11 分制的有效驗收）。新增 it「15 分制：達 15 且差距 ≥ 2 → 勝，差距 1 → 延長」與「21 分制：達 21 且差距 ≥ 2 → 勝，差距 1 → 延長」。重跑 2.1 指令確認全綠
+  - ⚠️ **誠實標註**：2.3 新增的兩個 it 中，多數斷言在 2.2 實作前即會通過，屬 **regression guard 而非 TDD 紅燈** —— 15-13、16-14、21-19 在舊實作下同樣達 `max >= 11` 且差距 ≥ 2 而判勝；15-14、21-20 在舊實作下同樣因 `diff < 2` 而判延長。真正的新紅燈只有兩筆：2.1 的 `{us:11, them:0}` 在 15 分制、以及本步驟的 `{us:20, them:18}` 在 21 分制（兩者在舊邏輯下皆會誤判為獲勝）。**不得**以修改斷言看紅再改回的方式偽造紅燈
+  - code review 後補：21 分制那組原本缺「對方獲勝」的對稱斷言（`isGameWon` 的 `them` 分支在 21 分制下未被走到），已補 `{us:19, them:21} → winner: "them"`
+- [x] 2.4 **refactor**：檢視 `isGameWon` 的註解是否已更新（現行註解寫死「任一方達 11 分」）。**已更新** —— 註解改為說明門檻依 targetScore、不設 cap，並載明第二參數為何刻意不給預設值；其餘無壞味道
 
 ## 3. Reducer 與賽前設定（`lib/scoreboard/reducer.ts` — 行為邏輯，必 TDD）
 
