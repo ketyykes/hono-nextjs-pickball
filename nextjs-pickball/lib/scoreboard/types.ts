@@ -43,6 +43,14 @@ export type ScoreEvent = z.infer<typeof ScoreEventSchema>;
 export type ScoreboardState = z.infer<typeof ScoreboardStateSchema>;
 export type TargetScore = z.infer<typeof TargetScoreSchema>;
 
+// 賽前設定：status === "setup" 期間可調整、且在 UNDO replay 與 RESET 後必須被保留的欄位。
+// 收斂為單一型別，使新增設定值時只需改這裡與 settingsOf()，不必巡視每個 createInitialState 呼叫點。
+export interface MatchSettings {
+	mode: Mode;
+	firstServer: Team;
+	targetScore: TargetScore;
+}
+
 // Action 為純記憶體型別，不會落 localStorage，無需 zod 驗證
 export type Action =
 	| { type: "SET_MODE"; mode: Mode }

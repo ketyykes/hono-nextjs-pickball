@@ -1,4 +1,4 @@
-import type { Action, Mode, ScoreboardState, Team, TargetScore } from "./types";
+import type { Action, Mode, MatchSettings, ScoreboardState, Team, TargetScore } from "./types";
 import { applyRallyResult, isGameWon } from "./rules";
 
 /**
@@ -9,7 +9,7 @@ import { applyRallyResult, isGameWon } from "./rules";
  * 單打規則：直接從 1 號發球員開始，無特殊規則。
  */
 export function createInitialState(
-	overrides: { mode?: Mode; firstServer?: Team; targetScore?: TargetScore } = {},
+	overrides: Partial<MatchSettings> = {},
 ): ScoreboardState {
 	const mode: Mode = overrides.mode ?? "doubles";
 	const firstServer: Team = overrides.firstServer ?? "us";
@@ -32,6 +32,15 @@ export function createInitialState(
 	};
 }
 
+// 從 state 取出三項賽前設定，供重建初始狀態時原樣帶入
+function settingsOf(state: ScoreboardState): MatchSettings {
+	return {
+		mode: state.mode,
+		firstServer: state.firstServer,
+		targetScore: state.targetScore,
+	};
+}
+
 /**
  * 記分板 reducer：處理 setup toggle、rally 計分、undo、reset、hydrate。
  */
@@ -44,31 +53,19 @@ export function scoreboardReducer(
 			// playing/finished 階段不允許變更設定
 			if (state.status !== "setup") return state;
 			// 重新建立初始狀態，保留現有的先發球隊與目標分數設定
-			return createInitialState({
-				mode: action.mode,
-				firstServer: state.firstServer,
-				targetScore: state.targetScore,
-			});
+			return createInitialState({ ...settingsOf(state), mode: action.mode });
 		}
 		case "SET_FIRST_SERVER": {
 			// playing/finished 階段不允許變更設定
 			if (state.status !== "setup") return state;
 			// 重新建立初始狀態，保留現有的模式與目標分數設定
-			return createInitialState({
-				mode: state.mode,
-				firstServer: action.team,
-				targetScore: state.targetScore,
-			});
+			return createInitialState({ ...settingsOf(state), firstServer: action.team });
 		}
 		case "SET_TARGET_SCORE": {
 			// playing/finished 階段不允許變更設定
 			if (state.status !== "setup") return state;
 			// 重新建立初始狀態，保留現有的模式與先發球隊設定
-			return createInitialState({
-				mode: state.mode,
-				firstServer: state.firstServer,
-				targetScore: action.targetScore,
-			});
+			return createInitialState({ ...settingsOf(state), targetScore: action.targetScore });
 		}
 		case "RALLY_WON": {
 			if (state.status === "finished") return state;
@@ -90,22 +87,14 @@ export function scoreboardReducer(
 			if (state.history.length === 0) return state;
 			// 移除最後一筆 event，從初始狀態 replay 重建
 			const newHistory = state.history.slice(0, -1);
-			let rebuilt = createInitialState({
-				mode: state.mode,
-				firstServer: state.firstServer,
-				targetScore: state.targetScore,
-			});
+			let rebuilt = createInitialState(settingsOf(state));
 			for (const event of newHistory) {
 				rebuilt = scoreboardReducer(rebuilt, event);
 			}
 			return rebuilt;
 		}
 		case "RESET": {
-			return createInitialState({
-				mode: state.mode,
-				firstServer: state.firstServer,
-				targetScore: state.targetScore,
-			});
+			return createInitialState(settingsOf(state));
 		}
 		case "HYDRATE": {
 			return action.state;
