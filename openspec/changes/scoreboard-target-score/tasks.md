@@ -28,14 +28,14 @@
 
 ## 4. UI 呈現（例外層 — 純呈現型元件，以 E2E 驗收）
 
-- [ ] 4.1 `components/scoreboard/ScoreboardSetup.tsx` 新增「目標分數」分段按鈕（11 | 15 | 21），`aria-label="目標分數"`，鎖定狀態使用原生 `disabled={locked}`（與其餘兩控制項一致）；props 增加 `targetScore` 與 `onTargetScoreChange`
+- [ ] 4.1 `components/scoreboard/ScoreboardSetup.tsx` 新增「目標分數」分段按鈕（11 | 15 | 21）：外層 `role="radiogroup"` + `aria-label="目標分數"`，三顆按鈕各為 `role="radio"` + `aria-checked`（見 design 已決議事項），鎖定狀態使用原生 `disabled={locked}`（與其餘兩控制項一致）；props 增加 `targetScore` 與 `onTargetScoreChange`
 - [ ] 4.2 `components/scoreboard/Scoreboard.tsx` 傳入 `state.targetScore` 與 `onTargetScoreChange={(targetScore) => dispatch({ type: "SET_TARGET_SCORE", targetScore })}`
 - [ ] 4.3 `components/scoreboard/TeamPanel.tsx` 名稱行改為顯示「{label} · {targetScore} 分制」（沿用既有 label 節點，**不新增獨立列**——頁面為 `h-dvh` + `overflow-hidden` 鎖高，見 design Decision 7）
 - [ ] 4.4 於 `pnpm dev:web` 手動確認：橫向（844x390）設定列單列容納三控制項；直向（390x844）設定列折為兩列且兩顆「贏這球+」仍完整可見。**折行為預期行為**，正式驗收以 5.3 的 E2E 為準
 
 ## 5. E2E 驗收（例外層 — 不強制三步）
 
-- [ ] 5.1 於 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 新增 test「15 分制下連贏 11 球不觸發 GameOverDialog」——切換目標分數為 15 後連按我方「贏這球+」11 次，斷言比分為 11 – 0 且 GameOverDialog 未出現
+- [ ] 5.1 於 `nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts` 新增 test「15 分制下連贏 11 球不觸發 GameOverDialog」——以 `getByRole("radio", { name: "15" })` 切換目標分數為 15 後連按我方「贏這球+」11 次，斷言比分為 11 – 0 且 GameOverDialog 未出現
 - [ ] 5.2 新增 test「比賽開始後三個賽前設定控制項皆為 disabled」與「專注模式下隊伍面板仍顯示目標分數」
 - [ ] 5.3 重跑既有 test「多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見」，確認設定列增為三控制項後 390x844／844x390／768x1024／1024x600 四個 viewport 仍全數通過（此為直向折行是否造成靜默裁切的唯一防線）
 - [ ] 5.4 確認既有 test「我方連贏 11 球觸發 GameOverDialog…」仍通過（預設值仍為 11，不應受影響）

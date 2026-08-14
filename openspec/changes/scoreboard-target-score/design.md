@@ -176,5 +176,26 @@ createInitialState({                type MatchSettings = {
 
 ## Open Questions
 
-- `GameOverDialog` 是否要在比分下方附帶顯示「15 分制 · 雙打」？目前傾向不加——比分 15-13 本身已隱含分制，且該 dialog 的內容越少越適合快速關閉。若加，屬純呈現變更，E2E 驗收。
-- 分段按鈕的 a11y 語意採 `aria-pressed` 的三顆 toggle button，或 `role="radiogroup"`？兩者皆可滿足 delta spec 的「原生 `disabled` + `aria-label="目標分數"`」要求，實作時擇一並在 E2E 固定選取方式即可。
+（實作前已全數決議，保留於此供追溯）
+
+### 已決議：分段按鈕採 `role="radiogroup"`
+
+三個目標分數為互斥單選，`radiogroup` 的語意比三顆 `aria-pressed` toggle button 準確——讀屏會告知「1 of 3」，使用者知道這是三選一而非三個獨立開關。
+
+```tsx
+<div role="radiogroup" aria-label="目標分數">
+  <button role="radio" aria-checked={targetScore === 11} disabled={locked}>11</button>
+  <button role="radio" aria-checked={targetScore === 15} disabled={locked}>15</button>
+  <button role="radio" aria-checked={targetScore === 21} disabled={locked}>21</button>
+</div>
+```
+
+E2E 一律以 `getByRole("radio", { name: "15" })` 選取，實作與測試的選取方式 MUST 對齊。
+
+**未採用**：`aria-pressed` toggle button。它與設定列既有的專注模式按鈕語意一致，實作也較簡，但讀屏不會告知三者互斥。
+
+### 已決議：`GameOverDialog` 不顯示分制
+
+比分本身（如 15–13）已隱含分制，且該 dialog 的定位是比賽結束後快速關閉，內容越少越好。`GameOverDialog.tsx` 在本 change 中不變更。
+
+比賽進行中的分制可見性由 Decision 7（TeamPanel 名稱行）承擔，此處不重複。
