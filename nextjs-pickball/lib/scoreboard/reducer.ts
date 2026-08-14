@@ -63,7 +63,7 @@ export function scoreboardReducer(
 			const afterRally = applyRallyResult(state, action.winner);
 			// history 直接 push action 物件——action 已具備 ScoreEvent 形狀且為 immutable
 			const newHistory = [...state.history, action];
-			const { won, winner } = isGameWon(afterRally.scores);
+			const { won, winner } = isGameWon(afterRally.scores, afterRally.targetScore);
 			return {
 				...afterRally,
 				history: newHistory,

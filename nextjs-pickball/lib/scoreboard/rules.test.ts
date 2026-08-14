@@ -34,30 +34,48 @@ describe("getServeSide", () => {
 
 describe("isGameWon", () => {
 	it("任一方未達 11 → 未贏", () => {
-		expect(isGameWon({ us: 10, them: 9 })).toEqual({ won: false, winner: null });
-		expect(isGameWon({ us: 0, them: 0 })).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 10, them: 9 }, 11)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 0, them: 0 }, 11)).toEqual({ won: false, winner: null });
 	});
 
 	it("達 11 但差距未滿 2 → 未贏（延長賽，雙方領先皆然）", () => {
-		expect(isGameWon({ us: 11, them: 10 })).toEqual({ won: false, winner: null });
-		expect(isGameWon({ us: 12, them: 11 })).toEqual({ won: false, winner: null });
-		expect(isGameWon({ us: 10, them: 11 })).toEqual({ won: false, winner: null });
-		expect(isGameWon({ us: 11, them: 12 })).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 11, them: 10 }, 11)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 12, them: 11 }, 11)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 10, them: 11 }, 11)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 11, them: 12 }, 11)).toEqual({ won: false, winner: null });
 	});
 
 	it("達 11 且差距 ≥ 2 → 我方贏", () => {
-		expect(isGameWon({ us: 11, them: 9 })).toEqual({ won: true, winner: "us" });
-		expect(isGameWon({ us: 13, them: 11 })).toEqual({ won: true, winner: "us" });
+		expect(isGameWon({ us: 11, them: 9 }, 11)).toEqual({ won: true, winner: "us" });
+		expect(isGameWon({ us: 13, them: 11 }, 11)).toEqual({ won: true, winner: "us" });
 	});
 
 	it("對方達 11 且差距 ≥ 2 → 對方贏", () => {
-		expect(isGameWon({ us: 7, them: 11 })).toEqual({ won: true, winner: "them" });
-		expect(isGameWon({ us: 11, them: 13 })).toEqual({ won: true, winner: "them" });
+		expect(isGameWon({ us: 7, them: 11 }, 11)).toEqual({ won: true, winner: "them" });
+		expect(isGameWon({ us: 11, them: 13 }, 11)).toEqual({ won: true, winner: "them" });
 	});
 
 	it("雙方平局 → 未贏", () => {
-		expect(isGameWon({ us: 11, them: 11 })).toEqual({ won: false, winner: null });
-		expect(isGameWon({ us: 12, them: 12 })).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 11, them: 11 }, 11)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 12, them: 12 }, 11)).toEqual({ won: false, winner: null });
+	});
+
+	it("15 分制：11-0 尚未達標 → 未贏", () => {
+		expect(isGameWon({ us: 11, them: 0 }, 15)).toEqual({ won: false, winner: null });
+	});
+
+	it("15 分制：達 15 且差距 ≥ 2 → 勝，差距 1 → 延長", () => {
+		expect(isGameWon({ us: 15, them: 13 }, 15)).toEqual({ won: true, winner: "us" });
+		expect(isGameWon({ us: 15, them: 14 }, 15)).toEqual({ won: false, winner: null });
+		expect(isGameWon({ us: 16, them: 14 }, 15)).toEqual({ won: true, winner: "us" });
+		expect(isGameWon({ us: 13, them: 15 }, 15)).toEqual({ won: true, winner: "them" });
+	});
+
+	it("21 分制：達 21 且差距 ≥ 2 → 勝，差距 1 → 延長", () => {
+		expect(isGameWon({ us: 21, them: 19 }, 21)).toEqual({ won: true, winner: "us" });
+		expect(isGameWon({ us: 21, them: 20 }, 21)).toEqual({ won: false, winner: null });
+		// 20-18 在 11 分制下會判勝，21 分制下未達門檻——這是本 task 的核心行為差異
+		expect(isGameWon({ us: 20, them: 18 }, 21)).toEqual({ won: false, winner: null });
 	});
 });
 
