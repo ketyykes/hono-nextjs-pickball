@@ -11,6 +11,7 @@
 - **GIVEN** `targetScore === 15`
 - **WHEN** 檢視任一隊伍面板
 - **THEN** 名稱行呈現「我方 · 15 分制」／「對方 · 15 分制」
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「一般模式下隊伍面板顯示目標分數」
 
 #### Scenario: 專注模式下目標分數仍可見
 
@@ -35,21 +36,25 @@
 
 - **WHEN** 使用者按下「贏這球+」且當前發球方與按鈕對應隊伍相同
 - **THEN** 該隊分數 +1，發球權不變，`history` push 一筆 RALLY_WON
+- **驗收**：`nextjs-pickball/lib/scoreboard/rules.test.ts`，it 名稱「發球方贏 → 該方 +1，發球權不變」
 
 #### Scenario: 接發方贏球 — 單打 side-out
 
 - **WHEN** 單打模式，使用者按下接發方的「贏這球+」
 - **THEN** 分數不變，發球權移交給接發方（side-out）
+- **驗收**：`nextjs-pickball/lib/scoreboard/rules.test.ts`，it 名稱「接發方贏 → side-out，雙方分數不變」
 
 #### Scenario: 接發方贏球 — 雙打 server #1 失球
 
 - **WHEN** 雙打，目前發球員為 #1，接發方贏球
 - **THEN** 發球權不轉移，同隊改由 #2 接手發球（serverNumber 1→2）
+- **驗收**：`nextjs-pickball/lib/scoreboard/rules.test.ts`，it 名稱「發球方 #1 輸 → 同隊 #2 接手」
 
 #### Scenario: 接發方贏球 — 雙打 server #2 失球
 
 - **WHEN** 雙打，目前發球員為 #2，接發方贏球
 - **THEN** side-out，對方獲得發球權，serverNumber 重置為 1
+- **驗收**：`nextjs-pickball/lib/scoreboard/rules.test.ts`，it 名稱「發球方 #2 輸 → side-out 給對方，serverNumber 重置為 1」
 
 #### Scenario: 0-0-2 起手規則
 
@@ -62,6 +67,7 @@
 - **GIVEN** 發球方當局得分為 N
 - **WHEN** 顯示發球指示
 - **THEN** N 為偶數 → 從右場發（right）；N 為奇數 → 從左場發（left）
+- **驗收**：`nextjs-pickball/lib/scoreboard/rules.test.ts`，it 名稱「發球方分數偶數時從右場發」與「發球方分數奇數時從左場發」
 
 #### Scenario: 首球由 setup 轉入 playing
 
@@ -109,6 +115,7 @@
 
 - **WHEN** 使用者更新分數（dispatch RALLY_WON / UNDO / RESET）
 - **THEN** 當前 state 寫入 `localStorage["scoreboard:current:v1"]`（zod 驗證後序列化），保存內容含分數、發球狀態、history、`mode`、`firstServer`（起手方設定，UNDO replay 必要）與 `targetScore`
+- **驗收**：`nextjs-pickball/lib/scoreboard/storage.test.ts`，it 名稱「write 後 read 可取回相同 state」
 
 #### Scenario: 頁面重整回復
 
@@ -127,6 +134,7 @@
 
 - **WHEN** localStorage 資料無法通過 zod schema 驗證
 - **THEN** 清除 key，以 `createInitialState()` 起手，console.warn 記錄錯誤
+- **驗收**：`nextjs-pickball/lib/scoreboard/storage.test.ts`，it 名稱「資料為非 JSON 時 read 回 null 並清 key，且 warn」與「資料 schema 不合法時 read 回 null 並清 key，且 warn」
 
 ---
 
@@ -154,6 +162,7 @@
 
 - **WHEN** `window.matchMedia("(orientation: landscape)").matches === true`
 - **THEN** 兩隊面板左右並排（flex-row），分數大字，發球指示顯示
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「橫式 viewport 兩隊面板左右並排」
 
 #### Scenario: 直式排版（portrait）
 
@@ -165,6 +174,7 @@
 
 - **WHEN** 使用者按下提示橫幅的 ✕ 關閉按鈕
 - **THEN** 橫幅消失，`sessionStorage["scoreboard:hint-dismissed"]` 設為 "1"；分頁存活期間不再顯示
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「直式提示橫幅可關閉並記入 sessionStorage」
 
 #### Scenario: 多 viewport 零捲動
 
@@ -202,6 +212,7 @@
 - **GIVEN** TeamPanel 的可用高度因 orientation 切換、提示橫幅顯示／關閉而改變
 - **WHEN** 檢視分數數字的字級來源
 - **THEN** TeamPanel 根節點帶 `@container-size`，分數字級以 cqh/cqw + `clamp()` 表達；程式碼中不存在以寬度斷點（`md:` 等）指定分數字級的 class
+- **驗收**：`nextjs-pickball/components/scoreboard/TeamPanel.contract.test.ts`（讀取原始碼的契約測試，剝除註解後斷言不存在 `sm|md|lg|xl:text-`，並反向驗證剝除邏輯未空轉）
 
 ---
 
