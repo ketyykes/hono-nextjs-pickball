@@ -46,7 +46,7 @@ export function ScoreboardSetup({
 	onToggleFocus,
 }: ScoreboardSetupProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+		<div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
 			<Select
 				value={mode}
 				onValueChange={(v) => onModeChange(v as Mode)}

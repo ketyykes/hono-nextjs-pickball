@@ -21,42 +21,58 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 		// @container-size（需 tailwindcss >= 4.3）：panel 為 size container，
 		// 「後代」的 cqh/cqw 以 panel 內容盒為基準——分數字級因此跟隨面板實際
 		// 可用高度，直向（panel≈可用高一半）與橫向（panel≈全高）共用同一組參數，
-		// 並自動吸收 OrientationHint 顯示/關閉等高度變因。禁用寬度斷點字級
-		// （md:text-[14rem] 會讓平板直向、橫向手機誤中大字而溢出）。
-		// gap/padding 掛在 panel 自身，cq 單位查不到自己、只會 fallback 到視口，
-		// 故明確用 dvh（隨視窗高縮放，與外層 h-dvh 鎖高一致）。
-		<div className="@container-size flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-[clamp(0.375rem,2dvh,1.5rem)] p-[clamp(0.375rem,2dvh,1.5rem)]">
-			<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
-				<span>{label}</span>
-				<span className="opacity-70"> · {state.targetScore} 分制</span>
+		// 並自動吸收 OrientationHint、ScoreboardSetup 折行等高度變因。禁用寬度斷點
+		// 字級（md:text-[14rem] 會讓平板直向、橫向手機誤中大字而溢出）。
+		// 此節點本身只負責建立 size container 與參與外層 flex 版面，不直接排版
+		// 子項——排版與 gap/padding 交給下面的內層 wrapper（原因見其註解）。
+		<div className="@container-size min-h-0 min-w-0 flex-1 overflow-hidden">
+			{/* gap/padding 改掛在這層而非 @container-size 容器自身：cq 單位在容器
+			「自己身上」查不到自己（規格：只會 fallback 回視口），必須降一層子孫元素
+			才查得到外層容器的實際高度。故用 cqh 而非 dvh——dvh 只反映整個視口高度，
+			當 ScoreboardSetup 因窄視口折成兩列、擠壓掉面板可用高度時，dvh 基準的
+			gap/padding 不會跟著縮小，只有分數字級（cqh 基準）會縮，兩者不同步的
+			落差即是 Mobile Safari 下設定列折行後面板與相鄰面板重疊的根因（面板實際
+			可用高度已因折行而縮到不足以容納固定不變的 gap/padding + label/發球
+			指示/按鈕高度）。改用 cqh 後 gap/padding 與字級共用同一份「面板實際
+			可用高度」基準，折行擠壓面板時三者同步收斂，才能維持零重疊。
+			外層容器加 overflow-hidden 作最後防線：justify-content: center 在內容
+			仍超出（例如極端視窗高度、不同平台字體 metrics 造成的次像素差異）時會
+			向上下對稱溢出，沒有 overflow-hidden 會直接吃進相鄰面板的版面；有了它，
+			即使 fluid 公式仍有極小殘差，溢出也只會被裁在「自己這格」的邊界，不會
+			再侵犯到另一隊的可點擊區域。 */}
+			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.125rem,1cqh,1.5rem)] p-[clamp(0.125rem,1cqh,1.5rem)]">
+				<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
+					<span>{label}</span>
+					<span className="opacity-70"> · {state.targetScore} 分制</span>
+				</div>
+				<div
+					aria-live="polite"
+					aria-label={`${label}目前 ${score} 分`}
+					className={cn(
+						"font-bebas leading-none text-[clamp(2.5rem,min(37cqh,38cqw),14rem)]",
+						isServing ? "text-lime-400" : "text-foreground",
+					)}
+				>
+					{score}
+				</div>
+				{/* 永遠保留 indicator slot 佔位（含上下 gap）；非發球方用 invisible 隱藏內容但保留版面，避免「贏這球+」按鈕在發球權切換時上下跳動。aria-hidden 讓讀屏不重複讀出隱藏字串 */}
+				<div className={cn(!isServing && "invisible")} aria-hidden={!isServing}>
+					<ServeIndicator
+						servingTeamScore={score}
+						serverNumber={state.serverNumber}
+						showServerNumber={state.mode === "doubles"}
+					/>
+				</div>
+				<Button
+					size="lg"
+					disabled={disabled}
+					onClick={onWinRally}
+					aria-label={`${label}贏這一球，當前 ${score} 分`}
+					className="bg-lime-400 text-slate-900 hover:bg-lime-300"
+				>
+					贏這球 +
+				</Button>
 			</div>
-			<div
-				aria-live="polite"
-				aria-label={`${label}目前 ${score} 分`}
-				className={cn(
-					"font-bebas leading-none text-[clamp(2.5rem,min(37cqh,38cqw),14rem)]",
-					isServing ? "text-lime-400" : "text-foreground",
-				)}
-			>
-				{score}
-			</div>
-			{/* 永遠保留 indicator slot 佔位（含上下 gap）；非發球方用 invisible 隱藏內容但保留版面，避免「贏這球+」按鈕在發球權切換時上下跳動。aria-hidden 讓讀屏不重複讀出隱藏字串 */}
-			<div className={cn(!isServing && "invisible")} aria-hidden={!isServing}>
-				<ServeIndicator
-					servingTeamScore={score}
-					serverNumber={state.serverNumber}
-					showServerNumber={state.mode === "doubles"}
-				/>
-			</div>
-			<Button
-				size="lg"
-				disabled={disabled}
-				onClick={onWinRally}
-				aria-label={`${label}贏這一球，當前 ${score} 分`}
-				className="bg-lime-400 text-slate-900 hover:bg-lime-300"
-			>
-				贏這球 +
-			</Button>
 		</div>
 	);
 }
