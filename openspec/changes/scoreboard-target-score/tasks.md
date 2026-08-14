@@ -19,14 +19,15 @@
 
 ## 3. Reducer 與賽前設定（`lib/scoreboard/reducer.ts` — 行為邏輯，必 TDD）
 
-- [ ] 3.1 **紅**：於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 新增 it「setup 階段可切換 targetScore 且保留 mode 與 firstServer」，dispatch `{ type: "SET_TARGET_SCORE", targetScore: 15 }` 後斷言 `targetScore === 15`、`mode` 與 `firstServer` 不變、分數維持 0-0。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/reducer.test.ts` 看到紅燈（**真紅燈**：reducer 無此 case，走 default 回傳原 state）
-- [ ] 3.2 **綠**：新增 `SET_TARGET_SCORE` case（比照 `SET_MODE`：`status !== "setup"` 時 return state，否則重建初始 state 並保留另外兩項設定）。**同時**讓 `createInitialState` 的 `overrides` 接受 `targetScore`（取代 Task 1.2 的硬編碼 `targetScore: 11`，改為 `overrides.targetScore ?? 11`）—— 三個 `SET_*` case 都走「重建初始 state」，若 `createInitialState` 仍硬編碼 11，切換分制後會立刻被覆寫回 11，3.1 的紅燈無法轉綠。重跑 3.1 指令至綠
-- [ ] 3.3 **紅**：新增 it「UNDO 後保留 targetScore，不退回預設 11」——設 `targetScore = 21`、dispatch 數次 RALLY_WON 後 UNDO，斷言 `targetScore` 仍為 21 且 `status !== "finished"`。看到紅燈（**真紅燈**：`UNDO` 的 `createInitialState({ mode, firstServer })` 未帶 `targetScore`，replay 後靜默退回 11，且分數若已 ≥ 11 會誤判為結束）
-- [ ] 3.4 **綠**：`UNDO` 與 `RESET` 的重建路徑帶入 `targetScore`（`createInitialState` 本身已於 3.2 支援）。重跑 3.1 指令至綠
-- [ ] 3.5 新增 it「playing 階段 ignore SET_TARGET_SCORE」與「finished 階段 ignore SET_TARGET_SCORE」；更新既有 it 名稱「RESET 保留 mode 與 firstServer，清空分數與 history、status 回 setup」為「RESET 保留 mode、firstServer 與 targetScore，清空分數與 history、status 回 setup」並補上對應斷言。重跑 3.1 指令確認全綠
+- [x] 3.1 **紅**：於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 新增 it「setup 階段可切換 targetScore 且保留 mode 與 firstServer」，dispatch `{ type: "SET_TARGET_SCORE", targetScore: 15 }` 後斷言 `targetScore === 15`、`mode` 與 `firstServer` 不變、分數維持 0-0。執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/reducer.test.ts` 看到紅燈（**真紅燈**：reducer 無此 case，走 default 回傳原 state）
+- [x] 3.2 **綠**：新增 `SET_TARGET_SCORE` case（比照 `SET_MODE`：`status !== "setup"` 時 return state，否則重建初始 state 並保留另外兩項設定）。**同時**讓 `createInitialState` 的 `overrides` 接受 `targetScore`（取代 Task 1.2 的硬編碼 `targetScore: 11`，改為 `overrides.targetScore ?? 11`）—— 三個 `SET_*` case 都走「重建初始 state」，若 `createInitialState` 仍硬編碼 11，切換分制後會立刻被覆寫回 11，3.1 的紅燈無法轉綠。重跑 3.1 指令至綠
+- [x] 3.3 **紅**：新增 it「UNDO 後保留 targetScore，不退回預設 11」——設 `targetScore = 21`、dispatch 數次 RALLY_WON 後 UNDO，斷言 `targetScore` 仍為 21 且 `status !== "finished"`。看到紅燈（**真紅燈**：`UNDO` 的 `createInitialState({ mode, firstServer })` 未帶 `targetScore`，replay 後靜默退回 11，且分數若已 ≥ 11 會誤判為結束）
+- [x] 3.4 **綠**：`UNDO` 與 `RESET` 的重建路徑帶入 `targetScore`（`createInitialState` 本身已於 3.2 支援）。重跑 3.1 指令至綠
+- [x] 3.5 新增 it「playing 階段 ignore SET_TARGET_SCORE」與「finished 階段 ignore SET_TARGET_SCORE」；更新既有 it 名稱「RESET 保留 mode 與 firstServer，清空分數與 history、status 回 setup」為「RESET 保留 mode、firstServer 與 targetScore，清空分數與 history、status 回 setup」並補上對應斷言。重跑 3.1 指令確認全綠
   - ⚠️ **誠實標註**：兩個 ignore 測試屬 **regression guard**——reducer 的 `default` 分支對未知 action 本就回傳原 state，故它們在 3.2 實作前即為綠。其價值在於鎖定 3.2 的 `status` guard 不被日後移除
-- [ ] 3.6 **refactor**：將 `mode` / `firstServer` / `targetScore` 收斂為 `MatchSettings` 型別，`createInitialState(settings: MatchSettings)` 單一參數，四處呼叫點（`SET_MODE`／`SET_FIRST_SERVER`／`SET_TARGET_SCORE`／`UNDO`／`RESET`）改為「取出目前 settings → 套用差異」（見 design Decision 4）。重跑 3.1 指令確認仍全綠
-- [ ] 3.7 執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/` 確認 rules／reducer／storage 三檔全綠
+- [x] 3.6 **refactor**：將 `mode` / `firstServer` / `targetScore` 收斂為 `MatchSettings` 型別（定義於 `types.ts`），`createInitialState(overrides: Partial<MatchSettings> = {})`，並新增 `settingsOf(state)` helper；五處重建點（`SET_MODE`／`SET_FIRST_SERVER`／`SET_TARGET_SCORE`／`UNDO`／`RESET`）改為「取出目前 settings → 套用差異」（見 design Decision 4）。三個 `SET_*` case 維持各自獨立分支，不合併為 fallthrough。重跑 3.1 指令確認仍全綠
+  - 參數用 `Partial<MatchSettings> = {}` 而非必填 —— 既有測試有多處無參數呼叫 `createInitialState()`，改必填會逼出十餘處無關改動；防漏欄位的實際機制是 `settingsOf()` 而非簽章
+- [x] 3.7 執行 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/` 確認 rules／reducer／storage 三檔全綠
 
 ## 4. UI 呈現（例外層 — 純呈現型元件，以 E2E 驗收）
 
