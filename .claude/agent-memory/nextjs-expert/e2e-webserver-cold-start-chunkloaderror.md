@@ -1,58 +1,100 @@
 ---
 name: e2e-webserver-cold-start-chunkloaderror
-description: 完整 5-project E2E 全量並行執行時，chromium 最先起跑的幾個 test 偶爾因 dev server（Turbopack）冷啟動被 5 個瀏覽器同時打而噴 ChunkLoadError，與測試程式碼無關
+description: E2E 冷啟動時 ChunkLoadError 只出現在 WebKit 引擎（webkit／mobile-safari）project，且集中在整輪測試的中後段而非開頭；純噪音，7 次紀錄中從未造成測試失敗
 type: project
 ---
 
-## 現象
+## 更正說明（2026-08-14 深入調查後）
 
-`pnpm --filter ./nextjs-pickball exec playwright test <spec>` 在**沒有預先啟動
-dev server**（`playwright.config.ts` 的 `webServer` 自己接手起 `pnpm --filter
-hono-pickball dev` + `pnpm dev`）時，若該次是冷啟動，第一個排到的 project
-（`chromium`，因為 `projects` 陣列順序是 chromium 排第一）最先跑的幾個 test
-會噴：
+本記憶先前版本聲稱「chromium 最先跑的幾個 test 會中 ChunkLoadError」——**這個說法是錯的**，
+已用 7 次完整保留 log 的實測推翻。若之後又看到類似現象，以本次更新後的內容為準，
+不要再引用舊版「chromium 最先幾個 test」的說法。
 
-```
-Page error: ChunkLoadError: Failed to load chunk /_next/static/chunks/...
-  from module [turbopack]/browser/dev/hmr-client/hmr-client.ts [app-client]
-```
+## 現象（用 7 次冷啟動實測 log 驗證，log 完整保留於
+`/private/tmp/claude-501/-Users-danny-Desktop-project-hono-nextjs-pickball/<session>/scratchpad/`
+的 `e2e-full.log`、`e2e-par3.log`、`e2e-cold.log`、`e2e-serial.log`、
+`e2e-investigation/full-suite-cold-1.log`、`e2e-investigation/scoreboard-cold-w8.log`）
 
-固定是**同一批最先執行的 test**（照 spec 內的先後順序，例如某次連續兩輪
-都是同一 spec 檔前 4 個 test），不是隨機分散在整份測試裡，且與該測試本身
-的斷言邏輯無關——**單獨跑 `--project=chromium`（unconditional 4 workers）
-時完全不會重現**，因為此時對 dev server 的初始並發請求量小很多。
+`playwright.config.ts` 的 `webServer` 自己冷啟動 hono-pickball + Next.js dev 時：
 
-## 根因判斷
+- **ChunkLoadError 100% 只出現在 `webkit` 與 `mobile-safari` 這兩個 project**
+  （兩者皆由 Playwright 內建的 WebKit engine 驅動）。`chromium`、`firefox`、
+  `mobile-chrome`（Chromium/Gecko 系）在 5 次預設並發（`workers=4`，未指定時
+  Playwright 在此機器＝8 核取的近似值）的冷啟動全量執行中**一次都沒出現過**。
+- **不是集中在整輪的開頭**，而是集中在**整輪測試的中後段**——即 webkit／
+  mobile-safari 排到的那個區段（例如 80 tests 中的 test #33 之後、160 tests
+  中的 test #83 之後）。此時 chromium／firefox 早就把同樣的路由與 chunk
+  請求過幾十次，Turbopack 的編譯快取必然是熱的——**這排除了「首次編譯競態」
+  這個假設**，根因不是「dev server 還沒編譯完」。
+- 錯的 chunk 固定是 Next 的**非同步／延遲載入**片段：
+  `[turbopack]/browser/dev/hmr-client/hmr-client.ts`（本身就標記
+  `async loader`）與 Next 內建的 `global-error` boundary chunk（RSC client
+  reference 的延遲 import），**從未看過關鍵首屏 bundle 本身載入失敗**。
+- **並發是必要條件**：`--workers=1`（序列執行）跑完全部 80 test（含 webkit）
+  一次 ChunkLoadError 都沒有；預設 `workers=4` 每次跑 19～31 次；刻意超額
+  訂閱到 `--workers=8`（等於本機邏輯核心數，但還要跟兩個 dev server process
+  搶 CPU）時暴增到 90 次。
 
-`workers` 未設定時（非 CI）Playwright 用近似 CPU 核心數的並發數，加上
-`fullyParallel: true`，5 個 browser project 會在 dev server 剛啟動、
-Turbopack 尚未把所有 chunk 編譯完成時就同時發出大量並發導覽請求，
-`webServer.url` 的 readiness check 只驗證某個端點回 2xx，不代表所有路由的
-chunk 圖已經編譯完成——冷啟動 + 高並發首次導覽的組合會讓某些 client chunk
-請求打空，才噴 `ChunkLoadError`。這是 **dev server 基礎設施層的競態，
-與 spec 檔內任何測試邏輯（含 orientation 相關的量測時序）完全無關**。
+## 根因判斷（由證據推論，非官方文件佐證，MECHANISM 未經瀏覽器原始碼驗證）
 
-## 已驗證的規避方式
+每個 spec 的 test 都在極短時間內連續兩次 `page.goto()`
+（`beforeEach` 先 `goto("/")` 再 `evaluate` 清 localStorage，測試本體緊接著
+`goto(<route>)`，中間幾乎無停留）。`page.goto()` 只等到 `load` 事件，但
+Turbopack 的 HMR client／RSC runtime 在 `load` 之後仍會**背景**用動態
+`import()` 補抓幾個延遲 chunk。若並發夠高導致 dev server 回應變慢，這個背景
+fetch 還沒完成、下一行程式碼就已經觸發第二次導覽——新導覽會把前一個
+document 連同其 in-flight fetch 一起中斷。Webpack/Turbopack 的 chunk-loading
+runtime 把這個中斷後的 rejected promise 包成
+`ChunkLoadError: Failed to load chunk ...`，以 unhandled rejection 形式冒出來，
+同時被 Next dev server 的瀏覽器 console 轉發功能印到終端機、也被 Playwright
+自己的 page-error 監聽器記錄下來。只在 WebKit engine 上看得到，推測是
+WebKit 在導覽切換時對「舊 document 裡尚未 settle 的 fetch/import promise」
+的處理時機與 Chromium／Firefox 不同（允許它在新 document 已 commit 後才
+reject 並觸發 `unhandledrejection`），但這點沒有找到官方文件佐證，純粹是
+「93 次全部落在 WebKit 系、Chromium/Gecko 系全部 0 次」這個高度一致的相關性
+推出來的最合理解釋。
 
-**不要**去改動測試程式碼或 `playwright.config.ts` 的 `workers`/`fullyParallel`
-設定來繞開這個問題（不在授權範圍內，也不是這個問題該修的地方）。若需要
-在驗證階段拿到穩定的全量 4 輪結果，改為**在跑 playwright 前手動先把兩個
-dev server 起好、暖機過至少一次頁面導覽**，讓 `reuseExistingServer:
-!process.env.CI`（非 CI 時為 `true`）在 playwright 啟動時偵測到已有 server
-在跑而直接沿用，不再冷啟動：
+## 對測試可信度的實測結論
 
-```bash
-(pnpm --filter hono-pickball dev > /tmp/x/hono.log 2>&1 &)
-(pnpm --filter ./nextjs-pickball dev > /tmp/x/next.log 2>&1 &)
-# 輪詢至兩個 health endpoint 皆回 200 後，再各 curl 一次要測的路由暖機
-curl -s http://localhost:3005/scoreboard >/dev/null
-# 之後才開始跑 playwright test，且中間不要讓這兩個 dev server 進程被殺掉
-```
+**純噪音，不是假紅燈來源。** 5 次預設並發（`workers=4`）全量冷啟動執行，
+ChunkLoadError 出現 19～31 次／次，**每一次最終結果都是全數通過**（`80
+passed` ×3、`142 passed / 0 failed / 18 skipped` ×1）。刻意推到
+`--workers=8`（超訂閱本機核心數）**才**首次看到真正的測試失敗（20 failed），
+但逐一核對這 20 個失敗，**proximate error 全部是單純的
+`Test timeout of 30000ms exceeded`**（`page.goto`／`beforeEach` hook／
+locator 逾時），16/20 集中在 `chromium`（整輪最先起跑的 project，被 8 個
+同時起跑的瀏覽器行程搶 CPU 拖垮），只有 4/20 的失敗區塊裡「同時存在」
+ChunkLoadError 訊息（且都只是背景噪音，不是該次失敗的 thrown error）。
+**結論：`--workers=8` 這種超額訂閱會讓機器整體過載而導致逾時失敗，
+但這跟 ChunkLoadError 本身是兩件事**——ChunkLoadError 只是同一種過載下
+一起變多的另一個症狀，不是失敗的成因。
 
-驗證完畢記得 `pkill` 掉手動起的 `wrangler dev` 與 `next dev --port 3005`
-進程，避免佔用 :3005/:8787 影響下一次自動 webServer 啟動。
+## 已知但未能重現的個案
 
-**How to apply**：日後任何一次「跑 3 輪＋序列 1 輪、要求全綠」的 E2E flaky
-驗證任務，若观察到**只有第一輪、且只有 chromium 最先幾個 test**失敗、
-錯誤訊息含 `ChunkLoadError` 而非測試斷言訊息，先假設是這個已知的冷啟動
-競態，用上述暖機流程重跑，不要誤判成自己剛改的測試邏輯有問題。
+曾有一次全量冷啟動出現「chromium 的 3 個既有測試失敗」（GameOverDialog／
+Undo／重置二次確認），但該次完整 log 已遺失、無法比對。用 2 次新的嘗試
+（預設並發全量、`--workers=8`）都沒能重現這個特定失敗組合（失敗的 project
+與測試都對不上）。判斷為當時機器上有其他無關的資源競爭（一次性外部因素），
+不是這個 E2E 基礎設施本身可重現的缺陷。
+
+另外在本次調查中翻到一份**舊的、與此無關**的 log（`full-run.log`，對應
+`scoreboard.spec.ts` 每個 project 只有 11 個 test 的更早版本，非本分支現況），
+裡面 6 個 mobile-safari 失敗全部是「別的元素 subtree intercepts pointer
+events」導致 `.click()` 逾時，跟 ChunkLoadError 完全無關，且用現在的程式碼
+重跑（80 tests／project）已經穩定全綠——**這是已經解決、過時的舊問題，
+不要跟本記憶的 ChunkLoadError 現象混為一談**。
+
+## 建議（未執行任何修改，`playwright.config.ts` 維持原狀）
+
+不建議因為這個現象去改 `playwright.config.ts` 的 `workers`／`webServer`
+warmup 等設定——所有預設並發下的重現都是純噪音，改動只會拖慢所有人日常
+E2E 執行速度，換不到任何可靠性提升。若團隊想讓終端機輸出更乾淨，可以考慮
+在 `beforeEach` 的兩次 `page.goto()` 之間加一點等待，但那是美觀／降噪
+（cosmetic）調整，不影響任何測試結果，且會動到每個 spec 檔的共用寫法，
+不在本次調查授權範圍內，未執行。
+
+**How to apply**：日後若又看到「跑 E2E 冷啟動時終端機噴一堆
+ChunkLoadError」，先確認是不是 webkit／mobile-safari project、是不是落在
+整輪的中後段——如果是，直接視為已知噪音，不用開新的調查；只有在**真正看到
+測試失敗、且失敗的 proximate error 本身就是 ChunkLoadError（不是普通的
+30s timeout）**時，才需要重新認真看待這件事。
