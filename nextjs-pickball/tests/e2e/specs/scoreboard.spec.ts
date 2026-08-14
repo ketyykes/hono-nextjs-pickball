@@ -468,4 +468,54 @@ test.describe("/scoreboard 計分器", () => {
 			page.getByRole("status").filter({ hasText: "建議橫向使用" }),
 		).toBeHidden();
 	});
+
+	// scoreboard-select-popper change：SelectContent 預設 position="item-aligned" 會讓
+	// 選中第二個選項時面板上移、壓進 navbar 範圍（實測面板 top 33.8 < navbar bottom
+	// 56），但選項仍可點擊，既有的 80 個功能測試因此完全無感（.click() 只在 pointer
+	// events 真被攔截時才失敗）。此測試直接比較幾何座標，是唯一能抓到此類純視覺
+	// 遮擋的防線，不可退回「點得到就算過」的驗證方式。
+	test("下拉選單展開時不被 navbar 遮擋", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto("/scoreboard");
+
+		const navbar = page.locator("header").first();
+		const listbox = page.getByRole("listbox");
+
+		// 先選第二個選項使面板重現「選中項對齊觸發器」的上移條件，再次展開後量測
+		// 面板與 navbar 的幾何關係。面板有進場動畫（zoom-in-95），改用 expect.poll
+		// 讓每次重試都重新讀取 boundingBox，避免像本檔案先前的教訓一樣量到動畫過
+		// 渡中的座標（見「橫式 viewport 兩隊面板左右並排」test 的同一手法）。
+		async function assertPanelBelowNavbar(
+			comboboxName: string,
+			secondOptionName: string,
+		) {
+			const combobox = page.getByRole("combobox", { name: comboboxName });
+
+			await combobox.click();
+			await page.getByRole("option", { name: secondOptionName }).click();
+
+			await combobox.click();
+			await expect(listbox).toBeVisible();
+
+			await expect
+				.poll(
+					async () => {
+						const [panelBox, navBox] = await Promise.all([
+							listbox.boundingBox(),
+							navbar.boundingBox(),
+						]);
+						if (!panelBox || !navBox) return null;
+						return panelBox.y - (navBox.y + navBox.height);
+					},
+					{ message: `${comboboxName} 下拉面板的 top 不得小於 navbar 的 bottom` },
+				)
+				.toBeGreaterThanOrEqual(0);
+
+			await page.keyboard.press("Escape");
+			await expect(listbox).toBeHidden();
+		}
+
+		await assertPanelBelowNavbar("比賽形式", "單打");
+		await assertPanelBelowNavbar("先發球方", "先發：對方");
+	});
 });
