@@ -26,7 +26,10 @@ interface ScoreboardSetupProps {
 	onToggleFocus: () => void;
 }
 
-// 頂部設定列：mode 與 firstServer toggle，比賽中為 disabled；右側專注模式按鈕。
+// 頂部設定列：mode、firstServer 兩個 Select 與 targetScore radiogroup，比賽中三者皆為
+// disabled（賽中變更設定會使已累積的分數失去意義，見 scoreboard spec）；右側專注模式按鈕。
+// targetScore 以 role="radio" on button 實作而非 Radix ToggleGroup，代價是沒有 APG 慣用的
+// 方向鍵導覽——鍵盤仍可 Tab 逐顆抵達並以 Enter/Space 選取，WCAG 2.1.1／4.1.2 皆滿足。
 // 專注模式按鈕永遠渲染（不依 Fullscreen API 支援與否隱藏）——
 // 是否附帶 requestFullscreen 由父層（Scoreboard）決定。
 // aria-pressed／label／icon 皆綁 isFocusMode：目前專注模式下整列不渲染

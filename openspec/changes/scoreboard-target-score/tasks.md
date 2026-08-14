@@ -31,9 +31,10 @@
 
 ## 4. UI 呈現（例外層 — 純呈現型元件，以 E2E 驗收）
 
-- [ ] 4.1 `components/scoreboard/ScoreboardSetup.tsx` 新增「目標分數」分段按鈕（11 | 15 | 21）：外層 `role="radiogroup"` + `aria-label="目標分數"`，三顆按鈕各為 `role="radio"` + `aria-checked`（見 design 已決議事項），鎖定狀態使用原生 `disabled={locked}`（與其餘兩控制項一致）；props 增加 `targetScore` 與 `onTargetScoreChange`
-- [ ] 4.2 `components/scoreboard/Scoreboard.tsx` 傳入 `state.targetScore` 與 `onTargetScoreChange={(targetScore) => dispatch({ type: "SET_TARGET_SCORE", targetScore })}`
-- [ ] 4.3 `components/scoreboard/TeamPanel.tsx` 名稱行改為顯示「{label} · {targetScore} 分制」（沿用既有 label 節點，**不新增獨立列**——頁面為 `h-dvh` + `overflow-hidden` 鎖高，見 design Decision 7）
+- [x] 4.1 `components/scoreboard/ScoreboardSetup.tsx` 新增「目標分數」分段按鈕（11 | 15 | 21）：外層 `role="radiogroup"` + `aria-label="目標分數"`，三顆按鈕各為 `role="radio"` + `aria-checked`（見 design 已決議事項），鎖定狀態使用原生 `disabled={locked}`（與其餘兩控制項一致）；props 增加 `targetScore` 與 `onTargetScoreChange`
+- [x] 4.2 `components/scoreboard/Scoreboard.tsx` 傳入 `state.targetScore` 與 `onTargetScoreChange={(targetScore) => dispatch({ type: "SET_TARGET_SCORE", targetScore })}`
+- [x] 4.3 `components/scoreboard/TeamPanel.tsx` 名稱行改為顯示「{label} · {targetScore} 分制」（沿用既有 label 節點，**不新增獨立列**——頁面為 `h-dvh` + `overflow-hidden` 鎖高，見 design Decision 7）
+  - ⚠️ **隊伍名必須獨立成一個子節點**：既有 E2E 有三處 `page.getByText("我方", { exact: true })`（`tests/e2e/specs/scoreboard.spec.ts:26,27,111`），若整行文字變成「我方 · 15 分制」，exact 比對會失配而使既有測試全紅。故 MUST 寫成 `<span>{label}</span><span> · {targetScore} 分制</span>` 的巢狀結構，讓內層 span 的文字內容維持恰好是「我方」／「對方」。此舉同時讓分制可套用較淡的視覺權重，語意上亦更合理
 - [ ] 4.4 於 `pnpm dev:web` 手動確認：橫向（844x390）設定列單列容納三控制項；直向（390x844）設定列折為兩列且兩顆「贏這球+」仍完整可見。**折行為預期行為**，正式驗收以 5.3 的 E2E 為準
 
 ## 5. E2E 驗收（例外層 — 不強制三步）

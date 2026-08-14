@@ -200,6 +200,8 @@ E2E 一律以 `getByRole("radio", { name: "15" })` 選取，實作與測試的�
 
 **未採用**：`aria-pressed` toggle button。它與設定列既有的專注模式按鈕語意一致，實作也較簡，但讀屏不會告知三者互斥。
 
+**已知取捨（不修）**：以 `role="radio"` 標註原生 `<button>` 而非改用 Radix `ToggleGroup`，代價是沒有 WAI-ARIA APG 慣用的方向鍵導覽（roving tabindex）—— 標準 radio group 是「Tab 進入群組後以方向鍵移動選取」，此實作則是三顆各自為 tab stop、以 Enter/Space 選取。基本可操作性不受影響，WCAG 2.1.1（Keyboard）與 4.1.2（Name, Role, Value）皆滿足，code review 判定為可接受的常見 toggle group 實作。日後若要補強，加 `onKeyDown` 處理 ArrowLeft/ArrowRight 搭配 `tabIndex={targetScore === score ? 0 : -1}`，或改用 `ToggleGroup type="single"`。
+
 ### 已決議：`GameOverDialog` 不顯示分制
 
 比分本身（如 15–13）已隱含分制，且該 dialog 的定位是比賽結束後快速關閉，內容越少越好。`GameOverDialog.tsx` 在本 change 中不變更。
