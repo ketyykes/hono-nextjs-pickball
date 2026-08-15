@@ -1,1 +1,0 @@
-- [/quiz Hydration Mismatch（已修復）](project-quiz-hydration-mismatch.md) — Math.random() 造成 SSR/CSR 不一致；以 QuizClient.tsx（"use client"）包裝 dynamic+ssr:false 解決

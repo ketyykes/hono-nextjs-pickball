@@ -1,1 +1,1 @@
-- [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界
+- [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界、storage/store 降級測試已補齊（含自證斷言慣例）

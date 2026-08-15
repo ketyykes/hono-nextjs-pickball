@@ -57,5 +57,4 @@ hint 消失反而會 hang（hint 本來就該顯示）。判斷式：`vp.width >
 任何 client-side 才會 settle 的狀態（orientation、CSS container query、字型
 載入等），單次量測可能剛好卡在過渡態。修法是把量測函式包進
 `expect.poll(fn).toBeXxx()`，且**每次 poll 都要重新執行量測**（不能只 poll
-快取的舊值）。詳見 `[[playwright-flaky-viewport-measurement-pattern]]`（若尚未
-建檔）。
+快取的舊值）。詳見 [[playwright-flaky-viewport-measurement-pattern]]。

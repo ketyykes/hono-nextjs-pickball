@@ -1,1 +1,0 @@
-- [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay 設計、firstServer 持久化決策、history 只記 RALLY_WON

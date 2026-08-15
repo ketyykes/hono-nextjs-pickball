@@ -19,8 +19,16 @@ type: project
 - `hasLocalStorage()` 以 try/catch + `typeof window` 雙重 guard，同時防 SSR 與 Firefox 私密模式。
 - `readScoreboard`：`JSON.parse` 失敗與 `safeParse` 失敗都走相同路徑：`removeItem` + warn + return null。`safeParse` 是在 try 區塊內呼叫，因此 schema 驗證失敗以 `!result.success` 分支處理，不走 catch（正確）。
 - `writeScoreboard` warn on quota，`clearScoreboard` 靜默（設計刻意區分）。
-- 已知測試缺口：無 SSR guard 驗證、無 `clearScoreboard` localStorage.removeItem 拋例外測試。
-  （修正：`writeScoreboard` quota 失敗案例其實在 655514a 就已存在——見下方 Task 1 條目，先前記錯為缺口）
+- ~~已知測試缺口：無 SSR guard 驗證、無 `clearScoreboard` localStorage.removeItem 拋例外測試。~~
+  **已於 2026-08-15 補齊**（`lib/scoreboard/storage.test.ts`，10 tests）：新增
+  「clearScoreboard 的 removeItem 拋例外時不 throw，且刻意不 warn」與 describe
+  「localStorage 不可用時的降級行為」下的兩條——分別覆蓋 `typeof window === "undefined"`
+  與「屬性 getter 直接 throw（Firefox 私密模式）」兩條不同的 guard 路徑。
+  兩條降級測試都內建**自證斷言**（`expect(typeof window).toBe("undefined")`／
+  `expect(() => window.localStorage).toThrow()`），確保 guard 真的被觸發，
+  而不是因 storage 正常運作而假性通過——這類「模擬環境失效」的測試最容易寫成假防護，
+  日後補同類測試時比照加自證。
+  （另註：`writeScoreboard` quota 失敗案例其實在 655514a 就已存在——見下方 Task 1 條目，先前記錯為缺口）
 
 **How to apply:** 審查後續 hooks（useScoreboard）時，確認 HYDRATE action 在 `readScoreboard()` 回 non-null 時才 dispatch，並且 write 呼叫時機應在每次 reducer dispatch 後（side-effect hook 層）；storage.ts 本身不應依賴 reducer，保持單向依賴。
 
@@ -35,7 +43,13 @@ type: project
 - 返回型別宣告為 `Dispatch<Action>`，但 React 19 的 `useReducer` 實際回傳 `ActionDispatch<[Action]>`（即 `(value: Action) => void`）。兩者結構相容，`tsc --noEmit` 無報錯，因為 `Dispatch<A> = (value: A) => void` 是 `ActionDispatch<[A]>` 的子集。可接受，但嚴格來說宣告型別應配合 React 19 新型別。
 - `(_arg: undefined) => createInitialState()` 包裝的原因：plan 範本用 `createInitialState` 直接傳，但 `createInitialState(overrides?)` 簽名接收 optional 物件參數，不接受 `undefined` arg；包裝後型別完整。
 - 兩個 useEffect 的執行順序（test 環境 happy-dom）：mount → effect[state]（寫入預設值）→ effect[]（HYDRATE）→ effect[state]（寫入 hydrated 值）。實際無競態，因兩者都在同一 microtask flush 內依序執行，且 writeScoreboard 是純 side-effect，不影響正確性。
-- 測試缺口：缺少 localStorage 不可用（SSR guard）、儲存損壞 schema、UNDO 後 localStorage 同步等邊界案例。
+- ~~測試缺口：缺少 localStorage 不可用（SSR guard）、儲存損壞 schema、UNDO 後 localStorage 同步等邊界案例。~~
+  **已於 2026-08-15 補齊**（`hooks/useScoreboardStore.test.tsx`，6 tests）三條對應案例。
+  補測時踩到一個值得記的坑：最初把「持久化失效仍可計分」寫成 `RALLY_WON winner: "them"`
+  後預期 `scores.them === 1`，實際是 0 —— **匹克球只有發球方得分**（`applyRallyResult`
+  對接發方贏只做 side-out／換 server），初始 `servingTeam` 是 `us`。
+  日後在 hook 層寫涉及比分的測試，winner 一律取當下的 `servingTeam`，否則會拿到
+  一個看似產品 bug、實則測試預期錯誤的紅燈。
 
 **scoreboard-target-score change（2026-08，655514a→c277ef1）Task 1 審查記錄：**
 - Task 1 範圍：`types.ts` 加 `targetScore`（zod `.union([11,15,21]).default(11)`）+ `SET_TARGET_SCORE` action 型別，**刻意不做行為邏輯**（isGameWon 改參數是 Task 2、reducer 加 case 是 Task 3）。
@@ -80,7 +94,7 @@ type: project
 - **視覺平衡**：leading-none 修復讓分數 line-height 從 ~1.5× 降到 1×（實測 `scoreLineHeight === scoreFontSize`，兩引擎一致），釋放的垂直空間遠多於 gap 從 1cqh→3cqh 新增的量，兩個修法方向互補、非疊加惡化。截圖確認 mobile-safari／tablet-portrait／desktop 三個關鍵尺寸皆無明顯過鬆或過緊，tablet-portrait 的留白略多但不到「明顯失衡」程度。
 - **平板直向讓步（768x1024 gap 僅回到 11.91px）合理性**：spec 原文「SHALL NOT 以寬度斷點決定字級」**只限定「字級」與「寬度斷點」**，未禁止 orientation-based media query、也未提及 gap/padding。若日後想再拉近 tablet-portrait 密度，用 `portrait:` 系列 class 只調整 gap/padding（不動字級）技術上不違反現行 spec 文字——這是一個可行但目前未被採用的選項，非阻擋，值得記錄為 follow-up 建議。
 - **範圍核查**：`git diff 1cba147..6694856 --name-only` 實際列出 **3 個檔案**（多一個 `openspec/changes/scoreboard-target-score/specs/scoreboard/spec.md`），因為這個區間包含 2 個 commit——`36c3b9c`（docs-only，修正上一輪 review 對 mobile-safari 重疊根因的誤歸因，補充 cqh/dvh 一致性要求）與 `6694856`（本次調校）。改的是 change 底下的 delta spec（`openspec/changes/.../specs/`），不是主 spec，不違反「不可直接改主 spec」規則。但 `6694856` 新增的「面板內容不得貼齊邊界」E2E test 對應的驗收需求**沒有**寫回 delta spec（spec.md 全文搜尋不到「餘量」「安全值」等字樣）——測試領先於文件，屬 spec-driven 流程的小缺口，非阻擋。
-- **flake 判斷**：獨立完整重跑 `pnpm exec playwright test tests/e2e/specs/scoreboard.spec.ts`（預設 4 workers，對已在跑的 dev server），5 project 60 passed、0 flake，與 tuner 回報一致。跑的過程中觀察到與 tuner 描述類似的 `ChunkLoadError` console 雜訊（推測因為我在專案目錄裡新增/刪除暫存 .cjs 腳本觸發 turbopack watch 重新編譯，與平行 worker 同時打頁面造成 chunk hash 過期），沒有導致任何 test 失敛——支持但不是決定性證明「本機資源競爭」的判斷；若要完全排除產品面真實 race，更嚴謹的做法是對 `next build && next start`（無 HMR）跑，尚未執行。
+- **flake 判斷**：獨立完整重跑 `pnpm exec playwright test tests/e2e/specs/scoreboard.spec.ts`（預設 4 workers，對已在跑的 dev server），5 project 60 passed、0 flake，與 tuner 回報一致。跑的過程中觀察到與 tuner 描述類似的 `ChunkLoadError` console 雜訊（推測因為我在專案目錄裡新增/刪除暫存 .cjs 腳本觸發 turbopack watch 重新編譯，與平行 worker 同時打頁面造成 chunk hash 過期），沒有導致任何 test 失敛——支持但不是決定性證明「本機資源競爭」的判斷；若要完全排除產品面真實 race，更嚴謹的做法是對 `next build && next start`（無 HMR）跑。**該實驗已於 2026-08-15 執行完畢，結論確定為 dev-only 噪音**（production 下 workers=4 與 workers=8 兩輪皆 0 次、147 passed），詳見 nextjs-expert 目錄的 `e2e-webserver-cold-start-chunkloaderror.md`。
 - **最終結論**：本輪 APPROVE，無 High／Blocking，2 個 Medium（PriceStars.tsx 潛伏 className 覆蓋風險、spec.md 缺少新測試對應的 Scenario）與數個 Low（comment 因果描述過窄、320x568 已知會破版但在契約外、tablet-portrait 密度可再優化的 follow-up）。
 
 **How to apply:**

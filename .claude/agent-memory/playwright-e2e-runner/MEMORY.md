@@ -1,2 +1,4 @@
 - [/quiz Hydration Mismatch（已修復）](project-quiz-hydration-mismatch.md) — Math.random() 造成 SSR/CSR 不一致；以 QuizClient.tsx（"use client"）包裝 dynamic+ssr:false 解決
-- [scoreboard mobile-safari 版面重疊 bug](project_scoreboard-mobile-safari-overlap-bug.md) — iPhone 12 viewport 下 TeamPanel 互相遮蔽導致按鈕不可點；非瀏覽器版本問題，勿與 tour 的版本落後結論混用
+- [scoreboard mobile-safari 版面重疊 bug（已修）](project_scoreboard-mobile-safari-overlap-bug.md) — 390x664 下 TeamPanel 互相遮蔽；根因是 cq 單位寫在容器自身，非引擎 bug，1cba147 修復
+- [「瀏覽器版本落後」已不成立](tour-e2e-browser-version-mismatch.md) — 2026-08-15 實測 Chrome 148／Firefox 150／WebKit 26.4 皆當期；不要再用它解釋非 chromium 失敗
+- 幾何量測 flaky 的修法見 nextjs-expert 目錄的 `playwright-flaky-viewport-measurement-pattern.md`（`expect.poll` + 每次重新量測）

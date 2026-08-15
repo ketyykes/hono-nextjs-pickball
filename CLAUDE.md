@@ -11,6 +11,9 @@ hono-nextjs-pickball/
 ├─ openspec/          ← OpenSpec 規格與變更（spec-driven 工作流程）
 ├─ docs/              ← 設計文件與實作計畫（superpowers/）；已被 openspec 取代者於頁首標註
 ├─ .claude/           ← Claude Code 專案設定（settings.json 含 lint / cf-typegen hooks）
+│                       `agent-memory/` 為各 agent 的長期記憶，**唯一來源，不在 workspace 內複製**
+│                       （2026-08-15 已刪除 `nextjs-pickball/.claude/agent-memory/` 的舊複本：
+│                        兩份會各自演化，複本裡的過時結論會被當成事實引用）
 ├─ .agents/           ← agent 相關設定（**唯一來源，不在 workspace 內複製**）
 ├─ AGENTS.md          ← 非 Claude agent 的入口；**只放指標不放內容**，規則以本檔為準
 └─ skills-lock.json   ← 外部 skill 的版本鎖定（root 單一份）

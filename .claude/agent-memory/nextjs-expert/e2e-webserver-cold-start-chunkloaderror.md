@@ -1,6 +1,6 @@
 ---
 name: e2e-webserver-cold-start-chunkloaderror
-description: E2E 冷啟動時 ChunkLoadError 只出現在 WebKit 引擎（webkit／mobile-safari）project，且集中在整輪測試的中後段而非開頭；純噪音，7 次紀錄中從未造成測試失敗
+description: E2E 冷啟動時 ChunkLoadError 只出現在 WebKit 引擎（webkit／mobile-safari）project 的整輪中後段；已用 production build 對照證實為 dev-only 噪音（dev 19～90 次 vs production 0 次），與產品程式碼無關
 type: project
 ---
 
@@ -69,6 +69,36 @@ ChunkLoadError 訊息（且都只是背景噪音，不是該次失敗的 thrown 
 但這跟 ChunkLoadError 本身是兩件事**——ChunkLoadError 只是同一種過載下
 一起變多的另一個症狀，不是失敗的成因。
 
+## Production build 對照實驗（2026-08-15，本案結案證據）
+
+先前版本記著「若要完全排除產品面真實 race，更嚴謹的做法是對 `next build && next start`
+（無 HMR）跑，尚未執行」。**已執行，結論確定：ChunkLoadError 是 dev-only 現象，
+與產品程式碼無關。**
+
+做法：`pnpm --filter ./nextjs-pickball build` → 手動起
+`next start --port 3005` 與 `pnpm --filter hono-pickball dev`（:8787）→
+因 `playwright.config.ts` 的 `reuseExistingServer: !process.env.CI`，
+Playwright 會直接重用這兩個既有 server，不會另起 dev server。
+
+| 條件 | ChunkLoadError | 測試結果 |
+|---|---|---|
+| dev，`workers=4`（預設，5 次實測）| 19～31 次／次 | 全數通過 |
+| dev，`workers=8` | 90 次 | 20 failed（皆為過載 timeout）|
+| **production，`workers=4`** | **0** | **147 passed / 18 skipped** |
+| **production，`workers=8`（加壓）** | **0** | **147 passed / 18 skipped**，連 timeout 都 0 |
+
+佐證：`curl -s localhost:3005/scoreboard | grep -cE "hmr-client|turbopack/browser/dev"`
+在 production 下回 **0** —— dev 模式報錯的那兩個 chunk
+（`hmr-client.ts` 與 Next 內建 `global-error` boundary 的延遲 import）
+在 production bundle 裡根本不存在，自然無從失敗。
+
+**額外收穫**：production 下 `workers=8` 完全不過載（0 timeout），
+證明 dev 模式 `workers=8` 那 20 個 timeout 失敗的成因是**兩個 dev server 的即時編譯**
+在搶 CPU，不是 Playwright 並發本身的極限。日後若要跑高並發 E2E，
+對 production server 跑比調低 workers 更有效。
+
+log 保留於本次 session scratchpad 的 `e2e-prod.log`、`e2e-prod-w8.log`。
+
 ## 已知但未能重現的個案
 
 曾有一次全量冷啟動出現「chromium 的 3 個既有測試失敗」（GameOverDialog／
@@ -98,3 +128,7 @@ ChunkLoadError」，先確認是不是 webkit／mobile-safari project、是不�
 整輪的中後段——如果是，直接視為已知噪音，不用開新的調查；只有在**真正看到
 測試失敗、且失敗的 proximate error 本身就是 ChunkLoadError（不是普通的
 30s timeout）**時，才需要重新認真看待這件事。
+
+若有人再度質疑「這會不會其實是產品面的 race」，**不必重跑整套調查**——
+直接引用上方 production build 對照實驗（dev 19～90 次 vs production 0 次，
+且 production bundle 內不存在那兩個會失敗的 chunk）即可結案。
