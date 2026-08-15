@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
@@ -45,5 +45,74 @@ describe("useScoreboardStore", () => {
 		// useEffect 在 first render 後 sync 執行
 		expect(result.current[0].scores).toEqual({ us: 5, them: 3 });
 		expect(result.current[0].status).toBe("playing");
+	});
+
+	it("UNDO 後 localStorage 同步退回上一手，不會殘留已撤銷的比分", () => {
+		const { result } = renderHook(() => useScoreboardStore());
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		expect(result.current[0].scores.us).toBe(2);
+
+		act(() => {
+			result.current[1]({ type: "UNDO" });
+		});
+
+		expect(result.current[0].scores.us).toBe(1);
+		// write effect 必須跟著 UNDO 重跑：若只在得分時寫入，重整後會讀回已撤銷的 2 分
+		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		expect(stored.scores.us).toBe(1);
+		expect(stored.history).toHaveLength(1);
+	});
+
+	it("localStorage 資料 schema 損壞時保持初始 state，並清掉損壞資料", () => {
+		const corrupted = JSON.stringify({ mode: "invalid", scores: "nope" });
+		localStorage.setItem(STORAGE_KEY, corrupted);
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+		const { result } = renderHook(() => useScoreboardStore());
+
+		// 損壞資料不得被 HYDRATE 進 state
+		expect(result.current[0].scores).toEqual({ us: 0, them: 0 });
+		expect(result.current[0].status).toBe("setup");
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBe(corrupted);
+		warnSpy.mockRestore();
+	});
+
+	it("localStorage 不可用（如私密模式）時 hook 不 throw，仍可正常計分", () => {
+		const original = Object.getOwnPropertyDescriptor(
+			globalThis,
+			"localStorage",
+		);
+		Object.defineProperty(globalThis, "localStorage", {
+			configurable: true,
+			get() {
+				throw new DOMException("localStorage is not available");
+			},
+		});
+
+		try {
+			// 自證：確認存取真的會拋錯，否則本 test 只是在測正常路徑
+			expect(() => window.localStorage).toThrow();
+
+			const { result } = renderHook(() => useScoreboardStore());
+			expect(result.current[0].scores).toEqual({ us: 0, them: 0 });
+
+			// 持久化失效不應波及記憶體內的計分行為
+			// （winner 取初始發球方 us：匹克球只有發球方得分，接發方贏只會換發）
+			act(() => {
+				result.current[1]({ type: "RALLY_WON", winner: "us" });
+			});
+			expect(result.current[0].scores.us).toBe(1);
+		} finally {
+			if (original) {
+				Object.defineProperty(globalThis, "localStorage", original);
+			} else {
+				Reflect.deleteProperty(globalThis, "localStorage");
+			}
+		}
 	});
 });
