@@ -118,3 +118,13 @@ export function defaultGradient(index: number): GradientPreset {
 	const normalizedIndex = ((index % length) + length) % length;
 	return DEFAULT_GRADIENTS[normalizedIndex];
 }
+
+/**
+ * 在 `DEFAULT_GRADIENTS` 中反查指定漸層組合的 index，找不到回 `-1`。
+ * 供 `roster.ts` 的 `addPlayer` 掃描目前名單已佔用的 palette index，
+ * 藉此取「最小未使用值」而非依賴 `roster.length`（後者在有刪除操作時會與已用
+ * index 脫鉤，導致刪除後新增撞色，見 spec「雙色漸層與文字對比」）。
+ */
+export function paletteIndexOf(colorFrom: string, colorTo: string): number {
+	return DEFAULT_GRADIENTS.findIndex((g) => g.colorFrom === colorFrom && g.colorTo === colorTo);
+}

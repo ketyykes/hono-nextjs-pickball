@@ -41,6 +41,40 @@ describe("addPlayer", () => {
 		expect(roster).toHaveLength(0);
 		expect(result).not.toBe(roster);
 	});
+
+	it("刪除中間成員後新增，配色不與剩餘成員撞色", () => {
+		let roster: Player[] = [];
+		roster = addPlayer(roster, { name: "小明", gender: "male", rating: 3 }, { id: "p1", now: "2026-08-15T00:00:00.000Z" });
+		roster = addPlayer(roster, { name: "小美", gender: "female", rating: 3 }, { id: "p2", now: "2026-08-15T00:00:00.000Z" });
+		roster = addPlayer(roster, { name: "小華", gender: "male", rating: 3 }, { id: "p3", now: "2026-08-15T00:00:00.000Z" });
+
+		roster = removePlayer(roster, "p2");
+		roster = addPlayer(roster, { name: "小強", gender: "male", rating: 3 }, { id: "p4", now: "2026-08-15T00:00:00.000Z" });
+
+		const remaining = roster.filter((p) => p.id !== "p4");
+		const newcomer = roster.find((p) => p.id === "p4");
+
+		for (const p of remaining) {
+			expect(newcomer?.colorFrom === p.colorFrom && newcomer?.colorTo === p.colorTo).toBe(false);
+		}
+	});
+
+	it("只提供 colorFrom／colorTo 其中一端時，該端會被忽略並整組走自動配色", () => {
+		const withOnlyColorFrom = addPlayer(
+			[],
+			{ name: "小明", gender: "male", rating: 3, colorFrom: "#123456" },
+			{ id: "p1", now: "2026-08-15T00:00:00.000Z" },
+		);
+		// 自動配色第一組固定為既有 teal，使用者給的 colorFrom 未生效。
+		expect(withOnlyColorFrom[0].colorFrom).not.toBe("#123456");
+
+		const withOnlyColorTo = addPlayer(
+			[],
+			{ name: "小美", gender: "female", rating: 3, colorTo: "#654321" },
+			{ id: "p2", now: "2026-08-15T00:00:00.000Z" },
+		);
+		expect(withOnlyColorTo[0].colorTo).not.toBe("#654321");
+	});
 });
 
 describe("updatePlayer", () => {
@@ -65,6 +99,9 @@ describe("updatePlayer", () => {
 
 		expect(result.find((p) => p.id === "p1")).toEqual(p1);
 		expect(result.find((p) => p.id === "p3")).toEqual(p3);
+		// 未變更的成員保留原物件參考，而非重新建構的內容相等物件。
+		expect(result.find((p) => p.id === "p1")).toBe(p1);
+		expect(result.find((p) => p.id === "p3")).toBe(p3);
 	});
 
 	it("updatePlayer 遇到不存在的 id 時不新增也不改動", () => {
@@ -74,6 +111,9 @@ describe("updatePlayer", () => {
 
 		expect(result).toHaveLength(roster.length);
 		expect(result).toEqual(roster);
+		// 找不到 id 時每個成員都保留原物件參考。
+		expect(result.find((p) => p.id === "p1")).toBe(roster[0]);
+		expect(result.find((p) => p.id === "p2")).toBe(roster[1]);
 	});
 });
 
