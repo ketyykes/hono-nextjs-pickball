@@ -171,11 +171,22 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **THEN** 回傳的前景色，其與兩端點的對比度**最小值**，不低於另一候選前景色的對應最小值
 - **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「一深一淺漸層取兩端最小對比較高的前景色」
 
+系統 SHALL 於使用者未指定顏色時自動配色。預設調色盤 MUST **至少涵蓋 16 組**互異漸層 —— `prd.md` 12.1 的使用規模為 8～40 人，而 4.1.1 明訂漸層的目的是「讓使用者快速辨識球場位置」。若調色盤過小（例如僅 6 組），名單頁上多數參賽者會撞色，功能雖滿足「相鄰不重複」的字面要求，卻達不到其存在目的。
+
+超出調色盤長度後 SHALL 循環取用，SHALL NOT 因此拋錯或回傳空值；40 人規模下的循環撞色由姓名與其他非顏色標示輔助辨識（`prd.md` 12.5：色彩不得作為唯一資訊來源）。
+
 #### Scenario: 未指定顏色時自動配色
 
 - **WHEN** 新增參賽者未提供 `colorFrom`／`colorTo`
 - **THEN** `defaultGradient` 依序提供可辨識的預設漸層，相鄰新增的參賽者不會拿到相同配色
 - **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「defaultGradient 依序提供不重複的預設漸層」
+
+#### Scenario: 調色盤規模與循環
+
+- **WHEN** 連續取用 `defaultGradient(0)` 至 `defaultGradient(15)`
+- **THEN** 16 組結果**兩兩互異**
+- **AND** `defaultGradient(16)` 等於 `defaultGradient(0)`（循環取用），負數 index 亦回傳合法漸層而非拋錯
+- **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「defaultGradient 提供 16 組互異漸層並循環取用」
 
 ---
 

@@ -44,6 +44,18 @@
 - [ ] 2.8 **綠**：實作 `defaultGradient(index)`，以固定的預設調色盤依 index 取模。重跑至綠
 - [ ] 2.9 **refactor**：檢視 `relativeLuminance` 是否正確處理 sRGB gamma（低於 0.03928 的分支）；深／淺前景色是否取自 `app/globals.css` 的既有 OKLCH semantic token 而非硬編碼新色。無壞味道則註記 skipped
 
+### 2.10～2.12：code review 後補（調色盤規模與邊界覆蓋）
+
+> 源自 Task 2 的 code review。原 spec 的 Scenario 只要求「相鄰新增的參賽者不會拿到相同配色」，
+> modulo 實作技術上滿足，但 6 組預設在 PRD 12.1 的 8～40 人規模下會讓多數人撞色，
+> 達不到 PRD 4.1.1「快速辨識球場位置」的目的。spec 已補上調色盤規模要求與對應 Scenario。
+
+- [ ] 2.10 **紅**：新增 it「defaultGradient 提供 16 組互異漸層並循環取用」，斷言 `defaultGradient(0)`～`defaultGradient(15)` 兩兩互異、`defaultGradient(16)` 等於 `defaultGradient(0)`、負數 index 回傳合法漸層。執行看到紅燈（**真紅燈**：現行 `DEFAULT_GRADIENTS` 只有 6 組，index 6 起即與前面重複，「16 組兩兩互異」必然失敗）
+- [ ] 2.11 **綠**：將 `DEFAULT_GRADIENTS` 由 6 組擴充至 16 組，色相盡量分散以維持可辨識度。重跑至綠
+- [ ] 2.12 補兩處註解：
+  - `pickTextColor` 的平手分支（`lightScore >= darkScore`）——說明平手時取淺色是刻意決定、spec 未規範此邊界（存在中性灰亮度 L≈0.1791 使兩者恰好相等，是可實際觸發的情況，非純理論邊界）
+  - `hexToRgb` 的 JSDoc——標註「輸入需為合法 6 碼 hex（呼叫端經 `PlayerSchema` 保證），否則行為未定義」。**不加執行期驗證**：本模組刻意不 import `types.ts` 以保持獨立，重複驗證會製造第二個真相來源
+
 ## 3. 名單 CRUD（`lib/matchmaker/roster.ts` — 行為邏輯，必 TDD）
 
 - [ ] 3.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/roster.test.ts`，寫 it「addPlayer 回傳新陣列且不修改原陣列，id 與 createdAt 取自注入值」——對空陣列呼叫 `addPlayer(roster, input, { id: "p1", now: "2026-08-15T00:00:00.000Z" })`，斷言回傳長度 1、`id`／`createdAt` 為注入值、`restCount`／`gamesPlayed` 為 0、`isActive` 為 `true`，且**原陣列仍為空**（`toBe` 比對參考不相同）。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/roster.test.ts` 看到紅燈
