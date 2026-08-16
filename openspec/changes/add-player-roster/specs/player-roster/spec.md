@@ -21,6 +21,12 @@
 
 `rating` 超出 1.00～8.00 或 Hex 色碼格式不合法時 MUST 驗證失敗，SHALL NOT 靜默夾值或改寫。
 
+`createdAt` MUST 驗證為 ISO 8601 格式，SHALL NOT 接受任意字串 —— 此欄位會隨持久化資料回讀並經同一 schema 驗證，不驗格式等於讓損壞或被竄改的時間戳靜默通過。
+
+外層容器 `RosterSchema` 的 `version` MUST 為字面量 `1`，SHALL NOT 使用開放的 `z.number()` —— 開放型別會讓未來的 v2 結構通過外層驗證，再於逐筆驗證時整批落空，使用者看到的是「名單莫名少了很多人」而非明確的版本不符（見 design Decision 9）。
+
+`name` 的 `.trim()` 是**刻意的正規化**，不受上述「SHALL NOT 靜默改寫」約束 —— 該約束的主詞僅限 `rating` 與 Hex 色碼。
+
 實作位於 `nextjs-pickball/lib/matchmaker/types.ts`。
 
 #### Scenario: 合法參賽者通過驗證
@@ -33,7 +39,20 @@
 
 - **WHEN** `rating` 為 `0.99` 或 `8.01`
 - **THEN** 驗證失敗
+- **AND** 邊界值 `1` 與 `8` 本身 MUST 通過（範圍為 inclusive）
 - **驗收**：`nextjs-pickball/lib/matchmaker/types.test.ts`，it 名稱「rating 超出 1.00～8.00 時驗證失敗」
+
+#### Scenario: 建立時間非 ISO 8601
+
+- **WHEN** `createdAt` 為 `"not-a-date"`
+- **THEN** 驗證失敗；`"2026-08-15T00:00:00.000Z"` 則通過
+- **驗收**：`nextjs-pickball/lib/matchmaker/types.test.ts`，it 名稱「createdAt 非 ISO 8601 時驗證失敗」
+
+#### Scenario: 外層版本號不符
+
+- **WHEN** `RosterSchema.safeParse` 收到 `version: 2`
+- **THEN** 驗證失敗；`version: 1` 則通過
+- **驗收**：`nextjs-pickball/lib/matchmaker/types.test.ts`，it 名稱「RosterSchema 的 version 僅接受 1」
 
 #### Scenario: 名稱僅有空白
 

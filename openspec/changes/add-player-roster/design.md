@@ -152,6 +152,16 @@ PRD 4.1 規定 1.00～8.00、小數點後兩位。zod 驗證範圍，並在寫�
 
 UI 一律以 `toFixed(2)` 呈現，避免 `3.0499999` 這類顯示。
 
+### Decision 9：`RosterSchema.version` 定為 `z.literal(1)`，不是開放的 `z.number()`
+
+外層容器帶一個 `version` 欄位，但它的允許值必須收斂為字面量 `1`。
+
+寫成 `z.number()` 會讓任何數字通過——包括未來真的出現的 `2`。那正是最糟的情況：一份 v2 結構的資料會通過 v1 的外層驗證，然後在逐筆 `PlayerSchema` 驗證時因欄位對不上而被整批丟棄，使用者看到的是「名單莫名少了很多人」，而不是一個明確的版本不符。
+
+用 `z.literal(1)` 則讓版本不符在**外層**就失敗，走 Decision 3 的「無筆可救 → 清除 key」路徑，行為明確且可預期。日後真要支援多版本時，改為 `z.union([z.literal(1), z.literal(2)])` 並在該處加遷移分支，是一個顯眼且必須主動處理的改動點。
+
+此欄位與 `STORAGE_KEY` 名稱中的 `v1` 看似重複，但兩者用途不同：key 名稱隔離的是**不同版本的儲存空間**（v2 寫到新 key，v1 資料原地保留），`version` 欄位標記的是**這份內容本身的結構版本**，在 JSON 匯出檔（`prd.md` 9.2 要求含版本號）離開 LocalStorage 之後，key 名稱就不存在了，只剩這個欄位能表明結構版本。
+
 ### Decision 8：hydration 沿用 scoreboard 的 HYDRATE 模式
 
 首次 render 在 server 與 client 都以空名單開始，`useEffect` 讀取 LocalStorage 後 dispatch `HYDRATE`。與 `hooks/useScoreboardStore.ts` 相同，避免 SSR／CSR 首次輸出不一致造成的 hydration mismatch。

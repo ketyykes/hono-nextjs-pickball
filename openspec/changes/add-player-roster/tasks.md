@@ -19,6 +19,19 @@
 - [ ] 1.8 **綠**：`colorFrom`／`colorTo` 加上 `.regex(/^#[0-9a-fA-F]{6}$/)`。重跑至綠
 - [ ] 1.9 **refactor**：檢視 schema 是否與 `lib/scoreboard/types.ts` 的風格一致（union-of-literals、schema 與型別成對匯出）；`restCount`／`gamesPlayed` 上方應有註解說明「本 capability 只初始化不累加，先納入是為避免後續破壞性遷移」（見 design Decision 2）。無壞味道則註記 skipped
 
+### 1.10～1.15：code review 後補
+
+> 這六步源自 Task 1 的 code review。原 1.1～1.9 未涵蓋 `createdAt` 與 `version` 的驗證，
+> 是 spec 表格的型別描述（「ISO 8601」）與實際驗證強度之間的落差；spec 已同步補上對應 Scenario 與 design Decision 9。
+
+- [ ] 1.10 **紅**：新增 it「createdAt 非 ISO 8601 時驗證失敗」，斷言 `createdAt: "not-a-date"` 失敗、`"2026-08-15T00:00:00.000Z"` 通過。執行看到紅燈（**真紅燈**：現行 `z.string()` 接受任意字串）
+- [ ] 1.11 **綠**：`createdAt` 改為 `z.iso.datetime()`（zod 4.4.3 的慣用 API，非 zod 3 風格的 `z.string().datetime()`）。重跑至綠
+- [ ] 1.12 **紅**：新增 it「RosterSchema 的 version 僅接受 1」，斷言 `version: 2` 失敗、`version: 1` 通過。看到紅燈（**真紅燈**：現行 `z.number()` 接受任何數字）
+- [ ] 1.13 **綠**：`version` 改為 `z.literal(1)`（見 design Decision 9）。重跑至綠
+- [ ] 1.14 於既有 it「rating 超出 1.00～8.00 時驗證失敗」補上 inclusive 邊界的正向斷言（`rating: 1` 與 `rating: 8` 應通過）與一筆合法 baseline（`rating: 4.5`）
+  - ⚠️ **誠實標註**：實作的 `.min(1).max(8)` 本就是 inclusive，故這些斷言補上時**即為綠燈，屬 regression guard 而非 TDD 紅燈**。其價值在於鎖定邊界契約——日後有人改成 exclusive 寫法會被擋下。**不得**以修改斷言看紅再改回的方式偽造紅燈
+- [ ] 1.15 於 `name` 的 `.trim()` 該行補註解，說明此為刻意的正規化、不受 spec「SHALL NOT 靜默夾值或改寫」約束（該約束主詞僅限 rating 與 Hex），避免未來審查者重複糾結
+
 ## 2. 顏色對比（`lib/matchmaker/colors.ts` — 行為邏輯，必 TDD）
 
 - [ ] 2.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/colors.test.ts`，寫 it「深色漸層回傳淺色前景」——`pickTextColor("#0E6B63", "#134E4A")` 斷言回傳淺色前景常數。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/colors.test.ts` 看到紅燈（**真紅燈**：模組不存在）
