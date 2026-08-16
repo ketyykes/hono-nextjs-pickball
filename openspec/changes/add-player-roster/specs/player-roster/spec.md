@@ -175,6 +175,11 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 超出調色盤長度後 SHALL 循環取用，SHALL NOT 因此拋錯或回傳空值；40 人規模下的循環撞色由姓名與其他非顏色標示輔助辨識（`prd.md` 12.5：色彩不得作為唯一資訊來源）。
 
+**「互異」MUST 指視覺上可區分，而非僅是字串不相等。** 序列化比對（`colorFrom|colorTo` 不同即判為互異）會放行兩組色相幾乎重合的漸層——那在名單頁上看起來是同一個顏色，滿足了字面要求卻達不到辨識目的。因此調色盤 MUST 同時滿足：
+
+- 任兩組的 `colorFrom` **色相角度差 ≥ 15 度**（環狀距離，取 `min(d, 360-d)`）
+- 任兩組 **不得共用相同的 `colorTo`**
+
 #### Scenario: 未指定顏色時自動配色
 
 - **WHEN** 新增參賽者未提供 `colorFrom`／`colorTo`
@@ -187,6 +192,13 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **THEN** 16 組結果**兩兩互異**
 - **AND** `defaultGradient(16)` 等於 `defaultGradient(0)`（循環取用），負數 index 亦回傳合法漸層而非拋錯
 - **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「defaultGradient 提供 16 組互異漸層並循環取用」
+
+#### Scenario: 調色盤在視覺上可區分
+
+- **WHEN** 計算 16 組漸層兩兩之間的差異
+- **THEN** 任兩組的 `colorFrom` 色相角度差（環狀距離）MUST ≥ 15 度
+- **AND** 任兩組 MUST NOT 共用相同的 `colorTo`
+- **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「調色盤任兩組色相差至少 15 度且不共用 colorTo」
 
 ---
 
