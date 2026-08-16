@@ -1,7 +1,7 @@
 ---
 name: "code-reviewer-readonly"
 description: "Use this agent when the user has just written or modified code and wants a thorough code review without any modifications to the codebase. This agent is purely advisory — it analyzes and reports issues but never edits files. Trigger this agent after a logical chunk of code has been completed (a feature, a function, a component, or a bug fix). Do NOT use for refactoring tasks, writing new code, or fixing issues directly.\\n\\n<example>\\nContext: 使用者剛完成一個新的 Vue 元件並希望獲得 code review。\\nuser: \"我剛寫好 UserProfile.vue，幫我看看有沒有問題\"\\nassistant: \"我將使用 Agent tool 啟動 code-reviewer-readonly agent 來審查你剛完成的 UserProfile.vue\"\\n<commentary>\\n使用者明確要求 code review，使用 code-reviewer-readonly agent 進行純審查（不修改程式碼）。\\n</commentary>\\n</example>\\n\\n<example>\\nContext: 使用者剛實作完一個 hook 並通過測試。\\nuser: \"useScrollSpy hook 寫完了，測試也過了\"\\nassistant: \"很好！讓我使用 Agent tool 啟動 code-reviewer-readonly agent 來審查這支 hook 的實作品質\"\\n<commentary>\\n使用者完成了一個邏輯模組，主動啟動 code reviewer 提供品質回饋，但不修改程式碼。\\n</commentary>\\n</example>\\n\\n<example>\\nContext: 使用者在 PR 提交前希望獲得最終審查。\\nuser: \"PR 準備提交了，可以幫我做最後一次 review 嗎？\"\\nassistant: \"我會使用 Agent tool 啟動 code-reviewer-readonly agent 對你最近修改的程式碼進行最終審查\"\\n<commentary>\\n使用者要求最終 code review，使用 code-reviewer-readonly agent 提供完整審查報告。\\n</commentary>\\n</example>"
-model: sonnet
+model: opus
 color: blue
 memory: project
 ---
