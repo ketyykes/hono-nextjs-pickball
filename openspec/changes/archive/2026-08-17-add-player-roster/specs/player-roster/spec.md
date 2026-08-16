@@ -175,6 +175,12 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 超出調色盤長度後 SHALL 循環取用，SHALL NOT 因此拋錯或回傳空值；40 人規模下的循環撞色由姓名與其他非顏色標示輔助辨識（`prd.md` 12.5：色彩不得作為唯一資訊來源）。
 
+自動配色的**選色規則** MUST 為「掃描名單中已佔用的調色盤 index，取最小未使用者」（實作為 `roster.ts` 的 `nextAutoGradient`），SHALL NOT 依名單長度取用（`defaultGradient(roster.length)`）—— 刪除是本 capability 明列的功能，一旦發生刪除，名單長度就與「已佔用的最大 index + 1」脫鉤，依長度取色會與既有成員撞色。所有 index 皆已佔用時（人數超過調色盤組數）才退回上述的循環取用。
+
+新增表單的顏色**預覽**與 `addPlayer` 實際套用的顏色 MUST 取自同一個函式，SHALL NOT 各自計算 —— 兩處的計算方式一旦分歧，名單發生過刪除後使用者看到的預覽色會與實際拿到的不同。
+
+`colorFrom` 與 `colorTo` MUST **同時提供**才視為使用者指定配色；只提供其中一端時該端 SHALL 被忽略，整組改走自動配色 —— 半組顏色無法構成漸層，而以預設值補另一端等於產生一組使用者從未選擇的配色。
+
 **「互異」MUST 指視覺上可區分，而非僅是字串不相等。** 序列化比對（`colorFrom|colorTo` 不同即判為互異）會放行兩組色相幾乎重合的漸層——那在名單頁上看起來是同一個顏色，滿足了字面要求卻達不到辨識目的。因此調色盤 MUST 同時滿足：
 
 - 任兩組的 `colorFrom` **色相角度差 ≥ 13 度**（環狀距離，取 `min(d, 360-d)`）
@@ -209,6 +215,19 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **THEN** 任兩組的 `colorFrom` 色相角度差（環狀距離）MUST ≥ 13 度
 - **AND** 任兩組 MUST NOT 共用相同的 `colorTo`
 - **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「調色盤任兩組色相差至少 13 度且不共用 colorTo」
+
+#### Scenario: 刪除後新增不與剩餘成員撞色
+
+- **GIVEN** 名單依序新增三位參賽者，分別取得調色盤 index 0、1、2
+- **WHEN** 刪除中間那位（index 1）後再新增一位
+- **THEN** 新成員取得 index 1（最小未使用值），SHALL NOT 與剩餘兩位的任一配色相同
+- **驗收**：`nextjs-pickball/lib/matchmaker/roster.test.ts`，it 名稱「刪除中間成員後新增，配色不與剩餘成員撞色」
+
+#### Scenario: 只提供漸層的單一端點
+
+- **WHEN** 新增時只提供 `colorFrom` 而未提供 `colorTo`（或反之）
+- **THEN** 已提供的那一端被忽略，整組顏色改由自動配色決定
+- **驗收**：`nextjs-pickball/lib/matchmaker/roster.test.ts`，it 名稱「只提供 colorFrom／colorTo 其中一端時，該端會被忽略並整組走自動配色」
 
 ---
 
@@ -281,7 +300,9 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 丟棄筆數大於 0 時，UI SHALL 提示使用者有資料損毀被略過，SHALL NOT 靜默處理。
 
-實作位於 `nextjs-pickball/lib/matchmaker/storage.ts`。
+重置後 SHALL NOT 把空名單寫回，否則剛移除的 key 會立即復活。此「跳過寫入」的意圖 MUST 保存在 **reducer state** 中，SHALL NOT 以一次性的 ref 旗標實作 —— React automatic batching 會把同一個 handler 內連續呼叫的 `resetRoster()` 與 `addPlayer()` 合併為單次 render，一次性旗標被重置設下後不會被後續 action 復位，該次寫入因此被整批跳過：記憶體中有新參賽者、LocalStorage 卻是空的，使用者此刻重新整理即**靜默遺失資料**。折進 state 後，批次內的多個 action 會依序 reduce，最後一個 action 的決定自然覆蓋前面的，不需另外處理批次合併。
+
+實作位於 `nextjs-pickball/lib/matchmaker/storage.ts` 與 `nextjs-pickball/hooks/useRosterStore.ts`。
 
 #### Scenario: 重整後還原名單
 
@@ -333,3 +354,11 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **WHEN** 透過 store 新增一位參賽者
 - **THEN** `matchmaker:roster:v1` 的內容包含該筆參賽者
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「新增參賽者後自動寫回 localStorage」
+
+#### Scenario: 同批次內重置後緊接新增仍正確持久化
+
+- **GIVEN** 名單中已有參賽者且已寫入 LocalStorage
+- **WHEN** 於同一個 handler 內連續呼叫 `resetRoster()` 與 `addPlayer()`（React 會合併為單次 render）
+- **THEN** 記憶體中的名單含該新參賽者，**且** `matchmaker:roster:v1` 的內容同樣含該筆
+- **AND** SHALL NOT 出現「state 有資料但 LocalStorage 為空」的狀態
+- **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「同一批次內 resetRoster 後緊接 addPlayer 仍正確持久化」

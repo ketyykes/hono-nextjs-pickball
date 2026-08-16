@@ -63,7 +63,7 @@ describe("pickTextColor", () => {
 });
 
 describe("defaultGradient", () => {
-	it("依序提供不重複的預設漸層", () => {
+	it("defaultGradient 依序提供不重複的預設漸層", () => {
 		const results = Array.from({ length: 6 }, (_, index) => defaultGradient(index));
 
 		for (let i = 1; i < results.length; i++) {

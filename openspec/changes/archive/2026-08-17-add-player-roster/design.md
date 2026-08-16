@@ -152,6 +152,12 @@ PRD 4.1 規定 1.00～8.00、小數點後兩位。zod 驗證範圍，並在寫�
 
 UI 一律以 `toFixed(2)` 呈現，避免 `3.0499999` 這類顯示。
 
+### Decision 8：hydration 沿用 scoreboard 的 HYDRATE 模式
+
+首次 render 在 server 與 client 都以空名單開始，`useEffect` 讀取 LocalStorage 後 dispatch `HYDRATE`。與 `hooks/useScoreboardStore.ts` 相同，避免 SSR／CSR 首次輸出不一致造成的 hydration mismatch。
+
+代價是空狀態畫面會閃現一瞬。既有 scoreboard 已接受此取捨，此處保持一致，不另引入 `suppressHydrationWarning` 或 `next/dynamic` 的第二種模式。
+
 ### Decision 9：`RosterSchema.version` 定為 `z.literal(1)`，不是開放的 `z.number()`
 
 外層容器帶一個 `version` 欄位，但它的允許值必須收斂為字面量 `1`。
@@ -170,8 +176,3 @@ UI 一律以 `toFixed(2)` 呈現，避免 `3.0499999` 這類顯示。
 
 **這條限制的風險窗口在未來的 JSON 匯入**（`prd.md` 9.2）：目前該功能定位是「本 app 匯出入對稱的完整備份還原」，來源必定是本 app 的 `toISOString()` 輸出，所以安全。但若日後要接受**非本 app 產生**的 JSON（使用者手動編輯、或第三方工具匯出），帶 offset 的時間戳會整批驗證失敗，走 Decision 3 的「外層結構不合法 → 清除」路徑。屆時應改用更寬鬆的 ISO 8601 驗證，而非讓使用者的匯入檔靜默失效。
 
-### Decision 8：hydration 沿用 scoreboard 的 HYDRATE 模式
-
-首次 render 在 server 與 client 都以空名單開始，`useEffect` 讀取 LocalStorage 後 dispatch `HYDRATE`。與 `hooks/useScoreboardStore.ts` 相同，避免 SSR／CSR 首次輸出不一致造成的 hydration mismatch。
-
-代價是空狀態畫面會閃現一瞬。既有 scoreboard 已接受此取捨，此處保持一致，不另引入 `suppressHydrationWarning` 或 `next/dynamic` 的第二種模式。

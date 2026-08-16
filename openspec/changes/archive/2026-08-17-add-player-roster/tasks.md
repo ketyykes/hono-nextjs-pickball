@@ -210,5 +210,8 @@
     - `api-health.spec.ts` 早於本 change 存在（`b4acc81`）
   - 修復方式：從 repo root 執行 `pnpm dev` 同時帶起前後端讓 dev registry 接通，或清掉殘留的 dev server process 後重跑
 - [x] 9.5 建置驗證：`pnpm build` 兩個 workspace 皆通過，`/matchmaker/players` 被正確識別為 `○ (Static)` 靜態預渲染（與 Decision 8 的 HYDRATE 模式一致：首次輸出為空名單，client effect 後才填入）
-  - ⚠️ workerd runtime 的 `preview` 未執行：它與 9.4 的 api-health 同源，需 dev registry 接通 service binding。待環境修復後補跑
-- [x] 9.6 確認未讀取、修改或刪除 `scoreboard:current:v1`——手動在瀏覽器開一場計分板、切到名單頁操作後返回，計分進度應完好
+- [ ] 9.6 **未執行（環境阻擋，非通過）**：`pnpm --filter ./nextjs-pickball preview` 的 workerd runtime 整合驗證
+  - 這是 root `README.md`「部署前手動檢查清單」的第 5 步，**本 change 從未跑過**，刻意保留未勾選以免「全項完成」的外觀掩蓋它
+  - 與 9.4 的 api-health 同源：需 dev registry 接通 service binding，而 `~/.wrangler/registry` 目錄不存在
+  - 阻擋原因與本 change 的程式碼無關（見 9.4 的查證鏈），但**部署前必須補跑**
+- [x] 9.7 確認未讀取、修改或刪除 `scoreboard:current:v1`——手動在瀏覽器開一場計分板、切到名單頁操作後返回，計分進度應完好
