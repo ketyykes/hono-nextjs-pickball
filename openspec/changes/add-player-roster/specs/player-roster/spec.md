@@ -302,6 +302,7 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **GIVEN** 持久化資料含 3 筆參賽者，其中 1 筆的 `rating` 為 `99`（超出範圍）
 - **WHEN** 呼叫 `readRoster()`
 - **THEN** 回傳另外 2 筆合法參賽者，`droppedCount` 為 1，且**不清除**整份資料
+- **AND** 回寫後再次讀取時，MUST 同時斷言 `players` 的**筆數與內容**仍為那 2 筆，SHALL NOT 只斷言 `droppedCount` 為 0 —— 「回寫正確」與「回寫時把名單整個寫丟」兩種情況的 `droppedCount` 皆為 0（後者是空陣列沒東西可壞），該訊號無法區分兩者，只驗它會讓「整份名單靜默消失」的 regression 溜過測試
 - **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「單筆不合法時保留其餘 2 筆並回報 droppedCount 為 1」
 
 #### Scenario: 外層結構不合法時整份清除

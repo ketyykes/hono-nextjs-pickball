@@ -116,6 +116,18 @@
   - ⚠️ **誠實標註**：現行實作已正確（`RosterContainerSchema` 的 `z.literal(1)` 使外層驗證失敗而走清除路徑），故此測試補上時**即為綠燈，屬 regression guard 而非 TDD 紅燈**。其價值在於鎖住 Decision 9 的契約。**不得**以修改斷言看紅再改回的方式偽造紅燈
 - [ ] 4.14 檢視 `readRoster()` 的 docstring 是否已明列「版本不符」屬「無筆可救」路徑（目前已有，確認即可）
 
+### 4.15～4.16：code review 後補（回寫斷言強度與跨模組 import 註解）
+
+> 4.15 源自 Task 4 的 code review，是**我寫 4.7 時選錯驗證訊號**造成的。
+> reviewer 用突變測試證明：把 `writeRoster(players)` 改成 `writeRoster([])`（模擬參數用錯變數的
+> copy-paste bug），既有 5 個測試**全數依然通過**——因為「回寫正確剩 2 筆」與「回寫時把名單寫丟剩 0 筆」
+> 的第二次讀取都會得到 `droppedCount === 0`（後者是空陣列沒東西可壞）。
+> 這直擊本 task 名義上的最高風險「整份名單靜默消失」，觸發門檻只是打錯一個變數名。
+
+- [ ] 4.15 於既有 it「單筆不合法時保留其餘 2 筆並回報 droppedCount 為 1」的「再讀一次」段落，補上 `expect(secondResult.players.length).toBe(2)` 與內容斷言（id 仍為 `p1`／`p3`）
+  - ⚠️ **誠實標註**：現行實作正確（`storage.ts` 確實是 `writeRoster(players)`），故補上時**即為綠燈，屬 regression guard 而非 TDD 紅燈**。驗證其有效性的方式是突變測試：暫時把 `writeRoster(players)` 改為 `writeRoster([])`，補強後的斷言必須失敗——**驗證完務必還原**，且不得把突變狀態 commit
+- [ ] 4.16 於 `storage.test.ts` 的 `import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage"` 補註解，說明為何取 scoreboard 實際匯出的 key 而非硬編碼字串：若 scoreboard 日後改 key 名，硬編碼的測試會繼續綠燈但保護的是不存在的 key，跨模組 import 則會編譯失敗、強迫同步更新
+
 ## 5. 狀態管理（`hooks/useRosterStore.ts` — 行為邏輯，必 TDD）
 
 - [ ] 5.1 **紅**：新增 `nextjs-pickball/hooks/useRosterStore.test.tsx`，寫 it「無持久化資料時初始 players 為空陣列」——清空 localStorage 後 `renderHook(() => useRosterStore())`，斷言 `players` 為 `[]`。執行 `pnpm --filter ./nextjs-pickball test --run hooks/useRosterStore.test.tsx` 看到紅燈
