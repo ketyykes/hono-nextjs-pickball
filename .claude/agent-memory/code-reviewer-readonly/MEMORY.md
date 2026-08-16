@@ -1,1 +1,2 @@
 - [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界、storage/store 降級測試已補齊（含自證斷言慣例）
+- [Matchmaker Architecture Notes](project_matchmaker_architecture.md) — add-player-roster change 的 Decision 2/3/4/6/7/8、Task 1 types.ts 審查記錄（zod 4.4.3 現場驗證：min/max inclusive、trim 為 transform、default 的 input/output 型別差異、z.iso.datetime()）
