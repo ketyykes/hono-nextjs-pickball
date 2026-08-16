@@ -83,11 +83,11 @@
 > 這是本 change 第四次出現「滿足字面 Scenario、達不到 PRD 4.1.1 辨識目的」的模式，且觸發門檻最低——
 > 不需要特殊色碼或大規模名單，刪除＋新增是日常操作。
 
-- [ ] 3.16 **紅**：於 `roster.test.ts` 新增 it「刪除中間成員後新增，配色不與剩餘成員撞色」——建立三人名單（皆自動配色）、`removePlayer` 移除中間者、再 `addPlayer` 一位，斷言新成員的 `colorFrom`／`colorTo` 與剩餘兩位皆不相同。看到紅燈（**真紅燈**：現行 `defaultGradient(roster.length)` 必然回傳與第三位相同的漸層）
-- [ ] 3.17 **綠**：於 `colors.ts` 新增 `paletteIndexOf(colorFrom, colorTo): number`（在 `DEFAULT_GRADIENTS` 中反查，找不到回 `-1`）；`addPlayer` 改為「掃描目前名單已佔用的 palette index，取最小未使用值」。重跑至綠
+- [x] 3.16 **紅**：於 `roster.test.ts` 新增 it「刪除中間成員後新增，配色不與剩餘成員撞色」——建立三人名單（皆自動配色）、`removePlayer` 移除中間者、再 `addPlayer` 一位，斷言新成員的 `colorFrom`／`colorTo` 與剩餘兩位皆不相同。看到紅燈（**真紅燈**：現行 `defaultGradient(roster.length)` 必然回傳與第三位相同的漸層）
+- [x] 3.17 **綠**：於 `colors.ts` 新增 `paletteIndexOf(colorFrom, colorTo): number`（在 `DEFAULT_GRADIENTS` 中反查，找不到回 `-1`）；`addPlayer` 改為「掃描目前名單已佔用的 palette index，取最小未使用值」。重跑至綠
   - **不採**在 `PlayerSchema` 加序號欄位的方案：配色序號是 UI 配色演算法的實作細節，不是參賽者的網域資料，塞進持久化 schema 會把一個未來可能想更換的演算法選擇焊死。反查法額外的好處是，使用者手動選到剛好等於某個預設組合的顏色時，會被自然視為佔用該 index
-- [ ] 3.18 於 `AddPlayerInput` 的 `colorFrom`／`colorTo` 補 JSDoc，說明兩者為**同進同出**：只提供一端時該端會被忽略、整組走自動配色。並補一個 it 鎖定此行為，避免未來非 UI 呼叫端（例如批次匯入）靜默丟失使用者輸入而不自知
-- [ ] 3.19 於 `UpdatePlayerPatch` 補 JSDoc，提醒它是**覆寫**語意而非累加：M2／M4 若要更新 `restCount`／`gamesPlayed`，直接透過此 patch 寫入會蓋掉既有累計值，屆時應改用專門的 increment 函式
+- [x] 3.18 於 `AddPlayerInput` 的 `colorFrom`／`colorTo` 補 JSDoc，說明兩者為**同進同出**：只提供一端時該端會被忽略、整組走自動配色。並補一個 it 鎖定此行為，避免未來非 UI 呼叫端（例如批次匯入）靜默丟失使用者輸入而不自知
+- [x] 3.19 於 `UpdatePlayerPatch` 補 JSDoc，提醒它是**覆寫**語意而非累加：M2／M4 若要更新 `restCount`／`gamesPlayed`，直接透過此 patch 寫入會蓋掉既有累計值，屆時應改用專門的 increment 函式
 
 ## 4. 持久化（`lib/matchmaker/storage.ts` — 行為邏輯，必 TDD）
 
