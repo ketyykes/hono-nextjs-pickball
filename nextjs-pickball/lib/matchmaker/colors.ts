@@ -82,9 +82,17 @@ export interface GradientPreset {
 // prd.md 12.1 的使用規模為 8～40 人，4.1.1 明訂漸層目的是「讓使用者快速辨識球場位置」，
 // 故調色盤 MUST 至少涵蓋 16 組互異漸層（見 spec Requirement「雙色漸層與文字對比」）。
 // 前 6 組（teal／violet／pink／blue／orange／emerald）為既有行為，保留原順序，
-// 避免既有使用者的既有參賽者因調色盤重排而換色；新增的 10 組接在後面，
-// 色相依 HSL 環狀分散於既有 6 組之間（約每 36 度取一色相），並沿用「中等～深色端點」風格，
-// 使 pickTextColor 對它們穩定回傳淺色前景。
+// 避免既有使用者的既有參賽者因調色盤重排而換色；新增的 10 組接在後面。
+//
+// 「互異」不是序列化字串不同即可，而是視覺上可區分：spec 要求任兩組 colorFrom 的 HSL
+// 色相角度差（環狀距離，取 min(d, 360-d)）MUST ≥ 13 度，且任兩組不得共用相同 colorTo；
+// 兩者皆由 colors.test.ts 的「調色盤任兩組色相差至少 13 度且不共用 colorTo」把關。
+// 16 組實際色相並非均勻每 36 度分散一色（環狀均分 16 組理論上每組約 22.5 度，且原始
+// 6 組色相本就不均），而是在既有 6 組色相之間找出足夠寬（≥13 度雙邊留白）的空隙置入新色。
+// 門檻定為 13 度而非更高：既有 6 組中 teal（約 175°）與 emerald（約 161°）本身相差僅
+// 13.46 度，是既有調色盤的實際下限——訂更高即等於要求改動既有色，代價是既有使用者的
+// 既有參賽者換色，故不採。
+// 沿用「中等～深色端點」風格，使 pickTextColor 對這 16 組皆穩定回傳淺色前景。
 const DEFAULT_GRADIENTS: readonly GradientPreset[] = [
 	{ colorFrom: "#0E6B63", colorTo: "#134E4A" }, // teal（既有）
 	{ colorFrom: "#7C3AED", colorTo: "#4C1D95" }, // violet（既有）
@@ -95,13 +103,13 @@ const DEFAULT_GRADIENTS: readonly GradientPreset[] = [
 	{ colorFrom: "#DC2626", colorTo: "#7F1D1D" }, // red，補在 orange 與 pink 之間的色相缺口
 	{ colorFrom: "#CA8A04", colorTo: "#713F12" }, // amber/yellow，與 orange 區隔開的暖色
 	{ colorFrom: "#65A30D", colorTo: "#365314" }, // lime，介於 yellow 與 emerald 之間
-	{ colorFrom: "#0D9488", colorTo: "#134E4A" }, // cyan-teal，與既有 teal 同色系但取更亮端點區隔
+	{ colorFrom: "#898F14", colorTo: "#474908" }, // olive，色相約 63°，介於 amber 與 lime 間的缺口（原 cyan-teal 與既有 teal 幾乎重合，改置於此）
 	{ colorFrom: "#0284C7", colorTo: "#0C4A6E" }, // sky，介於 cyan 與 blue 之間
 	{ colorFrom: "#4F46E5", colorTo: "#312E81" }, // indigo，介於 blue 與 violet 之間
-	{ colorFrom: "#9333EA", colorTo: "#581C87" }, // purple，介於 violet 與 pink 之間
+	{ colorFrom: "#148F1B", colorTo: "#08490B" }, // green，色相約 123°，介於 lime 與 emerald 間的缺口（原 purple 與既有 violet 過近，改置於此）
 	{ colorFrom: "#C026D3", colorTo: "#701A75" }, // fuchsia，介於 purple 與 pink 之間
 	{ colorFrom: "#E11D48", colorTo: "#881337" }, // rose，介於 pink 與 red 之間
-	{ colorFrom: "#475569", colorTo: "#1E293B" }, // slate，中性色補位，供 40 人規模的最後一輪辨識
+	{ colorFrom: "#8F1473", colorTo: "#49083B" }, // magenta，色相約 314°，介於 fuchsia 與 pink 間的缺口（原 slate 與既有 blue 過近，改置於此）
 ];
 
 /** 依 index 於固定調色盤取模，提供不重複（相鄰不同）的預設漸層。 */
