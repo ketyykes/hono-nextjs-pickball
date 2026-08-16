@@ -9,40 +9,40 @@
 
 ## 1. 資料模型（`lib/matchmaker/types.ts` — 行為邏輯，必 TDD）
 
-- [ ] 1.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/types.test.ts`，寫 it「合法欄位通過驗證，restCount 與 gamesPlayed 未提供時補 0」——以完整合法欄位（省略 `restCount`／`gamesPlayed`）呼叫 `PlayerSchema.safeParse`，斷言 `success === true` 且兩欄位皆為 `0`。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/types.test.ts` 於 shell 實際看到紅燈（**真紅燈**：`types.ts` 尚不存在，import 失敗）
-- [ ] 1.2 **綠**：建立 `nextjs-pickball/lib/matchmaker/types.ts`，定義 `GenderSchema`（`"male" | "female" | "other"`）、`PlayerSchema`、`RosterSchema`（外層容器 `{ version, players }`），`restCount`／`gamesPlayed` 用 `z.number().int().nonnegative().default(0)`，並匯出對應 TS 型別。重跑 1.1 指令至綠
-- [ ] 1.3 **紅**：新增 it「rating 超出 1.00～8.00 時驗證失敗」，斷言 `rating: 0.99` 與 `rating: 8.01` 兩者 `success === false`。看到紅燈（**真紅燈**：1.2 若只寫 `z.number()` 則兩者皆通過）
-- [ ] 1.4 **綠**：`rating` 加上 `.min(1).max(8)`。重跑至綠
-- [ ] 1.5 **紅**：新增 it「name 僅含空白時驗證失敗」，斷言 `name: "   "` 的 `success === false`。看到紅燈（**真紅燈**：`z.string().min(1)` 對三個空白字元仍通過）
-- [ ] 1.6 **綠**：`name` 改為 `z.string().trim().min(1)`。重跑至綠
-- [ ] 1.7 **紅**：新增 it「Hex 色碼格式不合法時驗證失敗」，斷言 `colorFrom: "0E6B63"`（缺 `#`）與 `"#GGG"` 皆失敗、`"#0E6B63"` 通過。看到紅燈
-- [ ] 1.8 **綠**：`colorFrom`／`colorTo` 加上 `.regex(/^#[0-9a-fA-F]{6}$/)`。重跑至綠
-- [ ] 1.9 **refactor**：檢視 schema 是否與 `lib/scoreboard/types.ts` 的風格一致（union-of-literals、schema 與型別成對匯出）；`restCount`／`gamesPlayed` 上方應有註解說明「本 capability 只初始化不累加，先納入是為避免後續破壞性遷移」（見 design Decision 2）。無壞味道則註記 skipped
+- [x] 1.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/types.test.ts`，寫 it「合法欄位通過驗證，restCount 與 gamesPlayed 未提供時補 0」——以完整合法欄位（省略 `restCount`／`gamesPlayed`）呼叫 `PlayerSchema.safeParse`，斷言 `success === true` 且兩欄位皆為 `0`。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/types.test.ts` 於 shell 實際看到紅燈（**真紅燈**：`types.ts` 尚不存在，import 失敗）
+- [x] 1.2 **綠**：建立 `nextjs-pickball/lib/matchmaker/types.ts`，定義 `GenderSchema`（`"male" | "female" | "other"`）、`PlayerSchema`、`RosterSchema`（外層容器 `{ version, players }`），`restCount`／`gamesPlayed` 用 `z.number().int().nonnegative().default(0)`，並匯出對應 TS 型別。重跑 1.1 指令至綠
+- [x] 1.3 **紅**：新增 it「rating 超出 1.00～8.00 時驗證失敗」，斷言 `rating: 0.99` 與 `rating: 8.01` 兩者 `success === false`。看到紅燈（**真紅燈**：1.2 若只寫 `z.number()` 則兩者皆通過）
+- [x] 1.4 **綠**：`rating` 加上 `.min(1).max(8)`。重跑至綠
+- [x] 1.5 **紅**：新增 it「name 僅含空白時驗證失敗」，斷言 `name: "   "` 的 `success === false`。看到紅燈（**真紅燈**：`z.string().min(1)` 對三個空白字元仍通過）
+- [x] 1.6 **綠**：`name` 改為 `z.string().trim().min(1)`。重跑至綠
+- [x] 1.7 **紅**：新增 it「Hex 色碼格式不合法時驗證失敗」，斷言 `colorFrom: "0E6B63"`（缺 `#`）與 `"#GGG"` 皆失敗、`"#0E6B63"` 通過。看到紅燈
+- [x] 1.8 **綠**：`colorFrom`／`colorTo` 加上 `.regex(/^#[0-9a-fA-F]{6}$/)`。重跑至綠
+- [x] 1.9 **refactor**：檢視 schema 是否與 `lib/scoreboard/types.ts` 的風格一致（union-of-literals、schema 與型別成對匯出）；`restCount`／`gamesPlayed` 上方應有註解說明「本 capability 只初始化不累加，先納入是為避免後續破壞性遷移」（見 design Decision 2）。無壞味道則註記 skipped
 
 ### 1.10～1.15：code review 後補
 
 > 這六步源自 Task 1 的 code review。原 1.1～1.9 未涵蓋 `createdAt` 與 `version` 的驗證，
 > 是 spec 表格的型別描述（「ISO 8601」）與實際驗證強度之間的落差；spec 已同步補上對應 Scenario 與 design Decision 9。
 
-- [ ] 1.10 **紅**：新增 it「createdAt 非 ISO 8601 時驗證失敗」，斷言 `createdAt: "not-a-date"` 失敗、`"2026-08-15T00:00:00.000Z"` 通過。執行看到紅燈（**真紅燈**：現行 `z.string()` 接受任意字串）
-- [ ] 1.11 **綠**：`createdAt` 改為 `z.iso.datetime()`（zod 4.4.3 的慣用 API，非 zod 3 風格的 `z.string().datetime()`）。重跑至綠
-- [ ] 1.12 **紅**：新增 it「RosterSchema 的 version 僅接受 1」，斷言 `version: 2` 失敗、`version: 1` 通過。看到紅燈（**真紅燈**：現行 `z.number()` 接受任何數字）
-- [ ] 1.13 **綠**：`version` 改為 `z.literal(1)`（見 design Decision 9）。重跑至綠
-- [ ] 1.14 於既有 it「rating 超出 1.00～8.00 時驗證失敗」補上 inclusive 邊界的正向斷言（`rating: 1` 與 `rating: 8` 應通過）與一筆合法 baseline（`rating: 4.5`）
+- [x] 1.10 **紅**：新增 it「createdAt 非 ISO 8601 時驗證失敗」，斷言 `createdAt: "not-a-date"` 失敗、`"2026-08-15T00:00:00.000Z"` 通過。執行看到紅燈（**真紅燈**：現行 `z.string()` 接受任意字串）
+- [x] 1.11 **綠**：`createdAt` 改為 `z.iso.datetime()`（zod 4.4.3 的慣用 API，非 zod 3 風格的 `z.string().datetime()`）。重跑至綠
+- [x] 1.12 **紅**：新增 it「RosterSchema 的 version 僅接受 1」，斷言 `version: 2` 失敗、`version: 1` 通過。看到紅燈（**真紅燈**：現行 `z.number()` 接受任何數字）
+- [x] 1.13 **綠**：`version` 改為 `z.literal(1)`（見 design Decision 9）。重跑至綠
+- [x] 1.14 於既有 it「rating 超出 1.00～8.00 時驗證失敗」補上 inclusive 邊界的正向斷言（`rating: 1` 與 `rating: 8` 應通過）與一筆合法 baseline（`rating: 4.5`）
   - ⚠️ **誠實標註**：實作的 `.min(1).max(8)` 本就是 inclusive，故這些斷言補上時**即為綠燈，屬 regression guard 而非 TDD 紅燈**。其價值在於鎖定邊界契約——日後有人改成 exclusive 寫法會被擋下。**不得**以修改斷言看紅再改回的方式偽造紅燈
-- [ ] 1.15 於 `name` 的 `.trim()` 該行補註解，說明此為刻意的正規化、不受 spec「SHALL NOT 靜默夾值或改寫」約束（該約束主詞僅限 rating 與 Hex），避免未來審查者重複糾結
+- [x] 1.15 於 `name` 的 `.trim()` 該行補註解，說明此為刻意的正規化、不受 spec「SHALL NOT 靜默夾值或改寫」約束（該約束主詞僅限 rating 與 Hex），避免未來審查者重複糾結
 
 ## 2. 顏色對比（`lib/matchmaker/colors.ts` — 行為邏輯，必 TDD）
 
-- [ ] 2.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/colors.test.ts`，寫 it「深色漸層回傳淺色前景」——`pickTextColor("#0E6B63", "#134E4A")` 斷言回傳淺色前景常數。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/colors.test.ts` 看到紅燈（**真紅燈**：模組不存在）
-- [ ] 2.2 **綠**：建立 `colors.ts`，實作 WCAG 相對亮度 `relativeLuminance(hex)` 與對比度 `contrastRatio(a, b)`，`pickTextColor` 依 design Decision 5 的公式取「兩端最小對比較高」的前景色。重跑至綠
-- [ ] 2.3 **紅**：新增 it「淺色漸層回傳深色前景」——`pickTextColor("#E8F5F0", "#A7F3D0")` 斷言深色前景。看到紅燈（若 2.2 寫死回傳淺色則為真紅燈；若 2.2 已正確實作公式則此測試會直接綠 —— 此時**應強化 2.2 的最小實作為真正的最小**，而非在此標註 regression guard）
-- [ ] 2.4 **綠**：確保公式對兩個方向皆成立。重跑至綠
-- [ ] 2.5 **紅**：新增 it「一深一淺漸層取兩端最小對比較高的前景色」——`pickTextColor("#0E1A1A", "#E8F5F0")`，斷言「回傳色與兩端點的對比度最小值」≥「另一候選前景色的對應最小值」。此測試直接驗證 Decision 5 的核心不變式，**不可**改寫為斷言特定顏色字面值（那會把實作細節焊進測試）。看到紅燈
-- [ ] 2.6 **綠**：修正 `pickTextColor` 使其在此情境成立。重跑至綠
-- [ ] 2.7 **紅**：新增 it「defaultGradient 依序提供不重複的預設漸層」——連續呼叫 `defaultGradient(0)`～`defaultGradient(n)`，斷言相鄰兩次結果不同、且回傳值為合法 Hex（可用 1.2 的 `PlayerSchema` 驗證色碼欄位）。看到紅燈
-- [ ] 2.8 **綠**：實作 `defaultGradient(index)`，以固定的預設調色盤依 index 取模。重跑至綠
-- [ ] 2.9 **refactor**：檢視 `relativeLuminance` 是否正確處理 sRGB gamma（低於 0.03928 的分支）；深／淺前景色是否取自 `app/globals.css` 的既有 OKLCH semantic token 而非硬編碼新色。無壞味道則註記 skipped
+- [x] 2.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/colors.test.ts`，寫 it「深色漸層回傳淺色前景」——`pickTextColor("#0E6B63", "#134E4A")` 斷言回傳淺色前景常數。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/colors.test.ts` 看到紅燈（**真紅燈**：模組不存在）
+- [x] 2.2 **綠**：建立 `colors.ts`，實作 WCAG 相對亮度 `relativeLuminance(hex)` 與對比度 `contrastRatio(a, b)`，`pickTextColor` 依 design Decision 5 的公式取「兩端最小對比較高」的前景色。重跑至綠
+- [x] 2.3 **紅**：新增 it「淺色漸層回傳深色前景」——`pickTextColor("#E8F5F0", "#A7F3D0")` 斷言深色前景。看到紅燈（若 2.2 寫死回傳淺色則為真紅燈；若 2.2 已正確實作公式則此測試會直接綠 —— 此時**應強化 2.2 的最小實作為真正的最小**，而非在此標註 regression guard）
+- [x] 2.4 **綠**：確保公式對兩個方向皆成立。重跑至綠
+- [x] 2.5 **紅**：新增 it「一深一淺漸層取兩端最小對比較高的前景色」——`pickTextColor("#0E1A1A", "#E8F5F0")`，斷言「回傳色與兩端點的對比度最小值」≥「另一候選前景色的對應最小值」。此測試直接驗證 Decision 5 的核心不變式，**不可**改寫為斷言特定顏色字面值（那會把實作細節焊進測試）。看到紅燈
+- [x] 2.6 **綠**：修正 `pickTextColor` 使其在此情境成立。重跑至綠
+- [x] 2.7 **紅**：新增 it「defaultGradient 依序提供不重複的預設漸層」——連續呼叫 `defaultGradient(0)`～`defaultGradient(n)`，斷言相鄰兩次結果不同、且回傳值為合法 Hex（可用 1.2 的 `PlayerSchema` 驗證色碼欄位）。看到紅燈
+- [x] 2.8 **綠**：實作 `defaultGradient(index)`，以固定的預設調色盤依 index 取模。重跑至綠
+- [x] 2.9 **refactor**：檢視 `relativeLuminance` 是否正確處理 sRGB gamma（低於 0.03928 的分支）；深／淺前景色是否取自 `app/globals.css` 的既有 OKLCH semantic token 而非硬編碼新色。無壞味道則註記 skipped
 
 ### 2.10～2.12：code review 後補（調色盤規模與邊界覆蓋）
 
@@ -50,29 +50,44 @@
 > modulo 實作技術上滿足，但 6 組預設在 PRD 12.1 的 8～40 人規模下會讓多數人撞色，
 > 達不到 PRD 4.1.1「快速辨識球場位置」的目的。spec 已補上調色盤規模要求與對應 Scenario。
 
-- [ ] 2.10 **紅**：新增 it「defaultGradient 提供 16 組互異漸層並循環取用」，斷言 `defaultGradient(0)`～`defaultGradient(15)` 兩兩互異、`defaultGradient(16)` 等於 `defaultGradient(0)`、負數 index 回傳合法漸層。執行看到紅燈（**真紅燈**：現行 `DEFAULT_GRADIENTS` 只有 6 組，index 6 起即與前面重複，「16 組兩兩互異」必然失敗）
-- [ ] 2.11 **綠**：將 `DEFAULT_GRADIENTS` 由 6 組擴充至 16 組，色相盡量分散以維持可辨識度。重跑至綠
-- [ ] 2.12 補兩處註解：
+- [x] 2.10 **紅**：新增 it「defaultGradient 提供 16 組互異漸層並循環取用」，斷言 `defaultGradient(0)`～`defaultGradient(15)` 兩兩互異、`defaultGradient(16)` 等於 `defaultGradient(0)`、負數 index 回傳合法漸層。執行看到紅燈（**真紅燈**：現行 `DEFAULT_GRADIENTS` 只有 6 組，index 6 起即與前面重複，「16 組兩兩互異」必然失敗）
+- [x] 2.11 **綠**：將 `DEFAULT_GRADIENTS` 由 6 組擴充至 16 組，色相盡量分散以維持可辨識度。重跑至綠
+- [x] 2.12 補兩處註解：
   - `pickTextColor` 的平手分支（`lightScore >= darkScore`）——說明平手時取淺色是刻意決定、spec 未規範此邊界（存在中性灰亮度 L≈0.1791 使兩者恰好相等，是可實際觸發的情況，非純理論邊界）
   - `hexToRgb` 的 JSDoc——標註「輸入需為合法 6 碼 hex（呼叫端經 `PlayerSchema` 保證），否則行為未定義」。**不加執行期驗證**：本模組刻意不 import `types.ts` 以保持獨立，重複驗證會製造第二個真相來源
 
 ## 3. 名單 CRUD（`lib/matchmaker/roster.ts` — 行為邏輯，必 TDD）
 
-- [ ] 3.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/roster.test.ts`，寫 it「addPlayer 回傳新陣列且不修改原陣列，id 與 createdAt 取自注入值」——對空陣列呼叫 `addPlayer(roster, input, { id: "p1", now: "2026-08-15T00:00:00.000Z" })`，斷言回傳長度 1、`id`／`createdAt` 為注入值、`restCount`／`gamesPlayed` 為 0、`isActive` 為 `true`，且**原陣列仍為空**（`toBe` 比對參考不相同）。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/roster.test.ts` 看到紅燈
-- [ ] 3.2 **綠**：建立 `roster.ts`，實作 `addPlayer`，簽章 MUST 接受 `{ id, now }` 注入（見 design Decision 4，**不得**於函式內呼叫 `crypto.randomUUID()` 或 `new Date()`）。重跑至綠
-- [ ] 3.3 **紅**：新增 it「updatePlayer 只改指定欄位，其餘欄位與他人不受影響」——三人名單中改 `p2` 的 `rating`，斷言 `p2` 其餘欄位不變、`p1`／`p3` 完全不變。看到紅燈
-- [ ] 3.4 **綠**：實作 `updatePlayer(roster, id, patch)`。重跑至綠
-- [ ] 3.5 **紅**：新增 it「updatePlayer 遇到不存在的 id 時不新增也不改動」，斷言回傳長度不變且內容相等。看到紅燈（**真紅燈**：若 3.4 用 upsert 語意則會多一筆）
-- [ ] 3.6 **綠**：確保找不到 id 時原樣回傳。重跑至綠
-- [ ] 3.7 **紅**：新增 it「removePlayer 移除指定 id 並保持其餘順序」，三人名單移除中間者，斷言剩餘兩人的 id 順序為 `["p1", "p3"]`。看到紅燈
-- [ ] 3.8 **綠**：實作 `removePlayer`。重跑至綠
-- [ ] 3.9 **紅**：新增 it「rating 寫入前 round 至兩位小數」——以 `rating: 3.456` 新增、以 `rating: 5.994` 編輯，分別斷言 `3.46` 與 `5.99`。看到紅燈（**真紅燈**：3.2／3.4 未做 round）
-- [ ] 3.10 **綠**：在 `addPlayer` 與 `updatePlayer` 的寫入點統一 round（`Math.round(v * 100) / 100`，見 design Decision 7）。重跑至綠
-- [ ] 3.11 **紅**：新增 it「togglePlayerActive 切換 isActive 且不影響 restCount」——對 `isActive: true`、`restCount: 3` 的參賽者呼叫後，斷言 `isActive === false` 且 `restCount === 3`。看到紅燈
-- [ ] 3.12 **綠**：實作 `togglePlayerActive`。重跑至綠
-- [ ] 3.13 **紅**：新增 it「togglePlayerActive 可來回切換」，連續呼叫兩次後斷言回到 `true`。看到紅燈（若 3.12 已正確實作則此測試直接綠 —— 應強化 3.12 的最小實作為真正最小，例如原本寫死 `isActive: false`）
-- [ ] 3.14 **綠**：確保為布林反轉而非寫死。重跑至綠
-- [ ] 3.15 **refactor**：檢視四個函式是否共用同一個「找到 index 後替換」的內部 helper，是否有重複的不可變複製邏輯可收斂；round 是否只出現在單一寫入點而非散落。無壞味道則註記 skipped
+- [x] 3.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/roster.test.ts`，寫 it「addPlayer 回傳新陣列且不修改原陣列，id 與 createdAt 取自注入值」——對空陣列呼叫 `addPlayer(roster, input, { id: "p1", now: "2026-08-15T00:00:00.000Z" })`，斷言回傳長度 1、`id`／`createdAt` 為注入值、`restCount`／`gamesPlayed` 為 0、`isActive` 為 `true`，且**原陣列仍為空**（`toBe` 比對參考不相同）。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/roster.test.ts` 看到紅燈
+- [x] 3.2 **綠**：建立 `roster.ts`，實作 `addPlayer`，簽章 MUST 接受 `{ id, now }` 注入（見 design Decision 4，**不得**於函式內呼叫 `crypto.randomUUID()` 或 `new Date()`）。重跑至綠
+- [x] 3.3 **紅**：新增 it「updatePlayer 只改指定欄位，其餘欄位與他人不受影響」——三人名單中改 `p2` 的 `rating`，斷言 `p2` 其餘欄位不變、`p1`／`p3` 完全不變。看到紅燈
+- [x] 3.4 **綠**：實作 `updatePlayer(roster, id, patch)`。重跑至綠
+- [x] 3.5 **紅**：新增 it「updatePlayer 遇到不存在的 id 時不新增也不改動」，斷言回傳長度不變且內容相等。看到紅燈（**真紅燈**：若 3.4 用 upsert 語意則會多一筆）
+  - ⚠️ **誠實標註**：3.4 實作時順手加了 `index === -1` 的防護，超出 3.3 那個測試實際要求的最小行為，導致本步驟的測試**原本直接綠燈、不是真紅燈**。實作者依 TDD 紀律**退回**成不加防護的最小版本，重新執行取得真紅燈（`expected length 2 but got 4`——驗證了「upsert 語意會多一筆」的預期成因），才在 3.6 把防護補回。過程中未修改任何斷言，不是「改斷言看紅再改回」的偽造
+- [x] 3.6 **綠**：確保找不到 id 時原樣回傳。重跑至綠
+- [x] 3.7 **紅**：新增 it「removePlayer 移除指定 id 並保持其餘順序」，三人名單移除中間者，斷言剩餘兩人的 id 順序為 `["p1", "p3"]`。看到紅燈
+- [x] 3.8 **綠**：實作 `removePlayer`。重跑至綠
+- [x] 3.9 **紅**：新增 it「rating 寫入前 round 至兩位小數」——以 `rating: 3.456` 新增、以 `rating: 5.994` 編輯，分別斷言 `3.46` 與 `5.99`。看到紅燈（**真紅燈**：3.2／3.4 未做 round）
+- [x] 3.10 **綠**：在 `addPlayer` 與 `updatePlayer` 的寫入點統一 round（`Math.round(v * 100) / 100`，見 design Decision 7）。重跑至綠
+- [x] 3.11 **紅**：新增 it「togglePlayerActive 切換 isActive 且不影響 restCount」——對 `isActive: true`、`restCount: 3` 的參賽者呼叫後，斷言 `isActive === false` 且 `restCount === 3`。看到紅燈
+- [x] 3.12 **綠**：實作 `togglePlayerActive`。重跑至綠
+- [x] 3.13 **紅**：新增 it「togglePlayerActive 可來回切換」，連續呼叫兩次後斷言回到 `true`。看到紅燈（若 3.12 已正確實作則此測試直接綠 —— 應強化 3.12 的最小實作為真正最小，例如原本寫死 `isActive: false`）
+- [x] 3.14 **綠**：確保為布林反轉而非寫死。重跑至綠
+- [x] 3.15 **refactor**：檢視四個函式是否共用同一個「找到 index 後替換」的內部 helper，是否有重複的不可變複製邏輯可收斂；round 是否只出現在單一寫入點而非散落。無壞味道則註記 skipped
+
+### 3.16～3.19：code review 後補（配色序號與 API 邊界）
+
+> 源自 Task 3 的 code review。`addPlayer` 用 `defaultGradient(roster.length)` 決定自動配色，
+> 隱含「陣列長度＝累計新增次數」的假設——但刪除是 spec 明列的功能，刪除後 `roster.length`
+> 必然小於「已用的最大 index + 1」，新增者會與既有成員撞色（`[A0,B1,C2]` → 刪 B → 新增 D 拿到 index 2，與 C 相同）。
+> 這是本 change 第四次出現「滿足字面 Scenario、達不到 PRD 4.1.1 辨識目的」的模式，且觸發門檻最低——
+> 不需要特殊色碼或大規模名單，刪除＋新增是日常操作。
+
+- [ ] 3.16 **紅**：於 `roster.test.ts` 新增 it「刪除中間成員後新增，配色不與剩餘成員撞色」——建立三人名單（皆自動配色）、`removePlayer` 移除中間者、再 `addPlayer` 一位，斷言新成員的 `colorFrom`／`colorTo` 與剩餘兩位皆不相同。看到紅燈（**真紅燈**：現行 `defaultGradient(roster.length)` 必然回傳與第三位相同的漸層）
+- [ ] 3.17 **綠**：於 `colors.ts` 新增 `paletteIndexOf(colorFrom, colorTo): number`（在 `DEFAULT_GRADIENTS` 中反查，找不到回 `-1`）；`addPlayer` 改為「掃描目前名單已佔用的 palette index，取最小未使用值」。重跑至綠
+  - **不採**在 `PlayerSchema` 加序號欄位的方案：配色序號是 UI 配色演算法的實作細節，不是參賽者的網域資料，塞進持久化 schema 會把一個未來可能想更換的演算法選擇焊死。反查法額外的好處是，使用者手動選到剛好等於某個預設組合的顏色時，會被自然視為佔用該 index
+- [ ] 3.18 於 `AddPlayerInput` 的 `colorFrom`／`colorTo` 補 JSDoc，說明兩者為**同進同出**：只提供一端時該端會被忽略、整組走自動配色。並補一個 it 鎖定此行為，避免未來非 UI 呼叫端（例如批次匯入）靜默丟失使用者輸入而不自知
+- [ ] 3.19 於 `UpdatePlayerPatch` 補 JSDoc，提醒它是**覆寫**語意而非累加：M2／M4 若要更新 `restCount`／`gamesPlayed`，直接透過此 patch 寫入會蓋掉既有累計值，屆時應改用專門的 increment 函式
 
 ## 4. 持久化（`lib/matchmaker/storage.ts` — 行為邏輯，必 TDD）
 
