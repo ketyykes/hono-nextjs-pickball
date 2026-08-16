@@ -162,6 +162,14 @@ UI 一律以 `toFixed(2)` 呈現，避免 `3.0499999` 這類顯示。
 
 此欄位與 `STORAGE_KEY` 名稱中的 `v1` 看似重複，但兩者用途不同：key 名稱隔離的是**不同版本的儲存空間**（v2 寫到新 key，v1 資料原地保留），`version` 欄位標記的是**這份內容本身的結構版本**，在 JSON 匯出檔（`prd.md` 9.2 要求含版本號）離開 LocalStorage 之後，key 名稱就不存在了，只剩這個欄位能表明結構版本。
 
+### Decision 10：`createdAt` 用 `z.iso.datetime()`，只接受 UTC `Z` 格式
+
+`z.iso.datetime()`（zod 4）**只接受 `Z` 尾碼的 UTC 格式**，會拒絕帶時區 offset 的 `2026-08-15T08:00:00+08:00` 與純日期 `2026-08-15`。這是刻意接受的限制，理由如下。
+
+本 capability 的 `createdAt` 一律由 `useRosterStore` 呼叫 `new Date().toISOString()` 產生（Decision 4：時間由呼叫端注入）。`toISOString()` 的輸出格式**與裝置時區無關**——已於 `Asia/Taipei`、`America/New_York`、`Pacific/Kiritimati` 三個時區實測，輸出皆為 UTC `Z` 格式，它只取決於系統時鐘的絕對時間點。因此不存在「不同時區的裝置產生出 offset 格式檔案」這種情況。
+
+**這條限制的風險窗口在未來的 JSON 匯入**（`prd.md` 9.2）：目前該功能定位是「本 app 匯出入對稱的完整備份還原」，來源必定是本 app 的 `toISOString()` 輸出，所以安全。但若日後要接受**非本 app 產生**的 JSON（使用者手動編輯、或第三方工具匯出），帶 offset 的時間戳會整批驗證失敗，走 Decision 3 的「外層結構不合法 → 清除」路徑。屆時應改用更寬鬆的 ISO 8601 驗證，而非讓使用者的匯入檔靜默失效。
+
 ### Decision 8：hydration 沿用 scoreboard 的 HYDRATE 模式
 
 首次 render 在 server 與 client 都以空名單開始，`useEffect` 讀取 LocalStorage 後 dispatch `HYDRATE`。與 `hooks/useScoreboardStore.ts` 相同，避免 SSR／CSR 首次輸出不一致造成的 hydration mismatch。
