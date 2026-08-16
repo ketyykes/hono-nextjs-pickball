@@ -46,7 +46,10 @@
 
 ### 測試架構
 
-- **單元測試（Vitest）**：設定於 `vitest.config.ts`，使用 `happy-dom` 環境、globals 啟用（不需 import `describe`/`it`/`expect`）
+- **單元測試（Vitest）**：設定於 `vitest.config.ts`，使用 `happy-dom` 環境
+  - `globals: true` **只在執行期成立**：`tsconfig.json` 的 `types` 為 `["react/canary"]`，**不含 `vitest/globals`**，
+    因此 `describe`／`it`／`expect`／`vi`／`beforeEach` 一律**必須顯式 `import ... from "vitest"`**（現有 31 個測試檔皆如此）。
+    省略 import 時 vitest 跑得過但 `tsc --noEmit` 會失敗，Stop hook 會擋下 commit
   - 全域 setup：`tests/setup.ts` 每個測試後自動 `cleanup()`
   - Include 模式：`**/*.{test,spec}.{ts,tsx}`，排除 `**/e2e/**`、`.next`
   - 使用 `@testing-library/react`
