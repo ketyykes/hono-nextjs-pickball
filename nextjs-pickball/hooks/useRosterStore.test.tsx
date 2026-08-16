@@ -119,6 +119,30 @@ describe("useRosterStore", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
+	it("同一批次內 resetRoster 後緊接 addPlayer 仍正確持久化", () => {
+		const { result } = renderHook(() => useRosterStore());
+
+		act(() => {
+			result.current.addPlayer({ name: "舊資料", gender: "male", rating: 3 });
+		});
+
+		// React automatic batching 會把這兩個 dispatch 合併成單一次 render。
+		// 若「跳過寫入」的意圖以一次性旗標實作，RESET 設下的旗標不會被後續的
+		// ADD_PLAYER 復位，導致合併後那次 render 的寫入被整批跳過——
+		// 記憶體 state 有新參賽者、localStorage 卻是空的，此刻重整即靜默丟資料。
+		act(() => {
+			result.current.resetRoster();
+			result.current.addPlayer({ name: "新資料", gender: "female", rating: 4 });
+		});
+
+		expect(result.current.players).toHaveLength(1);
+		expect(result.current.players[0].name).toBe("新資料");
+
+		const stored = localStorage.getItem(STORAGE_KEY);
+		expect(stored).not.toBeNull();
+		expect(JSON.parse(stored!).players[0].name).toBe("新資料");
+	});
+
 	it("持久化資料含損壞筆數時 store 回報 droppedCount", () => {
 		// 兩筆合法、一筆 rating 超出 1~8 範圍，readRoster 會逐筆降級並回報 droppedCount
 		localStorage.setItem(

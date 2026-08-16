@@ -130,13 +130,30 @@
 
 ## 5. 狀態管理（`hooks/useRosterStore.ts` — 行為邏輯，必 TDD）
 
-- [ ] 5.1 **紅**：新增 `nextjs-pickball/hooks/useRosterStore.test.tsx`，寫 it「無持久化資料時初始 players 為空陣列」——清空 localStorage 後 `renderHook(() => useRosterStore())`，斷言 `players` 為 `[]`。執行 `pnpm --filter ./nextjs-pickball test --run hooks/useRosterStore.test.tsx` 看到紅燈
-- [ ] 5.2 **綠**：建立 `useRosterStore.ts`，比照 `hooks/useScoreboardStore.ts` 的 reducer + `HYDRATE` 模式（見 design Decision 8）：初始 state 為空名單，`useEffect` 讀取後 dispatch `HYDRATE`。重跑至綠
-- [ ] 5.3 **紅**：新增 it「新增參賽者後自動寫回 localStorage」——透過 store 的 `addPlayer` 新增一位，斷言 `localStorage["matchmaker:roster:v1"]` 解析後含該筆。看到紅燈
-- [ ] 5.4 **綠**：在 state 變更時 `writeRoster()`。重跑至綠
-- [ ] 5.5 **綠（續）**：補齊 store 對外介面——`updatePlayer`／`removePlayer`／`togglePlayerActive`／`resetRoster`，各自委派給 `lib/matchmaker/roster.ts` 的純函式；`id` 與 `createdAt` 在此層產生（`crypto.randomUUID()`、`new Date().toISOString()`）後注入純函式。為每個新增的介面補對應 it
-- [ ] 5.6 **綠（續）**：`readRoster()` 回報 `droppedCount > 0` 時，store 需保留該筆數供 UI 提示（例如 `droppedCount` 狀態欄位）。補 it「持久化資料含損壞筆數時 store 回報 droppedCount」
-- [ ] 5.7 **refactor**：檢視 hydration 是否會造成 SSR／CSR 首次輸出不一致；`writeRoster` 是否在每次 render 都被呼叫（應只在 state 實際變更時）。無壞味道則註記 skipped
+- [x] 5.1 **紅**：新增 `nextjs-pickball/hooks/useRosterStore.test.tsx`，寫 it「無持久化資料時初始 players 為空陣列」——清空 localStorage 後 `renderHook(() => useRosterStore())`，斷言 `players` 為 `[]`。執行 `pnpm --filter ./nextjs-pickball test --run hooks/useRosterStore.test.tsx` 看到紅燈
+- [x] 5.2 **綠**：建立 `useRosterStore.ts`，比照 `hooks/useScoreboardStore.ts` 的 reducer + `HYDRATE` 模式（見 design Decision 8）：初始 state 為空名單，`useEffect` 讀取後 dispatch `HYDRATE`。重跑至綠
+- [x] 5.3 **紅**：新增 it「新增參賽者後自動寫回 localStorage」——透過 store 的 `addPlayer` 新增一位，斷言 `localStorage["matchmaker:roster:v1"]` 解析後含該筆。看到紅燈
+- [x] 5.4 **綠**：在 state 變更時 `writeRoster()`。重跑至綠
+- [x] 5.5 **綠（續）**：補齊 store 對外介面——`updatePlayer`／`removePlayer`／`togglePlayerActive`／`resetRoster`，各自委派給 `lib/matchmaker/roster.ts` 的純函式；`id` 與 `createdAt` 在此層產生（`crypto.randomUUID()`、`new Date().toISOString()`）後注入純函式。為每個新增的介面補對應 it
+- [x] 5.6 **綠（續）**：`readRoster()` 回報 `droppedCount > 0` 時，store 需保留該筆數供 UI 提示（例如 `droppedCount` 狀態欄位）。補 it「持久化資料含損壞筆數時 store 回報 droppedCount」
+- [x] 5.7 **refactor**：檢視 hydration 是否會造成 SSR／CSR 首次輸出不一致；`writeRoster` 是否在每次 render 都被呼叫（應只在 state 實際變更時）。無壞味道則註記 skipped
+
+### 5.8～5.9：code review 後補（批次合併下的持久化）
+
+> 源自 Task 5 的 code review，是**我實作時的真實 bug**，reviewer 實測重現：
+> `act(() => { resetRoster(); addPlayer(...); })` 之後，記憶體 state 有新參賽者，
+> 但 `localStorage` 是 `null`——此刻重整即靜默丟資料。
+>
+> 成因是我用一次性 ref 旗標實作「跳過寫入」的意圖。React automatic batching 下，
+> 同一 handler 內的兩次 dispatch 會合併成單次 render，`RESET` 設下的旗標不會被
+> 後續的 `ADD_PLAYER` 復位，導致該次寫入被整批跳過。
+>
+> 我原本用突變測試證明了守門「有用」，但那只證明它在單獨重置時有效，
+> **沒有證明它在所有路徑上正確**——這兩件事不一樣。
+
+- [x] 5.8 **紅**：新增 it「同一批次內 resetRoster 後緊接 addPlayer 仍正確持久化」——先建一位參賽者，再於**單一 `act()` 內**連續呼叫 `resetRoster()` 與 `addPlayer()`，斷言 state 有新參賽者、且 `localStorage` 的內容與之相符。看到紅燈（**真紅燈**：`AssertionError: expected null not to be null`）
+- [x] 5.9 **綠**：把「是否跳過持久化」由 ref 旗標改為 **reducer state 的 `skipPersist` 欄位**：`RESET` 設 `true`、**其餘每個 case 一律設 `false`**。批次內的多個 action 會被依序 reduce，最後一個 action 的決定自然覆蓋前面的，不需另外處理批次合併。移除 `skipNextWriteRef`
+  - 已用雙重突變測試驗證兩個關鍵點各有測試把關：移除 write effect 的 `skipPersist` 檢查 → 「resetRoster 清空名單」測試失敗；`ADD_PLAYER` 忘記復位 `skipPersist` → 「同一批次」測試失敗
 
 ## 6. UI 元件（例外層 — 純呈現型元件，以 E2E 驗收）
 

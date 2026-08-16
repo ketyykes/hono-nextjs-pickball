@@ -18,6 +18,16 @@ import type { Player } from "@/lib/matchmaker/types";
 interface RosterState {
 	players: Player[];
 	droppedCount: number;
+	// 本次 state 是否應跳過持久化。只有 RESET 會設 true——重置剛把 key 移除，
+	// 若讓 write effect 把空名單寫回去，那個 key 會立刻復活。
+	//
+	// 這個意圖刻意放在 reducer state 而非 ref 旗標：React automatic batching 下，
+	// 同一個 handler 內連續呼叫 resetRoster() 與 addPlayer() 會合併成單次 render，
+	// 一次性旗標會被 RESET 設下卻不被後續 action 復位，導致該次寫入被整批跳過
+	// （記憶體有資料、localStorage 是空的，此刻重整即靜默丟失）。
+	// 折進 state 後，批次內的多個 action 會被依序 reduce，最後一個 action 的決定
+	// 自然覆蓋前面的，不需要另外處理批次合併。
+	skipPersist: boolean;
 }
 
 // HYDRATE：mount 後把 localStorage 讀到的名單灌入 state，
@@ -32,13 +42,20 @@ type RosterAction =
 	| { type: "RESET" };
 
 function createInitialState(): RosterState {
-	return { players: [], droppedCount: 0 };
+	return { players: [], droppedCount: 0, skipPersist: false };
 }
 
+// 每個 case 都明確設定 skipPersist：只有 RESET 為 true，其餘一律 false。
+// 「其餘一律 false」是這個設計的關鍵——它讓批次合併時後續 action 能覆蓋 RESET 的決定。
 function rosterReducer(state: RosterState, action: RosterAction): RosterState {
 	switch (action.type) {
 		case "HYDRATE":
-			return { ...state, players: action.players, droppedCount: action.droppedCount };
+			return {
+				...state,
+				players: action.players,
+				droppedCount: action.droppedCount,
+				skipPersist: false,
+			};
 		case "ADD_PLAYER":
 			return {
 				...state,
@@ -46,18 +63,28 @@ function rosterReducer(state: RosterState, action: RosterAction): RosterState {
 					id: action.id,
 					now: action.now,
 				}),
+				skipPersist: false,
 			};
 		case "UPDATE_PLAYER":
 			return {
 				...state,
 				players: updatePlayerInRoster(state.players, action.id, action.patch),
+				skipPersist: false,
 			};
 		case "REMOVE_PLAYER":
-			return { ...state, players: removePlayerFromRoster(state.players, action.id) };
+			return {
+				...state,
+				players: removePlayerFromRoster(state.players, action.id),
+				skipPersist: false,
+			};
 		case "TOGGLE_ACTIVE":
-			return { ...state, players: togglePlayerActiveInRoster(state.players, action.id) };
+			return {
+				...state,
+				players: togglePlayerActiveInRoster(state.players, action.id),
+				skipPersist: false,
+			};
 		case "RESET":
-			return createInitialState();
+			return { ...createInitialState(), skipPersist: true };
 		default:
 			return state;
 	}
@@ -85,19 +112,13 @@ export function useRosterStore(): UseRosterStoreResult {
 		(_arg: undefined) => createInitialState(),
 	);
 	const hasHydratedRef = useRef(false);
-	// 重置後 state.players 會變成新的空陣列，觸發 write effect 把 `{version:1,players:[]}`
-	// 寫回去——那會讓剛被 resetMatchmakerData() 移除的 key 立刻復活，違反 spec
-	// 「確認重置後該 key 已從 LocalStorage 移除」。故重置時標記跳過下一次寫入。
-	const skipNextWriteRef = useRef(false);
 
 	useEffect(() => {
 		if (!hasHydratedRef.current) return;
-		if (skipNextWriteRef.current) {
-			skipNextWriteRef.current = false;
-			return;
-		}
+		// 重置剛把 key 移除，此時不可把空名單寫回去讓它復活（見 RosterState.skipPersist）。
+		if (state.skipPersist) return;
 		writeRoster(state.players);
-	}, [state.players]);
+	}, [state.players, state.skipPersist]);
 
 	useEffect(() => {
 		const { players, droppedCount } = readRoster();
@@ -140,7 +161,6 @@ export function useRosterStore(): UseRosterStoreResult {
 	// 委派 resetMatchmakerData() 而非 clearRoster()：前者清除 RESET_KEYS 列舉的所有 key，
 	// M2／M6 把 rounds 與 history 加進該清單後，本函式不需改動（見 storage 的 Decision 6）。
 	function resetRoster(): void {
-		skipNextWriteRef.current = true;
 		resetMatchmakerData();
 		dispatch({ type: "RESET" });
 	}
