@@ -2,7 +2,7 @@
 // id 與 createdAt 一律由呼叫端注入（design Decision 4），本模組不呼叫
 // crypto.randomUUID() 或 new Date()，確保回傳值可被確定性斷言。
 
-import { defaultGradient, paletteIndexOf } from "./colors";
+import { defaultGradient, paletteIndexOf, PALETTE_SIZE } from "./colors";
 import type { GradientPreset } from "./colors";
 import type { Gender, Player } from "./types";
 
@@ -46,18 +46,6 @@ function roundRating(rating: number): number {
 	return Math.round(rating * 100) / 100;
 }
 
-// 調色盤的組數是有限值，但 colors.ts 依 3.17 的限制只能新增 paletteIndexOf，不能另外
-// 匯出長度常數。改以偵測 defaultGradient(0…n) 何時循環回到第 0 組反推長度——
-// DEFAULT_GRADIENTS 固定為 16 組，此迴圈只會跑 16 次，成本可忽略。
-function paletteLength(): number {
-	const first = defaultGradient(0);
-	let length = 1;
-	while (defaultGradient(length).colorFrom !== first.colorFrom || defaultGradient(length).colorTo !== first.colorTo) {
-		length++;
-	}
-	return length;
-}
-
 // 新成員自動配色：掃描目前名單「已入座」的 palette index（透過 paletteIndexOf 反查各
 // 成員現有顏色），取最小未使用值。改用此法而非 defaultGradient(roster.length)，
 // 是因為刪除是 spec 明列的功能——刪除後 roster.length 會與「已用的最大 index + 1」脫鉤，
@@ -67,12 +55,11 @@ function paletteLength(): number {
 // defaultGradient(roster.length) 循環取用——defaultGradient 內部已用 modulo 保護，
 // 不會因 index 超界而拋錯或回傳空值（spec「雙色漸層與文字對比」的 MUST 要求）。
 function nextAutoGradient(roster: readonly Player[]): GradientPreset {
-	const length = paletteLength();
 	const usedIndices = new Set(
 		roster.map((p) => paletteIndexOf(p.colorFrom, p.colorTo)).filter((index) => index !== -1),
 	);
 
-	for (let index = 0; index < length; index++) {
+	for (let index = 0; index < PALETTE_SIZE; index++) {
 		if (!usedIndices.has(index)) {
 			return defaultGradient(index);
 		}

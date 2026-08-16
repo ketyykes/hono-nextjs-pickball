@@ -112,6 +112,12 @@ const DEFAULT_GRADIENTS: readonly GradientPreset[] = [
 	{ colorFrom: "#8F1473", colorTo: "#49083B" }, // magenta，色相約 314°，介於 fuchsia 與 pink 間的缺口（原 slate 與既有 blue 過近，改置於此）
 ];
 
+/**
+ * 固定調色盤的組數。供呼叫端（如 `roster.ts` 的 `nextAutoGradient`）判斷
+ * 「所有預設漸層是否都已被佔用」，藉此決定何時該退回 modulo 循環取用。
+ */
+export const PALETTE_SIZE = DEFAULT_GRADIENTS.length;
+
 /** 依 index 於固定調色盤取模，提供不重複（相鄰不同）的預設漸層。 */
 export function defaultGradient(index: number): GradientPreset {
 	const length = DEFAULT_GRADIENTS.length;
