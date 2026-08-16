@@ -7,6 +7,8 @@ const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 export const PlayerSchema = z.object({
 	id: z.string(),
+	// trim() 是刻意的正規化，不在 spec「SHALL NOT 靜默夾值或改寫」的約束範圍內——
+	// 該約束僅針對 rating 與 Hex 色碼，trim 則是 tasks 1.6 明文指示的行為。
 	name: z.string().trim().min(1),
 	gender: GenderSchema,
 	colorFrom: HexColorSchema,
@@ -16,11 +18,11 @@ export const PlayerSchema = z.object({
 	restCount: z.number().int().nonnegative().default(0),
 	gamesPlayed: z.number().int().nonnegative().default(0),
 	isActive: z.boolean(),
-	createdAt: z.string(),
+	createdAt: z.iso.datetime(),
 });
 
 export const RosterSchema = z.object({
-	version: z.number(),
+	version: z.literal(1),
 	players: z.array(PlayerSchema),
 });
 

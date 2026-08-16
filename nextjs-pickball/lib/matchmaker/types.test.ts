@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PlayerSchema } from "./types";
+import { PlayerSchema, RosterSchema } from "./types";
 
 describe("PlayerSchema", () => {
 	it("合法欄位通過驗證，restCount 與 gamesPlayed 未提供時補 0", () => {
@@ -34,9 +34,15 @@ describe("PlayerSchema", () => {
 
 		const tooLow = PlayerSchema.safeParse({ ...baseFields, rating: 0.99 });
 		const tooHigh = PlayerSchema.safeParse({ ...baseFields, rating: 8.01 });
+		const lowerBound = PlayerSchema.safeParse({ ...baseFields, rating: 1 });
+		const upperBound = PlayerSchema.safeParse({ ...baseFields, rating: 8 });
+		const baseline = PlayerSchema.safeParse({ ...baseFields, rating: 4.5 });
 
 		expect(tooLow.success).toBe(false);
 		expect(tooHigh.success).toBe(false);
+		expect(lowerBound.success).toBe(true);
+		expect(upperBound.success).toBe(true);
+		expect(baseline.success).toBe(true);
 	});
 
 	it("name 僅含空白時驗證失敗", () => {
@@ -82,6 +88,40 @@ describe("PlayerSchema", () => {
 
 		expect(missingHash.success).toBe(false);
 		expect(invalidChars.success).toBe(false);
+		expect(valid.success).toBe(true);
+	});
+
+	it("createdAt 非 ISO 8601 時驗證失敗", () => {
+		const baseFields = {
+			id: "player-1",
+			name: "王小明",
+			gender: "male" as const,
+			colorFrom: "#0E6B63",
+			colorTo: "#14B8A6",
+			rating: 4.5,
+			isActive: true,
+		};
+
+		const invalid = PlayerSchema.safeParse({
+			...baseFields,
+			createdAt: "not-a-date",
+		});
+		const valid = PlayerSchema.safeParse({
+			...baseFields,
+			createdAt: "2026-08-15T00:00:00.000Z",
+		});
+
+		expect(invalid.success).toBe(false);
+		expect(valid.success).toBe(true);
+	});
+});
+
+describe("RosterSchema", () => {
+	it("RosterSchema 的 version 僅接受 1", () => {
+		const invalid = RosterSchema.safeParse({ version: 2, players: [] });
+		const valid = RosterSchema.safeParse({ version: 1, players: [] });
+
+		expect(invalid.success).toBe(false);
 		expect(valid.success).toBe(true);
 	});
 });
