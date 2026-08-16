@@ -21,6 +21,12 @@ function channelToLinear(value: number): number {
 	return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
 
+/**
+ * 將 6 碼 hex 色碼字串轉為 sRGB 分量。
+ * 輸入需為合法 6 碼 hex（由呼叫端經 `PlayerSchema` 保證），否則行為未定義。
+ * 本函式不做格式驗證——`colors.ts` 刻意不 import `types.ts`（見檔頭註解），
+ * 在此重複驗證 hex 格式會製造與 `PlayerSchema`／`HexColorSchema` 不同步的第二個真相來源。
+ */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
 	return {
 		r: parseInt(hex.slice(1, 3), 16),
@@ -60,6 +66,9 @@ export function pickTextColor(colorFrom: string, colorTo: string): string {
 	const darkScore = minContrastFor(DARK_FOREGROUND);
 	const lightScore = minContrastFor(LIGHT_FOREGROUND);
 
+	// 平手（lightScore === darkScore）時取淺色前景，是刻意決定，spec 未規範此邊界。
+	// 這不是純理論邊界：存在一個中性灰亮度（relativeLuminance ≈ 0.1791，約 rgb(119,119,119)）
+	// 使雙色漸層對深／淺前景的最小對比恰好相等，是可實際觸發的情況。
 	return lightScore >= darkScore ? LIGHT_FOREGROUND : DARK_FOREGROUND;
 }
 
@@ -70,13 +79,29 @@ export interface GradientPreset {
 }
 
 // 固定的預設調色盤，供新增參賽者時依序取用，相鄰項目彼此色相不同。
+// prd.md 12.1 的使用規模為 8～40 人，4.1.1 明訂漸層目的是「讓使用者快速辨識球場位置」，
+// 故調色盤 MUST 至少涵蓋 16 組互異漸層（見 spec Requirement「雙色漸層與文字對比」）。
+// 前 6 組（teal／violet／pink／blue／orange／emerald）為既有行為，保留原順序，
+// 避免既有使用者的既有參賽者因調色盤重排而換色；新增的 10 組接在後面，
+// 色相依 HSL 環狀分散於既有 6 組之間（約每 36 度取一色相），並沿用「中等～深色端點」風格，
+// 使 pickTextColor 對它們穩定回傳淺色前景。
 const DEFAULT_GRADIENTS: readonly GradientPreset[] = [
-	{ colorFrom: "#0E6B63", colorTo: "#134E4A" },
-	{ colorFrom: "#7C3AED", colorTo: "#4C1D95" },
-	{ colorFrom: "#DB2777", colorTo: "#831843" },
-	{ colorFrom: "#2563EB", colorTo: "#1E3A8A" },
-	{ colorFrom: "#EA580C", colorTo: "#7C2D12" },
-	{ colorFrom: "#059669", colorTo: "#064E3B" },
+	{ colorFrom: "#0E6B63", colorTo: "#134E4A" }, // teal（既有）
+	{ colorFrom: "#7C3AED", colorTo: "#4C1D95" }, // violet（既有）
+	{ colorFrom: "#DB2777", colorTo: "#831843" }, // pink（既有）
+	{ colorFrom: "#2563EB", colorTo: "#1E3A8A" }, // blue（既有）
+	{ colorFrom: "#EA580C", colorTo: "#7C2D12" }, // orange（既有）
+	{ colorFrom: "#059669", colorTo: "#064E3B" }, // emerald（既有）
+	{ colorFrom: "#DC2626", colorTo: "#7F1D1D" }, // red，補在 orange 與 pink 之間的色相缺口
+	{ colorFrom: "#CA8A04", colorTo: "#713F12" }, // amber/yellow，與 orange 區隔開的暖色
+	{ colorFrom: "#65A30D", colorTo: "#365314" }, // lime，介於 yellow 與 emerald 之間
+	{ colorFrom: "#0D9488", colorTo: "#134E4A" }, // cyan-teal，與既有 teal 同色系但取更亮端點區隔
+	{ colorFrom: "#0284C7", colorTo: "#0C4A6E" }, // sky，介於 cyan 與 blue 之間
+	{ colorFrom: "#4F46E5", colorTo: "#312E81" }, // indigo，介於 blue 與 violet 之間
+	{ colorFrom: "#9333EA", colorTo: "#581C87" }, // purple，介於 violet 與 pink 之間
+	{ colorFrom: "#C026D3", colorTo: "#701A75" }, // fuchsia，介於 purple 與 pink 之間
+	{ colorFrom: "#E11D48", colorTo: "#881337" }, // rose，介於 pink 與 red 之間
+	{ colorFrom: "#475569", colorTo: "#1E293B" }, // slate，中性色補位，供 40 人規模的最後一輪辨識
 ];
 
 /** 依 index 於固定調色盤取模，提供不重複（相鄰不同）的預設漸層。 */

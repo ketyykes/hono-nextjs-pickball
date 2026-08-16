@@ -42,4 +42,16 @@ describe("defaultGradient", () => {
 			expect(gradient.colorTo).toMatch(HEX_COLOR_PATTERN);
 		}
 	});
+
+	it("defaultGradient 提供 16 組互異漸層並循環取用", () => {
+		const results = Array.from({ length: 16 }, (_, index) => defaultGradient(index));
+		const serialized = new Set(results.map((gradient) => `${gradient.colorFrom}|${gradient.colorTo}`));
+
+		expect(serialized.size).toBe(16);
+		expect(defaultGradient(16)).toEqual(defaultGradient(0));
+		expect(defaultGradient(-1)).toMatchObject({
+			colorFrom: expect.stringMatching(HEX_COLOR_PATTERN),
+			colorTo: expect.stringMatching(HEX_COLOR_PATTERN),
+		});
+	});
 });
