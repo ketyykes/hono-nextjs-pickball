@@ -311,6 +311,14 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **THEN** 回傳空名單，且該 key 已被移除
 - **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「外層結構不合法時清除 key 並回空名單」
 
+#### Scenario: 版本號不符時整份清除
+
+- **GIVEN** `matchmaker:roster:v1` 的內容為 `{ version: 2, players: [三筆合法參賽者] }`
+- **WHEN** 呼叫 `readRoster()`
+- **THEN** 回傳空名單、`droppedCount` 為 0，且該 key 已被移除
+- **AND** SHALL NOT 走逐筆降級路徑 —— 版本不符屬**結構層級**損壞，即使每一筆 `player` 都合法也不得保留（見 design Decision 9）
+- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「version 不符時整份清除，不走逐筆降級」
+
 #### Scenario: LocalStorage 不可用時不拋出例外
 
 - **GIVEN** `window.localStorage` 存取會拋出例外

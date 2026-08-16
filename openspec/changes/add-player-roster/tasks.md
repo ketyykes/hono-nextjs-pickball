@@ -91,18 +91,30 @@
 
 ## 4. 持久化（`lib/matchmaker/storage.ts` — 行為邏輯，必 TDD）
 
-- [ ] 4.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/storage.test.ts`，寫 it「JSON 解析失敗時清除 key 並回空名單」——將 `localStorage["matchmaker:roster:v1"]` 設為 `"{ 不是合法 JSON"`，呼叫 `readRoster()`，斷言 `players` 為空陣列且該 key 已被移除。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/storage.test.ts` 看到紅燈
-- [ ] 4.2 **綠**：建立 `storage.ts`，比照 `lib/scoreboard/storage.ts` 實作 `hasLocalStorage()`、`STORAGE_KEY = "matchmaker:roster:v1"`、`readRoster()`／`writeRoster()`／`clearRoster()`。重跑至綠
-- [ ] 4.3 **紅**：新增 it「外層結構不合法時清除 key 並回空名單」——寫入合法 JSON 但結構為 `[1, 2, 3]`，斷言回空名單且 key 被移除。看到紅燈
-- [ ] 4.4 **綠**：外層以 `RosterSchema.safeParse` 驗證，失敗即清除。重跑至綠
-- [ ] 4.5 **紅**：新增 it「單筆不合法時保留其餘 2 筆並回報 droppedCount 為 1」——寫入含 3 筆的合法外層，其中 1 筆 `rating: 99`，斷言回傳 `players.length === 2`、`droppedCount === 1`，且 key **未被移除**。執行看到紅燈（**真紅燈**：4.4 的整份 `safeParse` 會讓外層驗證失敗而清空全部，這正是 design Decision 3 要避免的行為）
-- [ ] 4.6 **綠**：改為兩段式驗證——外層只驗容器形狀（`players` 為陣列），再逐筆 `PlayerSchema.safeParse`，保留合法者、計數丟棄者，回傳 `{ players, droppedCount }`。重跑 4.1／4.3／4.5 三個情境全綠
-- [ ] 4.7 **綠（續）**：`droppedCount > 0` 時將清理後的名單寫回，使損壞不再累積。於 4.5 的 it 追加斷言：呼叫後再讀一次，`droppedCount` 為 0
-- [ ] 4.8 **紅**：新增 it「localStorage 不可用時不拋出例外」——以 `vi.spyOn` 讓 `window.localStorage` 的 getter 拋出，斷言 `readRoster()` 不拋出且回空名單、`writeRoster()` 不拋出。看到紅燈
-- [ ] 4.9 **綠**：確保 `hasLocalStorage()` 的 try/catch 涵蓋讀寫兩側。重跑至綠
-- [ ] 4.10 **紅**：新增 it「重置只移除列舉的 key，不影響 scoreboard 資料」——同時寫入 `matchmaker:roster:v1` 與 `scoreboard:current:v1`，呼叫 `resetMatchmakerData()`，斷言前者被移除、**後者仍存在且內容不變**。看到紅燈
-- [ ] 4.11 **綠**：實作 `RESET_KEYS = ["matchmaker:roster:v1"] as const` 與 `resetMatchmakerData()`，逐一 `removeItem`。**不得**用前綴掃描（見 design Decision 6）。重跑至綠
-- [ ] 4.12 **refactor**：檢視 `RESET_KEYS` 上方是否有註解說明「新增資料域時必須主動決定是否納入重置範圍」；逐筆降級的分支是否清楚區分「無筆可救」與「部分可救」兩種情況。無壞味道則註記 skipped
+- [x] 4.1 **紅**：新增 `nextjs-pickball/lib/matchmaker/storage.test.ts`，寫 it「JSON 解析失敗時清除 key 並回空名單」——將 `localStorage["matchmaker:roster:v1"]` 設為 `"{ 不是合法 JSON"`，呼叫 `readRoster()`，斷言 `players` 為空陣列且該 key 已被移除。執行 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/storage.test.ts` 看到紅燈
+- [x] 4.2 **綠**：建立 `storage.ts`，比照 `lib/scoreboard/storage.ts` 實作 `hasLocalStorage()`、`STORAGE_KEY = "matchmaker:roster:v1"`、`readRoster()`／`writeRoster()`／`clearRoster()`。重跑至綠
+- [x] 4.3 **紅**：新增 it「外層結構不合法時清除 key 並回空名單」——寫入合法 JSON 但結構為 `[1, 2, 3]`，斷言回空名單且 key 被移除。看到紅燈
+- [x] 4.4 **綠**：外層以 `RosterSchema.safeParse` 驗證，失敗即清除。重跑至綠
+- [x] 4.5 **紅**：新增 it「單筆不合法時保留其餘 2 筆並回報 droppedCount 為 1」——寫入含 3 筆的合法外層，其中 1 筆 `rating: 99`，斷言回傳 `players.length === 2`、`droppedCount === 1`，且 key **未被移除**。執行看到紅燈（**真紅燈**：4.4 的整份 `safeParse` 會讓外層驗證失敗而清空全部，這正是 design Decision 3 要避免的行為）
+- [x] 4.6 **綠**：改為兩段式驗證——外層只驗容器形狀（`players` 為陣列），再逐筆 `PlayerSchema.safeParse`，保留合法者、計數丟棄者，回傳 `{ players, droppedCount }`。重跑 4.1／4.3／4.5 三個情境全綠
+- [x] 4.7 **綠（續）**：`droppedCount > 0` 時將清理後的名單寫回，使損壞不再累積。於 4.5 的 it 追加斷言：呼叫後再讀一次，`droppedCount` 為 0
+- [x] 4.8 **紅**：新增 it「localStorage 不可用時不拋出例外」——以 `vi.spyOn` 讓 `window.localStorage` 的 getter 拋出，斷言 `readRoster()` 不拋出且回空名單、`writeRoster()` 不拋出。看到紅燈
+- [x] 4.9 **綠**：確保 `hasLocalStorage()` 的 try/catch 涵蓋讀寫兩側。重跑至綠
+- [x] 4.10 **紅**：新增 it「重置只移除列舉的 key，不影響 scoreboard 資料」——同時寫入 `matchmaker:roster:v1` 與 `scoreboard:current:v1`，呼叫 `resetMatchmakerData()`，斷言前者被移除、**後者仍存在且內容不變**。看到紅燈
+- [x] 4.11 **綠**：實作 `RESET_KEYS = ["matchmaker:roster:v1"] as const` 與 `resetMatchmakerData()`，逐一 `removeItem`。**不得**用前綴掃描（見 design Decision 6）。重跑至綠
+- [x] 4.12 **refactor**：檢視 `RESET_KEYS` 上方是否有註解說明「新增資料域時必須主動決定是否納入重置範圍」；逐筆降級的分支是否清楚區分「無筆可救」與「部分可救」兩種情況。無壞味道則註記 skipped
+
+### 4.13～4.14：補上 version 不符的覆蓋缺口
+
+> 這是**寫 tasks 時的疏漏**：spec 與 design Decision 9 都明訂「`version` 不是 1 → 清除 key、回空名單」，
+> 但原 4.1～4.12 沒有任何一步測試這個路徑。4.3 的「外層結構不合法」測的是 `[1,2,3]`（不是物件），
+> 與版本不符是不同的失敗模式。實作恰好正確（`RosterContainerSchema` 的 `z.literal(1)` 會擋下），
+> 但**沒有測試鎖住它**——日後有人把 `version` 放寬為 `z.number()` 不會被任何測試攔截。
+
+- [ ] 4.13 **紅**：新增 it「version 不符時整份清除，不走逐筆降級」——寫入 `{ version: 2, players: [三筆**全部合法**的參賽者] }`，斷言 `players` 為空、`droppedCount` 為 **0**、key 已被移除。
+  - 三筆刻意全部合法，是為了區分兩條路徑：若實作誤把版本不符當成逐筆問題，會回傳 3 筆而非空名單；若誤走逐筆降級，`droppedCount` 會是 3 而非 0
+  - ⚠️ **誠實標註**：現行實作已正確（`RosterContainerSchema` 的 `z.literal(1)` 使外層驗證失敗而走清除路徑），故此測試補上時**即為綠燈，屬 regression guard 而非 TDD 紅燈**。其價值在於鎖住 Decision 9 的契約。**不得**以修改斷言看紅再改回的方式偽造紅燈
+- [ ] 4.14 檢視 `readRoster()` 的 docstring 是否已明列「版本不符」屬「無筆可救」路徑（目前已有，確認即可）
 
 ## 5. 狀態管理（`hooks/useRosterStore.ts` — 行為邏輯，必 TDD）
 
