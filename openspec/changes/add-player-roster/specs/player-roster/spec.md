@@ -177,8 +177,12 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 **「互異」MUST 指視覺上可區分，而非僅是字串不相等。** 序列化比對（`colorFrom|colorTo` 不同即判為互異）會放行兩組色相幾乎重合的漸層——那在名單頁上看起來是同一個顏色，滿足了字面要求卻達不到辨識目的。因此調色盤 MUST 同時滿足：
 
-- 任兩組的 `colorFrom` **色相角度差 ≥ 15 度**（環狀距離，取 `min(d, 360-d)`）
+- 任兩組的 `colorFrom` **色相角度差 ≥ 13 度**（環狀距離，取 `min(d, 360-d)`）
 - 任兩組 **不得共用相同的 `colorTo`**
+
+**門檻為何是 13 度而非更高**：既有 6 組中 teal（174.84°）與 emerald（161.38°）的色相差為 **13.46 度**，是既有調色盤的實際下限。門檻若訂在 13.46 度以上，就等於要求改動既有色——而改動既有色會讓**既有使用者的既有參賽者換色**，代價遠高於這一對的辨識度損失。13 度是「不迫使既有色變動」前提下能訂的最嚴門檻。
+
+日後若要提高此門檻，必須連帶處理既有 6 組的重新配色與使用者資料遷移，屬破壞性變更。
 
 #### Scenario: 未指定顏色時自動配色
 
@@ -196,9 +200,9 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 #### Scenario: 調色盤在視覺上可區分
 
 - **WHEN** 計算 16 組漸層兩兩之間的差異
-- **THEN** 任兩組的 `colorFrom` 色相角度差（環狀距離）MUST ≥ 15 度
+- **THEN** 任兩組的 `colorFrom` 色相角度差（環狀距離）MUST ≥ 13 度
 - **AND** 任兩組 MUST NOT 共用相同的 `colorTo`
-- **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「調色盤任兩組色相差至少 15 度且不共用 colorTo」
+- **驗收**：`nextjs-pickball/lib/matchmaker/colors.test.ts`，it 名稱「調色盤任兩組色相差至少 13 度且不共用 colorTo」
 
 ---
 
