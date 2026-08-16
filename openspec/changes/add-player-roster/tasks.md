@@ -161,18 +161,31 @@
 > 用 `pnpm dlx shadcn@latest add <component>` 並**必須在 `nextjs-pickball/` 內執行**（`components.json` 在此），
 > 且於本節註明新增了哪個元件與理由。
 
-- [ ] 6.1 `components/matchmaker/PlayerCard.tsx`：單筆參賽者，背景為 `linear-gradient(colorFrom → colorTo)`，前景色取自 `pickTextColor`；顯示姓名、性別、強度分數（`toFixed(2)`）、出場狀態。暫停中者需有非顏色的狀態標示（`prd.md` 12.5：色彩不得為唯一資訊來源）
-- [ ] 6.2 `components/matchmaker/PlayerForm.tsx`：新增／編輯表單。姓名 `input`、性別 `select`、兩個顏色用原生 `<input type="color">`、強度分數 `input` + 快速帶入按鈕（新手 1.00／中階 3.00／高階 5.00）。送出前以 `PlayerSchema` 驗證，錯誤訊息為繁體中文且說明修正方式（`prd.md` 11）
-- [ ] 6.3 `components/matchmaker/PlayerList.tsx`：列表容器，組合 `PlayerCard`，提供編輯與刪除入口。刪除 MUST 二次確認（`prd.md` 第 10 節）
-- [ ] 6.4 `components/matchmaker/EmptyRoster.tsx`：空白狀態，含「新增第一位參賽者」入口
-- [ ] 6.5 `components/matchmaker/ResetRosterDialog.tsx`：以既有 `components/ui/alert-dialog` 實作，提示文字採 `prd.md` 4.1.5 的原文：「確定要重置參賽者名單嗎？這會清除全部參賽者、目前回合與歷史賽果，且無法復原。」並建議先匯出備份（本階段尚無匯出功能，文案先不承諾操作入口）
-- [ ] 6.6 `droppedCount > 0` 時於名單頁顯示提示（例如「有 N 筆資料損毀已略過」），SHALL NOT 靜默處理
-- [ ] 6.7 所有元件頂部標 `"use client"`，與既有 `components/scoreboard/` 慣例一致
+- [x] 6.1 `components/matchmaker/PlayerCard.tsx`：單筆參賽者，背景為 `linear-gradient(colorFrom → colorTo)`，前景色取自 `pickTextColor`；顯示姓名、性別、強度分數（`toFixed(2)`）、出場狀態。暫停中者需有非顏色的狀態標示（`prd.md` 12.5：色彩不得為唯一資訊來源）
+- [x] 6.2 `components/matchmaker/PlayerForm.tsx`：新增／編輯表單。姓名 `input`、性別 `select`、兩個顏色用原生 `<input type="color">`、強度分數 `input` + 快速帶入按鈕（新手 1.00／中階 3.00／高階 5.00）。送出前以 `PlayerSchema` 驗證，錯誤訊息為繁體中文且說明修正方式（`prd.md` 11）
+- [x] 6.3 `components/matchmaker/PlayerList.tsx`：列表容器，組合 `PlayerCard`，提供編輯與刪除入口。刪除 MUST 二次確認（`prd.md` 第 10 節）
+- [x] 6.4 `components/matchmaker/EmptyRoster.tsx`：空白狀態，含「新增第一位參賽者」入口
+- [x] 6.5 `components/matchmaker/ResetRosterDialog.tsx`：以既有 `components/ui/alert-dialog` 實作，提示文字採 `prd.md` 4.1.5 的原文：「確定要重置參賽者名單嗎？這會清除全部參賽者、目前回合與歷史賽果，且無法復原。」並建議先匯出備份（本階段尚無匯出功能，文案先不承諾操作入口）
+- [x] 6.6 `droppedCount > 0` 時於名單頁顯示提示（例如「有 N 筆資料損毀已略過」），SHALL NOT 靜默處理
+- [x] 6.7 所有元件頂部標 `"use client"`，與既有 `components/scoreboard/` 慣例一致
 
 ## 7. 路由（例外層 — 入口）
 
-- [ ] 7.1 `app/matchmaker/players/page.tsx`：組合 `useRosterStore` 與上述元件；不加入全站 navbar（見 proposal 的不在範圍）
-- [ ] 7.2 確認 `pnpm --filter ./nextjs-pickball dev` 後可於 `http://localhost:3005/matchmaker/players` 開啟且無 console error
+- [x] 7.1 `app/matchmaker/players/page.tsx`：組合 `useRosterStore` 與上述元件；不加入全站 navbar（見 proposal 的不在範圍）
+- [x] 7.2 確認 `pnpm --filter ./nextjs-pickball dev` 後可於 `http://localhost:3005/matchmaker/players` 開啟且無 console error
+
+### 6.8～6.10：code review 後補
+
+> 源自 Task 6 的 code review。其中 6.8 是 **Task 3 那個撞色 bug 的回音**——
+> 我們在 `roster.ts` 修好了自動配色（改為反查已佔用 index），但 UI 層又用舊算法
+> 自己算了一次預覽，於是同一個錯誤在另一層重演。修資料層時沒有回頭檢查
+> 「還有誰在用同樣的算法」，是這次的教訓。
+
+- [ ] 6.8 **表單顏色預覽與實際配色不一致**（中）：`app/matchmaker/players/page.tsx` 用 `defaultGradient(players.length)` 算新增表單的顏色預覽，但 `addPlayer` 實際套用的是 `roster.ts` 內部未匯出的 `nextAutoGradient()`（反查已佔用 palette index 以避開撞色）。名單發生過刪除後兩者會算出不同顏色——使用者看到的預覽色與實際拿到的不同。
+  - 修法：把 `nextAutoGradient` 從 `roster.ts` 匯出（它需要 `Player[]` 才能反查，屬名單邏輯而非顏色邏輯，不搬到 `colors.ts`），`page.tsx` 改呼叫它
+  - 持久化的資料本身是正確的，這是**呈現與實際不一致**，不是資料錯誤
+- [ ] 6.9 **`droppedCount` 提示未說明可採取的修正方式**（中）：`page.tsx` 目前是「有 N 筆資料損毀已略過，其餘參賽者資料不受影響。」——滿足 spec 的「SHALL NOT 靜默處理」，但只描述狀況。`prd.md` 11 要求「說明可採取的修正方式」，`PlayerForm` 的錯誤訊息都有「請重新輸入」類指引，此處應對齊
+- [ ] 6.10 **次要文字的 `opacity-90` 會弱化已算好的對比度**（中）：`PlayerCard` 的性別／強度那行用 `opacity-90`。`pickTextColor` 是針對**完全不透明**的文字對兩端背景取 argmax，疊 10% 透明度會讓實際對比低於計算值。Task 2 記錄過 amber（index 7）與 lime（index 8）的 margin 僅約 25%，打折後理論上可能跌破可讀門檻。改用字重／字級做層級區分，不要犧牲透明度
 
 ## 8. E2E（例外層 — 測試基礎建設）
 
