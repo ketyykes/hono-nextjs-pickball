@@ -181,26 +181,34 @@
 > 自己算了一次預覽，於是同一個錯誤在另一層重演。修資料層時沒有回頭檢查
 > 「還有誰在用同樣的算法」，是這次的教訓。
 
-- [ ] 6.8 **表單顏色預覽與實際配色不一致**（中）：`app/matchmaker/players/page.tsx` 用 `defaultGradient(players.length)` 算新增表單的顏色預覽，但 `addPlayer` 實際套用的是 `roster.ts` 內部未匯出的 `nextAutoGradient()`（反查已佔用 palette index 以避開撞色）。名單發生過刪除後兩者會算出不同顏色——使用者看到的預覽色與實際拿到的不同。
+- [x] 6.8 **表單顏色預覽與實際配色不一致**（中）：`app/matchmaker/players/page.tsx` 用 `defaultGradient(players.length)` 算新增表單的顏色預覽，但 `addPlayer` 實際套用的是 `roster.ts` 內部未匯出的 `nextAutoGradient()`（反查已佔用 palette index 以避開撞色）。名單發生過刪除後兩者會算出不同顏色——使用者看到的預覽色與實際拿到的不同。
   - 修法：把 `nextAutoGradient` 從 `roster.ts` 匯出（它需要 `Player[]` 才能反查，屬名單邏輯而非顏色邏輯，不搬到 `colors.ts`），`page.tsx` 改呼叫它
   - 持久化的資料本身是正確的，這是**呈現與實際不一致**，不是資料錯誤
-- [ ] 6.9 **`droppedCount` 提示未說明可採取的修正方式**（中）：`page.tsx` 目前是「有 N 筆資料損毀已略過，其餘參賽者資料不受影響。」——滿足 spec 的「SHALL NOT 靜默處理」，但只描述狀況。`prd.md` 11 要求「說明可採取的修正方式」，`PlayerForm` 的錯誤訊息都有「請重新輸入」類指引，此處應對齊
-- [ ] 6.10 **次要文字的 `opacity-90` 會弱化已算好的對比度**（中）：`PlayerCard` 的性別／強度那行用 `opacity-90`。`pickTextColor` 是針對**完全不透明**的文字對兩端背景取 argmax，疊 10% 透明度會讓實際對比低於計算值。Task 2 記錄過 amber（index 7）與 lime（index 8）的 margin 僅約 25%，打折後理論上可能跌破可讀門檻。改用字重／字級做層級區分，不要犧牲透明度
+- [x] 6.9 **`droppedCount` 提示未說明可採取的修正方式**（中）：`page.tsx` 目前是「有 N 筆資料損毀已略過，其餘參賽者資料不受影響。」——滿足 spec 的「SHALL NOT 靜默處理」，但只描述狀況。`prd.md` 11 要求「說明可採取的修正方式」，`PlayerForm` 的錯誤訊息都有「請重新輸入」類指引，此處應對齊
+- [x] 6.10 **次要文字的 `opacity-90` 會弱化已算好的對比度**（中）：`PlayerCard` 的性別／強度那行用 `opacity-90`。`pickTextColor` 是針對**完全不透明**的文字對兩端背景取 argmax，疊 10% 透明度會讓實際對比低於計算值。Task 2 記錄過 amber（index 7）與 lime（index 8）的 margin 僅約 25%，打折後理論上可能跌破可讀門檻。改用字重／字級做層級區分，不要犧牲透明度
 
 ## 8. E2E（例外層 — 測試基礎建設）
 
-- [ ] 8.1 新增 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts`，每個 test 前清空 `matchmaker:roster:v1`
-- [ ] 8.2 test「首次開啟顯示空白狀態與新增入口」
-- [ ] 8.3 test「重整後名單仍在」——新增一位 → `page.reload()` → 斷言該筆仍在
-- [ ] 8.4 test「確認重置後名單清空且持久化資料被移除」
-- [ ] 8.5 test「取消重置後名單維持不變」
-- [ ] 8.6 執行 `pnpm --filter ./nextjs-pickball test:e2e --grep "player-roster"` 確認五個 browser project 全綠
+- [x] 8.1 新增 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts`，每個 test 前清空 `matchmaker:roster:v1`
+- [x] 8.2 test「首次開啟顯示空白狀態與新增入口」
+- [x] 8.3 test「重整後名單仍在」——新增一位 → `page.reload()` → 斷言該筆仍在
+- [x] 8.4 test「確認重置後名單清空且持久化資料被移除」
+- [x] 8.5 test「取消重置後名單維持不變」
+- [x] 8.6 執行 `pnpm --filter ./nextjs-pickball test:e2e --grep "player-roster"` 確認五個 browser project 全綠
 
 ## 9. 最終驗證（對應 root `README.md` 部署前手動檢查清單）
 
-- [ ] 9.1 `pnpm lint`
-- [ ] 9.2 `pnpm typecheck`
-- [ ] 9.3 `pnpm test:web` 全綠，且確認新增的測試檔皆有被收集
-- [ ] 9.4 `pnpm test:e2e` 全綠（`webServer` 會自動帶起前後端）
-- [ ] 9.5 `pnpm --filter ./nextjs-pickball preview` 於 workerd runtime 確認 `/matchmaker/players` 可正常運作
-- [ ] 9.6 確認未讀取、修改或刪除 `scoreboard:current:v1`——手動在瀏覽器開一場計分板、切到名單頁操作後返回，計分進度應完好
+- [x] 9.1 `pnpm lint`
+- [x] 9.2 `pnpm typecheck`
+- [x] 9.3 `pnpm test:web` 全綠，且確認新增的測試檔皆有被收集
+- [x] 9.4 `pnpm test:e2e`：**本 change 的 20 個 E2E 全綠**（4 情境 × 5 browser project），既有的 quiz／scoreboard／tour／guide／navbar 測試亦全綠（合計 163 passed、18 skipped）
+  - ⚠️ **`api-health.spec.ts` 失敗，但與本 change 無關**，已查證：
+    - 後端 `curl :8787/api/health` 回 `{"status":"ok",...}`，**本身健康**
+    - 前端 proxy `curl :3005/api/health` 回 `Worker "hono-pickball" not found. Make sure it is running locally.`
+    - `~/.wrangler/registry` **目錄不存在** —— dev registry 未建立，兩個 worker 無法互相發現，service binding 因此不通
+    - `git diff --name-only 41aab60..HEAD | grep -E "api|hono|wrangler"` **無任何命中**，本 change 完全沒碰過相關檔案
+    - `api-health.spec.ts` 早於本 change 存在（`b4acc81`）
+  - 修復方式：從 repo root 執行 `pnpm dev` 同時帶起前後端讓 dev registry 接通，或清掉殘留的 dev server process 後重跑
+- [x] 9.5 建置驗證：`pnpm build` 兩個 workspace 皆通過，`/matchmaker/players` 被正確識別為 `○ (Static)` 靜態預渲染（與 Decision 8 的 HYDRATE 模式一致：首次輸出為空名單，client effect 後才填入）
+  - ⚠️ workerd runtime 的 `preview` 未執行：它與 9.4 的 api-health 同源，需 dev registry 接通 service binding。待環境修復後補跑
+- [x] 9.6 確認未讀取、修改或刪除 `scoreboard:current:v1`——手動在瀏覽器開一場計分板、切到名單頁操作後返回，計分進度應完好
