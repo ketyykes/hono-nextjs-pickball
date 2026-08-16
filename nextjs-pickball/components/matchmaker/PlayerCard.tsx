@@ -44,7 +44,11 @@ export function PlayerCard({ player, onEdit, onToggleActive, onDeleteRequest }: 
 				<div className="flex items-start justify-between gap-2">
 					<div className="min-w-0">
 						<p className="truncate text-lg font-semibold">{player.name}</p>
-						<p className="text-sm opacity-90">
+						{/* 次要文字改用較小字級與一般字重做視覺層級區分，不用 opacity——
+						    pickTextColor 是針對文字完全不透明算出的前景色，疊加透明度會讓
+						    實際對比低於計算值（6.10：amber／lime 兩組 margin 僅約 25%，
+						    打折後理論上可能跌破可讀門檻）。 */}
+						<p className="text-xs font-normal">
 							{GENDER_LABEL[player.gender]} · 強度 {player.rating.toFixed(2)}
 						</p>
 					</div>

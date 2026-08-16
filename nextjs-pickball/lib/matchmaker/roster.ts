@@ -54,7 +54,7 @@ function roundRating(rating: number): number {
 // 邊界：名單人數超過調色盤組數（16）時，所有 index 皆已被佔用，退回
 // defaultGradient(roster.length) 循環取用——defaultGradient 內部已用 modulo 保護，
 // 不會因 index 超界而拋錯或回傳空值（spec「雙色漸層與文字對比」的 MUST 要求）。
-function nextAutoGradient(roster: readonly Player[]): GradientPreset {
+export function nextAutoGradient(roster: readonly Player[]): GradientPreset {
 	const usedIndices = new Set(
 		roster.map((p) => paletteIndexOf(p.colorFrom, p.colorTo)).filter((index) => index !== -1),
 	);

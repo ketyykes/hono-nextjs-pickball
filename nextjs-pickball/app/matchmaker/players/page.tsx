@@ -15,8 +15,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { defaultGradient } from "@/lib/matchmaker/colors";
 import { useRosterStore } from "@/hooks/useRosterStore";
+import { nextAutoGradient } from "@/lib/matchmaker/roster";
 import type { Player } from "@/lib/matchmaker/types";
 
 // 參賽者名單頁。刻意不加進全站 navbar——功能尚不完整（有名單但還無法產生對戰），
@@ -31,10 +31,12 @@ export default function PlayersPage() {
 	const [isAddOpen, setIsAddOpen] = useState(false);
 	const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
 
-	// 僅供新增表單的顏色選擇器預覽用起始值；實際配色由 addPlayer 決定
+	// 新增表單的顏色選擇器預覽值，須與 addPlayer 實際套用的自動配色算法一致
 	// （使用者未動過顏色選擇器時，PlayerForm 不會送出 colorFrom／colorTo，
-	// 交由 lib/matchmaker/roster.ts 的 nextAutoGradient 掃描目前名單後取用）。
-	const suggestedGradient = defaultGradient(players.length);
+	// 交由 nextAutoGradient 掃描目前名單已佔用的 palette index 後取用）。
+	// 若改回 defaultGradient(players.length)，名單發生過刪除後兩者會算出不同顏色
+	// ——使用者在表單看到的預覽色會與送出後實際拿到的顏色不一致（6.8）。
+	const suggestedGradient = nextAutoGradient(players);
 
 	function handleAddSubmit(values: PlayerFormSubmitValues) {
 		addPlayer(values);
@@ -68,7 +70,7 @@ export default function PlayersPage() {
 					role="alert"
 					className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
 				>
-					有 {droppedCount} 筆資料損毀已略過，其餘參賽者資料不受影響。
+					有 {droppedCount} 筆資料損毀已略過，其餘參賽者資料不受影響。如遺失重要參賽者，請重新新增。
 				</div>
 			)}
 
