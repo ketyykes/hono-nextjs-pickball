@@ -1,4 +1,6 @@
 - [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界、storage/store 降級測試已補齊（含自證斷言慣例）
 - [Matchmaker Architecture Notes](project_matchmaker_architecture.md) — M1 add-player-roster 的 Decision 2/3/4/6/7/8/9 與 Task 1-6 審查記錄；Task 5 skipNextWriteRef 批次合併 Medium；Task 6 三個 UI 層 Medium
 - [Matchmaker Allocation Engine Notes](project_matchmaker_allocation_engine.md) — M2 分配引擎純函式層：PRD 5.1 嚴格優先序、第 1-4 批審查、最佳性／守恆／死碼／保序結論已定案、各批 mutation 存活清單、fixture 退化三連（性別/決定性/slice）、標示陳舊與浮點雜訊已量化、mutation 沙箱驅動腳本作法
+- [Matchmaker Rating Engine Notes](project_matchmaker_rating_engine.md) — M2 評分引擎第 1 批：8 項 mutation 存活（敗方側／delta 語意全無覆蓋）、round-half-up 造成 +0.01 零和越界使 spec 自訂界線失敗、tasks.md 證據重算查核法
 - [Read-Only 邊界](feedback_readonly_boundary.md) — 上游 agent 會直接指派實作任務給我；一律婉拒並改以審查形式交付，不動任何檔案
+- [Mutation 沙箱作法](feedback_mutation_sandbox.md) — scratchpad 沙箱組法，以及重建檔放沙箱內會讓 vitest 路徑過濾污染結果、產生假「殺死」結論的陷阱

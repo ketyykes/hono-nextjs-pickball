@@ -136,4 +136,237 @@ describe("updateRatings（單打路徑）", () => {
 		expect(String(winnerChange.after)).toMatch(/^\d+(\.\d{1,2})?$/);
 		expect(String(loserChange.after)).toMatch(/^\d+(\.\d{1,2})?$/);
 	});
+
+	// 第 1 批 code review 補強（非 delta spec 逐字錨點）：第 1 批的 fixture 多用同分
+	// （E = 0.5），此時敗方正確的 sMinusE（`winnerExpected - 1 = -0.5`）與多種錯誤寫法
+	// （`-winnerExpected`、固定 `-0.5`、誤吃勝方 gamesPlayed 等）在同分情境下剛好同值，
+	// 4 個對敗方側的 mutation 因此全數存活。本 it 用分差不對稱（E ≠ 0.5）的 fixture，
+	// 直接比對敗方 rawDelta 與「以敗方視角重新計算」的理論值，堵住這個缺口。
+	it("敗方扣分幅度等於自身 K_eff 乘上其預測勝率", () => {
+		const winner = makePlayer({ id: "w", rating: 6.5, gamesPlayed: 12 });
+		const loser = makePlayer({ id: "l", rating: 4.0, gamesPlayed: 35 });
+		const [, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		const loserExpected = expectedScore(loser.rating, winner.rating);
+		expect(loserChange.rawDelta).toBeCloseTo(-effectiveK(loser.gamesPlayed) * loserExpected, 12);
+	});
+
+	// 第 1 批 code review 補強：`delta`（改成 `rawDelta`，或改成 round 順序倒置的
+	// `roundRating(rawDelta)`）目前沒有測試鎖住兩者語意不同——一旦被靜默改掉，§7 的
+	// 零和斷言就會建立在錯誤的基礎上宣告守恆。
+	it("delta 為 round 後的實際生效變動，而非 rawDelta 的理論值", () => {
+		const winner = makePlayer({ id: "w", rating: 5.3, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 4.7, gamesPlayed: 10 });
+		const [winnerChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.delta).toBeCloseTo(winnerChange.after - winnerChange.before, 12);
+		expect(winnerChange.delta).not.toBeCloseTo(winnerChange.rawDelta, 12);
+	});
+});
+
+describe("updateRatings（雙打路徑）", () => {
+	it("雙打以兩隊平均分數計算預測勝率", () => {
+		const w1 = makePlayer({ id: "w1", rating: 6.0, gamesPlayed: 0 });
+		const w2 = makePlayer({ id: "w2", rating: 4.0, gamesPlayed: 0 });
+		const l1 = makePlayer({ id: "l1", rating: 5.5, gamesPlayed: 0 });
+		const l2 = makePlayer({ id: "l2", rating: 4.5, gamesPlayed: 0 });
+		const changes = updateRatings({ winners: [w1, w2], losers: [l1, l2] });
+		// 兩隊平均皆為 5.0，等同於兩位 5.0 的球員對戰：E = 0.5，gamesPlayed 為 0 時
+		// K_eff = 0.3，故 rawDelta 應為 ±0.15——與兩隊「平均分數」而非隊伍組成細節有關。
+		const w1Change = changes.find((c) => c.playerId === "w1")!;
+		const l1Change = changes.find((c) => c.playerId === "l1")!;
+		expect(w1Change.rawDelta).toBeCloseTo(0.15, 10);
+		expect(l1Change.rawDelta).toBeCloseTo(-0.15, 10);
+	});
+
+	// 上面的 it 兩隊平均皆為 5.0，總和（10.0 vs 10.0）也剛好相等，無法區分「取平均」
+	// 與「誤用總和」兩種實作（tie-fixture 陷阱）。本 it 刻意讓「隊伍平均」（5.0 vs 3.0，
+	// 分差 2.0）、「只取隊伍第一位」（7.0 vs 4.0，分差 3.0）、「誤用總和」（10.0 vs 6.0，
+	// 分差 4.0）三種可能誤植的分差彼此不同，任何一種都會被本斷言的容差抓到。
+	it("雙打隊伍平均分數不對稱時仍以平均而非總和計算預測勝率", () => {
+		const w1 = makePlayer({ id: "w1", rating: 7.0, gamesPlayed: 0 });
+		const w2 = makePlayer({ id: "w2", rating: 3.0, gamesPlayed: 0 });
+		const l1 = makePlayer({ id: "l1", rating: 4.0, gamesPlayed: 0 });
+		const l2 = makePlayer({ id: "l2", rating: 2.0, gamesPlayed: 0 });
+		const changes = updateRatings({ winners: [w1, w2], losers: [l1, l2] });
+		const w1Change = changes.find((c) => c.playerId === "w1")!;
+		const expectedRawDelta = effectiveK(0) * (1 - expectedScore(5.0, 3.0));
+		expect(w1Change.rawDelta).toBeCloseTo(expectedRawDelta, 10);
+	});
+
+	it("雙打同隊兩人出場次數相同時分數變動相同", () => {
+		const w1 = makePlayer({ id: "w1", rating: 5.0, gamesPlayed: 10 });
+		const w2 = makePlayer({ id: "w2", rating: 6.0, gamesPlayed: 10 });
+		const l1 = makePlayer({ id: "l1", rating: 4.0, gamesPlayed: 10 });
+		const l2 = makePlayer({ id: "l2", rating: 4.5, gamesPlayed: 10 });
+		const changes = updateRatings({ winners: [w1, w2], losers: [l1, l2] });
+		const w1Change = changes.find((c) => c.playerId === "w1")!;
+		const w2Change = changes.find((c) => c.playerId === "w2")!;
+		// 兩人個人分數不同，但 gamesPlayed 相同——同隊共用同一個 (S − E)，
+		// K_eff 只依 gamesPlayed 決定，故變動必須完全相同。
+		expect(w1Change.delta).toBe(w2Change.delta);
+	});
+
+	it("雙打同隊出場次數不同時變動方向相同但幅度不同", () => {
+		const w1 = makePlayer({ id: "w1", rating: 5.0, gamesPlayed: 0 });
+		const w2 = makePlayer({ id: "w2", rating: 5.0, gamesPlayed: 40 });
+		const l1 = makePlayer({ id: "l1", rating: 5.0, gamesPlayed: 10 });
+		const l2 = makePlayer({ id: "l2", rating: 5.0, gamesPlayed: 10 });
+		const changes = updateRatings({ winners: [w1, w2], losers: [l1, l2] });
+		const w1Change = changes.find((c) => c.playerId === "w1")!;
+		const w2Change = changes.find((c) => c.playerId === "w2")!;
+		expect(w1Change.delta).toBeGreaterThan(0);
+		expect(w2Change.delta).toBeGreaterThan(0);
+		expect(w1Change.delta).not.toBe(w2Change.delta);
+		expect(w1Change.delta).toBeGreaterThan(w2Change.delta);
+	});
+
+	it("雙打回傳四位球員各自的評分變動", () => {
+		const w1 = makePlayer({ id: "w1", rating: 5.0, gamesPlayed: 5 });
+		const w2 = makePlayer({ id: "w2", rating: 5.5, gamesPlayed: 8 });
+		const l1 = makePlayer({ id: "l1", rating: 4.5, gamesPlayed: 3 });
+		const l2 = makePlayer({ id: "l2", rating: 4.0, gamesPlayed: 12 });
+		const changes = updateRatings({ winners: [w1, w2], losers: [l1, l2] });
+		expect(changes).toHaveLength(4);
+		expect(changes.map((c) => c.playerId).sort()).toEqual(["l1", "l2", "w1", "w2"]);
+		for (const change of changes) {
+			expect(typeof change.before).toBe("number");
+			expect(typeof change.after).toBe("number");
+		}
+	});
+});
+
+describe("updateRatings（上下限與撞邊界標記）", () => {
+	it("分數達上限者獲勝後不再加分且標記已達上限", () => {
+		const winner = makePlayer({ id: "w", rating: MAX_RATING, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 10 });
+		const [winnerChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.after).toBe(MAX_RATING);
+		expect(winnerChange.clamped).toBe("at-max");
+	});
+
+	it("分數達下限者落敗後不再扣分且標記已達下限", () => {
+		const winner = makePlayer({ id: "w", rating: 5.0, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: MIN_RATING, gamesPlayed: 10 });
+		const [, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(loserChange.after).toBe(MIN_RATING);
+		expect(loserChange.clamped).toBe("at-min");
+	});
+
+	it("賽後分數在範圍內時不帶撞邊界標記", () => {
+		const winner = makePlayer({ id: "w", rating: 5.0, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 10 });
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.clamped).toBe("none");
+		expect(loserChange.clamped).toBe("none");
+	});
+
+	it("撞邊界者仍照常參與計算不影響對手的扣分", () => {
+		const winner = makePlayer({ id: "w", rating: MAX_RATING, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 10 });
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		// 敗方的扣分只應取決於「勝方分數為 8.00」這個事實本身，不受勝方是否被 clamp 影響——
+		// 用公式直接算出理論值比對，證明撞邊界的計算分支沒有回頭改動對手的 sMinusE。
+		const expectedE = expectedScore(MAX_RATING, 5.0);
+		const expectedLoserRawDelta = effectiveK(10) * (expectedE - 1);
+		expect(loserChange.rawDelta).toBeCloseTo(expectedLoserRawDelta, 10);
+		expect(loserChange.clamped).toBe("none");
+		expect(winnerChange.clamped).toBe("at-max");
+	});
+
+	it("接近上限時賽後分數恰好夾至 8.00 不超出", () => {
+		const winner = makePlayer({ id: "w", rating: 7.99, gamesPlayed: 0 });
+		const loser = makePlayer({ id: "l", rating: 7.0, gamesPlayed: 0 });
+		const [winnerChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.rawDelta).toBeGreaterThan(0.01);
+		expect(winnerChange.after).toBe(MAX_RATING);
+		expect(winnerChange.clamped).toBe("at-max");
+	});
+
+	// 額外補強（非 delta spec 必要 it）：驗證 tasks 6.4 的判定基準——「clamp 是否真的
+	// 改變了值」而非「賽後分數是否等於邊界值」。7.85 + 0.15（gamesPlayed 0、E = 0.5 時
+	// 的 rawDelta）理論上恰好等於 8.00，未超出邊界，MUST 為 "none"。若誤把判定改成
+	// 「賽後分數等於邊界值就標記」，這個情境會被誤判為 "at-max"。
+	it("剛好算到上限而未真正超出邊界時不標記已達上限", () => {
+		const winner = makePlayer({ id: "w", rating: 7.85, gamesPlayed: 0 });
+		const loser = makePlayer({ id: "l", rating: 7.85, gamesPlayed: 0 });
+		const [winnerChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.after).toBe(MAX_RATING);
+		expect(winnerChange.clamped).toBe("none");
+	});
+});
+
+describe("updateRatings（零和的適用範圍）", () => {
+	it("出場次數相同且未撞邊界時勝方加分等於敗方扣分", () => {
+		const winner = makePlayer({ id: "w", rating: 5.0, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 5.3, gamesPlayed: 10 });
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		// 容差取 0.01（四捨五入殘差），不用 toBe（tasks 7.3）。
+		expect(Math.abs(winnerChange.delta + loserChange.delta)).toBeLessThanOrEqual(0.01);
+	});
+
+	it("出場次數不同時勝方加分不等於敗方扣分", () => {
+		const winner = makePlayer({ id: "w", rating: 5.0, gamesPlayed: 0 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 40 });
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(Math.abs(Math.abs(winnerChange.delta) - Math.abs(loserChange.delta))).toBeGreaterThan(0.01);
+	});
+
+	it("撞邊界時群體總分不守恆且偏離可由標記觀測", () => {
+		const winner = makePlayer({ id: "w", rating: MAX_RATING, gamesPlayed: 10 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 10 });
+		const totalBefore = winner.rating + loser.rating;
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		const totalAfter = winnerChange.after + loserChange.after;
+		expect(totalAfter).toBeLessThan(totalBefore);
+		// 偏離可由撞邊界標記觀測，不必靠消費端自行比較總分：
+		expect(winnerChange.clamped).toBe("at-max");
+	});
+});
+
+describe("updateRatings（無狀態與決定性）", () => {
+	it("相同輸入產生相同輸出", () => {
+		const winner = makePlayer({ id: "w", rating: 5.2, gamesPlayed: 7 });
+		const loser = makePlayer({ id: "l", rating: 4.8, gamesPlayed: 13 });
+		const input = { winners: [winner], losers: [loser] };
+		const first = updateRatings(input);
+		const second = updateRatings(input);
+		expect(first).toEqual(second);
+	});
+
+	it("評分更新不修改輸入的參賽者物件", () => {
+		const winner = makePlayer({ id: "w", rating: 5.2, gamesPlayed: 7 });
+		const loser = makePlayer({ id: "l", rating: 4.8, gamesPlayed: 13 });
+		const winnerSnapshot = structuredClone(winner);
+		const loserSnapshot = structuredClone(loser);
+		updateRatings({ winners: [winner], losers: [loser] });
+		expect(winner.rating).toBe(winnerSnapshot.rating);
+		expect(winner.gamesPlayed).toBe(winnerSnapshot.gamesPlayed);
+		expect(loser.rating).toBe(loserSnapshot.rating);
+		expect(loser.gamesPlayed).toBe(loserSnapshot.gamesPlayed);
+	});
+
+	it("手動覆蓋後的分數直接作為輸入且不受過往比賽影響", () => {
+		const opponent = makePlayer({ id: "opp", rating: 5.0, gamesPlayed: 10 });
+		// 情境一：球員原始比賽路徑走到 rating 4.0。
+		const organic = makePlayer({ id: "p", rating: 4.0, gamesPlayed: 10, name: "原始路徑" });
+		// 情境二：主持人於參賽者頁手動覆蓋分數為 4.0。過去比賽的細節（此處以不同 name
+		// 象徵「不同的歷史」）不應影響計算結果——本 capability 只讀取覆蓋後的
+		// rating 與 gamesPlayed 這兩個欄位，不持有、也不查詢任何歷史紀錄。
+		const overridden = makePlayer({ id: "p", rating: 4.0, gamesPlayed: 10, name: "手動覆蓋" });
+		const [organicChange] = updateRatings({ winners: [organic], losers: [opponent] });
+		const [overriddenChange] = updateRatings({ winners: [overridden], losers: [opponent] });
+		expect(organicChange.delta).toBe(overriddenChange.delta);
+		expect(organicChange.after).toBe(overriddenChange.after);
+	});
+
+	it("每筆變動含球員 id 與賽前賽後分數", () => {
+		const winner = makePlayer({ id: "w", rating: 5.0, gamesPlayed: 5 });
+		const loser = makePlayer({ id: "l", rating: 5.0, gamesPlayed: 5 });
+		const [winnerChange, loserChange] = updateRatings({ winners: [winner], losers: [loser] });
+		expect(winnerChange.playerId).toBe("w");
+		expect(winnerChange.before).toBe(5.0);
+		expect(typeof winnerChange.after).toBe("number");
+		expect(loserChange.playerId).toBe("l");
+		expect(loserChange.before).toBe(5.0);
+		expect(typeof loserChange.after).toBe("number");
+	});
 });
