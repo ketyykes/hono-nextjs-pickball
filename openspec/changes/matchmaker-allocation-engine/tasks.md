@@ -205,7 +205,29 @@
   nextjs-pickball test:       Tests  269 passed (269)
   ```
 - [x] 13.6 本段（`lib/matchmaker/allocation.ts`、`duplication.ts` 及對應測試）全為純函式、無 UI，**不跑 E2E**——`tests/e2e/specs/` 沒有涉及對戰分配畫面的既有測試會受影響，本批未新增任何 UI 元件或頁面路由
-- [ ] 13.7 `DO_NOT_TRACK=1 openspec validate matchmaker-allocation-engine --strict` 通過
+- [x] 13.7 `DO_NOT_TRACK=1 openspec validate matchmaker-allocation-engine --strict` 通過（由主 agent 執行，輸出：`Change 'matchmaker-allocation-engine' is valid`）
+
+## 14. 主 agent 的獨立驗證（verify 階段）
+
+實作者的回報一律不直接採信，以下為主 agent 自行重跑的結果：
+
+- [x] 14.1 錨點機械核對：33 個 Scenario、33 個驗收錨點、**33/33 逐字相符**（腳本比對，非目視）
+- [x] 14.2 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，不使用 BSD `uniq`）：**無重複**
+- [x] 14.3 `pnpm lint`：0 errors（3 個 warning 皆為 `useQuiz.ts`／`useRosterStore.ts`／`useScoreboardStore.ts` 既有，與本段無關）
+- [x] 14.4 `pnpm typecheck`：通過
+- [x] 14.5 `pnpm test` 全套：hono-pickball 4 檔 16 tests + nextjs-pickball 39 檔 270 tests，全數通過
+- [x] 14.6 **mutation 驗證**（主 agent 自行執行，每項改壞後跑 `lib/matchmaker/` 全套 74 tests，確認變紅後還原）：
+
+  | Mutation | 結果 |
+  |---|---|
+  | `allocateRound` 的 `avoidRepeats` 整段 no-op | 1 failed ✅ |
+  | `compareCandidates` 在 rating 相同時加 `gender.localeCompare` tiebreak | 1 failed ✅ |
+  | `compareCandidates` 相等分支回傳 `Math.random() - 0.5` | 1 failed ✅ |
+  | 移除 `allocateRound` 的場地編號覆寫 | 1 failed ✅ |
+  | `buildTeam` 拿掉 `roundRating` | 1 failed ✅ |
+
+  這五項在 `ad1db49` 之前**全部存活**（改壞後測試照樣全綠）。列於此是為了記錄：本段有大量測試是「加入即綠」的 regression guard，紅燈無法自然出現，
+  因此**測試有效性改由 mutation 驗證承擔**——不是「先看到紅」，而是「證明改壞會紅」。
 
 ## 14. 第 6 批 review 修正（M1～M7，殺傷力補強，非新功能）
 
