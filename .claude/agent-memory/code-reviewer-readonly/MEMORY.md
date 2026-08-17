@@ -1,2 +1,4 @@
 - [Scoreboard Architecture Notes](project_scoreboard_architecture.md) — UNDO replay、targetScore task 審查史、cqh/dvh RWD fix 實測法、twMerge text-*/leading-* 衝突群組真相、320x568 破版邊界、storage/store 降級測試已補齊（含自證斷言慣例）
-- [Matchmaker Architecture Notes](project_matchmaker_architecture.md) — add-player-roster change 的 Decision 2/3/4/6/7/8/9、Task 1-6 審查記錄；Task 5 skipNextWriteRef 批次合併 Medium bug；Task 6（UI/例外層）APPROVED，3 個新 Medium：顏色預覽未複用 nextAutoGradient、droppedCount 提示缺修正動作、opacity-90 弱化 pickTextColor 對比度
+- [Matchmaker Architecture Notes](project_matchmaker_architecture.md) — M1 add-player-roster 的 Decision 2/3/4/6/7/8/9 與 Task 1-6 審查記錄；Task 5 skipNextWriteRef 批次合併 Medium；Task 6 三個 UI 層 Medium
+- [Matchmaker Allocation Engine Notes](project_matchmaker_allocation_engine.md) — M2 分配引擎純函式層：PRD 5.1 嚴格優先序、第 1-4 批審查、最佳性／守恆／死碼／保序結論已定案、各批 mutation 存活清單、fixture 退化三連（性別/決定性/slice）、標示陳舊與浮點雜訊已量化、mutation 沙箱驅動腳本作法
+- [Read-Only 邊界](feedback_readonly_boundary.md) — 上游 agent 會直接指派實作任務給我；一律婉拒並改以審查形式交付，不動任何檔案
