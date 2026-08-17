@@ -59,20 +59,20 @@
 
 ## 6. 重複配對簽章（duplication.ts）
 
-- [ ] 6.1 🔴 新增 `nextjs-pickball/lib/matchmaker/duplication.test.ts`，寫入 it「三類簽章與球員排列順序無關」：同一場對戰在隊內互換、兩隊互換後三類簽章皆須相同。確認紅燈
-- [ ] 6.2 🟢 實作 `teammateKeys(match)`、`opponentKeys(match)`、`fullMatchKey(match)`：player id 先字典序排序再以 `|`（隊內）與 `#`（隊間）串接（design Decision 4）
-- [ ] 6.3 🟢 定義 `SignatureIndex`（三個 `Set<string>` 或等價的可序列化結構），並提供由 `Match[]` 建立索引的函式
-- [ ] 6.4 ♻️ refactor：分隔符抽為具名常數，確認三個函式共用同一套 id 正規化邏輯
+- [x] 6.1 🔴 新增 `nextjs-pickball/lib/matchmaker/duplication.test.ts`，寫入 it「三類簽章與球員排列順序無關」：同一場對戰在隊內互換、兩隊互換後三類簽章皆須相同。確認紅燈
+- [x] 6.2 🟢 實作 `teammateKeys(match)`、`opponentKeys(match)`、`fullMatchKey(match)`：player id 先字典序排序再以 `|`（隊內）與 `#`（隊間）串接（design Decision 4）
+- [x] 6.3 🟢 提供由 `Match[]` 建立 `SignatureIndex` 索引的函式 `buildSignatureIndex`（`SignatureIndex` 型別已在 1.3 定義於 `allocation-types.ts`，本檔沿用不重複定義）
+- [x] 6.4 ♻️ refactor：分隔符抽為具名常數，`teamTeammateSignature` 沿用 `teamRawSignature`，確認三個函式共用同一套 id 正規化邏輯
 
 ## 7. 重複偵測與受限交換（duplication.ts）
 
-- [ ] 7.1 🔴 於 `duplication.test.ts` 補 it「與歷史有相同隊友或對手組合時判定為重複」（含「完全沒有交集時判定為不重複」的斷言）。確認紅燈
-- [ ] 7.2 🟢 實作 `countRepeats(matches, seen)`：回傳重複命中數
-- [ ] 7.3 🔴 補兩個 it：「有可行交換時降低重複數且不更動出場名單」、「迴避會擴大強度差距時保留原配對並接受重複」。確認紅燈
-- [ ] 7.4 🟢 實作 `ratingSpread(matches)`：單打取每場雙方 `rating` 差絕對值總和、雙打取每場兩隊總和差絕對值總和（design Decision 5）
-- [ ] 7.5 🟢 實作 `avoidRepeats(matches, seen)`：依 5.6 三階段依序試探（跨場地換人 → 隊內換隊友 → 相鄰強度重排），採納條件為**重複數下降且 `ratingSpread` 未增加**（`<=`），否則回退
-- [ ] 7.6 🟢 確認 `avoidRepeats` 只重排既有球員，無法新增或移除任何人——出場名單成員在調整前後必須完全相同
-- [ ] 7.7 ♻️ refactor：試探掃描順序固定（不使用 `Math.random`），確保決定性；抽出「試探並回退」的共用結構避免三階段各寫一份
+- [x] 7.1 🔴 於 `duplication.test.ts` 補 it「與歷史有相同隊友或對手組合時判定為重複」（含「完全沒有交集時判定為不重複」的斷言）。確認紅燈
+- [x] 7.2 🟢 實作 `countRepeats(matches, seen)`：回傳重複命中數
+- [x] 7.3 🔴 補兩個 it：「有可行交換時降低重複數且不更動出場名單」、「迴避會擴大強度差距時保留原配對並接受重複」。確認紅燈
+- [x] 7.4 🟢 實作 `ratingSpread(matches)`：單打取每場雙方 `rating` 差絕對值總和、雙打取每場兩隊總和差絕對值總和（design Decision 5）；內部以「分」為單位取整數差再比較，避免浮點加總誤差（見 duplication.test.ts「ratingSpread 的浮點誤差防護」）
+- [x] 7.5 🟢 實作 `avoidRepeats(matches, seen)`：依 5.6 三階段依序試探（跨場地換人 → 隊內換隊友 → 相鄰強度重排），採納條件為**重複數下降且 `ratingSpread` 未增加**（`<=`），否則回退
+- [x] 7.6 🟢 確認 `avoidRepeats` 只重排既有球員，無法新增或移除任何人——出場名單成員在調整前後必須完全相同（隨 7.3 的測試一併斷言）
+- [x] 7.7 ♻️ refactor：試探掃描順序固定（不使用 `Math.random`），確保決定性；抽出 `runStage` 作為「試探並回退」的共用結構，三階段共用不各自寫一份
 
 ## 8. 分配入口（allocation.ts）
 
