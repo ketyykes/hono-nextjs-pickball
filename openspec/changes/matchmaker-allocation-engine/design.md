@@ -38,7 +38,7 @@
 
 ### Decision 2：`allocation-types.ts` 為純型別檔，不寫單元測試
 
-該檔只含 `export interface` / `export type` 與 `as const` 常數，無執行期邏輯。依 [`openspec/config.yaml`](../../config.yaml) 的 TDD 例外，型別檔不強制三步。
+該檔只含 `export interface` / `export type` 與 `as const` 常數，無執行期邏輯、無函式。[`openspec/config.yaml`](../../config.yaml) 的 TDD 例外清單只列 `*.d.ts`、`next-env.d.ts`、`cloudflare-env.d.ts`，**不含**本檔——本檔免測的依據不是援引該清單，而是 config.yaml 主句「對……下所有**具備行為邏輯**的模組採通用 TDD」：本檔無函式，本來就不在 TDD 適用範圍內。
 
 但**常數不是型別**——`DEFAULT_FORMAT`、`DEFAULT_COURT_COUNT`、`MIN_COURT_COUNT`、`MAX_COURT_COUNT` 有對外可觀察的值，spec 也為它們寫了 Scenario。這些常數的斷言掛在 `candidates.test.ts`（消費它們的模組），而不是為型別檔硬造一份測試檔。
 
@@ -50,11 +50,11 @@
 
 替代方案是計入休息名單但由第 3 段判斷不累加。否決理由：那把一個屬於分配語意的決定推給消費端，第 4、5 段若也消費此輸出就得各自重複同一條判斷。
 
-### Decision 4：簽章用排序後的 id 串接，不用 `Set` 或物件
+### Decision 4：簽章元素用排序後的 id 串接；索引 in-memory 用 `Set`、持久化用陣列
 
-三類簽章（隊友、交叉對手、完整比賽）皆先對 player id 做 `LC_ALL` 無關的字典序排序再以分隔符串接成字串。理由是**簽章必須與排列順序無關**——同一組人換個位置列出就該視為同一組合，否則交換位置即可騙過重複偵測，5.6 的整段迴避形同虛設。
+三類簽章（隊友、交叉對手、完整比賽）的每一筆皆先對 player id 做 `LC_ALL` 無關的字典序排序再以分隔符串接成字串。理由是**簽章必須與排列順序無關**——同一組人換個位置列出就該視為同一組合，否則交換位置即可騙過重複偵測，5.6 的整段迴避形同虛設。
 
-字串化的另一個好處是可直接放進 `Set<string>` 做 O(1) 比對，且**可序列化**——第 3 段要把「重複配對簽章」寫進 LocalStorage（`prd.md` 9.1 明列此項），字串是唯一不需要額外轉換的表示法。
+`SignatureIndex` 三個欄位的型別為 `ReadonlySet<string>`，而非陣列：**陣列允許重複條目，Set 天然去重**——型別名叫「索引」卻不保證唯一性是本末倒置，且第 3 段逐輪 append 時陣列會無界成長並被寫進 LocalStorage。Set 同時提供 O(1) 比對。「輸出須可序列化」的約束屬於**第 3 段要持久化的表示法**，不屬本段 in-memory 使用的 `AllocationInput`——`AllocationInput` 是 `allocateRound()` 的**函式引數**，不是持久化紀錄，套用「可序列化」這個約束套錯了對象。持久化仍以字串陣列表示（`Set` 無法被 `JSON.stringify` 直接還原成 `Set`），由第 3 段在讀取 LocalStorage 時把陣列轉換為 `Set`、寫回前把 `Set` 轉換回陣列；這道轉換屬於第 3 段的持久化邊界，不屬本段職責。
 
 分隔符選 `|`（隊內）與 `#`（隊間），皆非 `crypto.randomUUID()` 產生的 id 會出現的字元，不會造成歧義。
 

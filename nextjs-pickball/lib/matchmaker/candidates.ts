@@ -5,10 +5,10 @@ import { PLAYERS_PER_MATCH } from "./allocation-types";
 import type { MatchFormat } from "./allocation-types";
 import type { Player } from "./types";
 
-/** selectPlaying 的回傳形狀：本輪出場者與休息者。 */
+/** selectPlaying 的回傳形狀：本輪出場者與休息者。陣列本身亦唯讀，下游需先 slice() 才能排序。 */
 export interface SelectPlayingResult {
-	readonly playing: Player[];
-	readonly resting: Player[];
+	readonly playing: readonly Player[];
+	readonly resting: readonly Player[];
 }
 
 // 候選排序的比較函式：restCount 遞減 → rating 遞減。
@@ -37,7 +37,9 @@ export function countPlaying(availableCount: number, format: MatchFormat, courtC
 	const perMatch = PLAYERS_PER_MATCH[format];
 	const capacity = courtCount * perMatch;
 	const raw = Math.min(availableCount, capacity);
-	return raw - (raw % perMatch);
+	// JS 的 % 保留被除數符號，raw 為負數時 raw % perMatch 不會把 raw 拉回 0，
+	// 故顯式夾下限——負數出場人數的失敗模式是沉默的（見呼叫端 selectPlaying 的 slice 邊界）。
+	return Math.max(0, raw - (raw % perMatch));
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { countPlaying, selectPlaying, sortCandidates } from "./candidates";
-import { DEFAULT_COURT_COUNT, DEFAULT_FORMAT, MAX_COURT_COUNT } from "./allocation-types";
+import { DEFAULT_COURT_COUNT, DEFAULT_FORMAT, MAX_COURT_COUNT, MIN_COURT_COUNT } from "./allocation-types";
 import type { Player } from "./types";
 
 // 測試用的完整參賽者建構器，預設值皆為合法值，呼叫端可用 overrides 覆寫個別欄位。
@@ -32,6 +32,11 @@ describe("sortCandidates", () => {
 		const sorted = sortCandidates([d, b, a, c]);
 
 		expect(sorted.map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+
+		// spec 的 THEN 是「出場為 A、B，休息為 C、D」，只驗排序抓不到 selectPlaying 的 slice 邊界錯誤。
+		const result = selectPlaying([d, b, a, c], "singles", 1);
+		expect(result.playing.map((p) => p.id)).toEqual(["a", "b"]);
+		expect(result.resting.map((p) => p.id)).toEqual(["c", "d"]);
 	});
 
 	it("同休息次數時強度分數高者優先", () => {
@@ -45,22 +50,29 @@ describe("sortCandidates", () => {
 		const sorted = sortCandidates(players);
 
 		expect(sorted.map((p) => p.id)).toEqual(["c", "b", "d", "a"]);
+
+		// spec 的 THEN 是「出場為 rating 7.0 與 5.0 兩人」，只驗排序抓不到 selectPlaying 的 slice 邊界錯誤。
+		const result = selectPlaying(players, "singles", 1);
+		expect(result.playing.map((p) => p.id)).toEqual(["c", "b"]);
+		expect(result.resting.map((p) => p.id)).toEqual(["d", "a"]);
 	});
 
 	it("休息次數與強度皆相同時維持輸入的相對次序", () => {
+		// id 刻意取非字典序（c, a, b）：若 comparator 在相等分支加上 id.localeCompare tiebreak
+		// 以求「確定性」，這裡會被排回字典序 [a, b, c] 而抓到——那違反 spec「相對次序與輸入一致」。
 		const players = [
+			makePlayer({ id: "c", restCount: 1, rating: 5 }),
 			makePlayer({ id: "a", restCount: 1, rating: 5 }),
 			makePlayer({ id: "b", restCount: 1, rating: 5 }),
-			makePlayer({ id: "c", restCount: 1, rating: 5 }),
 		];
 
 		const sorted = sortCandidates(players);
 
-		expect(sorted.map((p) => p.id)).toEqual(["a", "b", "c"]);
+		expect(sorted.map((p) => p.id)).toEqual(["c", "a", "b"]);
 		// 對同一份輸入重複呼叫 MUST 得到相同結果。
-		expect(sortCandidates(players).map((p) => p.id)).toEqual(["a", "b", "c"]);
+		expect(sortCandidates(players).map((p) => p.id)).toEqual(["c", "a", "b"]);
 		// 排序不得原地改動輸入（design Decision 8：先 slice() 複製）。
-		expect(players.map((p) => p.id)).toEqual(["a", "b", "c"]);
+		expect(players.map((p) => p.id)).toEqual(["c", "a", "b"]);
 	});
 });
 
@@ -68,6 +80,7 @@ describe("預設值與場地數範圍", () => {
 	it("預設為單打與 1 個場地，場地數範圍為 1～8", () => {
 		expect(DEFAULT_FORMAT).toBe("singles");
 		expect(DEFAULT_COURT_COUNT).toBe(1);
+		expect(MIN_COURT_COUNT).toBe(1);
 		expect(MAX_COURT_COUNT).toBe(8);
 	});
 });
@@ -78,6 +91,14 @@ describe("countPlaying", () => {
 		expect(countPlaying(7, "doubles", 2)).toBe(4);
 		// 單打、2 個場地、可用人數為 7：min(7, 4) = 4。
 		expect(countPlaying(7, "singles", 2)).toBe(4);
+	});
+
+	// 防禦性 regression guard，spec 無對應 Scenario：courtCount 或 availableCount 為負數時，
+	// JS 的 % 保留被除數符號，若不夾下限會回傳負數出場人數，其失敗模式是沉默的
+	// （selectPlaying 的 slice(0, 負數) 會產出一份「看起來合法」但人數錯誤的名單）。
+	it("courtCount 或 availableCount 為負數時回傳 0，不回傳負數出場人數", () => {
+		expect(countPlaying(10, "singles", -1)).toBe(0);
+		expect(countPlaying(-5, "singles", 2)).toBe(0);
 	});
 });
 
@@ -97,5 +118,18 @@ describe("selectPlaying", () => {
 		expect(allIds).not.toContain("paused");
 		expect(result.playing.map((p) => p.id)).toEqual(["a", "b"]);
 		expect(result.resting.map((p) => p.id)).toEqual(["c"]);
+	});
+
+	it("不修改輸入的參賽者陣列", () => {
+		// sortCandidates 已有對應的不變式斷言，selectPlaying 缺這一條，同一個不變式覆蓋不均。
+		const players = [
+			makePlayer({ id: "a", restCount: 2 }),
+			makePlayer({ id: "b", restCount: 1 }),
+			makePlayer({ id: "c", restCount: 0 }),
+		];
+
+		selectPlaying(players, "singles", 1);
+
+		expect(players.map((p) => p.id)).toEqual(["a", "b", "c"]);
 	});
 });
