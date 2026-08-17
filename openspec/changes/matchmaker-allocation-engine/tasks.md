@@ -6,22 +6,22 @@
 
 ## 1. 型別與常數骨架
 
-- [ ] 1.1 建立 `nextjs-pickball/lib/matchmaker/allocation-types.ts`，定義 `MatchFormat`（`"singles" | "doubles"`）與 `DoublesComposition`（`"mens" | "womens" | "mixed" | "general"`）
-- [ ] 1.2 定義 `Team`（`players: readonly Player[]`、`rating: number`）、`Match`（`courtNumber`、`teams: readonly [Team, Team]`、`format`、`doublesComposition?`）、`RoundAllocation`（`matches`、`resting`）
-- [ ] 1.3 定義 `AllocationInput`（`players`、`format`、`courtCount`、`seenSignatures`），並確認全部欄位皆可序列化（無函式、無 class 實例，見 design Context）
-- [ ] 1.4 匯出常數 `DEFAULT_FORMAT = "singles"`、`DEFAULT_COURT_COUNT = 1`、`MIN_COURT_COUNT = 1`、`MAX_COURT_COUNT = 8`、`PLAYERS_PER_MATCH = { singles: 2, doubles: 4 }`
-- [ ] 1.5 本檔為純型別與常數檔，依 `openspec/config.yaml` 的 TDD 例外**不建立 `allocation-types.test.ts`**；常數的斷言掛在 `candidates.test.ts`（見 design Decision 2）
-- [ ] 1.6 型別匯入一律 `import type`（`verbatimModuleSyntax` 已開啟）；跑 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 確認無誤
+- [x] 1.1 建立 `nextjs-pickball/lib/matchmaker/allocation-types.ts`，定義 `MatchFormat`（`"singles" | "doubles"`）與 `DoublesComposition`（`"mens" | "womens" | "mixed" | "general"`）
+- [x] 1.2 定義 `Team`（`players: readonly Player[]`、`rating: number`）、`Match`（`courtNumber`、`teams: readonly [Team, Team]`、`format`、`doublesComposition?`）、`RoundAllocation`（`matches`、`resting`）
+- [x] 1.3 定義 `AllocationInput`（`players`、`format`、`courtCount`、`seenSignatures`），並確認全部欄位皆可序列化（無函式、無 class 實例，見 design Context）——`seenSignatures` 的型別 `SignatureIndex` 亦定義於本檔（三個 `readonly string[]`，而非 `Set`，確保可序列化），供 duplication.ts（後續批次）沿用
+- [x] 1.4 匯出常數 `DEFAULT_FORMAT = "singles"`、`DEFAULT_COURT_COUNT = 1`、`MIN_COURT_COUNT = 1`、`MAX_COURT_COUNT = 8`、`PLAYERS_PER_MATCH = { singles: 2, doubles: 4 }`
+- [x] 1.5 本檔為純型別與常數檔，依 `openspec/config.yaml` 的 TDD 例外**不建立 `allocation-types.test.ts`**；常數的斷言掛在 `candidates.test.ts`（見 design Decision 2）
+- [x] 1.6 型別匯入一律 `import type`（`verbatimModuleSyntax` 已開啟）；跑 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 確認無誤
 
 ## 2. 候選排序（candidates.ts）
 
-- [ ] 2.1 🔴 新增 `nextjs-pickball/lib/matchmaker/candidates.test.ts`，寫入三個 it：「休息次數多者優先出場」、「同休息次數時強度分數高者優先」、「休息次數與強度皆相同時維持輸入的相對次序」。跑單檔確認紅燈並貼出輸出
-- [ ] 2.2 🟢 實作 `sortCandidates(players)`：`restCount` 遞減 → `rating` 遞減 → 穩定。排序前先 `slice()` 複製，不得原地改動輸入（design Decision 8）
-- [ ] 2.3 ♻️ refactor：比較函式抽出具名常數或輔助函式，確認無重複邏輯
-- [ ] 2.4 🔴 補三個 it：「預設為單打與 1 個場地，場地數範圍為 1～8」、「出場人數取 min(可用人數, 場地數×每場人數) 後向下取整至每場人數的倍數」、「暫停出場者不進入候選池，既不出場也不列入休息名單」。確認紅燈
-- [ ] 2.5 🟢 實作 `countPlaying(availableCount, format, courtCount)` 與 `selectPlaying(players, format, courtCount)`：先以 `isActive` 過濾候選池 → 排序 → 取前 N 出場、其餘為休息名單
-- [ ] 2.6 🟢 確認暫停者既不在 `playing` 也不在 `resting`（design Decision 3）
-- [ ] 2.7 ♻️ refactor：`countPlaying` 的取整邏輯確認只有一處，`PLAYERS_PER_MATCH` 為唯一人數來源
+- [x] 2.1 🔴 新增 `nextjs-pickball/lib/matchmaker/candidates.test.ts`，寫入三個 it：「休息次數多者優先出場」、「同休息次數時強度分數高者優先」、「休息次數與強度皆相同時維持輸入的相對次序」。跑單檔確認紅燈並貼出輸出
+- [x] 2.2 🟢 實作 `sortCandidates(players)`：`restCount` 遞減 → `rating` 遞減 → 穩定。排序前先 `slice()` 複製，不得原地改動輸入（design Decision 8）
+- [x] 2.3 ♻️ refactor：比較函式抽出具名常數或輔助函式，確認無重複邏輯（skipped：GREEN 階段已將比較邏輯抽為具名函式 `compareCandidates`，複查無重複，無需再動）
+- [x] 2.4 🔴 補三個 it：「預設為單打與 1 個場地，場地數範圍為 1～8」、「出場人數取 min(可用人數, 場地數×每場人數) 後向下取整至每場人數的倍數」、「暫停出場者不進入候選池，既不出場也不列入休息名單」。確認紅燈
+- [x] 2.5 🟢 實作 `countPlaying(availableCount, format, courtCount)` 與 `selectPlaying(players, format, courtCount)`：先以 `isActive` 過濾候選池 → 排序 → 取前 N 出場、其餘為休息名單
+- [x] 2.6 🟢 確認暫停者既不在 `playing` 也不在 `resting`（design Decision 3）
+- [x] 2.7 ♻️ refactor：`countPlaying` 的取整邏輯確認只有一處，`PLAYERS_PER_MATCH` 為唯一人數來源（skipped：複查後取整邏輯僅存在於 `countPlaying`，`selectPlaying` 呼叫而非重算，無需再動）
 
 ## 3. 單打配對（pairing.ts）
 
