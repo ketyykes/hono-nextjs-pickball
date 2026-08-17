@@ -3,6 +3,7 @@
 // 的能力，確保 5.6 的迴避不會意外違反「不得改變出場與休息名單成員」的約束
 // （design Decision 1、PRD 5.1、5.6）。
 
+import { roundRating } from "./rating-math";
 import type { Match, SignatureIndex, Team } from "./allocation-types";
 import type { Player } from "./types";
 
@@ -181,13 +182,13 @@ function rebuildMatch(match: Match, teamIndex: 0 | 1, playerIndex: number, repla
 	const players = match.teams[teamIndex].players.slice();
 	players[playerIndex] = replacement;
 	const sum = players.reduce((total, p) => total + p.rating, 0);
-	// 與 pairing.ts 的 buildTeam 採同一四捨五入慣例（design Decision 5 的註解、tasks 回顧
-	// 記錄）：PRD 的 rating 為兩位小數，浮點加總在十進位小數上會有誤差（如 2.01 + 1.01
-	// 在 IEEE754 下得到 3.0199999999999996，而非數學上相等的 3.02）。若本函式不四捨五入，
-	// 「被交換過的隊伍」會帶浮點雜訊、「未被交換的隊伍」乾淨，兩者一起被第 3 段寫進
-	// LocalStorage 時表示法不一致（見 duplication.test.ts「交換後的隊伍分數與直接配對產生的
-	// 隊伍分數表示一致」）。
-	const rebuiltTeam: Team = { players, rating: Math.round(sum * 100) / 100 };
+	// 與 pairing.ts 的 buildTeam 共用同一份四捨五入邏輯（rating-math.ts 的 roundRating，
+	// reviewer M6 抽出，取代原本兩處各自一行 Math.round(sum * 100) / 100）：PRD 的 rating
+	// 為兩位小數，浮點加總在十進位小數上會有誤差（如 2.01 + 1.01 在 IEEE754 下得到
+	// 3.0199999999999996，而非數學上相等的 3.02）。若本函式不四捨五入，「被交換過的隊伍」
+	// 會帶浮點雜訊、「未被交換的隊伍」乾淨，兩者一起被第 3 段寫進 LocalStorage 時表示法不一致
+	// （見 duplication.test.ts「交換後的隊伍分數與直接配對產生的隊伍分數表示一致」）。
+	const rebuiltTeam: Team = { players, rating: roundRating(sum) };
 	const teams: [Team, Team] = teamIndex === 0 ? [rebuiltTeam, match.teams[1]] : [match.teams[0], rebuiltTeam];
 
 	return { ...match, teams };

@@ -45,7 +45,10 @@ describe("allocateRound", () => {
 		const [match] = result.matches;
 		expect(typeof match?.courtNumber).toBe("number");
 		expect(match?.format).toBe("doubles");
-		expect(match?.doublesComposition).toBeDefined();
+		// 斷言具體值而非只驗證「有值」——makePlayer 預設 gender 為 male，p1～p4 皆出場，
+		// 標示 MUST 為男雙；把 labelDoublesComposition 改成恆回傳 "general" 也會讓
+		// toBeDefined() 全綠（reviewer 小項），改用 toBe 才能抓到。
+		expect(match?.doublesComposition).toBe("mens");
 		expect(match?.teams).toHaveLength(2);
 		for (const team of match?.teams ?? []) {
 			expect(team.players).toHaveLength(2);
@@ -72,7 +75,18 @@ describe("allocateRound", () => {
 	});
 
 	it("相同輸入產生相同輸出", () => {
-		const players = Array.from({ length: 8 }, (_, i) => makePlayer({ id: `p${i + 1}`, rating: 8 - i * 0.5, restCount: i % 3 }));
+		// ⚠️ mutation 測試更正（reviewer M2）：原 fixture 8 人 rating 為 `8 - i * 0.5`，8 個值
+		// 互不相同；restCount 雖以 `i % 3` 製造 tie，但 compareCandidates 先比 restCount，
+		// restCount 不等時直接用它決勝負，只有「restCount 與 rating 皆相等」才會落到穩定排序
+		// 分支——原 fixture 從未命中這個分支，故 sortCandidates 若在該分支改回傳
+		// `Math.random() - 0.5`（破壞穩定性）仍會全綠（實測：73 tests 全數存活）。
+		// 改為讓 p2、p8 的 restCount（1）與 rating（7.5）皆相同，確保穩定排序分支真的被行使：
+		// 雙打 2 場地容量 8 剛好等於總人數，8 人全部出場（沒有出場／休息的邊界可用），但
+		// pairDoubles 仍會依 rating 對 `playing` 重新排序組隊，p2／p8 進入 pairDoubles 前的
+		// 相對次序若被隨機打亂，兩隊的隊員陣列順序就可能不同，使兩次呼叫的輸出不再相等。
+		const ratings = [8, 7.5, 7, 6.5, 6, 5.5, 5, 7.5];
+		const restCounts = [0, 1, 2, 0, 1, 2, 0, 1];
+		const players = ratings.map((rating, i) => makePlayer({ id: `p${i + 1}`, rating, restCount: restCounts[i] }));
 		const input: AllocationInput = {
 			players,
 			format: "doubles",
@@ -116,16 +130,27 @@ describe("allocateRound", () => {
 	});
 
 	it("僅性別不同時出場名單與隊伍組成完全一致", () => {
+		// ⚠️ mutation 測試更正（reviewer M1）：原 fixture 5 人 rating 全相異（8.0/7.0/6.0/5.0/4.0）、
+		// restCount 全為 0，compareCandidates 的「restCount 與 rating 皆相等」分支從未被執行過
+		// 一次——那正是本測試該守的分支（性別當 tiebreak 才是真實的外洩路徑：日後有人為了
+		// 「排序確定性」隨手替 compareCandidates 加一個性別 tiebreak，正好是本測試該擋而擋不住
+		// 的情況）。實測：`compareCandidates` 在相等分支加上
+		// `return a.gender.localeCompare(b.gender);` 後，73 tests 全數存活。
+		// 改為讓 p4、p5 的 restCount（0）與 rating（5.0）皆相同，且恰好落在雙打 1 場地
+		// （容量 4）的出場／休息分界上——p4 出場、p5 休息（stable sort 保留輸入相對次序）。
+		// playersB 刻意讓 p4＝male、p5＝female：若真的混入性別 tiebreak，
+		// "male".localeCompare("female") > 0 會讓 p5 排到 p4 前面，變成 p5 出場、p4 休息，
+		// 與 playersA（性別不影響排序）的結果不同，測試就會抓到。
 		const baseOverrides = [
 			{ id: "p1", rating: 8.0 },
 			{ id: "p2", rating: 7.0 },
 			{ id: "p3", rating: 6.0 },
 			{ id: "p4", rating: 5.0 },
-			{ id: "p5", rating: 4.0 },
+			{ id: "p5", rating: 5.0 },
 		];
 
 		const playersA = baseOverrides.map((o) => makePlayer({ ...o, gender: "male" }));
-		const gendersB: Array<Player["gender"]> = ["male", "female", "male", "female", "male"];
+		const gendersB: Array<Player["gender"]> = ["male", "female", "male", "male", "female"];
 		const playersB = baseOverrides.map((o, i) => makePlayer({ ...o, gender: gendersB[i] }));
 
 		const input = {
@@ -152,7 +177,11 @@ describe("allocateRound", () => {
 	it("強度差距再大也不得讓休息次數多者繼續休息", () => {
 		// a 的休息次數最高，但 rating 與其他出場者差距極大（1.0 vs 8.0／7.9）——
 		// 若強度配對推翻休息次數優先，a 會被排除以換取更接近的分差，違反嚴格優先序。
-		const players = [makePlayer({ id: "a", restCount: 5, rating: 1.0 }), makePlayer({ id: "p2", restCount: 0, rating: 8.0 }), makePlayer({ id: "p3", restCount: 0, rating: 7.9 })];
+		const players = [
+			makePlayer({ id: "a", restCount: 5, rating: 1.0 }),
+			makePlayer({ id: "p2", restCount: 0, rating: 8.0 }),
+			makePlayer({ id: "p3", restCount: 0, rating: 7.9 }),
+		];
 
 		const result = allocateRound({
 			players,
@@ -387,6 +416,22 @@ describe("allocateRound", () => {
 					seenSignatures: EMPTY_SIGNATURE_INDEX,
 				}),
 			).toThrow(/1.*8/);
+		});
+
+		it("場地數非整數時拒絕輸入而非靜默向下取整（reviewer M7，防禦性 guard，spec 無對應 Scenario）", () => {
+			// courtCount: 1.5 + 雙打 → capacity 6 → 若靜默向下取整為 4，會悄悄只產生 1 場，
+			// 使用者設定錯誤（例如 LocalStorage 回讀損壞值）不會被察覺。§10 只做了範圍檢查
+			// （1～8），未檢查整數性，courtCount 為 1.5 時目前會通過範圍檢查、不拋錯。
+			const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+
+			expect(() =>
+				allocateRound({
+					players,
+					format: "doubles",
+					courtCount: 1.5,
+					seenSignatures: EMPTY_SIGNATURE_INDEX,
+				}),
+			).toThrow(/整數/);
 		});
 	});
 });

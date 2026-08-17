@@ -71,7 +71,17 @@ describe("sortCandidates", () => {
 		expect(sorted.map((p) => p.id)).toEqual(["c", "a", "b"]);
 		// 對同一份輸入重複呼叫 MUST 得到相同結果。
 		expect(sortCandidates(players).map((p) => p.id)).toEqual(["c", "a", "b"]);
+
 		// 排序不得原地改動輸入（design Decision 8：先 slice() 複製）。
+		// ⚠️ mutation 測試更正（reviewer M4）：本 fixture 的 restCount／rating 全部相等（spec
+		// Scenario「休息次數與強度皆相同時維持穩定排序」的 WHEN 條件本就要求如此），穩定排序
+		// 對全相等的比較必然回傳與輸入相同的順序——無論 sortCandidates 是否先 slice() 複製，
+		// 「players 陣列的內容順序」這個斷言恆真，實測拿掉 sortCandidates 的 .slice() 依然
+		// 全綠。改為斷言回傳值與輸入是不同的陣列參照：sortCandidates 目前實作為
+		// `players.slice().sort(...)`，slice() 產生新陣列、sort() 回傳呼叫者本身，故 sorted
+		// 必為新參照；若拿掉 .slice() 直接對 players 呼叫 sort()，回傳的就是 players 本身
+		// （sorted === players），這個斷言在任何 fixture（含全相等）下都能抓到。
+		expect(sorted).not.toBe(players);
 		expect(players.map((p) => p.id)).toEqual(["c", "a", "b"]);
 	});
 });

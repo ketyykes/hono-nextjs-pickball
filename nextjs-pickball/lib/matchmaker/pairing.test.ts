@@ -49,9 +49,9 @@ describe("pairSingles", () => {
 		expect(matches).toHaveLength(2);
 		expect(matches[0].teams.map((t) => t.players[0].id)).toEqual(["p8", "p75"]);
 		expect(matches[1].teams.map((t) => t.players[0].id)).toEqual(["p4", "p35"]);
-		// courtNumber 為初值，1 起算依配對順序連續遞增；allocateRound 會在重複迴避完成後
-		// 覆寫為最終場地編號，這裡釘住的是 pairSingles 自身的現行行為（reviewer M5）。
-		expect(matches.map((m) => m.courtNumber)).toEqual([1, 2]);
+		// courtNumber 初值為 0（placeholder，代表「尚未指派」），實際編號由 allocateRound
+		// 的步驟 4 指派；pairSingles 本身不知道、也不假裝知道最終場地編號（reviewer M3）。
+		expect(matches.map((m) => m.courtNumber)).toEqual([0, 0]);
 
 		// PRD 5.4「盡量接近」缺乏絕對閾值，故用相對比較：4 人分兩隊只有 3 種分法，
 		// 逐一算出分差總和，驗證相鄰配對法為最小值。
@@ -185,9 +185,9 @@ describe("pairDoubles", () => {
 		const secondMatchIds = matches[1].teams.flatMap((t) => t.players.map((p) => p.id)).sort();
 		expect(firstMatchIds).toEqual(["p0", "p1", "p2", "p3"]);
 		expect(secondMatchIds).toEqual(["p4", "p5", "p6", "p7"]);
-		// courtNumber 為初值，1 起算依配對順序連續遞增；allocateRound 會在重複迴避完成後
-		// 覆寫為最終場地編號，這裡釘住的是 pairDoubles 自身的現行行為（reviewer M5）。
-		expect(matches.map((m) => m.courtNumber)).toEqual([1, 2]);
+		// courtNumber 初值為 0（placeholder，代表「尚未指派」），實際編號由 allocateRound
+		// 的步驟 4 指派；pairDoubles 本身不知道、也不假裝知道最終場地編號（reviewer M3）。
+		expect(matches.map((m) => m.courtNumber)).toEqual([0, 0]);
 	});
 
 	it("雙打人數非 4 的倍數時，剩餘不足 4 人不產生殘缺隊伍且不崩潰", () => {

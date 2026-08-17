@@ -14,10 +14,15 @@ import type { AllocationInput, Match, RoundAllocation } from "./allocation-types
  * `pairSingles`／`pairDoubles` 的迴圈條件 `i + perMatch <= length` 在長度不足時不執行），
  * 唯一缺口是場地數範圍——三個子模組都不知道「1～8」這個規則，只能在入口統一檢查
  * （design Decision 7）。
+ *
+ * 整數性與範圍共用同一條錯誤訊息（reviewer M7）：`courtCount` 為 `1.5` 這類非整數值時，
+ * `countPlaying` 的 `courtCount * perMatch` 會算出非整數容量（如雙打 1.5 場地 → 容量 6），
+ * 向下取整後悄悄產生「看似合理但其實錯誤」的場次數，使用者不會被提示這是一個無效設定
+ * （例如 LocalStorage 回讀到損壞值）。
  */
 function assertValidCourtCount(courtCount: number): void {
-	if (courtCount < MIN_COURT_COUNT || courtCount > MAX_COURT_COUNT) {
-		throw new Error(`場地數需介於 ${MIN_COURT_COUNT} 到 ${MAX_COURT_COUNT} 之間，請調整後再試一次（目前輸入：${courtCount}）。`);
+	if (!Number.isInteger(courtCount) || courtCount < MIN_COURT_COUNT || courtCount > MAX_COURT_COUNT) {
+		throw new Error(`場地數需為 ${MIN_COURT_COUNT} 到 ${MAX_COURT_COUNT} 之間的整數，請調整後再試一次（目前輸入：${courtCount}）。`);
 	}
 }
 

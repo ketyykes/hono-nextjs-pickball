@@ -82,9 +82,11 @@
 > 滿足「輸出形狀」「連續場地編號」「決定性」。因為 candidates.ts／pairing.ts／duplication.ts
 > 三個子模組在前面批次（§2～§7）已各自驗證為純函式、不修改輸入、正確處理場地無法填滿與性別
 > 不影響配對，8.3／9.1／9.3 新增的 it 因而是這些既有保證透過 `allocateRound` 重新曝光的
-> **必然結果**，並非需要新程式碼才能通過。三次都是加入測試後立即執行看到全綠（見下方各步驟
-> 貼出的 shell 輸出），沒有透過「先改斷言看紅、再改回」偽造紅燈。唯一真正的模組層級紅燈是
-> 8.1（`allocation.ts` 尚不存在時的 import 解析失敗），與 §3 開頭記錄的 `pairing.ts` 情況同構。
+> **必然結果**，並非需要新程式碼才能通過。三次都是加入測試後立即執行看到全綠（**未保留輸出**——
+> 這句話原引用「見下方各步驟貼出的 shell 輸出」，但 §8／§9 全文檢查後並無任何 shell 輸出區塊，
+> 是指向空氣的引用，第 6 批 review M5 指出後在此更正），沒有透過「先改斷言看紅、再改回」偽造
+> 紅燈。唯一真正的模組層級紅燈是 8.1（`allocation.ts` 尚不存在時的 import 解析失敗），與 §3
+> 開頭記錄的 `pairing.ts` 情況同構。
 
 - [x] 8.1 🔴 新增 `nextjs-pickball/lib/matchmaker/allocation.test.ts`，寫入三個 it：「輸出包含場地編號、兩隊球員與分數、對戰類型與休息名單」、「場地編號由 1 起算且連續指派」、「相同輸入產生相同輸出」。確認紅燈
 - [x] 8.2 🟢 實作 `allocateRound(input)`：`selectPlaying` → `pairSingles` / `pairDoubles` → `avoidRepeats` → 指派 1 起算的連續場地編號 → 回傳 `{ matches, resting }`
@@ -144,6 +146,7 @@
   ```
 - [x] 11.B.2 🟢 `duplication.ts` 的 `rebuildMatch` 改用與 `pairing.ts` 的 `buildTeam` 相同的四捨五入（`Math.round(sum * 100) / 100`）。綠燈：`Test Files 1 passed / Tests 6 passed`
 - [x] 11.B.3 ♻️ 共用性評估：`buildTeam`（`pairing.ts`）與 `rebuildMatch`（`duplication.ts`）的四捨五入邏輯目前**各自一行 `Math.round(sum * 100) / 100`**，未抽共用函式。理由：`pairing.ts` 不在本批可動檔案清單內，且兩處各自的四捨五入時機緊鄰不同的加總來源（`buildTeam` 對初始配對、`rebuildMatch` 對換人後的隊伍），抽共用模組需新增檔案或觸碰 `pairing.ts`，超出本批範圍。**記錄為後續項**：下次觸及 `pairing.ts` 時，評估把「rating 四捨五入到分」抽成 `allocation-types.ts` 或新檔的具名函式（例如 `roundTeamRating`），供兩處 import，避免兩處各自維護同一條 magic number（`100`）。
+  **✅ 已於第 6 批（M6）完成**：新增 `nextjs-pickball/lib/matchmaker/rating-math.ts`，匯出 `roundRating(value)`；`pairing.ts` 的 `buildTeam` 與 `duplication.ts` 的 `rebuildMatch` 皆改為呼叫 `roundRating(sum)`，移除各自的 `Math.round(sum * 100) / 100`。未放進 `allocation-types.ts`（該檔明訂為純型別與常數，見檔頭註解）；`duplication.ts` 不 import `pairing.ts`，兩者改為共同依賴 `rating-math.ts`，維持 design Decision 1 的單向依賴，不新增迴避模組對配對模組的耦合。行為不變，`pairing.test.ts`／`duplication.test.ts` 既有斷言全綠，無需改動測試。詳見 §14 M6。
 - [x] 11.C.1 更正 tasks.md 1.3 的文件漂移：`SignatureIndex` 已於 fix commit `20b8a1f` 改為 `ReadonlySet<string>`，1.3 原文「三個 `readonly string[]`」已過時，改為指向現行定義（見上方 1.3 的 ⚠️ 區塊）
 
 ## 12. 第 3 批 code review 追加項（D1～D5，第 5 批一併處理）
@@ -203,3 +206,73 @@
   ```
 - [x] 13.6 本段（`lib/matchmaker/allocation.ts`、`duplication.ts` 及對應測試）全為純函式、無 UI，**不跑 E2E**——`tests/e2e/specs/` 沒有涉及對戰分配畫面的既有測試會受影響，本批未新增任何 UI 元件或頁面路由
 - [ ] 13.7 `DO_NOT_TRACK=1 openspec validate matchmaker-allocation-engine --strict` 通過
+
+## 14. 第 6 批 review 修正（M1～M7，殺傷力補強，非新功能）
+
+> 本批不新增行為，只補強既有測試的偵測力／修文件缺口／小幅重構。逐項附 mutation 驗證
+> （改壞看紅、還原看綠）而非傳統 TDD 紅燈——因為多數項目是「既有測試斷言太弱」而非「行為
+> 尚未實作」。
+
+- [x] 14.M1 `allocation.test.ts` 的「僅性別不同時出場名單與隊伍組成完全一致」fixture 退化：原 5 人 rating 全相異、`restCount` 全為 0，`compareCandidates` 的「`restCount` 與 `rating` 皆相等」分支從未被執行，性別若被誤植為 tiebreak（真實的外洩路徑）不會被抓到。改為 p4／p5 的 `restCount`（0）與 `rating`（5.0）皆相同、恰好落在雙打 1 場地（容量 4）的出場／休息分界上，playersB 讓 p4=male、p5=female 使「若混入性別 tiebreak」會直接翻轉出場者。it 名稱未改。Mutation 驗證：
+  - `compareCandidates` 在相等分支加 `return a.gender.localeCompare(b.gender);` → 紅燈：
+    ```
+    FAIL  lib/matchmaker/allocation.test.ts > allocateRound > 僅性別不同時出場名單與隊伍組成完全一致
+    AssertionError: expected [ 'p4' ] to deeply equal [ 'p5' ]
+     Test Files  1 failed | 7 passed (8)
+          Tests  1 failed | 72 passed (73)
+    ```
+  - 還原 → 綠燈：`Test Files 8 passed (8) / Tests 73 passed (73)`
+- [x] 14.M2 `allocation.test.ts` 的「相同輸入產生相同輸出」fixture 退化：原 8 人 `rating: 8 - i * 0.5` 全相異，`restCount: i % 3` 雖有 tie，但 `compareCandidates` 先比 `restCount`，只有「`restCount` 與 `rating` 皆相等」才會落到穩定排序分支，原 fixture 從未命中。改為讓 p2、p8 的 `restCount`（1）與 `rating`（7.5）皆相同——雙打 2 場地容量 8 剛好等於總人數（8 人全出場，沒有出場／休息邊界），但 `pairDoubles` 仍依 `rating` 對 `playing` 重新排序組隊，p2／p8 的相對次序若被打亂，兩次輸出的隊伍陣列順序就會不同。it 名稱未改。Mutation 驗證：
+  - `compareCandidates` 在「`restCount` 與 `rating` 皆相等」分支回傳 `Math.random() - 0.5` → 紅燈：
+    ```
+    FAIL  lib/matchmaker/allocation.test.ts > allocateRound > 相同輸入產生相同輸出
+    AssertionError: expected { …, id: 'p8', … } to deeply equal { …, id: 'p2', … }
+     Test Files  1 failed (1)
+          Tests  1 failed | 15 passed (16)
+    ```
+    （兩次呼叫 `allocateRound(input)` 的 `court1.teams[1].players` 順序一次是 `[p2, p8]`、一次是 `[p8, p2]`，`toEqual` 因陣列元素順序不同而失敗）
+  - 還原 → 綠燈：`Test Files 8 passed (8) / Tests 73 passed (73)`
+- [x] 14.M3 `allocateRound` 步驟 4 的場地編號覆寫是死碼：`pairSingles`／`pairDoubles` 原本已用同一個索引推導出 `courtNumber = i / perMatch + 1`，與 `allocateRound` 步驟 4 的覆寫值恆等，沒有測試能分辨「誰生效」。**決定**：`pairing.ts` 不再假裝知道場地編號，`courtNumber` 初值改為 `0`（明確 placeholder，代表「尚未指派」），唯一指派點收斂到 `allocateRound` 的步驟 4。連帶修改 `pairing.test.ts`（不在原可動清單內，屬 M3 的必然連帶，已加入可動檔案）：「單打依強度排序後相鄰兩兩配對」與「多組雙打依強度由高到低每 4 人切分」的 `courtNumber` 斷言由 `[1, 2]` 改為 `[0, 0]`，並註記「初值為 placeholder，實際編號由 allocateRound 指派」。Mutation 驗證：
+  - `allocation.ts` 步驟 4 由 `relabeled.map((match, index) => ({ ...match, courtNumber: index + 1 }))` 改為 `relabeled.slice()`（移除覆寫）→ 紅燈：
+    ```
+    FAIL  lib/matchmaker/allocation.test.ts > allocateRound > 場地編號由 1 起算且連續指派
+    AssertionError: expected [ +0, +0, +0 ] to deeply equal [ 1, 2, 3 ]
+     Test Files  1 failed | 7 passed (8)
+          Tests  1 failed | 72 passed (73)
+    ```
+  - 還原 → 綠燈：`Test Files 8 passed (8) / Tests 73 passed (73)`
+- [x] 14.M4 `candidates.test.ts` 的「休息次數與強度皆相同時維持輸入的相對次序」（spec 錨點，WHEN 條件明訂 `restCount` 與 `rating` 完全相同，it 名稱不可改）唯讀斷言退化：原本比對 `players.map(id)` 內容順序，但全相等 fixture 下穩定排序無論是否 `.slice()` 複製，內容順序恆等，斷言恆真。改為額外斷言 `sorted` 與 `players` 是不同陣列參照（`sortCandidates` 現行實作 `players.slice().sort(...)`，`.slice()` 產生新陣列、`.sort()` 回傳呼叫者本身，故 `sorted` 必為新參照；拿掉 `.slice()` 後 `sorted === players`），這個檢查與 fixture 是否全相等無關，任何情況下都能抓到。Mutation 驗證：
+  - `sortCandidates` 由 `players.slice().sort(compareCandidates)` 改為 `(players as Player[]).sort(compareCandidates)` → 紅燈：
+    ```
+    FAIL  lib/matchmaker/candidates.test.ts > sortCandidates > 休息次數與強度皆相同時維持輸入的相對次序
+    AssertionError: expected [ …(3) ] not to be [ …(3) ] // Object.is equality
+     Test Files  1 failed (1)
+          Tests  1 failed | 7 passed (8)
+    ```
+  - 還原 → 綠燈：`Test Files 1 passed (1) / Tests 8 passed (8)`
+- [x] 14.M5 更正 §8 開頭 ⚠️ 區塊「見下方各步驟貼出的 shell 輸出」這句指向空氣的引用（§8／§9 全文檢查後並無任何 shell 輸出區塊）：改為「未保留輸出」並說明是本批 review 指出後更正，不假裝有證據存在
+- [x] 14.M6 `pairing.ts` 的 `buildTeam` 與 `duplication.ts` 的 `rebuildMatch` 各自維護一行 `Math.round(sum * 100) / 100`：新增 `nextjs-pickball/lib/matchmaker/rating-math.ts`，匯出 `roundRating(value)`，兩處改為呼叫該函式。放在獨立新檔而非 `allocation-types.ts`（該檔明訂純型別與常數、無執行期邏輯）；`duplication.ts` 不 import `pairing.ts`，兩者共同依賴 `rating-math.ts`，維持 design Decision 1 的單向依賴（不讓迴避模組依賴配對模組）。11.B.3 的後續項標記已完成，見該處。純重構、行為不變，`pairing.test.ts`／`duplication.test.ts` 既有斷言全綠：
+  ```
+   Test Files  1 passed (1)   # pairing.test.ts
+        Tests  12 passed (12)
+   Test Files  1 passed (1)   # duplication.test.ts
+        Tests  10 passed (10)
+  ```
+- [x] 14.M7 🔴🟢 `courtCount` 的整數性未檢查：`courtCount: 1.5` + 雙打 → capacity 6 → 向下取整為 4 → 靜默只產生 1 場，使用者不會發現是無效設定。於 `allocation.test.ts` 邊界條件補 it「場地數非整數時拒絕輸入而非靜默向下取整（reviewer M7，防禦性 guard，spec 無對應 Scenario）」。真紅燈：
+  ```
+  FAIL  lib/matchmaker/allocation.test.ts > allocateRound > 邊界條件 > 場地數非整數時拒絕輸入而非靜默向下取整（reviewer M7，防禦性 guard，spec 無對應 Scenario）
+  AssertionError: expected [Function] to throw an error
+   Test Files  1 failed (1)
+        Tests  1 failed | 16 passed (17)
+  ```
+  實作：`assertValidCourtCount` 併入 `Number.isInteger(courtCount)` 檢查，與範圍檢查共用同一條繁體中文錯誤訊息（「場地數需為 1 到 8 之間的整數，請調整後再試一次（目前輸入：N）」）。綠燈：`Test Files 8 passed (8) / Tests 74 passed (74)`
+- [x] 14.misc.1 `allocation.test.ts` 拆分 177 字元的長行（三個 `makePlayer(...)` 擠在同一行的「強度差距再大也不得讓休息次數多者繼續休息」fixture），與同檔既有多行風格一致
+- [x] 14.misc.2 `allocation.test.ts` 的「輸出包含場地編號、兩隊球員與分數、對戰類型與休息名單」`expect(match?.doublesComposition).toBeDefined()` 太弱（把 `labelDoublesComposition` 改成恆回傳 `"general"` 也會綠）——p1～p4 皆為 `makePlayer` 預設 `gender: "male"`，改為斷言具體值 `expect(match?.doublesComposition).toBe("mens")`
+- [x] 14.misc.3 `matchHitsSeen` 的第三道 `fullMatchKeys` 檢查已於 12.misc.1 加註「defence-in-depth，偵測力被前兩者涵蓋」，複查確認仍在（`duplication.ts` 該函式上方註解），本批不需重複補註
+
+**收尾驗證（14 批）**：
+- `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/`：`Test Files 8 passed (8) / Tests 74 passed (74)`（73 + 14.M7 新增 1 個）
+- `pnpm --filter ./nextjs-pickball exec tsc --noEmit`：無輸出，通過
+- `pnpm lint`（repo root）：`✖ 3 problems (0 errors, 3 warnings)`，與 13.3 記錄的既有 warning 相同（`useQuiz.ts`／`useRosterStore.ts`／`useScoreboardStore.ts`），無新增
+- `pnpm test`（repo root）：`hono-pickball Test Files 4 passed (4) / Tests 16 passed (16)`；`nextjs-pickball Test Files 39 passed (39) / Tests 270 passed (270)`（269 + 1）
+- 錨點腳本重跑：`共找到 33 個驗收錨點 / ✅ 全部 33 個錨點逐字相符`（fixture 改動未動到任何 it 名稱）
