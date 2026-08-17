@@ -83,7 +83,15 @@
 
 這與第 1 段 `roundRating` 的用法一致：`buildTeam` 也是只在產出 `Team.rating` 時 round 一次。
 
-順帶說明：`delta = after − before` 是**在 round 之後**計算的，因此 `delta` 必然是兩位小數的差；`rawDelta` 則保留完整精度。這讓「delta 加總是否守恆」的檢查建立在實際生效的數字上，而不是理論值。
+`delta = after − before` 是**在 round 之後**計算的，代表**實際生效**的變動；`rawDelta` 保留完整精度，代表理論值。
+
+⚠️ **原本這裡寫「因此 `delta` 必然是兩位小數的差」，那句是錯的**，code review 已證偽，更正於此：
+
+1. **IEEE754 下兩個兩位小數相減不是兩位小數。** 實測 `gamesPlayed = 0` 同分掃過 701 個 `rating` 值，**100%** 的 `delta` 都帶浮點尾數（例如 `5.15 − 5.0 = 0.15000000000000036`）。因此**任何涉及 `delta` 的斷言都不得用 `toBe`**，一律容差。
+
+2. **`delta` 之和不是守恆的正確衡量對象。** 兩個 `after` 各自獨立 round，誤差沒有抵銷機制；`roundRating` 採 half-up，雙方尾數同時落在 `.xx5` 時殘差同號相加，`delta` 之和可超過 `0.01`（實測 `rating` 皆 `5.27`、`gamesPlayed` 皆 `10` 時為 `0.0100000000000016`；同類組合的發生率 8.45%）。
+
+**守恆是 `rawDelta` 的性質。** delta spec 的零和 Scenario 已據此改為斷言 `rawDelta` 互為相反數。`delta` 的角色是「寫回 `Player.rating` 與顯示給使用者的實際數字」，不是用來驗證數學性質的。
 
 ## Risks / Trade-offs
 
