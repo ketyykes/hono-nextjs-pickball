@@ -25,22 +25,37 @@
 
 ## 3. 單打配對（pairing.ts）
 
-- [ ] 3.1 🔴 新增 `nextjs-pickball/lib/matchmaker/pairing.test.ts`，寫入兩個 it：「單打依強度排序後相鄰兩兩配對」、「單打每隊一人，隊伍分數等於該員 rating」。第一個 it 須同時斷言「分差總和不大於其他配對方式」。確認紅燈
-- [ ] 3.2 🟢 實作 `pairSingles(playing)`：依 `rating` 排序後相鄰兩兩配對，每隊 1 人，隊伍分數為該員 `rating`
-- [ ] 3.3 ♻️ refactor：與雙打共用的「建立 Team」邏輯抽成內部輔助函式
+> ⚠️ **本節與 §4、§5 的 TDD 證據有缺口，如實記錄**：實作 commit `682cd34` 未同步更新本檔，
+> 是事後（commit 後）由主 agent 依實作者回報補記的。實作者只提供了**一次**紅燈輸出——
+> `pairing.test.ts` 建立、`pairing.ts` 尚不存在時的模組解析失敗：
+>
+> ```
+> FAIL  lib/matchmaker/pairing.test.ts [ lib/matchmaker/pairing.test.ts ]
+> Error: Failed to resolve import "./pairing" from "lib/matchmaker/pairing.test.ts". Does the file exist?
+>  Test Files  1 failed (1)
+>       Tests  no tests
+> ```
+>
+> 該紅燈只涵蓋 3.1。**4.1 與 5.1 沒有各自獨立的紅燈輸出**，無法區分「先寫測試看到紅燈」
+> 與「實作完補測試」。這是流程缺陷，不是事後可補救的證據——標註於此以免日後誤讀為完整 TDD。
+> 綠燈為 `pairing.test.ts` 9 passed（主 agent 已自行重跑確認）。
+
+- [x] 3.1 🔴 新增 `nextjs-pickball/lib/matchmaker/pairing.test.ts`，寫入兩個 it：「單打依強度排序後相鄰兩兩配對」、「單打每隊一人，隊伍分數等於該員 rating」。第一個 it 須同時斷言「分差總和不大於其他配對方式」。確認紅燈（紅燈輸出見上方 ⚠️ 區塊）
+- [x] 3.2 🟢 實作 `pairSingles(playing)`：依 `rating` 排序後相鄰兩兩配對，每隊 1 人，隊伍分數為該員 `rating`
+- [x] 3.3 ♻️ refactor：與雙打共用的「建立 Team」邏輯抽成內部輔助函式（撰寫綠燈程式碼時已一併抽為 `buildTeam`，複查無額外壞味道，未產生獨立 refactor commit）
 
 ## 4. 雙打組隊（pairing.ts）
 
-- [ ] 4.1 🔴 於 `pairing.test.ts` 補三個 it：「雙打組內以最高＋最低對第二高＋第三高」、「雙打組隊方式的兩隊總和差不大於其餘分隊方式」、「多組雙打依強度由高到低每 4 人切分」。確認紅燈
-- [ ] 4.2 🟢 實作 `pairDoubles(playing)`：依 `rating` 由高到低排序 → 每 4 人一組 → 組內「最高＋最低」為第一隊、「第 2 高＋第 3 高」為第二隊，隊伍分數為兩人 `rating` 總和
-- [ ] 4.3 ♻️ refactor：確認 4 人分組的切片邏輯無 off-by-one，且不依賴輸入長度剛好整除（人數已於 §2 保證為 4 的倍數，但函式本身不得因此崩潰）
+- [x] 4.1 🔴 於 `pairing.test.ts` 補三個 it：「雙打組內以最高＋最低對第二高＋第三高」、「雙打組隊方式的兩隊總和差不大於其餘分隊方式」、「多組雙打依強度由高到低每 4 人切分」。確認紅燈（⚠️ **無獨立紅燈輸出**，見 §3 開頭說明）
+- [x] 4.2 🟢 實作 `pairDoubles(playing)`：依 `rating` 由高到低排序 → 每 4 人一組 → 組內「最高＋最低」為第一隊、「第 2 高＋第 3 高」為第二隊，隊伍分數為兩人 `rating` 總和
+- [x] 4.3 ♻️ refactor：確認 4 人分組的切片邏輯無 off-by-one，且不依賴輸入長度剛好整除（迴圈條件為 `i + 4 <= sorted.length`，殘餘 1～3 人自然略過不解構出 `undefined`；已補防呆測試「雙打人數非 4 的倍數時不崩潰」——該 it 不在 spec 驗收錨點內，屬 tasks 4.3 的防呆驗證而非 spec 承諾）
 
 ## 5. 雙打組成事後標示（pairing.ts）
 
-- [ ] 5.1 🔴 於 `pairing.test.ts` 補三個 it：「雙打四人同性別時標示男雙或女雙」、「雙打兼有男女且無其他時標示混雙」、「雙打含其他不指定時標示一般雙打」。確認紅燈
-- [ ] 5.2 🟢 實作 `labelDoublesComposition(fourPlayers)`：判定對象為**整場 4 人**而非單一隊伍；含任一 `other` 一律回傳 `"general"`
-- [ ] 5.3 🟢 於 `pairDoubles` 產生的每個 `Match` 掛上 `doublesComposition`；單打的 `Match` 不帶此欄位
-- [ ] 5.4 ♻️ refactor：確認標示邏輯**完全不影響**選人與配對——`labelDoublesComposition` 只在隊伍決定後被呼叫，其回傳值不流回任何排序或配對函式
+- [x] 5.1 🔴 於 `pairing.test.ts` 補三個 it：「雙打四人同性別時標示男雙或女雙」、「雙打兼有男女且無其他時標示混雙」、「雙打含其他不指定時標示一般雙打」。確認紅燈（⚠️ **無獨立紅燈輸出**，見 §3 開頭說明）
+- [x] 5.2 🟢 實作 `labelDoublesComposition(fourPlayers)`：判定對象為**整場 4 人**而非單一隊伍；含任一 `other` 一律回傳 `"general"`
+- [x] 5.3 🟢 於 `pairDoubles` 產生的每個 `Match` 掛上 `doublesComposition`；單打的 `Match` 不帶此欄位（`Match` 已於 fix `20b8a1f` 改為 discriminated union，此約束改由編譯期保證）
+- [x] 5.4 ♻️ refactor：確認標示邏輯**完全不影響**選人與配對——`labelDoublesComposition` 只在隊伍決定後被呼叫，其回傳值不流回任何排序或配對函式（code review 以實測確認：回傳值只落進 `doublesComposition` 欄位，不流回 `sortByRatingDesc`／`buildTeam`／分組迴圈）
 
 ## 6. 重複配對簽章（duplication.ts）
 
