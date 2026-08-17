@@ -33,7 +33,11 @@ context: |
   例外：wrangler.jsonc、worker-configuration.d.ts（wrangler types 產物）、vitest.config.ts。
 
   ## 測試工具
-  前端：Vitest 4 + happy-dom + @testing-library/react（已啟用 globals，不需 import describe/it/expect）。
+  前端：Vitest 4 + happy-dom + @testing-library/react。
+    - vitest.config.ts 有 globals: true，但那只在執行期成立 —— tsconfig.json 的 types 為 ["react/canary"]，
+      不含 vitest/globals，故 describe/it/expect/vi/beforeEach 一律必須顯式 import ... from "vitest"
+      （現有 31 個測試檔皆如此）。省略 import 時 vitest 跑得過但 tsc --noEmit 會失敗，Stop hook 會擋下 commit
+    - 受測模組用相對路徑 import（./types、./rules），@/ 別名保留給跨目錄引用
   後端：Vitest 4 + @cloudflare/vitest-pool-workers，測試在真正的 workerd runtime 中執行。
     - 設定於 hono-pickball/vitest.config.ts，用 cloudflareTest() plugin（本版無 defineWorkersConfig）
     - 測試放 hono-pickball/test/<領域>.test.ts（獨立目錄，非鄰近程式碼）——

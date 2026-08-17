@@ -1,7 +1,7 @@
 ---
 name: "playwright-e2e-runner"
 description: "Use this agent when the user wants to execute Playwright E2E tests and verify both test results and browser console output for errors. This agent should be invoked after E2E test files are written or modified, when validating user flows end-to-end, or when the user explicitly requests E2E test execution. The agent will run tests via the installed Playwright CLI and report any console errors detected during test runs.\\n\\n<example>\\nContext: 使用者剛完成一個新的 E2E 測試案例，想要執行並驗證結果。\\nuser: \"我剛寫好 nextjs-pickball/tests/e2e/specs/navigation.spec.ts，幫我跑一下\"\\nassistant: \"我將使用 Agent tool 啟動 playwright-e2e-runner agent 來執行該測試並監控 console 錯誤輸出\"\\n<commentary>\\n使用者明確要求執行 E2E 測試，使用 playwright-e2e-runner agent 執行並回報結果（包含 console errors）。\\n</commentary>\\n</example>\\n\\n<example>\\nContext: 使用者剛修改完一個前端元件，希望驗證沒有破壞既有 E2E 流程。\\nuser: \"我改完 Hero 元件了\"\\nassistant: \"修改完成。現在我將使用 Agent tool 啟動 playwright-e2e-runner agent 來執行 E2E 測試，確認沒有破壞既有流程，並檢查 console 是否有錯誤\"\\n<commentary>\\n元件修改後應主動執行 E2E 測試驗證，並特別關注 console 錯誤輸出。\\n</commentary>\\n</example>\\n\\n<example>\\nContext: 使用者想全面驗證網站在不同瀏覽器的表現。\\nuser: \"幫我跑全部的 e2e 測試\"\\nassistant: \"我將使用 Agent tool 啟動 playwright-e2e-runner agent 來執行全部 E2E 測試套件並監控 console 錯誤\"\\n<commentary>\\n直接的 E2E 執行請求，交給 playwright-e2e-runner 處理。\\n</commentary>\\n</example>"
-model: sonnet
+model: opus
 color: green
 memory: project
 skills:

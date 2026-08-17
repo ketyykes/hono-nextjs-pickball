@@ -1,4 +1,3 @@
-- [/quiz Hydration Mismatch（已修復）](project-quiz-hydration-mismatch.md) — Math.random() 造成 SSR/CSR 不一致；以 QuizClient.tsx（"use client"）包裝 dynamic+ssr:false 解決
-- [scoreboard mobile-safari 版面重疊 bug（已修）](project_scoreboard-mobile-safari-overlap-bug.md) — 390x664 下 TeamPanel 互相遮蔽；根因是 cq 單位寫在容器自身，非引擎 bug，1cba147 修復
-- [「瀏覽器版本落後」已不成立](tour-e2e-browser-version-mismatch.md) — 2026-08-15 實測 Chrome 148／Firefox 150／WebKit 26.4 皆當期；不要再用它解釋非 chromium 失敗
-- 幾何量測 flaky 的修法見 nextjs-expert 目錄的 `playwright-flaky-viewport-measurement-pattern.md`（`expect.poll` + 每次重新量測）
+- [E2E 在機器過載下的跨 browser 逾時噪音](project_e2e-flaky-under-machine-load.md) — 多 project 同時 beforeEach 30s timeout 時先查 uptime 負載，別急著懷疑測試/產品
+- [matchmaker/players 名單頁 E2E 筆記](project_matchmaker-roster-e2e-notes.md) — storage key、Dialog/AlertDialog accessible name、hydration 等 selector 細節，供後續 matchmaker E2E 延續
+- [playwright-cli 本機未安裝的替代探索法](env_playwright-cli-not-installed.md) — 用 @playwright/test 的 chromium 在 workspace 內寫一次性腳本取代
