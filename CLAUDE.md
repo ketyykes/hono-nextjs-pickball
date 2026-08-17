@@ -97,6 +97,14 @@ hono-nextjs-pickball/
 - 後端測試跑在真正的 workerd runtime；在受限沙箱中會噴 `listen EPERM 127.0.0.1`，
   那是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
 - E2E 的 `webServer` 有兩組，會自動先起後端再起前端；service binding 需兩者同時運行才通
+- **service binding 失敗（`Worker "hono-pickball" not found`）時，先找有沒有重複的 dev server**。
+  `playwright.config.ts` 的 `reuseExistingServer: !process.env.CI` 會重用既有 server，
+  但多次中斷的 session 容易留下**多組** `wrangler dev` 互搶 `:8787`，
+  此時後端在「有 process」的情況下其實已經壞掉（`curl :8787/api/health` 完全無回應）。
+  診斷順序是 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"`
+  找出**所有**殘留 process 全數 kill，確認 port 釋放後再起單一組。
+  **不要把 `~/.wrangler/registry` 目錄不存在當成根因** —— wrangler 4.99 不靠該路徑做本機服務發現，
+  後端單獨啟動且回應正常時它依然不存在（2026-08-17 實測，曾據此誤判）。
 - macOS 的 BSD `uniq` 在預設 locale 下會把**內容不同的中文標題誤判為重複**。稽核 spec／文件
   有無重複條目時**不要用 `sort | uniq -d`**（實測它同時謊報主 spec 的某個 Requirement 與某個
   Scenario 重複，但兩者 `grep -c` 皆為 1），改用 `LC_ALL=C sort | LC_ALL=C uniq -d`，

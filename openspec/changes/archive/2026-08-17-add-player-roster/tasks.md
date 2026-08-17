@@ -202,16 +202,25 @@
 - [x] 9.2 `pnpm typecheck`
 - [x] 9.3 `pnpm test:web` 全綠，且確認新增的測試檔皆有被收集
 - [x] 9.4 `pnpm test:e2e`：**本 change 的 20 個 E2E 全綠**（4 情境 × 5 browser project），既有的 quiz／scoreboard／tour／guide／navbar 測試亦全綠（合計 163 passed、18 skipped）
-  - ⚠️ **`api-health.spec.ts` 失敗，但與本 change 無關**，已查證：
-    - 後端 `curl :8787/api/health` 回 `{"status":"ok",...}`，**本身健康**
+  - ⚠️ 當時 **`api-health.spec.ts` 失敗，但與本 change 無關**，已查證：
     - 前端 proxy `curl :3005/api/health` 回 `Worker "hono-pickball" not found. Make sure it is running locally.`
-    - `~/.wrangler/registry` **目錄不存在** —— dev registry 未建立，兩個 worker 無法互相發現，service binding 因此不通
     - `git diff --name-only 41aab60..HEAD | grep -E "api|hono|wrangler"` **無任何命中**，本 change 完全沒碰過相關檔案
     - `api-health.spec.ts` 早於本 change 存在（`b4acc81`）
-  - 修復方式：從 repo root 執行 `pnpm dev` 同時帶起前後端讓 dev registry 接通，或清掉殘留的 dev server process 後重跑
+  - ✅ **2026-08-17 已解決並驗證通過**（4 passed／6 skipped，skip 為既有的 project 過濾）
+  - ❌ **當時對根因的判斷是錯的**：紀錄寫「`~/.wrangler/registry` 目錄不存在 → dev registry 未建立」。
+    該目錄確實不存在，但那是**紅鯡魚**——後端單獨啟動並回應正常後它仍然不存在，wrangler 4.99
+    並不靠這個路徑做本機服務發現。
+  - ✅ **真正的根因**：有**兩組** `wrangler dev` 同時在跑（一組來自完整的 `pnpm dev`，另一組只有後端），
+    兩者互搶 `:8787`。清理當下 `curl :8787/api/health` 已經**完全沒有回應**，
+    亦即後端在有 process 的情況下其實是壞的，binding 自然解析不到。
+  - 修復方式：`lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 找出**所有**殘留 process
+    並全數 kill，確認兩個 port 都釋放後再重新啟動單一組 dev server
 - [x] 9.5 建置驗證：`pnpm build` 兩個 workspace 皆通過，`/matchmaker/players` 被正確識別為 `○ (Static)` 靜態預渲染（與 Decision 8 的 HYDRATE 模式一致：首次輸出為空名單，client effect 後才填入）
-- [ ] 9.6 **未執行（環境阻擋，非通過）**：`pnpm --filter ./nextjs-pickball preview` 的 workerd runtime 整合驗證
-  - 這是 root `README.md`「部署前手動檢查清單」的第 5 步，**本 change 從未跑過**，刻意保留未勾選以免「全項完成」的外觀掩蓋它
-  - 與 9.4 的 api-health 同源：需 dev registry 接通 service binding，而 `~/.wrangler/registry` 目錄不存在
-  - 阻擋原因與本 change 的程式碼無關（見 9.4 的查證鏈），但**部署前必須補跑**
+- [x] 9.6 `pnpm --filter ./nextjs-pickball preview` 的 workerd runtime 整合驗證（root `README.md`「部署前手動檢查清單」第 5 步）
+  - 歸檔當下**尚未執行**，因與 9.4 同源的環境問題受阻，當時刻意保留未勾選以免「全項完成」的外觀掩蓋它
+  - ✅ **2026-08-17 清掉重複的 dev server process 後補跑通過**：
+    - `env.HONO_API (hono-pickball) → Worker, local [connected]`，service binding 在 workerd 下確實接通
+    - `curl :8788/api/health` 經 workerd 前端 proxy 回 `{"status":"ok","service":"hono-pickball",...}`
+    - `/matchmaker/players` HTTP 200，輸出含「參賽者名單」「新增第一位參賽者」「重置名單」，空白狀態正確渲染
+    - `/` 與 `/scoreboard` 皆 HTTP 200，無 regression
 - [x] 9.7 確認未讀取、修改或刪除 `scoreboard:current:v1`——手動在瀏覽器開一場計分板、切到名單頁操作後返回，計分進度應完好
