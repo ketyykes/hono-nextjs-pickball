@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
-import type { AllocationInput, Match } from "./allocation-types";
+import type { AllocationInput, Match, RoundAllocation } from "./allocation-types";
 import type { Player } from "./types";
 
 // 測試用的完整參賽者建構器，與 candidates.test.ts／pairing.test.ts／duplication.test.ts 同構，
@@ -225,6 +225,58 @@ describe("allocateRound", () => {
 		expect(playingIds).toEqual(["a", "b"]);
 	});
 
+	it("avoidRepeats 換人後雙打組成標示會依實際成員重新推導", () => {
+		// 這是 §7（duplication.ts）留白、§8 整合責任的補齊項（非 spec 驗收錨點，見
+		// duplication.ts 的 rebuildMatch 註解）。
+		// p1~p4（皆男性）依 rating 形成 court1（標示 mens），p5~p8（皆女性）形成 court2（標示
+		// womens）。歷史紀錄只重現 p3 對 p4 這組交叉對手（用不相干的填充球員 zA/zB 湊出隊伍，
+		// 確保不會意外命中隊友或完整比賽簽章）。p4 與 p5 的 rating 刻意設為相同（6.9）：
+		// 跨場地互換 p4↔p5 能讓 court1 不再命中歷史（p4 離開後 p3 的對手全換了），且因兩人
+		// rating 相同，全場強度差距總和 before／after 完全相等，滿足 `<=` 判準被接受。
+		// 換人後 court1 變成男女混合（p1、p2、p3 男 + p5 女），court2 也變成男女混合
+		// （p6、p7 女 + p4 男），但 pairDoubles 當初蓋的標示仍是 "mens"／"womens"（舊值）——
+		// 若 allocateRound 沒有在 avoidRepeats 之後重算，輸出會帶著與實際成員不符的標示。
+		const p1 = makePlayer({ id: "p1", rating: 8.0, gender: "male" });
+		const p2 = makePlayer({ id: "p2", rating: 7.9, gender: "male" });
+		const p3 = makePlayer({ id: "p3", rating: 7.0, gender: "male" });
+		const p4 = makePlayer({ id: "p4", rating: 6.9, gender: "male" });
+		const p5 = makePlayer({ id: "p5", rating: 6.9, gender: "female" });
+		const p6 = makePlayer({ id: "p6", rating: 6.0, gender: "female" });
+		const p7 = makePlayer({ id: "p7", rating: 5.0, gender: "female" });
+		const p8 = makePlayer({ id: "p8", rating: 1.0, gender: "female" });
+		const players = [p1, p2, p3, p4, p5, p6, p7, p8];
+
+		const zA = makePlayer({ id: "zA" });
+		const zB = makePlayer({ id: "zB" });
+		const historyMatch: Match = {
+			courtNumber: 99,
+			teams: [
+				{ players: [p3, zA], rating: 0 },
+				{ players: [p4, zB], rating: 0 },
+			],
+			format: "doubles",
+			doublesComposition: "general",
+		};
+		const seenSignatures = buildSignatureIndex([historyMatch]);
+
+		const result = allocateRound({
+			players,
+			format: "doubles",
+			courtCount: 2,
+			seenSignatures,
+		});
+
+		expect(result.matches).toHaveLength(2);
+		for (const match of result.matches) {
+			const [teamA, teamB] = match.teams;
+			const allGenders = new Set([...teamA.players, ...teamB.players].map((p) => p.gender));
+			// 兩場最終都混雜了男女球員，標示 MUST 為混雙，不得殘留 pairDoubles 當初蓋的
+			// mens／womens 舊值。
+			expect(allGenders.has("male") && allGenders.has("female")).toBe(true);
+			expect(match.doublesComposition).toBe("mixed");
+		}
+	});
+
 	it("連續多輪後出場機會輪轉，累計出場次數差距不超過 1", () => {
 		// 6 人、單打 1 個場地（每輪出場 2 人）連續產生多輪。每輪結束後由測試自行對「本輪休息者」
 		// 的 restCount 加 1（不在 allocateRound 內累加，符合 spec「本 capability SHALL NOT
@@ -254,5 +306,87 @@ describe("allocateRound", () => {
 		const counts = Array.from(playCounts.values());
 		const spread = Math.max(...counts) - Math.min(...counts);
 		expect(spread).toBeLessThanOrEqual(1);
+	});
+
+	describe("邊界條件", () => {
+		it("單打可用人數不足 2 時回傳空對戰清單", () => {
+			const players = [makePlayer({ id: "p1" })];
+
+			const result = allocateRound({
+				players,
+				format: "singles",
+				courtCount: 1,
+				seenSignatures: EMPTY_SIGNATURE_INDEX,
+			});
+
+			expect(result.matches).toEqual([]);
+			expect(result.resting.map((p) => p.id)).toEqual(["p1"]);
+		});
+
+		it("雙打可用人數不足 4 時回傳空對戰清單", () => {
+			const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+
+			const result = allocateRound({
+				players,
+				format: "doubles",
+				courtCount: 1,
+				seenSignatures: EMPTY_SIGNATURE_INDEX,
+			});
+
+			expect(result.matches).toEqual([]);
+			expect(result.resting.map((p) => p.id).sort()).toEqual(["p1", "p2", "p3"]);
+		});
+
+		it("全員暫停出場時對戰與休息名單皆為空", () => {
+			const players = [makePlayer({ id: "p1", isActive: false }), makePlayer({ id: "p2", isActive: false })];
+
+			const result = allocateRound({
+				players,
+				format: "singles",
+				courtCount: 1,
+				seenSignatures: EMPTY_SIGNATURE_INDEX,
+			});
+
+			expect(result.matches).toEqual([]);
+			expect(result.resting).toEqual([]);
+		});
+
+		it("名單為空時回傳空結果且不拋錯", () => {
+			let result: RoundAllocation | undefined;
+
+			expect(() => {
+				result = allocateRound({
+					players: [],
+					format: "singles",
+					courtCount: 1,
+					seenSignatures: EMPTY_SIGNATURE_INDEX,
+				});
+			}).not.toThrow();
+
+			expect(result?.matches).toEqual([]);
+			expect(result?.resting).toEqual([]);
+		});
+
+		it("場地數超出 1～8 時拒絕輸入而非靜默夾值", () => {
+			const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+			expect(() =>
+				allocateRound({
+					players,
+					format: "singles",
+					courtCount: 0,
+					seenSignatures: EMPTY_SIGNATURE_INDEX,
+				}),
+			).toThrow(/1.*8/);
+
+			expect(() =>
+				allocateRound({
+					players,
+					format: "singles",
+					courtCount: 9,
+					seenSignatures: EMPTY_SIGNATURE_INDEX,
+				}),
+			).toThrow(/1.*8/);
+		});
 	});
 });

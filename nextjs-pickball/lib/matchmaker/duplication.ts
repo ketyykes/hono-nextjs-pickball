@@ -103,6 +103,10 @@ export function buildSignatureIndex(matches: readonly Match[]): SignatureIndex {
 
 // 單場對戰是否命中既有簽章索引：隊友、交叉對手、完整比賽三類任一命中即算重複
 // （spec Requirement「重複配對迴避」：與歷史有相同隊友組合或相同交叉對手組合即判定為重複）。
+// 第三道 fullMatchKeys 檢查為 defence-in-depth：可證明 full match key 命中時，雙打必同時
+// 命中 teammateKeys、單打必同時命中 opponentKeys（兩隊球員集合相同 ⟹ 隊友與對手組合皆相同），
+// 偵測力已被前兩者涵蓋（第 3 批 code review 以 5000 組隨機搜尋驗證 0 個「只靠 full 命中」的
+// 反例）。索引本身仍依 spec 要求收三類簽章，此處保留檢查只為防禦性完整，不承擔額外偵測力。
 function matchHitsSeen(match: Match, seen: SignatureIndex): boolean {
 	if (teammateKeys(match).some((key) => seen.teammateKeys.has(key))) {
 		return true;
@@ -113,7 +117,18 @@ function matchHitsSeen(match: Match, seen: SignatureIndex): boolean {
 	return seen.fullMatchKeys.has(fullMatchKey(match));
 }
 
-/** 回傳 matches 中與 seen 有重複命中的場次數（tasks 7.2）。 */
+/**
+ * 回傳 matches 中與 seen 有重複命中的**場次數**（tasks 7.2）——是「有命中的場次數」，
+ * 不是「命中次數」：一場對戰即使同時命中隊友與對手兩類簽章，仍只計 1（見
+ * duplication.test.ts「一場同時命中隊友與對手組合仍只算一次重複」）。
+ *
+ * 這個計數語意是 `avoidRepeats` 對「完全重複的雙打場次」束手無策的已知盲點（非 bug，design
+ * 「不追求全域最優」的明文取捨）：單次交換通常只能拆掉一支隊伍，另一支隊伍的隊友簽章仍命中，
+ * 「有命中的場次數」因而不變，`avoidRepeats` 的嚴格 `repeats < current.repeats` 判準會拒絕該
+ * 交換——即使場上可能存在能讓 repeats／spread 同時歸零的其他重排方式，貪婪逐步改善法也不會
+ * 找到（第 3 批 code review 已用 3000 組隨機情境實測反例，記錄於
+ * `.claude/agent-memory/code-reviewer-readonly/project_matchmaker_allocation_engine.md`）。
+ */
 export function countRepeats(matches: readonly Match[], seen: SignatureIndex): number {
 	return matches.filter((match) => matchHitsSeen(match, seen)).length;
 }
@@ -160,12 +175,19 @@ function playerAt(matches: readonly Match[], slot: Slot): Player {
 // 重建單一場次：把 teamIndex／playerIndex 位置的球員換成 replacement，重新計算該隊分數。
 // 注意：雙打場次的 doublesComposition 是純顯示標示，換人後可能不再符合新組成；
 // 本函式維持原標示不變——依 design Decision 1 的職責邊界，duplication.ts 只負責「重排既有
-// 球員」，不重新推導顯示用標示，該標示若需要在迴避重複後更新，屬於 allocation.ts（§8，
-// 下一批）串接 avoidRepeats 之後的整合責任。
+// 球員」，不重新推導顯示用標示，該標示已由 allocation.ts 在串接 avoidRepeats 之後重算
+// （見該檔 relabelDoublesComposition）。
 function rebuildMatch(match: Match, teamIndex: 0 | 1, playerIndex: number, replacement: Player): Match {
 	const players = match.teams[teamIndex].players.slice();
 	players[playerIndex] = replacement;
-	const rebuiltTeam: Team = { players, rating: players.reduce((sum, p) => sum + p.rating, 0) };
+	const sum = players.reduce((total, p) => total + p.rating, 0);
+	// 與 pairing.ts 的 buildTeam 採同一四捨五入慣例（design Decision 5 的註解、tasks 回顧
+	// 記錄）：PRD 的 rating 為兩位小數，浮點加總在十進位小數上會有誤差（如 2.01 + 1.01
+	// 在 IEEE754 下得到 3.0199999999999996，而非數學上相等的 3.02）。若本函式不四捨五入，
+	// 「被交換過的隊伍」會帶浮點雜訊、「未被交換的隊伍」乾淨，兩者一起被第 3 段寫進
+	// LocalStorage 時表示法不一致（見 duplication.test.ts「交換後的隊伍分數與直接配對產生的
+	// 隊伍分數表示一致」）。
+	const rebuiltTeam: Team = { players, rating: Math.round(sum * 100) / 100 };
 	const teams: [Team, Team] = teamIndex === 0 ? [rebuiltTeam, match.teams[1]] : [match.teams[0], rebuiltTeam];
 
 	return { ...match, teams };

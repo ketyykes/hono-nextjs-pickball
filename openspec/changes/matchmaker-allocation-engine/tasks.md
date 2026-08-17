@@ -8,7 +8,7 @@
 
 - [x] 1.1 建立 `nextjs-pickball/lib/matchmaker/allocation-types.ts`，定義 `MatchFormat`（`"singles" | "doubles"`）與 `DoublesComposition`（`"mens" | "womens" | "mixed" | "general"`）
 - [x] 1.2 定義 `Team`（`players: readonly Player[]`、`rating: number`）、`Match`（`courtNumber`、`teams: readonly [Team, Team]`、`format`、`doublesComposition?`）、`RoundAllocation`（`matches`、`resting`）
-- [x] 1.3 定義 `AllocationInput`（`players`、`format`、`courtCount`、`seenSignatures`），並確認全部欄位皆可序列化（無函式、無 class 實例，見 design Context）——`seenSignatures` 的型別 `SignatureIndex` 亦定義於本檔（三個 `readonly string[]`，而非 `Set`，確保可序列化），供 duplication.ts（後續批次）沿用
+- [x] 1.3 定義 `AllocationInput`（`players`、`format`、`courtCount`、`seenSignatures`），並確認全部欄位皆可序列化（無函式、無 class 實例，見 design Context）——`seenSignatures` 的型別 `SignatureIndex` 亦定義於本檔，供 duplication.ts（後續批次）沿用（⚠️ **文件漂移更正**：本行原寫「三個 `readonly string[]`，而非 `Set`，確保可序列化」，但該型別已於 fix commit `20b8a1f` 改為三個 `ReadonlySet<string>`——理由是陣列允許重複條目而型別名叫「索引」，且「可序列化」的約束屬於第 3 段的持久化表示法，不屬本函式引數，見 `allocation-types.ts` 現行的 `SignatureIndex` 定義與 design Decision 4）
 - [x] 1.4 匯出常數 `DEFAULT_FORMAT = "singles"`、`DEFAULT_COURT_COUNT = 1`、`MIN_COURT_COUNT = 1`、`MAX_COURT_COUNT = 8`、`PLAYERS_PER_MATCH = { singles: 2, doubles: 4 }`
 - [x] 1.5 本檔為純型別與常數檔，依 `openspec/config.yaml` 的 TDD 例外**不建立 `allocation-types.test.ts`**；常數的斷言掛在 `candidates.test.ts`（見 design Decision 2）
 - [x] 1.6 型別匯入一律 `import type`（`verbatimModuleSyntax` 已開啟）；跑 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 確認無誤
@@ -102,17 +102,104 @@
 
 ## 10. 邊界條件（allocation.ts）
 
-- [ ] 10.1 🔴 於 `allocation.test.ts` 補五個 it：「單打可用人數不足 2 時回傳空對戰清單」、「雙打可用人數不足 4 時回傳空對戰清單」、「全員暫停出場時對戰與休息名單皆為空」、「名單為空時回傳空結果且不拋錯」、「場地數超出 1～8 時拒絕輸入而非靜默夾值」。確認紅燈
-- [ ] 10.2 🟢 補齊人數不足與空名單路徑：回傳空 `matches` 與完整 `resting`，不拋例外、不產生不完整隊伍
-- [ ] 10.3 🟢 場地數超出 1～8 時拋出可判讀的錯誤（design Decision 7），錯誤訊息為繁體中文並說明合法範圍
-- [ ] 10.4 ♻️ refactor：邊界判斷集中在 `allocateRound` 入口一處，子模組不各自重複檢查
+> ⚠️ **10.1 的五個 it 中，四個是「regression guard」，只有場地數範圍檢查是真紅燈，如實記錄**：
+> `candidates.ts` 的 `selectPlaying`／`countPlaying` 在前面批次（§2）已處理好「`isActive` 過濾」
+> 與「向下取整至每場人數倍數（含 0）」，`pairSingles`／`pairDoubles` 的迴圈條件
+> `i + perMatch <= length` 在人數不足時本就不產生任何場次——這三項邊界（單打/雙打人數不足、
+> 全員暫停、名單為空）在加入測試的當下就直接全綠，是既有保證透過 `allocateRound` 重新曝光的
+> 必然結果，同構於 §8/§9 記錄的模式。**場地數範圍檢查則不同**：`allocateRound` 在本批之前
+> 完全沒有對 `courtCount` 做任何驗證，是本 change 目前唯一一個「先寫測試、實際看到紅燈、
+> 再寫最小實作讓它變綠」的傳統 TDD 循環。實測輸出：
+>
+> ```
+> ❯ lib/matchmaker/allocation.test.ts (15 tests | 1 failed) 11ms
+>      × 場地數超出 1～8 時拒絕輸入而非靜默夾值 3ms
+> AssertionError: expected [Function] to throw an error
+>  Test Files  1 failed (1)
+>       Tests  1 failed | 14 passed (15)
+> ```
+>
+> 綠燈（10.3 實作 `assertValidCourtCount` 後）：`Test Files 1 passed / Tests 15 passed`。
 
-## 11. 收尾驗證
+- [x] 10.1 🔴 於 `allocation.test.ts` 補五個 it：「單打可用人數不足 2 時回傳空對戰清單」、「雙打可用人數不足 4 時回傳空對戰清單」、「全員暫停出場時對戰與休息名單皆為空」、「名單為空時回傳空結果且不拋錯」、「場地數超出 1～8 時拒絕輸入而非靜默夾值」。確認紅燈（⚠️ 四項為 regression guard 立即全綠、一項為真紅燈，見本節開頭說明）
+- [x] 10.2 🟢 補齊人數不足與空名單路徑：回傳空 `matches` 與完整 `resting`，不拋例外、不產生不完整隊伍（10.1 加入時該四項已全綠，`candidates.ts`／`pairing.ts` 既有邏輯已足夠，`allocateRound` 未新增額外處理）
+- [x] 10.3 🟢 場地數超出 1～8 時拋出可判讀的錯誤（design Decision 7），錯誤訊息為繁體中文並說明合法範圍——實作 `assertValidCourtCount(courtCount)`，訊息為「場地數需介於 1 到 8 之間，請調整後再試一次（目前輸入：N）」
+- [x] 10.4 ♻️ refactor：邊界判斷集中在 `allocateRound` 入口一處，子模組不各自重複檢查——複查 `candidates.ts`／`pairing.ts`／`duplication.ts` 三個子模組皆未新增邊界檢查，`assertValidCourtCount` 是唯一新增的檢查點，於 `allocateRound` 開頭（步驟 0）呼叫一次，無需再動
 
-- [ ] 11.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、it 名稱逐字相符。以腳本機械比對，不靠目視
-- [ ] 11.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 全綠，貼出輸出
-- [ ] 11.3 `pnpm lint` 通過，貼出輸出
-- [ ] 11.4 `pnpm typecheck` 通過，貼出輸出
-- [ ] 11.5 `pnpm test` 全套通過（確認未破壞 M1 既有測試），貼出輸出
-- [ ] 11.6 本段無 UI，**不跑 E2E**；在此註明理由，避免日後誤判為漏跑
-- [ ] 11.7 `DO_NOT_TRACK=1 openspec validate matchmaker-allocation-engine --strict` 通過
+## 11. 跨批次缺口修補（A／B／C，第 5 批 review 追加）
+
+> 第 4 批 code review 記錄了兩個跨批次缺口（`.claude/agent-memory/code-reviewer-readonly/project_matchmaker_allocation_engine.md`「待後續批次驗證的追蹤項」）與一處文件漂移，於本批一併處理，不另開變更。
+
+- [x] 11.A.1 🔴 於 `allocation.test.ts` 補 it「avoidRepeats 換人後雙打組成標示會依實際成員重新推導」：構造一個會觸發跨場地換人的雙打歷史重複 fixture，換人後兩場的實際性別組成皆變成男女混合，斷言 `doublesComposition` 為 `"mixed"`。確認紅燈：
+  ```
+  AssertionError: expected 'mens' to be 'mixed'
+  Tests  1 failed | 15 skipped (16)
+  ```
+- [x] 11.A.2 🟢 `allocation.ts` 在 `avoidRepeats` 之後、指派場地編號之前，新增 `relabelDoublesComposition`：對雙打場次以當下兩隊實際成員重新呼叫 `pairing.ts` 的 `labelDoublesComposition`；單打場次原樣返回。綠燈：`Test Files 1 passed / Tests 16 passed`
+- [x] 11.A.3 ♻️ refactor：確認 `relabelDoublesComposition` 只讀 `Match.teams` 重推導標示，不回頭影響 `avoidRepeats` 已決定的球員位置或隊伍組成（複查無需再動）
+- [x] 11.B.1 🔴 於 `duplication.test.ts` 補 it「交換後的隊伍分數與直接配對產生的隊伍分數表示一致」：fixture 使 `avoidRepeats` 交換後 `rebuildMatch` 重建的隊伍分數為 `2.01 + 1.01`（IEEE754 下為 `3.0199999999999996`），斷言 `Team.rating` 為四捨五入後的 `3.02`。確認紅燈：
+  ```
+  AssertionError: expected 3.0199999999999996 to be 3.02
+  Tests  1 failed | 5 skipped (6)
+  ```
+- [x] 11.B.2 🟢 `duplication.ts` 的 `rebuildMatch` 改用與 `pairing.ts` 的 `buildTeam` 相同的四捨五入（`Math.round(sum * 100) / 100`）。綠燈：`Test Files 1 passed / Tests 6 passed`
+- [x] 11.B.3 ♻️ 共用性評估：`buildTeam`（`pairing.ts`）與 `rebuildMatch`（`duplication.ts`）的四捨五入邏輯目前**各自一行 `Math.round(sum * 100) / 100`**，未抽共用函式。理由：`pairing.ts` 不在本批可動檔案清單內，且兩處各自的四捨五入時機緊鄰不同的加總來源（`buildTeam` 對初始配對、`rebuildMatch` 對換人後的隊伍），抽共用模組需新增檔案或觸碰 `pairing.ts`，超出本批範圍。**記錄為後續項**：下次觸及 `pairing.ts` 時，評估把「rating 四捨五入到分」抽成 `allocation-types.ts` 或新檔的具名函式（例如 `roundTeamRating`），供兩處 import，避免兩處各自維護同一條 magic number（`100`）。
+- [x] 11.C.1 更正 tasks.md 1.3 的文件漂移：`SignatureIndex` 已於 fix commit `20b8a1f` 改為 `ReadonlySet<string>`，1.3 原文「三個 `readonly string[]`」已過時，改為指向現行定義（見上方 1.3 的 ⚠️ 區塊）
+
+## 12. 第 3 批 code review 追加項（D1～D5，第 5 批一併處理）
+
+> 第 3 批（`duplication.ts`，commit `73470f6`）的 code review 判「1 個 High（流程）」＋數個 Medium，主 agent 要求在本批一併處理，不另開分支。
+
+- [x] 12.D1 補記 §6／§7 的紅燈證據（reviewer 判「高」，同構於 commit `f500b7a` 已檢討過的同一個洞）：
+  - Cycle A（§6.1，it「三類簽章與球員排列順序無關」）紅燈：`Error: Failed to resolve import "./duplication"`；綠燈：`Test Files 1 passed / Tests 1 passed`
+  - Cycle B（§7.1–7.2，it「與歷史有相同隊友或對手組合時判定為重複」）紅燈：`TypeError: countRepeats is not a function`；綠燈：`Test Files 1 passed / Tests 2 passed`
+  - Cycle C（§7.3–7.6，三個 it）紅燈：`TypeError: ratingSpread is not a function`（3 個測試皆因此失敗）；綠燈：`Test Files 1 passed / Tests 5 passed`
+  三次皆為「函式尚不存在」的模組層級真紅燈，與 §3 開頭記錄的「無獨立紅燈」情況不同類。
+- [x] 12.D2 🔴🟢 修正浮點防護測試假紅燈（reviewer 判「中」）：`duplication.test.ts` 原 fixture `1.1+2.2` vs `1.0+2.3` 乘以 100 後兩邊皆恰為 `330`，`Math.round` 未真正被觸發。改用 `a=2.02, b=1.00, c=2.01, d=1.01`（`*100` 後為 `302` vs `301.99999999999994`，四捨五入後才相等）。Mutation 驗證：
+  - `toRatingCents` 拿掉 `Math.round`（改回傳 `rating * CENTS_PER_RATING_UNIT`）→ 紅燈：`AssertionError: expected 5.684341886080802e-16 to be +0`
+  - 加回 `Math.round` → 綠燈：`Test Files 1 passed / Tests 6 passed`
+- [x] 12.D3 🔴🟢 補 it「強度差距總和完全不變時仍接受交換」覆蓋 `avoidRepeats` 採納條件的 `<=`（reviewer 判「中」，`design.md` Decision 5 的「零成本交換要接受」原本零測試 pin）：`a=5.0 vs b=3.0`（歷史重複）、`c=5.0 vs d=3.0`，交換後兩場仍是 5 vs 3，`ratingSpread` 前後皆為 `4.0`，重複數 1→0。Mutation 驗證：
+  - `runStage` 採納條件 `spread <= current.spread` 改為 `spread < current.spread` → 紅燈：`AssertionError: expected +0 to be 4`（改用另一個候選達成 spread=0，證明 `<=` 分支確實影響最終結果）
+  - 改回 `<=` → 綠燈：`Test Files 1 passed / Tests 7 passed`
+- [x] 12.D4 🔴🟢 補雙打 it「雙打隊內換隊友能消除隊友組合重複（受限交換階段②）」，覆蓋階段②（`intraTeamSwapCandidates`，reviewer 判「中」：既有兩個 `avoidRepeats` 測試皆為單打，階段②的雙打有效路徑一次都沒被執行過）。刻意只用單一場地讓階段①（跨場地換人）產生零候選；斷言精確到重建後的隊伍組成（`team0=[c,b]`、`team1=[a,d]`），而非只斷言重複數下降——因為本 fixture 若停用階段②，階段③（相鄰強度重排）會用不同候選順序找到不同組成（`[a,c]`／`[b,d]`），只斷言「重複數下降」無法區分兩者。Mutation 驗證：
+  - `avoidRepeats` 停用階段②（`runStage(state, seen, [])` 取代 `intraTeamSwapCandidates(...)`）→ 紅燈：`AssertionError: expected [ 'a', 'c' ] to deeply equal [ 'c', 'b' ]`
+  - 還原 → 綠燈：`Test Files 1 passed / Tests 8 passed`
+- [x] 12.D5 為 `countRepeats` 的計數語意補 JSDoc 與測試 pin（reviewer 記錄的已知盲點，非 bug，需留痕避免日後被誤判重查）：
+  1. JSDoc 明寫「回傳的是**有命中的場次數**，非命中次數」，並記錄此語意是 `avoidRepeats` 對「完全重複的雙打場次」束手無策的已知盲點成因
+  2. 補 it「一場同時命中隊友與對手組合仍只算一次重複」pin 住此語意（regression guard，加入時已綠燈：`Test Files 1 passed / Tests 9 passed`）
+  design.md 的 Risks 由主 agent 另補，不在本批範圍
+
+### 順手小項（D1～D5 之外，reviewer 記錄的低成本補強）
+
+- [x] 12.misc.1 `matchHitsSeen` 的 `fullMatchKeys` 檢查加註「defence-in-depth，偵測力已被前兩者涵蓋，可證為理論死碼但索引仍依 spec 要求產生三類簽章」（隨 12.D5 的 JSDoc 一併補上）
+- [x] 12.misc.2 補 it「單打分差為兩隊 rating 差的絕對值，回傳單位為分數而非分」pin `ratingSpread` 的回傳單位。Mutation 驗證：
+  - `ratingSpread` 拿掉 `/ CENTS_PER_RATING_UNIT`（直接回傳 `totalCents`）→ 紅燈：`AssertionError: expected 200 to be 2`
+  - 還原 → 綠燈：`Test Files 1 passed / Tests 10 passed`
+- [x] 12.misc.3 「ratingSpread 的浮點誤差防護」補註記「非 spec 驗收錨點」，避免 13.1 腳本比對時誤判為錯字
+
+## 13. 收尾驗證
+
+- [x] 13.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、it 名稱逐字相符。以 Python 腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條核對 `it("...")`，不靠目視。結果：**33 個錨點、33 個對上**（§10 補完前為 28/33，缺的 5 個正是 §10 五個 it，補完後全數對上）：
+  ```
+  共找到 33 個驗收錨點
+  ✅ 全部 33 個錨點逐字相符
+  ```
+- [x] 13.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 全綠：
+  ```
+   Test Files  8 passed (8)
+        Tests  73 passed (73)
+  ```
+- [x] 13.3 `pnpm lint` 通過（0 errors，3 個與本段無關的既有 warning：`useQuiz.ts`／`useRosterStore.ts`／`useScoreboardStore.ts`）：
+  ```
+  ✖ 3 problems (0 errors, 3 warnings)
+  ```
+- [x] 13.4 `pnpm typecheck` 通過（無輸出即成功）
+- [x] 13.5 `pnpm test` 全套通過（確認未破壞 M1 既有測試與 hono-pickball 後端測試）：
+  ```
+  hono-pickball test:  Test Files  4 passed (4)
+  hono-pickball test:       Tests  16 passed (16)
+  nextjs-pickball test:  Test Files  39 passed (39)
+  nextjs-pickball test:       Tests  269 passed (269)
+  ```
+- [x] 13.6 本段（`lib/matchmaker/allocation.ts`、`duplication.ts` 及對應測試）全為純函式、無 UI，**不跑 E2E**——`tests/e2e/specs/` 沒有涉及對戰分配畫面的既有測試會受影響，本批未新增任何 UI 元件或頁面路由
+- [ ] 13.7 `DO_NOT_TRACK=1 openspec validate matchmaker-allocation-engine --strict` 通過

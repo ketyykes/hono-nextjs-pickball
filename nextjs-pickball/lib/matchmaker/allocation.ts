@@ -4,8 +4,22 @@
 
 import { selectPlaying } from "./candidates";
 import { avoidRepeats } from "./duplication";
-import { pairDoubles, pairSingles } from "./pairing";
+import { labelDoublesComposition, pairDoubles, pairSingles } from "./pairing";
+import { MAX_COURT_COUNT, MIN_COURT_COUNT } from "./allocation-types";
 import type { AllocationInput, Match, RoundAllocation } from "./allocation-types";
+
+/**
+ * 邊界判斷集中於此，子模組不各自重複檢查（tasks 10.4）：`candidates.ts`／`pairing.ts`／
+ * `duplication.ts` 對人數不足或空名單皆已自然回傳空結果（`countPlaying` 向下取整為 0、
+ * `pairSingles`／`pairDoubles` 的迴圈條件 `i + perMatch <= length` 在長度不足時不執行），
+ * 唯一缺口是場地數範圍——三個子模組都不知道「1～8」這個規則，只能在入口統一檢查
+ * （design Decision 7）。
+ */
+function assertValidCourtCount(courtCount: number): void {
+	if (courtCount < MIN_COURT_COUNT || courtCount > MAX_COURT_COUNT) {
+		throw new Error(`場地數需介於 ${MIN_COURT_COUNT} 到 ${MAX_COURT_COUNT} 之間，請調整後再試一次（目前輸入：${courtCount}）。`);
+	}
+}
 
 /**
  * 產生本輪分配結果：依序完成「出場名單決策 → 配對 → 重複迴避 → 場地編號指派」，
@@ -28,6 +42,12 @@ import type { AllocationInput, Match, RoundAllocation } from "./allocation-types
 export function allocateRound(input: AllocationInput): RoundAllocation {
 	const { players, format, courtCount, seenSignatures } = input;
 
+	// 步驟 0：邊界檢查。場地數超出 1～8 時 MUST 拒絕輸入而非靜默夾值（design Decision 7、
+	// tasks 10.3）——UI 層加減按鈕本該在邊界 disable，此處防的是程式錯誤與 LocalStorage
+	// 回讀損壞設定的情況。人數不足與空名單 SHALL NOT 拋錯，故不在此檢查，留給步驟 1～4
+	// 的既有邏輯自然回傳空結果（tasks 10.2）。
+	assertValidCourtCount(courtCount);
+
 	// 步驟 1：出場／休息名單決策。此步驟決定的名單即為最終結果，後續步驟 SHALL NOT 更動成員
 	// （candidates.ts 的型別與邏輯已保證：pairing.ts 只接受「已決定的出場人員陣列」，
 	// duplication.ts 只能重排既有球員，兩者在型別上都拿不到休息名單）。
@@ -39,11 +59,29 @@ export function allocateRound(input: AllocationInput): RoundAllocation {
 	// 步驟 3：受限交換以迴避重複，只重排既有球員在場地／隊伍間的位置（design Decision 6）。
 	const avoided = avoidRepeats(paired, seenSignatures);
 
+	// 步驟 3.5：重算雙打組成標示。duplication.ts 的 rebuildMatch 刻意不重算此標示
+	// （該檔註解明寫屬本檔整合責任）——avoidRepeats 換人後，換入者的性別可能與原標示不符，
+	// 標示雖不參與任何選人或配對決策，仍是使用者看得到的資料（PRD 13.3）。
+	const relabeled = avoided.map(relabelDoublesComposition);
+
 	// 步驟 4：指派 1 起算的連續場地編號，覆寫配對階段的初值。
-	const matches: Match[] = avoided.map((match, index) => ({
+	const matches: Match[] = relabeled.map((match, index) => ({
 		...match,
 		courtNumber: index + 1,
 	}));
 
 	return { matches, resting };
+}
+
+// 依當下兩隊實際成員重新判定雙打組成標示；單打場次原樣返回（無此標示可重算）。
+function relabelDoublesComposition(match: Match): Match {
+	if (match.format !== "doubles") {
+		return match;
+	}
+
+	const [teamA, teamB] = match.teams;
+	const [first, second] = teamA.players;
+	const [third, fourth] = teamB.players;
+
+	return { ...match, doublesComposition: labelDoublesComposition([first, second, third, fourth]) };
 }
