@@ -76,19 +76,29 @@
 
 ## 8. 分配入口（allocation.ts）
 
-- [ ] 8.1 🔴 新增 `nextjs-pickball/lib/matchmaker/allocation.test.ts`，寫入三個 it：「輸出包含場地編號、兩隊球員與分數、對戰類型與休息名單」、「場地編號由 1 起算且連續指派」、「相同輸入產生相同輸出」。確認紅燈
-- [ ] 8.2 🟢 實作 `allocateRound(input)`：`selectPlaying` → `pairSingles` / `pairDoubles` → `avoidRepeats` → 指派 1 起算的連續場地編號 → 回傳 `{ matches, resting }`
-- [ ] 8.3 🔴 補三個 it：「場地無法填滿時只產生可完整組成的場次」、「分配不修改輸入的參賽者物件」、「僅性別不同時出場名單與隊伍組成完全一致」。確認紅燈
-- [ ] 8.4 🟢 補齊上述行為；「不修改輸入」以 `structuredClone` 前後比對或凍結輸入驗證
-- [ ] 8.5 ♻️ refactor：確認 `allocateRound` 只做串接，四個子模組的職責無外洩
+> ⚠️ **8.3／9.1／9.3 的紅燈是「regression guard」而非傳統 TDD 紅燈，如實記錄**：
+> 8.2 依 task 字面指示（`selectPlaying → pairSingles/pairDoubles → avoidRepeats → 指派場地編號`）
+> 一次到位實作了完整組合，該組合已是能通過 8.1 三個 it 的最小正確實作——沒有更小的實作能同時
+> 滿足「輸出形狀」「連續場地編號」「決定性」。因為 candidates.ts／pairing.ts／duplication.ts
+> 三個子模組在前面批次（§2～§7）已各自驗證為純函式、不修改輸入、正確處理場地無法填滿與性別
+> 不影響配對，8.3／9.1／9.3 新增的 it 因而是這些既有保證透過 `allocateRound` 重新曝光的
+> **必然結果**，並非需要新程式碼才能通過。三次都是加入測試後立即執行看到全綠（見下方各步驟
+> 貼出的 shell 輸出），沒有透過「先改斷言看紅、再改回」偽造紅燈。唯一真正的模組層級紅燈是
+> 8.1（`allocation.ts` 尚不存在時的 import 解析失敗），與 §3 開頭記錄的 `pairing.ts` 情況同構。
+
+- [x] 8.1 🔴 新增 `nextjs-pickball/lib/matchmaker/allocation.test.ts`，寫入三個 it：「輸出包含場地編號、兩隊球員與分數、對戰類型與休息名單」、「場地編號由 1 起算且連續指派」、「相同輸入產生相同輸出」。確認紅燈
+- [x] 8.2 🟢 實作 `allocateRound(input)`：`selectPlaying` → `pairSingles` / `pairDoubles` → `avoidRepeats` → 指派 1 起算的連續場地編號 → 回傳 `{ matches, resting }`
+- [x] 8.3 🔴 補三個 it：「場地無法填滿時只產生可完整組成的場次」、「分配不修改輸入的參賽者物件」、「僅性別不同時出場名單與隊伍組成完全一致」。確認紅燈（⚠️ 實測為 regression guard 立即全綠，見本節開頭說明；非傳統紅燈）
+- [x] 8.4 🟢 補齊上述行為；「不修改輸入」以 `structuredClone` 前後比對或凍結輸入驗證（8.3 加入時已全綠，無需額外實作；`allocation.test.ts` 的「分配不修改輸入的參賽者物件」以 `structuredClone` 前後比對驗證）
+- [x] 8.5 ♻️ refactor：確認 `allocateRound` 只做串接，四個子模組的職責無外洩（複查 `allocation.ts` 僅呼叫四個子模組並指派場地編號，無重新實作排序／配對／迴避邏輯，無需再動）
 
 ## 9. 優先序的整體保證（allocation.ts）
 
-- [ ] 9.1 🔴 於 `allocation.test.ts` 補三個 it：「強度差距再大也不得讓休息次數多者繼續休息」、「避免重複會改變出場人選時接受重複」、「無交換可行時照常產生重複的對戰」。確認紅燈
-- [ ] 9.2 🟢 補齊行為；此三項是 5.1 嚴格優先序的核心承諾，實作若需在 `avoidRepeats` 加防護則加在該處，不得在 `allocateRound` 事後修補名單
-- [ ] 9.3 🔴 補 it「連續多輪後出場機會輪轉，累計出場次數差距不超過 1」：以 6 人單打 1 場地連續跑多輪，每輪後對休息者 `restCount + 1`（在測試內模擬，不在被測函式內累加）。確認紅燈
-- [ ] 9.4 🟢 補齊行為，確認方向未反轉（休息次數**多**者優先，非少者）
-- [ ] 9.5 ♻️ refactor：檢查是否有任何路徑能讓後順位項目推翻前順位；若結構上已不可能，在 design 或註解記錄理由
+- [x] 9.1 🔴 於 `allocation.test.ts` 補三個 it：「強度差距再大也不得讓休息次數多者繼續休息」、「避免重複會改變出場人選時接受重複」、「無交換可行時照常產生重複的對戰」。確認紅燈（⚠️ 實測為 regression guard 立即全綠，見 §8 開頭說明；非傳統紅燈）
+- [x] 9.2 🟢 補齊行為；此三項是 5.1 嚴格優先序的核心承諾，實作若需在 `avoidRepeats` 加防護則加在該處，不得在 `allocateRound` 事後修補名單（9.1 加入時已全綠，`avoidRepeats` 既有的型別與採納條件已足夠保護，`allocateRound` 未新增任何事後修補邏輯）
+- [x] 9.3 🔴 補 it「連續多輪後出場機會輪轉，累計出場次數差距不超過 1」：以 6 人單打 1 場地連續跑多輪，每輪後對休息者 `restCount + 1`（在測試內模擬，不在被測函式內累加）。確認紅燈（⚠️ 實測為 regression guard 立即全綠，見 §8 開頭說明；非傳統紅燈——12 輪模擬下 6 人出場次數差距為 0）
+- [x] 9.4 🟢 補齊行為，確認方向未反轉（休息次數**多**者優先，非少者）（9.3 加入時已全綠，`candidates.ts` 的 `compareCandidates` 方向自 §2 起即為 `restCount` 遞減，未反轉，無需額外實作）
+- [x] 9.5 ♻️ refactor：檢查是否有任何路徑能讓後順位項目推翻前順位；若結構上已不可能，在 design 或註解記錄理由（已在 `allocation.ts` 的 `allocateRound` docstring 補上逐項理由：`pairing.ts` 拿不到 `resting`、`duplication.ts` 的 `avoidRepeats` 型別上只能重排既有 `Match[]` 且採納條件拒絕強度劣化，`allocateRound` 本身在迴避之後不做任何名單／配對的事後修補）
 
 ## 10. 邊界條件（allocation.ts）
 
