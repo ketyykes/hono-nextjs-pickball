@@ -5,23 +5,28 @@
 ## 結構
 
 ```
-hono-nextjs-pickball/
+hono-nextjs-pickball/     ← repo 與 root package 名稱
 ├─ nextjs-pickball/   ← 前端：Next.js 16 + React 19，經 OpenNext 部署為 Cloudflare Worker
 ├─ hono-pickball/     ← 後端：Hono API on Cloudflare Workers，所有後端邏輯都放這裡
-├─ openspec/          ← OpenSpec 規格與變更（spec-driven 工作流程）
-├─ docs/              ← 設計文件與實作計畫（superpowers/）；已被 openspec 取代者於頁首標註
-├─ .claude/           ← Claude Code 專案設定（settings.json 含 lint / cf-typegen hooks）
-│                       `agent-memory/` 為各 agent 的長期記憶，**唯一來源，不在 workspace 內複製**
-│                       （2026-08-15 已刪除 `nextjs-pickball/.claude/agent-memory/` 的舊複本：
-│                        兩份會各自演化，複本裡的過時結論會被當成事實引用）
-├─ .agents/           ← agent 相關設定（**唯一來源，不在 workspace 內複製**）
+├─ openspec/          ← OpenSpec 規格與變更；schemas/ 為 GENERATED 檔案（見「OpenSpec 慣例」）
+├─ prd.md             ← 「對戰分配機」PRD：matchmaker 系列 change 的需求來源。
+│                       commit / tasks 中的 4.2、5.1～5.6 等數字編號指本檔章節；
+│                       M 編號（M1 等）則指 milestone 或 tasks 內的修正項次，
+│                       定義在 openspec change 文件，不在本檔
+├─ docs/              ← 設計文件歷史紀錄（superpowers/）；已被 openspec 取代者於頁首標註
+├─ README.md          ← 含「部署前手動檢查清單」——本專案無 CI，這是唯一部署關卡
+├─ .claude/           ← settings.json（hooks，見下）、agents/（四個 project subagent 定義）、
+│                       agent-memory/（各 agent 長期記憶，**唯一來源**；workspace 內若長出
+│                       `.claude/agent-memory/` 複本請直接刪除——複本會各自演化，
+│                       過時結論會被當成事實引用）
+├─ .agents/           ← agent 相關設定（唯一來源，不在 workspace 內複製）
 ├─ AGENTS.md          ← 非 Claude agent 的入口；**只放指標不放內容**，規則以本檔為準
 └─ skills-lock.json   ← 外部 skill 的版本鎖定（root 單一份）
 ```
 
-> `docs/` 與 `openspec/` 的分工：`openspec/specs/` 是**正式規格**，
-> `docs/superpowers/` 是設計脈絡與實作計畫的歷史紀錄。
-> 任何行為變更以 openspec change 為準，不要在 `docs/` 下新增平行規格。
+> 三層文件分工：`openspec/specs/` 是**正式規格**；`prd.md` 是 matchmaker 的需求來源；
+> `docs/superpowers/` 是歷史紀錄。任何行為變更以 openspec change 為準，
+> 不要在 `docs/` 下新增平行規格。
 
 ## 不可省略的規則
 
@@ -29,13 +34,17 @@ hono-nextjs-pickball/
 要改規則只改本檔，不要在 `AGENTS.md` 內另寫一份。
 
 **任何行為變更都先走 openspec change 流程**，不要直接改 `openspec/specs/` 下的主 spec。
-流程為 propose → 產出 proposal / design / tasks / delta spec → 實作 → verify → archive。
+流程仍為 propose → 產出 artifacts → 實作（apply）→ verify → archive，但 artifact 清單與
+apply 規範由 `openspec/config.yaml` 指定的 schema 定義（目前為 `tdd-subagent-worktree`，
+詳見 `openspec/schemas/tdd-subagent-worktree/schema.yaml`：含 test-plan、execution-plan、
+environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent 派工）。
 歷史上主 spec 曾被直接編輯（commit `e5b709c`、`c7f4f7e`、`ea7955d`），
 導致 `changes/archive/` 無法用來重建主 spec —— 不要再製造這種情況。
 
 **行為邏輯一律 TDD 三步**：① 先寫失敗測試並在 shell 實際看到紅燈 ② 最小實作至綠
-③ refactor（無壞味道註記 skipped）。適用範圍、例外層與測試工具的權威來源是
-[`openspec/config.yaml`](./openspec/config.yaml)。單檔測試指令見下方「常用指令」。
+③ refactor（無壞味道註記 skipped）。適用範圍與例外層記載於
+`nextjs-pickball/CLAUDE.md` 的 TDD 節（前端）；後端為 `hono-pickball/src/**` 的行為邏輯。
+單檔測試指令見下方「常用指令」。
 
 **紅燈要是真的**。若某項行為早已實作，先寫測試會直接綠燈 —— 那是 regression guard 不是 TDD，
 請在 tasks.md 誠實標註，**不要用 mutation check（改斷言看紅再改回）偽造紅燈**。
@@ -64,6 +73,18 @@ hono-nextjs-pickball/
 
 執行單一測試檔用 `pnpm --filter ./<workspace> test --run <path>`。**`--run` 前不可加 `--`** —— `test -- --run <path>` 會讓 vitest 收不到路徑而跑完整套，TDD 的紅燈證據會被既有綠燈淹沒。
 
+## Hooks（`.claude/settings.json` 已自動強制的規則）
+
+- **逐檔 ESLint**（PostToolUse on Write|Edit）：編輯前端檔後自動 lint 該檔，錯誤以 exit 2 擋下
+  —— 編輯被擋時先讀 lint 輸出，不是工具故障。因 repo 路徑含 `nextjs-pickball` 字樣，
+  編輯 hono-pickball 檔案也會觸發一次空跑（輸出 "File ignored"，無害；後端本來就沒裝 eslint）。
+  matcher 不含 MultiEdit。
+- **wrangler → cf-typegen**（PostToolUse）：改任一 workspace 的 `wrangler.(jsonc|json|toml)`
+  後自動重跑該 workspace 的 `pnpm cf-typegen`，不必手動跑。
+- **Stop → tsc**（Stop）：session 停止時跑 `pnpm -r exec tsc --noEmit`，失敗以 exit 2 擋下。
+  ⚠️ 此指令**不含 `hono-pickball/test/**` 的型別**（那段只在該 workspace `pnpm typecheck`
+  的第二段）—— Stop hook 綠燈不代表後端測試檔型別無誤。
+
 ## Cloudflare Workers 部署架構
 
 - 兩個 Worker：`nextjs-pickball`（OpenNext adapter `@opennextjs/cloudflare`）與 `hono-pickball`（wrangler）
@@ -82,13 +103,16 @@ hono-nextjs-pickball/
 
 ### 部署前檢查
 
-本專案不使用 CI，改以 root `README.md` 的「部署前手動檢查清單」六步把關（lint → tsc → unit → e2e → preview → 部署順序）。推送前請實際跑過。
+本專案不使用 CI，改以 root `README.md` 的「部署前手動檢查清單」七步把關
+（lint → tsc → 前端 unit → 後端 unit → e2e → preview → 部署順序）。推送前請實際跑過。
 
 ## OpenSpec 慣例
 
 - `openspec/` 位於 repo root；openspec CLI 與 Claude Code session **一律從 repo root 執行**，建議帶 `DO_NOT_TRACK=1`
-- [`openspec/config.yaml`](./openspec/config.yaml) 是 TDD 規則（適用範圍、例外層、三步驟、測試工具）的權威來源
-- [`openspec/specs/`](./openspec/specs/) 是各 capability 的正式規格；主 spec 不可直接編輯，見上方「不可省略的規則」
+- `openspec/config.yaml` 目前只有一行 `schema: tdd-subagent-worktree`，作用是選定 workflow schema 變體
+- `openspec/schemas/**` 為 **GENERATED 檔案，不可手改**：來源是 repo 外的
+  `openspec-custom-schemas` 專案（改 `src/` 後以 `node src/build.mjs` 重建）；手改會在下次重建時被覆寫
+- `openspec/specs/` 是各 capability 的正式規格；主 spec 不可直接編輯，見上方「不可省略的規則」
 - 前端補充見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)
 
 ## 執行環境注意

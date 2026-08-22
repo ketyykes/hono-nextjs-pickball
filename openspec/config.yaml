@@ -1,63 +1,7 @@
-schema: spec-driven
+schema: tdd-subagent-worktree
 
+# context 會注入所有 artifact 的產出指示，輸出語言由此控制（見 schema 檔頭說明）
 context: |
-  本 repo 為 pnpm monorepo：
-    - 前端：nextjs-pickball/（Next.js 16，經 OpenNext 部署為 Cloudflare Worker）
-    - 後端：hono-pickball/（Hono on Cloudflare Workers）
-  openspec CLI 一律從 repo root 執行，以下路徑皆以 repo root 為基準。
-
-  ## 部署與通路架構
-  兩個 Worker：nextjs-pickball 與 hono-pickball。前端 wrangler.jsonc 宣告 service binding
-  HONO_API → hono-pickball；/api/* 由 Next.js catch-all route（app/api/[[...route]]/route.ts）
-  原樣轉發給 Hono，瀏覽器視角為 same-origin。因此後端對外端點一律掛在 /api/* 之下。
-  部署走 CF Dashboard Workers Builds，**順序必須先 hono-pickball 後 nextjs-pickball**。
-  本專案不使用 CI；部署前品質門檻為 root README.md 的手動檢查清單。
-
-  ## 前端 TDD 範圍
-  對 nextjs-pickball/app/**、nextjs-pickball/components/**、nextjs-pickball/hooks/**、
-  nextjs-pickball/lib/**、nextjs-pickball/data/** 下所有具備行為邏輯的模組採通用 TDD：
-  先寫 failing Vitest 測試 → 實作至通過 → refactor。
-  慣例：元件的行為邏輯應下放到 hooks/ 或 lib/ 並在該層 TDD；純呈現型元件不強制單元 TDD，
-  以 Playwright E2E 驗收。
-  例外（不強制 TDD，但鼓勵補 smoke/E2E）：
-    - 純樣式檔（*.css）
-    - 型別檔（*.d.ts、next-env.d.ts、cloudflare-env.d.ts）
-    - 入口與配置（nextjs-pickball/app/**/page.tsx、nextjs-pickball/app/**/layout.tsx、
-      各種 *.config.*、wrangler.jsonc、components.json、tsconfig.json）
-    - API proxy route（nextjs-pickball/app/api/**/route.ts）：以 E2E 與 mock 驗收，不強制三步
-    - Playwright E2E 與測試基礎建設（nextjs-pickball/tests/**）
-
-  ## 後端 TDD 範圍
-  對 hono-pickball/src/** 下具備行為邏輯的模組採相同的三步 TDD。
-  端點契約（路徑、status、回應形狀、Set-Cookie 屬性）須有對應測試。
-  例外：wrangler.jsonc、worker-configuration.d.ts（wrangler types 產物）、vitest.config.ts。
-
-  ## 測試工具
-  前端：Vitest 4 + happy-dom + @testing-library/react。
-    - vitest.config.ts 有 globals: true，但那只在執行期成立 —— tsconfig.json 的 types 為 ["react/canary"]，
-      不含 vitest/globals，故 describe/it/expect/vi/beforeEach 一律必須顯式 import ... from "vitest"
-      （現有 31 個測試檔皆如此）。省略 import 時 vitest 跑得過但 tsc --noEmit 會失敗，Stop hook 會擋下 commit
-    - 受測模組用相對路徑 import（./types、./rules），@/ 別名保留給跨目錄引用
-  後端：Vitest 4 + @cloudflare/vitest-pool-workers，測試在真正的 workerd runtime 中執行。
-    - 設定於 hono-pickball/vitest.config.ts，用 cloudflareTest() plugin（本版無 defineWorkersConfig）
-    - 測試放 hono-pickball/test/<領域>.test.ts（獨立目錄，非鄰近程式碼）——
-      理由：官方 tsconfig 分層以 test/ 為邊界，且 src/ 會被 wrangler deploy 打包，測試檔不該混入
-    - 刻意不開 globals，一律顯式 import，避免 workerd 全域污染
-    - 用 exports.default.fetch()，不要用 SELF / env（兩者已標 @deprecated）
-    - ⚠️ 在受限沙箱中執行會噴 `listen EPERM 127.0.0.1`（miniflare 需開 localhost server），
-      這不是設定錯誤，需放行後重跑
-    - 若日後要加 coverage，provider 必須是 istanbul —— cloudflareTest 在 v8 provider 下會 throw
-  E2E：Playwright，放 nextjs-pickball/tests/e2e/specs/。webServer 為兩組，
-    會自動先起 hono-pickball(:8787) 再起 Next.js(:3005)；service binding 需兩者同時運行才通。
-  前端單元測試鄰近程式碼以 *.test.ts(x) 形式放置。
-
-rules:
-  specs:
-    - 情境用 Given/When/Then；行為邏輯情境須可直接對應到 Vitest test case（附測試檔路徑與 it 名稱）
-  design:
-    - 明確標註哪些模組屬行為邏輯（必 TDD），哪些屬例外層（樣式／型別／入口／E2E，選配）
-  tasks:
-    - 行為邏輯 task 必須拆三步：① 新增失敗測試（附檔路徑與 it 名稱），並執行 `pnpm --filter ./<workspace> test --run <path>` 於 shell 實際看到紅燈後才進入下一步（從 repo root 執行；<path> 維持 workspace 相對路徑，因 filter 執行時 cwd 位於 workspace）② 最小實作至 green ③ refactor（檢視實作，若無壞味道則註記 skipped；若有則重構並保持測試通過）
-    - 每步需可用 `pnpm --filter ./<workspace> test --run <path>` 驗證（前端 `<path>` 如 `lib/foo.test.ts`；後端如 `test/routing.test.ts`）
-    - 指令中的 `--run` 前**不可**加 `--`：`test -- --run <path>` 會讓 vitest 收不到路徑而跑完整套（當時實測 15 檔 77 測；該數字隨補測持續變動，勿當成驗收基準），紅燈證據會被既有綠燈淹沒
-    - 例外層（樣式／型別／入口／E2E）task 不強制三步拆分，但至少要指定驗收方式
+  所有 artifact（proposal、specs、design、test-plan、overview、execution-plan、
+  tasks、environment）與 change 相關文件一律以繁體中文（台灣用語）撰寫；
+  程式碼識別字、指令與技術術語保留英文原文。

@@ -2,16 +2,19 @@
 
 本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含未來的 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
 
+> ⚠️ 範圍例外：matchmaker（對戰分配機）依 root `prd.md` 明定為 **LocalStorage-only 純前端功能**，
+> 引擎與名單邏輯**刻意**放在 `nextjs-pickball/lib/matchmaker/` —— 那不是待搬進來的「後端邏輯」。
+
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
 
 ## 常用指令
 
 - `pnpm dev` — wrangler dev（http://localhost:8787）
 - `pnpm test` — Vitest（在真正的 workerd runtime 中執行）；單檔用 `pnpm --filter ./hono-pickball test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）
-- `pnpm typecheck` — `tsc --noEmit` + `tsc --noEmit -p test/tsconfig.json`（兩段都要，root tsconfig 的 include 不含 test/）
+- `pnpm typecheck` — `tsc --noEmit` + `tsc --noEmit -p test/tsconfig.json`（**兩段都要**：workspace tsconfig 的 include 不含 test/，root 的 `pnpm typecheck` 與 Stop hook 也都查不到 test/ 的型別）
 - `pnpm build` — `tsc --noEmit && wrangler deploy --dry-run`；兩段互補：前者抓型別但抓不到打包錯，後者走真 esbuild 打包並驗證 wrangler.jsonc 但不做型別檢查
 - `pnpm run deploy` — `wrangler deploy --minify` 手動部署（注意：`deploy` 與 pnpm 內建指令撞名，必須加 `run`）；**正式部署走 CF Dashboard Workers Builds（Git 整合），平常不手動 deploy**
-- `pnpm cf-typegen` — 重新產生 `CloudflareBindings` 型別（`worker-configuration.d.ts`）；改 `wrangler.jsonc` 後必須重跑，root `.claude/settings.json` 已有 PostToolUse hook 自動觸發
+- `pnpm cf-typegen` — 重新產生 `CloudflareBindings` 型別（`worker-configuration.d.ts`）；改 `wrangler.jsonc` 後 root `.claude/settings.json` 的 PostToolUse hook 會自動重跑，不必手動
 
 ## wrangler.jsonc 要點
 
@@ -23,7 +26,7 @@
 
 - 測試放 **`test/` 獨立目錄**（與前端「鄰近程式碼」的慣例不同）。理由：(a) 官方 pool 的 tsconfig 分層以 `test/` 為邊界，(b) `src/` 會被 `wrangler deploy` 打包，測試檔不該混入
 - `vitest.config.ts` 用 **`cloudflareTest()` plugin 從套件根匯入**；本版（0.16.13）**沒有 `defineWorkersConfig`、也沒有 `./config` subpath**，照抄舊版官方範例會 import 失敗
-- 用 `import { exports } from "cloudflare:workers"` 搭配 `exports.default.fetch()`；**不要用 `SELF` / `env`**（兩者在 `types/cloudflare-test.d.ts` 皆已標 `@deprecated`）
+- 用 `import { exports } from "cloudflare:workers"` 搭配 `exports.default.fetch()`；**不要用 `SELF` / `env`**——兩者在套件的 `@cloudflare/vitest-pool-workers/types`（`cloudflare-test.d.ts`，經 `test/tsconfig.json` 的 `types` 引入，非本 workspace 的檔案）皆已標 `@deprecated`
 - 測試檔頂部要 `import "../src/index"`，`src/` 改動時才會自動重跑
 - 刻意不開 `globals`：一律顯式 `import { describe, it, expect } from "vitest"`，避免 workerd 全域污染
 - ⚠️ 在受限沙箱中跑會噴 `listen EPERM: operation not permitted 127.0.0.1` —— 是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
@@ -39,7 +42,7 @@
 
 ## 依賴注意
 
-- `better-auth`、`drizzle-orm`（與 `@better-auth/drizzle-adapter`、`drizzle-kit`）、`@hono/zod-validator`、`zod`、`date-fns` 已在 dependencies 但**尚未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝
+- `better-auth`、`drizzle-orm`、`@better-auth/drizzle-adapter`、`@hono/zod-validator`、`zod`、`date-fns` 在 dependencies（`drizzle-kit` 在 **devDependencies**，CLI 工具本該如此），但**皆尚未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝
 - **保留而非移除的理由**：`wrangler deploy --dry-run` 實測產物為 gzip **16.91 KiB**，離 CF Free plan 的 3 MiB 上限餘裕極大；體積沒有壓力時，移除的收益低於日後重裝的摩擦
 - **複審期限：2026-11-12**。屆時若仍未被 `src/**` 匯入，開 change 移除（決策 D5）
 - `@cloudflare/vitest-pool-workers` 與 `vitest` 不屬上述範圍——已於 change `backend-cleanup-and-tdd-enablement` 實際啟用

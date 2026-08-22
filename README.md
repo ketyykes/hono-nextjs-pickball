@@ -55,17 +55,18 @@ hono-nextjs-pickball/
 
 ### 部署前手動檢查清單
 
-本專案**不使用 CI**，以下六步在推送前手動跑過（順序刻意由快到慢，讓失敗盡早出現）：
+本專案**不使用 CI**，以下七步在推送前手動跑過（順序刻意由快到慢，讓失敗盡早出現）：
 
 ```bash
 pnpm lint                                        # 1. ESLint
 pnpm -r exec tsc --noEmit                        # 2. 型別檢查（兩個 workspace）
 pnpm --filter ./nextjs-pickball test --run       # 3. 前端單元測試
-pnpm test:e2e                                    # 4. Playwright E2E（會自動帶起前後端）
-pnpm --filter ./nextjs-pickball preview          # 5. workerd runtime 整合驗證
+pnpm test:api --run                              # 4. 後端單元測試（workerd；--run 停用 watch）
+pnpm test:e2e                                    # 5. Playwright E2E（會自動帶起前後端）
+pnpm --filter ./nextjs-pickball preview          # 6. workerd runtime 整合驗證
 ```
 
-6. 確認部署順序：先 hono-pickball，後 nextjs-pickball
+7. 確認部署順序：先 hono-pickball，後 nextjs-pickball
 
 ## 各 workspace 細節
 
