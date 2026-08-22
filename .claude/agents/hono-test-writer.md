@@ -45,7 +45,7 @@ describe("GET /api/health", () => {
 
 ## TDD 三步與紅燈證據
 
-行為邏輯一律走 TDD 三步（權威來源：`openspec/config.yaml` 與 root `CLAUDE.md`）：
+行為邏輯一律走 TDD 三步（權威來源：root `CLAUDE.md` 的三步與紅燈規則，各 workspace 的適用範圍與例外層見該 workspace 的 `CLAUDE.md`）：
 
 1. **先寫失敗測試，並在 shell 實際看到紅燈**——把失敗輸出貼進回報作為證據
 2. 最小實作至綠（若實作不在你的任務範圍，回報紅燈證據後交還主線）

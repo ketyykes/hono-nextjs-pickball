@@ -242,6 +242,6 @@ fixture 的 restCount／rating 全相等，穩定排序原地跑完順序照樣�
   審每一批的第一件事就是 `git diff <base>..<head> -- openspec/.../tasks.md`，看 🔴 條目旁有無證據。
 - **驗收錨點核對用 regex，不用目視**（tasks 11.1 明文要求）：從 spec.md 抽
   `**驗收**：\`<path>\`，it 名稱「<name>」`，跟測試檔的 `it("...")` 逐字比對。
-- **不要把 `*-types.ts` 當成 TDD 例外檔**。`openspec/config.yaml:24` 的例外清單只列 `*.d.ts`／`next-env.d.ts`／
-  `cloudflare-env.d.ts`。純型別檔之所以免測，靠的是 config.yaml:18 的主句「具備**行為邏輯**的模組」，
-  而不是副檔名。檔案一旦匯出執行期常數就有對外可觀察值，斷言得掛在某處。
+- **不要把 `*-types.ts` 當成 TDD 例外檔**。例外清單（現載於 `nextjs-pickball/CLAUDE.md` 的
+  TDD 節，2026-08-22 前在 `openspec/config.yaml`）只列型別檔 `*.d.ts`。純型別檔之所以免測，
+  靠的是主句「行為邏輯模組採 TDD」，而不是副檔名。檔案一旦匯出執行期常數就有對外可觀察值，斷言得掛在某處。

@@ -109,7 +109,9 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
 ## OpenSpec 慣例
 
 - `openspec/` 位於 repo root；openspec CLI 與 Claude Code session **一律從 repo root 執行**，建議帶 `DO_NOT_TRACK=1`
-- `openspec/config.yaml` 目前只有一行 `schema: tdd-subagent-worktree`，作用是選定 workflow schema 變體
+- `openspec/config.yaml` 只有兩項設定：`schema`（選定 workflow schema 變體，目前為 `tdd-subagent-worktree`）
+  與 `context`（注入所有 artifact 的產出指示，本專案用它要求繁體中文輸出）。
+  **TDD 規則內文不在此檔** —— 三步與紅燈規則在本檔，各 workspace 的適用範圍與例外層在該 workspace 的 `CLAUDE.md`
 - `openspec/schemas/**` 為 **GENERATED 檔案，不可手改**：來源是 repo 外的
   `openspec-custom-schemas` 專案（改 `src/` 後以 `node src/build.mjs` 重建）；手改會在下次重建時被覆寫
 - `openspec/specs/` 是各 capability 的正式規格；主 spec 不可直接編輯，見上方「不可省略的規則」

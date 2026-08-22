@@ -62,7 +62,7 @@ pnpm monorepo，兩個 workspace 部署為兩個 Cloudflare Worker：
 
 ### 3. 測試覆蓋（Test Coverage）
 
-- 行為邏輯模組是否遵循 TDD 三步（先 failing test 且紅燈是真的 → 最小實作至綠 → refactor）；例外層見 `openspec/config.yaml` 與各 workspace CLAUDE.md
+- 行為邏輯模組是否遵循 TDD 三步（先 failing test 且紅燈是真的 → 最小實作至綠 → refactor）；例外層見各 workspace 的 `CLAUDE.md`（三步與紅燈規則見 root `CLAUDE.md`）
 - **紅燈真實性**：行為早已存在卻標成 TDD、或以 mutation check（改斷言看紅再改回）偽造紅燈，屬於審查問題，要指出
 - 測試是否與規格情境（Given/When/Then）對應
 - 前端單元測試以 `*.test.ts(x)` 鄰近程式碼放置（`app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**`）；E2E 放 `nextjs-pickball/tests/e2e/specs/`

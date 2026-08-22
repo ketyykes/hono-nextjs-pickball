@@ -1,0 +1,4 @@
+# 以 tdd-sequential 覆寫 config.yaml 的 tdd-subagent-worktree（理由見 design.md D1）：
+# 本 change 只有一支守衛測試 + 文件同步，無可平行化工作，由單一 agent 依序執行
+schema: tdd-sequential
+created: 2026-08-22

@@ -43,9 +43,15 @@ app/              # Next.js App Router 進入點
 
 components/
 ├── ui/           # shadcn/ui 元件（11 個）
-└── guide/        # 指南專用元件（Hero、TocBar、10 個 Section、HeroTourCta、shared/）
+├── guide/        # 指南專用元件（Hero、TocBar、10 個 Section、HeroTourCta、shared/）
+├── layout/       # SiteNavbar
+├── matchmaker/   # 對戰分配機（參賽者名單）
+├── quiz/         # 規則隨堂測驗
+├── scoreboard/   # 單場 side-out 計分板
+└── tour/         # 捲動導覽動畫
 
-hooks/            # 各 capability 的 hooks + tests（scroll/observer、quiz、scoreboard、tour）
+hooks/            # 各 capability 的 hooks + tests（scroll/observer、quiz、scoreboard、tour、player-roster）
+                  # 跨 capability 歸屬清單的單一來源在 openspec/specs/pickleball-guide-page/spec.md
 lib/utils.ts      # cn() = clsx + tailwind-merge
 data/guide/       # 7 個 TS 資料檔
 tests/            # Vitest setup 與 Playwright E2E

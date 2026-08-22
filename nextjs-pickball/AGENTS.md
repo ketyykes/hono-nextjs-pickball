@@ -34,7 +34,9 @@ Before any Next.js work, find and read the relevant doc in `node_modules/next/di
 
 ### 要新增規則時
 
-本 workspace 的規則一律寫進 [`CLAUDE.md`](./CLAUDE.md)，跨 workspace 的規則寫進
-[`../CLAUDE.md`](../CLAUDE.md)，TDD 相關則寫進 [`../openspec/config.yaml`](../openspec/config.yaml)，
-**都不要寫在本檔**，更不要寫進上方的 `nextjs-agent-rules` 標記內（會被覆寫）。
+本 workspace 的規則（含本 workspace 的 TDD 適用範圍與例外層）一律寫進 [`CLAUDE.md`](./CLAUDE.md)，
+跨 workspace 的規則（含 TDD 三步與紅燈規則）寫進 [`../CLAUDE.md`](../CLAUDE.md)。
+**都不要寫在本檔**，也不要寫進 [`../openspec/config.yaml`](../openspec/config.yaml)
+（該檔只放 openspec workflow schema 與 artifact 輸出語言兩項設定），
+更不要寫進上方的 `nextjs-agent-rules` 標記內（會被覆寫）。
 本檔只在「該讀哪些檔案」這件事改變時才需要更新。

@@ -3,7 +3,8 @@
 > ⚠️ 本檔為歷史紀錄，指令原文刻意保留未改。
 > 文中 `pnpm ... test -- --run <path>` 已知失效：那個 `--` 會讓 vitest 收不到路徑而跑完整套，
 > 紅燈證據會被既有綠燈淹沒。正確寫法為 `pnpm --filter ./<workspace> test --run <path>`，
-> 見 `openspec/config.yaml`。（change: fix-tdd-toolchain-and-config）
+> 見 root `CLAUDE.md` 的「常用指令」節（原載於 `openspec/config.yaml`，該檔已只放 openspec
+> workflow schema 與輸出語言設定）。（change: fix-tdd-toolchain-and-config → sync-doc-drift-and-guard-hooks-inventory）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

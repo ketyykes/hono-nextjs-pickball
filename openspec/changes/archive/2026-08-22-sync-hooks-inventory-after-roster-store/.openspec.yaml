@@ -1,0 +1,4 @@
+# 本 change 零程式碼、零測試，故以 spec-driven 覆寫 config.yaml 的 tdd-subagent-worktree
+# （理由見 design.md D1；per-change 覆寫優先於 config.yaml，是 CLI 支援的解析順序）
+schema: spec-driven
+created: 2026-08-22

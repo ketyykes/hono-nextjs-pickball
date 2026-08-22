@@ -1,5 +1,10 @@
 # Scroll-Driven Tour 設計文件
 
+> 📌 **本文件已由 openspec 取代。**
+> `/tour` 的正式規格見 `openspec/specs/tour-experience/spec.md`。本檔僅保留為當時的設計脈絡紀錄，
+> 不再更新 —— 文中「依 `openspec/config.yaml` 規則」的指向已失效，TDD 規則現載於 root `CLAUDE.md`
+> 與各 workspace 的 `CLAUDE.md`。
+
 - 日期：2026-05-08
 - 分支：`feature/scroll-driven-tour`
 - 目標讀者：實作者（後續 writing-plans 會以此為輸入）
