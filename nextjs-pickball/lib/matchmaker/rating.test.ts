@@ -29,7 +29,7 @@ describe("預測勝率", () => {
 	});
 
 	it("同一場雙方的預測勝率相加為 1", () => {
-		const testCases = [
+		const testCases: readonly (readonly [number, number])[] = [
 			[4, 4],
 			[4.5, 4],
 			[5, 4],
