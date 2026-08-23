@@ -65,58 +65,56 @@ const FORMAT_LABELS = {
 	doubles: "雙打",
 } as const satisfies Record<MatchFormat, string>;
 
-// 人數錯了不擋，updateRatings 算隊伍平均分時用的 sum / playersPerTeam 中，
-// playersPerTeam 是從 format 推導出的固定常數，不會因為實際塞了幾人而跟著變動，
-// 分子分母對不上，隊伍平均就被悄悄算錯——不會拋錯、也不會出現 NaN，錯得無聲無息。
-function assertValidTeamSize(format: MatchFormat, teams: readonly [Side, Side]): void {
-	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
-
-	for (let i = 0; i < 2; i++) {
-		const teamSize = teams[i].length;
-		if (teamSize !== playersPerTeam) {
-			throw new Error(`對戰方式為「${FORMAT_LABELS[format]}」時，隊伍人數需為 ${playersPerTeam} 人，請調整後再試一次（目前輸入：${teamSize} 人）。`);
-		}
-	}
+// 生成驗證錯誤訊息。人數、rating、gamesPlayed 三條訊息共用此句型，集中維護全形標點與固定句尾對齊 allocation.ts 格式；
+// 重複 id 那條刻意繞過此 helper，因為它的對象不是使用者調整輸入，而是 M4 上游接線錯誤的警報，
+// 句型改為「請檢查輸入」而非「請調整後再試」才能正確傳達語意。
+function createValidationError(requirement: string, actual: string | number): Error {
+	return new Error(`${requirement}，請調整後再試一次（目前輸入：${actual}）。`);
 }
 
-// 8.01 這種越界值若不在此擋下，applyDelta 的 clamp 邏輯會把它當成一場比賽打到觸頂
-// 一樣處理，照樣夾回 8.00 並標記 clamped: true——這個旗標的本意是給 M5 顯示「已達上限」，
-// 但這裡的觸界其實是名單資料本來就壞了，不是這場對戰真的把分數推到邊界。
-// 擋在這裡才能讓 M5 顯示的狀態對得上真正發生的事，而不是被偽裝的觸界訊號誤導。
-function assertValidRatings(teams: readonly [Side, Side]): void {
-	for (const team of teams) {
-		for (const player of team) {
-			if (player.rating < RATING_MIN || player.rating > RATING_MAX) {
-				throw new Error(`rating 需為 ${RATING_MIN} 到 ${RATING_MAX} 之間的數值，請調整後再試一次（目前輸入：${player.rating}）。`);
-			}
-		}
-	}
-}
-
-// 負值會讓 effectiveK 的 20 / (20 + gamesPlayed) 在 gamesPlayed = -20 時除以零，
-// K_eff 變成 Infinity，一路乘進 delta 後整場分數瞬間變成 Infinity 或 NaN；
-// 非整數雖不會馬上除以零，但會算出現實中不可能出現的中間 K_eff（沒有人打了 1.5 場）。
-// 兩者都擋在入口，比事後在公式裡加防呆或事後修補來得乾淨。
-function assertValidGamesPlayed(teams: readonly [Side, Side]): void {
-	for (const team of teams) {
-		for (const player of team) {
-			if (!Number.isInteger(player.gamesPlayed) || player.gamesPlayed < 0) {
-				throw new Error(`gamesPlayed 需為非負整數，請調整後再試一次（目前輸入：${player.gamesPlayed}）。`);
-			}
-		}
-	}
-}
-
-// 重複 id 不是使用者會自然打出的輸入，而是上游配對（M4）把同一人分進兩隊、
-// 或同一隊塞進同一位置兩次的接線錯誤。若不擋，該員會在 changes 裡出現兩筆，
-// M4 依 id 寫回分數時後面那筆會靜默覆蓋前面那筆——擋在這裡等於是這類接線錯誤的早期警報。
-function assertNoDuplicateIds(teams: readonly [Side, Side]): void {
+// 驗證輸入資料。四類檢查共用同一組走訪以確保只走一趟，避免分散成四個函式各走訪一遍。
+function assertValidInput(format: MatchFormat, teams: readonly [Side, Side], playersPerTeam: number): void {
 	const ids = new Set<string>();
 
 	for (const team of teams) {
+		// 人數錯了不擋，updateRatings 算隊伍平均分時用的 sum / playersPerTeam 中，
+		// playersPerTeam 是從 format 推導出的固定常數，不會因為實際塞了幾人而跟著變動，
+		// 分子分母對不上，隊伍平均就被悄悄算錯——不會拋錯、也不會出現 NaN，錯得無聲無息。
+		if (team.length !== playersPerTeam) {
+			throw createValidationError(
+				`對戰方式為「${FORMAT_LABELS[format]}」時，隊伍人數需為 ${playersPerTeam} 人`,
+				`${team.length} 人`
+			);
+		}
+
 		for (const player of team) {
+			// 8.01 這種越界值若不在此擋下，applyDelta 的 clamp 邏輯會把它當成一場比賽打到觸頂
+			// 一樣處理，照樣夾回 8.00 並標記 clamped: true——這個旗標的本意是給 M5 顯示「已達上限」，
+			// 但這裡的觸界其實是名單資料本來就壞了，不是這場對戰真的把分數推到邊界。
+			if (player.rating < RATING_MIN || player.rating > RATING_MAX) {
+				throw createValidationError(
+					`rating 需為 ${RATING_MIN} 到 ${RATING_MAX} 之間的數值`,
+					player.rating
+				);
+			}
+
+			// 負值會讓 effectiveK 的 K_DECAY_GAMES / (K_DECAY_GAMES + gamesPlayed)
+			// 在 gamesPlayed = -K_DECAY_GAMES 時除以零，K_eff 變成 Infinity；
+			// 非整數會算出現實中不可能的中間 K_eff（沒有人打了 1.5 場）。
+			if (!Number.isInteger(player.gamesPlayed) || player.gamesPlayed < 0) {
+				throw createValidationError(
+					"gamesPlayed 需為非負整數",
+					player.gamesPlayed
+				);
+			}
+
+			// 重複 id 不是使用者會自然打出的輸入，而是上游配對（M4）的接線錯誤：
+			// 把同一人分進兩隊、或同一隊塞進同一位置兩次。若不擋，該員會在 changes 裡出現兩筆，
+			// M4 依 id 寫回分數時後者會靜默覆蓋前者。
 			if (ids.has(player.id)) {
-				throw new Error(`同一場不得出現重複的 player id，請檢查輸入（重複 id：${player.id}）。`);
+				throw new Error(
+					`同一場不得出現重複的 player id，請檢查輸入（重複 id：${player.id}）。`
+				);
 			}
 			ids.add(player.id);
 		}
@@ -130,13 +128,11 @@ function assertNoDuplicateIds(teams: readonly [Side, Side]): void {
 export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	const { format, teams, winnerIndex } = input;
 
-	// 驗證輸入在任何計算之前執行。
-	assertValidTeamSize(format, teams);
-	assertValidRatings(teams);
-	assertValidGamesPlayed(teams);
-	assertNoDuplicateIds(teams);
-
 	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
+
+	// 驗證必須先於下方任何 reduce 與算術，否則越界或非整數輸入會先算出 NaN 或 Infinity，
+	// 錯誤訊息會指向計算結果而不是真正的壞輸入。
+	assertValidInput(format, teams, playersPerTeam);
 
 	// 計算兩隊平均評分而非加總：rating-types.ts 的 Side 與 allocation-types.ts 的 Team 不可互換。
 	// Team.rating 是隊內各選手 rating 的加總，但預測勝率 E 需要隊伍的平均評分（design Decision 2）。

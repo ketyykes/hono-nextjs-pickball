@@ -470,6 +470,8 @@ describe("輸入驗證", () => {
 			});
 		expect(singlesCall).toThrow(/隊伍人數需為 1 人/);
 		expect(singlesCall).toThrow(/目前輸入：2 人/);
+		expect(singlesCall).toThrow(/對戰方式為「單打」/);
+		expect(singlesCall).toThrow(/請調整後再試一次/);
 
 		// 雙打但隊 A 為 1 人
 		const doublesCall = () =>
@@ -483,11 +485,13 @@ describe("輸入驗證", () => {
 			});
 		expect(doublesCall).toThrow(/隊伍人數需為 2 人/);
 		expect(doublesCall).toThrow(/目前輸入：1 人/);
+		expect(doublesCall).toThrow(/對戰方式為「雙打」/);
+		expect(doublesCall).toThrow(/請調整後再試一次/);
 	});
 
 	it("rating 超出 1.00～8.00 時拒絕輸入而非靜默夾值", () => {
 		// rating 為 0.99
-		expect(() =>
+		const ratingTooLowCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -495,11 +499,12 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/rating/);
+			});
+		expect(ratingTooLowCall).toThrow(/rating/);
+		expect(ratingTooLowCall).toThrow(/目前輸入：0.99/);
 
 		// rating 為 8.01
-		expect(() =>
+		const ratingTooHighCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -507,8 +512,9 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/rating/);
+			});
+		expect(ratingTooHighCall).toThrow(/rating/);
+		expect(ratingTooHighCall).toThrow(/目前輸入：8.01/);
 
 		// rating 為 1.0 應正常
 		const result1 = updateRatings({
@@ -529,7 +535,7 @@ describe("輸入驗證", () => {
 
 	it("gamesPlayed 為負數或非整數時拒絕輸入", () => {
 		// gamesPlayed 為 -1
-		expect(() =>
+		const gamesPlayedNegativeCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -537,11 +543,12 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/gamesPlayed/);
+			});
+		expect(gamesPlayedNegativeCall).toThrow(/gamesPlayed/);
+		expect(gamesPlayedNegativeCall).toThrow(/目前輸入：-1/);
 
 		// gamesPlayed 為 1.5
-		expect(() =>
+		const gamesPlayedNonIntegerCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -549,8 +556,9 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/gamesPlayed/);
+			});
+		expect(gamesPlayedNonIntegerCall).toThrow(/gamesPlayed/);
+		expect(gamesPlayedNonIntegerCall).toThrow(/目前輸入：1.5/);
 
 		// gamesPlayed 為 0 應正常
 		const result = updateRatings({
@@ -563,7 +571,7 @@ describe("輸入驗證", () => {
 
 	it("同一場出現重複的 player id 時拒絕輸入", () => {
 		// 同一 id 同時在兩隊
-		expect(() =>
+		const duplicateIdAcrossTeamsCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -571,11 +579,11 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("A1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/player id|重複/);
+			});
+		expect(duplicateIdAcrossTeamsCall).toThrow(/重複 id：A1/);
 
 		// 同一 id 同時在同一隊兩個位置
-		expect(() =>
+		const duplicateIdWithinTeamCall = () =>
 			updateRatings({
 				format: "doubles",
 				teams: [
@@ -583,7 +591,7 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0), makeRatingPlayer("B2", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/player id|重複/);
+			});
+		expect(duplicateIdWithinTeamCall).toThrow(/重複 id：A1/);
 	});
 });
