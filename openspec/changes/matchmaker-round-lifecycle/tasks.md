@@ -322,13 +322,59 @@ Depends on: §4
 ## 6. 比分驗證與送出流程（round.ts）
 Depends on: §3, §5
 
-- [ ] 6.1 RED: 於 `round.test.ts` 補五個 it：「比分欄位空白時拒絕送出並回傳繁體中文訊息」、「比分非有效數字時拒絕送出」、「比分為負數時拒絕送出，0 本身可接受」、「兩隊比分相同時拒絕送出」、「已完成場次再次送出時被拒絕且既有結果不變」。確認紅燈
-- [ ] 6.2 GREEN: 實作 `validateScoreInput(match, rawA, rawB)`：回傳 `{ ok: true, scoreA, scoreB }` 或 `{ ok: false, code, message }`。SHALL NOT 用 `Number()` 或 `parseInt()` 單獨判斷（前者把 `""` 變 `0`、後者把 `"1a"` 變 `1`）
-- [ ] 6.3 RED: 於 `round.test.ts` 補四個 it：「送出合法比分後場次標記為完成並記錄比分、勝方與完成時間」、「完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數」、「完成場次後評分結果寫回名單，未參賽者不受影響」、「完成場次後該場球員 gamesPlayed 各加 1，其餘人不變」。確認紅燈
-- [ ] 6.4 GREEN: 實作 `submitScore({ round, players, matchId, rawScoreA, rawScoreB, now })`，依 0.1 記錄的評分 API 簽章呼叫評分；回傳 `{ ok: true, round, historyEntry, playerPatches, boundaryHits }`。`historyEntry` 以 `history.ts` 的 schema 建立，含姓名快照（design Decision 6）
-- [ ] 6.5 RED: 於 `round.test.ts` 補四個 it：「評分觸頂時賽後分數停在 8.00 並回報已達上限」、「送出失敗時回合、名單與歷史皆不變」、「已完成場次重複送出時歷史筆數不變」、「重排未完成場次不刪除也不修改既有歷史」。確認紅燈
-- [ ] 6.6 GREEN: 補齊 `boundaryHits` 的傳遞（不寫入回合、不持久化，design Decision 6）與原子性——驗證失敗時**不回傳任何可寫入的東西**，呼叫端因此無從產生部分更新。另加一層**防禦性** try/catch 包住評分 API 的呼叫（M3 對不合法輸入會 `throw`；本函式送進去的資料已由 §6.2 驗證過，正常路徑不會觸發），轉為同一種失敗結果而非讓例外穿透。此為 defence-in-depth，**spec 無對應 Scenario**，如實在本項旁註記
-- [ ] 6.7 REFACTOR: 確認勝方判定、比分 parse 與 `RoundMatch → MatchHistoryEntry` 的投影各只有一處實作；`submitScore` 為純函式（不碰 `localStorage`、不呼叫 `Date.now()`、不呼叫 `crypto.randomUUID()`，時間與 id 一律由呼叫端注入）
+- [x] 6.1 RED: 於 `round.test.ts` 補五個 it：「比分欄位空白時拒絕送出並回傳繁體中文訊息」、「比分非有效數字時拒絕送出」、「比分為負數時拒絕送出，0 本身可接受」、「兩隊比分相同時拒絕送出」、「已完成場次再次送出時被拒絕且既有結果不變」。確認紅燈
+
+  **紅燈證據（真紅燈）**：`TypeError: validateScoreInput is not a function`。Reviewer 以「`7404f06` 的實作 + HEAD 測試檔」重建實跑，13 條全紅、訊息逐字相符。
+
+- [x] 6.2 GREEN: 實作 `validateScoreInput(match, rawA, rawB)`：回傳 `{ ok: true, scoreA, scoreB }` 或 `{ ok: false, code, message }`。SHALL NOT 用 `Number()` 或 `parseInt()` 單獨判斷（前者把 `""` 變 `0`、後者把 `"1a"` 變 `1`）
+
+  綠燈。`parseScoreField` 用 `/^-?\d+$/`（trim 後比對）而非 `Number()`／`parseInt()`。邊界決定：**接受**前後空白 `" 11 "`（打字失手）；**拒絕** `"1.5"`／`"1e3"`（會讓 `RoundMatchSchema` 的 `z.number().int()` 事後爆炸）／全形 `"１１"`。審查後另補 `Number.isSafeInteger` 檢查（見 6.7）。
+
+- [x] 6.3 RED: 於 `round.test.ts` 補四個 it：「送出合法比分後場次標記為完成並記錄比分、勝方與完成時間」、「完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數」、「完成場次後評分結果寫回名單，未參賽者不受影響」、「完成場次後該場球員 gamesPlayed 各加 1，其餘人不變」。確認紅燈
+
+  **紅燈證據（真紅燈）**：`TypeError: submitScore is not a function`。重建實跑確認 `404d461` 的實作 + HEAD 測試 → `8 failed | 29 passed`（5 條 validate 已綠），與回報自洽。
+
+- [x] 6.4 GREEN: 實作 `submitScore({ round, players, matchId, rawScoreA, rawScoreB, now })`，依 0.1 記錄的評分 API 簽章呼叫評分；回傳 `{ ok: true, round, historyEntry, playerPatches, boundaryHits }`。`historyEntry` 以 `history.ts` 的 schema 建立，含姓名快照（design Decision 6）
+
+  綠燈。`submitScore({ round, players, matchId, rawScoreA, rawScoreB, now })` → `{ ok:true, round, historyEntry, playerPatches, boundaryHits } | { ok:false, code, message }`。`gamesPlayed` 的 patch 傳**絕對值**（目前值 + 1）而非差值——`updatePlayer` 是覆寫語意（`{ ...player, ...patch }`），傳差值會直接蓋掉累計值。
+
+- [x] 6.5 RED: 於 `round.test.ts` 補四個 it：「評分觸頂時賽後分數停在 8.00 並回報已達上限」、「送出失敗時回合、名單與歷史皆不變」、「已完成場次重複送出時歷史筆數不變」、「重排未完成場次不刪除也不修改既有歷史」。確認紅燈
+
+  ⚠️ **1 紅 3 綠**（如實標註，Reviewer 以重建實跑逐條印證，**誠實度完全通過**）：
+  - **真紅燈 1 條**：「評分觸頂時賽後分數停在 8.00 並回報已達上限」（`expected undefined to be true`——6.4 的 `boundaryHits` 是空陣列 stub）。
+  - **regression guard 3 條**：「送出失敗時回合、名單與歷史皆不變」「已完成場次重複送出時歷史筆數不變」「重排未完成場次不刪除也不修改既有歷史」。理由：6.4 就已採「先呼叫 `validateScoreInput`，失敗立即 return」的控制流；第三條則依賴 §5 既有的 `resetIncompleteMatches`（其簽章本來就沒有歷史參數）。重建實跑（`b46e914` 的實作 + HEAD 測試）確認**只有 1 條紅**，宣稱屬實。
+
+  **Implementer 自行發現並修正的一個假 mutation**：原觸界 fixture 讓雙方都在上限，此時 `clamped` 剛好也是 `true`，把 `atUpperBound` 改成 `clamped` **測不出差異**。它未放過，重新設計為實力懸殊 fixture（p1 於上限、p2 於下限，理論漲幅僅微幅超界至 8.0014，四捨五入為 8.00 但未真的截斷），使同一 mutation 才轉紅。Reviewer 驗算 8.0014 正確（`effectiveK(0)=0.30`、`expectedScore(8,1)=0.99538`），並確認該 commit **只改測試 fixture、零實作改動**。
+
+- [x] 6.6 GREEN: 補齊 `boundaryHits` 的傳遞（不寫入回合、不持久化，design Decision 6）與原子性——驗證失敗時**不回傳任何可寫入的東西**，呼叫端因此無從產生部分更新。另加一層**防禦性** try/catch 包住評分 API 的呼叫（M3 對不合法輸入會 `throw`；本函式送進去的資料已由 §6.2 驗證過，正常路徑不會觸發），轉為同一種失敗結果而非讓例外穿透。此為 defence-in-depth，**spec 無對應 Scenario**，如實在本項旁註記
+
+  綠燈。`boundaryHits` 由 `atUpperBound`／`atLowerBound` 推導（**不是** `clamped`——後者語意是「本場理論值真的超界被截斷」，理論值 8.0049 四捨五入為 8.00 者 `atUpperBound=true` 但 `clamped=false`），不寫入回合、不持久化。
+
+  ⚠️ **防禦性 try/catch 的註記（tasks 明文要求）**：包住 `updateRatings` 呼叫，接住 M3 對四類不合法輸入的 `throw`（隊伍人數不符／rating 越界／`gamesPlayed` 非非負整數／同場重複 id——經核對 `rating.ts` 的 `assertValidInput` 屬實）。**spec 無對應 Scenario**，為 defence-in-depth。原本無測試覆蓋，審查後發現有**零成本**的可達路徑（名單缺一位該場球員 → `updateRatings` 拋錯 → 被 catch），已併入既有 it 覆蓋，無需 mock、未新增 it。
+
+- [x] 6.7 REFACTOR: 確認勝方判定、比分 parse 與 `RoundMatch → MatchHistoryEntry` 的投影各只有一處實作；`submitScore` 為純函式（不碰 `localStorage`、不呼叫 `Date.now()`、不呼叫 `crypto.randomUUID()`，時間與 id 一律由呼叫端注入）
+
+  grep 佐證：勝方判定、`parseScoreField`、`toHistoryEntry` 各只有一處實作；`round.ts` 內無 `Date.now()`／`crypto.randomUUID()`／`localStorage`／`Math.random()`（僅註解提及）。
+
+  **審查退回一次（6 Blocker）——本組是覆蓋空洞最嚴重的一組**。Reviewer 抽驗 Implementer 宣稱的 4 次 mutation（**4/4 屬實**）後，自行加做 14 次，**其中 12 次存活**：`historyEntry` 投影的**每一個欄位**都無斷言守門（測試只把回傳值丟給 `appendHistoryEntry` 數筆數，而該函式不做 schema 驗證）。存活清單含姓名快照改用 `id`（直接打穿 Decision 3 的核心承諾）、`winner` 反轉、`ratingBefore`／`ratingAfter` 對調、雙打漏帶 `doublesComposition`、成功路徑改為就地修改傳入的 `round`、`scoring` 場次被誤拒。
+
+  修正內容（commit `9f46f24`、`4d65070`，**不新增第 38 個 it**）：
+  - 補 `MatchHistoryEntrySchema.safeParse` 驗證與逐欄斷言（一行同時關掉所有形狀類 mutation，因 DU 兩分支皆 `.strict()`）。
+  - `playerRatings[].after` 由 `typeof === "number"` 改為與 `playerPatches` 交叉比對。
+  - 補 `scoring` 場次可送出的覆蓋（**regression guard**，行為原本已正確）——design Decision 10 明文承諾「所有讀取路徑……緩解方式是這些分支全部有單元測試」，而後續 milestone 的計分板唯一會送出的就是 `scoring` 場次。
+  - 補成功路徑的不可變性守門（`structuredClone` 快照 + `not.toBe`）。
+  - 補 `MATCH_NOT_FOUND` 與防禦性 catch 兩條失敗路徑的覆蓋。
+  - **驗收條件：12 個先前存活的 mutation 全部轉紅**（已逐一驗證並於乾淨樹上重跑）。
+
+  **⚖️ Orchestrator 裁決的行為變更（B5-b，commit `4d65070`）**：`HistoryTeam.rating` 由「建立回合當下的快照」改為「**送出當下**兩位球員 `ratingBefore` 的和」。
+  - 起因：實作註解宣稱「從建立回合到送出比分之間沒有其他事件能改動這些球員的 rating」，Reviewer 查核發現**這句是假的**——`roster.ts` 的 `UpdatePlayerPatch` 明確允許 patch `rating`，而 **design Decision 3 的論證前提正是「使用者在本輪進行中手動改了某人的分數」**。
+  - 裁決理由：spec 對 per-player `ratingBefore` 明文要求「**送出當下**」；而 `HistoryTeam.rating` 的定義是「雙打為**兩人總和**」——要成立就必須等於兩位球員 `ratingBefore` 的和。沿用建立回合快照會在使用者中途改分時讓**同一筆歷史內部自相矛盾**（`teamA.rating ≠ Σ ratingBefore`），而歷史是自足快照，內部矛盾無從自我修復。
+  - 走 TDD：先讓斷言以「送出當下的和」為期望值 → **紅燈** `AssertionError: expected 6 to be 7` → 再改實作至綠。加總後以 `roundRating` 正規化，與既有 `Team.rating` 的表示法一致。
+
+  另一個 Blocker（B6）：`validateScoreInput` 原本放行 `"99999999999999999999"` → `RoundMatchSchema` 的 `z.number().int()` 事後才拒絕 → 回合是單一物件、無筆可救 → **整份回合被清除**。這與同一段註解自陳的取捨原則自相矛盾（小數與科學記號之所以被拒絕，理由正是「不把驗證責任推給 schema 事後爆炸」）。已加 `Number.isSafeInteger` 檢查並補測試案例。
+
+  另更正兩處不實技術斷言（本 change 第三次同類事故）與 5 項 Nit（含一處引用了只存在於派工訊息、不存在於 repo 的「要點 1」，以及一處把 `changes` 的順序保證誤引到 `rating-types.ts`——實際記載於 `rating.ts`）。
+
 
 ## 7. 回合與歷史的持久化（round-storage.ts）
 Depends on: §1, §2, §3
