@@ -174,6 +174,13 @@ function toSignatureMatch(match: RoundMatch): Match {
 	};
 }
 
+// 一組 RoundMatch 的簽章索引：先投影成簽章專用的 stand-in Match，再交給 duplication.ts。
+// createRound（上一輪自身簽章）與 resetIncompleteMatches（被丟棄的原始組合）共用這一份，
+// 兩處 SHALL NOT 各寫一遍 map(toSignatureMatch)（tasks 5.7）。
+function signatureIndexOf(matches: readonly RoundMatch[]): SignatureIndex {
+	return buildSignatureIndex(matches.map(toSignatureMatch));
+}
+
 // 上一輪自身的 completed／scoring 場次建出的索引——這就是新回合要保存的 seenSignatures
 // （scenario「上一輪已完成與進行中的場次納入重複比對基準」）。pending 場次一律略過：
 // 那些對戰從未發生，當成已配過會無謂限制新一輪的配對空間（design Decision 2）。
@@ -184,7 +191,7 @@ function previousRoundOwnSignatures(previousRound: Round | null): SignatureIndex
 
 	const considered = previousRound.matches.filter((m) => m.status === "completed" || m.status === "scoring");
 
-	return buildSignatureIndex(considered.map(toSignatureMatch));
+	return signatureIndexOf(considered);
 }
 
 // 餵給 allocateRound() 的暫時性避讓基準：上一輪自身的場次簽章（ownSignatures，即將成為
@@ -459,7 +466,7 @@ export function resetIncompleteMatches(
 	// 原始 pending 組合。少了後者，輸入完全沒變時 allocateRound 會原封不動排出同一組人
 	// （prd.md 5.6 明列「重設前的原始對戰組合」為需記錄的項目，design Decision 5）。
 	// 保留場次的簽章不必併入：那些人已被排除於候選池之外，新場次根本組不出含他們的組合。
-	const basis = mergeSignatureIndexes(toSets(round.seenSignatures), buildSignatureIndex(discardedMatches.map(toSignatureMatch)));
+	const basis = mergeSignatureIndexes(toSets(round.seenSignatures), signatureIndexOf(discardedMatches));
 
 	let allocation: RoundAllocation;
 	try {

@@ -736,18 +736,7 @@ describe("setTargetScore", () => {
 		// 把判定寫成單一狀態比對（例如僅檢查 completed）的實作仍會全綠。
 		const lockedMatches: RoundMatch[] = [
 			makeRoundMatch({ id: "m-2", courtNumber: 2, status: "scoring" }),
-			makeRoundMatch({
-				id: "m-2",
-				courtNumber: 2,
-				status: "completed",
-				scores: { teamA: 11, teamB: 7 },
-				winner: "teamA",
-				completedAt: "2026-08-22T00:00:00.000Z",
-				playerRatings: [
-					{ playerId: "p1", before: 5, after: 5.1 },
-					{ playerId: "p2", before: 6, after: 5.9 },
-				],
-			}),
+			makeCompletedRoundMatch({ id: "m-2", courtNumber: 2 }),
 		];
 
 		for (const lockedMatch of lockedMatches) {
