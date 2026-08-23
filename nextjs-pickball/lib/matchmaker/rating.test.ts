@@ -459,7 +459,7 @@ describe("雙打評分更新", () => {
 describe("輸入驗證", () => {
 	it("隊伍人數與對戰方式不符時拒絕輸入", () => {
 		// 單打但隊 A 為 2 人
-		expect(() =>
+		const singlesCall = () =>
 			updateRatings({
 				format: "singles",
 				teams: [
@@ -467,11 +467,12 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/隊伍人數.+2/);
+			});
+		expect(singlesCall).toThrow(/隊伍人數需為 1 人/);
+		expect(singlesCall).toThrow(/目前輸入：2 人/);
 
 		// 雙打但隊 A 為 1 人
-		expect(() =>
+		const doublesCall = () =>
 			updateRatings({
 				format: "doubles",
 				teams: [
@@ -479,8 +480,9 @@ describe("輸入驗證", () => {
 					[makeRatingPlayer("B1", 4.0, 0), makeRatingPlayer("B2", 4.0, 0)],
 				],
 				winnerIndex: 0,
-			})
-		).toThrow(/隊伍人數.+1/);
+			});
+		expect(doublesCall).toThrow(/隊伍人數需為 2 人/);
+		expect(doublesCall).toThrow(/目前輸入：1 人/);
 	});
 
 	it("rating 超出 1.00～8.00 時拒絕輸入而非靜默夾值", () => {
