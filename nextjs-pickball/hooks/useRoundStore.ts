@@ -13,8 +13,9 @@ import type { Player } from "@/lib/matchmaker/types";
 // 回合 store 的 state 形狀。history／droppedCount 目前只由 hydrate 路徑寫入——
 // 本 hook 尚未接上送出比分（round.ts 的 submitScore 尚未在此接線，見 round-lifecycle
 // delta「比分送出的完成流程」Requirement 的「實作位於」只列 round.ts，未列本檔），
-// 兩欄位先在此暴露供 UI 讀取歷史與損壞筆數提示（design：readHistory() 的 droppedCount
-// MUST 能被 hook 消費端看見，比照 useRosterStore 已匯出 droppedCount 的既有做法）。
+// 兩欄位先在此暴露供 UI 讀取歷史與損壞筆數提示：spec「回合與歷史的持久化與損壞降級」
+// 要求「丟棄筆數大於 0 時 SHALL 對外回報，SHALL NOT 靜默處理」，而 hook 是這條資訊
+// 通往 UI 的唯一路徑；比照 useRosterStore 已匯出 droppedCount 的既有做法。
 interface RoundStoreState {
 	round: Round | null;
 	history: MatchHistoryEntry[];
@@ -54,8 +55,9 @@ export interface UseRoundStoreOptions {
 }
 
 /** generateRound 對外的輸入：`players`／`previousRound` 取自 hook 目前握有的狀態，
- * `now`／`newMatchId` 由本 hook 注入（round.ts 明文「呼叫端（也就是你的 hook）注入」），
- * 呼叫端因此不需要自己產生時間戳記或場次 id。 */
+ * `now`／`newMatchId` 由本 hook 注入——`round.ts` 的 `createRound` 是純函式，其註解載明
+ * 「時間與場次 id 一律由呼叫端注入」，而本 hook 就是那個呼叫端。呼叫端因此不需要
+ * 自己產生時間戳記或場次 id。 */
 export type GenerateRoundInput = Omit<CreateRoundInput, "players" | "previousRound" | "now" | "newMatchId">;
 
 export interface UseRoundStoreResult {
@@ -101,6 +103,14 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		};
 	}, []);
 
+	// 已知限制（留給接上按鈕的 milestone）：本函式在 render scope 讀 state.round，
+	// 同一次 render 內連呼兩次會共用同一份舊值，第二次的 previousRound 仍是上上輪，
+	// 結果是輪次編號少前進一次。休息結算本身不受影響——restSettlements 帶的是
+	// 「原值 + 1」的絕對值 patch 而非差值，重複套用同一份結果相同。不改用「把
+	// state.round 的讀取搬進 reducer」來根治：那會迫使 reducer 呼叫 crypto.randomUUID()
+	// 與 new Date() 而不再是純函式，也讓本函式無法同步回傳 CreateRoundResult 供 UI
+	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。
+	//
 	// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）：createRound() 一次算出
 	// 新回合與 restSettlements，本函式在同一次同步呼叫內依序 dispatch 新回合、
 	// 並把每筆 restSettlement 交給 roster port 的 updatePlayer——失敗（result.ok
