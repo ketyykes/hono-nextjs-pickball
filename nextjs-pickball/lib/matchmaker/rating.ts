@@ -1,7 +1,7 @@
 // 評分更新函式。預測勝率、有效 K 值、批次更新都在此，純函式、無狀態、不涉及選手持久化。
 // 不 import candidates.ts 或 roster.ts 模組，避免評分邏輯被消費端選人決策耦合。
 
-import { RATING_D } from "./rating-types";
+import { RATING_D, RATING_K_BASE, K_DECAY_GAMES } from "./rating-types";
 
 /**
  * 計算預測勝率：輸入雙方的平均評分（雙打為隊伍平均），回傳前者的預測勝率。
@@ -11,4 +11,11 @@ import { RATING_D } from "./rating-types";
  */
 export function expectedScore(ratingA: number, ratingB: number): number {
 	return 1 / (1 + 10 ** (-(ratingA - ratingB) / RATING_D));
+}
+
+// 依出場次數計算有效 K 值：新手變動幅度大，老手變動幅度小，鼓勵新手盡快收斂。
+// 公式為 K_eff = K_base × (1 + K_DECAY_GAMES / (K_DECAY_GAMES + gamesPlayed))，
+// 逐人計算，使得同隊兩人若出場次數不同可有不同變動幅度（design Decision 3）。
+export function effectiveK(gamesPlayed: number): number {
+	return RATING_K_BASE * (1 + K_DECAY_GAMES / (K_DECAY_GAMES + gamesPlayed));
 }

@@ -7,7 +7,7 @@ import {
 	RATING_MAX,
 	K_DECAY_GAMES,
 } from "./rating-types";
-import { expectedScore } from "./rating";
+import { expectedScore, effectiveK } from "./rating";
 
 describe("評分常數", () => {
 	it("評分常數以具名常數匯出，D 為 3.0、K_base 為 0.15", () => {
@@ -41,6 +41,29 @@ describe("預測勝率", () => {
 
 		for (const [a, b] of testCases) {
 			expect(expectedScore(a, b) + expectedScore(b, a)).toBeCloseTo(1, 10);
+		}
+	});
+});
+
+describe("有效 K 值", () => {
+	it("K_eff 在 0 場為 K_base 的 2 倍、20 場為 1.5 倍、60 場為 1.25 倍", () => {
+		expect(effectiveK(0)).toBeCloseTo(0.30, 10);
+		expect(effectiveK(20)).toBeCloseTo(0.225, 10);
+		expect(effectiveK(60)).toBeCloseTo(0.1875, 10);
+	});
+
+	it("K_eff 隨出場次數單調遞減且恆大於 K_base", () => {
+		const gamesPlayedSequence = [0, 1, 5, 20, 50, 200, 1000];
+		const kEffValues = gamesPlayedSequence.map((games) => effectiveK(games));
+
+		// 驗證嚴格遞減
+		for (let i = 0; i < kEffValues.length - 1; i++) {
+			expect(kEffValues[i]).toBeGreaterThan(kEffValues[i + 1]);
+		}
+
+		// 驗證每項都大於 K_base
+		for (const kEff of kEffValues) {
+			expect(kEff).toBeGreaterThan(RATING_K_BASE);
 		}
 	});
 });
