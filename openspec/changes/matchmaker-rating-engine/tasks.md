@@ -104,13 +104,22 @@ Depends on: §5
 
 Depends on: §5
 
-- [ ] 7.1 RED: 補四個 it：
+- [x] 7.1 RED: 補四個 it：
   - 「隊伍人數與對戰方式不符時拒絕輸入」——`format: "singles"` 但某隊 2 人、`format: "doubles"` 但某隊 1 人 → 皆拋錯，訊息為繁體中文且含實際人數
   - 「rating 超出 1.00～8.00 時拒絕輸入而非靜默夾值」——任一員 `rating` 為 `0.99` 或 `8.01` → 拋錯；`1` 與 `8` 本身正常計算
   - 「gamesPlayed 為負數或非整數時拒絕輸入」——`-1` 或 `1.5` → 拋錯；`0` 正常
   - 「同一場出現重複的 player id 時拒絕輸入」——同一 `id` 同時在兩隊、或同時在同一隊兩個位置 → 皆拋錯
   確認紅燈並貼出輸出
-- [ ] 7.2 GREEN: 在 `updateRatings` 入口加入輸入驗證，違反時 `throw new Error(...)`。錯誤訊息為**繁體中文**、說明可採取的修正方式並附上實際輸入值，格式對齊 `allocation.ts` 既有寫法（`場地數需為 1 到 8 之間的整數，請調整後再試一次（目前輸入：0）。`）。SHALL NOT 夾值、補值或忽略（design Decision 8）
+  > **實測結果：真紅燈（4 failed）**。四個 it 全部以 `toThrow` 斷言，而 GREEN 前的 `rating.ts`
+  > 完全沒有拋錯路徑——`git show 866aa34^:nextjs-pickball/lib/matchmaker/rating.ts | grep -c throw`
+  > 回傳 `0`，可機械複驗。四個 `expect(...).toThrow(...)` 因此必然全紅，非偽造。
+- [x] 7.2 GREEN: 在 `updateRatings` 入口加入輸入驗證，違反時 `throw new Error(...)`。錯誤訊息為**繁體中文**、說明可採取的修正方式並附上實際輸入值，格式對齊 `allocation.ts` 既有寫法（`場地數需為 1 到 8 之間的整數，請調整後再試一次（目前輸入：0）。`）。SHALL NOT 夾值、補值或忽略（design Decision 8）
+  > **Stage 2 曾判 FAIL，兩項 blocking 已修正後重審 PASS**。① 四個 assert 的註解逐字重述函式名，
+  > 已依 design Decision 8／9 改寫為各自的「為什麼要擋」（commit `4e9daa0`）。
+  > ② 隊伍人數的兩條斷言 `/隊伍人數.+2/`／`/隊伍人數.+1/` 過寬，連把兩個數字對調的不合規訊息
+  > 都能通過，已改為 singles 斷 `/隊伍人數需為 1 人/` 與 `/目前輸入：2 人/`、doubles 鏡像對應
+  > 的定位式斷言（commit `dcc4999`）。收緊後直接綠燈（24 passed）——因 `afaefe9` 已產出合規訊息，
+  > 屬測試強化而非新行為，如實記錄，未偽造紅燈。
 - [ ] 7.3 REFACTOR: 把四類驗證抽為單一具名函式（例如 `assertValidInput`），訊息模板集中一處；確認驗證在任何計算之前執行（避免先算出 `NaN` 再報錯）
 
 ## 8. 純函式契約 regression guard（rating.ts）
