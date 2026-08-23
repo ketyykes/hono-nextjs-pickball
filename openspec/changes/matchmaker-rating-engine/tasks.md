@@ -76,7 +76,7 @@ Depends on: §4
   > 因此這三個 it 在寫入當下即為綠燈（`Tests 14 passed (14)`）。Stage 1 已比對前一版 `rating.ts`
   > 確認此說明成立、非掩飾漏寫實作，且無「改斷言看紅再改回」的痕跡。5.2 的人數推導照常實作。
 - [x] 5.2 GREEN: 把 `E` 的計算推廣為**兩隊平均 `rating`**（`sum / 隊伍人數`），並讓 `updateRatings` 依 `format` 處理每隊 1 人或 2 人。每隊人數由 `PLAYERS_PER_MATCH[format] / 2` 推導（`PLAYERS_PER_MATCH` 由 `./allocation-types` 匯入），**不得**寫死 `1` 或 `2`（design Decision 9）。同隊兩人共用同一個 `(S - E)`，各自以自己的 `K_eff` 放大（design Decision 3）
-- [ ] 5.3 REFACTOR: 確認單打與雙打**共用同一條路徑**（單打即隊伍人數 1 的特例，平均等於該員 `rating`），`rating.ts` 內不存在兩份平行的公式實作
+- [x] 5.3 REFACTOR: 確認單打與雙打**共用同一條路徑**（單打即隊伍人數 1 的特例，平均等於該員 `rating`），`rating.ts` 內不存在兩份平行的公式實作
 
 ## 6. 邊界 clamp 與觸界標示（rating.ts）
 
