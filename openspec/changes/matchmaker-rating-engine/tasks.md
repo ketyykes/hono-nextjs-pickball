@@ -56,7 +56,7 @@ Depends on: §2, §3
   - 「雙方 K_eff 不同時總分不守恆且不做事後補償」——4.00（0 場）對 4.00（60 場），前者勝 → 賽後 `4.15` 與 `3.91`，總和由 8.00 變 8.06；並斷言勝方加分**未**被縮減為 0.09
   確認紅燈並貼出輸出
 - [x] 4.2 GREEN: 實作 `updateRatings(input)` 的**單打路徑**：以雙方 `rating` 取 `E`（`expectedScore`）→ 依 `winnerIndex` 決定各自的 `S`（勝 1、敗 0）→ **逐人**取 `effectiveK(gamesPlayed)` → `after = roundRating(before + K_eff * (S - E))`（`roundRating` 由 `./rating-math` 匯入，**不得**另寫一份兩位小數規則）→ `delta = roundRating(after - before)` → 三個邊界旗標本批一律回 `false`（真正的邊界邏輯在 §6）→ 回傳 `{ changes, expectedScores }`，`changes` 依 `teams` 順序攤平
-- [ ] 4.3 REFACTOR: 把「單一球員的更新」抽為具名內部函式（例如 `applyDelta`），使 §5 的雙打能直接沿用；確認 `RATING_D`／`RATING_K_BASE` 沒有以 magic number 形式出現在 `rating.ts` 內
+- [x] 4.3 REFACTOR: 把「單一球員的更新」抽為具名內部函式（例如 `applyDelta`），使 §5 的雙打能直接沿用；確認 `RATING_D`／`RATING_K_BASE` 沒有以 magic number 形式出現在 `rating.ts` 內
 
 ## 5. 雙打評分更新（rating.ts）
 
