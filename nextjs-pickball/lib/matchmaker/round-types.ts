@@ -88,13 +88,26 @@ export const SeenSignaturesSchema = z.object({
 	fullMatchKeys: z.array(z.string()),
 });
 
+// 目標分數的三個合法值：11、15、21（不帶預設值）。
+export const RoundTargetScoreSchema = z.union([
+	z.literal(11),
+	z.literal(15),
+	z.literal(21),
+]);
+
+// 目標分數選項常數清單。
+export const TARGET_SCORE_OPTIONS = [11, 15, 21] as const;
+
+// 預設目標分數（由本 capability 匯出，不由 UI 各自寫死）。
+export const DEFAULT_TARGET_SCORE = 11;
+
 // 一輪對戰的完整資訊。
 export const RoundSchema = z.object({
 	roundNumber: z.number().int().positive(),
 	createdAt: z.iso.datetime(),
 	format: RoundFormatSchema,
 	courtCount: z.number().int().min(MIN_COURT_COUNT).max(MAX_COURT_COUNT),
-	targetScore: z.literal(11).or(z.literal(15)).or(z.literal(21)),
+	targetScore: RoundTargetScoreSchema,
 	matches: z.array(RoundMatchSchema),
 	restingPlayerIds: z.array(z.string()),
 	seenSignatures: SeenSignaturesSchema,

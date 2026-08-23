@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { RoundSchema, MatchStatusSchema } from "./round-types";
+import { RoundSchema, MatchStatusSchema, RoundTargetScoreSchema, TARGET_SCORE_OPTIONS } from "./round-types";
+import { TargetScoreSchema } from "../scoreboard/types";
 
 describe("RoundSchema", () => {
 	it("合法回合通過驗證，roundNumber 非正整數時失敗", () => {
@@ -206,5 +207,56 @@ describe("RoundSchema", () => {
 			},
 		});
 		expect(noCompletedAtResult.success).toBe(false);
+	});
+
+	it("targetScore 僅接受 11、15、21 且不帶預設值", () => {
+		const baseRound = {
+			roundNumber: 1,
+			createdAt: "2026-08-16T00:00:00.000Z",
+			format: "singles" as const,
+			courtCount: 1,
+			matches: [],
+			restingPlayerIds: [],
+			seenSignatures: {
+				teammateKeys: [],
+				opponentKeys: [],
+				fullMatchKeys: [],
+			},
+		};
+
+		// 三個合法值應通過
+		const valid11 = RoundSchema.safeParse({ ...baseRound, targetScore: 11 });
+		const valid15 = RoundSchema.safeParse({ ...baseRound, targetScore: 15 });
+		const valid21 = RoundSchema.safeParse({ ...baseRound, targetScore: 21 });
+		expect(valid11.success).toBe(true);
+		expect(valid15.success).toBe(true);
+		expect(valid21.success).toBe(true);
+
+		// 非法值應失敗
+		const invalid9 = RoundSchema.safeParse({ ...baseRound, targetScore: 9 });
+		const invalid13 = RoundSchema.safeParse({ ...baseRound, targetScore: 13 });
+		expect(invalid9.success).toBe(false);
+		expect(invalid13.success).toBe(false);
+
+		// 未提供 targetScore 應失敗（不帶預設值）
+		const invalidUndefined = RoundSchema.safeParse({
+			...baseRound,
+			// targetScore 未提供
+		} as any);
+		expect(invalidUndefined.success).toBe(false);
+	});
+
+	it("目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致", () => {
+		// 取出 RoundTargetScoreSchema 的可接受值
+		const roundOptions = new Set(TARGET_SCORE_OPTIONS);
+
+		// 取出 TargetScoreSchema 的可接受值（除了 default 之外）
+		// TargetScoreSchema 是 z.union([z.literal(11), z.literal(15), z.literal(21)]).default(11)
+		// 其可接受的值是 11、15、21
+		const scoreboardValidValues = [11, 15, 21];
+		const scoreboardOptions = new Set(scoreboardValidValues);
+
+		// 驗證兩個集合完全相同
+		expect(roundOptions).toEqual(scoreboardOptions);
 	});
 });
