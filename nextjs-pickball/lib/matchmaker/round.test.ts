@@ -1272,13 +1272,16 @@ describe("submitScore", () => {
 	});
 
 	it("完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數", () => {
-		// 雙打：4 人。teamA／teamB 的隊伍分數（match.teams[i].rating）刻意設為不同值，
-		// 讓「teamA.rating 誤用 teamB 的值」這類 mutation 有鑑別力（B1 point 4）。
+		// 雙打：4 人。teamA（p1、p2）與 teamB（p3、p4）送出當下的實際 rating 總和
+		// （7、5）刻意設成與 match.teams[i].rating 這份「建立回合快照」（6、8）不同——這是
+		// B5-b 的紅燈證據：若 toHistoryEntry 仍沿用建立回合快照（舊實作），teamA.rating／
+		// teamB.rating 會分別算成 6、8（與正確值 7、5 皆不符）；只有改成「送出當下」兩位
+		// 球員 ratingBefore 的和才會算出正確的 7、5。
 		const doublesPlayers = [
 			makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }),
-			makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: 4, gamesPlayed: 0 }),
 			makePlayer({ id: "p3", rating: 3, gamesPlayed: 0 }),
-			makePlayer({ id: "p4", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p4", rating: 2, gamesPlayed: 0 }),
 		];
 		const doublesMatch = makeRoundMatch({
 			id: "m-d",
@@ -1287,9 +1290,9 @@ describe("submitScore", () => {
 			teams: [makeTeamFixture(["p1", "p2"], 6), makeTeamFixture(["p3", "p4"], 8)],
 			playerRatings: [
 				makePendingPlayerRating("p1", 3),
-				makePendingPlayerRating("p2", 3),
+				makePendingPlayerRating("p2", 4),
 				makePendingPlayerRating("p3", 3),
-				makePendingPlayerRating("p4", 3),
+				makePendingPlayerRating("p4", 2),
 			],
 		});
 		const doublesRound = makeRound({ format: "doubles", matches: [doublesMatch] });
@@ -1310,9 +1313,9 @@ describe("submitScore", () => {
 		expect(new Set(doublesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2", "p3", "p4"]));
 		const doublesBeforeById = new Map([
 			["p1", 3],
-			["p2", 3],
+			["p2", 4],
 			["p3", 3],
-			["p4", 3],
+			["p4", 2],
 		]);
 		const doublesPatchesById = new Map(doublesResult.playerPatches.map((p) => [p.id, p]));
 		for (const rating of doublesUpdated?.playerRatings ?? []) {
@@ -1347,9 +1350,11 @@ describe("submitScore", () => {
 			expect(player.ratingAfter).toBe(matched?.after);
 		}
 
+		// B5-b：teamA／teamB 的隊伍分數不相等，且各自等於該隊兩人 ratingBefore 的和
+		// （送出當下），不是建立回合時寫入的快照（6、8）。
 		expect(doublesResult.historyEntry.teamA.rating).not.toBe(doublesResult.historyEntry.teamB.rating);
-		expect(doublesResult.historyEntry.teamA.rating).toBe(6);
-		expect(doublesResult.historyEntry.teamB.rating).toBe(8);
+		expect(doublesResult.historyEntry.teamA.rating).toBe(7);
+		expect(doublesResult.historyEntry.teamB.rating).toBe(5);
 
 		// 單打：2 人。teamA／teamB 的 rating 同樣刻意設為不同值，讓「teamA.rating 誤用
 		// teamB 的值」這類 mutation 有鑑別力。

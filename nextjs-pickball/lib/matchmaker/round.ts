@@ -7,6 +7,7 @@
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
+import { roundRating } from "./rating-math";
 import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
@@ -744,11 +745,18 @@ function resolveTeamPlayers(playerIds: readonly string[], players: readonly Play
 }
 
 // RoundMatch → MatchHistoryEntry 的唯一投影實作（tasks 6.7）。
-// teamA／teamB 的 rating 直接沿用 match.teams[i].rating——那是 createRound 建立本場次時
-// 寫入的隊伍分數快照（toRoundTeam，見本檔上方），語意正是 HistoryTeam.rating 定義的
-// 「賽前隊伍分數」：從建立回合到送出比分之間，除了這次 submitScore 呼叫本身，沒有其他
-// 事件能改動這些球員的 rating，因此兩個時間點的隊伍分數必然相同，可以直接沿用而不必
-// 重新加總。
+// teamA／teamB 的 rating 取「送出當下」兩位球員 ratingBefore（即 changes[].before）的和，
+// 與 per-player 的賽前分數定義一致——spec 對 per-player 明文要求「賽前分數 MUST 取送出
+// 當下該員在名單中的 rating」，而 HistoryTeam.rating 定義為「該隊的隊伍分數（賽前，單打
+// 為該員 rating、雙打為兩人總和）」，故此處必須等於 Σ ratingBefore。
+// SHALL NOT 沿用 match.teams[i].rating（createRound 建立本場次時寫入的隊伍分數快照）：
+// 兩者在「本輪進行中沒有人手動改分」時剛好相同，但 roster.ts 的 UpdatePlayerPatch
+// （Partial<Omit<Player,"id"|"createdAt">>）明確允許使用者中途 patch 某人的 rating——
+// design Decision 3 的論證前提正是「使用者在本輪進行中手動改了某人的分數」這個情境。
+// 沿用建立回合快照會讓同一筆歷史內部自相矛盾（teamA.rating ≠ Σ ratingBefore），而歷史是
+// 自足的快照，內部矛盾無從自我修復。加總後以 roundRating（rating-math.ts）正規化，
+// 與既有 Team.rating 的表示法一致（pairing.ts 的 buildTeam、duplication.ts 的
+// rebuildMatch 皆用同一函式四捨五入），避免引入浮點雜訊。
 //
 // changes 與 matchPlayers 的順序保證一致（見下方 submitScore：兩者皆源自同一次
 // 「teamAPlayers 在前、teamBPlayers 在後」的攤平），故以陣列索引配對即可，
@@ -764,8 +772,8 @@ function toHistoryEntry(
 ): MatchHistoryEntry {
 	const teamASize = match.teams[0].playerIds.length;
 
-	const toHistoryTeam = (teamChanges: readonly RatingChange[], teamPlayers: readonly Player[], teamRating: number) => ({
-		rating: teamRating,
+	const toHistoryTeam = (teamChanges: readonly RatingChange[], teamPlayers: readonly Player[]) => ({
+		rating: roundRating(teamChanges.reduce((sum, change) => sum + change.before, 0)),
 		players: teamChanges.map((change, index) => ({
 			id: change.id,
 			name: teamPlayers[index].name,
@@ -778,8 +786,8 @@ function toHistoryEntry(
 		matchId: match.id,
 		courtNumber: match.courtNumber,
 		playedAt: completedAt,
-		teamA: toHistoryTeam(changes.slice(0, teamASize), matchPlayers.slice(0, teamASize), match.teams[0].rating),
-		teamB: toHistoryTeam(changes.slice(teamASize), matchPlayers.slice(teamASize), match.teams[1].rating),
+		teamA: toHistoryTeam(changes.slice(0, teamASize), matchPlayers.slice(0, teamASize)),
+		teamB: toHistoryTeam(changes.slice(teamASize), matchPlayers.slice(teamASize)),
 		scoreA,
 		scoreB,
 		winner,
