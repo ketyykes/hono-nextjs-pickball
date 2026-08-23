@@ -125,11 +125,38 @@
 
 ## 2. LocalStorage key 與重置範圍（storage-keys.ts、storage.ts）
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-storage.test.ts`，寫入 it「三個 LocalStorage key 名稱由 storage-keys 單一來源匯出」：斷言三個常數的值分別為 `matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`，且皆自 `storage-keys.ts` 匯入。確認紅燈
-- [ ] 2.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/storage-keys.ts`，匯出 `ROSTER_STORAGE_KEY`、`ROUND_STORAGE_KEY`、`HISTORY_STORAGE_KEY` 與 `hasLocalStorage()`（由 `storage.ts` 的既有私有實作原樣搬移，行為不變）
-- [ ] 2.3 RED: 擴大 `nextjs-pickball/lib/matchmaker/storage.test.ts` 既有 it「重置只移除列舉的 key，不影響 scoreboard 資料」的斷言：預先寫入四個 key，斷言三個 `matchmaker:` key 皆被移除、`scoreboard:current:v1` 仍在。**it 名稱不改**。確認紅燈
-- [ ] 2.4 GREEN: `storage.ts` 的 `RESET_KEYS` 擴為三個 key（自 `storage-keys.ts` 匯入）；`hasLocalStorage()` 改為 re-use `storage-keys.ts` 的版本；`STORAGE_KEY` 改為 `export const STORAGE_KEY = ROSTER_STORAGE_KEY` 的 re-export，M1 既有匯入點與測試不得需要改動
-- [ ] 2.5 REFACTOR: 確認 `storage.ts` 內已無殘留的私有 `hasLocalStorage` 副本、無 `matchmaker:` 字串硬編、且 `storage.ts` 與 `round-storage.ts` 之間沒有循環匯入（兩者皆單向依賴 `storage-keys.ts`）
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-storage.test.ts`，寫入 it「三個 LocalStorage key 名稱由 storage-keys 單一來源匯出」：斷言三個常數的值分別為 `matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`，且皆自 `storage-keys.ts` 匯入。確認紅燈
+
+  **紅燈證據**：`Error: Failed to resolve import "./storage-keys"`（`Tests no tests`）。
+
+  ⚠️ **與 test-plan 的標註差異（實際比 test-plan 更嚴格，方向安全）**：test-plan 把本列標為 `regression guard`，但實測為**真紅燈**。Reviewer 覆核確認 `ROUND_STORAGE_KEY` 與 `HISTORY_STORAGE_KEY` 這兩個值在改動前的整個 codebase **完全不存在**（`matchmaker:round:v1` 當時只出現在 `round-types.ts` 的散文註解裡，無任何可執行定義），不符合 regression guard 的定義（「行為早已實作、測試會直接綠燈」）。唯一帶 regression 性質的只有 `ROSTER_STORAGE_KEY` 一條，不足以讓整個 it 降級為 guard。
+
+- [x] 2.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/storage-keys.ts`，匯出 `ROSTER_STORAGE_KEY`、`ROUND_STORAGE_KEY`、`HISTORY_STORAGE_KEY` 與 `hasLocalStorage()`（由 `storage.ts` 的既有私有實作原樣搬移，行為不變）
+
+  綠燈：1 passed。`hasLocalStorage()` 內文與搬移前**逐字相同**，行為不變由既有 it「localStorage 不可用時不拋出例外」持續守住（該 it 仍綠，證明跨模組後 try/catch 仍生效）。
+
+- [x] 2.3 RED: 擴大 `nextjs-pickball/lib/matchmaker/storage.test.ts` 既有 it「重置只移除列舉的 key，不影響 scoreboard 資料」的斷言：預先寫入四個 key，斷言三個 `matchmaker:` key 皆被移除、`scoreboard:current:v1` 仍在。**it 名稱不改**。確認紅燈
+
+  **紅燈證據**：`Tests 1 failed | 5 passed`，`AssertionError: expected '{"round":true}' to be null`——**真紅燈**（與 test-plan 標註一致）。it 名稱未改，其餘 5 個既有 it 未動。
+
+- [x] 2.4 GREEN: `storage.ts` 的 `RESET_KEYS` 擴為三個 key（自 `storage-keys.ts` 匯入）；`hasLocalStorage()` 改為 re-use `storage-keys.ts` 的版本；`STORAGE_KEY` 改為 `export const STORAGE_KEY = ROSTER_STORAGE_KEY` 的 re-export，M1 既有匯入點與測試不得需要改動
+
+  綠燈：6 passed。`git diff --stat` 確認 **`hooks/` 完全未出現在 diff 中**，M1 既有匯入點確實不需改動。
+
+  **mutation 驗證**：`RESET_KEYS` 暫改回只含 roster → 該 it 轉紅；還原 → 6 passed。
+
+  Reviewer 指出一個非預期的優點：`storage.test.ts` 用舊名 `STORAGE_KEY` 寫入、卻期待被以 `ROSTER_STORAGE_KEY` 組成的 `RESET_KEYS` 清掉，這個名稱不對稱**構成 re-export 未失效的隱含守衛**。
+
+- [x] 2.5 REFACTOR: 確認 `storage.ts` 內已無殘留的私有 `hasLocalStorage` 副本、無 `matchmaker:` 字串硬編、且 `storage.ts` 與 `round-storage.ts` 之間沒有循環匯入（兩者皆單向依賴 `storage-keys.ts`）
+
+  三項皆以 grep 佐證通過：
+  - `lib/matchmaker/` 內 `hasLocalStorage` 只有 `storage-keys.ts` 一份定義，`storage.ts` 的私有副本已刪淨（4 個呼叫點皆改讀 import）。
+  - `lib/**` 內 `matchmaker:` 字面字串僅出現在 `storage-keys.ts` 的三個常數定義與 `round-storage.test.ts` 的斷言（後者正是在驗證常數值，唯一允許的例外）；`storage.ts` 剩下的一處是解釋「為何不用前綴掃描」的散文註解。
+  - `storage-keys.ts` **無任何 import**（葉節點成立）；`storage.ts` 未 import `round-storage`。§7 建立 `round-storage.ts` 時只要單向依賴 `storage-keys.ts` 即無環。
+
+  **審查退回一次（Blocker）**：`RESET_KEYS` 上方補的「目前涵蓋名單、目前回合、歷史賽果三個 key（M2、M6 已納入）」被判定必須刪除——① 實際兌現這兩個 key 的是 **M4（本 change）**，M2 是已 archive 的分配引擎、M6 是尚未動工的計分板銜接，寫錯 milestone 會把日後考古者導向兩個無關的 change；② 該句同時只是把下一行識別字翻成中文，屬複述式註解（§1 剛因同一條被退回）。已刪除（commit `aba1cbb`），上方「為何用列舉而非前綴掃描」的理由原封保留。
+
+  **留給日後的備註（本 change 不處理，動了就是 scope creep）**：`nextjs-pickball/tests/e2e/specs/player-roster.spec.ts` 內仍有 `const STORAGE_KEY = "matchmaker:roster:v1"` 的既存硬編碼。本 change 明文不動 e2e，建議留給日後動到該 e2e 的 change 順手改為自 `@/lib/matchmaker/storage-keys` 匯入。
 
 ## 3. 歷史 schema 與追加（history.ts）
 Depends on: §1
