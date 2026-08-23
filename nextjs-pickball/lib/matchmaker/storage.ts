@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { PlayerSchema } from "./types";
+import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalStorage } from "./storage-keys";
 import type { Player } from "./types";
 
-export const STORAGE_KEY = "matchmaker:roster:v1";
+// re-export（非改名）：M1 既有的匯入點（hooks/useRosterStore.ts 等）與既有測試
+// 都是 import { STORAGE_KEY } from "./storage"，key 本體已搬到 storage-keys.ts
+// 單一來源（見 design Decision 8），保留這行 re-export 讓那些既有匯入點不必改動。
+export const STORAGE_KEY = ROSTER_STORAGE_KEY;
 
 /**
  * 容器（外層）schema：只驗證 version 與 players 是否為陣列，
@@ -16,15 +20,6 @@ const RosterContainerSchema = z.object({
 	version: z.literal(1),
 	players: z.array(z.unknown()),
 });
-
-/** 確認 localStorage 可用（SSR / 私密模式下可能不存在） */
-function hasLocalStorage(): boolean {
-	try {
-		return typeof window !== "undefined" && !!window.localStorage;
-	} catch {
-		return false;
-	}
-}
 
 /** readRoster() 的回傳形狀：合法名單，以及本次讀取時被丟棄的損壞筆數。 */
 export interface ReadRosterResult {
@@ -112,10 +107,8 @@ export function clearRoster(): void {
  * 重置範圍刻意採「明確列舉」而非「前綴掃描」（例如清除所有 matchmaker: 開頭的 key）：
  * 掃描式清除會誤刪未來加入、不該被重置的使用者偏好資料，改用列舉可強制在新增
  * 資料域時主動決定是否納入重置範圍。
- * - M2：加入 rounds 對應的 key
- * - M6：加入 history 對應的 key
  */
-const RESET_KEYS = [STORAGE_KEY] as const;
+const RESET_KEYS = [ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY] as const;
 
 /**
  * 重置 matchmaker 相關的 localStorage 資料。只移除 RESET_KEYS 列舉的 key，

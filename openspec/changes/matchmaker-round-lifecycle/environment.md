@@ -22,8 +22,8 @@ pnpm test
 
 | 欄位 | 值 |
 |---|---|
-| **Baseline tests** | 尚未執行——由 apply Step 0 建立 worktree 時執行並回填 |
-| **Initial commit hash** | 尚未執行——由 apply Step 0 建立 worktree 時執行並回填 |
+| **Baseline tests** | **PASS**——`pnpm test`（worktree root，2026-08-23）：前端 41 檔／299 測試全綠、後端 4 檔／16 測試全綠，exit code 0；後端未出現 `listen EPERM` |
+| **Initial commit hash** | `e3477eb`（`main` 的 merge commit「feat(matchmaker): 合併評分引擎（PRD 6.4）」，即 M3 合併點） |
 | **Worktree path** | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-round-lifecycle` |
 
 回填時 `Baseline tests` 請寫 `PASS` 或 `FAIL` 並附一行結果摘要（例如兩個 workspace 的檔數與測試數）；baseline 不是綠燈就**停下來回報，不要開始任何 task**。

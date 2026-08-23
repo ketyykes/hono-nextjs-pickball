@@ -63,6 +63,7 @@ M4 補的正是這條時間軸：**回合狀態機與持久化**。它讓 `alloc
   - 上述各檔對應的 `*.test.ts(x)`
 - **修改**：
   - `nextjs-pickball/lib/matchmaker/storage.ts`——`RESET_KEYS` 納入兩個新 key；`hasLocalStorage()` 與 `STORAGE_KEY` 改為由 `storage-keys.ts` 提供（`STORAGE_KEY` 保留 re-export，M1 既有匯入點與測試不受影響）
+  - `nextjs-pickball/lib/matchmaker/storage.test.ts`——重置範圍的斷言擴大為三個 key（`RESET_KEYS` 改動的對應測試；test-plan 的「既有測試檔的擴充」已列，apply 的 §9.8 核對時補記於此以免被判為未申報檔案）
   - `openspec/specs/pickleball-guide-page/spec.md` 的 hooks 歸屬清單一句（見 design Decision 9：這是 apply 期間唯一被允許、且範圍限定在本 change delta 內的主 spec 同步）
 - **重用（唯讀，不修改）**：`lib/matchmaker/allocation.ts` 的 `allocateRound`、`allocation-types.ts` 的 `Match`／`SignatureIndex`／`PLAYERS_PER_MATCH`、`duplication.ts` 的 `buildSignatureIndex`、`types.ts` 的 `Player`、M3 的評分 API
 - **不動**：`roster.ts`、`colors.ts`、`candidates.ts`、`pairing.ts`、`duplication.ts`、`app/matchmaker/**`、`components/matchmaker/**`、`lib/scoreboard/**`
