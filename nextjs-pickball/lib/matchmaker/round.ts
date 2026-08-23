@@ -1,15 +1,16 @@
-// 產生本輪對戰與休息結算。唯一對外入口 createRound()：把 M2 allocateRound() 的
+// 產生本輪對戰與休息結算。本段的對外入口為 createRound()：把 M2 allocateRound() 的
 // in-memory 輸出（Match 內嵌完整 Player）投影成可持久化的 Round／RoundMatch，
 // 並推導出下一輪要用的重複比對基準與休息次數 patch。本檔 SHALL NOT 重新實作
-// allocateRound 已負責的排序、配對或重複迴避（design Decision 1、tasks 4.7）。
+// allocateRound 已負責的排序、配對或重複迴避（matchmaker-allocation-engine design
+// Decision 1、tasks 4.7）。
 
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
+import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { Player } from "./types";
 import type { PlayerRating, Round, RoundMatch, RoundTeam, SeenSignatures } from "./round-types";
-import { DEFAULT_TARGET_SCORE } from "./round-types";
 
 /**
  * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
@@ -183,9 +184,15 @@ function previousRoundOwnSignatures(previousRound: Round | null): SignatureIndex
 // 本輪要保存的 seenSignatures），再併入上一輪回合自身攜帶的 seenSignatures（tasks 4.4）。
 // 這個併入刻意只影響「本次呼叫 allocateRound 用來避開重複的候選集合」，不進入本輪要保存
 // 的 seenSignatures 欄位——若把它也存進本輪的欄位，下一輪建立時又會把「已經包含上上輪
-// 東西」的本輪欄位再併入*下一輪*的避讓基準，如此遞迴下去，兩輪前、三輪前的簽章會透過
+// 東西」的本輪欄位再併入*下一輪*的避讓基準，如此遞迴下去，三輪前（以上）的簽章會透過
 // 這條路徑無限傳遞，等同真的在累積全部歷史，違反 design Decision 2「基準只取上一輪，
-// 不累積更早的回合」。讓「保存」與「避讓基準」在這一點上分岔，才能讓累積鏈長度恆為 1。
+// 不累積更早的回合」。
+// 這個分岔讓兩種東西的深度不同，且兩者都是刻意的：本函式回傳的「避讓基準」依 spec 正文
+// 「併入上一輪回合物件本身攜帶的 seenSignatures」刻意橫跨兩輪（上一輪自身 ownSignatures
+// ∪ 上一輪攜帶的 seenSignatures，也就是上上輪自身），深度有界為 2；呼叫端最終寫回
+// round.seenSignatures 的「保存欄位」則只用 ownSignatures 本身（見 createRound 內
+// `toArrays(ownSignatures)`），深度恆為一輪。保存欄位的深度不會因為避讓基準是 2 就跟著
+// 累加——正是因為兩者在這裡分岔，保存欄位才不會像上面段落描述的那樣無界成長。
 // 呼叫端一併取得 ownSignatures，避免同一個 previousRound 被 buildSignatureIndex 算兩次。
 function avoidanceBasis(previousRound: Round | null, ownSignatures: SignatureIndex): SignatureIndex {
 	if (previousRound === null) {

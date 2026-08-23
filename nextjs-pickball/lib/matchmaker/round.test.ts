@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 
 import { createRound, ROUND_FAILURE_CODE } from "./round";
-import { fullMatchKey, opponentKeys } from "./duplication";
+import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
 import { updatePlayer } from "./roster";
+import { PLAYERS_PER_MATCH } from "./allocation-types";
 import type { Match, Team } from "./allocation-types";
 import type { Player } from "./types";
 import type { Round, RoundMatch } from "./round-types";
@@ -77,13 +78,20 @@ function makeIdGenerator(prefix: string): () => string {
 }
 
 // 用來算「期望簽章字串」的最小 Match fixture——直接呼叫 duplication.ts 的真實
-// fullMatchKey／opponentKeys，不在本檔重新拼出分隔符與排序邏輯（避免重複實作既有邏輯）。
-function makeSignatureTeam(playerId: string): Team {
-	return { players: [makePlayer({ id: playerId })], rating: 0 };
+// teammateKeys／opponentKeys／fullMatchKey，不在本檔重新拼出分隔符與排序邏輯
+// （避免重複實作既有邏輯）。吃 id 陣列而非單一 id：單打隊伍傳 1 個 id、雙打隊伍傳 2 個，
+// 由呼叫端決定人數（reviewer B1：既有版本恆為單打，teammateKeys 恆為 []）。
+function makeSignatureTeam(ids: readonly string[]): Team {
+	return { players: ids.map((id) => makePlayer({ id })), rating: 0 };
 }
 
-function makeSignatureMatch(playerIdA: string, playerIdB: string): Match {
-	return { courtNumber: 1, format: "singles", teams: [makeSignatureTeam(playerIdA), makeSignatureTeam(playerIdB)] };
+// format 固定回傳 "singles" 變體，即使餵入雙打陣容（每隊 2 個 id）：teammateKeys／
+// opponentKeys／fullMatchKey 三個簽章函式只讀 team.players 的 id 與人數（見 duplication.ts
+// 頂端註解），完全不讀取 Match.format 或 doublesComposition，回傳哪個 discriminated union
+// 分支都不影響任何期望簽章字串的計算結果；固定用 "singles" 可讓本函式免於為了滿足型別
+// 而猜測或還原 doublesComposition 標示。
+function makeSignatureMatch(teamAIds: readonly string[], teamBIds: readonly string[]): Match {
+	return { courtNumber: 1, format: "singles", teams: [makeSignatureTeam(teamAIds), makeSignatureTeam(teamBIds)] };
 }
 
 describe("createRound", () => {
@@ -134,7 +142,11 @@ describe("createRound", () => {
 		if (!result.ok) return;
 
 		expect(result.round.roundNumber).toBe(4);
-		expect(result.round).not.toBe(previousRound);
+		// not.toBe(previousRound) 近似恆真——createRound 永遠回傳新物件字面量，這個斷言
+		// 幾乎不可能轉紅。改為能實際證明「取代」的斷言：createdAt 等於本次注入的時間、
+		// 且所有場次皆為 pending，只有「真的用新輸入重新產生」才會同時成立（reviewer N3）。
+		expect(result.round.createdAt).toBe(FIXED_NOW);
+		expect(result.round.matches.every((m) => m.status === "pending")).toBe(true);
 	});
 
 	it("簽章基準以字串陣列保存，呼叫 allocateRound 前轉為 Set", () => {
@@ -187,39 +199,61 @@ describe("createRound", () => {
 	});
 
 	it("上一輪已完成與進行中的場次納入重複比對基準", () => {
+		// 8 人雙打、courtCount: 2：兩場都是雙打（2 人一隊），讓 teammateKeys 非空。若沿用
+		// 單打 fixture，teammateKeys 恆為 []，spec 明寫的「隊友」子句會空洞成立、零斷言
+		// （reviewer B1）。這同時是套件內唯一一次讓 createRound 成功走過 format: "doubles"
+		// 的測試，一併覆蓋 toRoundMatch 的 doublesComposition 分支，以及簽章 shim
+		// （toSignaturePlayer／toSignatureTeam／toSignatureMatch）處理 2-id 隊伍的路徑。
 		const players = [
 			makePlayer({ id: "p1" }),
 			makePlayer({ id: "p2" }),
 			makePlayer({ id: "p3" }),
 			makePlayer({ id: "p4" }),
+			makePlayer({ id: "p5" }),
+			makePlayer({ id: "p6" }),
+			makePlayer({ id: "p7" }),
+			makePlayer({ id: "p8" }),
 		];
 		const previousRound = makeRound({
 			roundNumber: 1,
+			format: "doubles",
 			courtCount: 2,
 			matches: [
 				makeRoundMatch({
 					id: "prev-1",
 					courtNumber: 1,
+					format: "doubles",
+					doublesComposition: "general",
 					status: "completed",
 					teams: [
-						{ playerIds: ["p1"], rating: 3 },
-						{ playerIds: ["p2"], rating: 3 },
+						{ playerIds: ["p1", "p2"], rating: 6 },
+						{ playerIds: ["p3", "p4"], rating: 6 },
 					],
 					scores: { teamA: 11, teamB: 5 },
 					winner: "teamA",
 					completedAt: "2026-08-22T00:00:00.000Z",
 					playerRatings: [
 						{ playerId: "p1", before: 3, after: 3.1 },
-						{ playerId: "p2", before: 3, after: 2.9 },
+						{ playerId: "p2", before: 3, after: 3.1 },
+						{ playerId: "p3", before: 3, after: 2.9 },
+						{ playerId: "p4", before: 3, after: 2.9 },
 					],
 				}),
 				makeRoundMatch({
 					id: "prev-2",
 					courtNumber: 2,
+					format: "doubles",
+					doublesComposition: "general",
 					status: "scoring",
 					teams: [
-						{ playerIds: ["p3"], rating: 3 },
-						{ playerIds: ["p4"], rating: 3 },
+						{ playerIds: ["p5", "p6"], rating: 6 },
+						{ playerIds: ["p7", "p8"], rating: 6 },
+					],
+					playerRatings: [
+						{ playerId: "p5", before: 3, after: null },
+						{ playerId: "p6", before: 3, after: null },
+						{ playerId: "p7", before: 3, after: null },
+						{ playerId: "p8", before: 3, after: null },
 					],
 				}),
 			],
@@ -227,7 +261,7 @@ describe("createRound", () => {
 
 		const result = createRound({
 			players,
-			format: "singles",
+			format: "doubles",
 			courtCount: 2,
 			previousRound,
 			now: FIXED_NOW,
@@ -237,14 +271,20 @@ describe("createRound", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 
-		const completedMatch = makeSignatureMatch("p1", "p2");
-		const scoringMatch = makeSignatureMatch("p3", "p4");
+		const completedMatch = makeSignatureMatch(["p1", "p2"], ["p3", "p4"]);
+		const scoringMatch = makeSignatureMatch(["p5", "p6"], ["p7", "p8"]);
 		const { seenSignatures } = result.round;
 
+		for (const key of teammateKeys(completedMatch)) {
+			expect(seenSignatures.teammateKeys).toContain(key);
+		}
 		for (const key of opponentKeys(completedMatch)) {
 			expect(seenSignatures.opponentKeys).toContain(key);
 		}
 		expect(seenSignatures.fullMatchKeys).toContain(fullMatchKey(completedMatch));
+		for (const key of teammateKeys(scoringMatch)) {
+			expect(seenSignatures.teammateKeys).toContain(key);
+		}
 		for (const key of opponentKeys(scoringMatch)) {
 			expect(seenSignatures.opponentKeys).toContain(key);
 		}
@@ -279,7 +319,7 @@ describe("createRound", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 
-		const pendingMatch = makeSignatureMatch("p1", "p2");
+		const pendingMatch = makeSignatureMatch(["p1"], ["p2"]);
 		const { seenSignatures } = result.round;
 
 		expect(seenSignatures.fullMatchKeys).not.toContain(fullMatchKey(pendingMatch));
@@ -289,8 +329,10 @@ describe("createRound", () => {
 		// createRound 不具備寫入歷史的能力（那是 §6 submitScore 的職責，本函式完全不
 		// import history.ts、不碰 localStorage）——回傳形狀本身就是這個保證的證據：
 		// 成功結果只有 { ok, round, restSettlements } 三個欄位，不含任何歷史相關欄位。
-		expect(result).not.toHaveProperty("historyEntry");
-		expect(result).not.toHaveProperty("history");
+		// 用單一結構斷言取代兩個各別的 not.toHaveProperty：後者只證明「這個特定名稱不存在」，
+		// 對任何未列出的屬性名稱都恆真；直接比對完整鍵集合才是真的把「只有這三個欄位」
+		// 斷言出來，等價於原本兩條再加上「沒有其他意料外欄位」（reviewer N7）。
+		expect(Object.keys(result).sort()).toEqual(["ok", "restSettlements", "round"]);
 	});
 
 	it("重複比對基準只取上一輪，不累積更早的回合", () => {
@@ -345,7 +387,7 @@ describe("createRound", () => {
 		expect(round3Result.ok).toBe(true);
 		if (!round3Result.ok) return;
 
-		const round1Match = makeSignatureMatch("p1", "p2");
+		const round1Match = makeSignatureMatch(["p1"], ["p2"]);
 		const { seenSignatures } = round3Result.round;
 
 		expect(seenSignatures.fullMatchKeys).not.toContain(fullMatchKey(round1Match));
@@ -365,6 +407,11 @@ describe("createRound", () => {
 		// 這個名單——本測試只關心 createRound 如何消費 restingPlayerIds，不關心「誰該休息」
 		// 這個排序決策（那是 candidates.ts 的職責，見 4.7 的職責邊界）。
 		const previousRound = makeRound({ roundNumber: 1, restingPlayerIds: ["c", "d"] });
+		// tasks 4.6／design Decision 1 的核心約束：createRound SHALL NOT 修改任何 Player
+		// 物件（休息次數的結算只回傳 patch，套用是呼叫端的職責）。這一點先前沒有測試守門，
+		// 這裡補上 regression guard，同時對應 spec Scenario 的「上一輪出場者的 restCount
+		// 不變」（reviewer N4）。
+		const playersSnapshot = structuredClone(players);
 
 		const result = createRound({
 			players,
@@ -378,6 +425,7 @@ describe("createRound", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 
+		expect(players).toEqual(playersSnapshot);
 		expect(result.restSettlements).toEqual(
 			expect.arrayContaining([
 				{ id: "c", restCount: 3 },
@@ -507,8 +555,10 @@ describe("createRound", () => {
 	});
 
 	it("單打不足 2 人或雙打不足 4 人時不建立回合", () => {
+		// 所需人數比 PLAYERS_PER_MATCH 少 1（唯一人數來源，測試檔也適用——不得另行寫死
+		// 2／4 反推的字面量陣列，reviewer N2）。
 		const singlesResult = createRound({
-			players: [makePlayer({ id: "p1" })],
+			players: Array.from({ length: PLAYERS_PER_MATCH.singles - 1 }, (_, i) => makePlayer({ id: `p${i + 1}` })),
 			format: "singles",
 			courtCount: 1,
 			previousRound: null,
@@ -521,7 +571,7 @@ describe("createRound", () => {
 		}
 
 		const doublesResult = createRound({
-			players: [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })],
+			players: Array.from({ length: PLAYERS_PER_MATCH.doubles - 1 }, (_, i) => makePlayer({ id: `p${i + 1}` })),
 			format: "doubles",
 			courtCount: 1,
 			previousRound: null,
@@ -563,7 +613,9 @@ describe("createRound", () => {
 
 	it("產生失敗時既有回合與 restCount 皆不受影響", () => {
 		const previousRound = makeRound({ roundNumber: 2 });
-		const previousRoundSnapshot = JSON.parse(JSON.stringify(previousRound)) as Round;
+		// 深拷貝快照沿用 codebase 既有慣例（見 allocation.test.ts、rating.test.ts）：
+		// structuredClone 不像 JSON 往返需要型別斷言（JSON.parse 回傳 any），reviewer N1。
+		const previousRoundSnapshot = structuredClone(previousRound);
 		// 全員暫停：確保會走到失敗路徑。
 		const players = [makePlayer({ id: "p1", isActive: false }), makePlayer({ id: "p2", isActive: false })];
 
