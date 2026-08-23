@@ -36,8 +36,8 @@ Depends on: §1
 > （`0.15 * 1.5` 在 IEEE754 下的結果），**`toBe(0.225)` 會直接失敗**——那不是實作錯誤。
 > 三個斷言一律用 `toBeCloseTo(x, 10)`。`effectiveK(0)`（`0.3`）與 `effectiveK(60)`（`0.1875`）剛好是精確值。
 
-- [ ] 3.1 RED: 補兩個 it：「K_eff 在 0 場為 K_base 的 2 倍、20 場為 1.5 倍、60 場為 1.25 倍」（`effectiveK(0)=0.30`、`effectiveK(20)=0.225`、`effectiveK(60)=0.1875`，以 `toBeCloseTo` 斷言）、「K_eff 隨出場次數單調遞減且恆大於 K_base」（對序列 `[0,1,5,20,50,200,1000]` 斷言嚴格遞減，且每項大於 `RATING_K_BASE`）。確認紅燈並貼出輸出
-- [ ] 3.2 GREEN: 實作 `effectiveK(gamesPlayed)`：`RATING_K_BASE * (1 + K_DECAY_GAMES / (K_DECAY_GAMES + gamesPlayed))`。兩個常數皆由 `./rating-types` 匯入，**不得**寫死 `0.15` 或 `20`
+- [x] 3.1 RED: 補兩個 it：「K_eff 在 0 場為 K_base 的 2 倍、20 場為 1.5 倍、60 場為 1.25 倍」（`effectiveK(0)=0.30`、`effectiveK(20)=0.225`、`effectiveK(60)=0.1875`，以 `toBeCloseTo` 斷言）、「K_eff 隨出場次數單調遞減且恆大於 K_base」（對序列 `[0,1,5,20,50,200,1000]` 斷言嚴格遞減，且每項大於 `RATING_K_BASE`）。確認紅燈並貼出輸出
+- [x] 3.2 GREEN: 實作 `effectiveK(gamesPlayed)`：`RATING_K_BASE * (1 + K_DECAY_GAMES / (K_DECAY_GAMES + gamesPlayed))`。兩個常數皆由 `./rating-types` 匯入，**不得**寫死 `0.15` 或 `20`
 
 ## 4. 單打評分更新與零和（rating.ts）
 
