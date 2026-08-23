@@ -44,23 +44,20 @@ function makeUnevenDoublesTeams(): readonly [Side, Side] {
 	];
 }
 
-// PlayerSchema 驗證用的完整玩家物件建構器
-function makeRosterPlayer(
-	id: string,
-	name: string,
-	rating: number
-): Player {
+// PlayerSchema 驗證用的完整球員物件建構器，預設值皆為合法值，呼叫端可用 overrides 覆寫個別欄位。
+function makeRosterPlayer(overrides: Partial<Player> = {}): Player {
 	return {
-		id,
-		name,
+		id: "default-id",
+		name: "預設球員",
 		gender: "male",
 		colorFrom: "#000000",
 		colorTo: "#ffffff",
-		rating,
+		rating: 0,
 		gamesPlayed: 20,
 		restCount: 0,
 		isActive: true,
 		createdAt: new Date(0).toISOString(),
+		...overrides,
 	};
 }
 
@@ -164,10 +161,7 @@ describe("單打評分更新", () => {
 
 	it("爆冷獲勝的加分明顯大於預期內獲勝的加分", () => {
 		// 低分方獲勝
-		const teamsCase1: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 3.0, 20)],
-			[makeRatingPlayer("B1", 6.0, 20)],
-		];
+		const teamsCase1 = makeSinglesTeams(3.0, 6.0, 20);
 
 		const resultCase1 = updateRatings({
 			format: "singles",
@@ -178,10 +172,7 @@ describe("單打評分更新", () => {
 		const lowScorerGain = resultCase1.changes[0].delta;
 
 		// 高分方獲勝
-		const teamsCase2: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 6.0, 20)],
-			[makeRatingPlayer("B1", 3.0, 20)],
-		];
+		const teamsCase2 = makeSinglesTeams(6.0, 3.0, 20);
 
 		const resultCase2 = updateRatings({
 			format: "singles",
@@ -199,10 +190,7 @@ describe("單打評分更新", () => {
 	});
 
 	it("輸出依隊伍順序攤平，每筆含 id、賽前分數、賽後分數與變動值", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 4.0, 0)],
-			[makeRatingPlayer("B1", 4.0, 0)],
-		];
+		const teams = makeSinglesTeams(4.0, 4.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -387,8 +375,8 @@ describe("邊界 clamp 與觸界標示", () => {
 		const winnerAfter = result.changes[0].after;
 		const loserAfter = result.changes[1].after;
 
-		const winner = makeRosterPlayer("A1", "Winner", winnerAfter);
-		const loser = makeRosterPlayer("B1", "Loser", loserAfter);
+		const winner = makeRosterPlayer({ id: "A1", name: "Winner", rating: winnerAfter, gamesPlayed: 20 });
+		const loser = makeRosterPlayer({ id: "B1", name: "Loser", rating: loserAfter, gamesPlayed: 20 });
 
 		const winnerResult = PlayerSchema.safeParse(winner);
 		const loserResult = PlayerSchema.safeParse(loser);
