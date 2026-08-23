@@ -138,7 +138,7 @@ Hero 的 badge / 標題 / 統計區進場 SHALL 由 motion 的 `staggerChildren`
 
 系統 SHALL 提供三支 scroll / observer React hooks：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`，分別位於 `nextjs-pickball/hooks/`。每支 hook SHALL 有對應 `*.test.ts` 檔，包含至少一個 happy-path scenario。`useScrolledPast` SHALL 接受 `threshold: number | (() => number)`：為 `number` 時以該值為固定門檻，為 function 時於每次 scroll 事件呼叫以取得當前門檻（供動態讀取 `window.innerHeight - navHeight` 等情境）。
 
-本 capability 只擁有上述三支；`nextjs-pickball/hooks/` 下其餘 hook 歸屬其他 capability（`useQuiz` → quiz；`useRosterStore` → player-roster；`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode` → scoreboard；`useEnterAnimationProgress`、`useReducedMotion` → tour-experience）。
+本 capability 只擁有上述三支；`nextjs-pickball/hooks/` 下其餘 hook 歸屬其他 capability（`useQuiz` → quiz；`useRosterStore` → player-roster；`useRoundStore` → round-lifecycle；`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode` → scoreboard；`useEnterAnimationProgress`、`useReducedMotion` → tour-experience）。
 
 此歸屬清單為 `nextjs-pickball/hooks/` 跨 capability 分工的**單一來源**。其他 capability 於該目錄新增 hook 時，其 change SHALL 一併更新此清單 —— 否則本 capability 的規格會單邊失真。此規則已失效兩次：`4c5b724` 新增 `useFocusMode` 時只更新了 `scoreboard` 規格；change `add-player-roster`（實作 commit `d00fea6`、歸檔 commit `0974918`）新增 `useRosterStore` 時只更新了 `player-roster` 規格，且該 change 的 proposal 還明文宣告「對 `pickleball-guide-page` 無影響」—— 新增 hook 前 SHALL 直接核對本清單，SHALL NOT 以「本 capability 與 pickleball-guide-page 無關」推論無影響。
 
