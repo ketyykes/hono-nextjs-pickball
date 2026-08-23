@@ -208,16 +208,62 @@ Depends on: §1
 ## 4. 產生本輪與休息結算（round.ts）
 Depends on: §1, §3
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round.test.ts`，寫入三個 it：「首輪回合編號為 1，基準為空且所有場次為 pending」、「產生新一輪時回合編號加 1 並取代目前回合」、「簽章基準以字串陣列保存，呼叫 allocateRound 前轉為 Set」。確認紅燈
-- [ ] 4.2 GREEN: 實作 `createRound(input)` 骨幹：呼叫 `allocateRound()` → 把 `Match`（內嵌完整 `Player`）投影成只帶 `playerIds` 與 rating 快照的 `RoundMatch` → 填入 `playerRatings[].before`、`after` 為 `null` → 回合編號由 `previousRound` 推導。`seenSignatures` 在回合物件中為字串陣列，傳給 `allocateRound()` 前轉 `Set`
-- [ ] 4.3 RED: 於 `round.test.ts` 補三個 it：「上一輪已完成與進行中的場次納入重複比對基準」、「上一輪未開始的場次不納入基準也不寫入歷史」、「重複比對基準只取上一輪，不累積更早的回合」。確認紅燈
-- [ ] 4.4 GREEN: 實作基準推導：以 `duplication.ts` 的 `buildSignatureIndex` 對上一輪的 `completed` + `scoring` 場次建索引，併入上一輪回合自身的 `seenSignatures`；`pending` 場次一律略過。SHALL NOT 累積更早的回合（design Decision 2）
-- [ ] 4.5 RED: 於 `round.test.ts` 補四個 it：「產生新一輪時上一輪休息者的 restCount 加 1，出場者不變」、「產生首輪時不結算任何人的 restCount」、「連續產生多輪時同一輪的休息名單只被結算一次」、「暫停出場者不因本輪休息而累加 restCount」。確認紅燈
-- [ ] 4.6 GREEN: `createRound` 回傳值新增 `restSettlements`（`{ id, restCount }` patch 陣列），內容為**上一輪** `restingPlayerIds` 各 +1；無上一輪時為空陣列。SHALL NOT 在本函式內修改任何 `Player` 物件（design Decision 1）
-- [ ] 4.7 REFACTOR: 確認 `createRound` 只做投影與串接——排序、配對、重複迴避一律由 `allocateRound` 負責，本檔 SHALL NOT 重新實作其中任何一項
-- [ ] 4.8 RED: 於 `round.test.ts` 補五個 it：「名單為空時不建立回合並提示新增參賽者」、「單打不足 2 人或雙打不足 4 人時不建立回合」、「全員暫停出場時的訊息與名單為空時不同」、「產生失敗時既有回合與 restCount 皆不受影響」、「場地數不合法時接住例外並轉為失敗結果」。確認紅燈
-- [ ] 4.9 GREEN: 實作失敗結果的 discriminated union（`{ ok: false, code, message }`），訊息為繁體中文並說明修正方式；以 try/catch 接住 `allocateRound` 對場地數拋出的 `Error`，轉為同一種失敗結果。失敗時 SHALL NOT 產生 `restSettlements`
-- [ ] 4.10 REFACTOR: 邊界檢查集中在 `createRound` 入口一處，錯誤代碼與訊息抽為具名常數，三種空狀態（名單為空／人數不足／全員暫停）各有各的訊息
+- [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round.test.ts`，寫入三個 it：「首輪回合編號為 1，基準為空且所有場次為 pending」、「產生新一輪時回合編號加 1 並取代目前回合」、「簽章基準以字串陣列保存，呼叫 allocateRound 前轉為 Set」。確認紅燈
+
+  **紅燈證據**：`Failed to resolve import "./round"`——**真紅燈**。
+
+- [x] 4.2 GREEN: 實作 `createRound(input)` 骨幹：呼叫 `allocateRound()` → 把 `Match`（內嵌完整 `Player`）投影成只帶 `playerIds` 與 rating 快照的 `RoundMatch` → 填入 `playerRatings[].before`、`after` 為 `null` → 回合編號由 `previousRound` 推導。`seenSignatures` 在回合物件中為字串陣列，傳給 `allocateRound()` 前轉 `Set`
+
+  綠燈：3 passed。⚠️ **本步驟寫過頭**——把基準推導（`previousRoundOwnSignatures`／`avoidanceBasis`）與休息結算（`computeRestSettlements`）的完整邏輯一次寫入，而非只留最小骨幹，導致 4.3／4.5 的 7 個 it 加入時即綠（見下）。Implementer 主動揭露此事，經 reviewer 以 `git show 9e77c58` 查核**與 git 完全相符**。
+
+- [x] 4.3 RED: 於 `round.test.ts` 補三個 it：「上一輪已完成與進行中的場次納入重複比對基準」、「上一輪未開始的場次不納入基準也不寫入歷史」、「重複比對基準只取上一輪，不累積更早的回合」。確認紅燈
+
+  ⚠️ **regression guard（加入即綠，非真紅燈）**：邏輯已於 4.2 一併寫入。`git show --stat 78f6548` 確認該 commit **只新增測試檔（+180 行）、未動 `round.ts`**，標註誠實。
+
+- [x] 4.4 GREEN: 實作基準推導：以 `duplication.ts` 的 `buildSignatureIndex` 對上一輪的 `completed` + `scoring` 場次建索引，併入上一輪回合自身的 `seenSignatures`；`pending` 場次一律略過。SHALL NOT 累積更早的回合（design Decision 2）
+
+  **mutation 驗證**：把 `previousRoundOwnSignatures` 暫時改成也併入 `previousRound.seenSignatures`（模擬累積式錯誤實作）→「重複比對基準只取上一輪，不累積更早的回合」轉紅（`expected [ 'p1#p2' ] to not include 'p1#p2'`）；還原 → 綠。
+
+  **設計說明（經 reviewer 確認為 spec 唯一自洽解）**：「本輪保存的 `seenSignatures`」與「餵給 `allocateRound` 的避讓基準」刻意**分岔**——前者只含上一輪自身 `completed`／`scoring` 的簽章（深度恆為一輪），後者才額外併入上一輪攜帶的 `seenSignatures`（深度有界為 2）。若不分岔而把避讓基準原樣寫回欄位，第三輪的 `seenSignatures` 會含第一輪的簽章，**直接違反** Scenario「基準只取上一輪不累積更早的回合」；而 §5 的 Scenario「重排沿用原回合與前一輪的重複比對基準」又以「GIVEN 目前回合的 `seenSignatures` 含前一輪的組合」反向背書此設計。spec 正文第 120 行的括號與該 Scenario 本身互相矛盾，依 Scenario 解讀是正確取捨。
+
+- [x] 4.5 RED: 於 `round.test.ts` 補四個 it：「產生新一輪時上一輪休息者的 restCount 加 1，出場者不變」、「產生首輪時不結算任何人的 restCount」、「連續產生多輪時同一輪的休息名單只被結算一次」、「暫停出場者不因本輪休息而累加 restCount」。確認紅燈
+
+  ⚠️ **regression guard（加入即綠，非真紅燈）**：同 4.3，邏輯已於 4.2 寫入。`git show --stat 5e3bdb5` 確認只新增測試檔（+137 行）。
+
+- [x] 4.6 GREEN: `createRound` 回傳值新增 `restSettlements`（`{ id, restCount }` patch 陣列），內容為**上一輪** `restingPlayerIds` 各 +1；無上一輪時為空陣列。SHALL NOT 在本函式內修改任何 `Player` 物件（design Decision 1）
+
+  **mutation 驗證**：把 `computeRestSettlements` 的引數由 `previousRound` 暫改為 `round`（模擬用錯輪次的 off-by-one）→「連續產生多輪時同一輪的休息名單只被結算一次」與「產生新一輪時上一輪休息者的 restCount 加 1，出場者不變」同時轉紅；還原 → 綠。
+
+  審查後補上「`createRound` SHALL NOT 修改任何 `Player` 物件」的測試守門（`structuredClone` 快照 + `toEqual` 比對）——此為 Decision 1 的核心承諾，原本只有實作正確但無 regression guard。
+
+- [x] 4.7 REFACTOR: 確認 `createRound` 只做投影與串接——排序、配對、重複迴避一律由 `allocateRound` 負責，本檔 SHALL NOT 重新實作其中任何一項
+
+  grep 佐證：`round.ts` 內 `"|"`／`"#"`／`.sort(`／`.join(` **零命中**，簽章一律經 `buildSignatureIndex`，排序／配對／迴避全在 `allocateRound` 內。`round.ts` 唯一「自己算」的是 `roundNumber + 1` 與 `restCount + 1`。
+
+  **簽章 shim 的解法**：`buildSignatureIndex` 吃 `Match`（內嵌完整 `Player`）但回合只有 `RoundMatch`（只有 `playerIds`）。逐行查核 `duplication.ts` 後確認三個簽章函式**只讀 `players.map(p => p.id)` 與 `players.length`**，完全不讀 `format`／`courtNumber`／`doublesComposition`／`rating`／`name`，故建立 stand-in `Player`（只有 `id` 為真、其餘為佔位值），**不查名單**——球員已被刪除也不影響簽章。全程未用 `as any`。
+
+  ⚠️ **已知技術債**：stand-in `Player` 的 `name: ""`／`rating: 0` **違反 `PlayerSchema`**（型別合法、schema 非法），但該物件只存活於一次 `buildSignatureIndex` 呼叫、不進入回傳值、不被持久化，reviewer 判為可接受的 Nit。**更乾淨的正解**是把 `duplication.ts` 的簽章函式改為吃 id 陣列、`Match` 版本降為薄包裝——但 `duplication.ts` 不在本 change 可動檔案清單內，**建議另開 change 處理**。
+
+- [x] 4.8 RED: 於 `round.test.ts` 補五個 it：「名單為空時不建立回合並提示新增參賽者」、「單打不足 2 人或雙打不足 4 人時不建立回合」、「全員暫停出場時的訊息與名單為空時不同」、「產生失敗時既有回合與 restCount 皆不受影響」、「場地數不合法時接住例外並轉為失敗結果」。確認紅燈
+
+  **紅燈證據**：`ROUND_FAILURE_CODE` 未匯出、`TypeError: Cannot read properties of undefined`，且三個 `expect(result.ok).toBe(false)` 因尚無邊界檢查而收到 `true`。
+
+  ⚠️ **紅燈性質需精確區分**（原回報「那部分邏輯在 4.2 完全沒有寫」過度概括，經 reviewer 以 `git show` 查核更正）：`try/catch` 與 `{ ok: false, code: "invalid-court-count" }` **在 4.2 的 `9e77c58` 就已存在**，因此「場地數不合法時接住例外並轉為失敗結果」的紅燈只源於 `ROUND_FAILURE_CODE` 尚未匯出，屬**形狀紅燈**；其餘 4 個 it 為貨真價實的**行為紅燈**。
+
+- [x] 4.9 GREEN: 實作失敗結果的 discriminated union（`{ ok: false, code, message }`），訊息為繁體中文並說明修正方式；以 try/catch 接住 `allocateRound` 對場地數拋出的 `Error`，轉為同一種失敗結果。失敗時 SHALL NOT 產生 `restSettlements`
+
+  綠燈：15/15。`ROUND_FAILURE_CODE`、`FORMAT_LABEL`、三則訊息常數與三道入口邊界檢查（名單為空／全員暫停／人數不足）確認**首次出現於 `6103f57`**（逐 commit `grep -c` 佐證：前四個 commit 皆為 0）。人數判斷用 `PLAYERS_PER_MATCH[format]`，未寫死 2／4。
+
+- [x] 4.10 REFACTOR: 邊界檢查集中在 `createRound` 入口一處，錯誤代碼與訊息抽為具名常數，三種空狀態（名單為空／人數不足／全員暫停）各有各的訊息
+
+  邊界檢查集中於 `createRound` 入口一處，錯誤代碼與訊息皆為具名常數（`ROUND_FAILURE_CODE`、`EMPTY_ROSTER_MESSAGE`、`ALL_PAUSED_MESSAGE`、`INVALID_COURT_COUNT_MESSAGE`、`insufficientPlayersMessage()`），三種空狀態各有各的訊息。另消除 `previousRoundOwnSignatures` 被重複計算。
+
+  **審查退回一次（3 Blocker）後的修正**（commit `441a795`）：
+  - **補雙打覆蓋**：spec 明寫「兩場的**隊友**、交叉對手與完整比賽簽章 MUST 全部出現」，但原 fixture 全為單打 → `teammateKeys` 恆為 `[]`，該子句**空洞成立、零斷言**；連帶使整個套件從未讓 `createRound` 成功走過雙打，`doublesComposition` 分支與簽章 shim 的 2-id 路徑皆零覆蓋。已就地改造為 8 人雙打（不新增 it），補上隊友簽章斷言。**mutation 驗證**：把 `toSignatureTeam` 改為只取第一個 id → 該 it 轉紅（`expected [] to include 'p1|p2'`）；還原 → 綠。
+  - **更正註解 `design Decision 1` 的歧義**：檔首該處指的是已歸檔 `matchmaker-allocation-engine` 的 Decision 1，與檔案後段本 change 的 Decision 1 同名卻指涉不同文件，已明確標註來源。
+  - **更正「累積鏈長度恆為 1」的不實敘述**：實測避讓基準回溯深度為 **2 輪**（`sig(rN-1) ∪ sig(rN-2)`），有界合規但不是 1；保存欄位才是深度恆為一輪。
+  - 另採納 7 項 Nit：`structuredClone` 取代 `JSON.parse(JSON.stringify())`、測試人數改由 `PLAYERS_PER_MATCH` 推導、替換近似恆真的斷言、補不可變性守門、修正 import 順序、移除會過期的「唯一對外入口」措辭、以 `Object.keys` 結構斷言取代湊數的 `not.toHaveProperty`。
+
 
 ## 5. 目標分數與重排未完成場次（round.ts）
 Depends on: §4
