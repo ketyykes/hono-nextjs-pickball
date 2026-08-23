@@ -5,6 +5,7 @@ import { RATING_D, RATING_K_BASE, K_DECAY_GAMES, RATING_MIN, RATING_MAX } from "
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
 import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult, Side } from "./rating-types";
+import type { MatchFormat } from "./allocation-types";
 
 /**
  * 計算預測勝率：輸入雙方的平均評分（雙打為隊伍平均），回傳前者的預測勝率。
@@ -58,14 +59,20 @@ function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChan
 	};
 }
 
+// 對戰方式的中文標籤。
+const FORMAT_LABELS = {
+	singles: "單打",
+	doubles: "雙打",
+} as const satisfies Record<MatchFormat, string>;
+
 // 驗證隊伍人數與對戰方式是否符合。
-function assertValidTeamSize(format: string, teams: readonly [Side, Side]): void {
-	const playersPerTeam = PLAYERS_PER_MATCH[format as keyof typeof PLAYERS_PER_MATCH] / 2;
+function assertValidTeamSize(format: MatchFormat, teams: readonly [Side, Side]): void {
+	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
 
 	for (let i = 0; i < 2; i++) {
 		const teamSize = teams[i].length;
 		if (teamSize !== playersPerTeam) {
-			throw new Error(`隊伍人數需為 ${playersPerTeam} 人（目前輸入：${teamSize}）。`);
+			throw new Error(`對戰方式為「${FORMAT_LABELS[format]}」時，隊伍人數需為 ${playersPerTeam} 人，請調整後再試一次（目前輸入：${teamSize} 人）。`);
 		}
 	}
 }
