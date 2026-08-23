@@ -7,8 +7,11 @@
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
+import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
+import type { MatchHistoryEntry } from "./history";
+import type { RatingPlayerInput } from "./rating-types";
 import type { Player } from "./types";
 import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
 
@@ -641,4 +644,221 @@ export function validateScoreInput(match: RoundMatch, rawScoreA: string, rawScor
 	}
 
 	return { ok: true, scoreA, scoreB };
+}
+
+/**
+ * submitScore 的失敗代碼：驗證失敗直接沿用 validateScoreInput 的代碼（同一組原因、
+ * 同一句訊息），MATCH_NOT_FOUND 是本函式獨有——找不到指定場次代表呼叫端持有過期的
+ * matchId（例如場次已被重排移除），與比分欄位是否合法無關。
+ */
+export const SUBMIT_SCORE_FAILURE_CODE = {
+	MATCH_NOT_FOUND: "match-not-found",
+} as const;
+
+export type SubmitScoreFailureCode = ValidateScoreFailureCode | (typeof SUBMIT_SCORE_FAILURE_CODE)[keyof typeof SUBMIT_SCORE_FAILURE_CODE];
+
+const MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
+
+/** submitScore 的輸入。純函式——時間一律由呼叫端注入（design：不呼叫 Date.now()）。 */
+export interface SubmitScoreInput {
+	readonly round: Round;
+	readonly players: readonly Player[];
+	readonly matchId: string;
+	readonly rawScoreA: string;
+	readonly rawScoreB: string;
+	readonly now: string;
+}
+
+/** 名單 patch，形狀可直接餵給 roster.ts 的 updatePlayer(id, patch)（design Decision 6）。 */
+export interface ScorePlayerPatch {
+	readonly id: string;
+	readonly rating: number;
+	readonly gamesPlayed: number;
+}
+
+/** 本次送出的一次性觸界訊息，不進回合物件、不持久化（design Decision 6）。 */
+export interface ScoreBoundaryHit {
+	readonly playerId: string;
+	readonly atUpperBound: boolean;
+	readonly atLowerBound: boolean;
+}
+
+export interface SubmitScoreSuccess {
+	readonly ok: true;
+	readonly round: Round;
+	readonly historyEntry: MatchHistoryEntry;
+	readonly playerPatches: readonly ScorePlayerPatch[];
+	readonly boundaryHits: readonly ScoreBoundaryHit[];
+}
+
+export interface SubmitScoreFailure {
+	readonly ok: false;
+	readonly code: SubmitScoreFailureCode;
+	readonly message: string;
+}
+
+export type SubmitScoreResult = SubmitScoreSuccess | SubmitScoreFailure;
+
+// 送出當下該員在名單中的資料（rating／gamesPlayed／name），依 playerIds 的順序取出。
+// 用 filter 而非逐一 find＋在此拋錯：找不到的球員（已被移除，roster.ts 的 removePlayer
+// 不禁止移除仍在進行中場次裡的人）直接被排除在外，讓結果陣列長度變少而非在這裡處理
+// 「查無此人」的例外情境。這不是靜默放行——人數不足會在下方餵給 updateRatings 時被
+// M3 自己的 assertValidInput 擋下（「隊伍人數需為 N 人」），與 6.6 的防禦性 try/catch
+// 是同一條路徑，不需要在這裡重新實作一次「球員是否存在」的檢查。
+function resolveTeamPlayers(playerIds: readonly string[], players: readonly Player[]): Player[] {
+	return players.filter((player) => playerIds.includes(player.id));
+}
+
+// RoundMatch → MatchHistoryEntry 的唯一投影實作（tasks 6.7）。
+// teamA／teamB 的 rating 直接沿用 match.teams[i].rating——那是 createRound 建立本場次時
+// 寫入的隊伍分數快照（toRoundTeam，見本檔上方），語意正是 HistoryTeam.rating 定義的
+// 「賽前隊伍分數」：從建立回合到送出比分之間，除了這次 submitScore 呼叫本身，沒有其他
+// 事件能改動這些球員的 rating，因此兩個時間點的隊伍分數必然相同，可以直接沿用而不必
+// 重新加總。
+//
+// changes 與 matchPlayers 的順序保證一致（見下方 submitScore：兩者皆源自同一次
+// 「teamAPlayers 在前、teamBPlayers 在後」的攤平），故以陣列索引配對即可，
+// 不需要另外以 id 建 Map 查表。
+function toHistoryEntry(
+	match: RoundMatch,
+	scoreA: number,
+	scoreB: number,
+	winner: "teamA" | "teamB",
+	completedAt: string,
+	changes: readonly { readonly id: string; readonly before: number; readonly after: number }[],
+	matchPlayers: readonly Player[],
+): MatchHistoryEntry {
+	const teamASize = match.teams[0].playerIds.length;
+
+	const toHistoryTeam = (
+		teamChanges: readonly { readonly id: string; readonly before: number; readonly after: number }[],
+		teamPlayers: readonly Player[],
+		teamRating: number,
+	) => ({
+		rating: teamRating,
+		players: teamChanges.map((change, index) => ({
+			id: change.id,
+			name: teamPlayers[index].name,
+			ratingBefore: change.before,
+			ratingAfter: change.after,
+		})),
+	});
+
+	const base = {
+		matchId: match.id,
+		courtNumber: match.courtNumber,
+		playedAt: completedAt,
+		teamA: toHistoryTeam(changes.slice(0, teamASize), matchPlayers.slice(0, teamASize), match.teams[0].rating),
+		teamB: toHistoryTeam(changes.slice(teamASize), matchPlayers.slice(teamASize), match.teams[1].rating),
+		scoreA,
+		scoreB,
+		winner,
+	};
+
+	// 單打／雙打分屬 MatchHistoryEntrySchema 的兩個 .strict() 分支（history.ts）：單打分支
+	// 不得帶 doublesComposition、雙打分支必須帶。用 match.format 分岔物件字面量而非事後
+	// spread 補欄位，讓 TS 在編譯期就能檢查兩分支各自的欄位集合是否正確，spread 則要到
+	// zod parse 才會發現漏欄位或多欄位。
+	//
+	// match.doublesComposition 型別上是 optional（round-types.ts 刻意不用 discriminated
+	// union，理由見該檔 RoundMatchSchema 註解），但雙打場次在唯一的建構路徑
+	// createRound／resetIncompleteMatches 一定會寫入這個欄位（toRoundMatch 的
+	// ...(format === "doubles" ? { doublesComposition } : {})）。這裡退回 "general"
+	// 純粹是為了在型別上收斂（DoublesComposition 沒有「未知」這個合法值可用），不代表
+	// 本函式認為缺值是正常情況——若真的發生，代表回合資料已經損壞，而本函式不是資料
+	// 完整性的把關點（那是 round-storage.ts 的 §7 職責）。
+	if (match.format === "doubles") {
+		const doublesComposition = match.doublesComposition ?? "general";
+		return { ...base, format: "doubles", doublesComposition };
+	}
+	return { ...base, format: "singles" };
+}
+
+/**
+ * 送出一場比分：驗證 → 呼叫評分 API → 標記完成 → 建立歷史紀錄 → 結算 gamesPlayed，
+ * 依固定順序完成一場對戰（spec「比分送出的完成流程」）。純函式，回傳新回合與待套用的
+ * 歷史／名單 patch，不直接操作任何 store（design Decision 6：三份資料的更新若各自散在
+ * side effect 裡，任一個丟例外就會留下部分更新且無法自我修復）。
+ *
+ * 原子性由「失敗時不回傳任何可寫入的東西」保證：validateScoreInput 在最前面、任何計算
+ * 之前完成，失敗時直接回傳該失敗結果，呼叫端拿到的物件裡沒有 historyEntry／
+ * playerPatches／boundaryHits 可用，無從產生部分更新。
+ */
+export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
+	const { round, players, matchId, rawScoreA, rawScoreB, now } = input;
+
+	const match = round.matches.find((m) => m.id === matchId);
+	if (match === undefined) {
+		return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.MATCH_NOT_FOUND, message: MATCH_NOT_FOUND_MESSAGE };
+	}
+
+	const validated = validateScoreInput(match, rawScoreA, rawScoreB);
+	if (!validated.ok) {
+		return validated;
+	}
+	const { scoreA, scoreB } = validated;
+
+	// 勝方判定的唯一實作位置（tasks 6.7）：上面已擋下平局，此處 scoreA、scoreB 必不相等。
+	const winner: "teamA" | "teamB" = scoreA > scoreB ? "teamA" : "teamB";
+
+	const teamAPlayers = resolveTeamPlayers(match.teams[0].playerIds, players);
+	const teamBPlayers = resolveTeamPlayers(match.teams[1].playerIds, players);
+	const matchPlayers = [...teamAPlayers, ...teamBPlayers];
+
+	const toRatingInput = (player: Player): RatingPlayerInput => ({
+		id: player.id,
+		rating: player.rating,
+		gamesPlayed: player.gamesPlayed,
+	});
+
+	const ratingResult = updateRatings({
+		format: match.format,
+		teams: [teamAPlayers.map(toRatingInput), teamBPlayers.map(toRatingInput)],
+		winnerIndex: winner === "teamA" ? 0 : 1,
+	});
+
+	// changes 的順序是「隊伍 A 全員 → 隊伍 B 全員」（rating-types.ts），與上面 matchPlayers
+	// 的建構順序（teamAPlayers 在前、teamBPlayers 在後）一致，可直接以陣列索引配對。
+	const playerRatings: PlayerRating[] = ratingResult.changes.map((change) => ({
+		playerId: change.id,
+		before: change.before,
+		after: change.after,
+	}));
+
+	// boundaryHits 於此階段先留空陣列：正確推導觸界旗標是 §6.6「補齊 boundaryHits 的傳遞」
+	// 的範圍，本階段（§6.4）只需先完成送出比分的骨幹流程。
+	const boundaryHits: ScoreBoundaryHit[] = [];
+
+	const playerPatches: ScorePlayerPatch[] = ratingResult.changes.map((change, index) => ({
+		id: change.id,
+		rating: change.after,
+		// gamesPlayed 的 patch 值須為「目前值 + 1」（絕對值），不是差值——updatePlayer 是
+		// 覆寫語意（roster.ts UpdatePlayerPatch 註解對此有明文警告），傳差值會直接蓋掉
+		// 既有累計值。matchPlayers[index] 與 change 同序（見上方註解），故可直接索引取值。
+		gamesPlayed: matchPlayers[index].gamesPlayed + 1,
+	}));
+
+	const completedMatch: RoundMatch = {
+		...match,
+		status: "completed",
+		scores: { teamA: scoreA, teamB: scoreB },
+		winner,
+		completedAt: now,
+		playerRatings,
+	};
+
+	const updatedRound: Round = {
+		...round,
+		matches: round.matches.map((m) => (m.id === matchId ? completedMatch : m)),
+	};
+
+	const historyEntry = toHistoryEntry(match, scoreA, scoreB, winner, now, ratingResult.changes, matchPlayers);
+
+	return {
+		ok: true,
+		round: updatedRound,
+		historyEntry,
+		playerPatches,
+		boundaryHits,
+	};
 }

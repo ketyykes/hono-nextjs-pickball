@@ -1198,3 +1198,180 @@ describe("validateScoreInput", () => {
 		expect(completedMatch).toEqual(snapshot);
 	});
 });
+
+describe("submitScore", () => {
+	it("送出合法比分後場次標記為完成並記錄比分、勝方與完成時間", () => {
+		const players = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+			],
+		});
+		const round = makeRound({ matches: [match] });
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const updated = result.round.matches.find((m) => m.id === "m-1");
+		expect(updated?.status).toBe("completed");
+		expect(updated?.scores).toEqual({ teamA: 11, teamB: 7 });
+		expect(updated?.winner).toBe("teamA");
+		expect(updated?.completedAt).toBe(FIXED_NOW);
+	});
+
+	it("完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數", () => {
+		// 雙打：4 人。
+		const doublesPlayers = [
+			makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p3", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p4", rating: 3, gamesPlayed: 0 }),
+		];
+		const doublesMatch = makeRoundMatch({
+			id: "m-d",
+			format: "doubles",
+			doublesComposition: "general",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+				{ playerId: "p3", before: 3, after: null },
+				{ playerId: "p4", before: 3, after: null },
+			],
+		});
+		const doublesRound = makeRound({ format: "doubles", matches: [doublesMatch] });
+
+		const doublesResult = submitScore({
+			round: doublesRound,
+			players: doublesPlayers,
+			matchId: "m-d",
+			rawScoreA: "11",
+			rawScoreB: "9",
+			now: FIXED_NOW,
+		});
+
+		expect(doublesResult.ok).toBe(true);
+		if (!doublesResult.ok) return;
+		const doublesUpdated = doublesResult.round.matches.find((m) => m.id === "m-d");
+		expect(doublesUpdated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.doubles);
+		expect(new Set(doublesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2", "p3", "p4"]));
+		for (const rating of doublesUpdated?.playerRatings ?? []) {
+			expect(rating.before).toBe(3);
+			expect(typeof rating.after).toBe("number");
+		}
+
+		// 單打：2 人。
+		const singlesPlayers = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
+		const singlesMatch = makeRoundMatch({
+			id: "m-s",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+			],
+		});
+		const singlesRound = makeRound({ matches: [singlesMatch] });
+
+		const singlesResult = submitScore({
+			round: singlesRound,
+			players: singlesPlayers,
+			matchId: "m-s",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: FIXED_NOW,
+		});
+
+		expect(singlesResult.ok).toBe(true);
+		if (!singlesResult.ok) return;
+		const singlesUpdated = singlesResult.round.matches.find((m) => m.id === "m-s");
+		expect(singlesUpdated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.singles);
+		expect(new Set(singlesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2"]));
+	});
+
+	it("完成場次後評分結果寫回名單，未參賽者不受影響", () => {
+		const players = [
+			makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "bystander", rating: 5, gamesPlayed: 2 }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+			],
+		});
+		const round = makeRound({ matches: [match] });
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.playerPatches.map((p) => p.id).sort()).toEqual(["p1", "p2"]);
+		const p1Patch = result.playerPatches.find((p) => p.id === "p1");
+		const p2Patch = result.playerPatches.find((p) => p.id === "p2");
+		// p1（勝方）分數應上升，p2（敗方）分數應下降——零和結構（rating.ts design Decision 4）。
+		expect(p1Patch?.rating).toBeGreaterThan(3);
+		expect(p2Patch?.rating).toBeLessThan(3);
+		expect(result.playerPatches.some((p) => p.id === "bystander")).toBe(false);
+	});
+
+	it("完成場次後該場球員 gamesPlayed 各加 1，其餘人不變", () => {
+		const players = [
+			makePlayer({ id: "p1", rating: 3, gamesPlayed: 4 }),
+			makePlayer({ id: "p2", rating: 3, gamesPlayed: 2 }),
+			makePlayer({ id: "p3", rating: 3, gamesPlayed: 1 }),
+			makePlayer({ id: "p4", rating: 3, gamesPlayed: 9 }),
+			makePlayer({ id: "resting", rating: 3, gamesPlayed: 7 }),
+		];
+		const match = makeRoundMatch({
+			id: "m-d",
+			format: "doubles",
+			doublesComposition: "general",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+				{ playerId: "p3", before: 3, after: null },
+				{ playerId: "p4", before: 3, after: null },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match] });
+
+		const result = submitScore({ round, players, matchId: "m-d", rawScoreA: "11", rawScoreB: "9", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const patchesById = new Map(result.playerPatches.map((p) => [p.id, p]));
+		// gamesPlayed 的 patch 值須為「目前值 + 1」（絕對值），不是差值 1——updatePlayer 是
+		// 覆寫語意（roster.ts UpdatePlayerPatch 註解），傳差值會直接蓋掉既有累計值。
+		expect(patchesById.get("p1")?.gamesPlayed).toBe(5);
+		expect(patchesById.get("p2")?.gamesPlayed).toBe(3);
+		expect(patchesById.get("p3")?.gamesPlayed).toBe(2);
+		expect(patchesById.get("p4")?.gamesPlayed).toBe(10);
+		expect(patchesById.has("resting")).toBe(false);
+	});
+});
