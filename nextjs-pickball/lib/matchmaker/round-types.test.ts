@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RoundSchema, MatchStatusSchema, RoundTargetScoreSchema, TARGET_SCORE_OPTIONS } from "./round-types";
+import { RoundSchema, MatchStatusSchema, TARGET_SCORE_OPTIONS } from "./round-types";
 import { TargetScoreSchema } from "../scoreboard/types";
 
 describe("RoundSchema", () => {
@@ -242,21 +242,20 @@ describe("RoundSchema", () => {
 		const invalidUndefined = RoundSchema.safeParse({
 			...baseRound,
 			// targetScore 未提供
-		} as any);
+		});
 		expect(invalidUndefined.success).toBe(false);
 	});
 
 	it("目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致", () => {
-		// 取出 RoundTargetScoreSchema 的可接受值
 		const roundOptions = new Set(TARGET_SCORE_OPTIONS);
 
-		// 取出 TargetScoreSchema 的可接受值（除了 default 之外）
-		// TargetScoreSchema 是 z.union([z.literal(11), z.literal(15), z.literal(21)]).default(11)
-		// 其可接受的值是 11、15、21
-		const scoreboardValidValues = [11, 15, 21];
-		const scoreboardOptions = new Set(scoreboardValidValues);
+		// 值域必須自 TargetScoreSchema 本身讀出，而非硬編字面量。
+		// 若計分板日後改變可接受的分數，這個測試才會轉紅，防止跨 capability 的靜默漂移。
+		// .unwrap() 用來去掉向後相容所加的 .default(11) 包裝，才能存取底層 union 的選項。
+		const scoreboardOptions = new Set(
+			TargetScoreSchema.unwrap().options.map((literal) => literal.value),
+		);
 
-		// 驗證兩個集合完全相同
 		expect(roundOptions).toEqual(scoreboardOptions);
 	});
 });
