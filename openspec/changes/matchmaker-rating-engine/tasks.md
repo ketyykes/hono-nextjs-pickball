@@ -16,8 +16,8 @@
 
 ## 1. 常數與型別骨架（rating-types.ts）
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/rating.test.ts`，寫入 it「評分常數以具名常數匯出，D 為 3.0、K_base 為 0.15」——由 `./rating-types` 匯入 `RATING_D`、`RATING_K_BASE`、`RATING_MIN`、`RATING_MAX`、`K_DECAY_GAMES` 並斷言依序為 `3.0`、`0.15`、`1`、`8`、`20`。跑單檔確認紅燈（此時應為模組解析失敗）並貼出輸出
-- [ ] 1.2 GREEN: 建立 `nextjs-pickball/lib/matchmaker/rating-types.ts`：匯出上述五個常數，並定義 `RatingPlayerInput`（`id`、`rating`、`gamesPlayed`）、`RatingUpdateInput`（`format`、`teams: readonly [Side, Side]`、`winnerIndex: 0 | 1`）、`RatingChange`（`id`、`before`、`after`、`delta`、`atUpperBound`、`atLowerBound`、`clamped`）、`RatingUpdateResult`（`changes`、`expectedScores`）。`MatchFormat` 由 `./allocation-types` **`import type` 取用**，不重新定義（design Decision 9）。本檔為純型別與常數、無函式，依 `nextjs-pickball/CLAUDE.md` 的 TDD 適用範圍**不建立 `rating-types.test.ts`**；常數的斷言掛在 `rating.test.ts`（沿用 M2 `allocation-types.ts` 的既有處理方式）
+- [x] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/rating.test.ts`，寫入 it「評分常數以具名常數匯出，D 為 3.0、K_base 為 0.15」——由 `./rating-types` 匯入 `RATING_D`、`RATING_K_BASE`、`RATING_MIN`、`RATING_MAX`、`K_DECAY_GAMES` 並斷言依序為 `3.0`、`0.15`、`1`、`8`、`20`。跑單檔確認紅燈（此時應為模組解析失敗）並貼出輸出
+- [x] 1.2 GREEN: 建立 `nextjs-pickball/lib/matchmaker/rating-types.ts`：匯出上述五個常數，並定義 `RatingPlayerInput`（`id`、`rating`、`gamesPlayed`）、`RatingUpdateInput`（`format`、`teams: readonly [Side, Side]`、`winnerIndex: 0 | 1`）、`RatingChange`（`id`、`before`、`after`、`delta`、`atUpperBound`、`atLowerBound`、`clamped`）、`RatingUpdateResult`（`changes`、`expectedScores`）。`MatchFormat` 由 `./allocation-types` **`import type` 取用**，不重新定義（design Decision 9）。本檔為純型別與常數、無函式，依 `nextjs-pickball/CLAUDE.md` 的 TDD 適用範圍**不建立 `rating-types.test.ts`**；常數的斷言掛在 `rating.test.ts`（沿用 M2 `allocation-types.ts` 的既有處理方式）
 
 ## 2. 預測勝率（rating.ts）
 
