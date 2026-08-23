@@ -66,12 +66,16 @@ Depends on: §4
 > 5.1 的三個 it 會在寫入當下即為綠燈——**那是 regression guard，請如實標註於本行並貼出實測輸出**，
 > 不得改斷言偽造紅燈。「雙打每隊 2 人」的人數推導在該情況下仍可能是紅燈，照常走 5.2。
 
-- [ ] 5.1 RED: 補三個 it：
+- [x] 5.1 RED: 補三個 it：
   - 「雙打以兩隊平均分數計算預測勝率，而非以總和」——隊一 `[6.00, 4.00]`、隊二 `[4.50, 3.50]`、`gamesPlayed` 皆 0，隊一勝 → `expectedScores[0]` 約 `0.683`（非 `0.823`），四人賽後為 `6.10`／`4.10`／`4.40`／`3.40`
   - 「雙打同隊兩人出場次數相同時加減同一數值」——同上輸入，隊一兩人 `delta` 皆為 `+0.10`（完全相等）
   - 「雙打同隊兩人出場次數不同時各自套用自己的 K_eff」——四人皆 4.00，每隊各有 `gamesPlayed` 0 與 60 各一人，隊一勝 → 隊一 `delta` 為 `+0.15` 與 `+0.09`、隊二為 `-0.15` 與 `-0.09`，同隊方向相同
   確認紅燈並貼出輸出
-- [ ] 5.2 GREEN: 把 `E` 的計算推廣為**兩隊平均 `rating`**（`sum / 隊伍人數`），並讓 `updateRatings` 依 `format` 處理每隊 1 人或 2 人。每隊人數由 `PLAYERS_PER_MATCH[format] / 2` 推導（`PLAYERS_PER_MATCH` 由 `./allocation-types` 匯入），**不得**寫死 `1` 或 `2`（design Decision 9）。同隊兩人共用同一個 `(S - E)`，各自以自己的 `K_eff` 放大（design Decision 3）
+  > **實測結果：全綠，本批為 regression guard（如實標註）**。§4 的 `updateRatings` 已以隊伍平均
+  > （`sum / team.length`）與逐人 `effectiveK(player.gamesPlayed)` 實作，雙層迴圈本就能處理任意隊伍人數，
+  > 因此這三個 it 在寫入當下即為綠燈（`Tests 14 passed (14)`）。Stage 1 已比對前一版 `rating.ts`
+  > 確認此說明成立、非掩飾漏寫實作，且無「改斷言看紅再改回」的痕跡。5.2 的人數推導照常實作。
+- [x] 5.2 GREEN: 把 `E` 的計算推廣為**兩隊平均 `rating`**（`sum / 隊伍人數`），並讓 `updateRatings` 依 `format` 處理每隊 1 人或 2 人。每隊人數由 `PLAYERS_PER_MATCH[format] / 2` 推導（`PLAYERS_PER_MATCH` 由 `./allocation-types` 匯入），**不得**寫死 `1` 或 `2`（design Decision 9）。同隊兩人共用同一個 `(S - E)`，各自以自己的 `K_eff` 放大（design Decision 3）
 - [ ] 5.3 REFACTOR: 確認單打與雙打**共用同一條路徑**（單打即隊伍人數 1 的特例，平均等於該員 `rating`），`rating.ts` 內不存在兩份平行的公式實作
 
 ## 6. 邊界 clamp 與觸界標示（rating.ts）
