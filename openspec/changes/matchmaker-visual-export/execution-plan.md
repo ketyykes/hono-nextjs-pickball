@@ -1,23 +1,35 @@
 ## Mode
 
-`subagent-driven`
+`group-driven`
 
-每個 task 由**全新的 subagent** 執行，逐 task 走 Implementer → Stage 1（規格符合）→ Stage 2
-（程式品質）三段流程；全部 task 完成後再跑一次 Final Code Reviewer 檢查跨 task 的一致性。
-SHALL NOT 並行派發多個 Implementer——它們共用同一個 worktree，並行必然互相覆寫。
+派工單位是 tasks.md 的 `§` 群組（章節）：**一個群組派一個全新的 subagent**，由它一次做完
+該組所有 task。組內仍**逐 task 依序**走 TDD 三步——每個 task 先寫失敗測試並在 shell 實際
+看到紅燈，再最小實作至綠，再 refactor；紅燈誠實條款不變（加入即綠者 MUST 誠實標註為
+regression guard，SHALL NOT 用「改斷言看紅再改回」偽造紅燈）。
 
-## Per-task contract
+兩階段審查改為**逐組**：整組所有 task 完成後才跑 Stage 1（規格符合，審整組）→ Stage 2
+（程式品質，審整組），SHALL NOT 在組內逐 task 送審。全部群組完成後再跑一次 Final Code
+Reviewer 檢查跨群組的一致性，該階段的內容與時機完全不變。
 
-subagent **不繼承主對話的任何 context**。每次派工時，下列項目 MUST 逐字貼進 prompt，
-SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 明文禁止讓 subagent 直接讀
-計畫檔）：
+群組之間**仍嚴格序列**。SHALL NOT 並行派發多個 Implementer——它們共用同一個 worktree，
+並行必然互相覆寫。
 
-1. **tasks.md 的完整 task 文字**：RED + GREEN 配對（REFACTOR task 則貼該項全文）。
-2. **test-plan.md 的對應表格列**：Test name / Scenario / Assertion / Why first / Tier 五欄，
-   一字不改。Tier 決定測試放哪一層與用哪個指令跑，不可省略。
-3. **相關的 spec.md 片段**：只貼本 task 觸及的那一個 Requirement 及其 Scenario（含「驗收」
+> 出處：2026-08-23 依使用者決定由逐 task 派工改為逐組派工以加速；
+> M3（matchmaker-rating-engine）不適用，仍依原逐 task 制執行。
+
+## Per-group contract
+
+subagent **不繼承主對話的任何 context**。每次派工（單位為一個 `§` 群組）時，下列項目 MUST
+逐字貼進 prompt，SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 明文禁止讓
+subagent 直接讀計畫檔）：
+
+1. **tasks.md 該組的完整 task 文字**：該組**所有** task 的 RED + GREEN 配對全文
+   （REFACTOR task 則貼該項全文），依組內原順序排列。
+2. **test-plan.md 該組對應的所有表格列**：Test name / Scenario / Assertion / Why first / Tier
+   五欄，一字不改。Tier 決定測試放哪一層與用哪個指令跑，不可省略。
+3. **相關的 spec.md 片段**：貼本組觸及的**每一個** Requirement 全文及其 Scenario（含「驗收」
    錨點）。SHALL NOT 貼整份 spec。
-4. **相關的 design.md 片段**：影響本 task 的 Decision 與 Risk 條目。對照表：
+4. **相關的 design.md 片段**：影響本組的 Decision 與 Risk 條目。對照表：
    - §2（`export-scene.ts`）→ Decision 2（共用 scene）、Decision 8（找不到球員）、
      Decision 9（不透明白底）與「手繪版面與畫面版面是兩份呈現」的 Risk
    - §3（`export-filename.ts`）→ Decision 6（與 M8 對齊但各自實作，含 UTC 日期的已知取捨）
@@ -27,14 +39,15 @@ SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 
    - §7（canvas 與頁面組裝）→ Decision 1（選型與四個被否決的替代方案）、Decision 9
      （2 倍縮放、品質 0.92、`document.fonts.ready`）
    - §8（print CSS）→ Decision 3 的 CSS 區塊與 `body:has()` 的收斂理由
-5. **明確的「不給你」清單**：其他 task 的內容、其他 capability 的 spec、`prd.md` 全文、
+5. **明確的「不給你」清單**：其他群組的 task 內容、其他 capability 的 spec、`prd.md` 全文、
    本 change 以外的 openspec 檔案。若 subagent 認為缺 context，MUST 回報 `NEEDS_CONTEXT`
    而不是自行去翻。
 6. **worktree 絕對路徑**（見 environment.md）：
    `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-visual-export`。
    所有 subagent 共用**同一個** worktree，SHALL NOT 自行 `git worktree add`。
 7. **本 repo 的固定紀律**（每次都貼，不假設對方記得）：
-   - TDD 三步：先寫失敗測試並在 shell 實際看到紅燈（貼出輸出）→ 最小實作至綠 → refactor。
+   - TDD 三步（組內**每個 task 各走一輪**，不可整組先寫測試再一次實作）：先寫失敗測試並在
+     shell 實際看到紅燈（貼出輸出）→ 最小實作至綠 → refactor。
    - 單檔測試指令 `pnpm --filter ./nextjs-pickball test --run <path>`，**`--run` 前不可加
      `--`**（加了會跑完整套，紅燈證據被既有綠燈淹沒）。
    - E2E 指令 `pnpm --filter ./nextjs-pickball test:e2e <path>`；webServer 會自動起前後端。
@@ -56,20 +69,21 @@ SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 
 - **rationale**: §2～§6 的多數 task 是「照著 test-plan 寫一個純函式或一段 JSX」，規則已由
   spec 與 design 定死，屬執行而非設計。用最便宜的模型跑最多的量。
 - **upgrade_to_sonnet_when**:
-  - task 觸及 §7（canvas 繪製與頁面組裝）——那裡要把 scene、canvas API、Blob 下載與 M5 的
+  - 群組觸及 §7（canvas 繪製與頁面組裝）——那裡要把 scene、canvas API、Blob 下載與 M5 的
     `page.tsx` 接在一起，是本 change 唯一需要跨檔案推理的地方。
-  - task 觸及 E2E（`visual-export.spec.ts`）——`waitForEvent("download")` 的時序、
+  - 群組含 E2E task（`visual-export.spec.ts`）——`waitForEvent("download")` 的時序、
     `emulateMedia` 的作用範圍、`addInitScript` 覆寫 `window.print` 的時機都容易寫出假綠。
-  - task 觸及 §8 的 `@media print` CSS——`body:has()`、`!important` 與 Tailwind utility 的
+  - 群組觸及 §8 的 `@media print` CSS——`body:has()`、`!important` 與 Tailwind utility 的
     優先序互動不是照抄就會對。
-  - 同一 task 被同一個 reviewer 退回 2 次。
+  - 同一群組被同一個 reviewer 退回 2 次。
 - **upgrade_to_opus_when**:
-  - 同一 task 被同一個 reviewer 退回 3 次（見 Escalation）。
-  - Implementer 回報 `BLOCKED` 且原因為推理不足（非 context 不足、非 task 過大）。
-- **self-review checklist**（提交前自己先過一遍）:
-  - [ ] 紅燈輸出真的貼出來了，而且失敗訊息是「斷言不符」或「函式不存在」，不是打錯字。
+  - 同一群組被同一個 reviewer 退回 3 次（見 Escalation）。
+  - Implementer 回報 `BLOCKED` 且原因為推理不足（非 context 不足、非群組過大）。
+- **self-review checklist**（整組提交前自己先過一遍，組內每個 task 都要滿足）:
+  - [ ] 每個 task 的紅燈輸出真的都貼出來了，而且失敗訊息是「斷言不符」或「函式不存在」，
+        不是打錯字。
   - [ ] `it`／`test` 名稱與收到的 spec 驗收錨點逐字相同（含全形標點）。
-  - [ ] 沒有動到 task 範圍外的檔案；特別是**沒有修改 M5 的任何元件檔**
+  - [ ] 沒有動到本群組範圍外的檔案；特別是**沒有修改 M5 的任何元件檔**
         （`MatchStage`／`CourtCard`／`RoundControls`／`RestingPanel`）。
   - [ ] `package.json` 沒有任何新增相依（`git diff package.json` 為空）。
   - [ ] `lib/` 內的三個純函式模組沒有觸碰 `window`／`document`／`Blob`／`canvas`。
@@ -82,11 +96,11 @@ SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 
 - **rationale**: 只需比對「程式有沒有做到 spec 說的事」，不需要對品味下判斷；但要能讀懂中文
   規格的細微差異（例如「未完成場次 MUST 顯示可判讀狀態」與「留白」都能通過一個寫鬆的斷言），
   haiku 容易放行。
-- **required first action**: 覆述收到的 spec／test-plan 片段的**標題**。若與被審的 task 對不上，
+- **required first action**: 覆述收到的 spec／test-plan 片段的**標題**。若與被審的群組對不上，
   回報 `NEEDS_CONTEXT` 而**不要**開始審。
-- **review checklist**:
-  - [ ] 這個 task 對應的每一個 Scenario 都有測試覆蓋，且測試名稱與驗收錨點逐字相同。
-  - [ ] RED 測試真的映射到 Scenario 的 WHEN／THEN，不是換個容易通過的斷言。
+- **review checklist**（一次審整組）:
+  - [ ] 這個群組對應的每一個 Scenario 都有測試覆蓋，且測試名稱與驗收錨點逐字相同。
+  - [ ] 組內每個 task 的 RED 測試真的映射到 Scenario 的 WHEN／THEN，不是換個容易通過的斷言。
   - [ ] `prd.md` 9.4 的七項內容（App 名稱／回合編號／對戰方式／場地編號／色塊／姓名／
         比分或未完成狀態）在 `ExportScene` 裡一項不缺。
   - [ ] 沒有 scope creep：沒有做 JSON／CSV（M8）、歷史匯出（M7）、場邊計分（M6），
@@ -141,8 +155,9 @@ SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 
 
 ## Escalation
 
-- **同一 reviewer 連續退回 3 次** → 升級 Implementer 的模型（`haiku` → `sonnet` → `opus`）
-  後重新派工。SHALL NOT 用同一個模型在同樣條件下重試——那只會得到同樣的結果。
+- **同一群組被同一 reviewer 連續退回 3 次** → 升級 Implementer 的模型
+  （`haiku` → `sonnet` → `opus`）後重新派工該群組。SHALL NOT 用同一個模型在同樣條件下
+  重試——那只會得到同樣的結果。
 - **Spec Reviewer 自身判斷前後不一致**（例如同一條 Scenario 這次過、下次不過）→ 代表規格本身
   有歧義，升級給人類澄清並把結論補進 design.md 的 Open Questions，SHALL NOT 由 reviewer
   自行選一個解釋繼續。
@@ -150,7 +165,7 @@ SHALL NOT 只給檔案路徑要對方自己去讀（`schema.yaml` 的 Forbidden 
 - **任一階段 BLOCKED 超過 30 分鐘** → 升級給人類。
 - **本 change 專屬的升級條件**：
   - Implementer 回報「canvas 手繪做不出可接受的結果，想改用 `html-to-image` 之類的套件」
-    → **立即停止該 task**，升級給人類。這是 design Decision 1 的核心選型，牽動 bundle、
+    → **立即停止該群組**，升級給人類。這是 design Decision 1 的核心選型，牽動 bundle、
     Workers 部署與整套測試策略，SHALL NOT 由 subagent 自行改變。
   - Implementer 回報「M5 的 `page.tsx` 或 `stage-layout.ts` 與 design 假設不符」→ 依
     design Open Questions 第 1、2 條把實際簽章補記進 design.md 後再繼續；若差異大到需要改

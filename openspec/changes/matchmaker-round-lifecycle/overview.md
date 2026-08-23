@@ -248,35 +248,44 @@ LocalStorage 的每個 key 在此視為一張 table。下圖左為本 change 之
 
 ## Task Tree
 
-tasks.md 的分組與相依。§1 是所有人的地基；§2～§4 之後才輪得到 §5 的 store，§6 是收尾。
+tasks.md 的分組與相依，共 10 個章節。§1 是所有人的地基；回合狀態轉換拆成 §4→§5→§6 三段依序推進，§4～§7 全數完成後才輪得到 §8 的 store，§9 是收尾。派工單位就是這裡的 `§`（見 execution-plan 的 Mode），其中 §0 由 orchestrator 自己執行、§9 併入 Final Code Review，兩者都不派 Implementer。
 
 ```
-§0 前置 (不含 checkbox 的必讀清單)
- |   - 確認 M3 已在 main，讀出評分 API 實際簽章
- |   - 重讀主 spec 的 hooks 歸屬清單，對齊 delta 全文
+§0 前置 (不產生程式碼，由 orchestrator 自己執行)
+ |   0.1  確認 M3 已在 main，讀出評分 API 實際簽章
+ |   0.2  重讀主 spec 的 hooks 歸屬清單，對齊 delta 全文
+ |   0.3  依 environment.md 建立 worktree，回填 baseline
  |
- +-- §1 型別與 key 骨架
- |     1.1-1.3  round-types.ts + round-types.test.ts
- |     1.4-1.6  storage-keys.ts、storage.ts 的 RESET_KEYS
- |          |
- |          +-- §2 歷史 schema 與追加 (match-history)
- |          |     2.1-2.6  history.ts + history.test.ts
- |          |          |
- |          +-- §3 回合狀態轉換 (round.ts)       <-- Depends on §1, §2
- |          |     3.1-3.4   createRound + 邊界
- |          |     3.5-3.6   休息結算
- |          |     3.7-3.8   setTargetScore
- |          |     3.9-3.10  resetIncompleteMatches
- |          |     3.11-3.14 validateScore + submitScore
- |          |          |
- |          +-- §4 持久化 (round-storage.ts)     <-- Depends on §1, §2
- |                4.1-4.6  read/write + 降級
- |                     |
- |                     +-- §5 store hook          <-- Depends on §3, §4
- |                           5.1-5.4  useRoundStore + 歸屬清單同步
- |                                |
- |                                +-- §6 收尾驗證  <-- Depends on §1-§5
- |                                      6.1-6.7
+ +-- §1 回合型別與 schema (round-types.ts)
+ |     1.1-1.5  round-types.ts + round-types.test.ts
+ |
+ +-- §2 LocalStorage key 與重置範圍
+ |     2.1-2.5  storage-keys.ts、storage.ts 的 RESET_KEYS
+ |
+ +-- §3 歷史 schema 與追加 (history.ts)       <-- Depends on §1
+ |     3.1-3.7  schema + appendHistoryEntry
+ |
+ +-- §4 產生本輪與休息結算 (round.ts)         <-- Depends on §1, §3
+ |     4.1-4.4   createRound + 重複比對基準推導
+ |     4.5-4.7   休息結算 restSettlements
+ |     4.8-4.10  名單、人數與場地數邊界
+ |
+ +-- §5 目標分數與重排未完成場次 (round.ts)   <-- Depends on §4
+ |     5.1-5.2  setTargetScore
+ |     5.3-5.7  resetIncompleteMatches + 共用投影抽出
+ |
+ +-- §6 比分驗證與送出流程 (round.ts)         <-- Depends on §3, §5
+ |     6.1-6.2  validateScoreInput
+ |     6.3-6.7  submitScore + 評分回寫 + 原子性
+ |
+ +-- §7 回合與歷史的持久化 (round-storage.ts) <-- Depends on §1, §2, §3
+ |     7.1-7.7  read/write/clear + 兩段式降級
+ |
+ +-- §8 store hook (useRoundStore)     <-- Depends on §4, §5, §6, §7
+ |     8.1-8.3  useRoundStore + hooks 歸屬清單同步
+ |
+ +-- §9 收尾驗證 (併入 Final Code Review)     <-- Depends on §1-§8
+       9.1-9.8  錨點核對、lint/typecheck/test/e2e、validate
 ```
 
 ## Cross-Cutting Impact

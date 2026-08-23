@@ -33,7 +33,7 @@ git branch -d change/matchmaker-history-page
 
 ## 注意事項
 
-- 所有被派工的 subagent 共用**同一個** worktree，SHALL NOT 各自 `git worktree add`（見 [execution-plan.md](./execution-plan.md) 的 Per-task contract 第 5 點）。
+- 所有被派工的 subagent 共用**同一個** worktree，SHALL NOT 各自 `git worktree add`（見 [execution-plan.md](./execution-plan.md) 的 Per-group contract 第 5 點）。
 - 本 repo 後端測試跑在真正的 **workerd** runtime，在受限沙箱中會噴 `listen EPERM 127.0.0.1`，那是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可（見 root `CLAUDE.md`）。
 - 單檔測試指令的 **`--run` 前不可加 `--`**：`pnpm --filter ./nextjs-pickball test --run lib/matchmaker/history-range.test.ts`。加了 `--` 會讓 vitest 收不到路徑而跑完整套，RED 的紅燈證據會被既有綠燈淹沒。
 - E2E 的 `webServer` 有兩組（先起 `hono-pickball` :8787、再起 Next.js :3005）。若遇到 `Worker "hono-pickball" not found`，先用 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 找出**所有**殘留 process 全數 kill，確認 port 釋放後再起單一組；**不要**把 `~/.wrangler/registry` 目錄不存在當成根因（root `CLAUDE.md` 已記錄此誤判）。
