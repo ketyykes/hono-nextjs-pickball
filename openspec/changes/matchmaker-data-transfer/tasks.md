@@ -1,0 +1,287 @@
+# Tasks — matchmaker-data-transfer（M8）
+
+> **TDD 三步**：每個行為邏輯 task 拆為 ① 新增失敗測試並用
+> `pnpm --filter ./nextjs-pickball test --run <path>` 在 shell 實際看到紅燈（貼出輸出）
+> ② 最小實作至綠 ③ refactor（無壞味道可註記 skipped）。**`--run` 前不可加 `--`**。
+>
+> **it／test 名稱必須與 delta spec 的「驗收」錨點逐字一致**，否則 `/opsx:verify`
+> 無法機械核對。名稱清單見 `test-plan.md`。
+>
+> **紅燈形式聲明**：`lib/matchmaker/` 下六個模組**全為新檔**，每個模組第一個測試的紅燈
+> 會是「模組／函式尚不存在」的解析失敗，之後同檔追加的測試才是斷言失敗型紅燈——兩者都是
+> 真紅燈。若某條測試加入後**立即全綠**，MUST 誠實標註為 regression guard 並改以 mutation
+> 驗證（改壞看紅、還原看綠）證明偵測力，**SHALL NOT 用「改斷言看紅再改回」偽造紅燈**。
+>
+> **例外層**：`app/matchmaker/data/page.tsx` 與 `components/matchmaker/**` 依
+> `nextjs-pickball/CLAUDE.md` 屬純入口／純視覺，不強制單元 TDD——§8 改以 **Playwright E2E
+> 當 RED**（路由不存在時測試必紅），再實作元件轉綠，TDD 節奏不因例外層而消失。
+
+## 0. 前置：與 M4 的介面對齊（調查與記錄，非實作）
+
+> 本群組**不寫任何程式碼**，只確認 base 狀態並產出後續所有 subagent 都要引用的對照表。
+> 下表的「M4 delta 名稱」欄是撰寫本 change 時從 `matchmaker-round-lifecycle` 的 delta spec
+> 讀出的，**M4 當時尚未合併**；本群組的工作就是逐項對照 worktree 內的**實際程式碼**，
+> 不一致時以程式碼為準並就地更新此表。
+
+- [ ] 0.1 確認 worktree 的 base 已含 M5（`matchmaker-match-stage-ui`），
+      並確認 M3（`matchmaker-rating-engine`）與 M4（`matchmaker-round-lifecycle`）
+      皆已在 `main`：`ls openspec/changes/archive | grep matchmaker`。
+      **若任一未合併，停止 apply 並回報**（見 `execution-plan.md` 的 Escalation）
+- [ ] 0.2 `grep -rn "^export " nextjs-pickball/lib/matchmaker/round-types.ts
+      nextjs-pickball/lib/matchmaker/history.ts nextjs-pickball/lib/matchmaker/storage-keys.ts
+      nextjs-pickball/lib/matchmaker/round-storage.ts`
+      核對回合／歷史 schema、key 常數、`hasLocalStorage()` 與讀寫函式的實際匯出名稱
+- [ ] 0.3 確認 `Round` 的簽章欄位（預期 `seenSignatures`，三組字串陣列）
+      與其在 `RoundSchema` 內的巢狀位置
+- [ ] 0.4 確認 `MatchHistoryEntry` 的球員快照欄位（預期
+      `teamA.players[].name`／`ratingBefore`／`ratingAfter`），CSV 匯出直接讀這些欄位
+- [ ] 0.5 列出**本 app 寫入 LocalStorage 的全部 key 常數**，兩道 grep 都要跑
+      （第二道用來抓不是 `export const` 形式的宣告，例如包在物件或陣列裡的字面值）：
+      `grep -rnE '^export const [A-Z_]+ = "(matchmaker|scoreboard):' nextjs-pickball/lib/`
+      與 `grep -rnE '"(matchmaker|scoreboard):[^"]*"' nextjs-pickball/lib/`。
+      **重點是 `lib/scoreboard/` 不只有 `storage.ts` 的 `STORAGE_KEY`**——M6
+      （`matchmaker-scoreboard-binding`）若已合併，該目錄下會多一個分槽模組匯出
+      `scoreboard:matches:v1`。命中的每一個 key 常數都 MUST 填入下表並成為 §7
+      `CLEAR_ALL_KEYS` 的來源：spec 的「清除本機資料」承諾的是「本 app 寫入的全部 key」
+      而非固定四筆，**漏列即為 spec 違反**（會留下整批孤兒分場計分槽）
+- [ ] 0.6 把 0.2～0.5 的核對結果填入下表——§2 之後的每一次派工都要附上此表：
+
+  | 需要的東西 | M4 delta 名稱（待核對） | 實際名稱 | 模組路徑 |
+  |---|---|---|---|
+  | 回合 schema | `RoundSchema` | _核對後填_ | `lib/matchmaker/round-types.ts` |
+  | 歷史單筆 schema | `MatchHistoryEntrySchema` | _核對後填_ | `lib/matchmaker/history.ts` |
+  | 名單 key 常數 | `ROSTER_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
+  | 回合 key 常數 | `ROUND_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
+  | 歷史 key 常數 | `HISTORY_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
+  | LocalStorage 防護 | `hasLocalStorage()` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
+  | 回合／歷史讀寫 | `readRound`／`writeRound`／`readHistory`／`writeHistory` | _核對後填_ | `lib/matchmaker/round-storage.ts` |
+  | 簽章持久化欄位 | `Round.seenSignatures`（三組字串陣列） | _核對後填_ | `lib/matchmaker/round-types.ts` |
+  | 計分板獨立槽 key 常數 | `STORAGE_KEY` | _核對後填_ | `lib/scoreboard/storage.ts` |
+  | 計分板分槽 key 常數（M6 已合併時才存在） | `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`） | _核對後填；M6 未合併則填「不存在」_ | `lib/scoreboard/` 下的分槽模組 |
+  | 其他 `matchmaker:`／`scoreboard:` key 常數 | （0.5 的 grep 若還有命中就逐一補列） | _核對後填_ | _核對後填_ |
+
+- [ ] 0.7 跑 `pnpm test` 確認 baseline 全綠，把結果與 commit hash 回填
+      `environment.md` 的 Verification 三個欄位
+
+## 1. CSV 底層序列化與解析（`lib/matchmaker/csv.ts`）
+
+> 刻意排在最前面且**不依賴 §0**：本模組只認識字串與二維陣列，完全不 import 任何網域型別，
+> 因此 M4 是否已合併都不影響它。
+
+- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/csv.test.ts`，寫入 it
+      「CSV 文字以 UTF-8 BOM 開頭」：對任意二維陣列呼叫 `toCsv`，斷言首字元為 `﻿`。
+      跑單檔確認紅燈並貼出輸出
+- [ ] 1.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/csv.ts` 的 `toCsv(rows)`：
+      以 `﻿` 起頭、逗號分隔、`\r\n` 換行（Excel 相容），並匯出 BOM 具名常數
+- [ ] 1.3 RED: 於 `csv.test.ts` 補 it
+      「含逗號、雙引號或換行的欄位以 RFC 4180 規則跳脫並可原樣讀回」：
+      以 `王小明, Jr.`／`他說"讚"`／含 `\n` 的值序列化後斷言引號與跳脫，
+      再以 `parseCsv` 讀回斷言逐字相同。確認紅燈
+- [ ] 1.4 GREEN: 實作 `escape` 規則與 `parseCsv(text)`：引號狀態機（引號內的逗號與換行不分隔、
+      連續兩個雙引號還原為一個）、去除開頭 BOM、同時接受 `\n` 與 `\r\n`
+- [ ] 1.5 REFACTOR: 分隔符、引號、換行、BOM 抽為具名常數；序列化與解析共用同一組常數，
+      不各自寫死字面值
+
+## 2. 備份 schema、訊息常數與匯出（`transfer-types.ts`、`backup.ts`）
+Depends on: §0
+
+- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/backup.test.ts`，寫入 it
+      「buildBackup 產生的備份含版本號、參賽者、目前回合、歷史與重複配對簽章」：
+      以 2 位參賽者／1 回合／3 筆歷史／2 組簽章的快照斷言五個區塊。確認紅燈
+- [ ] 2.2 GREEN: 建立 `nextjs-pickball/lib/matchmaker/transfer-types.ts`：
+      `BackupSchema`（`version: z.literal(1)`、`players: z.array(PlayerSchema)`、
+      `currentRound: RoundSchema.nullable()`、`history: z.array(MatchHistoryEntrySchema)`），
+      巢狀 schema 一律 **import 自 §0 對照表記錄的模組**，SHALL NOT 重新宣告欄位；
+      同檔匯出 `TRANSFER_MESSAGES` 訊息常數表（先放本任務用得到的）。
+      並實作 `backup.ts` 的 `buildBackup(snapshot, { exportedAt })`
+- [ ] 2.3 RED: 補 it「空資料時仍產生合法備份而非拒絕匯出」：空名單／`currentRound: null`／
+      空歷史，斷言回傳合法備份且不拋例外。確認紅燈
+- [ ] 2.4 GREEN: 補齊空資料路徑：空陣列與 `null` 皆為合法輸入，不進入任何錯誤分支
+- [ ] 2.5 RED: 補 it「簽章以字串陣列寫入備份，JSON 往返後內容不變」：以簽章為 `Set` 的快照
+      呼叫 `buildBackup`，斷言 `backup.currentRound` 的三組簽章欄位皆為字串陣列，且
+      `JSON.parse(JSON.stringify(backup))` 後內容相等。確認紅燈
+- [ ] 2.6 GREEN: 在 `buildBackup` 內把簽章的 `Set` 轉為**排序後**的字串陣列並寫回
+      `currentRound` 的對應欄位（design Decision 11：**不另設頂層 `signatures` 欄位**；
+      排序是為了讓相同內容產生相同備份，便於 round-trip 斷言與 diff）
+- [ ] 2.7 RED: 補 it「backupFileName 依注入時間產生含日期的檔名」：
+      `exportedAt = "2026-08-23T01:02:03.000Z"` → `matchmaker-backup-2026-08-23.json`。確認紅燈
+- [ ] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`
+- [ ] 2.9 REFACTOR: 確認 `transfer-types.ts` 內**沒有任何函式**（純 schema 與常數），
+      且 `buildBackup` 未重複實作任何既有模組已提供的轉換
+
+## 3. 備份匯入的驗證與錯誤訊息（`backup.ts`）
+Depends on: §2
+
+- [ ] 3.1 RED: 於 `backup.test.ts` 補 it
+      「buildBackup 的輸出經 JSON 往返後可被 parseBackup 還原為相同快照」。確認紅燈
+- [ ] 3.2 GREEN: 實作 `parseBackup(text)`：`JSON.parse` → `BackupSchema.safeParse`，
+      成功回 `{ ok: true, backup }`。回傳型別 MUST 讓「未驗證的資料」在型別上無法傳給
+      §7 的寫入函式（design Decision 1 的原子性由型別強制）
+- [ ] 3.3 RED: 補 it「JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯」。確認紅燈
+- [ ] 3.4 GREEN: 以 try/catch 接住 `JSON.parse`，回 `{ ok: false, message }`，
+      訊息取自 `TRANSFER_MESSAGES`，SHALL NOT 在此處寫死字串
+- [ ] 3.5 RED: 補 it「version 不是 1 時整份拒絕並說明版本不支援」。確認紅燈
+- [ ] 3.6 GREEN: 在 `parseBackup` 內先辨識版本不符並回傳專屬訊息，
+      不與「結構不合法」共用同一則（兩者的修正方式不同）
+- [ ] 3.7 RED: 補 it「單筆參賽者不合法時整份拒絕，不走逐筆降級」：3 位中 1 位
+      `rating: 99`，斷言 `ok` 為 `false` **且結果中不存在另外 2 位**。確認紅燈
+- [ ] 3.8 GREEN: 確認 `BackupSchema` 對 `players` 使用完整的 `PlayerSchema` 陣列驗證
+      （非 `z.unknown()` 兩段式），使單筆不合法即整份失敗（design Decision 4）
+- [ ] 3.9 RED: 補 it「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」：
+      遍歷 `TRANSFER_MESSAGES` 的每一則，斷言① 不含未翻譯的 zod issue 字串
+      （如 `Invalid input`、`Expected`）② 含「請」字開頭的下一步指引。確認紅燈
+- [ ] 3.10 GREEN: 補齊訊息表：每一則都寫成「＜發生了什麼＞。＜目前資料狀態＞。請＜下一步＞。」
+      三段式，與 `PlayerForm` 既有訊息語氣一致
+- [ ] 3.11 REFACTOR: 確認 `parseBackup` 的失敗分支只有一處組裝結果物件，
+      三種失敗（語法／版本／結構）只是取不同訊息，不各自寫一份 return
+
+## 4. 歷史賽果的 CSV 匯出（`history-csv.ts`）
+Depends on: §0, §1
+
+- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-csv.test.ts`，寫入 it
+      「標題列涵蓋 9.3.1 的 11 個欄位且順序固定」：去除 BOM 後比對第一列。確認紅燈
+- [ ] 4.2 GREEN: 實作 `history-csv.ts`：匯出標題列常數與轉換函式，內部委派 `csv.ts` 的 `toCsv`
+- [ ] 4.3 RED: 補 it「雙打歷史輸出日期時間、雙方球員與各員賽前賽後分數」：
+      以一筆雙打歷史斷言日期／時間由對戰時間拆出、雙方球員串接、賽前與賽後分數對應到各員。確認紅燈
+- [ ] 4.4 GREEN: 實作單筆歷史 → CSV 列的欄位對應（欄位名稱以 §0 對照表為準）
+- [ ] 4.5 RED: 補 it「歷史為空時仍輸出只有標題列的 CSV」。確認紅燈
+- [ ] 4.6 GREEN: 補齊空歷史路徑：仍輸出標題列（含 BOM），SHALL NOT 回傳空字串
+- [ ] 4.7 REFACTOR: 確認欄位順序**只有一處來源**（標題列常數與資料列的組裝共用同一份
+      欄位定義），避免兩處各自維護順序而漂移
+
+## 5. 參賽者 CSV 的解析與逐列驗證（`roster-csv.ts`）
+Depends on: §0, §1
+
+- [ ] 5.1 RED: 新增 `nextjs-pickball/lib/matchmaker/roster-csv.test.ts`，寫入 it
+      「合法 CSV 解析出對應筆數且性別已正規化」：標題列 + 3 筆合法資料 →
+      3 筆可新增、0 筆錯誤。確認紅燈
+- [ ] 5.2 GREEN: 實作 `parseRosterCsv(text)`：委派 `csv.ts` 的 `parseCsv`，
+      **依標題名稱**（非欄位位置）對應五個欄位，逐列產出可新增列
+- [ ] 5.3 RED: 補 it「性別欄接受中英文常見寫法並忽略大小寫與前後空白」：
+      `男`／`female`／` M `／`不指定` → `male`／`female`／`male`／`other`。確認紅燈
+- [ ] 5.4 GREEN: 實作性別正規化對照表（trim + toLowerCase 後查表）
+- [ ] 5.5 RED: 補 it「無法對應的性別記為該列錯誤而非靜默歸為 other」。確認紅燈
+- [ ] 5.6 GREEN: 查表失敗時產生該列錯誤，SHALL NOT 回退為 `other`
+- [ ] 5.7 RED: 補 it「每筆錯誤指出試算表列號、欄位與繁體中文原因」：
+      第 3 列名稱空白、第 5 列強度分數 `9` → 斷言**具體數字 3 與 5**、欄位名與繁中原因。確認紅燈
+- [ ] 5.8 GREEN: 實作列號換算：標題列為第 1 列、第一筆資料為第 2 列
+      （即 `資料索引 + 2`），SHALL NOT 使用 0 起算索引
+- [ ] 5.9 RED: 補 it「缺少必填標題欄時回傳結構性錯誤並指出欄位名稱」。確認紅燈
+- [ ] 5.10 GREEN: 在逐列解析**之前**先檢查標題列，缺欄位時直接回結構性錯誤，不進入逐列迴圈
+- [ ] 5.11 RED: 補 it「只提供顏色起點或終點其中一端時整組改走自動配色」。確認紅燈
+- [ ] 5.12 GREEN: 只提供一端時兩端皆不帶入 `AddPlayerInput`，交由 `addPlayer` 走自動配色
+      （design Decision 9：不在本模組另寫顏色判定）
+- [ ] 5.13 REFACTOR: 欄位名稱、性別對照表抽為具名常數；
+      每個欄位的驗證抽成同一形狀的小函式，避免五段各寫各的錯誤組裝
+
+## 6. CSV 匯入的預覽與附加寫入（`roster-csv.ts`）
+Depends on: §5
+
+- [ ] 6.1 RED: 於 `roster-csv.test.ts` 補 it「預覽回報可新增人數與問題列的列號與原因」：
+      5 筆其中 2 筆有問題 → 可新增 3 人、2 筆問題列。確認紅燈
+- [ ] 6.2 GREEN: 讓 `parseRosterCsv` 的回傳形狀即為預覽所需（可新增列數 + 問題列清單），
+      SHALL NOT 另做一個只為 UI 服務的第二種回傳型別
+- [ ] 6.3 RED: 補 it「任一列驗證失敗時整份不匯入，名單完全不變」：
+      4 筆中第 3 筆 rating `12` → 回傳名單與原名單逐筆相等。確認紅燈
+- [ ] 6.4 GREEN: 實作 `applyRosterImport(roster, rows, { ids, now })`：
+      有任一錯誤列時**直接回傳原名單**（不進入迴圈），
+      `ids.length` 與 `rows.length` 不符時視為呼叫端錯誤並拋出可判讀訊息
+- [ ] 6.5 RED: 補 it「匯入採附加模式，既有參賽者不被覆蓋且順序在前」。確認紅燈
+- [ ] 6.6 GREEN: 以 `reduce` 逐列呼叫既有 `roster.ts` 的 `addPlayer`，新成員附加於陣列尾端
+- [ ] 6.7 RED: 補 it「同名參賽者各自獨立建立，不靜默合併」。確認紅燈
+- [ ] 6.8 GREEN: 確認流程中**沒有任何依 `name` 的比對或去重**，同名自然各自建立
+- [ ] 6.9 RED: 補 it「同一次匯入未提供顏色的多列取得互不相同的預設漸層」：
+      匯入 3 筆皆未提供顏色 → 三者的 `colorFrom`／`colorTo` 組合兩兩相異。確認紅燈
+- [ ] 6.10 GREEN: 確認 `reduce` 的累積值是**成長中的名單**（每次 `addPlayer` 都看到前一列的結果），
+      而非固定的匯入前名單——後者會讓每一列的 `nextAutoGradient` 回傳同一個 index
+      （design Decision 9）
+- [ ] 6.11 REFACTOR: 確認本模組**完全沒有**自行組裝 `Player` 物件的程式碼，
+      rating 的 round 與顏色判定全部落在 `addPlayer` 內
+
+## 7. 快照的讀寫與清除（`transfer-storage.ts`）
+Depends on: §0, §3
+
+- [ ] 7.1 RED: 新增 `nextjs-pickball/lib/matchmaker/transfer-storage.test.ts`，寫入 it
+      「clearAllLocalData 移除本 app 寫入的全部 LocalStorage key」：以 §0.5／0.6 對照表列出的
+      **全部** key 常數（由來源模組 import，SHALL NOT 在測試內抄字面值）組成 `expectedKeys`，
+      逐一寫入內容後呼叫，斷言① 每個 key 皆為 `null` ②
+      `new Set(CLEAR_ALL_KEYS)` 與 `new Set(expectedKeys)` 相等。
+      **SHALL NOT 斷言固定筆數**（如 `toHaveLength(4)`）——寫死筆數會讓日後新增資料域
+      卻漏列的情況維持綠燈。確認紅燈
+- [ ] 7.2 GREEN: 實作 `transfer-storage.ts` 的 `CLEAR_ALL_KEYS`（**import**
+      `storage-keys.ts` 的三個 matchmaker key 常數，以及 §0.5 grep 出的
+      `lib/scoreboard/` 全部 key 常數——至少 `storage.ts` 的 `STORAGE_KEY`，M6 已合併時
+      還包含分槽模組的 `scoreboard:matches:v1` 常數；SHALL NOT 硬編字串）與
+      `clearAllLocalData()`。
+      **SHALL NOT 編輯 `lib/matchmaker/storage.ts` 或 `storage-keys.ts`**（design Decision 2），
+      也 SHALL NOT 編輯 `lib/scoreboard/**`（只 import）
+- [ ] 7.3 RED: 補 it「clearAllLocalData 不呼叫 clear，列舉範圍外的 key 完全不受影響」：
+      另寫一個不在清單的 key，斷言其內容逐字不變。確認紅燈
+- [ ] 7.4 GREEN: 確認實作為逐一 `removeItem`，且原始碼中不存在 `localStorage.clear()`
+- [ ] 7.5 RED: 補 it「匯入驗證失敗時三個 key 的內容完全不變」：既有三 key 有內容，
+      以不合法備份走匯入流程，斷言三者的字串與匯入前逐字相同。確認紅燈
+- [ ] 7.6 GREEN: 實作 `writeBackup(backup)`：參數型別只接受 §3 驗證通過的 `Backup`，
+      驗證與寫入在型別上就無法對調順序
+- [ ] 7.7 RED: 補 it「localStorage 不可用時讀寫皆不拋出例外並回報可判讀結果」：
+      以 `vi.spyOn(window, "localStorage", "get")` 讓存取拋例外。確認紅燈
+- [ ] 7.8 GREEN: 讀寫入口皆先呼叫 `storage-keys.ts` **匯出的** `hasLocalStorage()`；
+      讀取回空快照、寫入回失敗結果並附 `TRANSFER_MESSAGES` 的訊息
+- [ ] 7.9 RED: 補 it「寫入超出配額時回報失敗並提供繁體中文的修正建議」：
+      讓 `setItem` 拋 quota 例外。確認紅燈
+- [ ] 7.10 GREEN: 以 try/catch 接住 `setItem`，回傳失敗結果與專屬訊息
+      （「請先清除舊資料或減少匯入筆數」）
+- [ ] 7.11 REFACTOR: 確認 `hasLocalStorage` 的判斷**沒有在本檔重寫**一份；
+      `CLEAR_ALL_KEYS` 內每一個 key 的來源皆為 import 而非字面值，且其成員與 §0.6
+      對照表列出的全部 key 常數逐一對得上（有落差就是漏列，回到 7.2 補齊）
+
+## 8. 資料頁與元件（例外層，E2E 當 RED）
+Depends on: §2, §3, §4, §6, §7
+
+> 依 `nextjs-pickball/CLAUDE.md`，`app/**/page.tsx` 與純呈現元件為 TDD 例外層。
+> 本群組不寫單元測試，改以 Playwright E2E 當紅燈：路由或區塊不存在時測試必紅。
+> Blob／`<a download>`／`FileReader` 等瀏覽器 I/O **只出現在本層**（design Decision 7）。
+
+- [ ] 8.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，
+      寫入兩個 test：「可從 matchmaker 區段導覽抵達資料頁並看到四個功能區塊」、
+      「資料頁標示 CSV 匯出入不對稱且完整還原請用 JSON」。
+      跑 `pnpm --filter ./nextjs-pickball test:e2e --grep "資料頁"` 確認紅燈並貼出輸出
+- [ ] 8.2 GREEN: 建立 `app/matchmaker/data/page.tsx` 與四個區塊元件骨架
+      （`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`、
+      `ClearLocalDataSection`），含 9.3 不對稱說明文字與從 matchmaker 區段的導覽入口
+- [ ] 8.3 RED: 補 test「匯入合法 JSON 備份後參賽者與歷史一併還原」。確認紅燈
+- [ ] 8.4 GREEN: 接上 `JsonBackupSection` 的匯出（Blob + `<a download>`）與匯入
+      （`File.text()` → `parseBackup` → `writeBackup` → `location.reload()`），
+      失敗時只顯示訊息**不寫入**
+- [ ] 8.5 RED: 補兩個 test：「在 CSV 匯入預覽按取消後名單維持不變」、
+      「確認 CSV 匯入預覽後名單新增匯入的參賽者」。確認紅燈
+- [ ] 8.6 GREEN: 接上 `RosterCsvImportSection`：選檔 → `parseRosterCsv` → 顯示預覽
+      （可新增人數 + 問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
+      確認後 `applyRosterImport` → 寫入 → reload
+- [ ] 8.7 RED: 補三個 test：「清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含
+      計分進度」、「取消清除本機資料後名單維持不變」、「確認清除本機資料後參賽者頁回到
+      空白狀態」。確認紅燈
+- [ ] 8.8 GREEN: 實作 `components/matchmaker/ClearLocalDataDialog.tsx`：
+      比照既有 `ResetRosterDialog` 的 `AlertDialog` + `variant="destructive"` 模式，
+      文案含三句（無法復原／建議先匯出 JSON／備份不含 `/scoreboard` 計分進度）
+- [ ] 8.9 REFACTOR: 四個區塊共用的「選檔 → 讀文字 → 顯示錯誤」樣板抽成單一元件或
+      小型 helper；確認 `lib/` 的純函式沒有為了配合 UI 而被改動
+
+## 9. 收尾驗證（驗證項，非實作項）
+
+- [ ] 9.1 逐條核對 delta spec 的 38 個「驗收」錨點：以腳本抽出
+      `**驗收**：\`<path>\`，it／test 名稱「<name>」` 並與實際 `it(...)`／`test(...)`
+      逐字比對（比照 M2 §13.1 的做法），**不靠目視**
+- [ ] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法統計
+      `### Requirement:` 與 `#### Scenario:`，**不使用 BSD `uniq`**
+- [ ] 9.3 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 全綠
+- [ ] 9.4 `pnpm lint` 0 errors（既有 3 個 warning 不計）
+- [ ] 9.5 `pnpm typecheck` 通過
+- [ ] 9.6 `pnpm test` 全套通過（確認未破壞 M1～M7 既有測試與後端測試）
+- [ ] 9.7 `pnpm test:e2e` 通過（本 change 新增的 8 個 E2E case 皆綠）；
+      **後端測試在受限沙箱會噴 `listen EPERM`，那是 miniflare 需要開 localhost server
+      被擋，不是設定錯誤**，放行後重跑即可
+- [ ] 9.8 確認 `git status` 中**沒有**任何 `openspec/specs/**`、`prd.md`、
+      `lib/matchmaker/storage.ts`、`roster.ts`、`types.ts`、`colors.ts`、`hooks/**` 的改動
+- [ ] 9.9 `DO_NOT_TRACK=1 npx openspec validate matchmaker-data-transfer --strict` 通過
+- [ ] 9.10 派發 Final Code Reviewer（見 `execution-plan.md`）對完整 commit 集合做跨任務審查，
+      並把結論記入本檔
