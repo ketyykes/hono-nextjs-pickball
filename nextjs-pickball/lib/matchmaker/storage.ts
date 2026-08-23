@@ -107,7 +107,6 @@ export function clearRoster(): void {
  * 重置範圍刻意採「明確列舉」而非「前綴掃描」（例如清除所有 matchmaker: 開頭的 key）：
  * 掃描式清除會誤刪未來加入、不該被重置的使用者偏好資料，改用列舉可強制在新增
  * 資料域時主動決定是否納入重置範圍。
- * 目前涵蓋名單、目前回合、歷史賽果三個 key（M2、M6 已納入）。
  */
 const RESET_KEYS = [ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY] as const;
 
