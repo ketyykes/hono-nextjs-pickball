@@ -3,6 +3,9 @@ import { readRoster, writeRoster, resetMatchmakerData, STORAGE_KEY } from "./sto
 // 取 scoreboard 實際匯出的 key 而非硬編碼 "scoreboard:current:v1"——若 scoreboard 日後改 key 名，
 // 硬編碼的測試會繼續綠燈但保護的是不存在的 key；跨模組 import 則會編譯失敗、強迫同步更新。
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
+// roster 的 key 沿用既有的 STORAGE_KEY（storage.ts re-export 自 storage-keys.ts，見 2.4）；
+// round／history 兩個新 key 沒有既存名稱可用，直接自單一來源匯入。
+import { ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
 import type { Player } from "./types";
 
 /** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位。 */
@@ -110,11 +113,15 @@ describe("storage", () => {
 	it("重置只移除列舉的 key，不影響 scoreboard 資料", () => {
 		const roster = { version: 1, players: [makePlayer()] };
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(roster));
+		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ round: true }));
+		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ history: true }));
 		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
 
 		resetMatchmakerData();
 
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 });
