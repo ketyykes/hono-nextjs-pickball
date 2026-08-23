@@ -346,6 +346,66 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
    歸屬清單。這正是 Decision 3 不在本 change 新增 hook 的理由——兩個並行 worktree 若都去改
    那一份清單，合併時衝突的會是規格文字。
 
+   **→ 已於 apply Step 0（tasks 1.2～1.5）在 `main`（`bbda8ff`）上實測，結果如下。**
+
+   **(a) 常數來源（tasks 1.3、1.4）——與假設一致，無待決事項。**
+   `nextjs-pickball/lib/matchmaker/rating-types.ts` 確實匯出 `RATING_MIN = 1`／`RATING_MAX = 8`，
+   路徑與 Open Questions 第 1 條的假設相同，§6 直接 import 即可。
+   `nextjs-pickball/lib/matchmaker/round-types.ts` 已匯出**可迭代的** `TARGET_SCORE_OPTIONS`
+   （由 `RoundTargetScoreSchema.options` 推導）與 `DEFAULT_TARGET_SCORE = 11`，
+   tasks 1.4 所擔心的「只有型別沒有清單」並未發生，**不需要**回頭改 M4 的模組。
+
+   **(b) 回合資料形狀——與 Decision 9 的假設相容，但隊伍不內嵌 `Player`。**
+   `Round` 為 `{ roundNumber, createdAt, format, courtCount, targetScore, matches, restingPlayerIds,
+   seenSignatures }`；`RoundMatch` 為 `{ id, courtNumber, format, doublesComposition?, teams:
+   [RoundTeam, RoundTeam], status: "pending" | "scoring" | "completed", scores: { teamA, teamB } | null,
+   winner: "teamA" | "teamB" | null, completedAt: string | null, playerRatings[] }`；
+   `RoundTeam` 為 `{ playerIds: string[], rating: number }`。
+   **持久化層刻意只存 id**（M4 註解：回合與名單同時活著，內嵌 `Player` 會產生兩個互相矛盾的
+   真相）。因此 UI 的 `players` prop 不只是為了顯示，而是**解析 `playerIds` 的必要輸入**；
+   `restingPlayerIds` 同樣是 `string[]`，`RestingPanel` 需要的姓名／顏色／`restCount`
+   一律由頁面層以名單查表後傳入。這與 Decision 9 的 props 形狀（`MatchStage ({ round, players,
+   onSubmitScore })`、`CourtCard ({ match, players, ... })`）相容，不需要改 Decision 9。
+
+   **(c) `buildCourtTiles` 的輸入型別（影響 §4／§8 的接縫）——採結構型別。**
+   test-plan 與 tasks 4.2 寫的是「以一場 `Match` 呼叫」，指 `allocation-types.ts` 的 `Match`
+   （`teams[].players` 內嵌完整 `Player`）；但 §8 的 `CourtCard` 拿到的是 `RoundMatch`
+   （`teams[].playerIds`）。把 `RoundMatch` 回填成完整 `Match` 需要偽造 `doublesComposition`
+   （`RoundMatch` 為 optional、`Match` 的 doubles 分支為必填），是靜默補值。
+   **決議**：`buildCourtTiles` 的參數型別放寬為「只要求 `format` 與 `teams[].players`」的結構型別，
+   `allocation-types.ts` 的 `Match` 可直接指派（§4 的測試仍照 test-plan 傳入真正的 `Match`），
+   §8 則傳入由 `playerIds` 解析後的隊伍。分支仍以 `format` 這個判別欄位進行。
+   SHALL NOT 為此在 `stage-layout.ts` 之外另立一份 `RoundMatch → Match` 投影。
+
+   **(d) `useRoundStore` 只接線了 `generateRound`——§11.6 需要擴充該檔。**
+   合併後的 `hooks/useRoundStore.ts` 對外只回傳 `{ round, history, droppedCount, generateRound }`；
+   `setTargetScore`／`resetIncompleteMatches`／`submitScore` 三個 pipeline 只以純函式存在於
+   `lib/matchmaker/round.ts`，**尚未接上 store**（M4 經 Stage 1 裁決的刻意範圍，非遺漏）。
+   tasks 11.6 要求「於 `page.tsx` 接上 M4 的產生／重排／送出 pipeline」，而回合狀態由 store 擁有，
+   頁面無法從外部更新它。因此 **§11 MUST 擴充既有的 `hooks/useRoundStore.ts`**
+   （新增 reducer action 與對外函式）。這**不違反 Decision 3**——Decision 3 禁止的是在 `hooks/`
+   **新增檔案**（會動到 `pickleball-guide-page` 的 hooks 歸屬清單與 `hooksInventory.test.ts`），
+   修改既有檔案不影響那份清單。
+   連帶（M4 交接明文要求）：接 `submitScore` 時 MUST 一併補上 `round-storage.ts` 的 `writeHistory`
+   歷史寫入路徑，並把 `playerPatches` 交給 roster port 的 `updatePlayer`；
+   `submitScore` 的成功結果同時帶 `round`／`historyEntry`／`playerPatches`／`boundaryHits` 四項。
+
+   **(e) 錯誤訊息已是繁體中文，UI 不需自譯。**
+   `createRound`／`resetIncompleteMatches`／`validateScoreInput`／`submitScore` 皆回傳
+   `{ ok: true, ... } | { ok: false, code, message }`，`message` 已是可直接顯示的繁體中文
+   （例如「兩隊比分相同時無法判定勝方，請確認比分後再試一次。」）。UI 的責任只是把 `message`
+   放進 `role="alert"`，SHALL NOT 依 `code` 另寫一份中文對照表。
+
+   **(f) `ROUND_FAILURE_CODE` 的命名（M4 交接事項第 4 點）——本 change 不處理。**
+   M4 建議 M5 接線前把它更名為 `CREATE_ROUND_FAILURE_CODE`（其餘四組皆以函式名命名，只有這組
+   以模組命名）。本 change 的 tasks.md **沒有這一項**，依派工紀律不自行擴權更名，留待後續
+   milestone 或整理型 change 處理。
+
+   **(g) `/matchmaker` 目前確為 404（tasks 1.5）。**
+   `nextjs-pickball/app/matchmaker/` 底下只有 `players/`，無 `page.tsx` 亦無 `layout.tsx`。
+   `tests/e2e/specs/player-roster.spec.ts` 內查無「頁面頂部第一個元素」這類位置性斷言
+   （grep `first()`／`nth(0)`／`heading`／`h1` 皆無命中），新增區段導覽不會使其轉紅。
+
 3. **完成時間的顯示格式**：暫定 `HH:mm`（當地時區），與 `prd.md` 8.2 歷史紀錄的「對戰時間」
    同源。若 M7 的歷史頁決定用別的格式，兩處 SHALL 對齊——但那是 M7 的事，本 change 不預先
    為它抽共用格式化函式（沒有第二個消費者的抽象是負債）。

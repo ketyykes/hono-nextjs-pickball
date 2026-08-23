@@ -14,11 +14,11 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的 Open Questions 從假設
 > 變成事實，避免 §7 之後整批建立在錯的介面上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 讀 `main` 上 M4（`matchmaker-round-lifecycle`）的實際匯出——預期為 `nextjs-pickball/hooks/useRoundStore.ts` 與 `nextjs-pickball/lib/matchmaker/round-types.ts`：目前回合的型別與欄位、產生本輪／重設再排／送出比分三個 pipeline 的簽章與回傳形狀（成功與驗證失敗各長什麼樣）。與 design.md Decision 9 的假設逐項比對，**差異一律補記進 design.md 的 Open Questions 第 2 條**，不要默默改實作去遷就
-- [ ] 1.3 確認評分 capability（M3，`matchmaker-rating-engine`）上下限具名常數的**實際檔案路徑**——名稱已定案為 `RATING_MIN`／`RATING_MAX`，預期由 `nextjs-pickball/lib/matchmaker/rating-types.ts` 匯出（M3 的 spec「評分更新公式與常數」已明訂該 capability 以具名常數匯出，design 與 tasks 1.1 指名此二者，見 design Open Questions 第 1 條的已解決記錄）。以 `grep -rn "RATING_MAX" nextjs-pickball/lib/matchmaker/` 確認路徑後記下供 §6 取用；**路徑不同**（例如 M3 改由 `rating.ts` 轉出）→ 直接調整 import 往下做，**不需升級**；**完全找不到該匯出** → 才依 execution-plan 的升級條件回報人類由 M3 補匯出。任何情況都 SHALL NOT 在 `rating-bounds.ts` 內寫死 `1` 與 `8`
-- [ ] 1.4 確認 M4 是否匯出**可迭代的**目標分數選項清單（11／15／21）。M4 的 Round schema 已把 `targetScore` 定為 `11 | 15 | 21` 型別，但型別無法在執行期迭代出三顆按鈕；若只有型別沒有清單，MUST 於 M4 的 `round-types.ts` 補一個具名匯出再取用。SHALL NOT 從 `components/scoreboard/ScoreboardSetup.tsx` 的私有 `TARGET_SCORE_OPTIONS` 取用（那是 scoreboard 的內部實作，見 design Decision 6），也 SHALL NOT 在元件內寫死 `[11, 15, 21]`
-- [ ] 1.5 確認 `/matchmaker` 目前確實為 404（本 change 開始前的事實基準），並檢查 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts` 有無「頁面頂部第一個元素」這類位置性斷言——`app/matchmaker/layout.tsx` 會替該頁加上區段導覽（design Decision 1 的副作用）
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 讀 `main` 上 M4（`matchmaker-round-lifecycle`）的實際匯出——預期為 `nextjs-pickball/hooks/useRoundStore.ts` 與 `nextjs-pickball/lib/matchmaker/round-types.ts`：目前回合的型別與欄位、產生本輪／重設再排／送出比分三個 pipeline 的簽章與回傳形狀（成功與驗證失敗各長什麼樣）。與 design.md Decision 9 的假設逐項比對，**差異一律補記進 design.md 的 Open Questions 第 2 條**，不要默默改實作去遷就
+- [x] 1.3 確認評分 capability（M3，`matchmaker-rating-engine`）上下限具名常數的**實際檔案路徑**——名稱已定案為 `RATING_MIN`／`RATING_MAX`，預期由 `nextjs-pickball/lib/matchmaker/rating-types.ts` 匯出（M3 的 spec「評分更新公式與常數」已明訂該 capability 以具名常數匯出，design 與 tasks 1.1 指名此二者，見 design Open Questions 第 1 條的已解決記錄）。以 `grep -rn "RATING_MAX" nextjs-pickball/lib/matchmaker/` 確認路徑後記下供 §6 取用；**路徑不同**（例如 M3 改由 `rating.ts` 轉出）→ 直接調整 import 往下做，**不需升級**；**完全找不到該匯出** → 才依 execution-plan 的升級條件回報人類由 M3 補匯出。任何情況都 SHALL NOT 在 `rating-bounds.ts` 內寫死 `1` 與 `8`
+- [x] 1.4 確認 M4 是否匯出**可迭代的**目標分數選項清單（11／15／21）。M4 的 Round schema 已把 `targetScore` 定為 `11 | 15 | 21` 型別，但型別無法在執行期迭代出三顆按鈕；若只有型別沒有清單，MUST 於 M4 的 `round-types.ts` 補一個具名匯出再取用。SHALL NOT 從 `components/scoreboard/ScoreboardSetup.tsx` 的私有 `TARGET_SCORE_OPTIONS` 取用（那是 scoreboard 的內部實作，見 design Decision 6），也 SHALL NOT 在元件內寫死 `[11, 15, 21]`
+- [x] 1.5 確認 `/matchmaker` 目前確實為 404（本 change 開始前的事實基準），並檢查 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts` 有無「頁面頂部第一個元素」這類位置性斷言——`app/matchmaker/layout.tsx` 會替該頁加上區段導覽（design Decision 1 的副作用）
 
 ## 2. 區段導覽的分頁與 active 判定（section-nav.ts）
 
