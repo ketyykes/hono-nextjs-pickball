@@ -595,3 +595,69 @@ describe("輸入驗證", () => {
 		expect(duplicateIdWithinTeamCall).toThrow(/重複 id：A1/);
 	});
 });
+
+describe("純函式契約", () => {
+	it("評分更新不修改輸入的球員物件", () => {
+		// 鎖住「輸入唯讀」特性，防止日後最佳化或 M4 接線改動 updateRatings 讓它就地修改輸入
+		const teams = makeSinglesTeams(4.0, 5.5, 10);
+		const teamsBefore = structuredClone(teams);
+
+		updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 深度比對整個 teams 陣列，確保沒有任何欄位被改過
+		expect(teams).toEqual(teamsBefore);
+		// 特別確認 rating 與 gamesPlayed 未變
+		expect(teams[0][0].rating).toBe(teamsBefore[0][0].rating);
+		expect(teams[0][0].gamesPlayed).toBe(teamsBefore[0][0].gamesPlayed);
+		expect(teams[1][0].rating).toBe(teamsBefore[1][0].rating);
+		expect(teams[1][0].gamesPlayed).toBe(teamsBefore[1][0].gamesPlayed);
+	});
+
+	it("相同輸入產生相同輸出", () => {
+		// 鎖住決定性：純函式無亂數、無時間、無 I/O，同一份輸入必產相同結果。M4 的回合重播依此特性。
+		const teams = makeUnevenDoublesTeams();
+
+		const result1 = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		const result2 = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		expect(result1).toEqual(result2);
+	});
+
+	it("評分更新不累加 gamesPlayed 與 restCount", () => {
+		// 防止 M4 接線誤把 gamesPlayed 新值混進輸出，也鎖住「累加由 M4 負責、本段不動它」的設計邊界
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 4.0, 20), makeRatingPlayer("A2", 4.5, 20)],
+			[makeRatingPlayer("B1", 3.5, 20), makeRatingPlayer("B2", 4.0, 20)],
+		];
+		const gamesBefore = teams[0][0].gamesPlayed;
+
+		const result = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 回傳的每筆 RatingChange 不含 gamesPlayed 與 restCount 欄位
+		expect(result.changes).toHaveLength(4);
+		for (const change of result.changes) {
+			expect(change).not.toHaveProperty("gamesPlayed");
+			expect(change).not.toHaveProperty("restCount");
+		}
+
+		// 輸入球員的 gamesPlayed 維持原值
+		expect(teams[0][0].gamesPlayed).toBe(gamesBefore);
+	});
+});
