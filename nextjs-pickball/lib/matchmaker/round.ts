@@ -11,7 +11,7 @@ import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { MatchHistoryEntry } from "./history";
-import type { RatingPlayerInput, RatingUpdateResult } from "./rating-types";
+import type { RatingChange, RatingPlayerInput, RatingUpdateResult } from "./rating-types";
 import type { Player } from "./types";
 import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
 
@@ -677,14 +677,21 @@ export interface SubmitScoreInput {
 	readonly now: string;
 }
 
-/** 名單 patch，形狀可直接餵給 roster.ts 的 updatePlayer(id, patch)（design Decision 6）。 */
+// 回傳 patch 而非整份新名單（design Decision 6）：submitScore 不擁有名單，回傳整份
+// Player[] 等於宣稱它有權決定名單裡沒被這場比賽影響到的其他人。patch 形狀
+// { id, rating, gamesPlayed } 與 roster.ts 的 updatePlayer(id, patch) 直接對接，
+// 呼叫端逐筆套用即可，不需要自己 diff 出「這場比賽到底改了誰」。
 export interface ScorePlayerPatch {
 	readonly id: string;
 	readonly rating: number;
 	readonly gamesPlayed: number;
 }
 
-/** 本次送出的一次性觸界訊息，不進回合物件、不持久化（design Decision 6）。 */
+// 本次送出的一次性觸界訊息（design Decision 6）：SHALL NOT 進回合物件、SHALL NOT 持久化。
+// 「這個人現在在評分上限／下限」是可以直接從其 rating 讀出的衍生資訊，若額外存一份
+// boundaryHit 標記，就會有兩份可能不同步的真相（例如日後又贏了一場但沒觸界，
+// 舊的持久化標記卻沒被清掉）。它只是這一次 submitScore 呼叫要回報給 UI 顯示
+// 「已達上限／下限」提示用的暫態資料，用完即棄。
 export interface ScoreBoundaryHit {
 	readonly playerId: string;
 	readonly atUpperBound: boolean;
@@ -733,16 +740,12 @@ function toHistoryEntry(
 	scoreB: number,
 	winner: "teamA" | "teamB",
 	completedAt: string,
-	changes: readonly { readonly id: string; readonly before: number; readonly after: number }[],
+	changes: readonly RatingChange[],
 	matchPlayers: readonly Player[],
 ): MatchHistoryEntry {
 	const teamASize = match.teams[0].playerIds.length;
 
-	const toHistoryTeam = (
-		teamChanges: readonly { readonly id: string; readonly before: number; readonly after: number }[],
-		teamPlayers: readonly Player[],
-		teamRating: number,
-	) => ({
+	const toHistoryTeam = (teamChanges: readonly RatingChange[], teamPlayers: readonly Player[], teamRating: number) => ({
 		rating: teamRating,
 		players: teamChanges.map((change, index) => ({
 			id: change.id,
