@@ -15,7 +15,7 @@ import { appendHistoryEntry } from "./history";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
-import { RATING_MAX } from "./rating-types";
+import { RATING_MAX, RATING_MIN } from "./rating-types";
 import type { Match, Team } from "./allocation-types";
 import type { MatchHistoryEntry } from "./history";
 import type { Player } from "./types";
@@ -1376,18 +1376,28 @@ describe("submitScore", () => {
 	});
 
 	it("評分觸頂時賽後分數停在 8.00 並回報已達上限", () => {
-		// 雙方皆已在評分上限：預測勝率恰為 0.5，勝方的理論賽後分數必然超過 RATING_MAX
-		// 而被夾回上限——不寫死字面量 8，改用 RATING_MAX（唯一來源，rating-types.ts）。
-		const players = [makePlayer({ id: "p1", rating: RATING_MAX, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: RATING_MAX, gamesPlayed: 0 })];
+		// 刻意讓雙方實力懸殊（p1 已在上限、p2 在下限）而非兩人同分：若兩人同樣是 8 分,
+		// 勝方的理論賽後分數會大幅超過 8（例如 8.15），此時 atUpperBound 與 clamped
+		// 會同時為 true，測不出「回報已達上限用的是哪一個旗標」。實力懸殊時 p1 幾乎穩贏、
+		// 預測勝率趨近 1，理論漲幅被壓得極小（僅超出 8 一點點，如 8.0014），四捨五入後
+		// 恰為 8.00——沒有真的超出上限（clamped 為 false），但仍停在界上
+		// （atUpperBound 為 true）。這才是 rating-types.ts 註解「理論值 8.0049 四捨五入後
+		// 為 8.00 者，atUpperBound = true 但 clamped = false」描述的情境，能真正分辨
+		// 實作用的是哪一個旗標。不寫死字面量 8／1，改用 RATING_MAX／RATING_MIN
+		// （唯一來源，rating-types.ts）。
+		const players = [
+			makePlayer({ id: "p1", rating: RATING_MAX, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: RATING_MIN, gamesPlayed: 0 }),
+		];
 		const match = makeRoundMatch({
 			id: "m-1",
 			teams: [
 				{ playerIds: ["p1"], rating: RATING_MAX },
-				{ playerIds: ["p2"], rating: RATING_MAX },
+				{ playerIds: ["p2"], rating: RATING_MIN },
 			],
 			playerRatings: [
 				{ playerId: "p1", before: RATING_MAX, after: null },
-				{ playerId: "p2", before: RATING_MAX, after: null },
+				{ playerId: "p2", before: RATING_MIN, after: null },
 			],
 		});
 		const round = makeRound({ matches: [match] });
@@ -1400,8 +1410,11 @@ describe("submitScore", () => {
 		const winnerRating = result.round.matches[0].playerRatings.find((r) => r.playerId === "p1");
 		expect(winnerRating?.after).toBe(RATING_MAX);
 		// 回報已達上限用的是 atUpperBound（停在界上即 true），不是 clamped（本場理論值是否
-		// 真的被截斷）——兩者語意分歧見 rating-types.ts 的 RatingChange 註解。
-		expect(result.boundaryHits.some((hit) => hit.playerId === "p1" && hit.atUpperBound)).toBe(true);
+		// 真的被截斷）——兩者語意分歧見 rating-types.ts 的 RatingChange 註解。這個 fixture
+		// 下 p1 的 clamped 為 false（理論值未真的超界），若實作誤用 clamped 判斷，
+		// 這條斷言會轉紅。
+		const p1Hit = result.boundaryHits.find((hit) => hit.playerId === "p1");
+		expect(p1Hit?.atUpperBound).toBe(true);
 	});
 
 	it("送出失敗時回合、名單與歷史皆不變", () => {
