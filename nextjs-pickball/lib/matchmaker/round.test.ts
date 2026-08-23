@@ -912,4 +912,172 @@ describe("resetIncompleteMatches", () => {
 		expect(reallocatedIds).toHaveLength(PLAYERS_PER_MATCH.singles);
 		expect(result.round.restingPlayerIds).toEqual(["d"]);
 	});
+
+	it("重排沿用原回合與前一輪的重複比對基準", () => {
+		// 四人強度與休息次數全部相同，出場名單與配對次序因此完全由穩定排序決定：
+		// 候選池順序即 p1、p2、p3、p4，未受任何基準影響時 allocateRound 必定排出
+		// 「p1 對 p2」「p3 對 p4」——這正是前一輪剛打過的兩組，測試才能分辨基準有沒有被沿用。
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+		const previousRoundMatches = [makeSignatureMatch(["p1"], ["p2"]), makeSignatureMatch(["p3"], ["p4"])];
+		const previousOpponentKeys = previousRoundMatches.flatMap(opponentKeys);
+		const round = makeRound({
+			courtCount: 2,
+			// 本輪的 pending 組合刻意與前一輪不同（p1 對 p3、p2 對 p4）：若兩者相同，
+			// 只把「被丟棄的原始組合」併入基準也能讓本 it 轉綠，就分辨不出前一輪的基準
+			// 到底有沒有被沿用了。
+			matches: [
+				makeRoundMatch({
+					id: "todo-1",
+					courtNumber: 1,
+					teams: [
+						{ playerIds: ["p1"], rating: 3 },
+						{ playerIds: ["p3"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: null },
+						{ playerId: "p3", before: 3, after: null },
+					],
+				}),
+				makeRoundMatch({
+					id: "todo-2",
+					courtNumber: 2,
+					teams: [
+						{ playerIds: ["p2"], rating: 3 },
+						{ playerIds: ["p4"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p2", before: 3, after: null },
+						{ playerId: "p4", before: 3, after: null },
+					],
+				}),
+			],
+			seenSignatures: {
+				teammateKeys: previousRoundMatches.flatMap(teammateKeys),
+				opponentKeys: previousOpponentKeys,
+				fullMatchKeys: previousRoundMatches.map(fullMatchKey),
+			},
+		});
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// 從空基準重排會把上一輪剛打過的組合原樣再排一次；重排後的對手組合完全避開那些簽章，
+		// 才證明基準真的被餵進了 allocateRound（不是只留在回合欄位上好看）。
+		const resultingOpponentKeys = result.round.matches.flatMap((match) =>
+			opponentKeys(makeSignatureMatch(match.teams[0].playerIds, match.teams[1].playerIds)),
+		);
+		for (const key of previousOpponentKeys) {
+			expect(resultingOpponentKeys).not.toContain(key);
+			expect(result.round.seenSignatures.opponentKeys).toContain(key);
+		}
+	});
+
+	it("重排把被丟棄的原始組合併入本回合基準", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const round = makeRound({
+			matches: [
+				makeRoundMatch({
+					id: "todo",
+					teams: [
+						{ playerIds: ["p1"], rating: 3 },
+						{ playerIds: ["p2"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: null },
+						{ playerId: "p2", before: 3, after: null },
+					],
+				}),
+			],
+		});
+		const discardedMatch = makeSignatureMatch(["p1"], ["p2"]);
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// 少了這一步，輸入完全沒變時重排會產生一模一樣的結果，使用者按下去看到畫面沒動，
+		// 會判定功能壞掉（prd.md 5.6 明列「重設前的原始對戰組合」為需記錄的項目）。
+		for (const key of opponentKeys(discardedMatch)) {
+			expect(result.round.seenSignatures.opponentKeys).toContain(key);
+		}
+		expect(result.round.seenSignatures.fullMatchKeys).toContain(fullMatchKey(discardedMatch));
+	});
+
+	it("重排不改變回合編號、建立時間、對戰方式與目標分數", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+		const round = makeRound({
+			roundNumber: 2,
+			format: "doubles",
+			targetScore: 15,
+			matches: [
+				makeRoundMatch({
+					id: "todo",
+					format: "doubles",
+					doublesComposition: "general",
+					teams: [
+						{ playerIds: ["p1", "p2"], rating: 6 },
+						{ playerIds: ["p3", "p4"], rating: 6 },
+					],
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: null },
+						{ playerId: "p2", before: 3, after: null },
+						{ playerId: "p3", before: 3, after: null },
+						{ playerId: "p4", before: 3, after: null },
+					],
+				}),
+			],
+		});
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// 重排若走「建立新回合」的同一條路徑，這四個欄位會被一起重設（編號 +1、時間換成
+		// 呼叫當下、對戰方式與目標分數退回目前設定），而使用者只是想重排這一輪。
+		expect(result.round.roundNumber).toBe(round.roundNumber);
+		expect(result.round.createdAt).toBe(round.createdAt);
+		expect(result.round.format).toBe(round.format);
+		expect(result.round.targetScore).toBe(round.targetScore);
+	});
+
+	it("重排未完成場次不觸發休息結算", () => {
+		const players = [
+			makePlayer({ id: "c", restCount: 1 }),
+			makePlayer({ id: "d", restCount: 0 }),
+			makePlayer({ id: "e", restCount: 5 }),
+		];
+		const playersSnapshot = structuredClone(players);
+		const round = makeRound({
+			matches: [
+				makeRoundMatch({
+					id: "todo",
+					teams: [
+						{ playerIds: ["c"], rating: 3 },
+						{ playerIds: ["d"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "c", before: 3, after: null },
+						{ playerId: "d", before: 3, after: null },
+					],
+				}),
+			],
+			restingPlayerIds: ["e"],
+		});
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）；重排不是本輪結束，
+		// 因此回傳形狀裡根本沒有可以攜帶 restCount patch 的位置——比對完整鍵集合即為證據
+		// （單獨的 not.toHaveProperty 對任何未列出的欄位名稱都恆真）。
+		expect(Object.keys(result).sort()).toEqual(["ok", "round"]);
+		// 也沒有任何 Player 被就地改動：本函式是純函式，restCount 的唯一結算點在 createRound。
+		expect(players).toEqual(playersSnapshot);
+	});
 });

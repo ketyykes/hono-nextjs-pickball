@@ -432,7 +432,8 @@ export function resetIncompleteMatches(
 	// 依 spec 同樣不屬於「尚未比賽」。用否定式表達，MatchStatus 日後若擴值也不會有新狀態
 	// 被默默當成可重排。沒有任何場次可丟棄（含整個回合連一場都沒有）即前置條件不成立。
 	const keptMatches = round.matches.filter((match) => match.status !== "pending");
-	if (keptMatches.length === round.matches.length) {
+	const discardedMatches = round.matches.filter((match) => match.status === "pending");
+	if (discardedMatches.length === 0) {
 		return {
 			ok: false,
 			code: RESET_INCOMPLETE_MATCHES_FAILURE_CODE.NO_PENDING_MATCH,
@@ -454,13 +455,19 @@ export function resetIncompleteMatches(
 	// 損壞資料上會少扣，排出比實際空場地更多的場次。
 	const availableCourtCount = round.courtCount - keptMatches.length;
 
+	// 重排的避讓基準＝原回合已攜帶的基準（createRound 存進去的上一輪自身簽章）∪ 本次被丟棄的
+	// 原始 pending 組合。少了後者，輸入完全沒變時 allocateRound 會原封不動排出同一組人
+	// （prd.md 5.6 明列「重設前的原始對戰組合」為需記錄的項目，design Decision 5）。
+	// 保留場次的簽章不必併入：那些人已被排除於候選池之外，新場次根本組不出含他們的組合。
+	const basis = mergeSignatureIndexes(toSets(round.seenSignatures), buildSignatureIndex(discardedMatches.map(toSignatureMatch)));
+
 	let allocation: RoundAllocation;
 	try {
 		allocation = allocateRound({
 			players: candidates,
 			format: round.format,
 			courtCount: availableCourtCount,
-			seenSignatures: EMPTY_SIGNATURE_INDEX,
+			seenSignatures: basis,
 		});
 	} catch {
 		// 在「matches.length <= courtCount」的不變式下 availableCourtCount 至少為 1（前置條件
@@ -484,12 +491,19 @@ export function resetIncompleteMatches(
 	// 否則重排後 2 號場會跑到 1 號場前面。這裡排的是新建的陣列，不動 round.matches。
 	const matches = [...keptMatches, ...reallocated].sort((a, b) => a.courtNumber - b.courtNumber);
 
+	// 保存欄位直接沿用同一份 basis：重排後 round.seenSignatures = 原有值 ∪ 被丟棄組合的簽章。
+	// 這不會讓保存欄位無界成長——下一次 createRound 會以「上一輪自身 completed／scoring 的
+	// 簽章」整份覆寫它（見 createRound 的 toArrays(ownSignatures)），被丟棄的組合影響過下一輪的
+	// 避讓基準之後就自然退場，鏈的深度仍有界。
+	// roundNumber／createdAt／format／courtCount／targetScore 全部以 ...round 原樣沿用：
+	// 重排的是這一輪，不是換一輪。
 	return {
 		ok: true,
 		round: {
 			...round,
 			matches,
 			restingPlayerIds: allocation.resting.map((player) => player.id),
+			seenSignatures: toArrays(basis),
 		},
 	};
 }
