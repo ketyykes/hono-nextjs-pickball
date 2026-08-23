@@ -268,13 +268,56 @@ Depends on: §1, §3
 ## 5. 目標分數與重排未完成場次（round.ts）
 Depends on: §4
 
-- [ ] 5.1 RED: 於 `round.test.ts` 補兩個 it：「產生本輪時決定目標分數，未指定時採預設 11」、「所有場次皆為 pending 時可改目標分數，已有場次離開 pending 時拒絕」。確認紅燈
-- [ ] 5.2 GREEN: `createRound` 接受選填的 `targetScore`（預設 `DEFAULT_TARGET_SCORE`）；實作 `setTargetScore(round, targetScore)`：僅在所有場次皆 `pending` 時回傳新回合，否則回傳失敗結果且原回合不被修改
-- [ ] 5.3 RED: 於 `round.test.ts` 補三個 it：「沒有回合或沒有 pending 場次時重排被拒絕」、「重排保留已完成場次的比分、勝方與賽前賽後分數」、「重排的候選池含休息名單成員，已比賽者不再納入」。確認紅燈
-- [ ] 5.4 GREEN: 實作 `resetIncompleteMatches(round, players, ids)`：前置條件檢查 → 候選池為「`pending` 場次球員 ∪ `restingPlayerIds`」→ 可用場地數扣除 `completed` 與 `scoring` 佔用者 → 呼叫 `allocateRound` → 保留原有的 `completed` 與 `scoring` 場次（design Decision 5）
-- [ ] 5.5 RED: 於 `round.test.ts` 補四個 it：「重排沿用原回合與前一輪的重複比對基準」、「重排把被丟棄的原始組合併入本回合基準」、「重排不改變回合編號、建立時間、對戰方式與目標分數」、「重排未完成場次不觸發休息結算」。確認紅燈
-- [ ] 5.6 GREEN: 重排時把被丟棄的 `pending` 場次以 `buildSignatureIndex` 建索引併入 `round.seenSignatures`，並以原有基準作為 `allocateRound` 的輸入；`roundNumber`／`createdAt`／`format`／`targetScore` 原樣沿用；回傳值不含任何 `restCount` patch
-- [ ] 5.7 REFACTOR: 抽出 `createRound` 與 `resetIncompleteMatches` 共用的「Match → RoundMatch 投影」與「簽章陣列 ↔ Set 轉換」為內部輔助函式，兩處 SHALL NOT 各寫一份
+- [x] 5.1 RED: 於 `round.test.ts` 補兩個 it：「產生本輪時決定目標分數，未指定時採預設 11」、「所有場次皆為 pending 時可改目標分數，已有場次離開 pending 時拒絕」。確認紅燈
+
+  **紅燈證據（真紅燈）**：`expected 11 to be 15`（`createRound` 當時把 `targetScore` 寫死為 `DEFAULT_TARGET_SCORE`）＋ `TypeError: setTargetScore is not a function`。Reviewer 以「base 實作 + HEAD 測試檔」重建實跑，錯誤訊息**與回報逐字相同**。
+
+- [x] 5.2 GREEN: `createRound` 接受選填的 `targetScore`（預設 `DEFAULT_TARGET_SCORE`）；實作 `setTargetScore(round, targetScore)`：僅在所有場次皆 `pending` 時回傳新回合，否則回傳失敗結果且原回合不被修改
+
+  綠燈。`CreateRoundInput` 新增選填 `targetScore?: RoundTargetScore`（省略取 `DEFAULT_TARGET_SCORE`——依 Decision 4，預設值屬**這一層**的行為，schema 刻意不帶 `.default()`）；`setTargetScore(round, targetScore)` 回傳 `{ ok:true, round } | { ok:false, code, message }`。實測成功與失敗兩條路徑**皆未就地修改**傳入的 `round`。
+
+- [x] 5.3 RED: 於 `round.test.ts` 補三個 it：「沒有回合或沒有 pending 場次時重排被拒絕」、「重排保留已完成場次的比分、勝方與賽前賽後分數」、「重排的候選池含休息名單成員，已比賽者不再納入」。確認紅燈
+
+  **紅燈證據（真紅燈）**：三條皆為 `resetIncompleteMatches is not a function`（其一包在 `.not.toThrow()` 內）。
+
+- [x] 5.4 GREEN: 實作 `resetIncompleteMatches(round, players, ids)`：前置條件檢查 → 候選池為「`pending` 場次球員 ∪ `restingPlayerIds`」→ 可用場地數扣除 `completed` 與 `scoring` 佔用者 → 呼叫 `allocateRound` → 保留原有的 `completed` 與 `scoring` 場次（design Decision 5）
+
+  綠燈。前置檢查 → 候選池 → 場地數扣除 → `allocateRound` → 併回保留場次。
+
+  ⚠️ **與 spec 字面的讀法差異（經 Reviewer 裁定可接受，於此記錄）**：候選池實作為「目前名單扣掉保留場次球員」的**補集**，而非 spec 同位語字面的「`pending` 球員 ∪ `restingPlayerIds`」聯集。Reviewer 判定 spec 正文的主句「MUST 為**本輪尚未比賽者**」是規範性的，該同位語只是**解釋性的過度具體化**，且在名單可變時是錯的——**剛新增**與**剛由暫停恢復出場**的人在型別上就不可能出現在聯集裡（建立本輪時已被 `selectPlaying` 完全排除，既不在 pending 也不在 `restingPlayerIds`），而 design Decision 5 白紙黑字把這兩種人列為主持人按下重排的主要動機。兩者的差集恰為「名單中本輪完全沒出現的人」。實證確認 `isActive === false` 者**不會**被補集誤納（`selectPlaying` 濾掉）；已被刪除的球員在補集下自然不在池中，無需處理「查無此人」。
+
+  ⚠️ **`INVALID_COURT_COUNT` 的 catch 分支無測試覆蓋**（如實揭露，比照 tasks 6.6 的體例）。推導經 Reviewer 逐層驗證：`allocateRound` 產出的場次數恆 ≤ `courtCount`，且前置條件保證至少一個 `pending`，故 `availableCourtCount ≥ 1`，**正常路徑不可能為 0**；但 `RoundSchema` 不檢查 `matches.length ≤ courtCount` 這個跨欄位不變式，LocalStorage 回讀的損壞資料可以違反它，因此仍照 `createRound` 的前例用 try/catch 接住並轉為同一個 code。spec 無對應 Scenario。
+
+  **後續 milestone 注意**：本函式的 `courtCount` 取自 `round.courtCount`。若日後讓使用者調小場地數並寫回目前回合，這個分支會從「只有損壞資料可達」變成正常路徑。
+
+  **另一個已知行為（spec 未規範，不改行為，僅記錄）**：候選池為空或人數不足時，`allocateRound` 依既有邊界行為回傳空 `matches`，本函式不因此判定失敗——結果是 `pending` 場次被靜默丟棄，回合可能變成 0 場次或只剩保留場次。「SHALL NOT 建立沒有場次的空回合」那兩條 MUST 屬「無參賽者與人數不足」Requirement，作用對象是**建立回合**而非重排，故非違規。是否在按鈕層擋下留給後續 milestone。
+
+- [x] 5.5 RED: 於 `round.test.ts` 補四個 it：「重排沿用原回合與前一輪的重複比對基準」、「重排把被丟棄的原始組合併入本回合基準」、「重排不改變回合編號、建立時間、對戰方式與目標分數」、「重排未完成場次不觸發休息結算」。確認紅燈
+
+  ⚠️ **2 紅 2 綠**（如實標註，Reviewer 以重建實跑逐一查核，**完全誠實、零不符**）：
+  - **真紅燈 2 條**：「重排沿用原回合與前一輪的重複比對基準」（`expected [ 'p1#p2', 'p3#p4' ] to not include 'p1#p2'`——5.4 當時以 `EMPTY_SIGNATURE_INDEX` 當基準，重排原封不動排出前一輪剛打過的兩組）、「重排把被丟棄的原始組合併入本回合基準」（`expected [] to include 'p1#p2'`）。
+  - **regression guard 2 條**（寫下當下即綠）：「重排不改變回合編號、建立時間、對戰方式與目標分數」——5.4 的成功回傳是 `{ ...round, matches, restingPlayerIds }`，這四個欄位本來就靠 spread 沿用；「重排未完成場次不觸發休息結算」——5.4 的成功形狀本來就只有 `{ ok, round }`，沒有可放 patch 的位置。兩者皆另以 mutation 證明有殺傷力（見 5.7）。
+
+- [x] 5.6 GREEN: 重排時把被丟棄的 `pending` 場次以 `buildSignatureIndex` 建索引併入 `round.seenSignatures`，並以原有基準作為 `allocateRound` 的輸入；`roundNumber`／`createdAt`／`format`／`targetScore` 原樣沿用；回傳值不含任何 `restCount` patch
+
+  綠燈。基準 = `toSets(round.seenSignatures) ∪ signatureIndexOf(discardedMatches)`，同一份寫回 `seenSignatures`；`roundNumber`／`createdAt`／`format`／`targetScore` 原樣沿用；回傳值不含任何 `restCount` patch。
+
+  **場地編號規則**（spec 未規範，自行決定並記錄）：保留場次的編號視為**既定事實**（使用者正站在那個場地、比分已記在該號碼下），新場次以 `takeFreeCourtNumbers` 取最小可用值讓開，合併後依 `courtNumber` 排序輸出。Reviewer 以 `courtCount` 1～8 × 保留數 0～n-1 × 三種佔用佈局做 sweep 實測：**無重複編號、無超出 `courtCount`**。
+
+- [x] 5.7 REFACTOR: 抽出 `createRound` 與 `resetIncompleteMatches` 共用的「Match → RoundMatch 投影」與「簽章陣列 ↔ Set 轉換」為內部輔助函式，兩處 SHALL NOT 各寫一份
+
+  抽出 `signatureIndexOf`；`toRoundMatch` 單一實作、`createRound` 與 `resetIncompleteMatches` 兩處共用；`toSets`／`toArrays` 各一份、兩處共用。grep 佐證 `round.ts` 內 `"|"`／`"#"`／`.join(` 零命中（簽章組裝未外洩）。
+
+  ⚠️ **更正 §4.7 的紀錄**：§4.7 曾記「`round.ts` 內 `.sort(` 零命中」，§5 後失效——現有 1 處，是**顯示用**的場地編號排序（輸出卡片順序），不是候選／配對排序，職責邊界未破，已於該行加註解說明。
+
+  **Implementer 自行做的 5 次 mutation 驗證**（Reviewer 抽驗 4 次，全部與宣稱一致、每次只殺掉預期的那一條）：M1 保留場次比分被抹除、M2 基準不併入被丟棄組合、M3 回合編號 +1、M4 成功結果補上 `restSettlements`、M5 候選池不排除已比賽者。
+
+  **審查退回一次（2 Blocker，皆由 Reviewer 自行加做的 mutation 存活而揭露）**：
+  - **B1 `scoring` 場次在 `resetIncompleteMatches` 完全零覆蓋**——mutation M7（保留條件改為只保留 `completed`）**存活**。這同時違反 spec 正文「重排 MUST 保留所有 `scoring` 場次」、Scenario 正文「已在 `completed` **或 `scoring`** 場次中的球員 MUST 被排除」，以及 **design Decision 10 的明文承諾**（「所有讀取路徑……**重排排除**……緩解方式是這些分支全部有單元測試」——三條讀取路徑中唯獨這條沒有）。
+  - **B2「保留場次佔用的場地 MUST 被排除於可重排場地數之外」空洞成立**——mutation M6（完全不扣除）**存活**。成因是原 fixture 的候選池只有 3 人，單打向下取整後被**人數**卡住而非被**場地數**卡住，扣不扣除排出來一模一樣。連帶使該處註解宣稱了測試並未證明的事（與 §3／§4 兩度退回的「註解含不實技術斷言」同類）。
+  - **合併修正**（commit `2c727e4`，**不新增第 25 個 it**）：就地改造該 it——加 4 人（`g`／`h` 供 `scoring` 場次、`f` 把候選池撐到 4 人使場地數成為真正的約束）、改為 `courtCount: 3` 三場（`completed`＋新增 `scoring`＋`pending`）、追加三條斷言（`scoring` 兩人不得出現在重排結果、`scoring` 場次整場 `toEqual` 快照）。**修正後三次 mutation（M5／M6／M7）全部轉紅**，一次關掉三個缺口。
+  - 另處理 4 項 Nit：`takeFreeCourtNumbers` 誤用 `MIN_COURT_COUNT`（語意是「場地**數**下限」而非「第一個場地**編號**」）改為字面量 `1`、更正 `INVALID_COURT_COUNT` 註解過強的斷言、為 `.sort(` 加職責說明、記錄候選池不足時靜默丟棄 `pending` 的已知行為。
+
 
 ## 6. 比分驗證與送出流程（round.ts）
 Depends on: §3, §5
