@@ -65,7 +65,9 @@ const FORMAT_LABELS = {
 	doubles: "雙打",
 } as const satisfies Record<MatchFormat, string>;
 
-// 驗證隊伍人數與對戰方式是否符合。
+// 人數錯了不擋，updateRatings 算隊伍平均分時用的 sum / playersPerTeam 中，
+// playersPerTeam 是從 format 推導出的固定常數，不會因為實際塞了幾人而跟著變動，
+// 分子分母對不上，隊伍平均就被悄悄算錯——不會拋錯、也不會出現 NaN，錯得無聲無息。
 function assertValidTeamSize(format: MatchFormat, teams: readonly [Side, Side]): void {
 	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
 
@@ -77,7 +79,10 @@ function assertValidTeamSize(format: MatchFormat, teams: readonly [Side, Side]):
 	}
 }
 
-// 驗證所有球員的 rating 是否在合法範圍內。
+// 8.01 這種越界值若不在此擋下，applyDelta 的 clamp 邏輯會把它當成一場比賽打到觸頂
+// 一樣處理，照樣夾回 8.00 並標記 clamped: true——這個旗標的本意是給 M5 顯示「已達上限」，
+// 但這裡的觸界其實是名單資料本來就壞了，不是這場對戰真的把分數推到邊界。
+// 擋在這裡才能讓 M5 顯示的狀態對得上真正發生的事，而不是被偽裝的觸界訊號誤導。
 function assertValidRatings(teams: readonly [Side, Side]): void {
 	for (const team of teams) {
 		for (const player of team) {
@@ -88,7 +93,10 @@ function assertValidRatings(teams: readonly [Side, Side]): void {
 	}
 }
 
-// 驗證所有球員的 gamesPlayed 是否合法（非負整數）。
+// 負值會讓 effectiveK 的 20 / (20 + gamesPlayed) 在 gamesPlayed = -20 時除以零，
+// K_eff 變成 Infinity，一路乘進 delta 後整場分數瞬間變成 Infinity 或 NaN；
+// 非整數雖不會馬上除以零，但會算出現實中不可能出現的中間 K_eff（沒有人打了 1.5 場）。
+// 兩者都擋在入口，比事後在公式裡加防呆或事後修補來得乾淨。
 function assertValidGamesPlayed(teams: readonly [Side, Side]): void {
 	for (const team of teams) {
 		for (const player of team) {
@@ -99,7 +107,9 @@ function assertValidGamesPlayed(teams: readonly [Side, Side]): void {
 	}
 }
 
-// 驗證是否有重複的 player id。
+// 重複 id 不是使用者會自然打出的輸入，而是上游配對（M4）把同一人分進兩隊、
+// 或同一隊塞進同一位置兩次的接線錯誤。若不擋，該員會在 changes 裡出現兩筆，
+// M4 依 id 寫回分數時後面那筆會靜默覆蓋前面那筆——擋在這裡等於是這類接線錯誤的早期警報。
 function assertNoDuplicateIds(teams: readonly [Side, Side]): void {
 	const ids = new Set<string>();
 
