@@ -47,7 +47,7 @@ Depends on: §2, §3
 > 拆成兩批會讓第二批必然變成 regression guard（第一批的 GREEN 就是完整的單打公式，
 > 沒有更小的實作能只滿足其中三個）。一次寫完、用單一 GREEN 補齊，是本群組唯一能保持**真紅燈**的切法。
 
-- [ ] 4.1 RED: 補六個 it，全部針對 `updateRatings`：
+- [x] 4.1 RED: 補六個 it，全部針對 `updateRatings`：
   - 「單打勢均力敵時勝方與敗方各變動 K_eff 的一半」——4.00 對 4.00（`gamesPlayed` 皆 0），第一位勝 → 賽後 `4.15` 與 `3.85`，`delta` 為 `+0.15` 與 `-0.15`
   - 「爆冷獲勝的加分明顯大於預期內獲勝的加分」——6.00 對 3.00（`gamesPlayed` 皆 20）：低分方勝時賽後 `3.20`（`delta` `0.20`），高分方勝時賽後 `6.02`（`delta` `0.02`），並斷言前者遠大於後者
   - 「輸出依隊伍順序攤平，每筆含 id、賽前分數、賽後分數與變動值」——`changes` 長度 2、順序為第一隊在前、`id` 對得上；每筆具備 `before`／`after`／`delta`／`atUpperBound`／`atLowerBound`／`clamped` 六個欄位（本批的三個旗標**皆應為 false**）；另帶 `expectedScores` 兩隊值
@@ -55,7 +55,7 @@ Depends on: §2, §3
   - 「雙方 K_eff 相同且未觸界時總分守恆」——5.00 對 4.00（`gamesPlayed` 皆 0），高分方勝 → 賽後 `5.10` 與 `3.90`，賽前總和 9.00 等於賽後總和 9.00
   - 「雙方 K_eff 不同時總分不守恆且不做事後補償」——4.00（0 場）對 4.00（60 場），前者勝 → 賽後 `4.15` 與 `3.91`，總和由 8.00 變 8.06；並斷言勝方加分**未**被縮減為 0.09
   確認紅燈並貼出輸出
-- [ ] 4.2 GREEN: 實作 `updateRatings(input)` 的**單打路徑**：以雙方 `rating` 取 `E`（`expectedScore`）→ 依 `winnerIndex` 決定各自的 `S`（勝 1、敗 0）→ **逐人**取 `effectiveK(gamesPlayed)` → `after = roundRating(before + K_eff * (S - E))`（`roundRating` 由 `./rating-math` 匯入，**不得**另寫一份兩位小數規則）→ `delta = roundRating(after - before)` → 三個邊界旗標本批一律回 `false`（真正的邊界邏輯在 §6）→ 回傳 `{ changes, expectedScores }`，`changes` 依 `teams` 順序攤平
+- [x] 4.2 GREEN: 實作 `updateRatings(input)` 的**單打路徑**：以雙方 `rating` 取 `E`（`expectedScore`）→ 依 `winnerIndex` 決定各自的 `S`（勝 1、敗 0）→ **逐人**取 `effectiveK(gamesPlayed)` → `after = roundRating(before + K_eff * (S - E))`（`roundRating` 由 `./rating-math` 匯入，**不得**另寫一份兩位小數規則）→ `delta = roundRating(after - before)` → 三個邊界旗標本批一律回 `false`（真正的邊界邏輯在 §6）→ 回傳 `{ changes, expectedScores }`，`changes` 依 `teams` 順序攤平
 - [ ] 4.3 REFACTOR: 把「單一球員的更新」抽為具名內部函式（例如 `applyDelta`），使 §5 的雙打能直接沿用；確認 `RATING_D`／`RATING_K_BASE` 沒有以 magic number 形式出現在 `rating.ts` 內
 
 ## 5. 雙打評分更新（rating.ts）
