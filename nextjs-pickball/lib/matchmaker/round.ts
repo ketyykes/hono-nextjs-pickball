@@ -5,7 +5,7 @@
 // Decision 1、tasks 4.7）。
 
 import { allocateRound } from "./allocation";
-import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
+import { EMPTY_SIGNATURE_INDEX, MIN_COURT_COUNT, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
@@ -90,12 +90,15 @@ function toPlayerRatings(match: Match): PlayerRating[] {
 	return match.teams.flatMap((team) => team.players.map((p) => ({ playerId: p.id, before: p.rating, after: null })));
 }
 
-function toRoundMatch(match: Match, id: string): RoundMatch {
+// courtNumber 由呼叫端指定而非直接取 match.courtNumber：createRound 沿用 allocateRound
+// 指派的 1 起算連續編號，重排則必須避開保留場次已佔用的編號（見 takeFreeCourtNumbers）。
+// 兩處共用同一份投影，SHALL NOT 各寫一份（tasks 5.7）。
+function toRoundMatch(match: Match, id: string, courtNumber: number): RoundMatch {
 	const teams: [RoundTeam, RoundTeam] = [toRoundTeam(match.teams[0]), toRoundTeam(match.teams[1])];
 
 	return {
 		id,
-		courtNumber: match.courtNumber,
+		courtNumber,
 		format: match.format,
 		...(match.format === "doubles" ? { doublesComposition: match.doublesComposition } : {}),
 		teams,
@@ -278,7 +281,7 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		return { ok: false, code: ROUND_FAILURE_CODE.INVALID_COURT_COUNT, message: INVALID_COURT_COUNT_MESSAGE };
 	}
 
-	const matches = allocation.matches.map((match) => toRoundMatch(match, newMatchId()));
+	const matches = allocation.matches.map((match) => toRoundMatch(match, newMatchId(), match.courtNumber));
 
 	const round: Round = {
 		roundNumber: previousRound === null ? 1 : previousRound.roundNumber + 1,
@@ -341,4 +344,152 @@ export function setTargetScore(round: Round, targetScore: RoundTargetScore): Set
 	}
 
 	return { ok: true, round: { ...round, targetScore } };
+}
+
+// ---- 重設與重排未完成場次（prd.md 6.2、design Decision 5） ----
+
+/**
+ * resetIncompleteMatches 的失敗代碼。兩種前置條件不成立的情境分開表達：UI 對「還沒產生
+ * 本輪」與「本輪已全部打完」要給的下一步不同（前者按「產生本輪」、後者按「產生新一輪」）。
+ */
+export const RESET_INCOMPLETE_MATCHES_FAILURE_CODE = {
+	NO_ROUND: "no-round",
+	NO_PENDING_MATCH: "no-pending-match",
+	// 直接沿用 createRound 的同一個代碼與訊息，不另立一個新字面值：對使用者而言成因與
+	// 修正方式完全相同（場地數設定不合法），沒有理由要求 UI 分兩種分支處理同一件事。
+	INVALID_COURT_COUNT: ROUND_FAILURE_CODE.INVALID_COURT_COUNT,
+} as const;
+
+export type ResetIncompleteMatchesFailureCode =
+	(typeof RESET_INCOMPLETE_MATCHES_FAILURE_CODE)[keyof typeof RESET_INCOMPLETE_MATCHES_FAILURE_CODE];
+
+const NO_ROUND_MESSAGE = "目前沒有進行中的回合可以重排，請先產生本輪對戰。";
+const NO_PENDING_MATCH_MESSAGE = "本輪已經沒有尚未開始的場次可以重排，如要換一批對戰組合請產生新一輪。";
+
+/**
+ * 新場次的 id 來源。命名沿用 tasks 5.4 的 `ids`，內容與 CreateRoundInput.newMatchId 同一種
+ * 注入方式（純函式，本檔不呼叫 crypto.randomUUID()）。包成具名物件而非裸函式參數：
+ * 第三個位置放一個匿名 () => string 在呼叫端讀起來只是個不明所以的引數，
+ * `{ newMatchId }` 則自我說明。
+ */
+export interface ResetIncompleteMatchesIds {
+	readonly newMatchId: () => string;
+}
+
+export interface ResetIncompleteMatchesSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface ResetIncompleteMatchesFailure {
+	readonly ok: false;
+	readonly code: ResetIncompleteMatchesFailureCode;
+	readonly message: string;
+}
+
+export type ResetIncompleteMatchesResult = ResetIncompleteMatchesSuccess | ResetIncompleteMatchesFailure;
+
+// 依序取出 count 個「未被保留場次佔用」的場地編號。allocateRound 一律把場地編號從 1 起算
+// 重新指派（allocation.ts 步驟 4），但保留下來的 completed／scoring 場次已經佔著自己的編號，
+// 直接沿用會出現兩張場地卡片同時寫著「1 號場」。spec 沒有規定重排後的編號規則，這裡讓新場次
+// 避開既有編號、取剩下最小的可用值：保留場次的編號是既定事實——使用者此刻就站在那個場地上，
+// 已完成場次的比分也是以那個號碼記錄下來的，能讓的只有新場次。
+// 迴圈以 numbers.length 而非上界為終止條件，故不需要「可用編號是否足夠」的前置假設。
+function takeFreeCourtNumbers(count: number, occupied: ReadonlySet<number>): number[] {
+	const numbers: number[] = [];
+
+	for (let candidate = MIN_COURT_COUNT; numbers.length < count; candidate++) {
+		if (!occupied.has(candidate)) {
+			numbers.push(candidate);
+		}
+	}
+
+	return numbers;
+}
+
+/**
+ * 重排本輪尚未比賽的人：保留 completed 與 scoring 場次原封不動，把 pending 場次全部丟棄，
+ * 以「本輪尚未比賽者」重新跑一次完整的分配優先序（design Decision 5）。純函式——回傳新回合，
+ * 原回合與 players 皆 SHALL NOT 被就地修改。
+ *
+ * 回傳值刻意不含任何 restCount patch：休息次數只在「產生新一輪」時結算，重排不是本輪結束
+ * （design Decision 1）。這也是採用該方案的直接好處——重排會換掉休息名單成員，若本輪已經
+ * 先加過一次，這裡就得反過來撤銷。
+ *
+ * round 收 `Round | null` 而非要求呼叫端先自行判斷：「目前沒有回合」是 spec 明列的前置條件
+ * 之一，判斷放在這裡才能保證每個呼叫端拿到的都是同一句訊息。
+ */
+export function resetIncompleteMatches(
+	round: Round | null,
+	players: readonly Player[],
+	ids: ResetIncompleteMatchesIds,
+): ResetIncompleteMatchesResult {
+	if (round === null) {
+		return { ok: false, code: RESET_INCOMPLETE_MATCHES_FAILURE_CODE.NO_ROUND, message: NO_ROUND_MESSAGE };
+	}
+
+	// 保留 pending 以外的全部場次：completed 是已發生的事實，scoring 則是「已經開始計分」，
+	// 依 spec 同樣不屬於「尚未比賽」。用否定式表達，MatchStatus 日後若擴值也不會有新狀態
+	// 被默默當成可重排。沒有任何場次可丟棄（含整個回合連一場都沒有）即前置條件不成立。
+	const keptMatches = round.matches.filter((match) => match.status !== "pending");
+	if (keptMatches.length === round.matches.length) {
+		return {
+			ok: false,
+			code: RESET_INCOMPLETE_MATCHES_FAILURE_CODE.NO_PENDING_MATCH,
+			message: NO_PENDING_MATCH_MESSAGE,
+		};
+	}
+
+	// 候選池＝目前名單中不在保留場次裡的人。spec 把它寫成「pending 場次的球員 ∪ 本輪休息
+	// 名單成員」，在名單未變動時兩者是同一個集合；名單變動時取補集才是「本輪尚未比賽者」的
+	// 正確讀法——剛加入或剛恢復出場的人不可能出現在本輪的 pending 場次或 restingPlayerIds 裡，
+	// 而那正是主持人按下重排最常見的兩個動機（design Decision 5），照字面取聯集會讓重排
+	// 對這兩種情境完全無效。取補集另有兩個附帶好處：pending 場次只存 playerIds，要拿回
+	// Player 物件本來就得回名單查；補集連查表都省了，也不會因為某人已被刪除而查無此人。
+	// 暫停出場者不需要在這裡過濾，selectPlaying 已保證 isActive === false 者不進候選池。
+	const occupiedPlayerIds = new Set(keptMatches.flatMap((match) => match.teams.flatMap((team) => team.playerIds)));
+	const candidates = players.filter((player) => !occupiedPlayerIds.has(player.id));
+
+	// 一場佔一個場地，所以直接扣場次數，而不是「相異 courtNumber 的個數」——後者在編號重複的
+	// 損壞資料上會少扣，排出比實際空場地更多的場次。
+	const availableCourtCount = round.courtCount - keptMatches.length;
+
+	let allocation: RoundAllocation;
+	try {
+		allocation = allocateRound({
+			players: candidates,
+			format: round.format,
+			courtCount: availableCourtCount,
+			seenSignatures: EMPTY_SIGNATURE_INDEX,
+		});
+	} catch {
+		// 在「matches.length <= courtCount」的不變式下 availableCourtCount 至少為 1（前置條件
+		// 已保證至少有一個 pending 場次，保留場次因此最多 courtCount - 1 場），但 Round 會從
+		// LocalStorage 回讀，而 RoundSchema 並不檢查這個跨欄位不變式。損壞資料仍 MUST 得到
+		// 可判讀的失敗結果而非讓例外穿透到 UI，理由與作法同 createRound。
+		return {
+			ok: false,
+			code: RESET_INCOMPLETE_MATCHES_FAILURE_CODE.INVALID_COURT_COUNT,
+			message: INVALID_COURT_COUNT_MESSAGE,
+		};
+	}
+
+	const freeCourtNumbers = takeFreeCourtNumbers(
+		allocation.matches.length,
+		new Set(keptMatches.map((match) => match.courtNumber)),
+	);
+	const reallocated = allocation.matches.map((match, index) => toRoundMatch(match, ids.newMatchId(), freeCourtNumbers[index]));
+
+	// 依場地編號排序而非「保留的在前、新排的在後」：畫面是一排場地卡片，順序就該是場地順序，
+	// 否則重排後 2 號場會跑到 1 號場前面。這裡排的是新建的陣列，不動 round.matches。
+	const matches = [...keptMatches, ...reallocated].sort((a, b) => a.courtNumber - b.courtNumber);
+
+	return {
+		ok: true,
+		round: {
+			...round,
+			matches,
+			restingPlayerIds: allocation.resting.map((player) => player.id),
+		},
+	};
 }

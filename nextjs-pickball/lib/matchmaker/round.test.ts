@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createRound, setTargetScore, ROUND_FAILURE_CODE } from "./round";
+import { createRound, resetIncompleteMatches, setTargetScore, RESET_INCOMPLETE_MATCHES_FAILURE_CODE, ROUND_FAILURE_CODE } from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
@@ -47,6 +47,25 @@ function makeRoundMatch(overrides: Partial<RoundMatch> = {}): RoundMatch {
 		],
 		...overrides,
 	};
+}
+
+/**
+ * 已完成場次的樣板：makeRoundMatch 的預設狀態是 pending，而 completed 場次還須帶齊比分、
+ * 勝方、完成時間與賽後分數（round-types.ts 的 superRefine 對這四者有跨欄位要求）。
+ * 覆寫 teams 時 MUST 一併覆寫 playerRatings，兩者的球員必須對得上。
+ */
+function makeCompletedRoundMatch(overrides: Partial<RoundMatch> = {}): RoundMatch {
+	return makeRoundMatch({
+		status: "completed",
+		scores: { teamA: 11, teamB: 7 },
+		winner: "teamA",
+		completedAt: "2026-08-22T00:00:00.000Z",
+		playerRatings: [
+			{ playerId: "p1", before: 5, after: 5.1 },
+			{ playerId: "p2", before: 6, after: 5.9 },
+		],
+		...overrides,
+	});
 }
 
 /** 建立一份合法的測試用 Round，可透過 overrides 覆寫特定欄位。 */
@@ -742,5 +761,155 @@ describe("setTargetScore", () => {
 			expect(rejected.message).toContain("目標分數");
 			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
+	});
+});
+
+// 取出一組場次裡的所有球員 id，供「誰有出場」類斷言使用。
+function playerIdsOf(matches: readonly RoundMatch[]): string[] {
+	return matches.flatMap((match) => match.teams.flatMap((team) => team.playerIds));
+}
+
+describe("resetIncompleteMatches", () => {
+	it("沒有回合或沒有 pending 場次時重排被拒絕", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		// 沒有回合以 null 表達（與 CreateRoundInput.previousRound 同一種表達方式），
+		// 呼叫端不必先自行判斷有沒有回合才敢呼叫。
+		const allCompletedRound = makeRound({ matches: [makeCompletedRoundMatch({ id: "done" })] });
+		const allCompletedSnapshot = structuredClone(allCompletedRound);
+
+		let noRound: ReturnType<typeof resetIncompleteMatches> | undefined;
+		let noPending: ReturnType<typeof resetIncompleteMatches> | undefined;
+
+		// 兩者皆 SHALL NOT 拋出例外——UI 靠回傳值決定按鈕是否顯示，拋例外會讓整個畫面掛掉。
+		expect(() => {
+			noRound = resetIncompleteMatches(null, players, { newMatchId: makeIdGenerator("r") });
+		}).not.toThrow();
+		expect(() => {
+			noPending = resetIncompleteMatches(allCompletedRound, players, { newMatchId: makeIdGenerator("r") });
+		}).not.toThrow();
+
+		expect(noRound?.ok).toBe(false);
+		if (noRound !== undefined && !noRound.ok) {
+			expect(noRound.code).toBe(RESET_INCOMPLETE_MATCHES_FAILURE_CODE.NO_ROUND);
+			expect(noRound.message).toContain("回合");
+		}
+
+		expect(noPending?.ok).toBe(false);
+		if (noPending !== undefined && !noPending.ok) {
+			expect(noPending.code).toBe(RESET_INCOMPLETE_MATCHES_FAILURE_CODE.NO_PENDING_MATCH);
+			expect(noPending.message).toContain("尚未開始");
+		}
+
+		// 兩種失敗原因的修正方式不同（一個要先產生本輪、一個要直接產生新一輪），訊息 MUST 不同。
+		if (noRound !== undefined && !noRound.ok && noPending !== undefined && !noPending.ok) {
+			expect(noRound.message).not.toBe(noPending.message);
+		}
+		// SHALL NOT 產生新回合，既有回合也不被就地修改。
+		expect(allCompletedRound).toEqual(allCompletedSnapshot);
+	});
+
+	it("重排保留已完成場次的比分、勝方與賽前賽後分數", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+		const completedMatch = makeCompletedRoundMatch({
+			id: "done",
+			courtNumber: 1,
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const round = makeRound({
+			courtCount: 2,
+			matches: [
+				completedMatch,
+				makeRoundMatch({
+					id: "todo",
+					courtNumber: 2,
+					teams: [
+						{ playerIds: ["p3"], rating: 3 },
+						{ playerIds: ["p4"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p3", before: 3, after: null },
+						{ playerId: "p4", before: 3, after: null },
+					],
+				}),
+			],
+		});
+		const completedSnapshot = structuredClone(completedMatch);
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// 整場相等一次涵蓋 scores／winner／completedAt／playerRatings 四項，並且連 id、
+		// 場地編號、狀態都不能被動到——重排「保留」的意思就是原封不動。
+		expect(result.round.matches.find((match) => match.id === "done")).toEqual(completedSnapshot);
+		// 對照組：原本的 pending 場次確實被換掉了。少了這一條，一個什麼都不做、原樣回傳
+		// 整個回合的實作也會讓上面的斷言成立。
+		expect(result.round.matches.some((match) => match.id === "todo")).toBe(false);
+		expect(result.round.matches).toHaveLength(2);
+	});
+
+	it("重排的候選池含休息名單成員，已比賽者不再納入", () => {
+		// A、B 的 restCount 刻意設為全場最高：若實作忘了把已比賽者排除於候選池之外，
+		// 他們會是「休息次數多者優先」下最先被選中的兩人，本 it 才會真的轉紅。
+		// 其餘人 rating 全部相同，出場人選只由 restCount 決定，不靠強度排序的巧合。
+		const players = [
+			makePlayer({ id: "a", restCount: 9 }),
+			makePlayer({ id: "b", restCount: 9 }),
+			makePlayer({ id: "c", restCount: 1 }),
+			makePlayer({ id: "d", restCount: 0 }),
+			makePlayer({ id: "e", restCount: 5 }),
+		];
+		const round = makeRound({
+			courtCount: 2,
+			matches: [
+				makeCompletedRoundMatch({
+					id: "done",
+					courtNumber: 1,
+					teams: [
+						{ playerIds: ["a"], rating: 3 },
+						{ playerIds: ["b"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "a", before: 3, after: 3.1 },
+						{ playerId: "b", before: 3, after: 2.9 },
+					],
+				}),
+				makeRoundMatch({
+					id: "todo",
+					courtNumber: 2,
+					teams: [
+						{ playerIds: ["c"], rating: 3 },
+						{ playerIds: ["d"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "c", before: 3, after: null },
+						{ playerId: "d", before: 3, after: null },
+					],
+				}),
+			],
+			restingPlayerIds: ["e"],
+		});
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const reallocatedIds = playerIdsOf(result.round.matches.filter((match) => match.status === "pending"));
+		expect(reallocatedIds).not.toContain("a");
+		expect(reallocatedIds).not.toContain("b");
+		expect(reallocatedIds).toContain("e");
+		// 可用場地只剩 1（court 1 仍被已完成場次佔著），單打 1 場即 2 人：E（休息 5 次）
+		// 與 C（1 次）依序入選，D（0 次）落到休息名單——已比賽的 A、B 不該混進休息名單。
+		expect(reallocatedIds).toHaveLength(PLAYERS_PER_MATCH.singles);
+		expect(result.round.restingPlayerIds).toEqual(["d"]);
 	});
 });
