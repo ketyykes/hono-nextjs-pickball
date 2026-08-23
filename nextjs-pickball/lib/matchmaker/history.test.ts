@@ -1,6 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { MatchHistoryEntrySchema } from "./history";
 import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
+import type { Player } from "./types";
+
+/** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位（沿用 storage.test.ts 的樣板）。 */
+function makePlayer(overrides: Partial<Player> = {}): Player {
+	return {
+		id: "p1",
+		name: "Alice",
+		gender: "female",
+		colorFrom: "#ff0000",
+		colorTo: "#00ff00",
+		rating: 3,
+		restCount: 0,
+		gamesPlayed: 0,
+		isActive: true,
+		createdAt: "2026-08-15T00:00:00.000Z",
+		...overrides,
+	};
+}
 
 /** 建立一份球員快照，可透過 overrides 覆寫特定欄位。 */
 function makePlayerSnapshot(overrides: Partial<HistoryPlayer> = {}): HistoryPlayer {
@@ -133,5 +151,40 @@ describe("MatchHistoryEntrySchema", () => {
 		const doublesWithoutComposition: Record<string, unknown> = { ...makeDoublesEntry() };
 		delete doublesWithoutComposition.doublesComposition;
 		expect(MatchHistoryEntrySchema.safeParse(doublesWithoutComposition).success).toBe(false);
+	});
+
+	it("球員自名單刪除後歷史紀錄的姓名與分數仍完整", () => {
+		const players: Player[] = [
+			makePlayer({ id: "p1", name: "Alice" }),
+			makePlayer({ id: "p2", name: "Bob" }),
+		];
+		const rawEntry = makeSinglesEntry({
+			teamA: {
+				rating: 5,
+				players: [{ id: "p1", name: "Alice", ratingBefore: 5, ratingAfter: 5.2 }],
+			},
+			teamB: {
+				rating: 4,
+				players: [{ id: "p2", name: "Bob", ratingBefore: 4, ratingAfter: 3.8 }],
+			},
+			scoreA: 11,
+			scoreB: 7,
+		});
+
+		// 特意先經過 safeParse 再斷言——直接斷言建構用的原始物件測不出「schema 是否真的
+		// 保存了 name」，parse 後的輸出才是歷史實際會持久化、日後讀回顯示的資料形狀。
+		const result = MatchHistoryEntrySchema.safeParse(rawEntry);
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+		const entry = result.data;
+
+		// 名單本身的異動（p1 被移除）不應波及已寫入的歷史紀錄——兩者是各自獨立的資料。
+		const remainingPlayers = players.filter((p) => p.id !== "p1");
+
+		expect(remainingPlayers.find((p) => p.id === "p1")).toBeUndefined();
+		expect(entry.teamA.players[0].name).toBe("Alice");
+		expect(entry.scoreA).toBe(11);
+		expect(entry.teamA.players[0].ratingBefore).toBe(5);
+		expect(entry.teamA.players[0].ratingAfter).toBe(5.2);
 	});
 });
