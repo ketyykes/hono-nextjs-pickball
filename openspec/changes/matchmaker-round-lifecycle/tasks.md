@@ -387,6 +387,8 @@ Depends on: §1, §2, §3
 - [x] 7.6 GREEN: 四個函式一律先過 `hasLocalStorage()`，寫入包 try/catch 並以 `console.warn` 記錄，SHALL NOT 讓例外穿透中斷呼叫端。**與 7.2／7.4 同步完成，本項無新增程式碼**（見 7.5 註記）
 - [x] 7.7 REFACTOR: 抽出「讀 key → JSON.parse → 外層驗證」的共用骨架，回合與歷史兩條路徑只在降級策略上分歧，SHALL NOT 各自複製一份 try/catch 樣板。已抽出 `readContainer()` / `writeJSON()` / `clearKey()` 三個內部共用函式，`readRound`／`writeRound`／`clearRound`／`readHistory`／`writeHistory`／`clearHistory` 六個匯出函式改為委派這三者，降級策略分歧（回合無筆可救 vs. 歷史逐筆 safeParse）保留在呼叫端。重跑單檔測試確認仍綠燈
 
+  **審查紀錄**：Stage 1 PASS（自行做 9 次 mutation，0 次存活）；Stage 2 PASS_WITH_NITS、無 Blocker（自行做 13 次品質面 mutation，7 次存活，多數判為無需測試）。leader 依 Stage 2 的 Nit 補了兩處：① `readRound()`／`readHistory()` 的註解原寫「見 design Decision 3」，但本 change 的 Decision 3 講的是 id／姓名快照而非損壞降級（那個指標實際對應 `player-roster` 已封存 change 的 Decision 3），改為指向 spec「回合與歷史的持久化與損壞降級」；② 新增 it「回合寫入後可原樣讀回，寫入 null 則讀回無回合但保留 key」——**regression guard 非真紅燈**（行為在寫入該 it 之前已成立），補它是因為 `writeRound` 原本只被 `not.toThrow()` 覆蓋、沒有任何 round-trip 斷言（歷史那側靠 `readHistory` 的回寫路徑順帶取得覆蓋，回合沒有對應路徑），且 `writeRound(null)` 這條路徑 §8 的整合測試也覆蓋不到。已 mutation 驗證它殺得死 Stage 2 三個存活項（寫入 `version: 2`、`writeRound(null)` no-op、`round` 為 `null` 時誤清 key），三次皆轉紅、還原後 7 測試回綠
+
 ## 8. store hook（useRoundStore）
 Depends on: §4, §5, §6, §7
 

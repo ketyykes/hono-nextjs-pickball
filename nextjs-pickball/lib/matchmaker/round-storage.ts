@@ -75,7 +75,7 @@ const RoundContainerSchema = z.object({
  *
  * - 無資料 → 無目前回合（null）
  * - JSON 解析失敗、外層結構不合法或 version 不符 → 清除損壞資料並回無目前回合
- *   （回合是單一物件，無筆可救，見 design Decision 3）
+ *   （回合是單一物件，無筆可救，見 spec「回合與歷史的持久化與損壞降級」）
  */
 export function readRound(): Round | null {
 	const result = readContainer(ROUND_STORAGE_KEY, RoundContainerSchema);
@@ -120,8 +120,8 @@ export interface ReadHistoryResult {
  * - JSON 解析失敗、外層結構不合法或 version 不符 → 清除損壞資料並回空歷史，
  *   不走逐筆降級（結構層級損壞，即使每筆都合法也不得保留）
  * - 外層合法但個別紀錄不合法 → 保留合法者、捨棄不合法者，回報 droppedCount，
- *   key 不移除（逐筆降級，見 design Decision 3——歷史是活動累積的資料，
- *   因單筆損壞而清空整份的損失不成比例）
+ *   key 不移除（逐筆降級，見 spec「回合與歷史的持久化與損壞降級」——歷史是活動
+ *   累積的資料，因單筆損壞而清空整份的損失不成比例）
  */
 export function readHistory(): ReadHistoryResult {
 	const result = readContainer(HISTORY_STORAGE_KEY, HistoryReadContainerSchema);

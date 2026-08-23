@@ -103,6 +103,21 @@ describe("round-storage", () => {
 		expect(HISTORY_STORAGE_KEY).toBe("matchmaker:history:v1");
 	});
 
+	// regression guard（非 TDD 紅燈，行為在寫入本 it 之前已成立）。補這條是因為
+	// writeRound 原本只被 not.toThrow() 覆蓋，沒有任何斷言驗證它寫出去的東西讀得回來：
+	// 歷史那側靠 readHistory 的回寫路徑順帶取得了 round-trip 覆蓋，回合沒有對應路徑。
+	// writeRound(null) 尤其裸露——它寫的是「明確的無回合」而非移除 key，兩者對呼叫端
+	// 等價但只有前者能與 clearRound() 區分，且 §8 的整合測試只走非 null 路徑。
+	it("回合寫入後可原樣讀回，寫入 null 則讀回無回合但保留 key", () => {
+		const round = makeRound();
+		writeRound(round);
+		expect(readRound()).toEqual(round);
+
+		writeRound(null);
+		expect(readRound()).toBeNull();
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).not.toBeNull();
+	});
+
 	it("回合 JSON 解析失敗時清除 key 並回傳無回合", () => {
 		localStorage.setItem(ROUND_STORAGE_KEY, "{ 不是合法 JSON");
 
