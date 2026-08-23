@@ -67,8 +67,7 @@ export const MatchHistoryEntrySchema = z.discriminatedUnion("format", [
 		.strict(),
 ]);
 
-// 外層容器：version 為字面量 1；entries 以追加順序保存（見 appendHistoryEntry），
-// 不在 schema 層排序或去重。
+// 外層容器：version 為字面量 1；entries 以追加順序保存，不在 schema 層排序或去重。
 export const HistorySchema = z.object({
 	version: z.literal(1),
 	entries: z.array(MatchHistoryEntrySchema),

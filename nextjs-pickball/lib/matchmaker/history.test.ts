@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MatchHistoryEntrySchema } from "./history";
+import { MatchHistoryEntrySchema, appendHistoryEntry } from "./history";
 import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
 import type { Player } from "./types";
 
@@ -186,5 +186,48 @@ describe("MatchHistoryEntrySchema", () => {
 		expect(entry.scoreA).toBe(11);
 		expect(entry.teamA.players[0].ratingBefore).toBe(5);
 		expect(entry.teamA.players[0].ratingAfter).toBe(5.2);
+	});
+});
+
+describe("appendHistoryEntry", () => {
+	it("appendHistoryEntry 回傳新陣列且只增加一筆", () => {
+		const existing: MatchHistoryEntry[] = [
+			makeSinglesEntry({ matchId: "match-existing-1", courtNumber: 1 }),
+			makeSinglesEntry({ matchId: "match-existing-2", courtNumber: 2 }),
+		];
+		const newEntry = makeDoublesEntry({
+			matchId: "match-new",
+			courtNumber: 3,
+			scoreA: 11,
+			scoreB: 5,
+			winner: "teamA",
+		});
+
+		const result = appendHistoryEntry(existing, newEntry);
+
+		expect(result).toHaveLength(3);
+		expect(result[2].matchId).toBe(newEntry.matchId);
+		expect(result[2].courtNumber).toBe(newEntry.courtNumber);
+		expect(result[2].scoreA).toBe(newEntry.scoreA);
+		expect(result[2].scoreB).toBe(newEntry.scoreB);
+		expect(result[2].winner).toBe(newEntry.winner);
+
+		// 原陣列未被就地修改：長度不變，且回傳的不是同一個參考。
+		expect(existing).toHaveLength(2);
+		expect(result).not.toBe(existing);
+	});
+
+	it("多筆歷史依追加順序保存，不重新排序", () => {
+		// courtNumber 刻意與追加順序相反，證明不是依場地編號排序。
+		const entryA = makeSinglesEntry({ matchId: "match-A", courtNumber: 3 });
+		const entryC = makeSinglesEntry({ matchId: "match-C", courtNumber: 1 });
+		const entryB = makeSinglesEntry({ matchId: "match-B", courtNumber: 2 });
+
+		let history: MatchHistoryEntry[] = [];
+		history = appendHistoryEntry(history, entryA);
+		history = appendHistoryEntry(history, entryC);
+		history = appendHistoryEntry(history, entryB);
+
+		expect(history.map((entry) => entry.matchId)).toEqual(["match-A", "match-C", "match-B"]);
 	});
 });
