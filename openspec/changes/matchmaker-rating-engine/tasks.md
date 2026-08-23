@@ -25,8 +25,8 @@ Depends on: §1
 
 > 本群組**不設 REFACTOR**：`expectedScore` 是單一運算式，GREEN 完成時已無可抽出的重複。
 
-- [ ] 2.1 RED: 於 `rating.test.ts` 補兩個 it：「分差對應的預測勝率符合 D=3.0 的級距」（`expectedScore(4,4)=0.5`、`(4.5,4)≈0.5948`、`(5,4)≈0.6830`、`(6,4)≈0.8228`、`(7,4)≈0.9091`，以 `toBeCloseTo` 取小數 3 位）、「同一場雙方的預測勝率相加為 1」（對多組 `(a,b)` 斷言 `expectedScore(a,b)+expectedScore(b,a)` 等於 1，`toBeCloseTo` 取小數 10 位）。確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/rating.ts`，實作 `expectedScore(ratingA, ratingB)`：`1 / (1 + 10 ** (-(ratingA - ratingB) / RATING_D))`。`RATING_D` 由 `./rating-types` 匯入，**不得**在函式內寫死 `3`
+- [x] 2.1 RED: 於 `rating.test.ts` 補兩個 it：「分差對應的預測勝率符合 D=3.0 的級距」（`expectedScore(4,4)=0.5`、`(4.5,4)≈0.5948`、`(5,4)≈0.6830`、`(6,4)≈0.8228`、`(7,4)≈0.9091`，以 `toBeCloseTo` 取小數 3 位）、「同一場雙方的預測勝率相加為 1」（對多組 `(a,b)` 斷言 `expectedScore(a,b)+expectedScore(b,a)` 等於 1，`toBeCloseTo` 取小數 10 位）。確認紅燈並貼出輸出
+- [x] 2.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/rating.ts`，實作 `expectedScore(ratingA, ratingB)`：`1 / (1 + 10 ** (-(ratingA - ratingB) / RATING_D))`。`RATING_D` 由 `./rating-types` 匯入，**不得**在函式內寫死 `3`
 
 ## 3. K 依出場次數遞減（rating.ts）
 
