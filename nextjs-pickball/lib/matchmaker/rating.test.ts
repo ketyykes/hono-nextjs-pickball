@@ -231,3 +231,79 @@ describe("零和的成立條件", () => {
 		expect(result.changes[0].delta).toBe(0.15);
 	});
 });
+
+describe("雙打評分更新", () => {
+	it("雙打以兩隊平均分數計算預測勝率，而非以總和", () => {
+		// 隊一平均 5.00（總和 10.00）、隊二平均 4.00（總和 8.00），用平均差 1.00 算預測勝率
+		// E_A = 0.683，用平均時結果與用總和時不同（總和會得到 0.823）
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
+			[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
+		];
+
+		const result = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 隊一勝方每人 +0.10，隊二敗方每人 -0.10
+		expect(result.expectedScores[0]).toBeCloseTo(0.683, 2);
+		expect(result.changes[0].delta).toBe(0.1); // A1
+		expect(result.changes[1].delta).toBe(0.1); // A2
+		expect(result.changes[0].after).toBe(6.1);
+		expect(result.changes[1].after).toBe(4.1);
+		expect(result.changes[2].after).toBe(4.4); // B1
+		expect(result.changes[3].after).toBe(3.4); // B2
+		expect(result.changes[2].delta).toBe(-0.1);
+		expect(result.changes[3].delta).toBe(-0.1);
+	});
+
+	it("雙打同隊兩人出場次數相同時加減同一數值", () => {
+		// 同隊兩人 gamesPlayed 皆 0，即使分數不同（6.00 vs 4.00），也應加減同一數值
+		// 因為 (S - E) 來自隊伍層級的預測落差，與個人分數無關
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
+			[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
+		];
+
+		const result = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 隊一兩人變動值完全相等（都是 +0.10）
+		expect(result.changes[0].delta).toBe(result.changes[1].delta);
+		expect(result.changes[0].delta).toBe(0.1);
+		// 隊二兩人變動值完全相等（都是 -0.10）
+		expect(result.changes[2].delta).toBe(result.changes[3].delta);
+		expect(result.changes[2].delta).toBe(-0.1);
+	});
+
+	it("雙打同隊兩人出場次數不同時各自套用自己的 K_eff", () => {
+		// 四人皆 4.00，隊一為 0 場與 60 場各一人，隊二亦然
+		// 隊一勝時，0 場者變 +0.15，60 場者變 +0.09；變動方向相同但幅度不同
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 4.0, 0), makeRatingPlayer("A2", 4.0, 60)],
+			[makeRatingPlayer("B1", 4.0, 0), makeRatingPlayer("B2", 4.0, 60)],
+		];
+
+		const result = updateRatings({
+			format: "doubles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 隊一勝方
+		expect(result.changes[0].delta).toBe(0.15); // A1（0場）
+		expect(result.changes[1].delta).toBe(0.09); // A2（60場）
+		// 隊二敗方
+		expect(result.changes[2].delta).toBe(-0.15); // B1（0場）
+		expect(result.changes[3].delta).toBe(-0.09); // B2（60場）
+
+		// 驗證同隊方向相同
+		expect(Math.sign(result.changes[0].delta)).toBe(Math.sign(result.changes[1].delta));
+		expect(Math.sign(result.changes[2].delta)).toBe(Math.sign(result.changes[3].delta));
+	});
+});

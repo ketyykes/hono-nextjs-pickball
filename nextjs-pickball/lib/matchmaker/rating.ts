@@ -2,8 +2,10 @@
 // 不 import candidates.ts 或 roster.ts 模組，避免評分邏輯被消費端選人決策耦合。
 
 import { RATING_D, RATING_K_BASE, K_DECAY_GAMES } from "./rating-types";
-import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
+import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
+
+import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
 
 /**
  * 計算預測勝率：輸入雙方的平均評分（雙打為隊伍平均），回傳前者的預測勝率。
@@ -46,16 +48,19 @@ function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChan
 // 更新評分：輸入一場對戰的雙方與結果，回傳各球員的分數變動與預測勝率。
 // 單打路徑：逐人計算 K_eff，共用同一個預測勝率 E，變動方向必定相反（零和的結構保證）。
 // 雙打路徑：取隊伍平均 rating 計算 E，但逐人套用自己的 K_eff（design Decision 3）。
-// 注意：本批實作只驗證單打；format 參數目前尚未被讀取，每隊人數推導（PLAYERS_PER_MATCH[format] / 2）
-// 與雙打測試留待後續 task。
+// 每隊人數由 format 決定，單打每隊 1 人、雙打每隊 2 人，均由 PLAYERS_PER_MATCH 推導
+// （design Decision 9）——不得另行寫死 1 或 2。
 export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
-	const { teams, winnerIndex } = input;
+	const { format, teams, winnerIndex } = input;
+
+	// 每隊人數由對戰方式決定：PLAYERS_PER_MATCH[format] / 2
+	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
 
 	// 計算兩隊平均評分而非加總：rating-types.ts 的 Side 與 allocation-types.ts 的 Team 不可互換。
 	// Team.rating 是隊內各選手 rating 的加總，但預測勝率 E 需要隊伍的平均評分（design Decision 2）。
 	// 用加總計算 E 會把級距分差悄悄放大成兩倍——不會拋錯、也不會越界，只會靜默失真，用平均來規避。
-	const avgRatingA = teams[0].reduce((sum, p) => sum + p.rating, 0) / teams[0].length;
-	const avgRatingB = teams[1].reduce((sum, p) => sum + p.rating, 0) / teams[1].length;
+	const avgRatingA = teams[0].reduce((sum, p) => sum + p.rating, 0) / playersPerTeam;
+	const avgRatingB = teams[1].reduce((sum, p) => sum + p.rating, 0) / playersPerTeam;
 
 	// 預測勝率用 1 - E 而非 expectedScore(B, A)：同場對賽的雙方共用同一個 E 是零和結構保證
 	// （design Decision 4）的必要條件。浮點誤差下 expectedScore(3,6) ≠ 1 - expectedScore(6,3)
