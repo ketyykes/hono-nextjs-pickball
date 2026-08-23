@@ -98,7 +98,7 @@ Depends on: §5
   > 舊實作的三旗標又本就硬編碼 `false`，故 clamp 有無都不影響結果。Stage 1 已用前一版 `applyDelta`
   > 邏輯逐一回代驗證，得到的紅／綠分布與實測完全一致，確認非掩飾漏寫實作、無偽造紅燈痕跡。
 - [x] 6.2 GREEN: 在更新流程末端加入邊界處理，順序 MUST 為「先 `roundRating` 至兩位小數 → 再 clamp 於 `RATING_MIN`～`RATING_MAX`」（design Decision 5，順序不可顛倒）；接著 `delta = roundRating(after - before)` 由**夾值後**的 `after` 重算（design Decision 6）；產生三個旗標：`atUpperBound = after === RATING_MAX`、`atLowerBound = after === RATING_MIN`、`clamped = 捨入後的理論值超出範圍`
-- [ ] 6.3 REFACTOR: 確認 clamp 與四捨五入沒有各自散落在多個分支；`RATING_MIN`／`RATING_MAX` 只出現在單一處；`rating-math.ts` 未被修改（`git diff --stat` 確認）
+- [x] 6.3 REFACTOR: 確認 clamp 與四捨五入沒有各自散落在多個分支；`RATING_MIN`／`RATING_MAX` 只出現在單一處；`rating-math.ts` 未被修改（`git diff --stat` 確認）
 
 ## 7. 輸入驗證（rating.ts）
 
