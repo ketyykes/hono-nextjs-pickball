@@ -1,11 +1,23 @@
 import { describe, it, expect } from "vitest";
 
-import { createRound, resetIncompleteMatches, setTargetScore, RESET_INCOMPLETE_MATCHES_FAILURE_CODE, ROUND_FAILURE_CODE } from "./round";
+import {
+	createRound,
+	resetIncompleteMatches,
+	setTargetScore,
+	submitScore,
+	validateScoreInput,
+	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
+	ROUND_FAILURE_CODE,
+	VALIDATE_SCORE_FAILURE_CODE,
+} from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
+import { appendHistoryEntry } from "./history";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
+import { RATING_MAX } from "./rating-types";
 import type { Match, Team } from "./allocation-types";
+import type { MatchHistoryEntry } from "./history";
 import type { Player } from "./types";
 import type { Round, RoundMatch } from "./round-types";
 
@@ -1099,5 +1111,90 @@ describe("resetIncompleteMatches", () => {
 		expect(Object.keys(result).sort()).toEqual(["ok", "round"]);
 		// 也沒有任何 Player 被就地改動：本函式是純函式，restCount 的唯一結算點在 createRound。
 		expect(players).toEqual(playersSnapshot);
+	});
+});
+
+describe("validateScoreInput", () => {
+	it("比分欄位空白時拒絕送出並回傳繁體中文訊息", () => {
+		const match = makeRoundMatch();
+
+		for (const [rawScoreA, rawScoreB] of [
+			["", "11"],
+			["   ", "11"],
+			["11", ""],
+			["11", "   "],
+		] as const) {
+			const result = validateScoreInput(match, rawScoreA, rawScoreB);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) continue;
+			expect(result.code).toBe(VALIDATE_SCORE_FAILURE_CODE.EMPTY_FIELD);
+			// 訊息須為繁體中文且說明「兩隊比分皆須填寫」這件事——直接斷言語意詞而非逐字元
+			// 檢查繁簡，才是真的在意「使用者看得懂該怎麼修正」而非文案本身的用字。
+			expect(result.message).toContain("填寫");
+		}
+	});
+
+	it("比分非有效數字時拒絕送出", () => {
+		const match = makeRoundMatch();
+
+		// 除 test-plan 列出的 "abc"／"1a"／"NaN" 外，一併涵蓋要點 1 的邊界決定：
+		// 小數（"1.5"）與科學記號（"1e3"）會讓 RoundMatchSchema 的
+		// z.number().int().nonnegative() 驗證失敗，故本函式先行拒絕；全形數字（"１１"）
+		// 不是行動裝置數字鍵盤會產生的輸入，同樣不接受，以維持解析規則單純。
+		for (const rawScoreA of ["abc", "1a", "NaN", "1.5", "1e3", "１１"]) {
+			const result = validateScoreInput(match, rawScoreA, "11");
+
+			expect(result.ok).toBe(false);
+			if (result.ok) continue;
+			expect(result.code).toBe(VALIDATE_SCORE_FAILURE_CODE.INVALID_NUMBER);
+		}
+	});
+
+	it("比分為負數時拒絕送出，0 本身可接受", () => {
+		const match = makeRoundMatch();
+
+		const negative = validateScoreInput(match, "-1", "11");
+		expect(negative.ok).toBe(false);
+		if (!negative.ok) {
+			expect(negative.code).toBe(VALIDATE_SCORE_FAILURE_CODE.NEGATIVE_SCORE);
+		}
+
+		const zeroValid = validateScoreInput(match, "0", "11");
+		expect(zeroValid.ok).toBe(true);
+		if (zeroValid.ok) {
+			expect(zeroValid.scoreA).toBe(0);
+			expect(zeroValid.scoreB).toBe(11);
+		}
+
+		// 要點 1 的邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
+		// 這是使用者打字最常見的失手，不應被當成錯誤輸入拒絕。
+		const trimmed = validateScoreInput(match, " 0 ", " 11 ");
+		expect(trimmed.ok).toBe(true);
+	});
+
+	it("兩隊比分相同時拒絕送出", () => {
+		const match = makeRoundMatch();
+
+		const result = validateScoreInput(match, "11", "11");
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(VALIDATE_SCORE_FAILURE_CODE.TIE);
+		expect(result.message).toContain("勝方");
+	});
+
+	it("已完成場次再次送出時被拒絕且既有結果不變", () => {
+		const completedMatch = makeCompletedRoundMatch();
+		const snapshot = structuredClone(completedMatch);
+
+		const result = validateScoreInput(completedMatch, "20", "15");
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe(VALIDATE_SCORE_FAILURE_CODE.ALREADY_COMPLETED);
+		}
+		// validateScoreInput 是純函式，不觸碰傳入的 match——這裡仍實際比對而非只靠型別信任。
+		expect(completedMatch).toEqual(snapshot);
 	});
 });

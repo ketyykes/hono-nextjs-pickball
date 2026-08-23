@@ -535,3 +535,110 @@ export function resetIncompleteMatches(
 		},
 	};
 }
+
+// ---- 比分驗證與送出（prd.md 6.3、6.4、6.5、8.2） ----
+
+/**
+ * validateScoreInput 的失敗代碼。五種拒絕原因（欄位空白／非數字／負數／平局／場次已完成）
+ * 的修正方式互不相同，各自具名而非共用單一「輸入不合法」代碼，理由同 ROUND_FAILURE_CODE。
+ */
+export const VALIDATE_SCORE_FAILURE_CODE = {
+	EMPTY_FIELD: "empty-field",
+	INVALID_NUMBER: "invalid-number",
+	NEGATIVE_SCORE: "negative-score",
+	TIE: "tie",
+	ALREADY_COMPLETED: "already-completed",
+} as const;
+
+export type ValidateScoreFailureCode = (typeof VALIDATE_SCORE_FAILURE_CODE)[keyof typeof VALIDATE_SCORE_FAILURE_CODE];
+
+const EMPTY_FIELD_MESSAGE = "兩隊比分皆須填寫，請輸入完整比分後再試一次。";
+const INVALID_NUMBER_MESSAGE = "比分須為有效的整數，請重新輸入。";
+const NEGATIVE_SCORE_MESSAGE = "比分不可為負數，請輸入 0 或以上的整數。";
+const TIE_MESSAGE = "兩隊比分相同時無法判定勝方，請確認比分後再試一次。";
+const ALREADY_COMPLETED_MESSAGE = "此場次已完成，無法再次送出比分。";
+
+export interface ValidateScoreSuccess {
+	readonly ok: true;
+	readonly scoreA: number;
+	readonly scoreB: number;
+}
+
+export interface ValidateScoreFailure {
+	readonly ok: false;
+	readonly code: ValidateScoreFailureCode;
+	readonly message: string;
+}
+
+export type ValidateScoreResult = ValidateScoreSuccess | ValidateScoreFailure;
+
+// 比分欄位只接受「（可選負號）＋一或多個 ASCII 數字」，前後空白先 trim 再比對格式
+// （要點 1 的邊界決定）：
+// - 接受前後空白（" 11 "）：使用者打字最常見的失手（誤觸空白鍵、觸控鍵盤誤觸），
+//   trim 後仍是合法整數格式時不該被當成錯誤輸入。
+// - 不接受小數（"1.5"）或科學記號（"1e3"）：RoundMatchSchema 的 scores 是
+//   z.number().int().nonnegative()，接受這兩種格式會在寫回 Round 時才被 schema 拒絕，
+//   等於把「輸入驗證」的責任推給 schema 事後爆炸，而不是在使用者送出當下就擋下並說明。
+// - 不接受全形數字（"１１"）：行動裝置的數字鍵盤不會產生全形字元，接受它需要額外的
+//   locale-aware 正規化邏輯，超出「使用者打字失手」這個要處理的範圍。
+// SHALL NOT 單獨用 Number() 或 parseInt() 判斷（tasks 6.2）：Number("") 為 0、
+// Number("   ") 為 0、parseInt("1a") 為 1、Number("NaN") 為 NaN，四者都會被其中一個
+// 函式單獨使用時靜默放行。這裡先用正規表示式判斷格式是否合法，Number() 只在格式已確定
+// 合法之後才用來取值，不構成「單獨判斷」。
+const SCORE_INPUT_PATTERN = /^-?\d+$/;
+
+// 回傳值刻意設計成「三個字面量狀態 + number」的聯合型別而非另外包一層 { ok, ... } 物件：
+// validateScoreInput 需要同時檢視兩個欄位（A、B）才能決定要回報哪一種失敗，用字面量
+// 讓呼叫端能以 === 比對個別欄位的判定結果，同時在依序排除三種失敗字面量後，TS 能將
+// 剩餘型別收斂為 number，不需要 as 斷言或非空判斷符號 !。
+type ScoreFieldParseResult = "empty" | "invalid" | "negative" | number;
+
+function parseScoreField(raw: string): ScoreFieldParseResult {
+	const trimmed = raw.trim();
+	if (trimmed === "") {
+		return "empty";
+	}
+	if (!SCORE_INPUT_PATTERN.test(trimmed)) {
+		return "invalid";
+	}
+
+	const value = Number(trimmed);
+	if (value < 0) {
+		return "negative";
+	}
+	return value;
+}
+
+/**
+ * 驗證一場比分的輸入是否可以送出：欄位空白、非數字、負數、平局、場次已完成五種情況皆
+ * MUST 拒絕（spec「比分驗證」），拒絕時回傳可判讀的失敗結果而非拋出例外或只回布林值。
+ * 純函式，不修改傳入的 match。
+ */
+export function validateScoreInput(match: RoundMatch, rawScoreA: string, rawScoreB: string): ValidateScoreResult {
+	// 場次已完成是最優先的門檻：一旦成立，比分欄位本身合不合法已經無關緊要——已完成的
+	// 場次不該再被任何欄位內容說服而重新計分。
+	if (match.status === "completed") {
+		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.ALREADY_COMPLETED, message: ALREADY_COMPLETED_MESSAGE };
+	}
+
+	const scoreA = parseScoreField(rawScoreA);
+	const scoreB = parseScoreField(rawScoreB);
+
+	if (scoreA === "empty" || scoreB === "empty") {
+		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.EMPTY_FIELD, message: EMPTY_FIELD_MESSAGE };
+	}
+	if (scoreA === "invalid" || scoreB === "invalid") {
+		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.INVALID_NUMBER, message: INVALID_NUMBER_MESSAGE };
+	}
+	if (scoreA === "negative" || scoreB === "negative") {
+		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.NEGATIVE_SCORE, message: NEGATIVE_SCORE_MESSAGE };
+	}
+
+	// 至此 scoreA、scoreB 皆已排除 "empty"／"invalid"／"negative" 三種字面量，TS 將
+	// ScoreFieldParseResult 收斂為 number，不需要斷言。
+	if (scoreA === scoreB) {
+		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.TIE, message: TIE_MESSAGE };
+	}
+
+	return { ok: true, scoreA, scoreB };
+}
