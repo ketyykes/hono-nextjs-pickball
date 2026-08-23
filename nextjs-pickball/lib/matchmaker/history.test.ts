@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MatchHistoryEntrySchema, appendHistoryEntry } from "./history";
+import { PLAYERS_PER_MATCH } from "./allocation-types";
 import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
 import type { Player } from "./types";
 
@@ -123,7 +124,7 @@ describe("MatchHistoryEntrySchema", () => {
 		const doublesEntry = makeDoublesEntry();
 		expect(MatchHistoryEntrySchema.safeParse(doublesEntry).success).toBe(true);
 		const doublesPlayers = [...doublesEntry.teamA.players, ...doublesEntry.teamB.players];
-		expect(doublesPlayers).toHaveLength(4);
+		expect(doublesPlayers).toHaveLength(PLAYERS_PER_MATCH.doubles);
 		for (const player of doublesPlayers) {
 			expect(typeof player.ratingBefore).toBe("number");
 			expect(typeof player.ratingAfter).toBe("number");
@@ -132,7 +133,7 @@ describe("MatchHistoryEntrySchema", () => {
 		const singlesEntry = makeSinglesEntry();
 		expect(MatchHistoryEntrySchema.safeParse(singlesEntry).success).toBe(true);
 		const singlesPlayers = [...singlesEntry.teamA.players, ...singlesEntry.teamB.players];
-		expect(singlesPlayers).toHaveLength(2);
+		expect(singlesPlayers).toHaveLength(PLAYERS_PER_MATCH.singles);
 		for (const player of singlesPlayers) {
 			expect(typeof player.ratingBefore).toBe("number");
 			expect(typeof player.ratingAfter).toBe("number");
@@ -159,14 +160,8 @@ describe("MatchHistoryEntrySchema", () => {
 			makePlayer({ id: "p2", name: "Bob" }),
 		];
 		const rawEntry = makeSinglesEntry({
-			teamA: {
-				rating: 5,
-				players: [{ id: "p1", name: "Alice", ratingBefore: 5, ratingAfter: 5.2 }],
-			},
-			teamB: {
-				rating: 4,
-				players: [{ id: "p2", name: "Bob", ratingBefore: 4, ratingAfter: 3.8 }],
-			},
+			teamA: makeTeam({ rating: 5, players: [makePlayerSnapshot({ id: "p1", name: "Alice", ratingBefore: 5, ratingAfter: 5.2 })] }),
+			teamB: makeTeam({ rating: 4, players: [makePlayerSnapshot({ id: "p2", name: "Bob", ratingBefore: 4, ratingAfter: 3.8 })] }),
 			scoreA: 11,
 			scoreB: 7,
 		});
@@ -215,6 +210,8 @@ describe("appendHistoryEntry", () => {
 		// 原陣列未被就地修改：長度不變，且回傳的不是同一個參考。
 		expect(existing).toHaveLength(2);
 		expect(result).not.toBe(existing);
+		// 原陣列內容也未變——只鎖長度與參考鎖不住 push/splice 這類就地插入。
+		expect(existing.map((e) => e.matchId)).toEqual(["match-existing-1", "match-existing-2"]);
 	});
 
 	it("多筆歷史依追加順序保存，不重新排序", () => {

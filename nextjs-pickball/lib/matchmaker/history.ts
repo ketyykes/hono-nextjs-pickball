@@ -49,10 +49,17 @@ const HistoryEntryBaseSchema = z.object({
 // 兩個分支的字面量各自用 satisfies MatchFormat 綁定，而非把 z.enum(["singles",
 // "doubles"]) 包成 z.ZodType<MatchFormat> 再用 .options 拆解——試過那條路：zod4
 // 的 ZodEnum.options 型別是 T[]（一般陣列），不是逐位置字面量的 tuple，解構出來的
-// 兩個變數都會被寬化成整個 MatchFormat 聯集，z.literal() 吃到聯集會退化成 never，
-// discriminatedUnion 因此在型別層失去分辨力（實測會讓下游所有依賴 format 判斷分支
-// 的型別退化為 undefined／never）。satisfies 逐一綁定沒有這個陷阱，仍能在字面量
-// 拼錯或 MatchFormat 增減字面量時擋下編譯。
+// 兩個變數都會被寬化成整個 MatchFormat 聯集。z.literal(聯集值) 推導出來的型別是
+// 整個聯集本身，不會退化成 never；真正退化成 never 的是下游依賴 format 判斷分支時
+// 的 Extract<MatchHistoryEntry, { format: "..." }> 收窄結果——discriminatedUnion
+// 在型別層失去分辨力後，下游所有靠 format 縮小型別的地方都拿不到正確的分支型別。
+// satisfies 逐一綁定能避開這個陷阱，但保護是不對稱的：字面量拼錯，或
+// MatchFormat 移除／改名某個值時，會是 TS1360 編譯錯誤；但 MatchFormat
+// **新增**一個字面量時，這裡完全不會有任何編譯錯誤（兩個分支照樣通過，只是
+// 少涵蓋新值）。這個「擋得住減、擋不住增」的缺口與 round-types.ts 的
+// z.ZodType<T> 綁定寫法（RoundFormatSchema／RoundDoublesCompositionSchema）
+// 及本檔 HistoryDoublesCompositionSchema 完全相同——皆非本寫法獨有，故不視為
+// 退步。下方 AssertFormatCovered 型別斷言補上「新增」這一側的防護。
 export const MatchHistoryEntrySchema = z.discriminatedUnion("format", [
 	HistoryEntryBaseSchema
 		.extend({
@@ -67,7 +74,25 @@ export const MatchHistoryEntrySchema = z.discriminatedUnion("format", [
 		.strict(),
 ]);
 
-// 外層容器：version 為字面量 1；entries 以追加順序保存，不在 schema 層排序或去重。
+// satisfies 只擋得住字面量拼錯與 MatchFormat 移除／改名，擋不住新增字面量
+// （見上方註解）。這行把「DU 兩分支 format 的值域」與「MatchFormat 的值域」
+// 互相收斂比對：MatchFormat 新增一個分支未涵蓋的字面量時，其中一側 extends
+// 會不成立，此型別退化為 never，在需要它是 true 的地方轉紅，補上「新增」這
+// 一側原本擋不住的缺口。以 export 而非底線前綴命名，避免僅供型別層驗證用途
+// 卻被 @typescript-eslint/no-unused-vars 判定未使用。
+export type AssertFormatCovered =
+	[MatchHistoryEntry["format"]] extends [MatchFormat]
+		? [MatchFormat] extends [MatchHistoryEntry["format"]] ? true : never
+		: never;
+
+// 外層容器：entries 以追加順序保存，不在 schema 層排序或去重。
+//
+// 這份是寫入用的嚴格版（entries: z.array(MatchHistoryEntrySchema)，單筆壞掉就整體
+// safeParse 失敗）。讀取路徑若要做到「單筆壞不拖垮整份」的兩段式降級，需要的是
+// entries: z.array(z.unknown()) 這種寬鬆外層容器再逐筆 safeParse——與這裡嚴格版
+// 無法互換。兩者的關係留待建立 round-storage.ts 時一併決定，不要讓外層容器演化成
+// 兩份互不相干的定義（design 文件的 Goals 已定調 Round／MatchHistoryEntry 這兩份
+// schema 要一次定案、避免後續各自擴充造成破壞性遷移，外層容器不應例外）。
 export const HistorySchema = z.object({
 	version: z.literal(1),
 	entries: z.array(MatchHistoryEntrySchema),
