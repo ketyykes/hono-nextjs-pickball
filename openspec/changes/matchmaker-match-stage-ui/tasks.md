@@ -22,9 +22,10 @@
 
 ## 2. 區段導覽的分頁與 active 判定（section-nav.ts）
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/section-nav.test.ts`，寫入 it「目前路徑對應的分頁為 active，其餘分頁為非 active」：以 `"/matchmaker"` 與 `"/matchmaker/players"` 兩個輸入各斷言一次。跑單檔確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/section-nav.ts` 的 `matchmakerSectionTabs(pathname)`：回傳兩筆分頁（「對戰」→ `/matchmaker`、「參賽者」→ `/matchmaker/players`），各帶 `label`、`href` 與 `active`
-- [ ] 2.3 REFACTOR: 分頁清單抽為模組層級 `as const` 常數，`active` 判定只有一處；確認函式為純函式、不 import 任何 React 或 `next/navigation`
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/section-nav.test.ts`，寫入 it「目前路徑對應的分頁為 active，其餘分頁為非 active」：以 `"/matchmaker"` 與 `"/matchmaker/players"` 兩個輸入各斷言一次。跑單檔確認紅燈並貼出輸出
+      - Stage 2 審查後補一個 it「分頁清單依序為對戰與參賽者兩筆」以 `toEqual` 釘住 label／href／順序（原測試只斷言 `active`，順序對調、label 對調、多回傳一筆三種 mutation 皆存活）。此 it 於實作完成後才補，寫入當下即為綠燈，**如實標註為 regression guard，非真紅燈**
+- [x] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/section-nav.ts` 的 `matchmakerSectionTabs(pathname)`：回傳兩筆分頁（「對戰」→ `/matchmaker`、「參賽者」→ `/matchmaker/players`），各帶 `label`、`href` 與 `active`
+- [x] 2.3 REFACTOR: 分頁清單抽為模組層級 `as const` 常數，`active` 判定只有一處；確認函式為純函式、不 import 任何 React 或 `next/navigation`
 
 ## 3. 本輪設定的預設值與場地數夾值（round-settings.ts）
 
