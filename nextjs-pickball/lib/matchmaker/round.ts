@@ -10,7 +10,7 @@ import { buildSignatureIndex } from "./duplication";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { Player } from "./types";
-import type { PlayerRating, Round, RoundMatch, RoundTeam, SeenSignatures } from "./round-types";
+import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
 
 /**
  * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
@@ -51,6 +51,10 @@ export interface CreateRoundInput {
 	readonly previousRound: Round | null;
 	readonly now: string;
 	readonly newMatchId: () => string;
+	/** 本輪的目標分數，省略時採 DEFAULT_TARGET_SCORE。預設值落在本層而非 schema 層：
+	 * RoundSchema 刻意不帶 .default()，否則一份 targetScore 損壞的回合資料會被靜默補成 11
+	 * 而不是被判為損壞（design Decision 4）。 */
+	readonly targetScore?: RoundTargetScore;
 }
 
 /** 休息次數結算 patch，形狀可直接餵給 roster.ts 的 updatePlayer(id, { restCount })。 */
@@ -233,7 +237,7 @@ function computeRestSettlements(players: readonly Player[], previousRound: Round
  * 只負責一次算出兩者，不負責套用。
  */
 export function createRound(input: CreateRoundInput): CreateRoundResult {
-	const { players, format, courtCount, previousRound, now, newMatchId } = input;
+	const { players, format, courtCount, previousRound, now, newMatchId, targetScore = DEFAULT_TARGET_SCORE } = input;
 
 	// 邊界檢查集中於此一處（tasks 4.10）：allocateRound 對名單相關的邊界不拋錯而是自然
 	// 回傳空 matches（M2 的既有行為，見 allocation.ts 頂端註解），本函式是唯一呼叫端，
@@ -281,7 +285,7 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		createdAt: now,
 		format,
 		courtCount,
-		targetScore: DEFAULT_TARGET_SCORE,
+		targetScore,
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
 		seenSignatures: toArrays(ownSignatures),
@@ -292,4 +296,49 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		round,
 		restSettlements: computeRestSettlements(players, previousRound),
 	};
+}
+
+// ---- 目標分數：每輪設定，開始計分後鎖定（prd.md 6.3.1） ----
+
+/**
+ * setTargetScore 的失敗代碼。不併入 ROUND_FAILURE_CODE：那個列舉是 CreateRoundFailure.code
+ * 的型別來源，混進本代碼等於宣稱 createRound 可能回傳一個它永遠不會回傳的失敗，呼叫端的
+ * 分支處理會多出一個不存在的分支。目前只有一種失敗原因仍以具名代碼回傳，理由同 createRound：
+ * UI 需要能在不比對訊息字串的情況下分辨失敗種類，訊息文案本來就會被改寫。
+ */
+export const SET_TARGET_SCORE_FAILURE_CODE = {
+	SCORING_STARTED: "scoring-started",
+} as const;
+
+export type SetTargetScoreFailureCode = (typeof SET_TARGET_SCORE_FAILURE_CODE)[keyof typeof SET_TARGET_SCORE_FAILURE_CODE];
+
+const SCORING_STARTED_MESSAGE = "本輪已有場次開始計分，目標分數不可再更改；如需改用其他分制，請於產生新一輪時設定。";
+
+export interface SetTargetScoreSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface SetTargetScoreFailure {
+	readonly ok: false;
+	readonly code: SetTargetScoreFailureCode;
+	readonly message: string;
+}
+
+export type SetTargetScoreResult = SetTargetScoreSuccess | SetTargetScoreFailure;
+
+/**
+ * 更改該輪的目標分數：僅在該輪所有場次皆為 pending 時允許，否則回傳失敗結果且原回合
+ * SHALL NOT 被修改（純函式，回傳新回合由呼叫端套用）。
+ *
+ * 鎖定條件寫成「有任一場次不是 pending」而非「有 scoring 或 completed」：spec 明訂本
+ * capability 只以「是否仍全為 pending」為鎖定條件，用否定式表達，日後 MatchStatus 若再擴值
+ * 也不會悄悄變成「新狀態可以改分制」。
+ */
+export function setTargetScore(round: Round, targetScore: RoundTargetScore): SetTargetScoreResult {
+	if (round.matches.some((match) => match.status !== "pending")) {
+		return { ok: false, code: SET_TARGET_SCORE_FAILURE_CODE.SCORING_STARTED, message: SCORING_STARTED_MESSAGE };
+	}
+
+	return { ok: true, round: { ...round, targetScore } };
 }

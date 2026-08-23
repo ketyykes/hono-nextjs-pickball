@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 
-import { createRound, ROUND_FAILURE_CODE } from "./round";
+import { createRound, setTargetScore, ROUND_FAILURE_CODE } from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
 import { updatePlayer } from "./roster";
+import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import type { Match, Team } from "./allocation-types";
 import type { Player } from "./types";
@@ -147,6 +148,41 @@ describe("createRound", () => {
 		// 且所有場次皆為 pending，只有「真的用新輸入重新產生」才會同時成立（reviewer N3）。
 		expect(result.round.createdAt).toBe(FIXED_NOW);
 		expect(result.round.matches.every((m) => m.status === "pending")).toBe(true);
+	});
+
+	it("產生本輪時決定目標分數，未指定時採預設 11", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+		const explicit = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			targetScore: 15,
+		});
+		const omitted = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(explicit.ok).toBe(true);
+		expect(omitted.ok).toBe(true);
+		if (!explicit.ok || !omitted.ok) return;
+
+		expect(explicit.round.targetScore).toBe(15);
+		// 「該輪所有場次共用此值」是結構上的保證，不需逐場斷言：RoundMatch 根本沒有
+		// targetScore 欄位（round-types.ts），目標分數只存在於回合層級這一個位置。
+		expect(omitted.round.targetScore).toBe(DEFAULT_TARGET_SCORE);
+		// 上一條只證明 createRound 採用了那個常數，不證明常數本身是 11；而本 it 名稱與
+		// spec 都明訂預設值 MUST 為 11，套件中又沒有其他測試釘住這個字面值（round-types.test.ts
+		// 只釘住 11／15／21 這個值域，不含「預設是哪一個」），故在此補釘。
+		expect(DEFAULT_TARGET_SCORE).toBe(11);
 	});
 
 	it("簽章基準以字串陣列保存，呼叫 allocateRound 前轉為 Set", () => {
@@ -656,6 +692,55 @@ describe("createRound", () => {
 			if (result !== undefined && !result.ok) {
 				expect(result.code).toBe(ROUND_FAILURE_CODE.INVALID_COURT_COUNT);
 			}
+		}
+	});
+});
+
+describe("setTargetScore", () => {
+	it("所有場次皆為 pending 時可改目標分數，已有場次離開 pending 時拒絕", () => {
+		const pendingRound = makeRound({
+			matches: [makeRoundMatch({ id: "m-1" }), makeRoundMatch({ id: "m-2", courtNumber: 2 })],
+		});
+		const pendingRoundSnapshot = structuredClone(pendingRound);
+
+		const changed = setTargetScore(pendingRound, 21);
+
+		expect(changed.ok).toBe(true);
+		if (!changed.ok) return;
+		expect(changed.round.targetScore).toBe(21);
+		// 「其餘欄位不變」：把 targetScore 改回原值後應與原回合完全相等。單一結構比對取代
+		// 逐欄斷言——逐欄只證明「列出來的那幾個欄位沒變」，日後新增欄位不會有任何提醒。
+		expect({ ...changed.round, targetScore: pendingRound.targetScore }).toEqual(pendingRound);
+		expect(pendingRound).toEqual(pendingRoundSnapshot);
+
+		// scoring 與 completed 都算「已離開 pending」，兩者分別驗證：只測其中一個時，
+		// 把判定寫成單一狀態比對（例如僅檢查 completed）的實作仍會全綠。
+		const lockedMatches: RoundMatch[] = [
+			makeRoundMatch({ id: "m-2", courtNumber: 2, status: "scoring" }),
+			makeRoundMatch({
+				id: "m-2",
+				courtNumber: 2,
+				status: "completed",
+				scores: { teamA: 11, teamB: 7 },
+				winner: "teamA",
+				completedAt: "2026-08-22T00:00:00.000Z",
+				playerRatings: [
+					{ playerId: "p1", before: 5, after: 5.1 },
+					{ playerId: "p2", before: 6, after: 5.9 },
+				],
+			}),
+		];
+
+		for (const lockedMatch of lockedMatches) {
+			const lockedRound = makeRound({ matches: [makeRoundMatch({ id: "m-1" }), lockedMatch] });
+			const lockedRoundSnapshot = structuredClone(lockedRound);
+
+			const rejected = setTargetScore(lockedRound, 21);
+
+			expect(rejected.ok).toBe(false);
+			if (rejected.ok) continue;
+			expect(rejected.message).toContain("目標分數");
+			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
 	});
 });
