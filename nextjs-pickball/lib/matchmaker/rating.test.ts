@@ -173,7 +173,7 @@ describe("單打評分更新", () => {
 		expect(result.changes[0].id).toBe("A1");
 		expect(result.changes[1].id).toBe("B1");
 
-		// 檢查每筆都有七個欄位
+		// 檢查迴圈內每筆都有六個欄位（id 已在迴圈外單獨斷言）
 		for (const change of result.changes) {
 			expect(change).toHaveProperty("before");
 			expect(change).toHaveProperty("after");

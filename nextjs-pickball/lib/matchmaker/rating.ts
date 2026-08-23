@@ -1,7 +1,8 @@
 // 評分更新函式。預測勝率、有效 K 值、批次更新都在此，純函式、無狀態、不涉及選手持久化。
 // 不 import candidates.ts 或 roster.ts 模組，避免評分邏輯被消費端選人決策耦合。
 
-import { RATING_D, RATING_K_BASE, K_DECAY_GAMES, type RatingPlayerInput, type RatingUpdateInput, type RatingUpdateResult, type RatingChange } from "./rating-types";
+import { RATING_D, RATING_K_BASE, K_DECAY_GAMES } from "./rating-types";
+import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
 import { roundRating } from "./rating-math";
 
 /**
@@ -60,13 +61,11 @@ export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	// （design Decision 4）的必要條件。浮點誤差下 expectedScore(3,6) ≠ 1 - expectedScore(6,3)
 	// （IEEE754 下分別為 0.09090909090909091 與 0.09090909090909094），用 1 - E_A 能保持完全對稱。
 	// 這一行最容易被順手改成 expectedScore(avgRatingB, avgRatingA) 形式而破壞零和特性——註解在此預防。
-	const expectedScores: readonly [number, number] = [
-		expectedScore(avgRatingA, avgRatingB),
-		1 - expectedScore(avgRatingA, avgRatingB),
-	];
+	const expectedScoreA = expectedScore(avgRatingA, avgRatingB);
+	const expectedScores: readonly [number, number] = [expectedScoreA, 1 - expectedScoreA];
 
 	// 依隊伍順序遍歷每位球員並計算評分變動。changes 清單維持「第一隊的球員在前」的順序
-	// ——規格明訂該順序（spec Requirement: 單打評分更新 / Scenario: 輸出形狀與順序），後續 task 的持久化與顯示會依序用到。
+	// （spec Requirement: 單打評分更新 / Scenario: 輸出形狀與順序）——後續 task 的持久化與顯示會依序用到。
 	const changes: RatingChange[] = [];
 
 	for (const teamIndex of [0, 1] as const) {
