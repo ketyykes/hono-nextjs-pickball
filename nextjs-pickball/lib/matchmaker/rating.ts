@@ -4,7 +4,7 @@
 import { RATING_D, RATING_K_BASE, K_DECAY_GAMES, RATING_MIN, RATING_MAX } from "./rating-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
-import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
+import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult, Side } from "./rating-types";
 
 /**
  * 計算預測勝率：輸入雙方的平均評分（雙打為隊伍平均），回傳前者的預測勝率。
@@ -58,12 +58,66 @@ function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChan
 	};
 }
 
+// 驗證隊伍人數與對戰方式是否符合。
+function assertValidTeamSize(format: string, teams: readonly [Side, Side]): void {
+	const playersPerTeam = PLAYERS_PER_MATCH[format as keyof typeof PLAYERS_PER_MATCH] / 2;
+
+	for (let i = 0; i < 2; i++) {
+		const teamSize = teams[i].length;
+		if (teamSize !== playersPerTeam) {
+			throw new Error(`隊伍人數需為 ${playersPerTeam} 人（目前輸入：${teamSize}）。`);
+		}
+	}
+}
+
+// 驗證所有球員的 rating 是否在合法範圍內。
+function assertValidRatings(teams: readonly [Side, Side]): void {
+	for (const team of teams) {
+		for (const player of team) {
+			if (player.rating < RATING_MIN || player.rating > RATING_MAX) {
+				throw new Error(`rating 需為 ${RATING_MIN} 到 ${RATING_MAX} 之間的數值，請調整後再試一次（目前輸入：${player.rating}）。`);
+			}
+		}
+	}
+}
+
+// 驗證所有球員的 gamesPlayed 是否合法（非負整數）。
+function assertValidGamesPlayed(teams: readonly [Side, Side]): void {
+	for (const team of teams) {
+		for (const player of team) {
+			if (!Number.isInteger(player.gamesPlayed) || player.gamesPlayed < 0) {
+				throw new Error(`gamesPlayed 需為非負整數，請調整後再試一次（目前輸入：${player.gamesPlayed}）。`);
+			}
+		}
+	}
+}
+
+// 驗證是否有重複的 player id。
+function assertNoDuplicateIds(teams: readonly [Side, Side]): void {
+	const ids = new Set<string>();
+
+	for (const team of teams) {
+		for (const player of team) {
+			if (ids.has(player.id)) {
+				throw new Error(`同一場不得出現重複的 player id，請檢查輸入（重複 id：${player.id}）。`);
+			}
+			ids.add(player.id);
+		}
+	}
+}
+
 // 更新評分：輸入一場對戰的雙方與結果，回傳各球員的分數變動與預測勝率。
 // 單打與雙打共用同一條路徑：單打即每隊 1 人的特例，此時隊伍平均等於該員 rating。
 // 每隊人數由 format 推導自 PLAYERS_PER_MATCH（design Decision 9）——不得另行寫死 1 或 2。
 // 逐人計算 K_eff（design Decision 3），共用隊伍層級的預測勝率 E，變動方向必定相反（零和結構保證）。
 export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	const { format, teams, winnerIndex } = input;
+
+	// 驗證輸入在任何計算之前執行。
+	assertValidTeamSize(format, teams);
+	assertValidRatings(teams);
+	assertValidGamesPlayed(teams);
+	assertNoDuplicateIds(teams);
 
 	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
 

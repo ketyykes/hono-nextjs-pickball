@@ -455,3 +455,133 @@ describe("雙打評分更新", () => {
 		expect(Math.sign(result.changes[2].delta)).toBe(Math.sign(result.changes[3].delta));
 	});
 });
+
+describe("輸入驗證", () => {
+	it("隊伍人數與對戰方式不符時拒絕輸入", () => {
+		// 單打但隊 A 為 2 人
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, 0), makeRatingPlayer("A2", 4.0, 0)],
+					[makeRatingPlayer("B1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/隊伍人數.+2/);
+
+		// 雙打但隊 A 為 1 人
+		expect(() =>
+			updateRatings({
+				format: "doubles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, 0)],
+					[makeRatingPlayer("B1", 4.0, 0), makeRatingPlayer("B2", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/隊伍人數.+1/);
+	});
+
+	it("rating 超出 1.00～8.00 時拒絕輸入而非靜默夾值", () => {
+		// rating 為 0.99
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 0.99, 0)],
+					[makeRatingPlayer("B1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/rating/);
+
+		// rating 為 8.01
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 8.01, 0)],
+					[makeRatingPlayer("B1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/rating/);
+
+		// rating 為 1.0 應正常
+		const result1 = updateRatings({
+			format: "singles",
+			teams: makeSinglesTeams(1.0, 4.0),
+			winnerIndex: 0,
+		});
+		expect(result1.changes).toBeDefined();
+
+		// rating 為 8.0 應正常
+		const result2 = updateRatings({
+			format: "singles",
+			teams: makeSinglesTeams(8.0, 4.0),
+			winnerIndex: 0,
+		});
+		expect(result2.changes).toBeDefined();
+	});
+
+	it("gamesPlayed 為負數或非整數時拒絕輸入", () => {
+		// gamesPlayed 為 -1
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, -1)],
+					[makeRatingPlayer("B1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/gamesPlayed/);
+
+		// gamesPlayed 為 1.5
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, 1.5)],
+					[makeRatingPlayer("B1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/gamesPlayed/);
+
+		// gamesPlayed 為 0 應正常
+		const result = updateRatings({
+			format: "singles",
+			teams: makeSinglesTeams(4.0, 4.0, 0),
+			winnerIndex: 0,
+		});
+		expect(result.changes).toBeDefined();
+	});
+
+	it("同一場出現重複的 player id 時拒絕輸入", () => {
+		// 同一 id 同時在兩隊
+		expect(() =>
+			updateRatings({
+				format: "singles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, 0)],
+					[makeRatingPlayer("A1", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/player id|重複/);
+
+		// 同一 id 同時在同一隊兩個位置
+		expect(() =>
+			updateRatings({
+				format: "doubles",
+				teams: [
+					[makeRatingPlayer("A1", 4.0, 0), makeRatingPlayer("A1", 4.0, 0)],
+					[makeRatingPlayer("B1", 4.0, 0), makeRatingPlayer("B2", 4.0, 0)],
+				],
+				winnerIndex: 0,
+			})
+		).toThrow(/player id|重複/);
+	});
+});
