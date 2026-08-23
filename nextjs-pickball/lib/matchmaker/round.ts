@@ -5,7 +5,7 @@
 // Decision 1、tasks 4.7）。
 
 import { allocateRound } from "./allocation";
-import { EMPTY_SIGNATURE_INDEX, MIN_COURT_COUNT, PLAYERS_PER_MATCH } from "./allocation-types";
+import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
@@ -362,8 +362,12 @@ export function setTargetScore(round: Round, targetScore: RoundTargetScore): Set
 export const RESET_INCOMPLETE_MATCHES_FAILURE_CODE = {
 	NO_ROUND: "no-round",
 	NO_PENDING_MATCH: "no-pending-match",
-	// 直接沿用 createRound 的同一個代碼與訊息，不另立一個新字面值：對使用者而言成因與
-	// 修正方式完全相同（場地數設定不合法），沒有理由要求 UI 分兩種分支處理同一件事。
+	// 沿用 createRound 的同一個代碼與訊息，不另立一個新字面值——但兩者的成因並不相同：
+	// 這條路徑只在「matches.length > courtCount」這種跨欄位損壞資料下才會被觸發（見下方
+	// 的 catch 區塊），courtCount 本身仍是合法值，訊息「請調整為 1 到 8 之間的整數」對這
+	// 條路徑而言其實不可行動（使用者沒有欄位可以調）。沿用同一個 code／訊息單純是因為
+	// 兩者對使用者而言的下一步做法剛好相同（重新產生／重排一次），不是因為觸發原因相同，
+	// 也沒有理由要求 UI 為同一種下一步分兩個分支處理。
 	INVALID_COURT_COUNT: ROUND_FAILURE_CODE.INVALID_COURT_COUNT,
 } as const;
 
@@ -405,7 +409,11 @@ export type ResetIncompleteMatchesResult = ResetIncompleteMatchesSuccess | Reset
 function takeFreeCourtNumbers(count: number, occupied: ReadonlySet<number>): number[] {
 	const numbers: number[] = [];
 
-	for (let candidate = MIN_COURT_COUNT; numbers.length < count; candidate++) {
+	// 這裡要的是「第一個場地編號」，不是「場地數合法範圍下限」——兩者現在剛好同為 1，
+	// 但語意不同：MIN_COURT_COUNT（allocation-types.ts）文件明訂為後者，若哪天下限改為
+	// 2，沿用它會讓場地編號跟著從 2 起算。直接用字面量 1，寫法同 allocation.ts 步驟 4
+	// 的既有先例（`courtNumber: index + 1`）。
+	for (let candidate = 1; numbers.length < count; candidate++) {
 		if (!occupied.has(candidate)) {
 			numbers.push(candidate);
 		}
@@ -458,6 +466,14 @@ export function resetIncompleteMatches(
 	const occupiedPlayerIds = new Set(keptMatches.flatMap((match) => match.teams.flatMap((team) => team.playerIds)));
 	const candidates = players.filter((player) => !occupiedPlayerIds.has(player.id));
 
+	// 已知行為（記錄用，不改動）：若 candidates 為空或人數不足以組成任何一場，下方
+	// allocateRound 依其既有邊界行為（M2）回傳空的 matches 陣列，本函式不會因此判定失敗——
+	// 結果是 pending 場次被靜默丟棄且不補回，回合可能因此變成 0 場次、或只剩保留下來的
+	// completed／scoring 場次。這不是本函式的邊界檢查職責：spec「SHALL NOT 建立沒有場次的
+	// 空回合」那兩條 MUST 屬於「無參賽者與人數不足」Requirement，作用對象是 createRound
+	// 的建立回合路徑，不是這裡的重排路徑；本組 spec 未規範重排時候選池不足的行為，故非違規。
+	// 是否要在按鈕層擋下（例如禁用重排按鈕）留給後續 milestone 決定。
+
 	// 一場佔一個場地，所以直接扣場次數，而不是「相異 courtNumber 的個數」——後者在編號重複的
 	// 損壞資料上會少扣，排出比實際空場地更多的場次。
 	const availableCourtCount = round.courtCount - keptMatches.length;
@@ -480,7 +496,9 @@ export function resetIncompleteMatches(
 		// 在「matches.length <= courtCount」的不變式下 availableCourtCount 至少為 1（前置條件
 		// 已保證至少有一個 pending 場次，保留場次因此最多 courtCount - 1 場），但 Round 會從
 		// LocalStorage 回讀，而 RoundSchema 並不檢查這個跨欄位不變式。損壞資料仍 MUST 得到
-		// 可判讀的失敗結果而非讓例外穿透到 UI，理由與作法同 createRound。
+		// 可判讀的失敗結果而非讓例外穿透到 UI，理由與作法同 createRound；下面沿用的
+		// INVALID_COURT_COUNT_MESSAGE 是 createRound 訊息文案的沿用，不是針對這條「資料已損壞」
+		// 的路徑精準撰寫（見上方 RESET_INCOMPLETE_MATCHES_FAILURE_CODE 的說明）。
 		return {
 			ok: false,
 			code: RESET_INCOMPLETE_MATCHES_FAILURE_CODE.INVALID_COURT_COUNT,
@@ -496,6 +514,9 @@ export function resetIncompleteMatches(
 
 	// 依場地編號排序而非「保留的在前、新排的在後」：畫面是一排場地卡片，順序就該是場地順序，
 	// 否則重排後 2 號場會跑到 1 號場前面。這裡排的是新建的陣列，不動 round.matches。
+	// 這個 .sort( 是純粹的顯示排序（依 courtNumber 排卡片順序），不是候選或配對排序——
+	// 候選排序、配對與重複迴避一律是 allocation.ts／candidates.ts 的職責，本檔頂端註解
+	// SHALL NOT 重新實作，此處未越界。
 	const matches = [...keptMatches, ...reallocated].sort((a, b) => a.courtNumber - b.courtNumber);
 
 	// 保存欄位直接沿用同一份 basis：重排後 round.seenSignatures = 原有值 ∪ 被丟棄組合的簽章。

@@ -846,18 +846,41 @@ describe("resetIncompleteMatches", () => {
 	});
 
 	it("重排的候選池含休息名單成員，已比賽者不再納入", () => {
-		// A、B 的 restCount 刻意設為全場最高：若實作忘了把已比賽者排除於候選池之外，
-		// 他們會是「休息次數多者優先」下最先被選中的兩人，本 it 才會真的轉紅。
-		// 其餘人 rating 全部相同，出場人選只由 restCount 決定，不靠強度排序的巧合。
+		// A、B、G、H 的 restCount 刻意設為全場最高：若實作忘了把已比賽者排除於候選池之外，
+		// 他們會是「休息次數多者優先」下最先被選中的人，本 it 才會真的轉紅。A、B 掛在
+		// completed 場次、G、H 掛在 scoring 場次，兩種「已比賽」狀態各驗一次。F 的
+		// restCount 刻意介於 C、D 之間，把候選池撐到 4 人——這是關鍵：courtCount 3 扣掉
+		// 2 場保留場次後可用場地只剩 1（單打 2 人名額），若候選池只有 3 人會被「人數」
+		// 卡住而非「場地數」卡住，就驗不出場地扣除是否正確。其餘人 rating 全部相同，
+		// 出場人選只由 restCount 決定，不靠強度排序的巧合。
 		const players = [
 			makePlayer({ id: "a", restCount: 9 }),
 			makePlayer({ id: "b", restCount: 9 }),
 			makePlayer({ id: "c", restCount: 1 }),
 			makePlayer({ id: "d", restCount: 0 }),
 			makePlayer({ id: "e", restCount: 5 }),
+			makePlayer({ id: "f", restCount: 3 }),
+			makePlayer({ id: "g", restCount: 9 }),
+			makePlayer({ id: "h", restCount: 9 }),
 		];
+		const scoringMatch = makeRoundMatch({
+			id: "live",
+			courtNumber: 2,
+			status: "scoring",
+			teams: [
+				{ playerIds: ["g"], rating: 3 },
+				{ playerIds: ["h"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "g", before: 3, after: null },
+				{ playerId: "h", before: 3, after: null },
+			],
+		});
+		// 重排「保留 scoring 場次」的斷言要靠整場相等來驗證，先在傳入 resetIncompleteMatches
+		// 之前存一份快照，理由同上一個 it 對 completed 場次的做法。
+		const scoringSnapshot = structuredClone(scoringMatch);
 		const round = makeRound({
-			courtCount: 2,
+			courtCount: 3,
 			matches: [
 				makeCompletedRoundMatch({
 					id: "done",
@@ -871,9 +894,10 @@ describe("resetIncompleteMatches", () => {
 						{ playerId: "b", before: 3, after: 2.9 },
 					],
 				}),
+				scoringMatch,
 				makeRoundMatch({
 					id: "todo",
-					courtNumber: 2,
+					courtNumber: 3,
 					teams: [
 						{ playerIds: ["c"], rating: 3 },
 						{ playerIds: ["d"], rating: 3 },
@@ -895,11 +919,18 @@ describe("resetIncompleteMatches", () => {
 		const reallocatedIds = playerIdsOf(result.round.matches.filter((match) => match.status === "pending"));
 		expect(reallocatedIds).not.toContain("a");
 		expect(reallocatedIds).not.toContain("b");
+		expect(reallocatedIds).not.toContain("g");
+		expect(reallocatedIds).not.toContain("h");
 		expect(reallocatedIds).toContain("e");
-		// 可用場地只剩 1（court 1 仍被已完成場次佔著），單打 1 場即 2 人：E（休息 5 次）
-		// 與 C（1 次）依序入選，D（0 次）落到休息名單——已比賽的 A、B 不該混進休息名單。
+		// 可用場地只剩 1（court 1 被 completed 場次佔著、court 2 被 scoring 場次佔著，
+		// courtCount 3 扣掉這 2 場保留場次後只剩 1），單打 1 場即 2 人名額：E（休息 5 次）
+		// 與 F（3 次）依序入選，C（1 次）、D（0 次）落到休息名單——已比賽的 A、B、G、H
+		// 都不該混進休息名單。
 		expect(reallocatedIds).toHaveLength(PLAYERS_PER_MATCH.singles);
-		expect(result.round.restingPlayerIds).toEqual(["d"]);
+		expect(result.round.restingPlayerIds).toEqual(["c", "d"]);
+		// scoring 場次 MUST 原封不動被保留：整場相等一次涵蓋 id、courtNumber、teams、
+		// playerRatings 等全部欄位，不是只驗證其中球員未被排入新場次。
+		expect(result.round.matches.find((match) => match.id === "live")).toEqual(scoringSnapshot);
 	});
 
 	it("重排沿用原回合與前一輪的重複比對基準", () => {
