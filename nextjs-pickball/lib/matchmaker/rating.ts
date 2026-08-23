@@ -4,7 +4,6 @@
 import { RATING_D, RATING_K_BASE, K_DECAY_GAMES } from "./rating-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
-
 import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
 
 /**
@@ -46,14 +45,12 @@ function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChan
 }
 
 // 更新評分：輸入一場對戰的雙方與結果，回傳各球員的分數變動與預測勝率。
-// 單打路徑：逐人計算 K_eff，共用同一個預測勝率 E，變動方向必定相反（零和的結構保證）。
-// 雙打路徑：取隊伍平均 rating 計算 E，但逐人套用自己的 K_eff（design Decision 3）。
-// 每隊人數由 format 決定，單打每隊 1 人、雙打每隊 2 人，均由 PLAYERS_PER_MATCH 推導
-// （design Decision 9）——不得另行寫死 1 或 2。
+// 單打與雙打共用同一條路徑：單打即每隊 1 人的特例，此時隊伍平均等於該員 rating。
+// 每隊人數由 format 推導自 PLAYERS_PER_MATCH（design Decision 9）——不得另行寫死 1 或 2。
+// 逐人計算 K_eff（design Decision 3），共用隊伍層級的預測勝率 E，變動方向必定相反（零和結構保證）。
 export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	const { format, teams, winnerIndex } = input;
 
-	// 每隊人數由對戰方式決定：PLAYERS_PER_MATCH[format] / 2
 	const playersPerTeam = PLAYERS_PER_MATCH[format] / 2;
 
 	// 計算兩隊平均評分而非加總：rating-types.ts 的 Side 與 allocation-types.ts 的 Team 不可互換。

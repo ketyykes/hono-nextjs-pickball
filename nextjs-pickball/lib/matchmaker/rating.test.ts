@@ -20,6 +20,14 @@ function makeRatingPlayer(
 	return { id, rating, gamesPlayed };
 }
 
+// 雙打測試用的不勻均隊伍配置（隊一平均 5.00、隊二平均 4.00）
+function makeUnevenDoublesTeams(): readonly [Side, Side] {
+	return [
+		[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
+		[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
+	];
+}
+
 describe("評分常數", () => {
 	it("評分常數以具名常數匯出，D 為 3.0、K_base 為 0.15", () => {
 		expect(RATING_D).toBe(3.0);
@@ -236,10 +244,7 @@ describe("雙打評分更新", () => {
 	it("雙打以兩隊平均分數計算預測勝率，而非以總和", () => {
 		// 隊一平均 5.00（總和 10.00）、隊二平均 4.00（總和 8.00），用平均差 1.00 算預測勝率
 		// E_A = 0.683，用平均時結果與用總和時不同（總和會得到 0.823）
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
-			[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
-		];
+		const teams = makeUnevenDoublesTeams();
 
 		const result = updateRatings({
 			format: "doubles",
@@ -262,10 +267,7 @@ describe("雙打評分更新", () => {
 	it("雙打同隊兩人出場次數相同時加減同一數值", () => {
 		// 同隊兩人 gamesPlayed 皆 0，即使分數不同（6.00 vs 4.00），也應加減同一數值
 		// 因為 (S - E) 來自隊伍層級的預測落差，與個人分數無關
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
-			[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
-		];
+		const teams = makeUnevenDoublesTeams();
 
 		const result = updateRatings({
 			format: "doubles",
