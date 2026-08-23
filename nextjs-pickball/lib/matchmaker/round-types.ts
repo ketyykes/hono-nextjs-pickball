@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MatchFormat, DoublesComposition } from "./allocation-types";
+import type { MatchFormat } from "./allocation-types";
 import { MIN_COURT_COUNT, MAX_COURT_COUNT } from "./allocation-types";
 
 // 場次狀態：pending（已排定但未開始）、scoring（進行中）、completed（已完成）。
