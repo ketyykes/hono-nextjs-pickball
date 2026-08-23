@@ -90,11 +90,38 @@
 
 ## 1. 回合型別與 schema（round-types.ts）
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-types.test.ts`，寫入三個 it：「合法回合通過驗證，roundNumber 非正整數時失敗」、「場次狀態僅接受 pending、scoring、completed」、「completed 場次缺少比分、勝方或完成時間時驗證失敗」。跑單檔確認紅燈並貼出輸出
-- [ ] 1.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/round-types.ts`，定義 `MatchStatusSchema`（三值列舉）、`RoundTeamSchema`（`playerIds` + `rating`）、`PlayerRatingSchema`（`playerId` / `before` / `after` 可為 `null`）、`RoundMatchSchema`、`RoundSchema`。`completed` 場次的欄位完整性以 `superRefine` 表達，不靠呼叫端自律
-- [ ] 1.3 RED: 於 `round-types.test.ts` 補兩個 it：「targetScore 僅接受 11、15、21 且不帶預設值」、「目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致」。確認紅燈
-- [ ] 1.4 GREEN: 定義 `RoundTargetScoreSchema`（`z.union` 三個字面量，**不加 `.default()`**，理由見 design Decision 4）、`TARGET_SCORE_OPTIONS` 與 `DEFAULT_TARGET_SCORE = 11`。值域一致性的斷言只存在於測試檔，產品程式碼 SHALL NOT import `lib/scoreboard/**`
-- [ ] 1.5 REFACTOR: 檢查 `format` 是否沿用 `allocation-types.ts` 的 `MatchFormat` 而非另行定義；型別匯入是否一律 `import type`（`verbatimModuleSyntax`）；跑 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 確認無誤
+- [x] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-types.test.ts`，寫入三個 it：「合法回合通過驗證，roundNumber 非正整數時失敗」、「場次狀態僅接受 pending、scoring、completed」、「completed 場次缺少比分、勝方或完成時間時驗證失敗」。跑單檔確認紅燈並貼出輸出
+
+  **紅燈證據**：`Error: Failed to resolve import "./round-types"`（0 tests collected）——`round-types.ts` 此時尚不存在。三個 it 皆為**真紅燈**。
+
+- [x] 1.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/round-types.ts`，定義 `MatchStatusSchema`（三值列舉）、`RoundTeamSchema`（`playerIds` + `rating`）、`PlayerRatingSchema`（`playerId` / `before` / `after` 可為 `null`）、`RoundMatchSchema`、`RoundSchema`。`completed` 場次的欄位完整性以 `superRefine` 表達，不靠呼叫端自律
+
+  綠燈：`Test Files 1 passed / Tests 3 passed`。`superRefine` 除 spec 三欄位外一併檢查「`completed` 場次的 `playerRatings[].after` MUST 為數字」（spec 狀態語意正文的 MUST，無對應 Scenario）。
+
+- [x] 1.3 RED: 於 `round-types.test.ts` 補兩個 it：「targetScore 僅接受 11、15、21 且不帶預設值」、「目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致」。確認紅燈
+
+  **紅燈證據**：`Tests 1 failed | 4 passed`，失敗者為「目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致」（`AssertionError: expected Set{} to deeply equal Set{ 11, 15, 21 }`，`TARGET_SCORE_OPTIONS` 此時尚未定義）——**真紅燈**。
+
+  ⚠️ **regression guard 標註**：「targetScore 僅接受 11、15、21 且不帶預設值」**加入當下即綠**，因為 1.2 定義 `targetScore` 時已寫成不帶 `.default()` 的三值 union，被守護的行為在此之前已成立。依 root `CLAUDE.md`「紅燈要是真的」如實標註為 **regression guard 而非 TDD 紅燈**，未以 mutation check 偽造紅燈。其殺傷力另由 1.4 的 mutation 驗證間接證明（見下）。
+
+- [x] 1.4 GREEN: 定義 `RoundTargetScoreSchema`（`z.union` 三個字面量，**不加 `.default()`**，理由見 design Decision 4）、`TARGET_SCORE_OPTIONS` 與 `DEFAULT_TARGET_SCORE = 11`。值域一致性的斷言只存在於測試檔，產品程式碼 SHALL NOT import `lib/scoreboard/**`
+
+  綠燈：`Tests 5 passed`。經 Stage 2 審查後 `TARGET_SCORE_OPTIONS` 改為由 `RoundTargetScoreSchema.options` 推導（單一真相來源），`DEFAULT_TARGET_SCORE` 以 `satisfies RoundTargetScore` 綁定值域。
+
+  **mutation 驗證**（證明測試有殺傷力，非偽造紅燈）：在 union 內加入 `z.literal(25)` → 「目標分數選項與 scoreboard 的 TargetScoreSchema 值域一致」轉紅（`Set{11,15,21,25}` vs `Set{11,15,21}`）；還原 → 5 passed。
+
+- [x] 1.5 REFACTOR: 檢查 `format` 是否沿用 `allocation-types.ts` 的 `MatchFormat` 而非另行定義；型別匯入是否一律 `import type`（`verbatimModuleSyntax`）；跑 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 確認無誤
+
+  `format` 以 `RoundFormatSchema: z.ZodType<MatchFormat>` 綁定既有型別，未另行宣告 `MatchFormat`；`tsc --noEmit` exit 0。
+
+  兩階段審查後另行完成的 refactor（原始交付未做，由審查退回）：
+  - `doublesComposition` 由寫死的四個字面量改為 `RoundDoublesCompositionSchema: z.ZodType<DoublesComposition>`，綁定 `allocation-types.ts` 的型別；並註明為何刻意維持 `optional()` 而非既有 `Match` 的 discriminated union（spec 無對應 Scenario、持久化資料的損壞診斷性、M5～M8 就地更新的消費形態）。
+  - 四處 `z.ZodIssueCode.custom` 改為字串字面量 `"custom"`（zod 4.4.3 已將前者標為 `@deprecated`；本檔是 codebase 唯一使用 `superRefine` 者，會成為 §3／§6 的模板）。
+  - 匯出 `RoundTargetScore` 型別，補齊「每個 schema 各配一個 `z.infer` 匯出」的檔內慣例。
+  - 註解全面改寫：刪除 6 條純複述註解，改為記錄 design Decision 3／4／10 的決策理由。
+  - 測試檔抽出 `makeRoundMatch(overrides)`／`makeRound(overrides)` 兩個 factory（沿用 `storage.test.ts` 的既有模式），檔案由 261 行降為 169 行，5 個 `it` 名稱與全部斷言不變。
+
+  **審查紀錄**：Stage 1 退回 1 次（值域一致測試硬編 `[11,15,21]` 未真正讀取 `TargetScoreSchema`、`as any` 造成 lint error）；Stage 2 退回 1 次（6 個 Blocker，如上）。修正後 lint 回到 baseline 的 0 error + 3 warning、前端全套件 42 檔／304 測試綠。
 
 ## 2. LocalStorage key 與重置範圍（storage-keys.ts、storage.ts）
 
