@@ -4,12 +4,39 @@
 // allocateRound 已負責的排序、配對或重複迴避（design Decision 1、tasks 4.7）。
 
 import { allocateRound } from "./allocation";
-import { EMPTY_SIGNATURE_INDEX } from "./allocation-types";
+import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { Player } from "./types";
 import type { PlayerRating, Round, RoundMatch, RoundTeam, SeenSignatures } from "./round-types";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
+
+/**
+ * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
+ * 不合法各自獨立，訊息與修正方式互不相同（spec「無參賽者與人數不足時的邊界行為」）。
+ */
+export const ROUND_FAILURE_CODE = {
+	EMPTY_ROSTER: "empty-roster",
+	ALL_PAUSED: "all-paused",
+	INSUFFICIENT_PLAYERS: "insufficient-players",
+	INVALID_COURT_COUNT: "invalid-court-count",
+} as const;
+
+export type RoundFailureCode = (typeof ROUND_FAILURE_CODE)[keyof typeof ROUND_FAILURE_CODE];
+
+const FORMAT_LABEL: Record<MatchFormat, string> = { singles: "單打", doubles: "雙打" };
+
+// 「全員暫停」與「名單為空」的修正方式完全不同（前者要恢復出場、後者要新增參賽者），
+// 訊息 MUST 不同，否則使用者會對著滿滿一頁參賽者被告知「請先新增參賽者」（spec 明文）。
+const EMPTY_ROSTER_MESSAGE = "目前名單尚無任何參賽者，請先新增參賽者後再產生本輪對戰。";
+const ALL_PAUSED_MESSAGE = "目前所有參賽者皆為暫停出場狀態，請先恢復至少一位的出場狀態後再產生本輪對戰。";
+const INVALID_COURT_COUNT_MESSAGE = "場地數設定不合法，請調整為 1 到 8 之間的整數後再試一次。";
+
+// 所需人數直接讀 PLAYERS_PER_MATCH（唯一人數來源），不得另行寫死 2／4。
+function insufficientPlayersMessage(format: MatchFormat): string {
+	const required = PLAYERS_PER_MATCH[format];
+	return `目前可出場人數不足以組成任何一場${FORMAT_LABEL[format]}對戰（至少需要 ${required} 人），請新增參賽者或恢復暫停者的出場狀態後再試一次。`;
+}
 
 /** createRound 的輸入。純函式——時間與場次 id 一律由呼叫端注入，本函式不呼叫
  * Date.now() 或 crypto.randomUUID()（design：本輪不修改 Player、也不碰任何外部世界狀態）。
@@ -39,7 +66,7 @@ export interface CreateRoundSuccess {
 
 export interface CreateRoundFailure {
 	readonly ok: false;
-	readonly code: string;
+	readonly code: RoundFailureCode;
 	readonly message: string;
 }
 
@@ -200,6 +227,28 @@ function computeRestSettlements(players: readonly Player[], previousRound: Round
 export function createRound(input: CreateRoundInput): CreateRoundResult {
 	const { players, format, courtCount, previousRound, now, newMatchId } = input;
 
+	// 邊界檢查集中於此一處（tasks 4.10）：allocateRound 對名單相關的邊界不拋錯而是自然
+	// 回傳空 matches（M2 的既有行為，見 allocation.ts 頂端註解），本函式是唯一呼叫端，
+	// 必須自己判斷、拒絕建立一個沒有任何場次的空回合。三種空狀態的判斷順序刻意由窄到寬：
+	// 先分辨「完全沒有名單」與「名單非空但全員暫停」（兩者的可用人數同為 0，但修正方式不同、
+	// 訊息 MUST 不同），最後才是「可用人數非 0 但不足以組成任何一場」。
+	if (players.length === 0) {
+		return { ok: false, code: ROUND_FAILURE_CODE.EMPTY_ROSTER, message: EMPTY_ROSTER_MESSAGE };
+	}
+
+	const activePlayers = players.filter((p) => p.isActive);
+	if (activePlayers.length === 0) {
+		return { ok: false, code: ROUND_FAILURE_CODE.ALL_PAUSED, message: ALL_PAUSED_MESSAGE };
+	}
+
+	if (activePlayers.length < PLAYERS_PER_MATCH[format]) {
+		return {
+			ok: false,
+			code: ROUND_FAILURE_CODE.INSUFFICIENT_PLAYERS,
+			message: insufficientPlayersMessage(format),
+		};
+	}
+
 	let allocation: RoundAllocation;
 	try {
 		allocation = allocateRound({
@@ -209,7 +258,10 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 			seenSignatures: avoidanceBasis(previousRound),
 		});
 	} catch {
-		return { ok: false, code: "invalid-court-count", message: "場地數設定不合法。" };
+		// 名單相關的邊界已在上方擋下，執行到這裡時 allocateRound 唯一可能拋出的原因是
+		// 場地數不合法（M2 的 assertValidCourtCount）。本函式是唯一呼叫端，MUST 接住這個
+		// Error 轉為同一種可判讀的失敗結果，SHALL NOT 讓例外穿透到 UI 層（tasks 4.9）。
+		return { ok: false, code: ROUND_FAILURE_CODE.INVALID_COURT_COUNT, message: INVALID_COURT_COUNT_MESSAGE };
 	}
 
 	const matches = allocation.matches.map((match) => toRoundMatch(match, newMatchId()));

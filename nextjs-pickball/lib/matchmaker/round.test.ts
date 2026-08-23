@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createRound } from "./round";
+import { createRound, ROUND_FAILURE_CODE } from "./round";
 import { fullMatchKey, opponentKeys } from "./duplication";
 import { updatePlayer } from "./roster";
 import type { Match, Team } from "./allocation-types";
@@ -488,5 +488,122 @@ describe("createRound", () => {
 		if (!round2Result.ok) return;
 
 		expect(round2Result.restSettlements.some((s) => s.id === "c")).toBe(false);
+	});
+
+	it("名單為空時不建立回合並提示新增參賽者", () => {
+		const result = createRound({
+			players: [],
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(ROUND_FAILURE_CODE.EMPTY_ROSTER);
+		expect(result.message).toContain("新增參賽者");
+	});
+
+	it("單打不足 2 人或雙打不足 4 人時不建立回合", () => {
+		const singlesResult = createRound({
+			players: [makePlayer({ id: "p1" })],
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(singlesResult.ok).toBe(false);
+		if (!singlesResult.ok) {
+			expect(singlesResult.code).toBe(ROUND_FAILURE_CODE.INSUFFICIENT_PLAYERS);
+		}
+
+		const doublesResult = createRound({
+			players: [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })],
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(doublesResult.ok).toBe(false);
+		if (!doublesResult.ok) {
+			expect(doublesResult.code).toBe(ROUND_FAILURE_CODE.INSUFFICIENT_PLAYERS);
+		}
+	});
+
+	it("全員暫停出場時的訊息與名單為空時不同", () => {
+		const players = Array.from({ length: 6 }, (_, i) => makePlayer({ id: `p${i + 1}`, isActive: false }));
+
+		const allPausedResult = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		const emptyResult = createRound({
+			players: [],
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(allPausedResult.ok).toBe(false);
+		expect(emptyResult.ok).toBe(false);
+		if (allPausedResult.ok || emptyResult.ok) return;
+		expect(allPausedResult.code).toBe(ROUND_FAILURE_CODE.ALL_PAUSED);
+		expect(allPausedResult.message).not.toBe(emptyResult.message);
+	});
+
+	it("產生失敗時既有回合與 restCount 皆不受影響", () => {
+		const previousRound = makeRound({ roundNumber: 2 });
+		const previousRoundSnapshot = JSON.parse(JSON.stringify(previousRound)) as Round;
+		// 全員暫停：確保會走到失敗路徑。
+		const players = [makePlayer({ id: "p1", isActive: false }), makePlayer({ id: "p2", isActive: false })];
+
+		const result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(result.ok).toBe(false);
+		// 既有回合原封不動：createRound 對失敗輸入不做任何就地修改。
+		expect(previousRound).toEqual(previousRoundSnapshot);
+		// 失敗結果的形狀裡沒有 restSettlements 這個欄位——沒有任何休息次數被結算。
+		expect("restSettlements" in result).toBe(false);
+	});
+
+	it("場地數不合法時接住例外並轉為失敗結果", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+		for (const courtCount of [0, 9, 1.5]) {
+			let result: ReturnType<typeof createRound> | undefined;
+
+			expect(() => {
+				result = createRound({
+					players,
+					format: "singles",
+					courtCount,
+					previousRound: null,
+					now: FIXED_NOW,
+					newMatchId: makeIdGenerator("m"),
+				});
+			}).not.toThrow();
+
+			expect(result?.ok).toBe(false);
+			if (result !== undefined && !result.ok) {
+				expect(result.code).toBe(ROUND_FAILURE_CODE.INVALID_COURT_COUNT);
+			}
+		}
 	});
 });
