@@ -23,12 +23,45 @@ function makeRatingPlayer(
 	return { id, rating, gamesPlayed };
 }
 
+// 單打隊伍配置：各隊各一人。ratingA 與 ratingB 為兩隊各自的評分（單打時隊伍平均等於該員 rating）。
+// gamesPlayed 為兩人的出場次數（預設都是 0）。
+function makeSinglesTeams(
+	ratingA: number,
+	ratingB: number,
+	gamesPlayed: number = 0
+): readonly [Side, Side] {
+	return [
+		[makeRatingPlayer("A1", ratingA, gamesPlayed)],
+		[makeRatingPlayer("B1", ratingB, gamesPlayed)],
+	];
+}
+
 // 雙打測試用的不勻均隊伍配置（隊一平均 5.00、隊二平均 4.00）
 function makeUnevenDoublesTeams(): readonly [Side, Side] {
 	return [
 		[makeRatingPlayer("A1", 6.0, 0), makeRatingPlayer("A2", 4.0, 0)],
 		[makeRatingPlayer("B1", 4.5, 0), makeRatingPlayer("B2", 3.5, 0)],
 	];
+}
+
+// PlayerSchema 驗證用的完整玩家物件建構器
+function makeRosterPlayer(
+	id: string,
+	name: string,
+	rating: number
+): Player {
+	return {
+		id,
+		name,
+		gender: "male",
+		colorFrom: "#000000",
+		colorTo: "#ffffff",
+		rating,
+		gamesPlayed: 20,
+		restCount: 0,
+		isActive: true,
+		createdAt: new Date(0).toISOString(),
+	};
 }
 
 describe("評分常數", () => {
@@ -115,10 +148,7 @@ describe("有效 K 值", () => {
 
 describe("單打評分更新", () => {
 	it("單打勢均力敵時勝方與敗方各變動 K_eff 的一半", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 4.0, 0)],
-			[makeRatingPlayer("B1", 4.0, 0)],
-		];
+		const teams = makeSinglesTeams(4.0, 4.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -201,10 +231,7 @@ describe("單打評分更新", () => {
 
 describe("零和的成立條件", () => {
 	it("雙方 K_eff 相同且未觸界時總分守恆", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 5.0, 0)],
-			[makeRatingPlayer("B1", 4.0, 0)],
-		];
+		const teams = makeSinglesTeams(5.0, 4.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -243,10 +270,7 @@ describe("零和的成立條件", () => {
 	});
 
 	it("觸界時 clamp 優先於零和，總分不守恆", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 8.0, 0)],
-			[makeRatingPlayer("B1", 8.0, 0)],
-		];
+		const teams = makeSinglesTeams(8.0, 8.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -273,10 +297,7 @@ describe("零和的成立條件", () => {
 
 describe("邊界 clamp 與觸界標示", () => {
 	it("更新後超過 8.00 時夾為 8.00 並標示已達上限", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 7.95, 0)],
-			[makeRatingPlayer("B1", 7.95, 0)],
-		];
+		const teams = makeSinglesTeams(7.95, 7.95);
 
 		const result = updateRatings({
 			format: "singles",
@@ -298,10 +319,7 @@ describe("邊界 clamp 與觸界標示", () => {
 	});
 
 	it("更新後低於 1.00 時夾為 1.00 並標示已達下限", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 1.05, 0)],
-			[makeRatingPlayer("B1", 1.05, 0)],
-		];
+		const teams = makeSinglesTeams(1.05, 1.05);
 
 		const result = updateRatings({
 			format: "singles",
@@ -317,10 +335,7 @@ describe("邊界 clamp 與觸界標示", () => {
 	});
 
 	it("未觸界時上下限與夾值旗標皆為 false", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 4.0, 0)],
-			[makeRatingPlayer("B1", 4.0, 0)],
-		];
+		const teams = makeSinglesTeams(4.0, 4.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -337,10 +352,7 @@ describe("邊界 clamp 與觸界標示", () => {
 	});
 
 	it("已達上限者落敗時分數照常下降且不再標示已達上限", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 8.0, 0)],
-			[makeRatingPlayer("B1", 8.0, 0)],
-		];
+		const teams = makeSinglesTeams(8.0, 8.0);
 
 		const result = updateRatings({
 			format: "singles",
@@ -356,10 +368,7 @@ describe("邊界 clamp 與觸界標示", () => {
 	});
 
 	it("賽後分數為兩位小數且可通過 PlayerSchema 的 rating 驗證", () => {
-		const teams: readonly [Side, Side] = [
-			[makeRatingPlayer("A1", 6.0, 20)],
-			[makeRatingPlayer("B1", 3.0, 20)],
-		];
+		const teams = makeSinglesTeams(6.0, 3.0, 20);
 
 		const result = updateRatings({
 			format: "singles",
@@ -378,31 +387,8 @@ describe("邊界 clamp 與觸界標示", () => {
 		const winnerAfter = result.changes[0].after;
 		const loserAfter = result.changes[1].after;
 
-		const winner: Player = {
-			id: "A1",
-			name: "Winner",
-			gender: "male",
-			colorFrom: "#000000",
-			colorTo: "#ffffff",
-			rating: winnerAfter,
-			gamesPlayed: 20,
-			restCount: 0,
-			isActive: true,
-			createdAt: new Date(0).toISOString(),
-		};
-
-		const loser: Player = {
-			id: "B1",
-			name: "Loser",
-			gender: "male",
-			colorFrom: "#000000",
-			colorTo: "#ffffff",
-			rating: loserAfter,
-			gamesPlayed: 20,
-			restCount: 0,
-			isActive: true,
-			createdAt: new Date(0).toISOString(),
-		};
+		const winner = makeRosterPlayer("A1", "Winner", winnerAfter);
+		const loser = makeRosterPlayer("B1", "Loser", loserAfter);
 
 		const winnerResult = PlayerSchema.safeParse(winner);
 		const loserResult = PlayerSchema.safeParse(loser);

@@ -30,8 +30,8 @@ export function effectiveK(gamesPlayed: number): number {
 // 若先 clamp 再 round，理論值 8.0049 會被判定為「被夾值」——但它捨入後本來就是 8.00，
 // 使用者一分都沒少拿，M5 卻會誤報「已被上限截斷」的提示；先 round 再 clamp 則只有真正損失分數的情況才標記。
 // delta 由夾值後的 after 重算而非使用理論值（design Decision 6）：
-// 8.0 - 7.95 在 IEEE754 下是 0.04999999999999982，直接用浮點差會累積誤差，
-// 再過一次 roundRating 才能確保與 after 的差異在可接受的範圍。
+// 8.0 - 7.95 在 IEEE754 下是 0.04999999999999982，直接用浮點差的結果不再是兩位小數的表示，
+// 需再過一次 roundRating 正規化回兩位小數（rating 的表示契約）。
 // 回傳該球員的變動紀錄，包含三個邊界旗標（語意分歧見 rating-types.ts 的 RatingChange 說明）。
 function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChange {
 	const kEff = effectiveK(player.gamesPlayed);
