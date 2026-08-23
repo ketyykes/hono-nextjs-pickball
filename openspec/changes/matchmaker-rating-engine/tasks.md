@@ -82,7 +82,7 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 RED: 補六個 it：
+- [x] 6.1 RED: 補六個 it：
   - 「更新後超過 8.00 時夾為 8.00 並標示已達上限」——7.95 對 7.95（`gamesPlayed` 皆 0），第一位勝 → 勝方 `8.00`、`delta` `0.05`、`atUpperBound` 與 `clamped` 皆 true；敗方 `7.80` 且三旗標皆 false
   - 「更新後低於 1.00 時夾為 1.00 並標示已達下限」——1.05 對 1.05（`gamesPlayed` 皆 0），第二位勝 → 敗方 `1.00`、`delta` `-0.05`、`atLowerBound` 與 `clamped` 皆 true
   - 「未觸界時上下限與夾值旗標皆為 false」——4.00 對 4.00（`gamesPlayed` 皆 0）→ 兩筆三旗標皆 false
@@ -90,7 +90,14 @@ Depends on: §5
   - 「觸界時 clamp 優先於零和，總分不守恆」——同上輸入 → 勝方 `8.00` 且 `delta` 為 `0`，總和由 16.00 變 15.85，並斷言敗方**未**被少扣
   - 「賽後分數為兩位小數且可通過 PlayerSchema 的 rating 驗證」——6.00 對 3.00（`gamesPlayed` 皆 20）→ 每筆 `after` 滿足 `roundRating(after) === after` 且落在 `RATING_MIN`～`RATING_MAX`；以該 `after` 組成的 `Player` 通過 `PlayerSchema.safeParse`（`PlayerSchema` 由 `./types` **唯讀匯入**，不得修改該檔）
   確認紅燈並貼出輸出
-- [ ] 6.2 GREEN: 在更新流程末端加入邊界處理，順序 MUST 為「先 `roundRating` 至兩位小數 → 再 clamp 於 `RATING_MIN`～`RATING_MAX`」（design Decision 5，順序不可顛倒）；接著 `delta = roundRating(after - before)` 由**夾值後**的 `after` 重算（design Decision 6）；產生三個旗標：`atUpperBound = after === RATING_MAX`、`atLowerBound = after === RATING_MIN`、`clamped = 捨入後的理論值超出範圍`
+  > **實測結果：真紅燈（3 failed｜17 passed）**。紅燈的三個為「更新後超過 8.00…」「更新後低於 1.00…」
+  > 「觸界時 clamp 優先於零和，總分不守恆」——舊 `applyDelta` 無 clamp，賽後值分別為 8.10／0.90／8.15。
+  > **另三個 it 在寫入當下即為綠燈（如實標註）**：「未觸界時上下限與夾值旗標皆為 false」「已達上限者落敗時
+  > 分數照常下降且不再標示已達上限」「賽後分數為兩位小數且可通過 PlayerSchema 的 rating 驗證」——
+  > 三者的輸入本來就不觸界（4.00 對 4.00；只斷言遠離上限的敗方；6.02／2.98 落在範圍內），
+  > 舊實作的三旗標又本就硬編碼 `false`，故 clamp 有無都不影響結果。Stage 1 已用前一版 `applyDelta`
+  > 邏輯逐一回代驗證，得到的紅／綠分布與實測完全一致，確認非掩飾漏寫實作、無偽造紅燈痕跡。
+- [x] 6.2 GREEN: 在更新流程末端加入邊界處理，順序 MUST 為「先 `roundRating` 至兩位小數 → 再 clamp 於 `RATING_MIN`～`RATING_MAX`」（design Decision 5，順序不可顛倒）；接著 `delta = roundRating(after - before)` 由**夾值後**的 `after` 重算（design Decision 6）；產生三個旗標：`atUpperBound = after === RATING_MAX`、`atLowerBound = after === RATING_MIN`、`clamped = 捨入後的理論值超出範圍`
 - [ ] 6.3 REFACTOR: 確認 clamp 與四捨五入沒有各自散落在多個分支；`RATING_MIN`／`RATING_MAX` 只出現在單一處；`rating-math.ts` 未被修改（`git diff --stat` 確認）
 
 ## 7. 輸入驗證（rating.ts）
