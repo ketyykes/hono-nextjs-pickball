@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { z } from "zod";
 
 import {
 	RATING_D,
@@ -10,6 +11,8 @@ import {
 	type Side,
 } from "./rating-types";
 import { expectedScore, effectiveK, updateRatings } from "./rating";
+import { roundRating } from "./rating-math";
+import { PlayerSchema } from "./types";
 
 // 測試資料 fixture helper
 function makeRatingPlayer(
@@ -237,6 +240,175 @@ describe("零和的成立條件", () => {
 		expect(afterSum).toBe(8.06);
 		expect(afterSum).not.toBe(beforeSum);
 		expect(result.changes[0].delta).toBe(0.15);
+	});
+
+	it("觸界時 clamp 優先於零和，總分不守恆", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 8.0, 0)],
+			[makeRatingPlayer("B1", 8.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 1,
+		});
+
+		const beforeSum = 8.0 + 8.0;
+		const afterSum = result.changes[0].after + result.changes[1].after;
+
+		// 敗方（A1）照常降為 7.85
+		expect(result.changes[0].after).toBe(7.85);
+		expect(result.changes[0].delta).toBe(-0.15);
+
+		// 勝方（B1）被夾在 8.00
+		expect(result.changes[1].after).toBe(8.0);
+		expect(result.changes[1].delta).toBe(0);
+
+		// 總和由 16.00 變為 15.85
+		expect(afterSum).toBe(15.85);
+		expect(afterSum).not.toBe(beforeSum);
+	});
+});
+
+describe("邊界 clamp 與觸界標示", () => {
+	it("更新後超過 8.00 時夾為 8.00 並標示已達上限", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 7.95, 0)],
+			[makeRatingPlayer("B1", 7.95, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 勝方
+		expect(result.changes[0].after).toBe(8.0);
+		expect(result.changes[0].delta).toBe(0.05);
+		expect(result.changes[0].atUpperBound).toBe(true);
+		expect(result.changes[0].clamped).toBe(true);
+
+		// 敗方
+		expect(result.changes[1].after).toBe(7.8);
+		expect(result.changes[1].atUpperBound).toBe(false);
+		expect(result.changes[1].atLowerBound).toBe(false);
+		expect(result.changes[1].clamped).toBe(false);
+	});
+
+	it("更新後低於 1.00 時夾為 1.00 並標示已達下限", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 1.05, 0)],
+			[makeRatingPlayer("B1", 1.05, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 1,
+		});
+
+		// 敗方（A1）
+		expect(result.changes[0].after).toBe(1.0);
+		expect(result.changes[0].delta).toBe(-0.05);
+		expect(result.changes[0].atLowerBound).toBe(true);
+		expect(result.changes[0].clamped).toBe(true);
+	});
+
+	it("未觸界時上下限與夾值旗標皆為 false", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 4.0, 0)],
+			[makeRatingPlayer("B1", 4.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 兩筆結果的三個旗標皆為 false
+		for (const change of result.changes) {
+			expect(change.atUpperBound).toBe(false);
+			expect(change.atLowerBound).toBe(false);
+			expect(change.clamped).toBe(false);
+		}
+	});
+
+	it("已達上限者落敗時分數照常下降且不再標示已達上限", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 8.0, 0)],
+			[makeRatingPlayer("B1", 8.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 1,
+		});
+
+		// 敗方（A1）
+		expect(result.changes[0].after).toBe(7.85);
+		expect(result.changes[0].delta).toBe(-0.15);
+		expect(result.changes[0].atUpperBound).toBe(false);
+		expect(result.changes[0].clamped).toBe(false);
+	});
+
+	it("賽後分數為兩位小數且可通過 PlayerSchema 的 rating 驗證", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 6.0, 20)],
+			[makeRatingPlayer("B1", 3.0, 20)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		// 驗證每筆賽後分數為兩位小數
+		for (const change of result.changes) {
+			expect(roundRating(change.after)).toBe(change.after);
+			expect(change.after).toBeGreaterThanOrEqual(RATING_MIN);
+			expect(change.after).toBeLessThanOrEqual(RATING_MAX);
+		}
+
+		// 以賽後分數組成的 Player 物件應通過 PlayerSchema 驗證
+		const winnerAfter = result.changes[0].after;
+		const loserAfter = result.changes[1].after;
+
+		const winner: z.infer<typeof PlayerSchema> = {
+			id: "A1",
+			name: "Winner",
+			gender: "male",
+			colorFrom: "#000000",
+			colorTo: "#ffffff",
+			rating: winnerAfter,
+			gamesPlayed: 20,
+			restCount: 0,
+			isActive: true,
+			createdAt: new Date(0).toISOString(),
+		};
+
+		const loser: z.infer<typeof PlayerSchema> = {
+			id: "B1",
+			name: "Loser",
+			gender: "male",
+			colorFrom: "#000000",
+			colorTo: "#ffffff",
+			rating: loserAfter,
+			gamesPlayed: 20,
+			restCount: 0,
+			isActive: true,
+			createdAt: new Date(0).toISOString(),
+		};
+
+		const winnerResult = PlayerSchema.safeParse(winner);
+		const loserResult = PlayerSchema.safeParse(loser);
+
+		expect(winnerResult.success).toBe(true);
+		expect(loserResult.success).toBe(true);
 	});
 });
 

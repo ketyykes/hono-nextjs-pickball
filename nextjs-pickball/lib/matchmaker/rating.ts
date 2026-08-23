@@ -1,7 +1,7 @@
 // 評分更新函式。預測勝率、有效 K 值、批次更新都在此，純函式、無狀態、不涉及選手持久化。
 // 不 import candidates.ts 或 roster.ts 模組，避免評分邏輯被消費端選人決策耦合。
 
-import { RATING_D, RATING_K_BASE, K_DECAY_GAMES } from "./rating-types";
+import { RATING_D, RATING_K_BASE, K_DECAY_GAMES, RATING_MIN, RATING_MAX } from "./rating-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
 import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult } from "./rating-types";
@@ -26,21 +26,34 @@ export function effectiveK(gamesPlayed: number): number {
 // 計算單一球員的評分變動。逐人套用自己的 K_eff（design Decision 3），
 // 允許同隊兩人若出場次數不同時有不同變動幅度。
 // s = 該隊是否獲勝（1 或 0），e = 該隊的預測勝率（由隊伍層級計算、於此處套用在個人身上）。
-// 回傳該球員的變動紀錄；旗標在本階段全部回傳 false，後續 task（§6）在此處加入 clamp 邏輯。
+// 回傳該球員的變動紀錄，包含三個邊界旗標：atUpperBound（已達上限）、atLowerBound（已達下限）、
+// clamped（被夾值）。邊界處理順序為先四捨五入至兩位小數、再 clamp 於 RATING_MIN～RATING_MAX
+// （design Decision 5）；delta 由夾值後的 after 重算而非使用理論值（design Decision 6）。
 function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChange {
 	const kEff = effectiveK(player.gamesPlayed);
 	const before = player.rating;
-	const after = roundRating(before + kEff * (s - e));
-	const delta = roundRating(after - before);
+	const theoreticalAfter = before + kEff * (s - e);
+	const roundedAfter = roundRating(theoreticalAfter);
+
+	// 先四捨五入至兩位小數，再 clamp 於邊界
+	const clampedAfter = Math.max(RATING_MIN, Math.min(RATING_MAX, roundedAfter));
+
+	// 由夾值後的 after 重算 delta，並過一次 roundRating
+	const delta = roundRating(clampedAfter - before);
+
+	// 計算三個邊界旗標
+	const atUpperBound = clampedAfter === RATING_MAX;
+	const atLowerBound = clampedAfter === RATING_MIN;
+	const clamped = roundedAfter > RATING_MAX || roundedAfter < RATING_MIN;
 
 	return {
 		id: player.id,
 		before,
-		after,
+		after: clampedAfter,
 		delta,
-		atUpperBound: false,
-		atLowerBound: false,
-		clamped: false,
+		atUpperBound,
+		atLowerBound,
+		clamped,
 	};
 }
 
