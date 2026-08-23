@@ -142,9 +142,22 @@ Depends on: §7
 > 它們的價值是把「純函式契約」變成會失敗的測試，鎖住日後的最佳化或 M4 的接線不把它破壞掉。
 > 請貼出實測輸出並如實記錄；**嚴禁改斷言看紅再改回**。若實測為紅燈，代表 §4～§7 某處偏離設計，走 8.2 修正。
 
-- [ ] 8.1 RED: 補三個 it：
+- [x] 8.1 RED: 補三個 it：
   - 「評分更新不修改輸入的球員物件」——以 `structuredClone` 保存輸入，呼叫後深度比對輸入未變
   - 「相同輸入產生相同輸出」——同一份輸入連呼兩次，兩次結果 `toEqual`
   - 「評分更新不累加 gamesPlayed 與 restCount」——回傳的每筆 `RatingChange` 不含 `gamesPlayed`／`restCount` 欄位，且輸入球員的 `gamesPlayed` 維持原值
   跑單檔並如實貼出輸出（預期全綠，見本節開頭說明）
-- [ ] 8.2 GREEN: 若 8.1 出現紅燈，修正 `rating.ts` 使其滿足純函式契約（不就地修改輸入、不引入亂數或時間、不回傳任何 `gamesPlayed`／`restCount` 新值）；若 8.1 實測全綠，標註 `skipped` 並把綠燈輸出記錄在本行，**不要**為了讓這一行有東西可寫而重構無關的程式碼
+  > **實測結果：全綠，本批三個 it 皆為 regression guard（如實標註）**。實測輸出：
+  > `Test Files 1 passed (1)｜Tests 27 passed (27)`（原有 24 + 新增 3）。
+  > 必然為綠的結構性理由：`updateRatings` 與 `applyDelta` 只**讀取** `player.rating`／`player.gamesPlayed`
+  > 並回傳全新物件字面值，全檔無任何 `player.x = ...` 或對輸入陣列的 in-place 操作；
+  > `expectedScore`／`effectiveK`／`applyDelta`／`updateRatings` 全路徑無 `Math.random()`、無 `Date`、
+  > 無 I/O，輸出順序由固定的 `[0, 1] as const` 決定；`RatingChange` 介面本就只有七個欄位、不含
+  > `gamesPlayed`／`restCount`。Stage 1 已獨立回推 `rating.ts` 現況逐一驗證，確認此為 §4～§7 實作的
+  > 必然結果、非掩飾漏寫實作，且 `rating.ts` 本 task 完全未被修改（無「改斷言看紅再改回」痕跡）。
+  > Stage 2 另以 `@vitest/expect` 原始碼確認 `not.toHaveProperty` 涵蓋 prototype chain、
+  > 且 own-but-undefined 也會正確判為存在，斷言強度無漏判。
+- [x] 8.2 GREEN: **`skipped`** —— 8.1 實測全綠，`rating.ts` 無需任何修正。綠燈輸出：
+  `Test Files 1 passed (1)｜Tests 27 passed (27)`。依本行明文規則標註 skipped，
+  **未**為了讓本行有內容而重構無關程式碼（原任務文字如下保留）：
+  若 8.1 出現紅燈，修正 `rating.ts` 使其滿足純函式契約（不就地修改輸入、不引入亂數或時間、不回傳任何 `gamesPlayed`／`restCount` 新值）；若 8.1 實測全綠，標註 `skipped` 並把綠燈輸出記錄在本行，**不要**為了讓這一行有東西可寫而重構無關的程式碼
