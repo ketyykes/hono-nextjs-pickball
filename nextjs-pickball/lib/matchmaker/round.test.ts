@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { createRound } from "./round";
 import { fullMatchKey, opponentKeys } from "./duplication";
+import { updatePlayer } from "./roster";
 import type { Match, Team } from "./allocation-types";
 import type { Player } from "./types";
 import type { Round, RoundMatch } from "./round-types";
@@ -351,5 +352,141 @@ describe("createRound", () => {
 		for (const key of opponentKeys(round1Match)) {
 			expect(seenSignatures.opponentKeys).not.toContain(key);
 		}
+	});
+
+	it("產生新一輪時上一輪休息者的 restCount 加 1，出場者不變", () => {
+		const players = [
+			makePlayer({ id: "a", restCount: 0 }),
+			makePlayer({ id: "b", restCount: 0 }),
+			makePlayer({ id: "c", restCount: 2 }),
+			makePlayer({ id: "d", restCount: 2 }),
+		];
+		// 上一輪的休息名單直接以 fixture 指定 c、d，不透過 selectPlaying 實際跑一輪去湊出
+		// 這個名單——本測試只關心 createRound 如何消費 restingPlayerIds，不關心「誰該休息」
+		// 這個排序決策（那是 candidates.ts 的職責，見 4.7 的職責邊界）。
+		const previousRound = makeRound({ roundNumber: 1, restingPlayerIds: ["c", "d"] });
+
+		const result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.restSettlements).toEqual(
+			expect.arrayContaining([
+				{ id: "c", restCount: 3 },
+				{ id: "d", restCount: 3 },
+			]),
+		);
+		expect(result.restSettlements).toHaveLength(2);
+		expect(result.restSettlements.some((s) => s.id === "a" || s.id === "b")).toBe(false);
+	});
+
+	it("產生首輪時不結算任何人的 restCount", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+		const result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.restSettlements).toEqual([]);
+	});
+
+	it("連續產生多輪時同一輪的休息名單只被結算一次", () => {
+		const initialPlayers = [
+			makePlayer({ id: "a", restCount: 0 }),
+			makePlayer({ id: "b", restCount: 0 }),
+			makePlayer({ id: "c", restCount: 0 }),
+			makePlayer({ id: "d", restCount: 0 }),
+		];
+		// 第 1 輪的休息者為 C：以 fixture 直接指定，理由同上一個 it。
+		const round1 = makeRound({ roundNumber: 1, restingPlayerIds: ["c"] });
+
+		const round2Result = createRound({
+			players: initialPlayers,
+			format: "singles",
+			courtCount: 1,
+			previousRound: round1,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(round2Result.ok).toBe(true);
+		if (!round2Result.ok) return;
+		expect(round2Result.restSettlements).toEqual([{ id: "c", restCount: 1 }]);
+
+		// 套用第 1 輪的結算（C 現在 restCount = 1），並把「第 2 輪的休息名單」改為 D
+		// （模擬 C 這次有出場，只有 D 休息）——藉此把「第 2 輪自身的休息事件」與
+		// 「第 1 輪已經結算過的休息事件」區分開來。
+		const playersAfterRound2 = updatePlayer(initialPlayers, "c", { restCount: 1 });
+		const round2WithDResting: Round = { ...round2Result.round, restingPlayerIds: ["d"] };
+
+		const round3Result = createRound({
+			players: playersAfterRound2,
+			format: "singles",
+			courtCount: 1,
+			previousRound: round2WithDResting,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(round3Result.ok).toBe(true);
+		if (!round3Result.ok) return;
+
+		// C 因第 1 輪而增加的次數恰為 1：第 3 輪的結算只看第 2 輪（此處已被覆寫為 D）
+		// 的休息名單，不會讓 C 因為第 1 輪的事件被再次結算。
+		expect(round3Result.restSettlements.some((s) => s.id === "c")).toBe(false);
+		expect(round3Result.restSettlements).toEqual([{ id: "d", restCount: 1 }]);
+	});
+
+	it("暫停出場者不因本輪休息而累加 restCount", () => {
+		// C 暫停出場（isActive: false）。上一輪由真正的 createRound 產生（而非手寫
+		// fixture），藉此走過 candidates.ts 的真實過濾邏輯：暫停者完全不進入
+		// resting／playing 候選池，本 it 驗證這個保證會正確傳遞到 restSettlements，
+		// round.ts 不需要（也不應該）自行重複這層 isActive 過濾。
+		const players = [
+			makePlayer({ id: "a", isActive: true, restCount: 0 }),
+			makePlayer({ id: "b", isActive: true, restCount: 0 }),
+			makePlayer({ id: "c", isActive: false, restCount: 0 }),
+			makePlayer({ id: "d", isActive: true, restCount: 0 }),
+		];
+
+		const round1Result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(round1Result.ok).toBe(true);
+		if (!round1Result.ok) return;
+		// 前提：C 不在上一輪的休息名單中（它從未進入候選池）。
+		expect(round1Result.round.restingPlayerIds).not.toContain("c");
+
+		const round2Result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: round1Result.round,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		expect(round2Result.ok).toBe(true);
+		if (!round2Result.ok) return;
+
+		expect(round2Result.restSettlements.some((s) => s.id === "c")).toBe(false);
 	});
 });
