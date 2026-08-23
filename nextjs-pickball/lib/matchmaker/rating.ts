@@ -24,19 +24,27 @@ export function effectiveK(gamesPlayed: number): number {
 // 更新評分：輸入一場對戰的雙方與結果，回傳各球員的分數變動與預測勝率。
 // 單打路徑：逐人計算 K_eff，共用同一個預測勝率 E，變動方向必定相反（零和的結構保證）。
 // 雙打路徑：取隊伍平均 rating 計算 E，但逐人套用自己的 K_eff（design Decision 3）。
+// 注意：本批實作只驗證單打；format 參數目前尚未被讀取，每隊人數推導（PLAYERS_PER_MATCH[format] / 2）
+// 與雙打測試留待後續 task。
 export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	const { teams, winnerIndex } = input;
 	const [teamA, teamB] = teams;
 
-	// 計算兩隊平均評分
+	// 計算兩隊平均評分而非加總：rating-types.ts 的 Side 與 allocation-types.ts 的 Team 不可互換。
+	// Team.rating 是隊內各選手 rating 的加總，但預測勝率 E 需要隊伍的平均評分（design Decision 2）。
+	// 用加總計算 E 會把級距分差悄悄放大成兩倍——不會拋錯、也不會越界，只會靜默失真，用平均來規避。
 	const avgRatingA = teamA.reduce((sum, p) => sum + p.rating, 0) / teamA.length;
 	const avgRatingB = teamB.reduce((sum, p) => sum + p.rating, 0) / teamB.length;
 
-	// 計算預測勝率：teamA 的 E
+	// 預測勝率用 1 - E 而非 expectedScore(B, A)：同場對賽的雙方共用同一個 E 是零和結構保證
+	// （design Decision 4）的必要條件。浮點誤差下 expectedScore(3,6) ≠ 1 - expectedScore(6,3)
+	// （reviewer 實測分別為 0.09090909090909091 與 0.09090909090909094），用 1 - E_A 能保持完全對稱。
+	// 這一行最容易被順手改成 expectedScore(avgRatingB, avgRatingA) 形式而破壞零和特性——註解在此預防。
 	const expectedScoreA = expectedScore(avgRatingA, avgRatingB);
 	const expectedScoreB = 1 - expectedScoreA;
 
-	// 構造 changes 清單（依隊伍順序攤平）
+	// 依隊伍順序遍歷每位球員並計算評分變動。changes 清單維持「第一隊的球員在前」的順序
+	// ——規格明訂該順序（spec Requirement），後續 task 的持久化與顯示會依序用到。
 	const changes: RatingChange[] = [];
 
 	for (let teamIndex = 0; teamIndex < 2; teamIndex++) {
