@@ -6,8 +6,18 @@ import {
 	RATING_MIN,
 	RATING_MAX,
 	K_DECAY_GAMES,
+	type RatingPlayerInput,
 } from "./rating-types";
-import { expectedScore, effectiveK } from "./rating";
+import { expectedScore, effectiveK, updateRatings } from "./rating";
+
+// 測試資料 fixture helper
+function player(
+	id: string,
+	rating: number,
+	gamesPlayed: number
+): RatingPlayerInput {
+	return { id, rating, gamesPlayed };
+}
 
 describe("評分常數", () => {
 	it("評分常數以具名常數匯出，D 為 3.0、K_base 為 0.15", () => {
@@ -65,5 +75,156 @@ describe("有效 K 值", () => {
 		for (const kEff of kEffValues) {
 			expect(kEff).toBeGreaterThan(RATING_K_BASE);
 		}
+	});
+});
+
+describe("單打評分更新", () => {
+	it("單打勢均力敵時勝方與敗方各變動 K_eff 的一半", () => {
+		const teams: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 4.0, 0)],
+			[player("B1", 4.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		expect(result.changes[0].after).toBe(4.15);
+		expect(result.changes[0].delta).toBe(0.15);
+		expect(result.changes[1].after).toBe(3.85);
+		expect(result.changes[1].delta).toBe(-0.15);
+	});
+
+	it("爆冷獲勝的加分明顯大於預期內獲勝的加分", () => {
+		// 低分方獲勝
+		const teamsCase1: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 3.0, 20)],
+			[player("B1", 6.0, 20)],
+		];
+
+		const resultCase1 = updateRatings({
+			format: "singles",
+			teams: teamsCase1,
+			winnerIndex: 0,
+		});
+
+		const lowScorerGain = resultCase1.changes[0].delta;
+
+		// 高分方獲勝
+		const teamsCase2: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 6.0, 20)],
+			[player("B1", 3.0, 20)],
+		];
+
+		const resultCase2 = updateRatings({
+			format: "singles",
+			teams: teamsCase2,
+			winnerIndex: 0,
+		});
+
+		const highScorerGain = resultCase2.changes[0].delta;
+
+		expect(resultCase1.changes[0].after).toBe(3.2);
+		expect(lowScorerGain).toBe(0.2);
+		expect(resultCase2.changes[0].after).toBe(6.02);
+		expect(highScorerGain).toBe(0.02);
+		expect(lowScorerGain).toBeGreaterThan(highScorerGain);
+	});
+
+	it("輸出依隊伍順序攤平，每筆含 id、賽前分數、賽後分數與變動值", () => {
+		const teams: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 4.0, 0)],
+			[player("B1", 4.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		expect(result.changes).toHaveLength(2);
+		expect(result.changes[0].id).toBe("A1");
+		expect(result.changes[1].id).toBe("B1");
+
+		// 檢查每筆都有六個欄位
+		for (const change of result.changes) {
+			expect(change).toHaveProperty("id");
+			expect(change).toHaveProperty("before");
+			expect(change).toHaveProperty("after");
+			expect(change).toHaveProperty("delta");
+			expect(change).toHaveProperty("atUpperBound");
+			expect(change).toHaveProperty("atLowerBound");
+			expect(change).toHaveProperty("clamped");
+		}
+
+		// 檢查 expectedScores
+		expect(result.expectedScores).toHaveLength(2);
+	});
+
+	it("出場次數少者的評分變動幅度大於出場次數多者", () => {
+		const teams: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 4.0, 0)],
+			[player("B1", 4.0, 60)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		const noviceDelta = result.changes[0].delta;
+		const veteranDelta = result.changes[1].delta;
+
+		expect(noviceDelta).toBe(0.15);
+		expect(veteranDelta).toBe(-0.09);
+		expect(Math.abs(noviceDelta)).toBeGreaterThan(Math.abs(veteranDelta));
+	});
+});
+
+describe("零和的成立條件", () => {
+	it("雙方 K_eff 相同且未觸界時總分守恆", () => {
+		const teams: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 5.0, 0)],
+			[player("B1", 4.0, 0)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		const beforeSum = 5.0 + 4.0;
+		const afterSum = result.changes[0].after + result.changes[1].after;
+
+		expect(result.changes[0].after).toBe(5.1);
+		expect(result.changes[1].after).toBe(3.9);
+		expect(afterSum).toBe(beforeSum);
+	});
+
+	it("雙方 K_eff 不同時總分不守恆且不做事後補償", () => {
+		const teams: readonly [RatingPlayerInput[], RatingPlayerInput[]] = [
+			[player("A1", 4.0, 0)],
+			[player("B1", 4.0, 60)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: 0,
+		});
+
+		const beforeSum = 4.0 + 4.0;
+		const afterSum = result.changes[0].after + result.changes[1].after;
+
+		expect(result.changes[0].after).toBe(4.15);
+		expect(result.changes[1].after).toBe(3.91);
+		expect(afterSum).toBe(8.06);
+		expect(afterSum).not.toBe(beforeSum);
+		expect(result.changes[0].delta).toBe(0.15);
 	});
 });
