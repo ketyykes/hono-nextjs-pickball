@@ -13,9 +13,80 @@
 
 ## 0. 前置（準備，不產生任何程式碼）
 
-- [ ] 0.1 確認 M3（`matchmaker-rating-engine`）已合併回 `main`；讀出 `nextjs-pickball/lib/matchmaker/rating.ts` 的**實際匯出名稱、參數與回傳形狀**，抄寫在本項下方作為 §6 的實作依據。本 change 撰寫時的假設是 `updateRatings(input)` → `{ changes, expectedScores }`（`changes` 依 `teams` 順序攤平的逐人結果，含 `before`／`after`／`delta` 與邊界旗標；輸入不合法時 `throw`）。與實際不符時依 execution-plan 的 Escalation 回報 BLOCKED，**不要自行改 spec**
-- [ ] 0.2 重讀 `main` 上 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement，與本 change `specs/pickleball-guide-page/spec.md` 的 delta 逐行比對。若 `main` 已被其他 change 新增了 hook，MUST 把 delta 全文重新對齊為 union（**只加不刪**）並在本項下方記錄實際對齊了哪些項目（design Decision 9）
-- [ ] 0.3 依 environment.md 完成 worktree 建立與 baseline 驗證，並把 baseline 結果與 initial commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 0.1 確認 M3（`matchmaker-rating-engine`）已合併回 `main`；讀出 `nextjs-pickball/lib/matchmaker/rating.ts` 的**實際匯出名稱、參數與回傳形狀**，抄寫在本項下方作為 §6 的實作依據。本 change 撰寫時的假設是 `updateRatings(input)` → `{ changes, expectedScores }`（`changes` 依 `teams` 順序攤平的逐人結果，含 `before`／`after`／`delta` 與邊界旗標；輸入不合法時 `throw`）。與實際不符時依 execution-plan 的 Escalation 回報 BLOCKED，**不要自行改 spec**
+
+  **實測結果（2026-08-23，`main` merge commit `e3477eb`「feat(matchmaker): 合併評分引擎（PRD 6.4）」）：假設成立，未 BLOCKED。**
+
+  `nextjs-pickball/lib/matchmaker/rating.ts` 的匯出：
+
+  ```ts
+  export function expectedScore(ratingA: number, ratingB: number): number
+  export function effectiveK(gamesPlayed: number): number
+  export function updateRatings(input: RatingUpdateInput): RatingUpdateResult
+  ```
+
+  `nextjs-pickball/lib/matchmaker/rating-types.ts` 的型別與常數：
+
+  ```ts
+  export const RATING_D = 3.0;
+  export const RATING_K_BASE = 0.15;
+  export const RATING_MIN = 1;
+  export const RATING_MAX = 8;
+  export const K_DECAY_GAMES = 20;
+
+  export interface RatingPlayerInput {
+    readonly id: string;          // ← 注意：欄位名是 id，不是 playerId
+    readonly rating: number;
+    readonly gamesPlayed: number;
+  }
+  export type Side = readonly RatingPlayerInput[];
+
+  export interface RatingUpdateInput {
+    readonly format: MatchFormat;              // "singles" | "doubles"，取自 allocation-types
+    readonly teams: readonly [Side, Side];     // [隊伍 A, 隊伍 B]
+    readonly winnerIndex: 0 | 1;               // 0 = 隊伍 A 勝
+  }
+
+  export interface RatingChange {
+    readonly id: string;          // ← 對應輸入的 RatingPlayerInput.id
+    readonly before: number;
+    readonly after: number;       // 已 round 至兩位小數並 clamp 於 [1, 8]
+    readonly delta: number;       // 由 clamp 後的 after 重算，非理論值
+    readonly atUpperBound: boolean;  // after === 8，不論本場有無被夾
+    readonly atLowerBound: boolean;  // after === 1，不論本場有無被夾
+    readonly clamped: boolean;       // 本場理論值超界而被截斷（真的少拿分）
+  }
+
+  export interface RatingUpdateResult {
+    readonly changes: readonly RatingChange[];              // 依 teams 順序攤平：隊伍 A 的人在前
+    readonly expectedScores: readonly [number, number];     // [E_A, 1 - E_A]
+  }
+  ```
+
+  §6 需要注意的四點：
+  1. **欄位名是 `id` 不是 `playerId`**。回合的 `playerRatings[].playerId` 需自行對應，不能直接展開 `RatingChange`。
+  2. **`changes` 的順序**是「隊伍 A 全員 → 隊伍 B 全員」，與 `RoundMatch.teams[0].playerIds` ／ `teams[1].playerIds` 的攤平順序一致。
+  3. **每隊人數由 `PLAYERS_PER_MATCH[format] / 2` 推導**（單打 1、雙打 2）；人數不符會 `throw`。
+  4. **`updateRatings` 對四類不合法輸入會 `throw`**（隊伍人數不符、`rating` 超出 1～8、`gamesPlayed` 非非負整數、同場重複 `id`）——訊息皆為繁體中文。§6.6 的防禦性 try/catch 即為接住這四類。「觸頂／觸底」用 `atUpperBound`／`atLowerBound`（停在界上即 true），「本場真的被截斷」用 `clamped`；test-plan 的「評分觸頂時賽後分數停在 8.00 並回報已達上限」對應的是 `atUpperBound`。
+
+- [x] 0.2 重讀 `main` 上 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement，與本 change `specs/pickleball-guide-page/spec.md` 的 delta 逐行比對。若 `main` 已被其他 change 新增了 hook，MUST 把 delta 全文重新對齊為 union（**只加不刪**）並在本項下方記錄實際對齊了哪些項目（design Decision 9）
+
+  **實測結果（2026-08-23）：delta 已是 union，無需重新對齊。**
+
+  以 python `difflib` 逐行比對「Requirement 起始 → 下一個 `### Requirement:` 之前」的全文（兩側皆 45 行），唯一差異為第 5 行（歸屬清單那一句）：
+
+  ```diff
+  -...（`useQuiz` → quiz；`useRosterStore` → player-roster；`useScoreboardStore`、...）。
+  +...（`useQuiz` → quiz；`useRosterStore` → player-roster；`useRoundStore` → round-lifecycle；`useScoreboardStore`、...）。
+  ```
+
+  - **delta 相對 `main` 只新增了 `` `useRoundStore` → round-lifecycle `` 一項，未刪除任何既有項目**，符合 union（只加不刪）要求。
+  - `main` 上該清單目前為 9 支：`useScrollShadow`／`useScrollSpy`／`useScrolledPast`（本 capability）、`useQuiz`、`useRosterStore`、`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`、`useEnterAnimationProgress`、`useReducedMotion`。**沒有其他 change 在本 change 規劃後新增過 hook**，與 design Decision 9 末段的實地確認一致（衝突風險為零）。
+  - 其餘 44 行（三段散文與 6 個 Scenario）逐字相同，**§8 套用時只需改動這一行**。
+
+- [x] 0.3 依 environment.md 完成 worktree 建立與 baseline 驗證，並把 baseline 結果與 initial commit hash 回填 environment.md 的 Verification 三欄位
+
+  worktree 與 branch 由 coordinator 於本 session 前建立（`change/matchmaker-round-lifecycle`，基於 `main` 的 `e3477eb`），本 session 未重跑 `git worktree add`。於 worktree 內執行 `pnpm install`（exit 0）後跑 `pnpm test`：**PASS**——前端 41 檔／299 測試、後端 4 檔／16 測試，exit code 0。三欄位已回填 environment.md。
 
 ## 1. 回合型別與 schema（round-types.ts）
 
