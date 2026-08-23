@@ -25,8 +25,8 @@ pnpm test
 
 | 欄位 | 值 |
 |---|---|
-| **Baseline tests** | 尚未執行——由 apply Step 0 建立 worktree 時執行並回填（格式：`PASS`／`FAIL` + 一行結果摘要，例如 `PASS — 前端 Vitest N passed、後端 Vitest M passed`） |
-| **Initial commit hash** | 尚未執行——由 apply Step 0 建立 worktree 時以 `git rev-parse HEAD` 取得並回填 |
+| **Baseline tests** | `PASS` — 2026-08-23 於 worktree 執行 `pnpm test`：前端 Vitest 40 test files／272 tests passed、後端 Vitest 4 test files／16 tests passed（後端在 workerd runtime 正常執行，未出現 `listen EPERM`） |
+| **Initial commit hash** | `ec8564003c8ef56285d16157cb8e804f73ce60cf` |
 | **Worktree path** | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-rating-engine` |
 
 ## Teardown
