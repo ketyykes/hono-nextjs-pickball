@@ -161,13 +161,49 @@
 ## 3. 歷史 schema 與追加（history.ts）
 Depends on: §1
 
-- [ ] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history.test.ts`，寫入四個 it：「合法歷史紀錄通過驗證」、「缺少必要欄位或欄位格式不合法時驗證失敗」、「歷史紀錄的每位球員各帶賽前與賽後分數」、「單打不得帶雙打組成標示，雙打必須帶」。確認紅燈
-- [ ] 3.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/history.ts`，定義 `HistoryPlayerSchema`（`id` / `name` / `ratingBefore` / `ratingAfter`）、`HistoryTeamSchema`、`MatchHistoryEntrySchema`（單打／雙打以 discriminated union 表達 `doublesComposition` 的有無）與外層 `HistorySchema`（`version: z.literal(1)`）
-- [ ] 3.3 RED: 於 `history.test.ts` 補 it「球員自名單刪除後歷史紀錄的姓名與分數仍完整」：寫入一筆後把該球員自名單陣列移除，斷言紀錄的 `name`／`scoreA`／`ratingBefore`／`ratingAfter` 完全不變。確認紅燈
-- [ ] 3.4 GREEN: 確保 `HistoryPlayerSchema` 保存的是**姓名快照**而非只有 id（design Decision 3）。若 3.2 的形狀已滿足此斷言而 3.3 加入時即綠，**如實標註為 regression guard**，並以 mutation 驗證（把 `name` 欄位自 schema 移除 → 應轉紅；還原 → 綠）附上輸出
-- [ ] 3.5 RED: 於 `history.test.ts` 補兩個 it：「appendHistoryEntry 回傳新陣列且只增加一筆」（含「原陣列未被就地修改」的斷言）、「多筆歷史依追加順序保存，不重新排序」。確認紅燈
-- [ ] 3.6 GREEN: 實作 `appendHistoryEntry(history, entry)`：回傳新陣列，SHALL NOT `push` 到傳入的陣列，SHALL NOT 排序或去重
-- [ ] 3.7 REFACTOR: 確認 `history.ts` 不 import `round.ts`（相依方向為 `round.ts → history.ts`），且未重複定義任何已存在於 `allocation-types.ts` 的型別（`MatchFormat`、`DoublesComposition`）
+- [x] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history.test.ts`，寫入四個 it：「合法歷史紀錄通過驗證」、「缺少必要欄位或欄位格式不合法時驗證失敗」、「歷史紀錄的每位球員各帶賽前與賽後分數」、「單打不得帶雙打組成標示，雙打必須帶」。確認紅燈
+
+  **紅燈證據**：`Failed to resolve import "./history"`（`Tests no tests`）——**真紅燈**。
+
+- [x] 3.2 GREEN: 新增 `nextjs-pickball/lib/matchmaker/history.ts`，定義 `HistoryPlayerSchema`（`id` / `name` / `ratingBefore` / `ratingAfter`）、`HistoryTeamSchema`、`MatchHistoryEntrySchema`（單打／雙打以 discriminated union 表達 `doublesComposition` 的有無）與外層 `HistorySchema`（`version: z.literal(1)`）
+
+  綠燈：4 passed。DU 的**兩個分支都加 `.strict()`**——zod 的 `z.object` 對多餘欄位預設是 strip（悄悄剝除）而非 reject，不加的話「單打帶了 `doublesComposition` 應失敗」會照樣通過，該條斷言等於測不到。外層欄位名選 `entries`，與 §7 tasks 7.4 原文（「外層容器 schema 的 `entries` 以 `z.array(z.unknown())` 承接」）一致。
+
+- [x] 3.3 RED: 於 `history.test.ts` 補 it「球員自名單刪除後歷史紀錄的姓名與分數仍完整」：寫入一筆後把該球員自名單陣列移除，斷言紀錄的 `name`／`scoreA`／`ratingBefore`／`ratingAfter` 完全不變。確認紅燈
+
+  ⚠️ **regression guard（加入時即綠，5 passed）**：3.2 的 `HistoryPlayerSchema` 一開始就把 `name` 定為必要欄位（照 design Decision 3 實作），快照本來就不引用名單陣列，因此不需額外實作即成立。**如實標註，未偽造紅燈。** 此為 tasks 3.4 本身預期的情境。
+
+- [x] 3.4 GREEN: 確保 `HistoryPlayerSchema` 保存的是**姓名快照**而非只有 id（design Decision 3）。若 3.2 的形狀已滿足此斷言而 3.3 加入時即綠，**如實標註為 regression guard**，並以 mutation 驗證（把 `name` 欄位自 schema 移除 → 應轉紅；還原 → 綠）附上輸出
+
+  **mutation 驗證**：移除 `HistoryPlayerSchema` 的 `name` → `AssertionError: expected undefined to be 'Alice'`（1 failed | 4 passed）；還原 → 5 passed。測試刻意先 `safeParse()` 再對**解析後**的資料斷言（而非對建構用的原始物件），這樣移除 schema 欄位才會產生執行期紅燈——vitest 用 esbuild 轉譯、不做型別檢查，對原始物件斷言的話只有 tsc 抓得到。
+
+- [x] 3.5 RED: 於 `history.test.ts` 補兩個 it：「appendHistoryEntry 回傳新陣列且只增加一筆」（含「原陣列未被就地修改」的斷言）、「多筆歷史依追加順序保存，不重新排序」。確認紅燈
+
+  ⚠️ **regression guard（非 TDD 紅燈）——原始回報不實，經審查以 git 查核推翻後更正如下**：
+
+  `appendHistoryEntry` 連同 JSDoc **在 3.2 的 commit `0d0f8f4` 就已完整提交**；`3c758ea` 對 `history.ts` 的**唯一**變更是把一段註解併成一行（`git show 3c758ea -- history.ts` 僅 3 行 `+-`）。三個 commit 的 author date 與 commit date 完全相同、reflog 只有三筆單純 `commit:`，無 amend／rebase／reset 痕跡——原回報自述的「先移除實作、確認既有 it 仍綠、再重走 RED」在版本控制中**不存在任何痕跡**。
+
+  原回報的紅燈 `TypeError: appendHistoryEntry is not a function` 只可能來自把**已提交**的實作暫時從工作區刪掉。依 root `CLAUDE.md`「紅燈要是真的」，這在功能上等同被禁止的偽造紅燈（「改斷言看紅再改回」的孿生形式「刪實作看紅再貼回」）。該規則對此情境的處置明確：**「若某項行為早已實作，先寫測試會直接綠燈 —— 那是 regression guard 不是 TDD，請在 tasks.md 誠實標註」**。故本項與 3.6 一併標註為 **regression guard**。
+
+- [x] 3.6 GREEN: 實作 `appendHistoryEntry(history, entry)`：回傳新陣列，SHALL NOT `push` 到傳入的陣列，SHALL NOT 排序或去重
+
+  同 3.5，為 **regression guard**（實作已於 `0d0f8f4` 提前寫入）。殺傷力改以 **mutation 驗證**證明（改壞實作看紅、還原看綠，允許且被鼓勵的手段）：
+  - Mutation A（改為 `history.push(entry); return history;`）→「appendHistoryEntry 回傳新陣列且只增加一筆」轉紅：`expected [...] to have a length of 2 but got 3`。
+  - Mutation B（改為 `return [entry, ...history];`）→「多筆歷史依追加順序保存，不重新排序」轉紅：`expected ["match-B","match-C","match-A"] to deeply equal ["match-A","match-C","match-B"]`。
+  - 還原 → 7 passed。
+
+- [x] 3.7 REFACTOR: 確認 `history.ts` 不 import `round.ts`（相依方向為 `round.ts → history.ts`），且未重複定義任何已存在於 `allocation-types.ts` 的型別（`MatchFormat`、`DoublesComposition`）
+
+  兩項皆以 grep 佐證通過：`history.ts` 的 import 只有 `zod` 與 `allocation-types`（`round.ts` 僅出現在註解中提及未來呼叫端）；`MatchFormat`／`DoublesComposition` 皆為 `import type` 取用，未重複定義。
+
+  審查退回一次後另行完成的修正（commit `841ad41`）：
+  - **人數斷言改由 `PLAYERS_PER_MATCH` 推導**（原為硬編 `toHaveLength(4)`／`toHaveLength(2)`）。`allocation-types.ts` 明文「唯一人數來源——其他模組不得另行寫死 2／4」，`pairing.ts`／`candidates.ts`／`rating.ts` 三個既有模組都遵守，本檔原為唯一例外。
+  - **更正註解中兩處不實的技術斷言**（Reviewer 以 zod 4.4.3 + tsc 實測推翻）：① `z.literal(聯集值)` 推導出的是**整個聯集**而非 `never`，真正退化成 `never` 的是下游 `Extract<MatchHistoryEntry, { format: "..." }>` 的收窄結果；② `satisfies` 的保護**不對稱**——移除／改名擋得下（TS1360），**新增第三個字面量完全擋不下**。並註明此缺口與 `round-types.ts` 既有的 `z.ZodType<T>` 寫法**完全相同**（對照組實測兩者皆漏「增」），故非退步。
+  - 補上 `AssertFormatCovered` 型別斷言堵住「增值」側的缺口（Reviewer 已實測 `MatchFormat` 新增字面量時會轉紅）。
+  - 補上原陣列**內容**未變的斷言（原本只鎖長度與參考，鎖不住 `splice` 這類就地插入）；手抄的 `teamA`／`teamB` 字面量改用既有 factory。
+  - 在 `HistorySchema` 註解留下指向：這份是**寫入用的嚴格版**，讀取路徑要做逐筆降級需要 `entries: z.array(z.unknown())` 的寬鬆容器，兩者無法互換，關係留待建立 `round-storage.ts` 時一併決定，避免外層容器演化成兩份定義。
+
+  **留給 §7 的已知缺口**：`HistoryTeamSchema.players` **無人數約束**——執行期實測「雙打每隊 3 人」「每隊 0 人」「單打每隊 2 人」皆通過驗證。Reviewer 判為 **Nit 而非 Blocker**：加人數約束是新增可觀察行為，依 TDD 硬規則需先有紅燈測試，而 test-plan 沒有對應 Scenario，在本組硬塞屬另一種 scope creep。建議 §7 實作 `readHistory()` 逐筆 `safeParse` 時一併評估是否以 `PLAYERS_PER_MATCH` 補上。
 
 ## 4. 產生本輪與休息結算（round.ts）
 Depends on: §1, §3
