@@ -195,3 +195,10 @@ useRoundStore({ players, updatePlayer })
 2. **`scoring` 狀態的進入與離開時機**——本 change 只預留列舉值。由誰在什麼時候把場次設為 `scoring`、由計分板返回但尚未結束時如何保留進度，皆屬 M6。
 3. **回合是否需要自己的 `id`**——目前以「同時只有一個目前回合」為前提，`roundNumber` 已足夠識別。若 M7 日後要讓歷史紀錄回指所屬回合，需要一個穩定的回合 id；屆時新增欄位屬非破壞性變更（歷史紀錄目前保存 `matchId` 而非 `roundNumber`，已足以識別單場）。
 4. **重排是否應提供「只換這一場」的更細粒度操作**——`prd.md` 6.2 只描述「重排未完成」這一種粒度，本 change 照做。現場若出現「只想換某一場」的需求，屬新的產品決策，需另立 change。
+
+5. **apply 階段於 §6 結束後暫停（2026-08-24，非設計問題，為執行預算耗盡）**——§0～§6 已全數完成、通過兩階段審查並 commit，分支狀態為工作區乾淨、前端 45 檔／349 測試綠、後端 4 檔／16 測試綠、`tsc` exit 0、`lint` 0 error + 3 warning（與 baseline 相同）。**未完成：§7（回合與歷史的持久化，7 項）、§8（`useRoundStore`，3 項）、§9（收尾驗證，8 項）與 Final Code Review。** 續作者請直接自 §7 派工，注意下列已知事項：
+   - **§7 的外層容器與 `history.ts` 的 `HistorySchema` 不相容**：後者是寫入用的**嚴格版**（`entries: z.array(MatchHistoryEntrySchema)`），而 tasks 7.4 要求讀取路徑用 `entries: z.array(z.unknown())` 的**寬鬆版**才能逐筆降級。兩者無法互換，`history.ts` 該處註解已留指向，**不要讓外層容器演化成兩份互不相干的定義**。
+   - **`HistoryTeamSchema.players` 無人數約束**（實測「雙打每隊 3 人」「每隊 0 人」皆通過驗證）。§3 審查判為 Nit（加約束是新增可觀察行為，需先有紅燈測試，而 test-plan 無對應 Scenario）。建議 §7 實作逐筆 `safeParse` 時一併評估是否以 `PLAYERS_PER_MATCH` 補上。
+   - **§8 是唯一被允許修改主 spec 的群組**：只准在 `openspec/specs/pickleball-guide-page/spec.md` 的歸屬清單新增 `` `useRoundStore` → round-lifecycle `` 一項，其他文字一個字都不准動（Decision 9）。§0.2 已確認本 change 的 delta 相對 `main` 只多這一項，**已是 union，無需重新對齊**。
+   - **建議另開 change 的技術債**：把 `duplication.ts` 的 `teammateKeys`／`opponentKeys`／`fullMatchKey`／`buildSignatureIndex` 改為接受 id 陣列、`Match` 版本降為薄包裝，即可移除 `round.ts` 內為了餵給 `buildSignatureIndex` 而建的 stand-in `Player` shim（該 shim 的 `name: ""`／`rating: 0` 型別合法但違反 `PlayerSchema`）。`duplication.ts` 不在本 change 的可動檔案清單內。
+   - **`tests/e2e/specs/player-roster.spec.ts` 仍有硬編的 `"matchmaker:roster:v1"`**，本 change 明文不動 e2e，留給日後動到該檔的 change 改為自 `storage-keys.ts` 匯入。
