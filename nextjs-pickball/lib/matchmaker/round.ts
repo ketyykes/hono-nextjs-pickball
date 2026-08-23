@@ -179,19 +179,20 @@ function previousRoundOwnSignatures(previousRound: Round | null): SignatureIndex
 	return buildSignatureIndex(considered.map(toSignatureMatch));
 }
 
-// 餵給 allocateRound() 的暫時性避讓基準：上一輪自身的場次簽章，再併入上一輪回合自身
-// 攜帶的 seenSignatures（tasks 4.4）。這個併入刻意只影響「本次呼叫 allocateRound 用來
-// 避開重複的候選集合」，不進入本輪要保存的 seenSignatures 欄位（見 previousRoundOwnSignatures）
-// ——若把它也存進本輪的欄位，下一輪建立時又會把「已經包含上上輪東西」的本輪欄位再併入
-// *下一輪*的避讓基準，如此遞迴下去，兩輪前、三輪前的簽章會透過這條路徑無限傳遞，等同
-// 真的在累積全部歷史，違反 design Decision 2「基準只取上一輪，不累積更早的回合」。
-// 讓「保存」與「避讓基準」在這一點上分岔，才能讓累積鏈長度恆為 1。
-function avoidanceBasis(previousRound: Round | null): SignatureIndex {
+// 餵給 allocateRound() 的暫時性避讓基準：上一輪自身的場次簽章（ownSignatures，即將成為
+// 本輪要保存的 seenSignatures），再併入上一輪回合自身攜帶的 seenSignatures（tasks 4.4）。
+// 這個併入刻意只影響「本次呼叫 allocateRound 用來避開重複的候選集合」，不進入本輪要保存
+// 的 seenSignatures 欄位——若把它也存進本輪的欄位，下一輪建立時又會把「已經包含上上輪
+// 東西」的本輪欄位再併入*下一輪*的避讓基準，如此遞迴下去，兩輪前、三輪前的簽章會透過
+// 這條路徑無限傳遞，等同真的在累積全部歷史，違反 design Decision 2「基準只取上一輪，
+// 不累積更早的回合」。讓「保存」與「避讓基準」在這一點上分岔，才能讓累積鏈長度恆為 1。
+// 呼叫端一併取得 ownSignatures，避免同一個 previousRound 被 buildSignatureIndex 算兩次。
+function avoidanceBasis(previousRound: Round | null, ownSignatures: SignatureIndex): SignatureIndex {
 	if (previousRound === null) {
 		return EMPTY_SIGNATURE_INDEX;
 	}
 
-	return mergeSignatureIndexes(previousRoundOwnSignatures(previousRound), toSets(previousRound.seenSignatures));
+	return mergeSignatureIndexes(ownSignatures, toSets(previousRound.seenSignatures));
 }
 
 // ---- 休息次數結算（design Decision 1：本輪結束＝產生新一輪的那一刻） ----
@@ -249,13 +250,15 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		};
 	}
 
+	const ownSignatures = previousRoundOwnSignatures(previousRound);
+
 	let allocation: RoundAllocation;
 	try {
 		allocation = allocateRound({
 			players,
 			format,
 			courtCount,
-			seenSignatures: avoidanceBasis(previousRound),
+			seenSignatures: avoidanceBasis(previousRound, ownSignatures),
 		});
 	} catch {
 		// 名單相關的邊界已在上方擋下，執行到這裡時 allocateRound 唯一可能拋出的原因是
@@ -274,7 +277,7 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		targetScore: DEFAULT_TARGET_SCORE,
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
-		seenSignatures: toArrays(previousRoundOwnSignatures(previousRound)),
+		seenSignatures: toArrays(ownSignatures),
 	};
 
 	return {
