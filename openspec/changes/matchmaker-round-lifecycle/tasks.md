@@ -379,13 +379,13 @@ Depends on: §3, §5
 ## 7. 回合與歷史的持久化（round-storage.ts）
 Depends on: §1, §2, §3
 
-- [ ] 7.1 RED: 於 `round-storage.test.ts` 補兩個 it：「回合 JSON 解析失敗時清除 key 並回傳無回合」、「回合外層結構或 version 不符時整份清除」。確認紅燈
-- [ ] 7.2 GREEN: 實作 `readRound()` / `writeRound(round | null)` / `clearRound()`：外層 `{ version: z.literal(1), round: RoundSchema.nullable() }`；任一層驗證失敗即清除 key 並回傳無回合（回合是單一物件，無筆可救）
-- [ ] 7.3 RED: 於 `round-storage.test.ts` 補兩個 it：「歷史單筆損壞時保留其餘 2 筆並回報 droppedCount 為 1」（含回寫後再讀時**同時斷言筆數與內容**）、「歷史 version 不符時整份清除，不走逐筆降級」。確認紅燈
-- [ ] 7.4 GREEN: 實作 `readHistory()` / `writeHistory(entries)` / `clearHistory()`：外層容器 schema 的 `entries` 以 `z.array(z.unknown())` 承接、逐筆 `safeParse`，比照 `storage.ts` 的兩段式降級；`droppedCount > 0` 時回寫清理後的結果
-- [ ] 7.5 RED: 於 `round-storage.test.ts` 補 it「localStorage 不可用或寫入超出配額時不拋出例外」：分別模擬 `localStorage` 存取拋例外與 `setItem` 拋 `QuotaExceededError`，斷言四個讀寫函式皆不拋出且讀取回空結果。確認紅燈
-- [ ] 7.6 GREEN: 四個函式一律先過 `hasLocalStorage()`，寫入包 try/catch 並以 `console.warn` 記錄，SHALL NOT 讓例外穿透中斷呼叫端
-- [ ] 7.7 REFACTOR: 抽出「讀 key → JSON.parse → 外層驗證」的共用骨架，回合與歷史兩條路徑只在降級策略上分歧，SHALL NOT 各自複製一份 try/catch 樣板
+- [x] 7.1 RED: 於 `round-storage.test.ts` 補兩個 it：「回合 JSON 解析失敗時清除 key 並回傳無回合」、「回合外層結構或 version 不符時整份清除」。確認紅燈
+- [x] 7.2 GREEN: 實作 `readRound()` / `writeRound(round | null)` / `clearRound()`：外層 `{ version: z.literal(1), round: RoundSchema.nullable() }`；任一層驗證失敗即清除 key 並回傳無回合（回合是單一物件，無筆可救）
+- [x] 7.3 RED: 於 `round-storage.test.ts` 補兩個 it：「歷史單筆損壞時保留其餘 2 筆並回報 droppedCount 為 1」（含回寫後再讀時**同時斷言筆數與內容**）、「歷史 version 不符時整份清除，不走逐筆降級」。確認紅燈
+- [x] 7.4 GREEN: 實作 `readHistory()` / `writeHistory(entries)` / `clearHistory()`：外層容器 schema 的 `entries` 以 `z.array(z.unknown())` 承接、逐筆 `safeParse`，比照 `storage.ts` 的兩段式降級；`droppedCount > 0` 時回寫清理後的結果
+- [x] 7.5 RED: 於 `round-storage.test.ts` 補 it「localStorage 不可用或寫入超出配額時不拋出例外」：分別模擬 `localStorage` 存取拋例外與 `setItem` 拋 `QuotaExceededError`，斷言四個讀寫函式皆不拋出且讀取回空結果。**regression guard**：7.2／7.4 已依 `storage.ts` 既有樣板同步加上 `hasLocalStorage()` 守門與 try/catch，此 it 加入時立即全綠、非真紅燈。已用 mutation 驗證補證：分別暫時拿掉 `writeRound()` 的 try/catch 與 `readRound()` 的 `hasLocalStorage()` 守門，兩次都轉紅（`QuotaExceededError` 與 `localStorage 不可用` 例外皆穿透），還原後轉回綠燈
+- [x] 7.6 GREEN: 四個函式一律先過 `hasLocalStorage()`，寫入包 try/catch 並以 `console.warn` 記錄，SHALL NOT 讓例外穿透中斷呼叫端。**與 7.2／7.4 同步完成，本項無新增程式碼**（見 7.5 註記）
+- [x] 7.7 REFACTOR: 抽出「讀 key → JSON.parse → 外層驗證」的共用骨架，回合與歷史兩條路徑只在降級策略上分歧，SHALL NOT 各自複製一份 try/catch 樣板。已抽出 `readContainer()` / `writeJSON()` / `clearKey()` 三個內部共用函式，`readRound`／`writeRound`／`clearRound`／`readHistory`／`writeHistory`／`clearHistory` 六個匯出函式改為委派這三者，降級策略分歧（回合無筆可救 vs. 歷史逐筆 safeParse）保留在呼叫端。重跑單檔測試確認仍綠燈
 
 ## 8. store hook（useRoundStore）
 Depends on: §4, §5, §6, §7

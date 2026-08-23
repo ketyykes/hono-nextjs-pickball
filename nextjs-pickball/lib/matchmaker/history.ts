@@ -87,16 +87,23 @@ export type AssertFormatCovered =
 
 // 外層容器：entries 以追加順序保存，不在 schema 層排序或去重。
 //
-// 這份是寫入用的嚴格版（entries: z.array(MatchHistoryEntrySchema)，單筆壞掉就整體
-// safeParse 失敗）。讀取路徑若要做到「單筆壞不拖垮整份」的兩段式降級，需要的是
-// entries: z.array(z.unknown()) 這種寬鬆外層容器再逐筆 safeParse——與這裡嚴格版
-// 無法互換。兩者的關係留待建立 round-storage.ts 時一併決定，不要讓外層容器演化成
-// 兩份互不相干的定義（design 文件的 Goals 已定調 Round／MatchHistoryEntry 這兩份
-// schema 要一次定案、避免後續各自擴充造成破壞性遷移，外層容器不應例外）。
-export const HistorySchema = z.object({
-	version: z.literal(1),
-	entries: z.array(MatchHistoryEntrySchema),
-});
+// 已決定的關係（round-storage.ts 建立時一併拍板，取代原本「留待決定」的註記）：
+// 用工廠函式 makeHistoryContainerSchema 產生外層容器，version 字面量與 entries
+// 欄位名只在這裡定義一次。寫入用的嚴格版（本檔 HistorySchema）與讀取路徑用的
+// 寬鬆版（round-storage.ts 的 entries: z.array(z.unknown())，供逐筆 safeParse
+// 兩段式降級）都呼叫同一個工廠、只替換 entries 的驗證嚴寬度，version 與欄位名
+// 因此不會出現兩份互不相干的手打定義——這正是 design 文件 Goals 要求 Round／
+// MatchHistoryEntry 兩份 schema 一次定案、外層容器不例外的落地方式。
+export function makeHistoryContainerSchema<EntriesSchema extends z.ZodType>(
+	entriesSchema: EntriesSchema,
+) {
+	return z.object({
+		version: z.literal(1),
+		entries: entriesSchema,
+	});
+}
+
+export const HistorySchema = makeHistoryContainerSchema(z.array(MatchHistoryEntrySchema));
 
 export type HistoryPlayer = z.infer<typeof HistoryPlayerSchema>;
 export type HistoryTeam = z.infer<typeof HistoryTeamSchema>;
