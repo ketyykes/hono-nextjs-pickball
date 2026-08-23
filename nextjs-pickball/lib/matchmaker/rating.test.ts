@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { z } from "zod";
 
 import {
 	RATING_D,
@@ -13,6 +12,7 @@ import {
 import { expectedScore, effectiveK, updateRatings } from "./rating";
 import { roundRating } from "./rating-math";
 import { PlayerSchema } from "./types";
+import type { Player } from "./types";
 
 // 測試資料 fixture helper
 function makeRatingPlayer(
@@ -378,7 +378,7 @@ describe("邊界 clamp 與觸界標示", () => {
 		const winnerAfter = result.changes[0].after;
 		const loserAfter = result.changes[1].after;
 
-		const winner: z.infer<typeof PlayerSchema> = {
+		const winner: Player = {
 			id: "A1",
 			name: "Winner",
 			gender: "male",
@@ -391,7 +391,7 @@ describe("邊界 clamp 與觸界標示", () => {
 			createdAt: new Date(0).toISOString(),
 		};
 
-		const loser: z.infer<typeof PlayerSchema> = {
+		const loser: Player = {
 			id: "B1",
 			name: "Loser",
 			gender: "male",
