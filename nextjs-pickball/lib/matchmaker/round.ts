@@ -11,7 +11,7 @@ import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { MatchHistoryEntry } from "./history";
-import type { RatingPlayerInput } from "./rating-types";
+import type { RatingPlayerInput, RatingUpdateResult } from "./rating-types";
 import type { Player } from "./types";
 import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
 
@@ -648,16 +648,24 @@ export function validateScoreInput(match: RoundMatch, rawScoreA: string, rawScor
 
 /**
  * submitScore 的失敗代碼：驗證失敗直接沿用 validateScoreInput 的代碼（同一組原因、
- * 同一句訊息），MATCH_NOT_FOUND 是本函式獨有——找不到指定場次代表呼叫端持有過期的
- * matchId（例如場次已被重排移除），與比分欄位是否合法無關。
+ * 同一句訊息），另兩者是本函式獨有——MATCH_NOT_FOUND 代表呼叫端持有過期的 matchId
+ * （例如場次已被重排移除），與比分欄位是否合法無關；SCORING_FAILED 是 6.6 的
+ * defence-in-depth：評分 API 呼叫失敗時的統一回報代碼，spec 無對應 Scenario。
  */
 export const SUBMIT_SCORE_FAILURE_CODE = {
 	MATCH_NOT_FOUND: "match-not-found",
+	SCORING_FAILED: "scoring-failed",
 } as const;
 
 export type SubmitScoreFailureCode = ValidateScoreFailureCode | (typeof SUBMIT_SCORE_FAILURE_CODE)[keyof typeof SUBMIT_SCORE_FAILURE_CODE];
 
 const MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
+// defence-in-depth（tasks 6.6，spec 無對應 Scenario）：M3 的 updateRatings 對四類不合法
+// 輸入會 throw（隊伍人數不符、rating 超出 1～8、gamesPlayed 非非負整數、同場重複 id）。
+// 送進 updateRatings 的資料已由上面的 validateScoreInput（§6.2）與 resolveTeamPlayers
+// 的球員存在性間接把關過，正常路徑不會觸發這四類例外；但這裡仍以 try/catch 接住，
+// 轉為同一種失敗結果而非讓例外穿透到 UI，是防禦措施而非本函式預期的正常分支。
+const SCORING_FAILED_MESSAGE = "評分計算發生非預期錯誤，請重新整理頁面後再試一次。";
 
 /** submitScore 的輸入。純函式——時間一律由呼叫端注入（design：不呼叫 Date.now()）。 */
 export interface SubmitScoreInput {
@@ -811,11 +819,19 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		gamesPlayed: player.gamesPlayed,
 	});
 
-	const ratingResult = updateRatings({
-		format: match.format,
-		teams: [teamAPlayers.map(toRatingInput), teamBPlayers.map(toRatingInput)],
-		winnerIndex: winner === "teamA" ? 0 : 1,
-	});
+	let ratingResult: RatingUpdateResult;
+	try {
+		// 見上方 SCORING_FAILED_MESSAGE 的註解：本 try/catch 是防禦性的
+		// defence-in-depth（tasks 6.6），正常路徑（§6.2 已驗證的合法輸入、球員確實存在
+		// 於名單）不會讓 updateRatings 拋出例外。
+		ratingResult = updateRatings({
+			format: match.format,
+			teams: [teamAPlayers.map(toRatingInput), teamBPlayers.map(toRatingInput)],
+			winnerIndex: winner === "teamA" ? 0 : 1,
+		});
+	} catch {
+		return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: SCORING_FAILED_MESSAGE };
+	}
 
 	// changes 的順序是「隊伍 A 全員 → 隊伍 B 全員」（rating-types.ts），與上面 matchPlayers
 	// 的建構順序（teamAPlayers 在前、teamBPlayers 在後）一致，可直接以陣列索引配對。
@@ -825,9 +841,13 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		after: change.after,
 	}));
 
-	// boundaryHits 於此階段先留空陣列：正確推導觸界旗標是 §6.6「補齊 boundaryHits 的傳遞」
-	// 的範圍，本階段（§6.4）只需先完成送出比分的骨幹流程。
-	const boundaryHits: ScoreBoundaryHit[] = [];
+	// 回報「已達上限／下限」用的是 atUpperBound／atLowerBound（停在界上即 true），
+	// 不是 clamped（本場理論值是否真的被截斷而少拿分）——語意分歧見 rating-types.ts
+	// 的 RatingChange 註解：理論值 8.0049 四捨五入後恰為 8.00 者，atUpperBound 為 true
+	// 但 clamped 為 false，使用者一分未少拿，仍該被告知「已達上限」（prd.md 6.4.6）。
+	const boundaryHits: ScoreBoundaryHit[] = ratingResult.changes
+		.filter((change) => change.atUpperBound || change.atLowerBound)
+		.map((change) => ({ playerId: change.id, atUpperBound: change.atUpperBound, atLowerBound: change.atLowerBound }));
 
 	const playerPatches: ScorePlayerPatch[] = ratingResult.changes.map((change, index) => ({
 		id: change.id,

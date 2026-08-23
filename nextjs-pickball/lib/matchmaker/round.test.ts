@@ -1374,4 +1374,157 @@ describe("submitScore", () => {
 		expect(patchesById.get("p4")?.gamesPlayed).toBe(10);
 		expect(patchesById.has("resting")).toBe(false);
 	});
+
+	it("評分觸頂時賽後分數停在 8.00 並回報已達上限", () => {
+		// 雙方皆已在評分上限：預測勝率恰為 0.5，勝方的理論賽後分數必然超過 RATING_MAX
+		// 而被夾回上限——不寫死字面量 8，改用 RATING_MAX（唯一來源，rating-types.ts）。
+		const players = [makePlayer({ id: "p1", rating: RATING_MAX, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: RATING_MAX, gamesPlayed: 0 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: RATING_MAX },
+				{ playerIds: ["p2"], rating: RATING_MAX },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: RATING_MAX, after: null },
+				{ playerId: "p2", before: RATING_MAX, after: null },
+			],
+		});
+		const round = makeRound({ matches: [match] });
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const winnerRating = result.round.matches[0].playerRatings.find((r) => r.playerId === "p1");
+		expect(winnerRating?.after).toBe(RATING_MAX);
+		// 回報已達上限用的是 atUpperBound（停在界上即 true），不是 clamped（本場理論值是否
+		// 真的被截斷）——兩者語意分歧見 rating-types.ts 的 RatingChange 註解。
+		expect(result.boundaryHits.some((hit) => hit.playerId === "p1" && hit.atUpperBound)).toBe(true);
+	});
+
+	it("送出失敗時回合、名單與歷史皆不變", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+			],
+		});
+		const round = makeRound({ matches: [match] });
+		const roundSnapshot = structuredClone(round);
+		const playersSnapshot = structuredClone(players);
+
+		// 以平局送出，觸發 validateScoreInput 的 TIE 失敗。
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "11", now: FIXED_NOW });
+
+		expect(result.ok).toBe(false);
+		expect(round).toEqual(roundSnapshot);
+		expect(players).toEqual(playersSnapshot);
+		// 原子性由「失敗時不回傳任何可寫入的東西」保證（design Decision 6）：失敗結果沒有
+		// historyEntry／playerPatches／boundaryHits 欄位可讓呼叫端誤用來產生部分更新——
+		// 用完整鍵集合比對取代逐一檢查每個欄位不存在。
+		expect(Object.keys(result).sort()).toEqual(["code", "message", "ok"]);
+	});
+
+	it("已完成場次重複送出時歷史筆數不變", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const completedMatch = makeCompletedRoundMatch({ id: "m-1" });
+		const round = makeRound({ matches: [completedMatch] });
+		const existingEntry: MatchHistoryEntry = {
+			matchId: "m-1",
+			courtNumber: 1,
+			playedAt: "2026-08-22T00:00:00.000Z",
+			format: "singles",
+			teamA: { rating: 5, players: [{ id: "p1", name: "小明", ratingBefore: 5, ratingAfter: 5.1 }] },
+			teamB: { rating: 6, players: [{ id: "p2", name: "小美", ratingBefore: 6, ratingAfter: 5.9 }] },
+			scoreA: 11,
+			scoreB: 7,
+			winner: "teamA",
+		};
+		let history = appendHistoryEntry([], existingEntry);
+		expect(history).toHaveLength(1);
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "20", rawScoreB: "15", now: FIXED_NOW });
+
+		expect(result.ok).toBe(false);
+		// submitScore 對已完成場次的失敗結果沒有 historyEntry 欄位，呼叫端因此無從產生
+		// 第二筆——match-history spec 明訂「依賴該約束而非另行去重」。這裡模擬呼叫端唯一
+		// 會呼叫 appendHistoryEntry 的路徑（result.ok === true 才追加），驗證重複送出
+		// 不會讓歷史多一筆。
+		if (result.ok) {
+			history = appendHistoryEntry(history, result.historyEntry);
+		}
+		expect(history).toHaveLength(1);
+	});
+
+	it("重排未完成場次不刪除也不修改既有歷史", () => {
+		const players = [
+			makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p3", rating: 3, gamesPlayed: 0 }),
+			makePlayer({ id: "p4", rating: 3, gamesPlayed: 0 }),
+		];
+		const toBeCompletedMatch = makeRoundMatch({
+			id: "done",
+			courtNumber: 1,
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: null },
+				{ playerId: "p2", before: 3, after: null },
+			],
+		});
+		const pendingMatch = makeRoundMatch({
+			id: "todo",
+			courtNumber: 2,
+			teams: [
+				{ playerIds: ["p3"], rating: 3 },
+				{ playerIds: ["p4"], rating: 3 },
+			],
+			playerRatings: [
+				{ playerId: "p3", before: 3, after: null },
+				{ playerId: "p4", before: 3, after: null },
+			],
+		});
+		const roundBeforeCompletion = makeRound({ courtCount: 2, matches: [toBeCompletedMatch, pendingMatch] });
+
+		const submitResult = submitScore({
+			round: roundBeforeCompletion,
+			players,
+			matchId: "done",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: FIXED_NOW,
+		});
+		expect(submitResult.ok).toBe(true);
+		if (!submitResult.ok) return;
+
+		const history = appendHistoryEntry([], submitResult.historyEntry);
+		expect(history).toHaveLength(1);
+		const historySnapshot = structuredClone(history);
+
+		const resetResult = resetIncompleteMatches(submitResult.round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(resetResult.ok).toBe(true);
+		if (!resetResult.ok) return;
+
+		// resetIncompleteMatches 的簽章裡根本沒有歷史陣列這個參數（見本檔 §5 的既有型別），
+		// 結構上就不可能修改它；這裡仍實際比對內容，留下可執行的證據而非只靠「型別上
+		// 不可能」空談。
+		expect(history).toEqual(historySnapshot);
+		expect(history).toHaveLength(1);
+		// 對照組：確認重排真的把已完成場次保留下來——若重排本身壞掉，「歷史沒變」的斷言
+		// 也會失去參照意義。
+		const keptMatch = resetResult.round.matches.find((m) => m.id === "done");
+		expect(keptMatch?.status).toBe("completed");
+	});
 });
