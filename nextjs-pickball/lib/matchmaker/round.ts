@@ -576,18 +576,26 @@ export interface ValidateScoreFailure {
 export type ValidateScoreResult = ValidateScoreSuccess | ValidateScoreFailure;
 
 // 比分欄位只接受「（可選負號）＋一或多個 ASCII 數字」，前後空白先 trim 再比對格式
-// （要點 1 的邊界決定）：
+// （RoundMatchSchema 的 scores 約束與 tasks 6.2 的邊界決定）：
 // - 接受前後空白（" 11 "）：使用者打字最常見的失手（誤觸空白鍵、觸控鍵盤誤觸），
 //   trim 後仍是合法整數格式時不該被當成錯誤輸入。
 // - 不接受小數（"1.5"）或科學記號（"1e3"）：RoundMatchSchema 的 scores 是
 //   z.number().int().nonnegative()，接受這兩種格式會在寫回 Round 時才被 schema 拒絕，
 //   等於把「輸入驗證」的責任推給 schema 事後爆炸，而不是在使用者送出當下就擋下並說明。
+//   同理不接受超出安全整數範圍的值（"99999999999999999999"，B6）：Number() 轉換後會
+//   得到 1e20 這種遠超 Number.MAX_SAFE_INTEGER 的值，一樣會在寫回 Round 時才被 schema
+//   的整數上限拒絕——而且 Round 是單一物件，屆時無筆可救，整份回合會被判定損壞清除。
 // - 不接受全形數字（"１１"）：行動裝置的數字鍵盤不會產生全形字元，接受它需要額外的
 //   locale-aware 正規化邏輯，超出「使用者打字失手」這個要處理的範圍。
 // SHALL NOT 單獨用 Number() 或 parseInt() 判斷（tasks 6.2）：Number("") 為 0、
 // Number("   ") 為 0、parseInt("1a") 為 1、Number("NaN") 為 NaN，四者都會被其中一個
 // 函式單獨使用時靜默放行。這裡先用正規表示式判斷格式是否合法，Number() 只在格式已確定
 // 合法之後才用來取值，不構成「單獨判斷」。
+// 已知行為（N7，記錄用不改動）：正規表示式與 Number() 的組合下，"-0" 會被接受為 -0
+// （負零視覺上不影響顯示、比分邏輯上與 0 等價）、"007" 會被接受為 7（前導零屬「打字習慣」
+// 而非格式錯誤）、"+11" 則因正規表示式只允許可選負號、不允許正號而被拒絕（比分輸入沒有
+// 「明確標示正號」的使用情境，維持格式單純優先於對稱地放行 +／-）。三者皆非本函式的
+// 邊界決定重點，不另立測試，僅在此註記取捨。
 const SCORE_INPUT_PATTERN = /^-?\d+$/;
 
 // 回傳值刻意設計成「三個字面量狀態 + number」的聯合型別而非另外包一層 { ok, ... } 物件：
@@ -606,6 +614,12 @@ function parseScoreField(raw: string): ScoreFieldParseResult {
 	}
 
 	const value = Number(trimmed);
+	// B6：超出安全整數範圍的值一律視為格式不合法，而非放行後在 RoundMatchSchema 事後爆炸
+	// （見上方註解）。此檢查須在負數判斷之前，理由與其餘三種拒絕原因相同——都是「格式」
+	// 而非「數值範圍」層級的問題，回報的失敗代碼是 INVALID_NUMBER，不是 NEGATIVE_SCORE。
+	if (!Number.isSafeInteger(value)) {
+		return "invalid";
+	}
 	if (value < 0) {
 		return "negative";
 	}
@@ -714,7 +728,12 @@ export interface SubmitScoreFailure {
 
 export type SubmitScoreResult = SubmitScoreSuccess | SubmitScoreFailure;
 
-// 送出當下該員在名單中的資料（rating／gamesPlayed／name），依 playerIds 的順序取出。
+// 送出當下該員在名單中的資料（rating／gamesPlayed／name），依名單（players）的順序取出；
+// 本函式不保證與 playerIds 同序，索引配對之所以成立是因為下方 toHistoryEntry／submitScore
+// 用來配對的 changes 也源自同一個 players 陣列（B5-a：本段原註解宣稱「依 playerIds 的
+// 順序取出」與事實相反——players.filter(...) 保留的是名單原有順序，非 playerIds 的順序；
+// 例如 team.playerIds = ["p2","p1"] 而名單為 [p1,p2,…] 時，本函式回傳 [p1,p2]。功能上
+// 無 bug，只是敘述錯誤，特此更正）。
 // 用 filter 而非逐一 find＋在此拋錯：找不到的球員（已被移除，roster.ts 的 removePlayer
 // 不禁止移除仍在進行中場次裡的人）直接被排除在外，讓結果陣列長度變少而非在這裡處理
 // 「查無此人」的例外情境。這不是靜默放行——人數不足會在下方餵給 updateRatings 時被
@@ -836,7 +855,9 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: SCORING_FAILED_MESSAGE };
 	}
 
-	// changes 的順序是「隊伍 A 全員 → 隊伍 B 全員」（rating-types.ts），與上面 matchPlayers
+	// changes 的順序是「隊伍 A 全員 → 隊伍 B 全員」（該保證記載於 rating.ts 的迴圈註解——
+	// rating-types.ts 只寫「changes 包含本場所有參賽者的評分變動紀錄陣列」，未定序），
+	// 與上面 matchPlayers
 	// 的建構順序（teamAPlayers 在前、teamBPlayers 在後）一致，可直接以陣列索引配對。
 	const playerRatings: PlayerRating[] = ratingResult.changes.map((change) => ({
 		playerId: change.id,

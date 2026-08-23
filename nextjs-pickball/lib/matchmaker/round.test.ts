@@ -8,10 +8,11 @@ import {
 	validateScoreInput,
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
+	SUBMIT_SCORE_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
 } from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
-import { appendHistoryEntry } from "./history";
+import { appendHistoryEntry, MatchHistoryEntrySchema } from "./history";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
@@ -124,6 +125,19 @@ function makeSignatureTeam(ids: readonly string[]): Team {
 // 而猜測或還原 doublesComposition 標示。
 function makeSignatureMatch(teamAIds: readonly string[], teamBIds: readonly string[]): Match {
 	return { courtNumber: 1, format: "singles", teams: [makeSignatureTeam(teamAIds), makeSignatureTeam(teamBIds)] };
+}
+
+// submitScore 測試用的隊伍與賽前分數樣板（N6：§6 測試中 { playerIds, rating } 與
+// { playerId, before, after: null } 兩種字面量原本各自複製貼上超過 10 次）。
+function makeTeamFixture(playerIds: readonly string[], rating: number): { playerIds: string[]; rating: number } {
+	return { playerIds: [...playerIds], rating };
+}
+
+function makePendingPlayerRating(
+	playerId: string,
+	before: number,
+): { playerId: string; before: number; after: number | null } {
+	return { playerId, before, after: null };
 }
 
 describe("createRound", () => {
@@ -1138,11 +1152,14 @@ describe("validateScoreInput", () => {
 	it("比分非有效數字時拒絕送出", () => {
 		const match = makeRoundMatch();
 
-		// 除 test-plan 列出的 "abc"／"1a"／"NaN" 外，一併涵蓋要點 1 的邊界決定：
-		// 小數（"1.5"）與科學記號（"1e3"）會讓 RoundMatchSchema 的
-		// z.number().int().nonnegative() 驗證失敗，故本函式先行拒絕；全形數字（"１１"）
-		// 不是行動裝置數字鍵盤會產生的輸入，同樣不接受，以維持解析規則單純。
-		for (const rawScoreA of ["abc", "1a", "NaN", "1.5", "1e3", "１１"]) {
+		// 除 test-plan 列出的 "abc"／"1a"／"NaN" 外，一併涵蓋 RoundMatchSchema 的 scores
+		// 約束（z.number().int().nonnegative()）與 tasks 6.2 訂下的邊界決定：小數
+		// （"1.5"）與科學記號（"1e3"）會讓該約束驗證失敗，故本函式先行拒絕；全形數字
+		// （"１１"）不是行動裝置數字鍵盤會產生的輸入，同樣不接受，以維持解析規則單純；
+		// 超出安全整數範圍的值（"99999999999999999999"）同理不接受（B6）——放行會讓
+		// scoreA/scoreB 變成 1e20，寫回 Round 時才被 RoundMatchSchema 的
+		// Number.MAX_SAFE_INTEGER 上限拒絕，一份無筆可救的單一物件整份被判定損壞。
+		for (const rawScoreA of ["abc", "1a", "NaN", "1.5", "1e3", "１１", "99999999999999999999"]) {
 			const result = validateScoreInput(match, rawScoreA, "11");
 
 			expect(result.ok).toBe(false);
@@ -1167,7 +1184,7 @@ describe("validateScoreInput", () => {
 			expect(zeroValid.scoreB).toBe(11);
 		}
 
-		// 要點 1 的邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
+		// tasks 6.2 的邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
 		// 這是使用者打字最常見的失手，不應被當成錯誤輸入拒絕。
 		const trimmed = validateScoreInput(match, " 0 ", " 11 ");
 		expect(trimmed.ok).toBe(true);
@@ -1204,16 +1221,14 @@ describe("submitScore", () => {
 		const players = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
 		const match = makeRoundMatch({
 			id: "m-1",
-			teams: [
-				{ playerIds: ["p1"], rating: 3 },
-				{ playerIds: ["p2"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		const round = makeRound({ matches: [match] });
+		// B4：純函式的不可變性——只有失敗路徑有測試守著，成功路徑改為就地修改傳入的
+		// round 仍會全數綠燈（打穿 design Decision 6 的純函式承諾與 store 的 state
+		// identity），故在此另存一份快照供送出後比對。
+		const roundSnapshot = structuredClone(round);
 
 		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
 
@@ -1225,10 +1240,40 @@ describe("submitScore", () => {
 		expect(updated?.scores).toEqual({ teamA: 11, teamB: 7 });
 		expect(updated?.winner).toBe("teamA");
 		expect(updated?.completedAt).toBe(FIXED_NOW);
+
+		// B4：傳入的 round 必須維持原樣，回傳的必須是另一個物件。
+		expect(round).toEqual(roundSnapshot);
+		expect(result.round).not.toBe(round);
+
+		// B3（regression guard，非紅燈——實測目前行為已正確）：spec「比分驗證」正文只列
+		// 5 種拒絕原因，scoring 不在其中；design Decision 10 明文要求所有讀取路徑都要有
+		// 單元測試守住這些分支。後續 milestone（計分板）唯一會送出的就是 scoring 場次，
+		// 若這裡誤拒（例如把完成判斷寫成 `!== "pending"`），不會有任何既有測試轉紅。
+		const scoringMatch = makeRoundMatch({
+			id: "m-2",
+			status: "scoring",
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
+		});
+		const scoringRound = makeRound({ matches: [scoringMatch] });
+
+		const scoringResult = submitScore({
+			round: scoringRound,
+			players,
+			matchId: "m-2",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: FIXED_NOW,
+		});
+
+		expect(scoringResult.ok).toBe(true);
+		if (!scoringResult.ok) return;
+		expect(scoringResult.round.matches.find((m) => m.id === "m-2")?.status).toBe("completed");
 	});
 
 	it("完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數", () => {
-		// 雙打：4 人。
+		// 雙打：4 人。teamA／teamB 的隊伍分數（match.teams[i].rating）刻意設為不同值，
+		// 讓「teamA.rating 誤用 teamB 的值」這類 mutation 有鑑別力（B1 point 4）。
 		const doublesPlayers = [
 			makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }),
 			makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 }),
@@ -1239,15 +1284,12 @@ describe("submitScore", () => {
 			id: "m-d",
 			format: "doubles",
 			doublesComposition: "general",
-			teams: [
-				{ playerIds: ["p1", "p2"], rating: 6 },
-				{ playerIds: ["p3", "p4"], rating: 6 },
-			],
+			teams: [makeTeamFixture(["p1", "p2"], 6), makeTeamFixture(["p3", "p4"], 8)],
 			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-				{ playerId: "p3", before: 3, after: null },
-				{ playerId: "p4", before: 3, after: null },
+				makePendingPlayerRating("p1", 3),
+				makePendingPlayerRating("p2", 3),
+				makePendingPlayerRating("p3", 3),
+				makePendingPlayerRating("p4", 3),
 			],
 		});
 		const doublesRound = makeRound({ format: "doubles", matches: [doublesMatch] });
@@ -1266,23 +1308,56 @@ describe("submitScore", () => {
 		const doublesUpdated = doublesResult.round.matches.find((m) => m.id === "m-d");
 		expect(doublesUpdated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.doubles);
 		expect(new Set(doublesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2", "p3", "p4"]));
+		const doublesBeforeById = new Map([
+			["p1", 3],
+			["p2", 3],
+			["p3", 3],
+			["p4", 3],
+		]);
+		const doublesPatchesById = new Map(doublesResult.playerPatches.map((p) => [p.id, p]));
 		for (const rating of doublesUpdated?.playerRatings ?? []) {
-			expect(rating.before).toBe(3);
-			expect(typeof rating.after).toBe("number");
+			expect(rating.before).toBe(doublesBeforeById.get(rating.playerId));
+			// B2：與 playerPatches 交叉比對，取代零鑑別力的 typeof 斷言——fixture 中無人
+			// 觸界，賽後分數必定與賽前不同。
+			expect(rating.after).toBe(doublesPatchesById.get(rating.playerId)?.rating);
+			expect(rating.after).not.toBe(rating.before);
 		}
 
-		// 單打：2 人。
-		const singlesPlayers = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
+		// B1：historyEntry 投影的欄位級斷言（原本零覆蓋，7 個 mutation 皆存活）。
+		// 一行同時關掉「雙打漏帶 doublesComposition」與所有形狀類 mutation（DU 兩分支皆
+		// .strict()）。
+		expect(MatchHistoryEntrySchema.safeParse(doublesResult.historyEntry).success).toBe(true);
+		expect(doublesResult.historyEntry.matchId).toBe("m-d");
+		expect(doublesResult.historyEntry.courtNumber).toBe(1);
+		expect(doublesResult.historyEntry.playedAt).toBe(FIXED_NOW);
+		expect(doublesResult.historyEntry.scoreA).toBe(11);
+		expect(doublesResult.historyEntry.scoreB).toBe(9);
+		expect(doublesResult.historyEntry.winner).toBe("teamA");
+		expect(doublesResult.historyEntry.format).toBe("doubles");
+		if (doublesResult.historyEntry.format === "doubles") {
+			expect(doublesResult.historyEntry.doublesComposition).toBe("general");
+		}
+
+		const doublesRatingsById = new Map((doublesUpdated?.playerRatings ?? []).map((r) => [r.playerId, r]));
+		for (const player of [...doublesResult.historyEntry.teamA.players, ...doublesResult.historyEntry.teamB.players]) {
+			// 姓名快照 MUST 為名單中的姓名，不是 id（Decision 3 的核心承諾）。
+			expect(player.name).toBe(doublesPlayers.find((p) => p.id === player.id)?.name);
+			const matched = doublesRatingsById.get(player.id);
+			expect(player.ratingBefore).toBe(matched?.before);
+			expect(player.ratingAfter).toBe(matched?.after);
+		}
+
+		expect(doublesResult.historyEntry.teamA.rating).not.toBe(doublesResult.historyEntry.teamB.rating);
+		expect(doublesResult.historyEntry.teamA.rating).toBe(6);
+		expect(doublesResult.historyEntry.teamB.rating).toBe(8);
+
+		// 單打：2 人。teamA／teamB 的 rating 同樣刻意設為不同值，讓「teamA.rating 誤用
+		// teamB 的值」這類 mutation 有鑑別力。
+		const singlesPlayers = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 5, gamesPlayed: 0 })];
 		const singlesMatch = makeRoundMatch({
 			id: "m-s",
-			teams: [
-				{ playerIds: ["p1"], rating: 3 },
-				{ playerIds: ["p2"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 5)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 5)],
 		});
 		const singlesRound = makeRound({ matches: [singlesMatch] });
 
@@ -1300,6 +1375,28 @@ describe("submitScore", () => {
 		const singlesUpdated = singlesResult.round.matches.find((m) => m.id === "m-s");
 		expect(singlesUpdated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.singles);
 		expect(new Set(singlesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2"]));
+
+		// B1：對單打分支重複同一組 historyEntry 欄位級斷言。
+		expect(MatchHistoryEntrySchema.safeParse(singlesResult.historyEntry).success).toBe(true);
+		expect(singlesResult.historyEntry.matchId).toBe("m-s");
+		expect(singlesResult.historyEntry.courtNumber).toBe(1);
+		expect(singlesResult.historyEntry.playedAt).toBe(FIXED_NOW);
+		expect(singlesResult.historyEntry.scoreA).toBe(11);
+		expect(singlesResult.historyEntry.scoreB).toBe(7);
+		expect(singlesResult.historyEntry.winner).toBe("teamA");
+		expect(singlesResult.historyEntry.format).toBe("singles");
+
+		const singlesRatingsById = new Map((singlesUpdated?.playerRatings ?? []).map((r) => [r.playerId, r]));
+		for (const player of [...singlesResult.historyEntry.teamA.players, ...singlesResult.historyEntry.teamB.players]) {
+			expect(player.name).toBe(singlesPlayers.find((p) => p.id === player.id)?.name);
+			const matched = singlesRatingsById.get(player.id);
+			expect(player.ratingBefore).toBe(matched?.before);
+			expect(player.ratingAfter).toBe(matched?.after);
+		}
+
+		expect(singlesResult.historyEntry.teamA.rating).not.toBe(singlesResult.historyEntry.teamB.rating);
+		expect(singlesResult.historyEntry.teamA.rating).toBe(3);
+		expect(singlesResult.historyEntry.teamB.rating).toBe(5);
 	});
 
 	it("完成場次後評分結果寫回名單，未參賽者不受影響", () => {
@@ -1310,14 +1407,8 @@ describe("submitScore", () => {
 		];
 		const match = makeRoundMatch({
 			id: "m-1",
-			teams: [
-				{ playerIds: ["p1"], rating: 3 },
-				{ playerIds: ["p2"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		const round = makeRound({ matches: [match] });
 
@@ -1347,15 +1438,12 @@ describe("submitScore", () => {
 			id: "m-d",
 			format: "doubles",
 			doublesComposition: "general",
-			teams: [
-				{ playerIds: ["p1", "p2"], rating: 6 },
-				{ playerIds: ["p3", "p4"], rating: 6 },
-			],
+			teams: [makeTeamFixture(["p1", "p2"], 6), makeTeamFixture(["p3", "p4"], 6)],
 			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-				{ playerId: "p3", before: 3, after: null },
-				{ playerId: "p4", before: 3, after: null },
+				makePendingPlayerRating("p1", 3),
+				makePendingPlayerRating("p2", 3),
+				makePendingPlayerRating("p3", 3),
+				makePendingPlayerRating("p4", 3),
 			],
 		});
 		const round = makeRound({ format: "doubles", matches: [match] });
@@ -1376,7 +1464,7 @@ describe("submitScore", () => {
 	});
 
 	it("評分觸頂時賽後分數停在 8.00 並回報已達上限", () => {
-		// 刻意讓雙方實力懸殊（p1 已在上限、p2 在下限）而非兩人同分：若兩人同樣是 8 分,
+		// 刻意讓雙方實力懸殊（p1 已在上限、p2 在下限）而非兩人同分：若兩人同樣是 8 分，
 		// 勝方的理論賽後分數會大幅超過 8（例如 8.15），此時 atUpperBound 與 clamped
 		// 會同時為 true，測不出「回報已達上限用的是哪一個旗標」。實力懸殊時 p1 幾乎穩贏、
 		// 預測勝率趨近 1，理論漲幅被壓得極小（僅超出 8 一點點，如 8.0014），四捨五入後
@@ -1384,21 +1472,16 @@ describe("submitScore", () => {
 		// （atUpperBound 為 true）。這才是 rating-types.ts 註解「理論值 8.0049 四捨五入後
 		// 為 8.00 者，atUpperBound = true 但 clamped = false」描述的情境，能真正分辨
 		// 實作用的是哪一個旗標。不寫死字面量 8／1，改用 RATING_MAX／RATING_MIN
-		// （唯一來源，rating-types.ts）。
+		// （唯一來源，rating-types.ts）。p2 對稱地觸底，同一個 fixture 可一併覆蓋
+		// Scenario 標題的「或觸底」（N5）。
 		const players = [
 			makePlayer({ id: "p1", rating: RATING_MAX, gamesPlayed: 0 }),
 			makePlayer({ id: "p2", rating: RATING_MIN, gamesPlayed: 0 }),
 		];
 		const match = makeRoundMatch({
 			id: "m-1",
-			teams: [
-				{ playerIds: ["p1"], rating: RATING_MAX },
-				{ playerIds: ["p2"], rating: RATING_MIN },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: RATING_MAX, after: null },
-				{ playerId: "p2", before: RATING_MIN, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], RATING_MAX), makeTeamFixture(["p2"], RATING_MIN)],
+			playerRatings: [makePendingPlayerRating("p1", RATING_MAX), makePendingPlayerRating("p2", RATING_MIN)],
 		});
 		const round = makeRound({ matches: [match] });
 
@@ -1415,20 +1498,17 @@ describe("submitScore", () => {
 		// 這條斷言會轉紅。
 		const p1Hit = result.boundaryHits.find((hit) => hit.playerId === "p1");
 		expect(p1Hit?.atUpperBound).toBe(true);
+		// N5：p2 對稱地觸底，成本為零地覆蓋 Scenario 標題的「或觸底」。
+		const p2Hit = result.boundaryHits.find((hit) => hit.playerId === "p2");
+		expect(p2Hit?.atLowerBound).toBe(true);
 	});
 
 	it("送出失敗時回合、名單與歷史皆不變", () => {
 		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
 		const match = makeRoundMatch({
 			id: "m-1",
-			teams: [
-				{ playerIds: ["p1"], rating: 3 },
-				{ playerIds: ["p2"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		const round = makeRound({ matches: [match] });
 		const roundSnapshot = structuredClone(round);
@@ -1444,6 +1524,29 @@ describe("submitScore", () => {
 		// historyEntry／playerPatches／boundaryHits 欄位可讓呼叫端誤用來產生部分更新——
 		// 用完整鍵集合比對取代逐一檢查每個欄位不存在。
 		expect(Object.keys(result).sort()).toEqual(["code", "message", "ok"]);
+
+		// N1：MATCH_NOT_FOUND 與防禦性 catch 兩條失敗路徑原本零覆蓋，於此零成本補上。
+		const notFoundResult = submitScore({ round, players, matchId: "not-exist", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
+		expect(notFoundResult.ok).toBe(false);
+		if (!notFoundResult.ok) {
+			expect(notFoundResult.code).toBe(SUBMIT_SCORE_FAILURE_CODE.MATCH_NOT_FOUND);
+		}
+
+		// 名單缺一位該場球員：resolveTeamPlayers 回傳人數不足，updateRatings 的
+		// assertValidInput 拋錯，被 6.6 的防禦性 try/catch 接住並轉為 SCORING_FAILED——
+		// 不需要 mock 就能實際觸達這條分支。
+		const scoringFailedResult = submitScore({
+			round,
+			players: players.slice(0, 1),
+			matchId: "m-1",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: FIXED_NOW,
+		});
+		expect(scoringFailedResult.ok).toBe(false);
+		if (!scoringFailedResult.ok) {
+			expect(scoringFailedResult.code).toBe(SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED);
+		}
 	});
 
 	it("已完成場次重複送出時歷史筆數不變", () => {
@@ -1487,26 +1590,14 @@ describe("submitScore", () => {
 		const toBeCompletedMatch = makeRoundMatch({
 			id: "done",
 			courtNumber: 1,
-			teams: [
-				{ playerIds: ["p1"], rating: 3 },
-				{ playerIds: ["p2"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p1", before: 3, after: null },
-				{ playerId: "p2", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		const pendingMatch = makeRoundMatch({
 			id: "todo",
 			courtNumber: 2,
-			teams: [
-				{ playerIds: ["p3"], rating: 3 },
-				{ playerIds: ["p4"], rating: 3 },
-			],
-			playerRatings: [
-				{ playerId: "p3", before: 3, after: null },
-				{ playerId: "p4", before: 3, after: null },
-			],
+			teams: [makeTeamFixture(["p3"], 3), makeTeamFixture(["p4"], 3)],
+			playerRatings: [makePendingPlayerRating("p3", 3), makePendingPlayerRating("p4", 3)],
 		});
 		const roundBeforeCompletion = makeRound({ courtCount: 2, matches: [toBeCompletedMatch, pendingMatch] });
 
