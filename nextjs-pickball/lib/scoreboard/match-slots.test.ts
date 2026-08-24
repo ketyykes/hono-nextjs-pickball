@@ -83,4 +83,26 @@ describe("match-slots", () => {
 		expect(Object.keys(slots)).toEqual(["m2"]);
 		expect(slots.m2).toEqual(m2State);
 	});
+
+	// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉 hasLocalStorage()
+	// 守門在既有 4 個 it 下不會轉紅（happy-dom 恆有 window.localStorage），
+	// 故另補此測試堵住這個偵測缺口，寫法比照 storage.test.ts 的 SSR 情境。
+	it("SSR（無 window）時 read／write／clear 皆不寫入也不 throw", () => {
+		const sentinel = JSON.stringify({ m1: createInitialState() });
+		localStorage.setItem(MATCH_SLOTS_KEY, sentinel);
+
+		vi.stubGlobal("window", undefined);
+		try {
+			expect(typeof window).toBe("undefined");
+			expect(readMatchSlots()).toEqual({ slots: {}, droppedCount: 0 });
+			expect(readMatchSlot("m1")).toBeNull();
+			expect(() => writeMatchSlot("m2", createInitialState())).not.toThrow();
+			expect(() => clearMatchSlots(["m1"])).not.toThrow();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+
+		// guard 生效 → 三個寫入／清除函式都在碰 localStorage 之前就 return
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe(sentinel);
+	});
 });
