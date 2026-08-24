@@ -583,3 +583,62 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
      不是重新推導誰在哪一格。但正因為這四個數字（`repeat(2, …)`／`row*2+1`／控制區的
      `gridRow: 2`／`gridColumn: "1 / 3"`）之間的耦合只靠人腦維持，才需要 (B) R4 的網格結構斷言。
    - **`players.find(...)` 找不到球員時的行為**：見 (C) 4，可接受但需補測。
+
+7. **§11 的實作決定與 leader 裁決（2026-08-24，Implementer 交件後、審查回覆前落盤）。**
+
+   > 落盤理由同第 6 條：Implementer 的回報只存在於 leader 的對話脈絡中，磁碟無副本。
+
+   **交付內容**：`app/matchmaker/layout.tsx`、`app/matchmaker/page.tsx`、
+   `components/matchmaker/MatchmakerTabs.tsx`／`MatchStage.tsx`／`EmptyStage.tsx`、
+   `tests/e2e/specs/match-stage.spec.ts`（14 個 test）為新增；`hooks/useRoundStore.ts` 為**修改**
+   （+95/−14，`hooks/` 零新增檔案，符合 Decision 3）。
+   E2E 五個 browser project 共 **70/70 passed**；`player-roster.spec.ts` 與 `navbar-rwd.spec.ts`
+   無回歸；單元測試 381 passed；`tsc` 與 `lint` 乾淨。
+
+   **(a) 派工單的一處事實錯誤（leader 的錯，記錄以免重蹈）：`hooks/useRoundStore.test.tsx` 早就存在。**
+   該檔由 M4 commit（`b557a27`／`1912d38`），含 2 個 test（hydration restore、`generateRound` 的
+   rest-settlement → `updatePlayer` 接線）。leader 的派工單誤述為「不存在」，並據此要求 Implementer
+   在需要新增測試檔時回報 `NEEDS_CONTEXT`。Implementer 因該檔不在可動清單而未編輯它，
+   **導致新增的 `resetIncompleteMatches`／`submitScore` 兩個對外函式沒有任何 hooks 層單元測試**。
+   該檔另有一句註解「submitScore 尚未接線」現已過期。
+
+   **→ leader 裁決**：`useRoundStore.test.tsx` 是**既有檔**，編輯它**不違反 Decision 3**
+   （Decision 3 禁止的是在 `hooks/` 新增檔案，會動到 `pickleball-guide-page` 的 hooks 歸屬清單與
+   `hooksInventory.test.ts`；修改既有檔案不影響那份清單）。**MUST 把它加進 §11 的可動檔案清單，
+   補上兩個新函式的 hooks 層測試，並修掉那句過期註解。** 補上的測試是實作後才寫的
+   **regression guard**，須如實標註。
+
+   **(b) 完全沒有種入 `matchmaker:round:v1`——所有情境走 UI。**
+   含「2 場對戰」「目標分數已鎖定」在內的每個情境都能用 UI 達成（`增加場地數` + `產生本輪對戰`），
+   因此**不存在** Risks 所述的「E2E 種入 `matchmaker:round:v1` 是對 M4 內部格式的硬耦合」，
+   也沒有種回合資料的 helper。tasks 11.6 的「種資料 helper 集中一處並註明格式來源」是 conditional
+   要求（有種資料才需要），design Risks 亦明說「能用 UI 操作產生的狀態**優先用 UI 操作**」。
+   roster 則用 `page.addInitScript` 種入（非 `player-roster.spec.ts` 的 `goto` + `evaluate`——
+   後者只**清**資料、從不**種**資料；`addInitScript` 的先例在 `scoreboard.spec.ts`）。
+
+   **(c) 手機觸控目標 ≥44px 的實作方式——leader 記錄為已知取捨。**
+   `CourtCard`／`ScoreEntry`（§8 產出）渲染的是 `h-8`／`h-9`（32／36px），**低於 44px 要求**。
+   Implementer 未改那兩個檔（不在其可動清單），改在 `MatchStage.tsx` 加
+   `max-md:[&_input]:h-11 max-md:[&_button]:min-h-11` 的 Tailwind 後代選擇器覆寫
+   （只在 <768px、只作用於場地網格內；specificity `(0,1,1)` 勝過 `.h-9` 的 `(0,1,0)`；
+   `[&_svg]:...` 這個 pattern 在 `button.tsx`／`table.tsx` 已有先例）。
+   **已知隱患**：§8 的 `CourtCard` integration 測試把尺寸凍結在 32／36px，兩層對同一件事的認知
+   不一致；若 `CourtCard` 日後被 `MatchStage` 以外的地方重用，44px 保證就消失了。
+   spec 只要求「手機斷點下比分欄位與主要按鈕的可觸控區域 MUST 不小於 44x44」、未規定實作方式。
+
+   **(d) `layout.tsx` 加了 `pt-14`，同時影響 `/matchmaker/players`。**
+   該頁原本沒有上內距、壓在 fixed navbar 底下；引入共用 layout 後一併修正。
+   Decision 1 已預告「`/matchmaker/players` 從此多出一條區段導覽……不改 `player-roster` 的任何
+   Requirement，因此不列為 Modified capability」。`player-roster.spec.ts` 實測 4/4 仍綠。
+
+   **(e) 兩輪 regression guard（Implementer 主動誠實標註）。**
+   11.7／11.8（RWD 三斷點）：RWD 版面在 11.6 的 GREEN 就一併做完（同一個元件的版面決策），
+   三個 RWD test 寫入即綠、零程式碼改動。
+   11.9／11.10（無障礙）：§7～§9 已把 roving tabindex、disabled／focus、`aria-label`／
+   `<Label htmlFor>` 做對，頁面層未引入新的 a11y 邏輯，**11.10 是 no-op、零實作**。
+
+   **(f) 桌面場次網格欄數（Open Questions 4 授權自由決定）**：手機 1 欄、`md:` 起 2 欄；
+   場地內容與休息名單的並排為 `flex-col lg:flex-row`。
+
+   **(g) 一次 flaky**：`--workers=4` 預設併發下曾出現一次失敗（dev-server 競爭），
+   隔離重跑與 `--workers=2` 皆綠，與 repo 既有的 dev-server 緩慢紀錄一致。
