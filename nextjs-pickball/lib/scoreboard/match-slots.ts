@@ -25,7 +25,8 @@ function hasLocalStorage(): boolean {
 /**
  * 從 localStorage 讀取所有場次的分槽資料。
  *
- * 整份驗證失敗（JSON 解析失敗）目前尚未清 key（清 key 的行為留給 1.6 實作）。
+ * 整份不是合法 JSON、或解析後不是物件 → 清除整個 key（無筆可救，
+ * 只清 MATCH_SLOTS_KEY 一個 key，SHALL NOT 波及獨立槽 scoreboard:current:v1）。
  * 整份能解析為物件時逐筆 safeParse——刻意不整份丟給 MatchSlotsSchema，
  * 因為一筆壞資料就會讓 safeParse 整體失敗，與「單場損壞不得連坐清空
  * 其他場次」的需求牴觸（見 design Decision 4）。
@@ -38,12 +39,15 @@ export function readMatchSlots(): ReadMatchSlotsResult {
 
 	try {
 		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+			console.warn("[scoreboard] 分槽資料不是物件，清除", parsed);
+			clearAllMatchSlots();
+			return { slots: {}, droppedCount: 0 };
+		}
 
 		const slots: MatchSlots = {};
 		let droppedCount = 0;
-		for (const [matchId, rawState] of Object.entries(
-			parsed as Record<string, unknown>,
-		)) {
+		for (const [matchId, rawState] of Object.entries(parsed)) {
 			const result = ScoreboardStateSchema.safeParse(rawState);
 			if (result.success) {
 				slots[matchId] = result.data;
@@ -58,7 +62,8 @@ export function readMatchSlots(): ReadMatchSlotsResult {
 
 		return { slots, droppedCount };
 	} catch (err) {
-		console.warn("[scoreboard] 分槽資料 JSON 解析失敗", err);
+		console.warn("[scoreboard] 分槽資料 JSON 解析失敗，清除", err);
+		clearAllMatchSlots();
 		return { slots: {}, droppedCount: 0 };
 	}
 }
