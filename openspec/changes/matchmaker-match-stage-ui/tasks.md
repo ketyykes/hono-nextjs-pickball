@@ -77,13 +77,23 @@
 
 Depends on: §3
 
-- [ ] 7.1 RED: 新增 `nextjs-pickball/components/matchmaker/RoundControls.test.tsx`，寫入三個 it：「場地數為 1 時減號 disabled、為 8 時加號 disabled」、「對戰方式只提供單打與雙打且無性別限定模式選項」、「目標分數選項為 11／15／21 且預設選中 11」。確認紅燈（元件尚不存在，預期為模組解析失敗）
-- [ ] 7.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/RoundControls.tsx` 的設定區：對戰方式、場地數加減（`aria-label` 明確）、目標分數 radiogroup（`role="radiogroup"` + 三顆 `role="radio"`，鍵盤索引重用 `@/lib/scoreboard/radio-navigation` 的 `nextRadioIndex`，見 design Decision 6）。所有資料與 callback 走 props，SHALL NOT 在元件內 import 任何 store
-- [ ] 7.3 RED: 補兩個 it：「目前回合存在時目標分數選擇器 disabled 並顯示已鎖定說明」、「按下產生本輪對戰會以目前設定呼叫回合產生函式一次」。確認紅燈
-- [ ] 7.4 GREEN: 補齊：有回合即鎖定目標分數（design Decision 5 的嚴格版）並顯示「本輪已鎖定」文字；「產生本輪對戰」按鈕以目前 `format`／`courtCount`／`targetScore` 呼叫 `onGenerate`
-- [ ] 7.5 RED: 補三個 it：「可出場人數不足一場時產生按鈕 disabled 並顯示繁體中文原因」、「無目前回合或場次全部完成時不顯示重設再排入口」、「目前回合仍有未完成場次時顯示重設再排入口並委派回合 capability」。確認紅燈
-- [ ] 7.6 GREEN: 補齊：人數不足時 disabled 並顯示含「每場所需人數」與「目前可出場人數」的繁體中文說明；重設／再排入口的顯示條件為「回合存在 **AND** 至少一場未完成」兩個條件同時成立
-- [ ] 7.7 REFACTOR: 確認「每場人數」取自 `PLAYERS_PER_MATCH` 而非寫死 2／4；確認元件內沒有任何分配或評分計算；確認 disabled 一律以 `disabled` 屬性表達而非只調樣式
+- [x] 7.1 RED: 新增 `nextjs-pickball/components/matchmaker/RoundControls.test.tsx`，寫入三個 it：「場地數為 1 時減號 disabled、為 8 時加號 disabled」、「對戰方式只提供單打與雙打且無性別限定模式選項」、「目標分數選項為 11／15／21 且預設選中 11」。確認紅燈（元件尚不存在，預期為模組解析失敗）
+      - 真紅燈（`Failed to resolve import "./RoundControls"`）。
+- [x] 7.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/RoundControls.tsx` 的設定區：對戰方式、場地數加減（`aria-label` 明確）、目標分數 radiogroup（`role="radiogroup"` + 三顆 `role="radio"`，鍵盤索引重用 `@/lib/scoreboard/radio-navigation` 的 `nextRadioIndex`，見 design Decision 6）。所有資料與 callback 走 props，SHALL NOT 在元件內 import 任何 store
+- [x] 7.3 RED: 補兩個 it：「目前回合存在時目標分數選擇器 disabled 並顯示已鎖定說明」、「按下產生本輪對戰會以目前設定呼叫回合產生函式一次」。確認紅燈
+      - 兩者皆真紅燈（`Tests 2 failed | 3 passed (5)`）。
+- [x] 7.4 GREEN: 補齊：有回合即鎖定目標分數（design Decision 5 的嚴格版）並顯示「本輪已鎖定」文字；「產生本輪對戰」按鈕以目前 `format`／`courtCount`／`targetScore` 呼叫 `onGenerate`
+- [x] 7.5 RED: 補三個 it：「可出場人數不足一場時產生按鈕 disabled 並顯示繁體中文原因」、「無目前回合或場次全部完成時不顯示重設再排入口」、「目前回合仍有未完成場次時顯示重設再排入口並委派回合 capability」。確認紅燈
+      - 三者中兩者真紅燈；**「無目前回合或場次全部完成時不顯示重設再排入口」寫入當下即為綠燈，如實標註為 regression guard**。原因是它為否定式斷言（`queryByRole(...).toBeNull()`），而重設按鈕整個區塊要到 7.6 才存在——功能缺席時否定式斷言天生成立，非以改斷言偽造紅燈。Stage 1 獨立判定此標註可信：同輪另兩個 it 確實真紅，顯示分類有區辨力；且該 it 在 7.6 之後仍具迴歸防護力（涵蓋 `round === null` 與「全部 completed」兩種情境）。
+- [x] 7.6 GREEN: 補齊：人數不足時 disabled 並顯示含「每場所需人數」與「目前可出場人數」的繁體中文說明；重設／再排入口的顯示條件為「回合存在 **AND** 至少一場未完成」兩個條件同時成立
+      - 「未完成」判定為 `status !== "completed"`（涵蓋 `pending` 與 `scoring`），非 `=== "pending"`（design Open Questions 2b）；測試以 `status: "scoring"` 的場次驗證此點。
+- [x] 7.7 REFACTOR: 確認「每場人數」取自 `PLAYERS_PER_MATCH` 而非寫死 2／4；確認元件內沒有任何分配或評分計算；確認 disabled 一律以 `disabled` 屬性表達而非只調樣式
+      - Implementer 自檢的 20 次 mutation 中 1 次存活（人數不足判定 `<` 改 `<=`，因 test-plan 指定的雙打 3 人與自加的單打 1 人都不在邊界上），補「雙打恰好 4 人時按鈕不得 disabled」後轉紅。
+      - Stage 2 的 40 次 mutation 有 16 次存活，其中 **11 次為阻擋項**，根因是 **`onSettingsChange` 這條對外契約整條零斷言**（切換對戰方式／目標分數按了完全沒反應、加號會減場地、減號會加場地、回呼丟掉其他欄位、順手重設 `targetScore` 都能全綠），另加對戰方式的 `aria-checked` 無斷言、場地數**顯示值**無斷言、`round.matches` 為空陣列時的鎖定行為無斷言。已補兩個 regression guard it（`onSettingsChange` 完整物件契約、`matches: []` 仍鎖定）與三處既有 it 內的斷言，十一者皆轉紅（leader 以腳本機械複驗，還原後逐位元組相同）。
+      - Stage 2 追加採納：`FORMAT_OPTIONS` 改為 `readonly MatchFormat[]` 且由 `FORMAT_LABEL` 的 key 推導，避免 `MatchFormat` 擴值時兩處各自漂移。
+      - **上述補強的斷言一律於實作完成後才寫，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+      - 其餘 5 個存活變異經 Stage 2 判定**不阻擋**：`tabIndex` 全 0／全 -1、`if (locked) return;` 刪除、自寫索引計算取代 `nextRadioIndex` 三者屬「方向鍵導覽整體交由 §11 E2E」的分工結果；`PLAYERS_PER_MATCH[round?.format ?? settings.format]` 需要超出任何 Scenario 的情境才抓得到。**→ §11 的 E2E 驗收清單 MUST 補上「鎖定時按方向鍵目標分數不變」與「roving tabindex 只有選中項為 0」兩條**，否則 Decision 5 的鎖定嚴格性與 Decision 6 的重用點在整個 change 內將無任何一層測試保護。
+      - Stage 2 記錄的跨 capability 重複（**本 change 不處理**）：`handleTargetScoreKeyDown` 與 `components/scoreboard/ScoreboardSetup.tsx` 近乎逐字相同，radiogroup 的 JSX 亦然；重複的是「roving tabindex + focus 管理」這段純機制程式碼而非產品決策，但 Decision 6（不搬檔不合併）與 Decision 3（不新增 `hooks/` 檔案）讓本 change 沒有可落地的抽法。建議後續 change 抽共用 hook 或 presentational 元件。
 
 ## 8. CourtCard 與 PlayerTile／ScoreEntry
 
