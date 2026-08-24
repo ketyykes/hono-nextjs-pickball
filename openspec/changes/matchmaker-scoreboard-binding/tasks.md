@@ -78,7 +78,7 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 - [x] 1.4 GREEN: 實作逐筆降級：整份能解析為物件時逐筆 `safeParse`，只丟不合法的條目（比照 `player-roster` 的「LocalStorage 持久化與逐筆降級」，design Decision 4）
 - [x] 1.5 RED: 補 it「整份非 JSON 時清除分槽 key 且不動獨立槽」——分槽 key 內容為 `"{{{"` → 該 key 被移除、回傳空集合、`scoreboard:current:v1` 仍在。確認紅燈
 - [x] 1.6 GREEN: 實作整份損壞的清除路徑，且**只**移除分槽 key
-- [ ] 1.7 RED: 補 it「批次清除只移除指定場次且忽略不存在的 id」——`{m1,m2,m3}` 以 `["m1","m3","nope"]` 清除 → 只剩 `m2`，不拋錯。確認紅燈
+- [x] 1.7 RED: 補 it「批次清除只移除指定場次且忽略不存在的 id」——`{m1,m2,m3}` 以 `["m1","m3","nope"]` 清除 → 只剩 `m2`，不拋錯。確認紅燈
 - [ ] 1.8 GREEN: 實作批次清除與「清空全部條目」兩個函式
 - [ ] 1.9 REFACTOR: 確認 key 字串、schema 與 `console.warn` 前綴各只有一處定義；與 `storage.ts` 的既有慣例對齊（無壞味道則註記 skipped）
 

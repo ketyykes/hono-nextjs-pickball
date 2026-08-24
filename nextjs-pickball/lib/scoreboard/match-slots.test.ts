@@ -3,6 +3,7 @@ import {
 	readMatchSlot,
 	writeMatchSlot,
 	readMatchSlots,
+	clearMatchSlots,
 	MATCH_SLOTS_KEY,
 } from "./match-slots";
 import { createInitialState } from "./reducer";
@@ -68,5 +69,18 @@ describe("match-slots", () => {
 		expect(localStorage.getItem("scoreboard:current:v1")).not.toBeNull();
 		expect(warnSpy).toHaveBeenCalled();
 		warnSpy.mockRestore();
+	});
+
+	it("批次清除只移除指定場次且忽略不存在的 id", () => {
+		const m2State = createInitialState();
+		writeMatchSlot("m1", createInitialState());
+		writeMatchSlot("m2", m2State);
+		writeMatchSlot("m3", createInitialState());
+
+		expect(() => clearMatchSlots(["m1", "m3", "nope"])).not.toThrow();
+
+		const { slots } = readMatchSlots();
+		expect(Object.keys(slots)).toEqual(["m2"]);
+		expect(slots.m2).toEqual(m2State);
 	});
 });
