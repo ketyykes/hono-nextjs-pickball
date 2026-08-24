@@ -80,7 +80,7 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 - [x] 1.6 GREEN: 實作整份損壞的清除路徑，且**只**移除分槽 key
 - [x] 1.7 RED: 補 it「批次清除只移除指定場次且忽略不存在的 id」——`{m1,m2,m3}` 以 `["m1","m3","nope"]` 清除 → 只剩 `m2`，不拋錯。確認紅燈
 - [x] 1.8 GREEN: 實作批次清除與「清空全部條目」兩個函式（`clearAllMatchSlots()` 已於 §1.6 提前實作，因整份損壞清除路徑需要它；本項補上 `clearMatchSlots()` 批次清除）
-- [x] 1.9 REFACTOR: skipped——`MATCH_SLOTS_KEY`／`MatchSlotsSchema`／`console.warn` 前綴 `"[scoreboard]"` 皆各只有一處定義；`hasLocalStorage()` 與 storage.ts 重複但無法共用（storage.ts 未匯出該函式，且本組不得修改 storage.ts），為既有架構限制而非壞味道
+- [x] 1.9 REFACTOR: skipped——`MATCH_SLOTS_KEY` 與 `console.warn` 前綴 `"[scoreboard]"` 皆各只有一處定義；`hasLocalStorage()` 與 storage.ts 重複但無法共用（storage.ts 未匯出該函式，且本組不得修改 storage.ts），為既有架構限制而非壞味道。**Stage 2 追加**：整份 map schema `MatchSlotsSchema` 已判為 dead export 並移除（commit `a783873`），收斂由 Stage 2 完成而非本項
 
 ## 2. 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`）
 

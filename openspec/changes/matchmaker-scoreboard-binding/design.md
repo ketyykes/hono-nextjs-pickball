@@ -182,17 +182,35 @@
    - 1.8 的分工偏離判為「純記帳問題，不影響任何 Scenario 的行為覆蓋」，不予不通過；1.9 skipped 的理由經核實成立。
    - 未發現其他 scope creep：無多餘 storage key（`MATCH_SLOTS_KEY` 與 spec 表格逐字相符）、無 UI、無 spec 未要求的行為分支。
 
-   **Stage 1 依分工不審、明文移交給 Stage 2 裁決的兩項**：
-   - **`MatchSlotsSchema`（`match-slots.ts:9`）目前是 dead export**——`readMatchSlots()` 改採逐筆 `ScoreboardStateSchema.safeParse` 後，這個整份 schema 已無任何呼叫點，只在註解中被提及「刻意不用」。Stage 2 MUST 決定移除、或保留並讓某處真正消費它。**此裁決會牽動下方的命名契約**：若決定移除，§3～§6 的派工單也要同步拿掉這個名字。
-   - **`console.warn` 訊息偏「描述狀況」而非「說明可採取的修正方式」**。Stage 1 判定不阻擋（這些是開發者除錯 log 而非使用者可見錯誤訊息，且 spec 該處只要求「記錄被丟棄的筆數」），Stage 2 可再權衡。
+   **Stage 1 依分工不審、明文移交給 Stage 2 裁決的兩項——皆已由 Stage 2 結案（見下方 §1 Stage 2 判定）**：
+   - **`MatchSlotsSchema`（`match-slots.ts:9`）曾是 dead export**——`readMatchSlots()` 改採逐筆 `ScoreboardStateSchema.safeParse` 後，這個整份 schema 已無任何呼叫點，只在註解中被提及「刻意不用」。→ **Stage 2 裁決：移除**（commit `a783873`），已自下方命名契約刪除。
+   - **`console.warn` 訊息偏「描述狀況」而非「說明可採取的修正方式」**。Stage 1 判定不阻擋（這些是開發者除錯 log 而非使用者可見錯誤訊息，且 spec 該處只要求「記錄被丟棄的筆數」）。→ **Stage 2 裁決：維持現狀**，依 execution-plan 的 Escalation「風格爭議時既有 codebase 風格勝出」。
 
    **已落盤的審查結論（leader 於中斷前親自完成的機械複驗，續作者可直接採信、不需重做）**：依 root `CLAUDE.md`「紅燈要是真的」，以 `git show <commit>^:<path>` 複驗 §1 的四次紅燈宣稱，**四次皆為真紅燈**，無任何一項需改標為 regression guard——
    - `35551ad`（1.1 RED）：該 commit 樹內確認**不存在** `lib/scoreboard/match-slots.ts`，紅燈形式為 import 失敗，成立。
    - `95bf96e`（1.3 RED）當下的實作快照同時證明了三件事：`readMatchSlots()` 用的是**整份** `MatchSlotsSchema.safeParse`（故 1.3「逐筆降級」必紅）、JSON 解析失敗路徑**沒有** `removeItem`（故 1.5「整份非 JSON 應清 key」必紅）、`clearMatchSlots()` 是帶 `void matchIds;` 的 **no-op stub**（故 1.7「批次清除」必紅）。三者皆為斷言失敗型真紅燈。
 
+   **§1 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**（2026-08-24，結論落盤如下，續作者可直接採信）：
+   - **獨立 mutation 測試 27 次，原狀 18 轉紅／9 存活**（Implementer 自述為 6 次 1 存活，再次證明不可採信）。存活項補上斷言後 **27/27 全數轉紅**。commit `4a885ab`。
+   - **最重要的發現：`readMatchSlots()` 的「解析成功但不是物件」分支零覆蓋。** 既有測試用 `"{{{"`，會在 `JSON.parse` 就拋錯而走 catch 分支，因此 `Array.isArray(parsed)` guard 與該分支整段從未被執行——拿掉 guard、整段刪除、或改成只 warn 不清除，測試全綠。而 spec 的 Scenario 逐字寫著「不是合法 JSON（**或解析後不是物件**）」，`"[]"` 這類 JSON 陣列正是該 guard 存在的唯一理由。
+   - 其餘存活缺口：`clearAllMatchSlots()` 的 SSR 守門、`writeMatchSlot`／`clearMatchSlots` 的 `console.warn`、`raw === null` 早退、`hasLocalStorage()` 的 try/catch。
+   - Stage 2 新增 4 個 it（既有五個 it 名稱**未更動**，仍是 spec 驗收錨點）：「整份解析後不是物件（JSON 陣列或純量）時清除分槽 key 且不動獨立槽」、「分槽 key 不存在時視為空集合，不 warn 也不觸發清除」、「寫入與批次清除遇 localStorage 拋例外時不 throw，僅 warn」、「存取 localStorage 本身即拋例外（如 Firefox 私密模式）時安全降級」；並強化既有 it「SSR（無 window）時 read／write／clear 皆不寫入也不 throw」加入 `clearAllMatchSlots()` 斷言。
+   - 邊界檢查全數通過：`matchId` 空字串、槽內容為 `null`、SSR／私密模式、`QuotaExceededError`、清除範圍（三條清除路徑只碰 `MATCH_SLOTS_KEY` 或具名 `matchId`，無前綴掃描）。註解逐則檢視無重述函式名、無誤植 milestone 編號。
+   - 交件驗證：`match-slots.test.ts` 9 passed、`tsc --noEmit` exit 0、前端完整單元 **55 files / 419 tests** 全綠、ESLint exit 0。
+
+   **Stage 2 移交給 §3 的三項（MUST 寫進 §3 派工單）**：
+   1. **`hasLocalStorage()` 收斂的目標形態**：新增葉節點模組 `nextjs-pickball/lib/scoreboard/storage-keys.ts`，匯出 `hasLocalStorage()`（可一併收 `STORAGE_KEY` 與 `MATCH_SLOTS_KEY`），由 `storage.ts` 與 `match-slots.ts` **單向** import。
+      ❌ **不可**改成「`storage.ts` 匯出 `hasLocalStorage()` 給 `match-slots.ts` import」——§3 的核心工作正是讓 `storage.ts` import `match-slots.ts`（分派入口需要 `writeMatchSlot`），反向也成立就形成循環匯入；`lib/matchmaker/storage-keys.ts` 的頁首註解逐字記錄了同一個陷阱。
+      ❌ **不可**連 `lib/matchmaker/storage-keys.ts` 那份一起收——`lib/scoreboard/` SHALL NOT import `lib/matchmaker/`（Decision 2 單向相依），反向則會讓 matchmaker 的葉節點長出專案內部相依。
+      相容性：`STORAGE_KEY` 目前有三個外部匯入點（`lib/scoreboard/storage.test.ts`、`hooks/useScoreboardStore.test.tsx`、`lib/matchmaker/storage.test.ts`）。若 key 一併搬進葉節點，比照 `lib/matchmaker/storage.ts` 開頭的做法在 `storage.ts` 留一行 re-export，既有匯入點就不必改。
+      收斂後 MUST **至少保留一份**「存取 localStorage 本身即拋例外」的測試（`storage.test.ts` 與 `match-slots.test.ts` 現各有一份）。
+   2. **`writeMatchSlot` 的簽章收斂**（Stage 2 建議、leader 核可）：§2 讓 `ScoreboardState` 長出 `matchId` 之後，`writeMatchSlot(matchId, state)` 就有 `matchId !== state.matchId` 的靜默失效可能。§3 MUST 於其 REFACTOR 步驟收斂為由 `state.matchId` 推導（例如 `writeMatchSlot(state: ScoreboardState & { matchId: string })`），使 spec 的「寫入槽位 MUST 由 `state.matchId` 推導，SHALL NOT 由呼叫端另外傳入槽位參數」成為**結構上的必然**而非事後檢查。
+      —— 此為對下方命名契約的**已核可修訂**；§1 當下不可能做（`matchId` 欄位由 §2 才加入）。`readMatchSlot(matchId)` 與 `clearMatchSlots(matchIds)` **不變**（無 state 可推導）。
+   3. 非阻擋觀察（僅記錄，不需處理）：`__proto__` 作為 matchId 時該筆會靜默消失，但**不會**污染全域 `Object.prototype`（Stage 2 已實測），危害侷限且機率極低，不值得為此改用 `Object.create(null)`。
+
    **下一步（依序，SHALL NOT 跳過）**：
-   1. 補跑 **§1 Stage 2**（程式碼品質，opus），派工時 MUST 一併帶上上面那兩項移交事項。Stage 2 MUST 自行獨立再做一次 mutation 測試並回報存活數，**不採信 Implementer 的自述**（歷史命中率極高：先前 milestone 曾出現「做 9 次 9 次全存活、整段接線刪光仍全綠」）。
-   2. §1 通過 Stage 2 後才派 **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7，`lib/scoreboard/types.ts` 與 `reducer.ts`）。
+   1. ~~§1 Stage 2~~ **已完成，`PASS`**。
+   2. **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7，`lib/scoreboard/types.ts` 與 `reducer.ts`）。
    3. 之後依序 §3 → §4 → §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer**（execution-plan 明訂，本段任務高度集中在 `lib/scoreboard/` 與 `hooks/`，平行必然互撞）。
 
    **§1 Implementer 的自述事項（三項皆已由 Stage 1 裁決通過，此處僅留背景）**：
@@ -201,7 +219,8 @@
    - 1.9 REFACTOR 標註 skipped 的理由是 `hasLocalStorage()` 與 `lib/scoreboard/storage.ts` 重複、但該檔未匯出此函式且 §1 不得修改它。→ **這件事該在 §3 收掉**：§3 本來就要改 `storage.ts`，屆時應評估把 `hasLocalStorage()` 收斂為單一來源，而不是讓兩份長期並存。
 
    **§1 已固定的命名契約（§3～§6 會 import，續作者 MUST 沿用，不要改名）**：
-   `MATCH_SLOTS_KEY`、`MatchSlots`、`MatchSlotsSchema`、`ReadMatchSlotsResult`、`readMatchSlots()`、`readMatchSlot(matchId)`、`writeMatchSlot(matchId, state)`、`clearMatchSlots(matchIds)`、`clearAllMatchSlots()`。
+   `MATCH_SLOTS_KEY`、`MatchSlots`、`ReadMatchSlotsResult`、`readMatchSlots()`、`readMatchSlot(matchId)`、`writeMatchSlot(matchId, state)`、`clearMatchSlots(matchIds)`、`clearAllMatchSlots()`。
+   **兩處已核可的修訂**：① `MatchSlotsSchema` 經 Stage 2 判為 dead export 並移除（`a783873`），已自本清單刪除；② `writeMatchSlot` 的簽章將於 §3 收斂為由 `state.matchId` 推導（見上方「Stage 2 移交給 §3 的三項」第 2 點）。
    註記：`match-slots.ts` 是低階 map 操作層，以 `matchId` 為鍵是既定設計；spec 的「寫入槽位 MUST 由 `state.matchId` 推導」是針對 §3 要做的**對外分派入口** `storage.ts` 的 `writeScoreboard(state)`。reviewer **不應**因 `writeMatchSlot(matchId, state)` 帶參數而判不通過。
 
    **這一輪的坑與提醒**：
