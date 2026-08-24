@@ -642,3 +642,95 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
 
    **(g) 一次 flaky**：`--workers=4` 預設併發下曾出現一次失敗（dev-server 競爭），
    隔離重跑與 `--workers=2` 皆綠，與 repo 既有的 dev-server 緩慢紀錄一致。
+
+8. **§11 兩階段審查結果與 leader 的四項裁決（2026-08-24，退回當下的完整紀錄）。**
+
+   > 落盤理由同第 6、7 條。**本條記錄的是「退回當下」的狀態**；修正是否完成請以 tasks.md 的
+   > checkbox 與 git log 為準。
+
+   **審查狀態**：Stage 1（規格）**CHANGES_REQUESTED**（單一議題）；Stage 2（品質）
+   **CHANGES_REQUESTED**。**兩位 Reviewer 獨立收斂到同一個核心問題**（下方裁決 2）。
+
+   **兩位 Reviewer 都背書、不需修改的項目**（記錄以免後續重複爭論）：
+   `updatePlayer` port 來源正確（頁面層 `useRosterStore()`，hook 內部無呼叫）；`submitScore` 的
+   原子性正確（僅 `result.ok` 分支內動作）；新 `writeHistory` effect 的 `hasHydratedRef` 守門
+   **必要且正確**（Stage 2 實測移除守門會轉紅——三個 effect 的宣告序是 writeRound → writeHistory
+   → hydrate，mount 時若無守門會先用空陣列覆蓋 `matchmaker:history:v1`）；`submitError` 綁定
+   正確；`resting` 查表正確；Tailwind specificity 主張**數學上正確**（`[&_input]:h-11` 為 `(0,1,1)`
+   勝過 `.h-9` 的 `(0,1,0)`，`min-h-11` 更是不同屬性天然勝出；`[&_svg]:` pattern 在 `button.tsx`、
+   `dialog.tsx`、`select.tsx`、`table.tsx` 已有先例）；`pt-14` 是**修正既有 bug**（`/matchmaker/players`
+   原本一直壓在 fixed navbar 下，`app/quiz/page.tsx` 有逐字相同的先例，`player-roster` spec 全文
+   無版面條款，**不需列為 Modified capability**）；不種 `matchmaker:round:v1` **優於**派工單原本
+   要求（消滅了 Risks ① 的硬耦合，符合「能用 UI 產生的優先用 UI」）；`--workers=4` 的 flaky
+   **不該動測試檔**（config 已設 CI 單 worker、repo 無 `test.describe.configure` 先例、根因是
+   dev server 冷啟動）；兩輪 regression guard 的標註**誠實、不構成規避 TDD**
+   （`components/ui/button.tsx` 本就內建 `focus-visible:ring-*` 與原生 `disabled`，11.9 自然全綠）。
+
+   **(A) hooks 層的 12 個 mutation 存活 11 個**（Stage 2 獨立跑，控制組轉紅證明 harness 有效）：
+   `submitScore` 成功時不 dispatch／不呼叫 `updatePlayer`／失敗時仍套用／`playerPatches` 只套
+   第一筆／history 覆蓋而非 append／不更新 round／`resetIncompleteMatches` 成功時不 dispatch／
+   失敗時仍 dispatch／`writeHistory` effect 依賴陣列改 `[]`／整段 effect 刪除／`state.round === null`
+   防線移除。**唯一被守住的是「移除 `hasHydratedRef` 守門」**（由既有 hydration 測試擋下）。
+
+   **(B) E2E 的四條空／缺席斷言**（Stage 2 以閱讀＋推理找出，皆為「改壞實作後 14 個 test 全綠」）：
+   ① **`aria-current="page"` 零斷言**——把該行刪掉／永遠 `"page"`／反轉判定皆全綠，而這是 spec 的
+   MUST；② **「建立第一輪」從未被點過**——`onGenerate` 改成 no-op 或誤接 `handleReset` 皆全綠，
+   而 tasks 11.4 明訂它等同「產生本輪對戰」；③ **focus 樣式斷言是空的**——量測對象是
+   `variant="outline"` 按鈕，其 base class 本就含 `shadow-xs`，**未聚焦時 `boxShadow` 本來就不是
+   `"none"`**，把 `focus-visible:ring-*` 全砍光仍全綠；④ **完全沒有測到失敗路徑**——`roundError`
+   的 `role="alert"` 區塊與 `submitError?.matchId === match.id` 的**逐場次綁定**皆零覆蓋，
+   改成所有場地一起亮紅字仍全綠。
+
+   **(C) 三處逐字重複註解（慣例「不在兩處各寫一次同一句話」，本 change 第四次因此被退回）**：
+   `layout.tsx` ↔ `MatchmakerTabs.tsx`（連括號內的規範引用都一樣）；`page.tsx` ↔ `useRoundStore.ts`
+   （`page.tsx` 已寫「理由見該檔頂端註解」還把理由整段抄一次）；`match-stage.spec.ts` 檔頭 ↔
+   `seedRoster` 上方。另兩處 `§` 章節符號違規。註解密度：`layout.tsx` 41.2%、`MatchStage.tsx` 25.9%，
+   高於既有帶（`PlayerTile` 13.6%、`CourtCard` 13.2%、`RoundControls` 10.1%、`RestingPanel` 20.4%）。
+
+   ---
+
+   **leader 的四項裁決**
+
+   **裁決 1：可動檔案清單擴充三個既有檔。**
+   `hooks/useRoundStore.test.tsx`（**既有檔，M4 已 commit**——leader 派工單誤述它不存在；編輯它
+   不違反 Decision 3，該 Decision 禁止的是**新增**檔案）、`components/matchmaker/RoundControls.test.tsx`
+   （既有檔，理由見裁決 2）、`components/matchmaker/ScoreEntry.tsx`（**只改檔頭註解**）。
+
+   **裁決 2：「鎖定時方向鍵不得改變目標分數」的護欄改放 integration 層。**
+   兩位 Reviewer 獨立得出同一結論：E2E 那段**測不到** `RoundControls.tsx` 的 `if (locked) return;`
+   ——點擊「產生本輪對戰」後 focus 在 radiogroup **之外**（該按鈕是 radiogroup 容器的手足），
+   keydown 不會冒泡進 `handleTargetScoreKeyDown`；且鎖定時三顆 radio 全 `disabled`，鍵盤無法把
+   焦點放進容器。**裁決**：E2E 側刪掉該段並註解誠實記錄「鎖定時三顆皆 disabled，方向鍵在真實
+   鍵盤路徑上不可達」；integration 側在 `RoundControls.test.tsx` 以 `fireEvent.keyDown` **直接對
+   radiogroup 容器派發**（RTL 不受「disabled 元素不可聚焦」限制），補鎖定與未鎖定兩條對照。
+   這順帶補上 §7 完全缺席的鍵盤導覽 integration 覆蓋——§7 的 Stage 2 有三個變異
+   （`tabIndex` 全 0／全 -1、`if (locked) return;` 被刪、自寫索引計算取代 `nextRadioIndex`）
+   當初就是因「交由 §11 E2E」而存活。
+
+   **裁決 3：「主要按鈕」的範圍界定。**
+   spec 對「產生本輪對戰」的原文是「對戰頁 SHALL 提供『產生本輪對戰』**主要操作入口**」，
+   難以主張它不算主要按鈕。**「產生本輪對戰」與「重設／再排」MUST ≥44px（手機斷點），T11 的
+   量測陣列 MUST 擴充納入這兩顆。** 場地數加減（`size="icon-sm"`，32×32）與目標分數／對戰方式的
+   radio（`size="sm"`，32px）**本 change 不擴大範圍**——spec 的 MUST 對象是「比分欄位與主要按鈕」。
+   **此界定明文記錄於此，避免後續 review 再撞一次。**
+
+   **裁決 4：三項記為已知缺口、本 change 不處理。**
+   ① **`page.tsx` 未消費 `useRoundStore` 的 `droppedCount`**——`match-stage` spec 無此 Requirement；
+   M4 的「丟棄筆數大於 0 時 SHALL 對外回報」在 hook 邊界已滿足。留給 `matchmaker-history-page`。
+   （但 `useRoundStore.ts` 那段自稱「hook 是這條資訊通往 UI 的唯一路徑」的註解與現況不符，已要求
+   改為描述現況。）
+   ② **「重設／再排」的 E2E 零覆蓋**——由 hooks 層補測涵蓋，E2E 不加。
+   ③ **`round.matches` 為空時畫面無說明文字**——`round.ts` 已記載此狀態可達（重排時候選池不足），
+   觸發路徑為「單打 1 場地 2 人 → 產生回合 → 把其中一人設暫停 → 按重設／再排」。此時
+   `round !== null` 故不走 `EmptyStage`，畫面只剩休息名單。**非 spec 違規**（spec 的「SHALL NOT
+   建立空回合」作用對象是 `createRound`），且不是死路（「產生本輪對戰」仍可用）。
+
+   **(D) 其餘一併處理的建議項**：T8 的 `rating` 斷言由 `not.toBe(5)` 強化為方向斷言（勝方 `>5`、
+   敗方 `<5`，仍在契約內）並加 history 筆數斷言；`hasActivePlayers` 在 `page.tsx` 與 `MatchStage.tsx`
+   各推導一次，改以 prop 傳入（Decision 9）；`trackConsoleIssues` 只用在 T1（**沒種 roster** 的情境），
+   而 hydration mismatch 最可能發生在「`addInitScript` 種了 roster、SSR 輸出空名單」那條路徑，
+   應補到 T4、T8；`ScoreEntry.tsx` 檔頭補反向指標說明 44px 來自 `MatchStage` 的 `max-md` 覆寫。
+
+   > Stage 2 澄清一項派工單的誤述：**§8 的測試並沒有斷言 32／36px**（happy-dom 無排版引擎、
+   > 量不到高度），所以不存在「兩層被凍結在互相矛盾的數字上」；真正的風險只是 `CourtCard`／
+   > `ScoreEntry` 被重用時看不到 44px 保證的來源線索。
