@@ -169,3 +169,33 @@
    **已結案（實測）**：該入口是**純函式** `submitScore(input: SubmitScoreInput): SubmitScoreResult`，位於 `nextjs-pickball/lib/matchmaker/round.ts` 第 825 行，不負責持久化、可在單元層直接呼叫。因此 test-plan 的「回填與手動輸入的送出結果逐欄相同」維持 `unit` tier，§0.2 只需複核簽章即可。
 5. **對戰頁路由沒有可 import 的具名常數**（apply §0.4 實測，2026-08-24）。`match-stage` delta 要求「導向的對戰頁路由 MUST 取用 M5 既有的路由常數，SHALL NOT 另行寫死字串」，但 M5 實際只有 module-private 的 `MATCHMAKER_SECTION_HREFS`（`nextjs-pickball/lib/matchmaker/section-nav.ts` 第 13 行），未對外匯出。
    **處置**：不視為 execution-plan 所指的「上游契約不符」（缺欄位／缺型別）而停工——落差僅是「常數未匯出」，且同一份 delta 對 `TARGET_SCORE_OPTIONS` 已明文授權同一種補救（「若該 capability 只匯出型別而沒有可迭代的選項清單，MUST 於其模組補一個具名匯出再由本 capability 取用」）。本段於 `section-nav.ts` 補 `export const MATCHMAKER_ROUTE = "/matchmaker"` 並讓 `MATCHMAKER_SECTION_HREFS` 由它組成，行為零變更、既有測試不受影響。此為對 M5 檔案的**最小**改動，SHALL NOT 順手重構該模組的其他部分。
+
+6. **apply 階段於 §1 實作完成後暫停（2026-08-24，非設計問題，為使用者要求中斷）**——工作區乾淨、tasks.md **15／78** 勾選（§0 六項 + §1 九項）。基準線見 environment.md：hono-pickball 4 檔／16 測試、nextjs-pickball 54 檔／410 測試全綠，initial commit `3fefb029`。
+
+   **⚠️ 最重要的一條：§1 已實作但「兩階段審查皆未完成」。** Stage 1（Spec Reviewer, sonnet）已派出但在收到中斷指示時尚未回傳判定，該 subagent 已停止、**判定遺失**；Stage 2（Code-Quality Reviewer, opus）從未派出。續作者 MUST **重跑 §1 的 Stage 1 與 Stage 2**，SHALL NOT 因為「§1 的 task 都勾了」就當它已通過審查。
+
+   **已落盤的審查結論（leader 於中斷前親自完成的機械複驗，續作者可直接採信、不需重做）**：依 root `CLAUDE.md`「紅燈要是真的」，以 `git show <commit>^:<path>` 複驗 §1 的四次紅燈宣稱，**四次皆為真紅燈**，無任何一項需改標為 regression guard——
+   - `35551ad`（1.1 RED）：該 commit 樹內確認**不存在** `lib/scoreboard/match-slots.ts`，紅燈形式為 import 失敗，成立。
+   - `95bf96e`（1.3 RED）當下的實作快照同時證明了三件事：`readMatchSlots()` 用的是**整份** `MatchSlotsSchema.safeParse`（故 1.3「逐筆降級」必紅）、JSON 解析失敗路徑**沒有** `removeItem`（故 1.5「整份非 JSON 應清 key」必紅）、`clearMatchSlots()` 是帶 `void matchIds;` 的 **no-op stub**（故 1.7「批次清除」必紅）。三者皆為斷言失敗型真紅燈。
+
+   **下一步（依序，SHALL NOT 跳過）**：
+   1. 重跑 **§1 Stage 1**（spec 合規，sonnet）→ 通過後 **§1 Stage 2**（程式碼品質，opus）。Stage 2 MUST 自行獨立再做一次 mutation 測試並回報存活數，**不採信 Implementer 的自述**。
+   2. §1 通過後才派 **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7，`lib/scoreboard/types.ts` 與 `reducer.ts`）。
+   3. 之後依序 §3 → §4 → §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer**（execution-plan 明訂，本段任務高度集中在 `lib/scoreboard/` 與 `hooks/`，平行必然互撞）。
+
+   **留給 §1 兩位 reviewer 的待裁決事項**（Implementer 自述，leader 尚未裁決）：
+   - **test-plan 之外多寫了第 5 個 it**：`SSR（無 window）時 read／write／clear 皆不寫入也不 throw`。Implementer 的理由是交件前 mutation 自測時「拿掉 `hasLocalStorage()` 守門」是**唯一存活**的一項（happy-dom 恆有 `window.localStorage`，SSR 分支從未被觸發），補測試後同一 mutation 才轉紅。**Stage 1 MUST 明確裁決這是否構成 scope creep**（spec 未列 SSR Scenario，但 `storage.ts` 既有慣例含此守門）。
+   - **1.8 的分工偏離**：task 原文要 1.8 實作兩個函式，但 `clearAllMatchSlots()` 因 1.6 的「整份損壞清除路徑」需要而提前於 1.6 落地，1.8 實際只新增 `clearMatchSlots()`。已於 tasks.md 該項旁註明。
+   - **1.9 REFACTOR 標註 skipped**，理由是 `hasLocalStorage()` 與 `lib/scoreboard/storage.ts` 重複、但該檔未匯出此函式且 §1 不得修改它。→ **這件事該在 §3 收掉**：§3 本來就要改 `storage.ts`，屆時應評估把 `hasLocalStorage()` 收斂為單一來源，而不是讓兩份長期並存。
+
+   **§1 已固定的命名契約（§3～§6 會 import，續作者 MUST 沿用，不要改名）**：
+   `MATCH_SLOTS_KEY`、`MatchSlots`、`MatchSlotsSchema`、`ReadMatchSlotsResult`、`readMatchSlots()`、`readMatchSlot(matchId)`、`writeMatchSlot(matchId, state)`、`clearMatchSlots(matchIds)`、`clearAllMatchSlots()`。
+   註記：`match-slots.ts` 是低階 map 操作層，以 `matchId` 為鍵是既定設計；spec 的「寫入槽位 MUST 由 `state.matchId` 推導」是針對 §3 要做的**對外分派入口** `storage.ts` 的 `writeScoreboard(state)`。reviewer **不應**因 `writeMatchSlot(matchId, state)` 帶參數而判不通過。
+
+   **這一輪的坑與提醒**：
+   - **模型偏離（使用者硬性要求，非疏失）**：Implementer 一律用 `sonnet`，**不用** execution-plan 的預設 `haiku`。理由是先前 milestone 的 haiku 連續兩輪被退回（失效的假測試、複述式註解），每次退回要付一次 opus 審查成本，反而更貴。Spec Reviewer 用 `sonnet`，Code-Quality Reviewer 與 Final Reviewer 用 `opus`。**任何情況不得使用 `fable`，也不得省略 `model` 參數。**
+   - **派工單 MUST 逐字貼完整原文**（該組全部 task 原文、test-plan 列、觸及的 spec Requirement 全文、相關 design Decision），SHALL NOT 只給檔案路徑要 subagent 自己去讀——schema 的 Forbidden 明列此項。四個 capability 的 delta **不得**整包貼給同一位。
+   - **派工單 MUST 要求 Implementer 交件前自己先跑一輪 mutation 測試**並列出「做了幾次、每次改什麼、是否轉紅」，有存活就先補斷言再交件。§1 這樣做確實在交件前就抓出一個存活項（見上），值得延續。
+   - **單檔測試 `--run` 前不可加 `--`**：`test -- --run <path>` 會讓 vitest 收不到路徑而跑完整套，紅燈證據會被既有綠燈淹沒。
+   - **E2E 一律帶 `--workers=1`**（§7、§8 會用到）。預設併發下本機不穩定，先前實測三次每次失敗集合都不同，根因是 Turbopack dev 的延遲 chunk 競態。
+   - **每一組做完就立刻 commit，不要囤積**——審查結論只存在 leader 的脈絡裡，一旦中斷就永久遺失（這正是本項存在的理由）。
