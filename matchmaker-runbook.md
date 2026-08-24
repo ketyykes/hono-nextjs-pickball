@@ -25,32 +25,63 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
 | Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
 | Base | `main` @ `3fefb02` |
-| 進度 | **15/78 勾選、13 個 commit**，工作區乾淨（`git status --short` 為空） |
-| 已完成 | §0 上游契約對齊、§1 分槽儲存（`lib/scoreboard/match-slots.ts`）**但 §1 只過 Stage 1** |
-| 中斷於 | §2 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`），未派工 |
+| 進度 | **15/78 勾選、17 個 commit**，工作區乾淨（`git status --short` 為空） |
+| 已完成 | §0 上游契約對齊、**§1 分槽儲存已正式結案**（實作 + Stage 1 `PASS` + Stage 2 `PASS`） |
+| 中斷於 | **§2 綁定欄位與 reducer 鎖定，乾淨的未開始狀態**（曾派工後隨即召回，0 檔案異動、0 commit） |
+| 跑過幾棒 | **兩棒**。第一棒做到 §1 實作完成；第二棒補跑 §1 的 Stage 2 |
 
-## ⚠️ 續跑第一件事：補跑 §1 的 Stage 2（不是開 §2）
+## ▶️ 續跑起點：§2 綁定欄位與 reducer 鎖定
 
-**§1 的 task 雖然全勾了，但只跑完 Stage 1（`PASS`），Stage 2 品質審查完全沒跑。**
-接手 leader MUST 先派一位 **opus** Stage 2 Reviewer 補審 §1，**不必重跑 Stage 1**。
-勾選數看起來完整會誤導人以為 §1 已結案——它沒有。
+**§1 已完全結案，不必再碰。** 接手 leader 直接從 §2 開始。
+先讀 `design.md` 的 `## Open Questions` **第 6、7 項**（兩棒的完整交接），
+再讀 `tasks.md` 勾選狀態與 `git log main..HEAD` 對齊現況。
 
-Stage 1 已經移交兩項實質發現給 Stage 2（**coordinator 已獨立複驗，屬實**）：
+### §1 Stage 2 判定 `PASS`，但過程值得記住
 
-1. **`MatchSlotsSchema` 是 dead export。** 實測全 workspace 只有兩處出現——
-   `lib/scoreboard/match-slots.ts:9` 的定義本身，以及 `:30` 一句「刻意不整份丟給
-   `MatchSlotsSchema`」的**註解**。改成逐筆 `safeParse` 之後就沒有呼叫點了。
-   Stage 2 若判定移除，**§3～§6 的命名契約要同步改**（leader 已把該契約固定下來發給後續群組）。
-2. **`hasLocalStorage()` 實際上是三份不是兩份**（leader 只說了兩份）：
-   - `lib/matchmaker/storage-keys.ts:16`（**有 export**）
-   - `lib/scoreboard/storage.ts:7`（module-private，既有）
-   - `lib/scoreboard/match-slots.ts:17`（module-private，**§1 新增的**）
-   §1 因不得改 `storage.ts` 而 skip 掉收斂，**應在 §3 收掉 `lib/scoreboard/` 那兩份**
-   （§3 本來就要動 `storage.ts`）。
+**Stage 2 獨立跑 27 次 mutation，原狀 9 次存活**——而 Implementer 自述是「6 次、1 存活」。
+補完斷言後 27/27 全數轉紅。**這是「Stage 2 不得採信 Implementer 自述」這條規則的第六次實證。**
 
-分支上的 commit（新到舊，13 筆）：
+最嚴重的一項：`readMatchSlots()` 的「**解析成功但不是物件**」分支**零覆蓋**。
+既有測試用 `"{{{"`，那會在 `JSON.parse` 就拋錯而走 catch 分支，
+所以 `Array.isArray(parsed)` 這道 guard 從未被執行過——拿掉它、整段刪除、
+或改成只 warn 不清除，測試全部照樣綠。而 spec 逐字寫著
+「不是合法 JSON（**或解析後不是物件**）」，`"[]"` 這類 JSON 陣列正是該 guard 存在的唯一理由。
+
+其餘存活缺口：`clearAllMatchSlots()` 的 SSR 守門、`writeMatchSlot`／`clearMatchSlots`
+的 `console.warn`、`raw === null` 早退、`hasLocalStorage()` 的 try/catch。
+補了 4 個新 it、強化 1 個既有 it，**既有五個 it 名稱未動**（仍是 spec 驗收錨點）。
+
+### 三項移交裁決的結果
+
+1. **`MatchSlotsSchema` → 移除**（commit `a783873`，coordinator 已複驗全庫零殘留）。
+   Stage 2 的理由值得引用：「留著一個具名、已匯出、看起來完全正確的整份 schema，
+   等於在陷阱旁邊放一塊寫著『請勿使用』的牌子」——§3 接線時最自然的動作就是順手改用它，
+   而那正是 design Decision 4 明文否決的連坐失效模式。**命名契約已同步更新。**
+2. **`console.warn` 措辭 → 維持現狀。** 依 execution-plan Escalation
+   「風格爭議時既有 codebase 風格勝出」；實測現況幾乎是既有訊息的逐字改寫。
+3. **`hasLocalStorage()` 三份收斂 → 已完整寫進 §3 的派工指示**，含目標形態
+   （**新增葉節點 `lib/scoreboard/storage-keys.ts`**）與兩個被否決做法的理由：
+   讓 `storage.ts` 匯出會與 §3 的 `storage.ts → match-slots.ts` 形成**循環匯入**；
+   連 matchmaker 那份一起收會違反 design Decision 2 的單向相依。
+
+### §2 開工前就該知道的兩件事（第二棒已實測定位，非推測）
+
+1. **`matchId` 變必填後，`lib/scoreboard/rules.test.ts` 會有四處 tsc 失敗**——
+   coordinator 已複驗：第 5 行 `singlesInitial()`、第 83 行 `doublesPlaying()`、
+   第 145 與 164 行兩個 inline 字面量，各補一行 `matchId: null` 即可。
+   `reducer.test.ts` **不會**炸（12 處都以 `{ ...createInitialState() }` 為基底）。
+   因此 §2 的可改檔案清單由四個擴為五個，**`rules.test.ts` 僅限機械性補 `matchId: null`**。
+2. **`writeMatchSlot(matchId, state)` 的簽章收斂已核可，但延到 §3 做。**
+   §2 讓 state 長出 `matchId` 之後就有 `matchId !== state.matchId` 的靜默失效可能，
+   應收斂為由 `state.matchId` 推導。§1 當下做不到（欄位還不存在）。
+
+分支上的 commit（新到舊，17 筆）：
 
 ```
+1703843 docs(...): 落盤 §1 審查完成後的中斷狀態          ← 第二棒
+a94d63e docs(...): 落盤 §1 Stage 2 審查判定並修訂命名契約   ← 第二棒
+4a885ab test(scoreboard): 補分槽儲存五處 mutation 存活缺口的斷言  ← 第二棒
+a783873 refactor(scoreboard): 移除分槽儲存的 dead export MatchSlotsSchema  ← 第二棒
 4164608 docs(...): 補落盤 §1 Stage 1 審查判定
 d74ac4a docs(...): 落盤 §1 完成後的中斷狀態
 4ef61ad test(scoreboard): 補分槽 SSR 守門的 mutation 偵測缺口
@@ -65,6 +96,10 @@ faebeed docs(...): 標註 §1.9 REFACTOR 為 skipped
 35551ad test(scoreboard): 新增分槽寫入互不覆蓋的失敗測試
 bab6f19 docs(...): 完成 §0 上游契約對齊並回填 environment 基準
 ```
+
+⚠️ **分支基底停在 `3fefb02`，而 `main` 已前進四個 commit**
+（`f0bf406`、`a395174`、`36cb52d`、`7087508`）。四個都是 docs-only
+（M6 中斷點紀錄與 runbook 整理），**無程式碼衝突風險**，未做 rebase。
 
 ### 一個待裁決的判斷（leader 主動標記「若不同意可推翻」）
 
@@ -92,26 +127,29 @@ Baseline（§0 回填進 `environment.md`，已驗證與 coordinator 在 `main` 
 前端 54 檔／410 測試、後端 4 檔／16 測試全綠，`Initial commit hash` = `3fefb02`。
 
 中斷當下的分支狀態（**coordinator 獨立實跑，非採信回報**）：
-`pnpm test` → 前端 **55 檔／415 測試**（較 baseline +1 檔 +5 測試，無迴歸）、
-後端 4 檔／16 測試，exit 0；`pnpm -r exec tsc --noEmit` → exit 0。
-E2E 與 lint 未跑（§7 之前不需要）。
+`pnpm --filter ./nextjs-pickball test --run` → **55 檔／419 測試**全綠
+（baseline 54／410，即 +1 檔 +9 測試，無迴歸）；後端 4 檔／16；
+`pnpm -r exec tsc --noEmit` → exit 0。E2E 與 lint 未跑（§7 之前不需要）。
 
-紅燈誠信：§1 的四次紅燈宣稱，leader 都用 `git show <commit>^:<path>` 機械複驗過，
+紅燈誠信：§1 的四次紅燈宣稱，第一棒都用 `git show <commit>^:<path>` 機械複驗過，
 **四次皆為真紅燈**，§1 無任何一項需標為 regression guard。
-Implementer 交件前自跑 6 次 mutation、1 次存活（拿掉 `hasLocalStorage()` 守門仍全綠，
-因 happy-dom 恆有 `window`），交件前已補測試堵掉——就是 commit `4ef61ad`。
-**這證明「Implementer 自測 mutation」這條規則有實效，但不取代 Stage 2 的獨立複測。**
 
-**續跑方式**：worktree 已存在且乾淨，**不要重開**。派一位 opus leader，
-prompt 用下方模板加上：① 先讀 `design.md` 的 `## Open Questions` 取得中斷狀態；
-② 先讀 `tasks.md` 勾選狀態與 `git log main..HEAD` 對齊現況；③ 接續點為 §2。
+**續跑方式**：worktree 已存在且乾淨，**不要重開、不要重跑 `pnpm install`、
+不要重建 baseline**。派一位 opus leader，接續點為 **§2**（§1 已結案）。
 
-### 這一輪跑下來確認有效的做法（續跑時保留）
+### 這兩棒跑下來確認有效的做法（續跑時保留）
 
 - **編輯器診斷在 worktree 內大量謊報**（整批 `Cannot find module 'react'` 之類）。
   一律以 `pnpm -r exec tsc --noEmit` 的 exit code 為準，本輪實測 exit 0。
   唯一可信的例外是「單一新檔的單一 import 解不到」——那是 TDD 紅燈，是真的。
-- Implementer 交件前自跑 mutation 已見效：`4ef61ad` 就是補上 SSR 守門的偵測缺口。
+- **Implementer 自測 mutation 有效，但遠遠不夠。** §1 的對照極清楚：
+  Implementer 自測 6 次找到 1 個存活；Stage 2 獨立測 27 次找到 **9** 個。
+  自測抓到的是「自己想得到的那種」，抓不到的正是自己的盲點。
+  **兩層都要，不能省任何一層。**
+- **授權 Stage 2 直接動手改小東西。** 第二棒在派工單裡明文授權：
+  dead export 若判定移除就直接改好、mutation 存活項自行補斷言。
+  這偏離 execution-plan 對 reviewer 的純審查定位，但省下一輪派工成本，
+  且改動範圍極小、可驗證。**建議延用，但要求在回報的「偏離」欄如實記載。**
 
 ### M5 合併後的 `main` 品質基線（coordinator 獨立實測，非採信回報）
 
