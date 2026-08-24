@@ -126,9 +126,24 @@ Depends on: §4, §5, §6
 
 ## 9. RestingPanel 元件
 
-- [ ] 9.1 RED: 新增 `nextjs-pickball/components/matchmaker/RestingPanel.test.tsx`，寫入兩個 it：「休息名單顯示姓名顏色標記與累計休息次數」、「休息名單為空時區分本輪全員出場與全員暫停出場兩種文案」（兩段文案 MUST 不相等——分配引擎不把暫停者列入休息名單，兩種情況的資料完全相同，只有這條測試能分辨）。確認紅燈
-- [ ] 9.2 GREEN: 實作 `RestingPanel.tsx`：每筆顯示姓名、帶該員漸層的顏色標記與「休息 N 次」；空狀態依 `hasActivePlayers` 分流為兩段文案
-- [ ] 9.3 REFACTOR: 顏色標記重用 `playerTileStyle`（§5）而非另寫一份漸層字串；確認元件不含任何排序或篩選邏輯（休息名單的內容由分配引擎決定）
+- [x] 9.1 RED: 新增 `nextjs-pickball/components/matchmaker/RestingPanel.test.tsx`，寫入兩個 it：「休息名單顯示姓名顏色標記與累計休息次數」、「休息名單為空時區分本輪全員出場與全員暫停出場兩種文案」（兩段文案 MUST 不相等——分配引擎不把暫停者列入休息名單，兩種情況的資料完全相同，只有這條測試能分辨）。確認紅燈
+      - 兩個 it 於實作前皆為**真紅燈**（模組不存在）。
+      - 兩段文案除了「不相等」之外**各自釘住絕對值**（「本輪全員出場」／「目前沒有任何可出場的參賽者（全員暫停出場）」），並互相斷言對方文案不得出現——只驗不相等的話，把兩段都改成別的字仍會通過。
+      - **兩階段審查都退回，且兩位 Reviewer 獨立指出同一個問題**：Implementer 在 mutation 自檢時，為了殺死「元件內加入 `resting.filter((p) => p.isActive)`」這個變異，把測試資料中第二位休息者改成 `isActive: false`。但 `match-allocation` 的 spec 明文「暫停出場者……**也不出現在休息名單**」，`candidates.ts` 的 `selectPlaying` 先 `filter((p) => p.isActive)` 再 slice，`resting` 在結構上**不可能**含暫停者——那是不可達狀態，等於為了殺一個契約外的變異而承諾 spec 沒要求的行為。已還原為 `isActive: true`，該變異**恢復存活且刻意不殺**（契約下的等價變異）。
+        **這是本 change 第二次踩到同一顆地雷**（§6 同因被退回）。判準：補斷言前先自問「這個變異在合法輸入下可不可能發生」。
+      - Stage 2 的 43 次 mutation 有 **4 個非等價、且對應真實可達生產狀態的變異存活**，三個根因皆為測試資料的邊界覆蓋不足：
+        ① **無單人休息的案例**——空狀態門檻改成 `resting.length < 2` 仍全綠，單人名單被整個吞掉卻顯示「本輪全員出場」。奇數可出場人數必然產生單人休息（3 人單打 1 場地）。
+        ② **無 `restCount === 0` 的休息者**——`filter(restCount > 0)` 與「`restCount > 0` 才顯示數字」兩個變異存活。**第一輪休息名單全員 `restCount` 恆為 0**（`round.ts` 的 `createRound` 只結算「上一輪」休息者），這是必然狀態而非理論邊界。
+        ③ **測試資料的清單順序與排序鍵單調同向**——原 fixture 的 `restCount` 為 2 → 5，恰好已遞增排好，`sort((a,b) => a.restCount - b.restCount)` 無法轉紅；且分配引擎的真實輸出是 **`restCount` 遞減**（`candidates.ts` 的 `compareCandidates` 為 `b.restCount - a.restCount`），原 fixture 方向與真實資料相反。
+        已把測試資料改為**三筆、`restCount` 為 5／0／3**（清單順序上兩個方向皆非單調），並補單人渲染的案例。**leader 機械複驗 10 個非等價變異全數轉紅、`filter(isActive)` 如預期存活**，還原後逐位元組相同。
+      - **上述補強的斷言一律於實作完成後才寫，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+- [x] 9.2 GREEN: 實作 `RestingPanel.tsx`：每筆顯示姓名、帶該員漸層的顏色標記與「休息 N 次」；空狀態依 `hasActivePlayers` 分流為兩段文案
+      - 顏色標記為純裝飾的空 `<span>`，帶 `aria-hidden`（姓名與「休息 N 次」的文字才是主要資訊；讀屏本來就讀不到顏色，資訊零損失）。做法與 `PlayerTile.tsx`、`EmptyRoster.tsx` 對裝飾元素的既有慣例一致。
+- [x] 9.3 REFACTOR: 顏色標記重用 `playerTileStyle`（§5）而非另寫一份漸層字串；確認元件不含任何排序或篩選邏輯（休息名單的內容由分配引擎決定）
+      - `grep` 機械確認：無 `linear-gradient` 字面量、無 `.sort(`／`.filter(`／`.slice(`、無 `players.find` 之類的 id 查表、未 import `hooks/` 或 `round.ts`。
+      - 顏色標記**展開完整的 `playerTileStyle` 回傳物件**（`style={{ ...style }}`）而非只取 `background`：只取 `background` 會讓 `completed` 誤傳在 DOM 上完全不可觀察（實測 `completed: true` 在完整展開下轉紅、只取 `background` 時存活），且違反「元件不得對 `playerTileStyle` 的回傳值做挑選」的一致性。
+      - Stage 2 另要求精簡註解：同一句「休息名單不對應任何場次，`completed` 恆傳 `false`」原本在檔內相距 11 行寫了兩次（§4、§6 被退回的同一條慣例），已合併；`{...style}` 的辯護由 5 行壓到 2 行（原註解密度約 29%，對照 `PlayerTile.tsx` 約 15%、`CourtCard.tsx` 約 18%）。
+      - leader 裁決放行的一項：測試註解中的「（tasks 9.3）」引用形式。既有 codebase 大量存在此形式（`pairing.ts`、`allocation.ts`、`types.ts`、`round-types.ts`、`duplication.test.ts`），依「風格分歧時既有 codebase 風格勝出」放行；派工單禁止的是「§9」這種 openspec 章節符號。
 
 ## 10. SiteNavbar 新增第 5 條連結
 
