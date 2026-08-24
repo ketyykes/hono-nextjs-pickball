@@ -22,13 +22,34 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
 | Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
 | Base | `main` @ `3fefb02` |
-| 進度 | **15/78 勾選、11 個 commit**，工作區乾淨（`git status --short` 為空） |
-| 已完成 | §0 上游契約對齊、§1 分槽儲存（`lib/scoreboard/match-slots.ts`） |
-| 中斷於 | §2 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`） |
+| 進度 | **15/78 勾選、13 個 commit**，工作區乾淨（`git status --short` 為空） |
+| 已完成 | §0 上游契約對齊、§1 分槽儲存（`lib/scoreboard/match-slots.ts`）**但 §1 只過 Stage 1** |
+| 中斷於 | §2 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`），未派工 |
 
-分支上的 commit（新到舊）：
+## ⚠️ 續跑第一件事：補跑 §1 的 Stage 2（不是開 §2）
+
+**§1 的 task 雖然全勾了，但只跑完 Stage 1（`PASS`），Stage 2 品質審查完全沒跑。**
+接手 leader MUST 先派一位 **opus** Stage 2 Reviewer 補審 §1，**不必重跑 Stage 1**。
+勾選數看起來完整會誤導人以為 §1 已結案——它沒有。
+
+Stage 1 已經移交兩項實質發現給 Stage 2（**coordinator 已獨立複驗，屬實**）：
+
+1. **`MatchSlotsSchema` 是 dead export。** 實測全 workspace 只有兩處出現——
+   `lib/scoreboard/match-slots.ts:9` 的定義本身，以及 `:30` 一句「刻意不整份丟給
+   `MatchSlotsSchema`」的**註解**。改成逐筆 `safeParse` 之後就沒有呼叫點了。
+   Stage 2 若判定移除，**§3～§6 的命名契約要同步改**（leader 已把該契約固定下來發給後續群組）。
+2. **`hasLocalStorage()` 實際上是三份不是兩份**（leader 只說了兩份）：
+   - `lib/matchmaker/storage-keys.ts:16`（**有 export**）
+   - `lib/scoreboard/storage.ts:7`（module-private，既有）
+   - `lib/scoreboard/match-slots.ts:17`（module-private，**§1 新增的**）
+   §1 因不得改 `storage.ts` 而 skip 掉收斂，**應在 §3 收掉 `lib/scoreboard/` 那兩份**
+   （§3 本來就要動 `storage.ts`）。
+
+分支上的 commit（新到舊，13 筆）：
 
 ```
+4164608 docs(...): 補落盤 §1 Stage 1 審查判定
+d74ac4a docs(...): 落盤 §1 完成後的中斷狀態
 4ef61ad test(scoreboard): 補分槽 SSR 守門的 mutation 偵測缺口
 faebeed docs(...): 標註 §1.9 REFACTOR 為 skipped
 6b88de0 feat(scoreboard): 實作分槽批次清除
@@ -42,12 +63,40 @@ faebeed docs(...): 標註 §1.9 REFACTOR 為 skipped
 bab6f19 docs(...): 完成 §0 上游契約對齊並回填 environment 基準
 ```
 
+### 一個待裁決的判斷（leader 主動標記「若不同意可推翻」）
+
+§0.4 發現**M5 沒有可 import 的 `/matchmaker` 路由常數**——
+`lib/matchmaker/section-nav.ts:13` 的 `MATCHMAKER_SECTION_HREFS` 是
+`const` 而**非** `export const`（coordinator 已複驗屬實）。
+M6 的「返回對戰」按鈕需要這個路由。leader 判定這不到 execution-plan
+「上游契約不符即停工」的門檻（缺的是匯出而非欄位／型別），未停工，記入 Open Question 5。
+
+**coordinator 裁決：同意不停工。** 但接手者要知道兩個選項的代價：
+
+- **把第 13 行改成 `export const`** → 該行**與 M7／M8 必衝突**（它們正是要在同一行的陣列裡
+  加分頁）。衝突好解（`export` 與新分頁兩者都留），但要記得。
+- **M6 自己定一個路由常數** → 零衝突，但製造第二個真相來源，
+  而那個路由 M7／M8 馬上要動。
+
+兩個都可接受，由 §2 的 leader 或 Stage 2 定案並記入 design.md。
+
 **這位 leader 的 commit 粒度是逐 task（`test:` 一個、`feat:` 一個），比 runbook 要求的
 「一組一 commit」更細——這是好事，每次紅燈都獨立留在版控裡，接手者可以直接用
 `git show <commit>^:<path>` 機械複驗，不必採信任何回報。**
 
 Baseline（§0 回填進 `environment.md`，已驗證與 coordinator 在 `main` 上的實測一致）：
 前端 54 檔／410 測試、後端 4 檔／16 測試全綠，`Initial commit hash` = `3fefb02`。
+
+中斷當下的分支狀態（**coordinator 獨立實跑，非採信回報**）：
+`pnpm test` → 前端 **55 檔／415 測試**（較 baseline +1 檔 +5 測試，無迴歸）、
+後端 4 檔／16 測試，exit 0；`pnpm -r exec tsc --noEmit` → exit 0。
+E2E 與 lint 未跑（§7 之前不需要）。
+
+紅燈誠信：§1 的四次紅燈宣稱，leader 都用 `git show <commit>^:<path>` 機械複驗過，
+**四次皆為真紅燈**，§1 無任何一項需標為 regression guard。
+Implementer 交件前自跑 6 次 mutation、1 次存活（拿掉 `hasLocalStorage()` 守門仍全綠，
+因 happy-dom 恆有 `window`），交件前已補測試堵掉——就是 commit `4ef61ad`。
+**這證明「Implementer 自測 mutation」這條規則有實效，但不取代 Stage 2 的獨立複測。**
 
 **續跑方式**：worktree 已存在且乾淨，**不要重開**。派一位 opus leader，
 prompt 用下方模板加上：① 先讀 `design.md` 的 `## Open Questions` 取得中斷狀態；
