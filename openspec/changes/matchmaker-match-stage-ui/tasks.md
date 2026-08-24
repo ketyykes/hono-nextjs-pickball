@@ -173,17 +173,39 @@ Depends on: §4, §5, §6
 
 Depends on: §2, §3, §4, §5, §6, §7, §8, §9, §10
 
-- [ ] 11.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，寫入三個 test：「對戰頁可經 /matchmaker 開啟並顯示場次舞台」、「區段導覽可在對戰頁與參賽者名單頁之間來回切換」、「從首頁點擊 Navbar 的對戰分配連結進入對戰頁」。確認紅燈（`/matchmaker` 目前為 404，見 1.5）
-- [ ] 11.2 GREEN: 新增 `app/matchmaker/layout.tsx`（掛 `MatchmakerTabs`，分頁資料來自 §2 的 `matchmakerSectionTabs`，目前分頁帶 `aria-current="page"`）與 `app/matchmaker/page.tsx` 骨架（`"use client"`，此檔為**唯一** import M4 store 之處，design Decision 9）
-- [ ] 11.3 RED: 補三個 test：「有可出場參賽者但尚無回合時顯示空白球場與建立第一輪入口」、「名單為空時空白狀態提供前往參賽者名單的入口」、「空白狀態不顯示任何球員色塊或比分欄位」。種入 `matchmaker:roster:v1` 的方式沿用既有 `player-roster.spec.ts` 的 `addInitScript`。確認紅燈
-- [ ] 11.4 GREEN: 實作 `EmptyStage.tsx` 並於 `page.tsx` 依「有無回合」與「有無可出場參賽者」兩個條件分流入口
-- [ ] 11.5 RED: 補兩個 test：「單打場地為兩個接近正方形的色塊且左右排列」（量測 boundingBox 寬高比 0.85～1.15、垂直中心相同）、「完成一輪：產生本輪對戰後手動輸入比分並送出使場次進入完成狀態」（全程走 UI，不種回合資料）。確認紅燈
-- [ ] 11.6 GREEN: 實作 `MatchStage.tsx`（場次網格 + 休息名單）並於 `page.tsx` 接上 M4 的產生／重排／送出 pipeline；種資料 helper 集中一處並註明「格式來源為 M4 的 `matchmaker:round:v1`，改動請同步」（design Risks）
-- [ ] 11.7 RED: 補三個 test：「桌面斷點場地內容與休息名單左右並排」、「平板斷點休息名單移至場地內容下方」、「手機斷點觸控目標不小於 44px 且不橫向溢出」。確認紅燈
-- [ ] 11.8 GREEN: 實作 RWD 三斷點版面：桌面 `lg` 起左右並排、平板單欄且休息名單下移、手機單欄；比分欄位與按鈕的觸控目標 ≥44px
-- [ ] 11.9 RED: 補三個 test：「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」、「主要按鈕可由鍵盤聚焦並顯示 focus 樣式，停用者帶 disabled 屬性」、「對戰頁所有互動控制皆具備可存取名稱」。確認紅燈
-- [ ] 11.10 GREEN: 補齊無障礙缺口：圖示按鈕補 `aria-label`、focus 樣式可見、disabled 以屬性表達
-- [ ] 11.11 REFACTOR: 以 `grep` **機械確認**（不靠印象）—— ① 對 M4 store 的 import 只出現在 `app/matchmaker/page.tsx`；② `git diff --stat` 顯示 `hooks/` 目錄零新增檔案（design Decision 3）；③ 元件的 props 命名一致（一律 `onXxx`）
+> **§11 的完整審查紀錄（兩階段退回的原因、mutation 明細、四項 leader 裁決、被判定為已知缺口
+> 而不處理的項目）見 design.md Open Questions 第 7、8 條。** 本節只記結論。
+
+- [x] 11.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，寫入三個 test：「對戰頁可經 /matchmaker 開啟並顯示場次舞台」、「區段導覽可在對戰頁與參賽者名單頁之間來回切換」、「從首頁點擊 Navbar 的對戰分配連結進入對戰頁」。確認紅燈（`/matchmaker` 目前為 404，見 1.5）
+      - **真紅燈**（`/matchmaker` 為 404、`match-stage-region` 找不到、nav 找不到）。
+- [x] 11.2 GREEN: 新增 `app/matchmaker/layout.tsx`（掛 `MatchmakerTabs`，分頁資料來自 §2 的 `matchmakerSectionTabs`，目前分頁帶 `aria-current="page"`）與 `app/matchmaker/page.tsx` 骨架（`"use client"`，此檔為**唯一** import M4 store 之處，design Decision 9）
+      - `layout.tsx` 另加 `pt-14` 補償 fixed navbar——`/matchmaker/players` 原本沒有、一直壓在 navbar 下，屬引入共用 layout 帶來的**既有 bug 修正**（`app/quiz/page.tsx` 有逐字相同的先例）。兩位 Reviewer 皆確認**不需列 `player-roster` 為 Modified capability**（該 spec 全文無版面條款）。
+- [x] 11.3 RED: 補三個 test：「有可出場參賽者但尚無回合時顯示空白球場與建立第一輪入口」、「名單為空時空白狀態提供前往參賽者名單的入口」、「空白狀態不顯示任何球員色塊或比分欄位」。種入 `matchmaker:roster:v1` 的方式沿用既有 `player-roster.spec.ts` 的 `addInitScript`。確認紅燈
+      - **真紅燈**（`empty-stage` testid 三條皆找不到）。
+      - tasks 此處有一處事實不精確：`player-roster.spec.ts` **並未**使用 `addInitScript`，而是 `goto("/")` + `evaluate` 的 `removeItem`（它只**清**資料、從不**種**資料）。本組改用 `page.addInitScript`（先例在 `scoreboard.spec.ts`），理由是要在首次 hydration 前就備妥資料。
+- [x] 11.4 GREEN: 實作 `EmptyStage.tsx` 並於 `page.tsx` 依「有無回合」與「有無可出場參賽者」兩個條件分流入口
+- [x] 11.5 RED: 補兩個 test：「單打場地為兩個接近正方形的色塊且左右排列」（量測 boundingBox 寬高比 0.85～1.15、垂直中心相同）、「完成一輪：產生本輪對戰後手動輸入比分並送出使場次進入完成狀態」（全程走 UI，不種回合資料）。確認紅燈
+      - **真紅燈**（0 個色塊、score-label 找不到）。
+- [x] 11.6 GREEN: 實作 `MatchStage.tsx`（場次網格 + 休息名單）並於 `page.tsx` 接上 M4 的產生／重排／送出 pipeline；種資料 helper 集中一處並註明「格式來源為 M4 的 `matchmaker:round:v1`，改動請同步」（design Risks）
+      - **完全沒有種入 `matchmaker:round:v1`**：含「2 場對戰」「目標分數已鎖定」在內的每個情境都能用 UI 達成，因此不需要回合資料的 helper，也**徹底消滅了 design Risks ①「E2E 種入 `matchmaker:round:v1` 是對 M4 內部格式的硬耦合」這個風險**。tasks 此處的 helper 要求是 conditional（有種資料才需要），design Risks 亦明說「能用 UI 產生的優先用 UI」。**兩位 Reviewer 皆明確背書此偏離優於 tasks 字面要求。**
+      - `submitScore` 依 §8 交接傳**原字串**、不做 `Number()` 轉換。
+- [x] 11.7 RED: 補三個 test：「桌面斷點場地內容與休息名單左右並排」、「平板斷點休息名單移至場地內容下方」、「手機斷點觸控目標不小於 44px 且不橫向溢出」。確認紅燈
+      - **regression guard，非真紅燈**：RWD 版面在 11.6 的 GREEN 就一併做完（同一個元件的版面決策），三個 test 寫入即綠、零程式碼改動。Stage 1 獨立判定此標註**誠實、不構成規避 TDD**。
+- [x] 11.8 GREEN: 實作 RWD 三斷點版面：桌面 `lg` 起左右並排、平板單欄且休息名單下移、手機單欄；比分欄位與按鈕的觸控目標 ≥44px
+      - 手機觸控目標以 `MatchStage.tsx` 的 `max-md:[&_input]:h-11 max-md:[&_button]:min-h-11` 後代選擇器覆寫 `CourtCard`／`ScoreEntry` 的 `h-8`／`h-9`（specificity `(0,1,1)` 勝 `(0,1,0)`，Stage 2 已獨立驗證；`min-h-11` 更是不同屬性天然勝出）。`ScoreEntry.tsx` 檔頭已補反向指標說明 44px 保證來自消費端。
+      - **leader 裁決的「主要按鈕」範圍**：「產生本輪對戰」與「重設／再排」MUST ≥44px（spec 原文稱前者為「主要操作入口」），已納入覆寫與 E2E 量測；場地數加減（`icon-sm`，32×32）與目標分數／對戰方式的 radio（`sm`，32px）**本 change 不擴大範圍**——spec 的 MUST 對象是「比分欄位與主要按鈕」。**此界定明文記錄，避免後續 review 再撞一次。**
+- [x] 11.9 RED: 補三個 test：「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」、「主要按鈕可由鍵盤聚焦並顯示 focus 樣式，停用者帶 disabled 屬性」、「對戰頁所有互動控制皆具備可存取名稱」。確認紅燈
+      - **regression guard，非真紅燈**：`components/ui/button.tsx` 本就內建 `focus-visible:ring-ring/50 focus-visible:ring-[3px]` 與原生 `disabled`，§7～§9 也已把 roving tabindex 與 `aria-label` 做對，三個 test 寫入即綠。
+- [x] 11.10 GREEN: 補齊無障礙缺口：圖示按鈕補 `aria-label`、focus 樣式可見、disabled 以屬性表達
+      - **no-op、零實作**——未找到任何缺口（見 11.9 的說明）。
+- [x] 11.11 REFACTOR: 以 `grep` **機械確認**（不靠印象）—— ① 對 M4 store 的 import 只出現在 `app/matchmaker/page.tsx`；② `git diff --stat` 顯示 `hooks/` 目錄零新增檔案（design Decision 3）；③ 元件的 props 命名一致（一律 `onXxx`）
+      - 三項皆由兩位 Reviewer 獨立以 `grep`／`git status` 複驗通過。`hooks/useRoundStore.ts` 與 `useRoundStore.test.tsx` 皆為 `M`（修改既有檔），`hooks/` 零新增檔案，`hooksInventory.test.ts` 未受影響。
+      - **兩階段皆退回一輪，且兩位 Reviewer 獨立收斂到同一個核心問題**：「鎖定時按方向鍵目標分數不變」那段 E2E 斷言**測不到**它要保護的 `RoundControls.tsx` 的 `if (locked) return;`——點擊「產生本輪對戰」後 focus 在 radiogroup **之外**（該按鈕是容器的手足），keydown 不會冒泡進 handler；且鎖定時三顆 radio 全 `disabled`，鍵盤無法把焦點放進容器。**已依裁決改放 integration 層**：`RoundControls.test.tsx` 以 `fireEvent.keyDown` 直接對 radiogroup 容器派發（RTL 不受「disabled 元素不可聚焦」限制），補鎖定與未鎖定兩條對照——順帶補上 §7 完全缺席的鍵盤導覽 integration 覆蓋（§7 Stage 2 有三個變異當初就是因「交由 §11 E2E」而存活）。
+      - Stage 2 對 `hooks/useRoundStore.ts` 跑了 12 個 mutation、**存活 11 個**（唯一守住的是「移除 `hasHydratedRef` 守門」，由既有 hydration 測試擋下）。已在 `hooks/useRoundStore.test.tsx`（**既有檔，編輯它不違反 Decision 3**）補 6 個 it：`submitScore` 成功路徑（釘住 round 狀態、`updatePlayer` 呼叫次數等於該場人數、被 patch 的 id 集合）、連送兩場驗 history **依序附加而非覆蓋**、失敗路徑（`round` 參考以 `toBe` 比對不變、`updatePlayer` 未被呼叫）、`round === null` 時回 `MATCH_NOT_FOUND`、`resetIncompleteMatches` 成功／失敗兩條、history 持久化到 localStorage。同時修掉該檔已過期的「submitScore 尚未接線」註解。
+      - Stage 2 另找到 **E2E 的四條空／缺席斷言**（皆為「改壞實作後全部 test 仍綠」）：① `aria-current="page"` 零斷言（spec 的 MUST）；② 「建立第一輪」從未被點過（tasks 11.4 明訂它等同「產生本輪對戰」）；③ focus 樣式斷言量的是 `variant="outline"` 本就有的 `shadow-xs`，把 `focus-visible:ring-*` 全砍光仍綠；④ 失敗路徑完全沒測，`submitError` 的**逐場次綁定**改成全場地一起亮紅字仍綠。已逐條補齊，E2E 由 14 個增為 **15 個 test**（第 15 個為多場地失敗路徑的 regression guard，不對應 spec 驗收錨點，已於該 test 上方註明）。
+      - Stage 2 另修：三處**逐字重複註解**（本 change 第四次因同一條慣例被退回）、兩處 `§` 章節符號、`layout.tsx` 41.2% 與 `MatchStage.tsx` 25.9% 的過高註解密度、`hasActivePlayers` 在 `page.tsx` 與 `MatchStage.tsx` 各推導一次（改以 prop 傳入，Decision 9）、T8 的 `rating` 由 `not.toBe(5)` 強化為方向斷言（勝方 `>5`、敗方 `<5`）並加 history 筆數斷言、`trackConsoleIssues` 補到會種 roster 的 T4／T8（hydration mismatch 最可能發生的路徑）。
+      - **上述補強的斷言中，除裁決 2 的 integration it（刪掉 `if (locked) return;` 會真的轉紅）外，其餘一律於實作完成後才寫、寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+      - **leader 裁決記為已知缺口、本 change 不處理的三項**（詳見 design Open Questions 第 8 條）：`page.tsx` 未消費 `droppedCount`（留給 `matchmaker-history-page`）、「重設／再排」的 E2E 零覆蓋（由 hooks 層補測涵蓋）、`round.matches` 為空時畫面無說明文字（非 spec 違規、非死路）。
 
 ## 12. 收尾驗證
 

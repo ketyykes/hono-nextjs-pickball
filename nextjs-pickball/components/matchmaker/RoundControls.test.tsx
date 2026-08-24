@@ -1,6 +1,6 @@
 // components/matchmaker/RoundControls.test.tsx
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RoundControls } from "./RoundControls";
 import type { RoundControlsProps } from "./RoundControls";
@@ -310,5 +310,44 @@ describe("RoundControls", () => {
 		});
 		expect(screen.queryByText(/本輪已鎖定/)).not.toBeNull();
 		expect(screen.queryByRole("button", { name: "重設／再排" })).toBeNull();
+	});
+
+	// tasks 11 裁決 2：真實鍵盤路徑無法命中 handleTargetScoreKeyDown 內的 if (locked) return;
+	// ——鎖定時三顆 radio 皆 disabled，Tab 進不去容器，方向鍵事件根本不會發生。E2E（
+	// match-stage.spec.ts 的「目標分數 radiogroup」測試）因此只驗 disabled／aria-checked，
+	// 這條防線本身改由這裡的 fireEvent.keyDown 直接對容器派發事件覆蓋——RTL 的 fireEvent
+	// 不受「disabled 元素不可聚焦」限制，能真正命中 handler 內部邏輯。
+	it("目標分數鎖定時方向鍵不得呼叫 onSettingsChange 或改變選取（覆蓋 if (locked) return; 防線）", () => {
+		const round = buildRound({ targetScore: 15 });
+		const onSettingsChange = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({ round, settings: buildSettings({ targetScore: 15 }), onSettingsChange })}
+			/>,
+		);
+
+		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
+		fireEvent.keyDown(targetGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).not.toHaveBeenCalled();
+		const radios = within(targetGroup).getAllByRole("radio");
+		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("15");
+	});
+
+	// 對照組：未鎖定時方向鍵應正常運作，證明上一條測到的是「鎖定」這個條件本身，
+	// 而不是 fireEvent.keyDown 這個手法本身就測不出東西。順帶補上本檔原本完全缺席的
+	// 鍵盤導覽 integration 覆蓋（既有測試只覆蓋滑鼠點擊）。
+	it("目標分數未鎖定時方向鍵呼叫 onSettingsChange 並移動到下一個選項", () => {
+		const settings = buildSettings({ targetScore: 11 });
+		const onSettingsChange = vi.fn();
+		render(<RoundControls {...buildProps({ round: null, settings, onSettingsChange })} />);
+
+		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
+		fireEvent.keyDown(targetGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).toHaveBeenCalledTimes(1);
+		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, targetScore: 15 });
 	});
 });

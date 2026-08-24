@@ -14,6 +14,10 @@ export interface ScoreEntryProps {
 	submitError: string | null;
 }
 
+// 手機觸控目標（≥44px）由 components/matchmaker/MatchStage.tsx 以 max-md 的 Tailwind
+// 巢狀選擇器統一覆寫本元件的 input／button 尺寸；本元件自身的 h-8／h-9 不保證達到
+// 44px，重用本元件於 MatchStage 以外的情境時請留意這個外部覆寫依賴。
+//
 // 手動輸入比分是 prd.md 6.3 明訂不得移除的 fallback，MUST 能獨立完成一場。比分驗證規則
 // （空白、非數字、平局、已完成）歸屬回合 capability 的送出 pipeline，本元件 SHALL NOT
 // 複製一份——只負責把欄位原樣往上傳並把 submitError 原樣顯示出來（design Open Questions 2e）。
