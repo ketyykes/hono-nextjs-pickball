@@ -230,3 +230,38 @@
    - **單檔測試 `--run` 前不可加 `--`**：`test -- --run <path>` 會讓 vitest 收不到路徑而跑完整套，紅燈證據會被既有綠燈淹沒。
    - **E2E 一律帶 `--workers=1`**（§7、§8 會用到）。預設併發下本機不穩定，先前實測三次每次失敗集合都不同，根因是 Turbopack dev 的延遲 chunk 競態。
    - **每一組做完就立刻 commit，不要囤積**——審查結論只存在 leader 的脈絡裡，一旦中斷就永久遺失（這正是本項存在的理由）。
+
+7. **apply 階段於 §1 完成兩階段審查後再次暫停（2026-08-24，非設計問題，為使用者要求中斷）**——工作區乾淨、tasks.md **15／78** 勾選（§0 六項 + §1 九項，與第 6 項相同；本輪未新增勾選，因為 §1 的 task 早已勾完，本輪只補跑審查）。
+
+   **本輪（第二棒 leader）實際完成的事，只有一件：把 §1 的 Stage 2 補跑完並落盤。**
+   - **§1 Stage 2（Code-Quality Reviewer, opus）判定 `PASS`**，完整結論已寫在上方第 6 項內（含 mutation 表、四個新增 it 的名稱、移交 §3 的三項）。**續作者不需重跑 §1 的任何審查。**
+   - mutation：**獨立做 27 次，原狀 18 轉紅／9 存活**；補完斷言後 **27／27 全數轉紅**。Implementer 自述為「6 次 1 存活」——再次證明 **Stage 2 的獨立 mutation 不可省略、不可採信 Implementer 自述**。
+   - 兩項移交裁決皆已結案：**`MatchSlotsSchema` → 移除**（commit `a783873`，命名契約已同步更新）、**`console.warn` 措辭 → 維持現狀**（依 execution-plan Escalation「風格爭議時既有 codebase 風格勝出」）。
+   - coordinator 交辦的第三項（`hasLocalStorage()` 全庫三份的收斂）**已完整寫進上方「Stage 2 移交給 §3 的三項」第 1 點**，含目標形態（新增葉節點 `lib/scoreboard/storage-keys.ts`）與**兩個被否決的做法及其理由**（循環匯入、單向相依）。§3 派工單直接抄那一段即可。
+
+   **⚠️ 沒有任何審查結論只存在 leader 脈絡裡**——本項寫下時，§1 Stage 1（第 6 項）與 Stage 2（第 6 項）的判定全文皆已落盤，紅燈機械複驗結論亦已落盤。**本輪無未落盤事項。**
+
+   **§2 的狀態：已派工、隨即依使用者指示召回，`0` 檔案異動。**
+   - 派工單已送出（Implementer, `sonnet`），該 subagent 收到停止指令時**尚未修改任何檔案**，自行確認 `git status --short` 為空、無 commit。
+   - 因此 **§2 是乾淨的未開始狀態**，續作者直接重派即可，不需清理、不需接續半成品。
+
+   **下一步（依序，SHALL NOT 跳過）**：
+   1. 派 **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7）：`lib/scoreboard/types.ts` 加 `matchId: z.string().nullable().default(null)` 並併入 `MatchSettings`；`reducer.ts` 的 `SET_TARGET_SCORE` 在 `state.matchId !== null` 時回傳原 state；`createInitialState`／`settingsOf` 帶入 `matchId`。可修改的檔案**僅四個**：`types.ts`、`reducer.ts`、`reducer.test.ts`、`storage.test.ts`。
+   2. §2 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §3 → §4 → §5 → §6 → §7 → §8 → §9。
+   3. 全部群組完成後才做 Final Code Review（`opus`）。
+
+   **§2 派工時務必先講清楚的一個連帶影響（本輪派工單已寫入，續作者請沿用）**：
+   `matchId` 加入 `ScoreboardStateSchema` 後，`ScoreboardState` 型別會**多一個必填欄位**（zod 的 `.default()` 只讓輸入可省略，輸出型別仍必填——`targetScore` 已是同一個既有前例）。凡是「以物件字面量直接組出完整 `ScoreboardState`」的地方都會 tsc 失敗。
+   **失敗點已由 leader 實測掃描定位（不是推測，`grep -rn ": ScoreboardState = {"` 與 `Partial<ScoreboardState>` 的完整結果）**：
+   - `lib/scoreboard/rules.test.ts` **共四處**逐欄手寫的 `ScoreboardState` 字面量會炸開——第 5 行 `singlesInitial()`、第 83 行 `doublesPlaying()` 兩個 helper 的回傳物件，以及第 145、164 行的兩個 inline `const state: ScoreboardState = {...}`。四處都只需補 `matchId: null` 一行。
+   - `lib/scoreboard/reducer.test.ts` 內的 11 處**不會**炸開：它們一律是 `{ ...createInitialState(), ... }` 或以 spread 為基底，`createInitialState()` 在 2.6 之後自然帶出 `matchId`。
+   - 其餘檔案（`match-slots.ts`、`hooks/useScoreboardStore.ts`、`components/scoreboard/**`）只有型別標註、無逐欄字面量，**不受影響**。
+
+   **因此 §2 的可改檔案清單 MUST 由四個擴為五個**，第五個是 `nextjs-pickball/lib/scoreboard/rules.test.ts`，且**僅限**機械性補 `matchId: null`——**it 名稱、斷言與其他欄位一律不得動**。這不是行為變更，也不算 tasks 9.5 所指的「容許變動的既有測試」（那三處指的是改名或改斷言），因此不需要額外的 spec 依據。
+   仍然的規則：若 tsc 在**上述五個檔案以外**的地方失敗，**MUST 停止回報**，不得擅改、不得為了讓 tsc 過而放寬型別。
+
+   **這一輪的坑與提醒（補充第 6 項，不重複）**：
+   - **Stage 2 的價值已被本輪量化證實**：§1 的 Stage 1 判 `PASS`、Implementer 自述 mutation 只有 1 存活，但 Stage 2 獨立複做找出 **9 個存活**，其中最嚴重的一項是 `readMatchSlots()` 的「解析成功但不是物件」分支**零覆蓋**（既有測試用 `"{{{"`，會在 `JSON.parse` 就拋錯而走 catch 分支，該分支從未被執行）。**每一組都 MUST 派 Stage 2，且 MUST 要求它自行獨立 mutation。**
+   - **`MatchSlotsSchema` 這類 dead export 的判準**：Stage 2 的移除理由值得沿用——「留著一個具名、已匯出、看起來完全正確的整份 schema，等於在陷阱旁邊放一塊寫著『請勿使用』的牌子」。後續若再出現「定義了但註解說刻意不用」的符號，一律移除。
+   - **subagent 無法被 leader 用 TaskStop 中止**（實測：`Task ... is owned by ...; agent ... cannot stop it`）。要召回進行中的 subagent，只能用 `SendMessage` 送停止指令，它會在下一個 tool round 收到。**因此「脈絡將盡時就在派下一組之前停止」這條規則要更保守地執行**——一旦派出去就收不回即時控制權。
+   - **一次只派一位、派完立刻等結果**：本輪 §1 Stage 2 跑了約 13 分鐘（opus、27 次 mutation、35 個 tool call）。估算後續每組 Implementer + Stage 1 + Stage 2 至少三次派工，時間成本要納入交棒判斷。
