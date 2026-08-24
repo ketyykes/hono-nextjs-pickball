@@ -91,11 +91,19 @@ export function writeMatchSlot(matchId: string, state: ScoreboardState): void {
 
 /**
  * 批次清除指定場次的分槽（例：整輪重設時傳入該輪出現過的 matchId 清單）。
- * TODO(1.8)：目前為 no-op，實作與紅燈驗證見 1.7／1.8。
+ * 清除不存在的 matchId SHALL NOT 視為錯誤——呼叫端常會傳入已消失的 id。
  */
 export function clearMatchSlots(matchIds: readonly string[]): void {
 	if (!hasLocalStorage()) return;
-	void matchIds;
+	try {
+		const { slots } = readMatchSlots();
+		for (const matchId of matchIds) {
+			delete slots[matchId];
+		}
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify(slots));
+	} catch (err) {
+		console.warn("[scoreboard] 分槽資料批次清除失敗", err);
+	}
 }
 
 /** 清空所有分槽（整個 key 移除），SHALL NOT 影響獨立計分板的 scoreboard:current:v1 */
