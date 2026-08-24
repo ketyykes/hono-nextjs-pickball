@@ -476,3 +476,110 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
    （有名單但還無法產生對戰），導覽整合待對戰畫面完成後與 site-navbar capability 一併處理」。
    §10 完成後這句話即過期。tasks.md 沒有列出這一項（12.7 只涵蓋 `nextjs-pickball/CLAUDE.md`），
    請續作者判斷要納入 §10 還是 §12，或明確決定不動。
+   **→ 第二位 leader（2026-08-24）取得 coordinator 裁決：納入 §10 一併更新該註解，
+   於回報的「偏離」欄記載。理由是這屬本 change 自己造成的文件失準，一句與程式碼矛盾的
+   註解比一個範圍註記糟糕。**
+
+6. **§8 Stage 2 審查結果（未修正時的完整紀錄，2026-08-24）。**
+
+   > 落盤理由：這份審查結果原本只存在於 leader 的對話脈絡中，磁碟上沒有任何副本。
+   > leader 曾因 API 529 中途終止，若再發生一次即永久遺失、續作者只能整組重審。
+   > **本條記錄的是「退回當下」的狀態**；修正是否完成請以 tasks.md 的 checkbox 與 git log 為準。
+
+   **審查狀態**：Stage 1（規格符合度）**APPROVED**；Stage 2（程式品質）**CHANGES_REQUESTED**。
+   Stage 2 跑了 **55 次 mutation，23 次存活**，其中 **11 次非等價且落在契約內**。
+   當時工作區的四個未追蹤檔即 §8 的全部產出：`components/matchmaker/CourtCard.tsx`、
+   `CourtCard.test.tsx`、`PlayerTile.tsx`、`ScoreEntry.tsx`。
+
+   Implementer 交件時的三點自述經 Stage 2 獨立驗證**皆成立**：兩隊 `playerIds` 對調的位置
+   斷言有效、勝方 badge 兩方向都測有效、`data-slot="badge"` 不存在檢查為必要（純文字查詢
+   抓不到只有圖示的 badge）。實作本身 tsc 綠、lint 0 error、無新相依、無比分驗證規則複製、
+   六項 repo 慣例全數符合。
+
+   ---
+
+   **(A) 實質實作缺陷（非 mutation 發現，嚴重度最高）——`ScoreEntry` 的 `Number()` 轉換
+   銷毀了 M4 執行驗證所需的資訊。**
+
+   `lib/matchmaker/round.ts` 的契約是 `SubmitScoreInput { rawScoreA: string; rawScoreB: string }`
+   與 `validateScoreInput(match, rawScoreA, rawScoreB)`，其 `parseScoreField` **靠原字串**
+   才分得出 `EMPTY_FIELD` 與 `INVALID_NUMBER`（該檔註解明寫「SHALL NOT 單獨用 `Number()`
+   或 `parseInt()` 判斷」：`Number("")` 為 0、`Number("   ")` 為 0）。但 `ScoreEntry.handleSubmit`
+   在呼叫父層 callback **之前**就做了 `Number(teamAValue)`。實測傳給父層的值：
+
+   | 使用者輸入 | 實際傳給父層 | M4 會判定成 |
+   |---|---|---|
+   | 兩欄皆空白 | `("match-1", 0, 0)` | **TIE**「兩隊比分相同時無法判定勝方」（正確應為 `EMPTY_FIELD`「兩隊比分皆須填寫」） |
+   | **只填第一隊 `11`** | `("match-1", 11, 0)` | **通過驗證** → 場次被標記完成、寫入 11:0 與評分變動 |
+   | 第二隊填 `abc` | `("match-1", 11, NaN)` | 僥倖正確（`String(NaN)` → `"NaN"` 被 pattern 擋下） |
+
+   第二列是**資料完整性缺陷**：一個空欄位被靜默補成 0 並完成整場。這不算「複製驗證規則」，
+   但等於銷毀了 M4 執行該規則所需的資訊，實質效果與把「空白＝0」搬進 UI 相同，
+   與 spec「比分驗證規則歸屬回合 capability，UI SHALL NOT 複製一份」相衝。
+
+   **leader 裁決的修法**：`ScoreEntryProps.onSubmitScore: (rawScoreA: string, rawScoreB: string) => void`、
+   `CourtCardProps.onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void`，
+   原字串直接往上傳，`ScoreEntry` 內不再出現任何 `Number()`。
+
+   **是否牴觸規格的裁決：不牴觸。** spec Scenario 的 THEN 是「回合 capability 的送出函式被
+   呼叫一次，帶入該場次識別與**兩隊分數**」，未指定型別；tasks 8.3／8.4 亦未指定。
+   test-plan 的 Assertion 欄寫「參數含場次識別與 `[11, 7]`」屬計畫階段示意，**it 名稱不變**
+   （「送出比分會以場次識別與兩隊分數呼叫回合送出函式一次」），驗收錨點仍可機械核對。
+   斷言改為 `toHaveBeenCalledWith("match-42", "11", "7")`。
+   **→ §11 接 `submitScore` 時直接把這兩個原字串餵給 `rawScoreA`／`rawScoreB`，不要再轉型。**
+
+   ---
+
+   **(B) 測試斷言缺口（六個根因，11 次非等價存活）**
+
+   | 代號 | 根因 | 存活的 mutation | 修法 |
+   |---|---|---|---|
+   | R1 | 完成場次色塊樣式的 wiring 完全沒測 | M07（`playerTileStyle` 恆傳 `{ completed: false }`）、M55（把 `completed` 定義反向、再在 disabled／勝方／資訊列三處各補 `!`，只讓色塊受影響的**複合變異**） | 在完成場次的 it 內斷言色塊 `style.opacity`／`style.filter` 有值，未完成的對照組斷言兩者為空字串（**兩個方向都要**） |
+   | R2 | 隊伍文字標籤與 testid 脫鉤 | M09（兩排隊伍標籤文字對調、testid 不動） | 勝方斷言改釘容器**完整文字**（`textContent === "第一隊勝"`／`"第二隊"`），而非只查「頁面某處有『第一隊』」 |
+   | R3 | 完成比分的順序沒釘 | M10（`teamA`／`teamB` 顯示對調） | `expect(scoreRow.textContent).toBe("11:7")` 取代兩次 `getByText`。**與 §4 被退回的是同一個「集合式斷言丟失順序」盲點** |
+   | R4 | **球場網格結構零斷言（最大缺口，7 次存活）** | M06、M35、M36、M37、M49、M50、M51：控制區移到最下（「網」不見）、控制區只跨左半、grid 變四欄、grid 退化單欄、雙打同隊兩人疊同欄、單打兩人被拆成上下排，以及一個**三處互相抵消的複合鏡射**（`[teamB, teamA]` + `gridColumn: 2 - tile.column` + `gridRow: 3 - tile.row * 2`）。根因是**單打的 it 只驗 `gridColumn`、雙打的 it 只驗 `gridRow`** | ① 單打與雙打**兩個 format 都同時斷言 `gridColumn` 與 `gridRow`**；② 為比分／送出控制區容器加 `data-testid`，斷言 `gridRow === "2"` 且 `gridColumn === "1 / 3"`（Decision 4 的「網」）；③ 斷言 grid 容器 `gridTemplateColumns` 為兩欄 |
+   | R5 | 完成時間的補零分支從未被執行 | M12（拿掉 `padStart`）——測試資料 `13:05Z` 在 Asia/Taipei 是 `21:05`，小時本來就兩位數 | 加一組 `completedAt` 落在本地**單位數小時**的案例（如 `"2026-08-23T00:05:00.000Z"` → `08:05`）。期望值仍以 `Date` 推導、不硬寫字串 |
+   | R6 | `scoring` 狀態零覆蓋 | M46（`status === "completed"` 改 `!== "pending"`，使 `scoring` 場次被誤鎖並套完成樣式） | 加一條 `status: "scoring"` 的 it：欄位／送出鈕**未** disabled、不顯示完成資訊列、色塊未套完成樣式。§7 已測 `scoring`，此處應對齊 |
+
+   ---
+
+   **(C) 實作的設計保真修正（leader 裁決要做）**
+
+   1. **雙打的隊伍標籤位置與色塊排列不對應**：兩個標籤同放在色塊網格**上方**一列並以
+      `justify-between` 左右分置，但雙打色塊是**上下分排**（Decision 4）。結果「第二隊」
+      出現在右上角、正好壓在第一隊色塊上方，讀者仍得靠顏色把標籤連回色塊——與 Requirement
+      「色彩 SHALL NOT 作為唯一資訊來源：每支隊伍 MUST 有文字隊伍標籤」的意圖相衝。
+      （單打左右分置是正確的。）
+   2. `completed && match.scores && match.completedAt` 應**拆成兩個獨立條件**：目前
+      `completedAt` 為 `null` 時**比分也一起消失**；schema 的 `superRefine` 讓它實務不可達，
+      但比分不該被時間欄位損壞連坐。
+   3. `style={style as CSSProperties}` 改為 `style={{ ...style }}`：展開成物件字面量會取得
+      隱式索引簽章，**完全通過 tsc、不需任何斷言**，語意不變。（Stage 2 亦確認該 `as` cast
+      並未掩蓋真正的型別錯誤——加一個非 CSS 欄位仍會以 `TS2352` 報錯——所以這只是風格改善。）
+   4. 補「查無球員」的 regression guard：實測雙打缺一人時 `.filter` 濾掉 →
+      **只渲染 3 格、不拋錯、不破圖**。行為可接受（`roster.ts` 的 `removePlayer` 確實不禁止
+      移除場上球員），但完全沒測。
+   5. 補 `min-h-*` 的 class 斷言——design Risks ① 明寫「色塊 **MUST** 設最小高度」。
+      `aspect-square` 與 `truncate` **不必**補（repo 既有元件測試不驗 Tailwind class，
+      只有 `min-h` 是 MUST）。
+
+   ---
+
+   **(D) 明確判定為契約外／近似等價、SHALL NOT 處理的項目**（避免續作者重複爭論）
+
+   送出後是否清空欄位（spec 未規範）、觸界 badge 的 `ArrowUp`／`ArrowDown` 圖示對調
+   （圖示為 `aria-hidden` 裝飾、文字仍正確）、`buildCourtTiles(...).reverse()`
+   （grid 明確定位、視覺等價）、場地標題 `h3`→`span`（spec 只要求「可讀場地標題」）、
+   `type="text"`→`"number"`（spec 只要求 `inputMode`）、完成資訊列條件移除 `completed`
+   （schema 保證 pending 無 scores）、`teams` 長度非預期時解構拋 `TypeError`
+   （有 `z.tuple` + TS tuple 雙重保證）。
+
+   ---
+
+   **(E) Stage 2 對兩個爭議點的獨立判斷**
+
+   - **`CourtCard` 內 `tile.row * 2 + 1`／`tile.column + 1` 算不算第二份版面推導？**
+     判定為**不算**——那是把 `buildCourtTiles` 已算出的座標翻譯成 CSS grid line 的轉換，
+     不是重新推導誰在哪一格。但正因為這四個數字（`repeat(2, …)`／`row*2+1`／控制區的
+     `gridRow: 2`／`gridColumn: "1 / 3"`）之間的耦合只靠人腦維持，才需要 (B) R4 的網格結構斷言。
+   - **`players.find(...)` 找不到球員時的行為**：見 (C) 4，可接受但需補測。
