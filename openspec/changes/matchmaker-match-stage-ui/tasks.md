@@ -62,9 +62,16 @@
 
 ## 6. 強度觸頂／觸底判定（rating-bounds.ts）
 
-- [ ] 6.1 RED: 新增 `nextjs-pickball/lib/matchmaker/rating-bounds.test.ts`，寫入三個 it：「rating 為上限時判定為已達上限」、「rating 為下限時判定為已達下限」、「rating 介於上下限之間時不判定為觸界」（以 1.01、4.50、7.99 三個近界值，能抓到 `>=`／`>` 寫錯）。確認紅燈
-- [ ] 6.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/rating-bounds.ts` 的 `ratingBoundState(rating)`：回傳觸頂／觸底／未觸界三態；上下限值取自 1.3 確認的來源
-- [ ] 6.3 REFACTOR: 確認本檔沒有 `1`／`8` 字面量，且回傳為可辨識的具名值而非布林對（布林對會讓呼叫端寫出「兩個都 true」的不可能狀態）
+- [x] 6.1 RED: 新增 `nextjs-pickball/lib/matchmaker/rating-bounds.test.ts`，寫入三個 it：「rating 為上限時判定為已達上限」、「rating 為下限時判定為已達下限」、「rating 介於上下限之間時不判定為觸界」（以 1.01、4.50、7.99 三個近界值，能抓到 `>=`／`>` 寫錯）。確認紅燈
+      - 三個 it 於實作前皆為真紅燈（模組不存在，`Failed to resolve import "./rating-bounds"`）。近界值以 `RATING_MIN + 0.01`／`RATING_MAX - 0.01` 表達，斷言不寫死 `1`／`8`。
+      - Stage 2 的 24 次 mutation **22 killed、2 存活，且兩個存活者在真實契約下皆為等價變異**——本組是唯一沒有斷言密度問題的一組（三態改名、觸頂觸底互換、恆回傳最常見態皆被殺）。
+        兩個等價變異：① 兩個 `if` 先後順序對調（`rating >= RATING_MAX` 與 `rating <= RATING_MIN` 在 `RATING_MIN < RATING_MAX` 下互斥，`NaN` 在兩種順序下同樣落到 `within-bounds`）；② `>=`／`<=` 改 `===`（上游 `types.ts` 的 `z.number().min(1).max(8)` 與 `rating.ts` 的 `Math.max(RATING_MIN, Math.min(RATING_MAX, ...))` 雙重保證值域，兩種比較在 `[1, 8]` 內行為完全一致）。**兩者刻意不殺——為不可能的輸入寫斷言是假防護。**
+      - Stage 2 退回的理由是**斷言逾越契約**（與前四組相反）：Implementer 交件前自行加入的兩條值域外斷言（`RATING_MAX + 0.01` → 觸頂、`RATING_MIN - 0.01` → 觸底）只多殺上述等價變異 ②、對真實契約可達的變異零貢獻，且其宣告的「飽和語意」並未被完整釘住（加 `Math.abs(rating)` 預處理仍全綠）。已移除該兩條斷言，三個 it 回到與 spec 的三個 Scenario 一一對應。
+- [x] 6.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/rating-bounds.ts` 的 `ratingBoundState(rating)`：回傳觸頂／觸底／未觸界三態；上下限值取自 1.3 確認的來源
+      - 上下限 `import { RATING_MIN, RATING_MAX } from "./rating-types"`（§1 前置確認已在 `main` 實測路徑正確）。
+- [x] 6.3 REFACTOR: 確認本檔沒有 `1`／`8` 字面量，且回傳為可辨識的具名值而非布林對（布林對會讓呼叫端寫出「兩個都 true」的不可能狀態）
+      - `grep -nE '\b1\b'`／`'\b8\b'` 皆無命中。回傳為 `export type RatingBoundState = "at-upper-bound" | "at-lower-bound" | "within-bounds"`（字面量聯集，屬 repo 慣例中 `export type` 的正當用途）。
+      - Stage 2 審查後追加：實作端維持 `>=`／`<=`（比 `===` 穩健，上游若回歸夾值不會靜默漏標），並把該理由從測試承諾搬進 JSDoc；同時刪除與檔頭重複的 JSDoc 主句（慣例「不在檔頭與 JSDoc 各寫一次同一句話」）。
 
 ## 7. RoundControls 元件
 
