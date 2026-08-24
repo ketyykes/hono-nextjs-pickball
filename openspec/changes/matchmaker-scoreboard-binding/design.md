@@ -172,21 +172,33 @@
 
 6. **apply 階段於 §1 實作完成後暫停（2026-08-24，非設計問題，為使用者要求中斷）**——工作區乾淨、tasks.md **15／78** 勾選（§0 六項 + §1 九項）。基準線見 environment.md：hono-pickball 4 檔／16 測試、nextjs-pickball 54 檔／410 測試全綠，initial commit `3fefb029`。
 
-   **⚠️ 最重要的一條：§1 已實作但「兩階段審查皆未完成」。** Stage 1（Spec Reviewer, sonnet）已派出但在收到中斷指示時尚未回傳判定，該 subagent 已停止、**判定遺失**；Stage 2（Code-Quality Reviewer, opus）從未派出。續作者 MUST **重跑 §1 的 Stage 1 與 Stage 2**，SHALL NOT 因為「§1 的 task 都勾了」就當它已通過審查。
+   **⚠️ §1 的審查狀態：Stage 1 已通過（`PASS`），Stage 2（Code-Quality Reviewer, opus）尚未派出。** 續作者 MUST 先補跑 **§1 的 Stage 2** 再往下走，SHALL NOT 因為「§1 的 task 都勾了」就當它已完成審查；但**不需要**重跑 Stage 1。
+
+   **§1 Stage 1（Spec Reviewer, sonnet）判定：`PASS`**（結論落盤如下，續作者可直接採信）：
+   - Reviewer 先把收到的派工摘錄與 worktree 內的 `specs/scoreboard/spec.md`、`test-plan.md` 逐字對照，確認派工單未被竄改，才開始審查。
+   - 四個 Scenario **全數有對應測試**；四個 it 名稱（含全形符號、逗號、頓號）與 test-plan **逐字相符**；斷言確實覆蓋各自的 WHEN／THEN。
+   - 四條 SHALL NOT **全數有測試把關**：損壞條目不得連坐清空其他場地（`match-slots.test.ts:52-53`）、整份損壞不得連帶清 `scoreboard:current:v1`（`:69`）、寫分槽不得寫入獨立槽（`:36`，且實作全檔未出現該 key 字串）、清除不存在的 id 不得拋錯（`:80`）。
+   - **SSR 第 5 個 it 判定「不構成 scope creep」**，四點理由：該 commit（`4ef61ad`）**只改測試檔**、未新增任何 production 行為；`hasLocalStorage()` 守門早在 `1120d21` 就存在且註解已宣告沿用 `storage.ts`；`storage.test.ts:98` 已有同構的 sibling 測試；動機是 mutation 找到的真實偵測缺口。判為**測試覆蓋率補強**而非行為新增。
+   - 1.8 的分工偏離判為「純記帳問題，不影響任何 Scenario 的行為覆蓋」，不予不通過；1.9 skipped 的理由經核實成立。
+   - 未發現其他 scope creep：無多餘 storage key（`MATCH_SLOTS_KEY` 與 spec 表格逐字相符）、無 UI、無 spec 未要求的行為分支。
+
+   **Stage 1 依分工不審、明文移交給 Stage 2 裁決的兩項**：
+   - **`MatchSlotsSchema`（`match-slots.ts:9`）目前是 dead export**——`readMatchSlots()` 改採逐筆 `ScoreboardStateSchema.safeParse` 後，這個整份 schema 已無任何呼叫點，只在註解中被提及「刻意不用」。Stage 2 MUST 決定移除、或保留並讓某處真正消費它。**此裁決會牽動下方的命名契約**：若決定移除，§3～§6 的派工單也要同步拿掉這個名字。
+   - **`console.warn` 訊息偏「描述狀況」而非「說明可採取的修正方式」**。Stage 1 判定不阻擋（這些是開發者除錯 log 而非使用者可見錯誤訊息，且 spec 該處只要求「記錄被丟棄的筆數」），Stage 2 可再權衡。
 
    **已落盤的審查結論（leader 於中斷前親自完成的機械複驗，續作者可直接採信、不需重做）**：依 root `CLAUDE.md`「紅燈要是真的」，以 `git show <commit>^:<path>` 複驗 §1 的四次紅燈宣稱，**四次皆為真紅燈**，無任何一項需改標為 regression guard——
    - `35551ad`（1.1 RED）：該 commit 樹內確認**不存在** `lib/scoreboard/match-slots.ts`，紅燈形式為 import 失敗，成立。
    - `95bf96e`（1.3 RED）當下的實作快照同時證明了三件事：`readMatchSlots()` 用的是**整份** `MatchSlotsSchema.safeParse`（故 1.3「逐筆降級」必紅）、JSON 解析失敗路徑**沒有** `removeItem`（故 1.5「整份非 JSON 應清 key」必紅）、`clearMatchSlots()` 是帶 `void matchIds;` 的 **no-op stub**（故 1.7「批次清除」必紅）。三者皆為斷言失敗型真紅燈。
 
    **下一步（依序，SHALL NOT 跳過）**：
-   1. 重跑 **§1 Stage 1**（spec 合規，sonnet）→ 通過後 **§1 Stage 2**（程式碼品質，opus）。Stage 2 MUST 自行獨立再做一次 mutation 測試並回報存活數，**不採信 Implementer 的自述**。
-   2. §1 通過後才派 **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7，`lib/scoreboard/types.ts` 與 `reducer.ts`）。
+   1. 補跑 **§1 Stage 2**（程式碼品質，opus），派工時 MUST 一併帶上上面那兩項移交事項。Stage 2 MUST 自行獨立再做一次 mutation 測試並回報存活數，**不採信 Implementer 的自述**（歷史命中率極高：先前 milestone 曾出現「做 9 次 9 次全存活、整段接線刪光仍全綠」）。
+   2. §1 通過 Stage 2 後才派 **§2「綁定欄位與 reducer 鎖定」**（tasks 2.1～2.7，`lib/scoreboard/types.ts` 與 `reducer.ts`）。
    3. 之後依序 §3 → §4 → §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer**（execution-plan 明訂，本段任務高度集中在 `lib/scoreboard/` 與 `hooks/`，平行必然互撞）。
 
-   **留給 §1 兩位 reviewer 的待裁決事項**（Implementer 自述，leader 尚未裁決）：
-   - **test-plan 之外多寫了第 5 個 it**：`SSR（無 window）時 read／write／clear 皆不寫入也不 throw`。Implementer 的理由是交件前 mutation 自測時「拿掉 `hasLocalStorage()` 守門」是**唯一存活**的一項（happy-dom 恆有 `window.localStorage`，SSR 分支從未被觸發），補測試後同一 mutation 才轉紅。**Stage 1 MUST 明確裁決這是否構成 scope creep**（spec 未列 SSR Scenario，但 `storage.ts` 既有慣例含此守門）。
-   - **1.8 的分工偏離**：task 原文要 1.8 實作兩個函式，但 `clearAllMatchSlots()` 因 1.6 的「整份損壞清除路徑」需要而提前於 1.6 落地，1.8 實際只新增 `clearMatchSlots()`。已於 tasks.md 該項旁註明。
-   - **1.9 REFACTOR 標註 skipped**，理由是 `hasLocalStorage()` 與 `lib/scoreboard/storage.ts` 重複、但該檔未匯出此函式且 §1 不得修改它。→ **這件事該在 §3 收掉**：§3 本來就要改 `storage.ts`，屆時應評估把 `hasLocalStorage()` 收斂為單一來源，而不是讓兩份長期並存。
+   **§1 Implementer 的自述事項（三項皆已由 Stage 1 裁決通過，此處僅留背景）**：
+   - test-plan 之外多寫的第 5 個 it `SSR（無 window）時 read／write／clear 皆不寫入也不 throw`，動機是交件前 mutation 自測時「拿掉 `hasLocalStorage()` 守門」是**唯一存活**的一項（happy-dom 恆有 `window.localStorage`，SSR 分支從未被觸發），補測試後同一 mutation 才轉紅。
+   - Implementer 自述的 mutation 自測為 6 次、1 次存活（即上述守門項），已於交件前補斷言。**Stage 2 仍 MUST 自行獨立再做一次，不採信此自述。**
+   - 1.9 REFACTOR 標註 skipped 的理由是 `hasLocalStorage()` 與 `lib/scoreboard/storage.ts` 重複、但該檔未匯出此函式且 §1 不得修改它。→ **這件事該在 §3 收掉**：§3 本來就要改 `storage.ts`，屆時應評估把 `hasLocalStorage()` 收斂為單一來源，而不是讓兩份長期並存。
 
    **§1 已固定的命名契約（§3～§6 會 import，續作者 MUST 沿用，不要改名）**：
    `MATCH_SLOTS_KEY`、`MatchSlots`、`MatchSlotsSchema`、`ReadMatchSlotsResult`、`readMatchSlots()`、`readMatchSlot(matchId)`、`writeMatchSlot(matchId, state)`、`clearMatchSlots(matchIds)`、`clearAllMatchSlots()`。
