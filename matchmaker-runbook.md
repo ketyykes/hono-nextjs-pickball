@@ -8,11 +8,57 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `76647cb`（merge commit：M5 對戰畫面已進 main） |
+| `main` HEAD | `3fefb02`（docs：M6～M9 派工前的 44 項文件缺陷修正） |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**（第一位在 §3 後因單組 wall clock 過長主動停止；第二位中途被 API 529 打斷，以 SendMessage 從 transcript 恢復後跑完）。worktree 與分支已 teardown |
-| M6～M9 | **依使用者指示暫停**，見上方停止點 |
+| M6 | **進行中，已依使用者指示暫停**（2026-08-24，使用者開會）。見下方「M6 中斷點」 |
+| M7～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
+
+## 🔖 M6 中斷點（2026-08-24，使用者要求暫停）
+
+| 項目 | 值 |
+|---|---|
+| Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
+| Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
+| Base | `main` @ `3fefb02` |
+| 進度 | **15/78 勾選、11 個 commit**，工作區乾淨（`git status --short` 為空） |
+| 已完成 | §0 上游契約對齊、§1 分槽儲存（`lib/scoreboard/match-slots.ts`） |
+| 中斷於 | §2 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`） |
+
+分支上的 commit（新到舊）：
+
+```
+4ef61ad test(scoreboard): 補分槽 SSR 守門的 mutation 偵測缺口
+faebeed docs(...): 標註 §1.9 REFACTOR 為 skipped
+6b88de0 feat(scoreboard): 實作分槽批次清除
+68e460d test(scoreboard): 新增批次清除指定場次分槽的失敗測試
+0e21031 feat(scoreboard): 整份分槽資料損壞時只清該 key
+3b3313b test(scoreboard): 新增整份非 JSON 時應清除分槽 key 的失敗測試
+6885063 feat(scoreboard): 分槽讀取改為逐筆降級
+95bf96e test(scoreboard): 新增分槽逐筆損壞降級的失敗測試
+1120d21 feat(scoreboard): 建立分槽儲存模組的 key、schema 與單筆讀寫
+35551ad test(scoreboard): 新增分槽寫入互不覆蓋的失敗測試
+bab6f19 docs(...): 完成 §0 上游契約對齊並回填 environment 基準
+```
+
+**這位 leader 的 commit 粒度是逐 task（`test:` 一個、`feat:` 一個），比 runbook 要求的
+「一組一 commit」更細——這是好事，每次紅燈都獨立留在版控裡，接手者可以直接用
+`git show <commit>^:<path>` 機械複驗，不必採信任何回報。**
+
+Baseline（§0 回填進 `environment.md`，已驗證與 coordinator 在 `main` 上的實測一致）：
+前端 54 檔／410 測試、後端 4 檔／16 測試全綠，`Initial commit hash` = `3fefb02`。
+
+**續跑方式**：worktree 已存在且乾淨，**不要重開**。派一位 opus leader，
+prompt 用下方模板加上：① 先讀 `design.md` 的 `## Open Questions` 取得中斷狀態；
+② 先讀 `tasks.md` 勾選狀態與 `git log main..HEAD` 對齊現況；③ 接續點為 §2。
+
+### 這一輪跑下來確認有效的做法（續跑時保留）
+
+- **編輯器診斷在 worktree 內大量謊報**（整批 `Cannot find module 'react'` 之類）。
+  一律以 `pnpm -r exec tsc --noEmit` 的 exit code 為準，本輪實測 exit 0。
+  唯一可信的例外是「單一新檔的單一 import 解不到」——那是 TDD 紅燈，是真的。
+- Implementer 交件前自跑 mutation 已見效：`4ef61ad` 就是補上 SSR 守門的偵測缺口。
 
 ### M5 合併後的 `main` 品質基線（coordinator 獨立實測，非採信回報）
 
