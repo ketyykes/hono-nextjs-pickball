@@ -76,7 +76,7 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 - [x] 1.2 GREEN: 建立 `nextjs-pickball/lib/scoreboard/match-slots.ts`：匯出 `MATCH_SLOTS_KEY = "scoreboard:matches:v1"`、以 `ScoreboardStateSchema` 組成的 map schema，以及單筆讀寫函式。沿用 `storage.ts` 既有的 `hasLocalStorage()` 守門與 try/catch + `console.warn` 形態
 - [x] 1.3 RED: 補 it「單筆損壞只丟該筆並回報 droppedCount，其餘場次保留」——`{ m1: 缺必要欄位, m2: 合法 }` → 回傳只含 `m2`、`droppedCount === 1`、`console.warn` 被呼叫。確認紅燈
 - [x] 1.4 GREEN: 實作逐筆降級：整份能解析為物件時逐筆 `safeParse`，只丟不合法的條目（比照 `player-roster` 的「LocalStorage 持久化與逐筆降級」，design Decision 4）
-- [ ] 1.5 RED: 補 it「整份非 JSON 時清除分槽 key 且不動獨立槽」——分槽 key 內容為 `"{{{"` → 該 key 被移除、回傳空集合、`scoreboard:current:v1` 仍在。確認紅燈
+- [x] 1.5 RED: 補 it「整份非 JSON 時清除分槽 key 且不動獨立槽」——分槽 key 內容為 `"{{{"` → 該 key 被移除、回傳空集合、`scoreboard:current:v1` 仍在。確認紅燈
 - [ ] 1.6 GREEN: 實作整份損壞的清除路徑，且**只**移除分槽 key
 - [ ] 1.7 RED: 補 it「批次清除只移除指定場次且忽略不存在的 id」——`{m1,m2,m3}` 以 `["m1","m3","nope"]` 清除 → 只剩 `m2`，不拋錯。確認紅燈
 - [ ] 1.8 GREEN: 實作批次清除與「清空全部條目」兩個函式

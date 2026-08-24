@@ -54,4 +54,19 @@ describe("match-slots", () => {
 		expect(warnSpy).toHaveBeenCalled();
 		warnSpy.mockRestore();
 	});
+
+	it("整份非 JSON 時清除分槽 key 且不動獨立槽", () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		localStorage.setItem("scoreboard:current:v1", JSON.stringify(createInitialState()));
+		localStorage.setItem(MATCH_SLOTS_KEY, "{{{");
+
+		const { slots, droppedCount } = readMatchSlots();
+
+		expect(slots).toEqual({});
+		expect(droppedCount).toBe(0);
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+		expect(localStorage.getItem("scoreboard:current:v1")).not.toBeNull();
+		expect(warnSpy).toHaveBeenCalled();
+		warnSpy.mockRestore();
+	});
 });
