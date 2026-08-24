@@ -25,8 +25,10 @@ function hasLocalStorage(): boolean {
 /**
  * 從 localStorage 讀取所有場次的分槽資料。
  *
- * 目前為整份驗證（1.4 起改為逐筆降級，見該項）：JSON 解析失敗或 schema 驗證失敗
- * 皆回空集合，尚未清 key（清 key 的行為留給 1.6 實作）。
+ * 整份驗證失敗（JSON 解析失敗）目前尚未清 key（清 key 的行為留給 1.6 實作）。
+ * 整份能解析為物件時逐筆 safeParse——刻意不整份丟給 MatchSlotsSchema，
+ * 因為一筆壞資料就會讓 safeParse 整體失敗，與「單場損壞不得連坐清空
+ * 其他場次」的需求牴觸（見 design Decision 4）。
  */
 export function readMatchSlots(): ReadMatchSlotsResult {
 	if (!hasLocalStorage()) return { slots: {}, droppedCount: 0 };
@@ -36,12 +38,25 @@ export function readMatchSlots(): ReadMatchSlotsResult {
 
 	try {
 		const parsed: unknown = JSON.parse(raw);
-		const result = MatchSlotsSchema.safeParse(parsed);
-		if (!result.success) {
-			console.warn("[scoreboard] 分槽資料驗證失敗", result.error);
-			return { slots: {}, droppedCount: 0 };
+
+		const slots: MatchSlots = {};
+		let droppedCount = 0;
+		for (const [matchId, rawState] of Object.entries(
+			parsed as Record<string, unknown>,
+		)) {
+			const result = ScoreboardStateSchema.safeParse(rawState);
+			if (result.success) {
+				slots[matchId] = result.data;
+			} else {
+				droppedCount++;
+			}
 		}
-		return { slots: result.data, droppedCount: 0 };
+
+		if (droppedCount > 0) {
+			console.warn(`[scoreboard] 分槽資料中有 ${droppedCount} 筆不合法，已捨棄`);
+		}
+
+		return { slots, droppedCount };
 	} catch (err) {
 		console.warn("[scoreboard] 分槽資料 JSON 解析失敗", err);
 		return { slots: {}, droppedCount: 0 };
