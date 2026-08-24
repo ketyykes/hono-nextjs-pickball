@@ -413,3 +413,66 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
 4. **桌面斷點的場次網格欄數**：暫定手機 1 欄、平板起 2 欄。8 場地時桌面是否要 3 欄，等實際看到
    畫面再定；此細節不寫進 spec（spec 只約束「場地內容與休息名單左右並排」），因此調整欄數
    不需要改規格。
+
+5. **apply 階段的中途交接（2026-08-24，第一位 leader 乾淨停止）。**
+
+   **停止理由**：不是脈絡耗盡，而是**單組實耗時間遠超預期**。§2、§3 兩個群組（合計 6 個 task，
+   是本 change 最小的兩組）各花約 50～70 分鐘 wall clock，且**兩組的 Stage 2 都退回一次**。
+   依此速率，剩下 9 組（含 §7、§8、§11 三個最大群組，合計超過 40 個 task）不可能在同一個
+   session 內完成。依 apply 紀律在**派下一組之前**停止，未留下任何「已派工但無人審查」的狀態。
+
+   **已完成並 commit 的群組**（分支 `change/matchmaker-match-stage-ui`）：
+
+   | 群組 | 狀態 | commit |
+   |---|---|---|
+   | §1 前置確認 | 完成（本 Open Question 第 2 條的 (a)～(g) 即其產出） | `0a176d5` |
+   | §2 section-nav.ts | 完成，Stage 1／2 皆 APPROVED | `ee70514` |
+   | §3 round-settings.ts | 完成，Stage 1／2 皆 APPROVED | `4251a2a` |
+
+   **未完成的群組**：§4 stage-layout、§5 tile-style、§6 rating-bounds、§7 RoundControls、
+   §8 CourtCard／PlayerTile／ScoreEntry、§9 RestingPanel、§10 SiteNavbar 第 5 條連結、
+   §11 頁面組裝與 E2E、§12 收尾驗證。**下一組是 §4。**
+
+   **停止當下的驗證數字**（與 `bbda8ff` 的 baseline 逐項對照，無任何退步）：
+
+   | 項目 | baseline | 現在 |
+   |---|---|---|
+   | `pnpm test` 前端 | 46 檔 / 358 測試 passed | **48 檔 / 364 測試 passed** |
+   | `pnpm test` 後端 | 4 檔 / 16 測試 passed | 4 檔 / 16 測試 passed（未動） |
+   | `pnpm -r exec tsc --noEmit` | exit 0 | exit 0 |
+   | `pnpm --filter ./nextjs-pickball lint` | 0 errors / 3 warnings | 0 errors / 3 warnings（同一批既存 warning） |
+
+   E2E 本次**完全未執行**（§10／§11 才會動到）；工作區乾淨，無殘留暫存檔，無殘留 dev server。
+
+   **續作者必須知道的四件事**：
+
+   1. **兩階段審查的 mutation 測試是目前唯一抓到真問題的手段，不可省略。**
+      §2 的 Stage 2 做了 8 次 mutation、**3 次存活**（分頁順序對調、label 對調、多回傳一筆
+      都測不出來，根因是測試只斷言 `active` 欄位）；§3 做了 16 次、**6 次存活**（旗標改用
+      變動前的值、兩個旗標各自硬寫 `false`、上界改用 `MIN` 比、下界改用 `MAX` 比、丟棄
+      `...settings` 展開，根因是測試從未斷言任何旗標為 `true`、也沒有「夾值前後不同」的案例）。
+      兩次都由補斷言解決，補上的斷言**一律是實作後才寫的 regression guard**，已在 tasks.md
+      如實標註。**請把「對本組關鍵斷言做 mutation 測試並回報存活數」寫進每一張 Stage 2 派工單。**
+
+   2. **Implementer 用 `sonnet`，不要用 execution-plan 的預設 `haiku`。** 這是刻意偏離。
+      兩組實測下來 sonnet 的產出品質足夠，被退回的都是「測試斷言不夠密」與「回傳形狀的設計
+      取捨」這類需要判斷力的項目，不是低階錯誤。
+
+   3. **先把 §2／§3 兩次 Stage 2 抓到的 repo 慣例寫進 Implementer 的派工單，可省一輪退回**：
+      ① 單純物件形狀一律 `export interface` 且欄位標 `readonly`（`lib/matchmaker/` 有 18 個既有
+      先例；`export type X = { ... }` 只用於字面量聯集、discriminated union 與 `z.infer` 衍生）；
+      ② 註解引用 design 用短式「（design Decision N）」，SHALL NOT 寫 `openspec/changes/...`
+      完整路徑（歸檔後失效），也 SHALL NOT 在程式碼註解裡寫「§7」這類 tasks 章節編號；
+      ③ 註解只寫「為什麼」，不重述函式名、不在檔頭與 JSDoc 各寫一次同一句話；
+      ④ 回傳「領域物件 + 衍生旗標」時採**巢狀**而非攤平——`round.ts` 的四組 Result 都是巢狀，
+      攤平會讓型別結構相容領域物件而被 `useState` 靜默吞下衍生欄位。
+
+   4. **§7 可以直接用 `courtCountBounds(courtCount)`**（§3 追加的具名匯出）取得初次渲染時
+      加減按鈕的 disabled 狀態，不需要呼叫 `changeCourtCount(settings, 0)`，也 SHALL NOT 在
+      元件內自己寫 `courtCount < MAX_COURT_COUNT`（那會讓邊界判定出現第二處）。
+
+   **本次未觸及、仍待確認的既有事項**（非本次新增，一併記錄以免遺漏）：
+   `app/matchmaker/players/page.tsx` 檔頭註解寫著「刻意不加進全站 navbar——功能尚不完整
+   （有名單但還無法產生對戰），導覽整合待對戰畫面完成後與 site-navbar capability 一併處理」。
+   §10 完成後這句話即過期。tasks.md 沒有列出這一項（12.7 只涵蓋 `nextjs-pickball/CLAUDE.md`），
+   請續作者判斷要納入 §10 還是 §12，或明確決定不動。
