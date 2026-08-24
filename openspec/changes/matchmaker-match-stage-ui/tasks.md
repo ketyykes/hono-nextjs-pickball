@@ -29,9 +29,11 @@
 
 ## 3. 本輪設定的預設值與場地數夾值（round-settings.ts）
 
-- [ ] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-settings.test.ts`，寫入兩個 it：「預設為單打與 1 個場地且取用分配引擎匯出的常數」（斷言直接比對 import 進來的 `DEFAULT_FORMAT`／`DEFAULT_COURT_COUNT`，**不寫字面量**）、「場地數加減夾在 1～8 並回報是否已達邊界」（8 加一仍為 8 且 `canIncrement` 為 false；1 減一仍為 1 且 `canDecrement` 為 false；4 加一為 5、減一為 3）。確認紅燈
-- [ ] 3.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/round-settings.ts`：`createRoundSettings()` 回傳 `{ format, courtCount, targetScore }`，`changeCourtCount(settings, delta)` 以 `MIN_COURT_COUNT`／`MAX_COURT_COUNT` 夾值並回報 `canIncrement`／`canDecrement`
-- [ ] 3.3 REFACTOR: 確認四個常數皆來自 `allocation-types.ts` 的 import，本檔沒有任何 `"singles"`／`1`／`8` 字面量；目標分數的預設值來自 1.4 確認的 M4 常數
+- [x] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-settings.test.ts`，寫入兩個 it：「預設為單打與 1 個場地且取用分配引擎匯出的常數」（斷言直接比對 import 進來的 `DEFAULT_FORMAT`／`DEFAULT_COURT_COUNT`，**不寫字面量**）、「場地數加減夾在 1～8 並回報是否已達邊界」（8 加一仍為 8 且 `canIncrement` 為 false；1 減一仍為 1 且 `canDecrement` 為 false；4 加一為 5、減一為 3）。確認紅燈
+- [x] 3.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/round-settings.ts`：`createRoundSettings()` 回傳 `{ format, courtCount, targetScore }`，`changeCourtCount(settings, delta)` 以 `MIN_COURT_COUNT`／`MAX_COURT_COUNT` 夾值並回報 `canIncrement`／`canDecrement`
+- [x] 3.3 REFACTOR: 確認四個常數皆來自 `allocation-types.ts` 的 import，本檔沒有任何 `"singles"`／`1`／`8` 字面量；目標分數的預設值來自 1.4 確認的 M4 常數
+      - Stage 2 審查後追加：`CourtCountChangeResult` 由「攤平繼承 RoundSettings」改為巢狀 `{ settings, canIncrement, canDecrement }`（攤平會讓它結構相容 RoundSettings，衍生旗標可被靜默存進 `useState<RoundSettings>`）；邊界判定抽為具名匯出 `courtCountBounds(courtCount)`，供 RoundControls 初次渲染直接取用，`changeCourtCount` 內部呼叫同一函式使判定仍只有一處。
+      - Stage 2 的 16 次 mutation 中原有 6 次存活（旗標改用變動前的值、兩個旗標各自硬寫 false、上界改用 MIN 比、下界改用 MAX 比、丟棄 settings 展開），根因是測試從未斷言任何旗標為 `true`、也沒有「夾值前後不同」的案例。已補一個 it「場地數從邊界前一格加減至邊界時，回報的是變動後的邊界」與一個 `courtCountBounds` 的 describe，六者皆轉紅。**這些斷言於實作完成後才補，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
 
 ## 4. 色塊版面推導（stage-layout.ts）
 
