@@ -99,15 +99,30 @@ Depends on: §3
 
 Depends on: §4, §5, §6
 
-- [ ] 8.1 RED: 新增 `nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，寫入三個 it：「每個色塊顯示姓名、性別與強度分數」、「雙打場次顯示男雙女雙混雙或一般雙打的組成標示」（四個分支各斷言一次）、「場地與隊伍皆有文字標籤使色彩不是唯一資訊來源」。確認紅燈
-- [ ] 8.2 GREEN: 實作 `CourtCard.tsx` 與 `PlayerTile.tsx`：色塊網格由 `buildCourtTiles` 推導（§4）、樣式由 `playerTileStyle` 推導（§5）、格子為 `aspect-square` 並設最小高度（design Risks）；場地標題與隊伍標籤為可讀文字
-- [ ] 8.3 RED: 補三個 it：「比分欄位為 inputMode numeric 並標示所屬隊伍」、「送出比分會以場次識別與兩隊分數呼叫回合送出函式一次」、「送出失敗時於該場次以 role alert 顯示繁體中文錯誤訊息」。確認紅燈
-- [ ] 8.4 GREEN: 實作 `ScoreEntry.tsx`：兩個 `inputMode="numeric"` 欄位（各有指出隊伍的可存取名稱）與送出鈕；送出呼叫 props 傳入的 `onSubmitScore`；驗證失敗訊息由 props 傳入並以 `role="alert"` 呈現。**SHALL NOT 在此複製任何比分驗證規則**（空白／非數字／平局／已完成皆屬 M4）
-- [ ] 8.5 RED: 補三個 it：「已完成場次的比分欄位與送出按鈕皆為 disabled」、「已完成場次顯示最終比分勝方與完成時間」、「勝方以文字標籤標示而非僅以顏色區分」。確認紅燈
-- [ ] 8.6 GREEN: 補齊完成場次呈現：色塊套 `playerTileStyle(..., { completed: true })`；場次資訊列顯示最終比分、勝方文字標籤與 `HH:mm` 完成時間（design Open Questions 第 3 條）；欄位與送出鈕 `disabled`
-- [ ] 8.7 RED: 補 it「色塊在觸頂或觸底時顯示已達上限或已達下限標示」：場次含 `rating` 8.00 與 1.00 兩人，分別斷言「已達上限」「已達下限」文字。確認紅燈
-- [ ] 8.8 GREEN: 於 `PlayerTile` 接上 `ratingBoundState`（§6），以文字（可搭配圖示）標示，比照既有 `PlayerCard.tsx` 的「暫停出場」Badge 做法——不倚賴顏色辨識
-- [ ] 8.9 REFACTOR: 確認 `CourtCard` 只做組裝，版面／樣式／觸界三項推導全在 `lib/` 的純函式；確認單打與雙打共用同一個 `PlayerTile`，沒有為雙打另寫一份
+> **§8 的完整審查紀錄（含 Stage 2 退回當下的原始狀態、mutation 明細、被判定為契約外而
+> 不處理的項目）見 design.md Open Questions 第 6 條。** 本節只記結論。
+
+- [x] 8.1 RED: 新增 `nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，寫入三個 it：「每個色塊顯示姓名、性別與強度分數」、「雙打場次顯示男雙女雙混雙或一般雙打的組成標示」（四個分支各斷言一次）、「場地與隊伍皆有文字標籤使色彩不是唯一資訊來源」。確認紅燈
+      - 十個具名 it 於引入時皆為**真紅燈**（四輪 RED：8.1／8.3／8.5／8.7）。
+- [x] 8.2 GREEN: 實作 `CourtCard.tsx` 與 `PlayerTile.tsx`：色塊網格由 `buildCourtTiles` 推導（§4）、樣式由 `playerTileStyle` 推導（§5）、格子為 `aspect-square` 並設最小高度（design Risks）；場地標題與隊伍標籤為可讀文字
+      - `RoundMatch` 只存 `playerIds`，故以 `players` prop 查表解析為完整 `Player` 後組成 `CourtTileSource` 餵給 `buildCourtTiles`（design Open Questions 2c），未另立 `RoundMatch → Match` 投影。查無球員時該格略過不渲染、不拋錯（`roster.ts` 的 `removePlayer` 不禁止移除仍在場次中的人）。
+- [x] 8.3 RED: 補三個 it：「比分欄位為 inputMode numeric 並標示所屬隊伍」、「送出比分會以場次識別與兩隊分數呼叫回合送出函式一次」、「送出失敗時於該場次以 role alert 顯示繁體中文錯誤訊息」。確認紅燈
+- [x] 8.4 GREEN: 實作 `ScoreEntry.tsx`：兩個 `inputMode="numeric"` 欄位（各有指出隊伍的可存取名稱）與送出鈕；送出呼叫 props 傳入的 `onSubmitScore`；驗證失敗訊息由 props 傳入並以 `role="alert"` 呈現。**SHALL NOT 在此複製任何比分驗證規則**（空白／非數字／平局／已完成皆屬 M4）
+      - **Stage 2 抓到的實質缺陷（非 mutation 發現）**：初版在呼叫父層 callback 前先做 `Number()` 轉換，銷毀了 M4 的 `validateScoreInput` 分辨空白與非數字所需的原字串——「只填第一隊 11」會讓空欄位被靜默補成 0 並完成整場（寫入 11:0 與評分變動）。已改為 **`onSubmitScore(matchId, rawScoreA: string, rawScoreB: string)` 原字串直傳**，`ScoreEntry` 內不再有任何 `Number()`。
+        裁決：**不牴觸規格**——spec Scenario 的 THEN 只說「帶入該場次識別與兩隊分數」、未指定型別，tasks 8.3／8.4 亦然；test-plan 的 `[11, 7]` 屬計畫階段示意。**it 名稱不變**，斷言改為 `toHaveBeenCalledWith("match-42", "11", "7")`。
+        **→ §11 接 `submitScore` 時直接把這兩個原字串餵給 `rawScoreA`／`rawScoreB`，SHALL NOT 再轉型。**
+- [x] 8.5 RED: 補三個 it：「已完成場次的比分欄位與送出按鈕皆為 disabled」、「已完成場次顯示最終比分勝方與完成時間」、「勝方以文字標籤標示而非僅以顏色區分」。確認紅燈
+- [x] 8.6 GREEN: 補齊完成場次呈現：色塊套 `playerTileStyle(..., { completed: true })`；場次資訊列顯示最終比分、勝方文字標籤與 `HH:mm` 完成時間（design Open Questions 第 3 條）；欄位與送出鈕 `disabled`
+      - 完成時間讀本地時區的時／分並各自 `padStart(2, "0")`，不切片 ISO 字串（切片取到的是 UTC）。未抽共用格式化函式（Open Questions 3 的刻意決定）。
+      - 比分與完成時間**各自獨立判斷是否顯示**，不讓 `completedAt` 損壞連坐拖累仍然合法的比分。
+- [x] 8.7 RED: 補 it「色塊在觸頂或觸底時顯示已達上限或已達下限標示」：場次含 `rating` 8.00 與 1.00 兩人，分別斷言「已達上限」「已達下限」文字。確認紅燈
+- [x] 8.8 GREEN: 於 `PlayerTile` 接上 `ratingBoundState`（§6），以文字（可搭配圖示）標示，比照既有 `PlayerCard.tsx` 的「暫停出場」Badge 做法——不倚賴顏色辨識
+- [x] 8.9 REFACTOR: 確認 `CourtCard` 只做組裝，版面／樣式／觸界三項推導全在 `lib/` 的純函式；確認單打與雙打共用同一個 `PlayerTile`，沒有為雙打另寫一份
+      - Implementer 自檢 25 次 mutation，2 次初次存活後補斷言（兩隊 `playerIds` 對調、勝方 badge 條件塌陷）。
+      - Stage 2 的 55 次 mutation 有 **23 次存活、其中 11 次非等價**。六個根因：① 完成場次色塊樣式的 wiring 完全沒測；② 隊伍文字標籤與 testid 脫鉤（勝方 badge 可掛在寫著另一隊的格子上）；③ 完成比分順序沒釘（集合式斷言丟失順序，與 §4 同一個盲點）；④ **球場網格結構零斷言（7 次存活，最大缺口）**——單打的 it 只驗 `gridColumn`、雙打的 it 只驗 `gridRow`，一個三處互相抵消的複合鏡射就從這條縫穿過；⑤ 完成時間的補零分支從未被執行（測資小時本來就兩位數）；⑥ `scoring` 狀態零覆蓋。已逐項補斷言，**leader 以腳本機械複驗 18 個非等價變異全數轉紅**，還原後三檔皆與基準逐位元組相同。
+      - Stage 2 追加採納的四項設計保真修正：雙打隊伍標籤改貼各自那一排（原本兩個標籤同放網格上方左右分置，「第二隊」壓在第一隊色塊上方，讀者仍得靠顏色連回色塊）；比分與完成時間的顯示條件拆開；`style={style as CSSProperties}` 改為 `style={{ ...style }}`（展開取得隱式索引簽章，不需繞過型別檢查）；補「查無球員」與 `min-h-*` 兩條 regression guard。
+      - Stage 2 判定 `CourtCard` 內 `tile.row * 2 + 1`／`tile.column + 1` **不算第二份版面推導**（只是把 `buildCourtTiles` 已推導的邏輯座標翻譯成 CSS grid 列號），但正因這幾個數字的耦合只靠人腦維持，才需要根因 ④ 的網格結構斷言。
+      - **上述補強的斷言中，除「原字串契約」與「雙打標籤位置」兩項伴隨實作改動而先紅後綠外，其餘一律於實作完成後才寫、寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
 
 ## 9. RestingPanel 元件
 
