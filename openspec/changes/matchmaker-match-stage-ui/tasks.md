@@ -37,9 +37,15 @@
 
 ## 4. 色塊版面推導（stage-layout.ts）
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/stage-layout.test.ts`，寫入三個 it：「單打回傳兩格且兩格同列左右相鄰分屬兩隊」、「雙打回傳四格並排成 2x2」、「雙打上排兩格為第一隊下排兩格為第二隊」。第三個 it 是 design Decision 4 的判準——「對角同隊」的錯誤實作同樣會通過第二個 it，必須有獨立的一條把它擋下。確認紅燈
-- [ ] 4.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/stage-layout.ts` 的 `buildCourtTiles(match)`：依 `Match` 的 discriminated union 分支，單打回傳 2 格（同 `row`、`column` 為 0／1、`teamIndex` 為 0／1），雙打回傳 4 格（`row` 0 為第一隊兩人、`row` 1 為第二隊兩人）
-- [ ] 4.3 REFACTOR: 確認單打與雙打共用同一個「由 `Team` 展開為 tile」的內部輔助函式，不各寫一份；回傳型別為純資料，不挾帶 React 節點
+- [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/stage-layout.test.ts`，寫入三個 it：「單打回傳兩格且兩格同列左右相鄰分屬兩隊」、「雙打回傳四格並排成 2x2」、「雙打上排兩格為第一隊下排兩格為第二隊」。第三個 it 是 design Decision 4 的判準——「對角同隊」的錯誤實作同樣會通過第二個 it，必須有獨立的一條把它擋下。確認紅燈
+      - 三個 it 於實作前皆為真紅燈（模組不存在，`Failed to resolve import "./stage-layout"`）。
+      - Stage 2 第一輪 28 次 mutation 有 **5 次存活**：單打／雙打回傳陣列順序對調、隊內球員順序反轉、單打兩隊 `columnOffset` 對調、單打 `row` 改為固定 5。根因是斷言用 `.sort()` 丟掉順序資訊，且 `row` 只驗「兩格相等」而未釘絕對值。補上有序的「球員—座標」tuple 斷言與 `row` 絕對值後六者（含雙打隊內 column 反轉）皆轉紅。
+      - Stage 2 第二輪再抓到一個**複合變異**存活：回傳順序翻轉 **且** 兩隊 `columnOffset` 同時對調。根因是 it 1 用「陣列索引驗 `column`、球員身分驗 `teamIndex`」兩套互不交會的鍵，兩點同時變造會互相抵消。改為單一有序 `[player.id, teamIndex, row, column]` tuple 比對後轉紅。
+      - **上述補強的斷言一律於實作完成後才寫，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+- [x] 4.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/stage-layout.ts` 的 `buildCourtTiles(match)`：依 `Match` 的 discriminated union 分支，單打回傳 2 格（同 `row`、`column` 為 0／1、`teamIndex` 為 0／1），雙打回傳 4 格（`row` 0 為第一隊兩人、`row` 1 為第二隊兩人）
+      - 依 design Open Questions 第 2 條 (c)，參數型別為結構型別 `CourtTileSource`（只要求 `format` 與 `teams[].players`），`allocation-types.ts` 的 `Match` 可免 cast 直接指派；未另立 `RoundMatch → Match` 投影。
+- [x] 4.3 REFACTOR: 確認單打與雙打共用同一個「由 `Team` 展開為 tile」的內部輔助函式，不各寫一份；回傳型別為純資料，不挾帶 React 節點
+      - Stage 2 審查後追加三項：① 同一形狀 `{ readonly players: readonly Player[] }` 原本內聯三遍，抽為具名 `CourtTileTeamSource`（既有 codebase 在 tuple 位置一律放具名 interface）；② 刪除 `buildCourtTiles` 上方複述分支行為的 JSDoc（Decision 4 的理由檔頭已寫過一次）；③ 註解中的 tasks 章節編號改寫為不點編號的敘述。
 
 ## 5. 色塊樣式推導（tile-style.ts）
 
