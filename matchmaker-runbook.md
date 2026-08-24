@@ -2,9 +2,12 @@
 
 > 給下一個接手的 coordinator agent。目標：把 openspec 的 7 個 matchmaker change
 > 依相依順序全部跑完 `/opsx:apply` 並逐一合併回本機 `main`。
-> 本檔記錄 2026-08-23 中斷當下的狀態與接續步驟。
+>
+> **本檔內有多處寫於不同時間的段落。凡與「狀態快照」或「M6～M9 的執行順序」牴觸者，
+> 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
+> **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 狀態快照（2026-08-23 晚間，M3 已完成並合併）
+## 狀態快照（最後更新 2026-08-24）
 
 | 項目 | 值 |
 |---|---|
@@ -157,7 +160,16 @@ M4（62 task）耗掉兩位 leader 的脈絡，M5 有 **64 task／12 群組**，
 4. **Implementer 用 `sonnet` 不用計畫預設的 `haiku`。** M4 §1 的 haiku 連續兩輪被退回
    （失效的假測試、複述式註解），每次退回要付一次 opus 審查成本，反而更貴。
    這是刻意偏離 execution-plan，要求 leader 在回報的「偏離」欄如實記載。
-| quick-rating-spec-backfill | 不在本輪範圍（使用者指定只跑 7 個 matchmaker change） |
+5. **worktree 內的編輯器／IDE 診斷不可信**（2026-08-24 M6 加入）。常整批謊報
+   `Cannot find module 'react' / 'vitest' / '@/lib/...'` 與大量 JSX implicit any。
+   一律以實跑 `pnpm -r exec tsc --noEmit` 的 exit code 為準。
+   唯一可信的例外是「單一新檔的單一 import 解不到」——那是 TDD 紅燈，是真的。
+6. **要求 leader 逐 task commit（`test:` 一個、`feat:` 一個），不要一組一個 commit。**
+   M6 的第一棒自發這樣做，效果很好：每次紅燈獨立留在版控裡，
+   coordinator 可用 `git show <commit>^:<path>` 直接複驗，完全不必採信回報。
+
+> 註：`quick-rating-spec-backfill` 這個 change 不在本輪範圍
+> （使用者指定只跑 7 個 matchmaker change）。
 
 ### M3 留給 verify／archive 的三個備註
 
@@ -174,27 +186,29 @@ runbook 原寫 `Claude-Session: <當前 session 的 URL>`，但本機 CLI sessio
 ## Pipeline 總覽
 
 ```
-M3 rating-engine ──merge──> main ──> M4 round-lifecycle ──merge──> main
-                                                                    │
-                                     ┌──────────────┬───────────────┤
-                                     v              v               v
-        M5 match-stage-ui <──────── main <──merge── (M5 完成後)
-              │merge
-              v            ┌─> M6 scoreboard-binding ─┐
-             main ─────────┼─> M7 history-page        ├─ 四個平行，各自 merge 回 main
-                           ├─> M8 data-transfer       │  （逐一合併，衝突時停下回報）
-                           └─> M9 visual-export      ─┘
+M3 ──merge──> main ──> M4 ──merge──> main ──> M5 ──merge──> main
+                                                             │
+                                                             v
+        M6 scoreboard-binding ──merge──> main ──> M7 history-page ──merge──> main
+                                                             │
+                                                             v
+        M8 data-transfer ──merge──> main ──> M9 visual-export ──merge──> main
 ```
+
+**全程嚴格序列，一次只開一個 worktree。** 早期計畫寫「M6～M9 四個平行」，
+2026-08-24 的預檢與實測推翻了它，理由見「M6～M9 的執行順序」一節。
 
 硬相依（各 change 的 environment.md 明寫，不可跳過）：
 - M4 開分支前 M3 必須已合併回 `main`（M4 直接 import M3 的 `updateRatings`）。
-- M5 需要 M4 在 `main` 上；M6/M7/M8/M9 需要 M5 在 `main` 上。
-- M6～M9 之間無相依，可四個平行。
+- M5 需要 M4 在 `main` 上；M6～M9 需要 M5 在 `main` 上。
+- **M8 需要 M6 在 `main` 上**（直接 import M6 的 `MATCH_SLOTS_KEY`，否則 `tsc` 失敗）。
+- M7 與 M8 都要改 `lib/matchmaker/section-nav.ts`，序列跑才不必解衝突。
 
 ## 模型規定（使用者硬性要求）
 
 - 每個 change 由**一個 opus leader**（`Agent` tool、`subagent_type: general-purpose`、`model: 'opus'`）執行。
-- leader 派工的 subagent 依該 change `execution-plan.md` 的 Roles：Implementer 預設 `haiku`、
+- leader 派工的 subagent 依該 change `execution-plan.md` 的 Roles，但有一項**常設覆寫**：
+  **Implementer 一律用 `sonnet`，不用 execution-plan 預設的 `haiku`**（理由見下方派工經驗第 4 條）。
   Spec Reviewer `sonnet`、Code-Quality／Final Reviewer `opus`，升級照 Escalation 規則。
 - **每次 Agent 呼叫都必須明確帶 `model` 參數；任何情況不得使用 `fable`**（fable 只允許
   當 coordinator，不做實作）。
@@ -213,10 +227,10 @@ M3 rating-engine ──merge──> main ──> M4 round-lifecycle ──merge�
 | M3 | matchmaker-rating-engine | ~~matchmaker-rating-engine~~（已拆） | ~~change/matchmaker-rating-engine~~（已刪） | main（已滿足） | **apply 完成並已合併**，待 verify／archive |
 | M4 | matchmaker-round-lifecycle | ~~matchmaker-round-lifecycle~~（已拆） | ~~change/matchmaker-round-lifecycle~~（已刪） | M3 已合併回 main | **apply 完成並已合併**，待 verify／archive |
 | M5 | matchmaker-match-stage-ui | ~~matchmaker-match-stage-ui~~（已拆） | ~~change/matchmaker-match-stage-ui~~（已刪） | M4 已合併回 main | **apply 完成並已合併**，待 verify／archive |
-| M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding | change/matchmaker-scoreboard-binding | M5 已合併回 main | 未開始 |
-| M7 | matchmaker-history-page | matchmaker-history-page | change/matchmaker-history-page | M5 已合併回 main | 未開始 |
-| M8 | matchmaker-data-transfer | matchmaker-data-transfer | change/matchmaker-data-transfer | M5 已合併回 main | 未開始 |
-| M9 | matchmaker-visual-export | matchmaker-visual-export | change/matchmaker-visual-export | M5 已合併回 main | 未開始 |
+| M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding（**已存在，勿重開**） | change/matchmaker-scoreboard-binding | main @ `3fefb02`（已滿足） | **apply 進行中，已暫停**。見「M6 中斷點」 |
+| M7 | matchmaker-history-page | 尚未建立 | change/matchmaker-history-page | **M6 已合併回 main** | 未開始 |
+| M8 | matchmaker-data-transfer | 尚未建立 | change/matchmaker-data-transfer | **M6 與 M7 都已合併回 main** | 未開始 |
+| M9 | matchmaker-visual-export | 尚未建立 | change/matchmaker-visual-export | **M6～M8 都已合併回 main** | 未開始 |
 
 ## 接續步驟
 
@@ -266,18 +280,20 @@ git merge --no-ff change/matchmaker-rating-engine \
 沿用 M2 的合併慣例（`d8a23ee`：--no-ff、Conventional Commits、繁體中文）。**只動本機 main，不 push。**
 合併後依該 change `environment.md` 的 Teardown 拆 worktree 與分支。測試不綠就**不合併**，回報使用者。
 
-### 3. 開 M4 → M5 →（M6～M9 平行）
+### 3. 每開一個新 change 的標準流程（M7、M8、M9 各走一次）
 
-每一輪相同：
+⚠️ **一次只開一個。前一個合併並 teardown 之後才開下一個。**
 
 ```bash
 git worktree add /Users/m2_24gb/Desktop/project/pickball-worktrees/<change-id> -b change/<change-id> main
 ```
 
-然後用下方模板啟動 opus leader（M4 起走逐組制，模板中的單檔測試路徑與唯讀檔案清單
-換成該 change execution-plan.md 寫的內容）。完成 → 驗證 → 合併 → teardown → 下一個。
-M6～M9 在 M5 合併後**同時**開 4 個 worktree、4 個 leader 平行跑；合併時逐一來，
-遇衝突停下回報（各 change 已設計成互不改同檔，理論上無衝突）。
+然後用下方模板啟動 opus leader（走逐組制，模板中的單檔測試路徑與唯讀檔案清單
+換成該 change execution-plan.md 寫的內容）。完成 → **coordinator 獨立驗證**
+（`pnpm test`、`pnpm -r exec tsc --noEmit`、lint、E2E 帶 `--workers=1`）→
+`--no-ff` 合併回本機 `main`（**不 push**）→ 依 environment.md teardown → 更新本檔 → 下一個。
+
+測試不綠就**不合併**，回報使用者。
 
 ## Leader prompt 模板
 
@@ -406,12 +422,15 @@ M5 合併後 `/matchmaker` 才會存在（在此之前是 404）。檢視方式�
 ## M6～M9 預檢結果（2026-08-24，四個平行讀者 + 整合分析）
 
 **結論：runbook 原本那句「各 change 已設計成互不改同檔，理論上無衝突」不成立。**
-合併風險評為 **HIGH**。四個 change 仍可平行開發，但**不能照現況直接開四個 worktree**。
+合併風險評為 **HIGH**。
 
-### 阻擋條件：M5 合併前不要開任何 M6～M9 的 worktree
+> 📌 本節寫於 M5 尚未合併時，當時的結論是「仍可平行開發、但不能照現況開四個 worktree」。
+> **後續的文件修正與實測把它收斂為「嚴格序列」**——見「M6～M9 的執行順序」一節。
+> 以下保留原分析供追溯，但**不要照這裡的「四個平行」執行**。
+
+### 阻擋條件（已滿足，2026-08-24 M5 已合併）
 
 M6／M7／M8／M9 的 `environment.md` 與 tasks §0 全都明文要求「`main` 必須先含 M5，否則立即停止」。
-現在開會四個一起卡在 Step 0，白白浪費四輪派工。
 
 ### 合併順序必須是 M6 → M7 → M8 → M9（不可任意調換）
 
