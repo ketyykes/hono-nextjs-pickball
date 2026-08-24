@@ -1,12 +1,9 @@
-import { z } from "zod";
 import { ScoreboardStateSchema } from "./types";
 import type { ScoreboardState } from "./types";
 
 export const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
 
 export type MatchSlots = Record<string, ScoreboardState>;
-
-export const MatchSlotsSchema = z.record(z.string(), ScoreboardStateSchema);
 
 export interface ReadMatchSlotsResult {
 	slots: MatchSlots;
@@ -27,8 +24,8 @@ function hasLocalStorage(): boolean {
  *
  * 整份不是合法 JSON、或解析後不是物件 → 清除整個 key（無筆可救，
  * 只清 MATCH_SLOTS_KEY 一個 key，SHALL NOT 波及獨立槽 scoreboard:current:v1）。
- * 整份能解析為物件時逐筆 safeParse——刻意不整份丟給 MatchSlotsSchema，
- * 因為一筆壞資料就會讓 safeParse 整體失敗，與「單場損壞不得連坐清空
+ * 整份能解析為物件時逐筆 safeParse——刻意不定義「整份 map」的 schema 一次驗完，
+ * 因為一筆壞資料就會讓整份驗證失敗，與「單場損壞不得連坐清空
  * 其他場次」的需求牴觸（見 design Decision 4）。
  */
 export function readMatchSlots(): ReadMatchSlotsResult {
