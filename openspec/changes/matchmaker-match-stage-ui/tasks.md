@@ -49,9 +49,16 @@
 
 ## 5. 色塊樣式推導（tile-style.ts）
 
-- [ ] 5.1 RED: 新增 `nextjs-pickball/lib/matchmaker/tile-style.test.ts`，寫入兩個 it：「色塊背景為雙色漸層且前景取 pickTextColor 的結果」（斷言 `background` 同時含 `colorFrom` 與 `colorTo`，`color` 等於直接呼叫 `pickTextColor` 的回傳值——不硬寫顏色字串）、「已完成場次的色塊樣式降低不透明度與飽和度」（`completed: true` 相對 `false` 兩項皆較低，且 `false` 時不帶這兩項）。確認紅燈
-- [ ] 5.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/tile-style.ts` 的 `playerTileStyle(player, options)`：回傳可直接展開到 `style` 的物件；漸層寫法比照既有 `components/matchmaker/PlayerCard.tsx`
-- [ ] 5.3 REFACTOR: 完成場次的不透明度與飽和度抽為具名常數（不留裸數字），並在檔頭註解說明「為何走 inline style 而非 Tailwind class」與「降不透明度會削弱 `pickTextColor` 對比、但關鍵資訊顯示在色塊外」兩件事（design Decision 8）
+- [x] 5.1 RED: 新增 `nextjs-pickball/lib/matchmaker/tile-style.test.ts`，寫入兩個 it：「色塊背景為雙色漸層且前景取 pickTextColor 的結果」（斷言 `background` 同時含 `colorFrom` 與 `colorTo`，`color` 等於直接呼叫 `pickTextColor` 的回傳值——不硬寫顏色字串）、「已完成場次的色塊樣式降低不透明度與飽和度」（`completed: true` 相對 `false` 兩項皆較低，且 `false` 時不帶這兩項）。確認紅燈
+      - 兩個 it 於實作前皆為真紅燈（模組不存在，`Failed to resolve import "./tile-style"`）。
+      - Stage 2 的 30 次 mutation 有 **8 次存活，其中 7 次非等價**：`pickTextColor(colorFrom, colorFrom)`／`(colorTo, colorTo)`（只看單一端點）、完成分支的 `background`／`color` 被改壞或整個漏掉（3 種）、兩個分支各自多帶一個未預期的 CSS 鍵（2 種）。三個根因分別是：① 原測試只用一組「兩端皆淺色」的配色，擋不住「只看一端」——而 `pickTextColor` 的設計重點正是取**兩端**最小對比；② 完成分支的 `background`／`color` 從未被斷言；③ 逐鍵斷言不比對物件形狀。已改為「兩組互為反向的一深一淺配色」＋ `toStrictEqual` 完整物件比對，七者皆轉紅。
+      - 第 8 個存活（`pickTextColor` 兩引數對調）經 Stage 2 獨立驗證為**等價變異**：`pickTextColor` 內部為 `min(contrast(from, fg), contrast(to, fg))`，`Math.min` 與 `contrastRatio` 對其兩引數皆對稱，任何輸入下對調結果相同。**刻意不殺。**
+      - **上述補強的斷言一律於實作完成後才寫，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+- [x] 5.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/tile-style.ts` 的 `playerTileStyle(player, options)`：回傳可直接展開到 `style` 的物件；漸層寫法比照既有 `components/matchmaker/PlayerCard.tsx`
+      - 回傳 `{ background, color }`，`completed: true` 時另帶 `opacity`／`filter`；`completed: false` 時該兩鍵**不存在**（非 `undefined`），對應驗收「不帶這兩項」的字面意思。
+- [x] 5.3 REFACTOR: 完成場次的不透明度與飽和度抽為具名常數（不留裸數字），並在檔頭註解說明「為何走 inline style 而非 Tailwind class」與「降不透明度會削弱 `pickTextColor` 對比、但關鍵資訊顯示在色塊外」兩件事（design Decision 8）
+      - 三個具名常數 `GRADIENT_ANGLE_DEG`／`COMPLETED_OPACITY`／`COMPLETED_SATURATION`，函式體內無裸數字（含漸層角度）。
+      - 已知的跨檔重複（Stage 2 記錄，**本 change 不處理**）：漸層字串在 `tile-style.ts` 與 `components/matchmaker/PlayerCard.tsx` 各有一份字面量，格式完全一致但角度只在前者具名。建議後續 change 抽 `gradientCss(player)` 讓 `PlayerCard.tsx` 改為呼叫。
 
 ## 6. 強度觸頂／觸底判定（rating-bounds.ts）
 
