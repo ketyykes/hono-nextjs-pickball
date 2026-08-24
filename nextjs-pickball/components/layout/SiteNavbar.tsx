@@ -16,10 +16,11 @@ const NAV_LINKS: readonly NavLink[] = [
 	{ href: "/tour", label: "完整體驗" },
 	{ href: "/scoreboard", label: "計分板" },
 	{ href: "/quiz", label: "測驗" },
+	{ href: "/matchmaker", label: "對戰分配" },
 ] as const;
 
 // 全域 navbar：fixed top，捲離首頁 Hero 後切換為白底；
-// 在首頁以外的路由（/tour、/scoreboard、/quiz）一律白底樣式。
+// 在首頁以外的路由一律白底樣式。
 export function SiteNavbar() {
 	const pathname = usePathname();
 	const isHome = pathname === "/";
@@ -38,8 +39,8 @@ export function SiteNavbar() {
 					: "border-white/5 bg-slate-900/20 backdrop-blur-sm",
 			)}
 		>
-			{/* 窄螢幕：收合 logo 文字並縮小間距，讓 4 個連結維持單行。
-			    不做漢堡選單——只有 4 個連結，藏起來等於替每次導航多加一次點擊。 */}
+			{/* 窄螢幕：收合 logo 文字並縮小間距，讓 5 個連結維持單行。
+			    不做漢堡選單——只有 5 個連結，藏起來等於替每次導航多加一次點擊。 */}
 			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-3 px-4 sm:gap-6 sm:px-6">
 				<Link
 					href="/"

@@ -147,11 +147,27 @@ Depends on: §4, §5, §6
 
 ## 10. SiteNavbar 新增第 5 條連結
 
-- [ ] 10.1 RED: 於既有 `nextjs-pickball/components/layout/SiteNavbar.test.tsx` 補兩個 it：「Navbar 顯示對戰分配連結且指向 /matchmaker」、「路由為 /matchmaker 時對戰分配連結套用 active 樣式」（沿用該檔既有的 `vi.mock("next/navigation")` 模式）。確認紅燈
-- [ ] 10.2 GREEN: 於 `SiteNavbar.tsx` 的 `NAV_LINKS` 加入 `{ href: "/matchmaker", label: "對戰分配" }`；`transitionTypes` 沿用既有規則（非 `/` 一律 `nav-forward`）
-- [ ] 10.3 RED: 於 `nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts` **新增**一個 test「窄螢幕下對戰分配連結亦全部可見」（390px 下第 5 條連結 visible 且不換行）。**既有 test「窄螢幕下四個導航連結全部可見」原樣保留不改名**——openspec 的 MODIFIED 是整段取代語意，改 Scenario 標題會被 `validate --strict` 判為刪除既有 Scenario（spec 內已註明）。跑 E2E 確認紅燈；若順序上 10.2 已完成使新 test 立即全綠，此步為 regression guard，MUST 在此如實標註，SHALL NOT 偽造紅燈
-- [ ] 10.4 GREEN: 確認 390px 下 logo 與五個連結皆不換行（既有 test「窄螢幕下 logo 與導航連結皆不換行」為紅燈來源）。**若換行**：依 design Decision 7 的退路把連結文案由「對戰分配」縮短為「對戰」，並同步更新 10.1 的 it 斷言與 spec 的 MODIFIED 內文；**SHALL NOT 改為漢堡選單或橫向捲動**
-- [ ] 10.5 REFACTOR: 確認 `NAV_LINKS` 仍只含公開內容路由（`/health` 未被順手加入）；逐項確認四個既有 navbar E2E test 仍綠——「窄螢幕下 logo 與導航連結皆不換行」、「窄螢幕下四個導航連結全部可見」、「寬螢幕顯示 logo 文字，窄螢幕收合只留圖示」、「窄螢幕下導航列內容不橫向溢出」（後兩者本 change 不改動，屬既有 regression guard，在此列名以免收尾時漏跑）
+- [x] 10.1 RED: 於既有 `nextjs-pickball/components/layout/SiteNavbar.test.tsx` 補兩個 it：「Navbar 顯示對戰分配連結且指向 /matchmaker」、「路由為 /matchmaker 時對戰分配連結套用 active 樣式」（沿用該檔既有的 `vi.mock("next/navigation")` 模式）。確認紅燈
+      - 兩個 it 皆為**真紅燈**（`Tests 2 failed | 3 passed (5)`，既有三個 it 全數通過，證實紅燈只來自新斷言）。
+      - active 樣式的 it 兩半都驗（該連結套 active、其餘四條為 muted），以 `className.split(/\s+/)` 的 exact token 比對而非 substring——`text-slate-900` 是 `hover:text-slate-900` 的子字串，substring 比對會誤判。
+- [x] 10.2 GREEN: 於 `SiteNavbar.tsx` 的 `NAV_LINKS` 加入 `{ href: "/matchmaker", label: "對戰分配" }`；`transitionTypes` 沿用既有規則（非 `/` 一律 `nav-forward`）
+      - **`transitionTypes` 以 code inspection 驗收，RTL 不可觀察**（不留下「有測試涵蓋」的錯覺）：Stage 2 獨立查證 `next/dist/esm/client/link.js`，`transitionTypes` 在解構後不會落進 `restProps`、整條路徑無 `setAttribute` 或 spread 到 DOM `<a>`；全 repo 四處使用（`HeroTourCta.tsx`、`TourSkipButton.tsx`、`ClosingStage.tsx`、`SiteNavbar.tsx`）皆無測試覆蓋。三種補法（mock `next/link`、為可測而抽 exported helper、E2E 反推動畫方向）都不划算。真正的護欄在程式碼形狀：該三元是 5 條連結**共用的同一個運算式、無 per-link 特例**，要製造偏差必須顯式加上一眼可見的特例。
+- [x] 10.3 RED: 於 `nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts` **新增**一個 test「窄螢幕下對戰分配連結亦全部可見」（390px 下第 5 條連結 visible 且不換行）。**既有 test「窄螢幕下四個導航連結全部可見」原樣保留不改名**——openspec 的 MODIFIED 是整段取代語意，改 Scenario 標題會被 `validate --strict` 判為刪除既有 Scenario（spec 內已註明）。跑 E2E 確認紅燈；若順序上 10.2 已完成使新 test 立即全綠，此步為 regression guard，MUST 在此如實標註，SHALL NOT 偽造紅燈
+      - **依 tasks 原順序執行（10.2 先於 10.3），新 test 寫入當下即為綠燈——如實標註為 regression guard，非真紅燈。** Stage 1 獨立判定此標註可信且**不需重排順序去追求真紅燈**：tasks 10.3 本身已預先授權這個情況；若該 test 在 10.2 之前寫，`getByRole("link", { name: "對戰分配" })` 必然找不到元素而紅燈。
+      - 該 test 兩件事都驗：連結 visible，且窄／寬螢幕高度差 ≤ 4px（不換行）。
+      - 既有四個 E2E test 與三個既有 it **原樣保留**：`git diff` 的 `^-` 行（排除 header）為空，證實整段改動為純新增。
+- [x] 10.4 GREEN: 確認 390px 下 logo 與五個連結皆不換行（既有 test「窄螢幕下 logo 與導航連結皆不換行」為紅燈來源）。**若換行**：依 design Decision 7 的退路把連結文案由「對戰分配」縮短為「對戰」，並同步更新 10.1 的 it 斷言與 spec 的 MODIFIED 內文；**SHALL NOT 改為漢堡選單或橫向捲動**
+      - 實測 390px 與 1280px 下 logo 皆 20px、連結皆 36px（一致，無換行），**未動用 Decision 7 的縮短文案退路**，spec 的 MODIFIED 內文不需調整。
+- [x] 10.5 REFACTOR: 確認 `NAV_LINKS` 仍只含公開內容路由（`/health` 未被順手加入）；逐項確認四個既有 navbar E2E test 仍綠——「窄螢幕下 logo 與導航連結皆不換行」、「窄螢幕下四個導航連結全部可見」、「寬螢幕顯示 logo 文字，窄螢幕收合只留圖示」、「窄螢幕下導航列內容不橫向溢出」（後兩者本 change 不改動，屬既有 regression guard，在此列名以免收尾時漏跑）
+      - E2E（chromium，該檔 `test.skip` 非 chromium）五個 test 全綠，逐項列名確認。跑前跑後 `lsof -i :3005 -i :8787` 與 `ps aux` 皆無殘留。
+      - Stage 2 的 26 次 mutation 有 **3 個非等價變異存活，根因是 active 的「排他性」零護欄**：`|| link.href === "/matchmaker"`、`= link.href === "/matchmaker"`、`startsWith` 前綴比對（後者會讓 `/matchmaker/players` 下「對戰分配」也高亮）。原 active it 把 THEN 的兩半都驗了，但 **WHEN 只餵 `/matchmaker` 一個值**，整個測試檔從未觀察過「對戰分配在非 `/matchmaker` 路由下長什麼樣」。已補 it「路由非 /matchmaker 時對戰分配連結不套用 active 樣式」（pathname 用 `/matchmaker/players`，一併釘住前綴比對這條邊界），三者皆轉紅。
+      - Stage 2 另指出 **`whitespace-nowrap`（spec 明文的「本 Requirement 核心」）在單元與 E2E 兩層都是真空**：390px 下餘裕為正（約 28px），內容本來就排得下一行，拿掉 `whitespace-nowrap` 不會讓既有高度測試轉紅——它是「餘裕為負時才發揮作用」的保險絲，而本 change 剛把餘裕從 90px 砍到 28px。已補 it「logo 與所有導航連結皆套用 whitespace-nowrap」（走訪所有 link 斷言 class token），logo 與連結兩個變異皆轉紅。
+      - Stage 2 另修兩項：① `SiteNavbar.tsx` 的路由列舉註解「（/tour、/scoreboard、/quiz）」加入第 5 條後已不完整，改為不列舉的寫法（每加一條連結就要維護一次的列舉本身就是漂移來源）；② `afterEach` 的 `vi.clearAllMocks()` 只做 `mockClear()`、**不會清掉 `mockReturnValue`**，`usePathname` 的回傳值會外洩到後續測試——原本因 active it 排最後才沒炸，新增第三個 it 會立刻引爆，已改用 `vi.resetAllMocks()`。
+      - **leader 機械複驗 9 個 mutation 全數轉紅**（3 個 active 排他性 + 2 個 `whitespace-nowrap` + `href` 改子路由 + muted class 與 active 同值 + 順手加 `/health` + active 整體反轉），還原後逐位元組相同。
+      - 兩位 Reviewer 一致判定為**契約外、刻意不殺**的存活變異：`NAV_LINKS` 陣列順序（spec 只說「並列顯示」未規定順序）、`transitionTypes` 給 `nav-back`（RTL 不可觀察，見 10.2 的註記）、label 前後加空白（accessible name 會正規化）、`key` 改用 label、`NAV_LINKS` 去 `readonly`、非 solid（首頁）分支的 active／muted 對調（既有缺口非本組新增）、`px-2` → `px-4`（E2E 的橫向溢出測試有機會抓到）。
+      - **上述補強的斷言一律於實作完成後才寫，寫入當下即為綠燈，屬 regression guard 而非真紅燈。**
+- [x] **10.6（coordinator 追加，tasks.md 原本未列）**：更新 `nextjs-pickball/app/matchmaker/players/page.tsx` 的檔頭註解。原文「刻意不加進全站 navbar——功能尚不完整（有名單但還無法產生對戰），導覽整合待對戰畫面完成後與 site-navbar capability 一併處理」在 §10 完成後即成為假敘述。改為描述現況：navbar 的 matchmaker 入口指向對戰頁 `/matchmaker`（不同時掛第二條指向本頁的連結，spec 明文），本頁改由 matchmaker 區段內的區段導覽抵達。**只改註解，程式碼零改動**（`git diff` 確認）。
+      - `tests/e2e/specs/player-roster.spec.ts` 檔頭的類似敘述**未動**——該句說的是「此頁一律用 `page.goto()` 直接以網址存取，不走 navbar 連結」，這在 §10 之後**仍然成立**（navbar 沒有指向本頁的連結）。
 
 ## 11. 頁面組裝與 E2E
 

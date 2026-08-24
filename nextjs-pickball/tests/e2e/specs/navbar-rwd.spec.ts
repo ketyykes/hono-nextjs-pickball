@@ -65,6 +65,29 @@ test.describe("SiteNavbar 窄螢幕呈現", () => {
 		}
 	});
 
+	test("窄螢幕下對戰分配連結亦全部可見", async ({ page }) => {
+		await page.setViewportSize(NARROW);
+		await page.goto("/");
+
+		const matchmakerLink = page.getByRole("link", {
+			name: "對戰分配",
+			exact: true,
+		});
+		await expect(matchmakerLink).toBeVisible();
+
+		// 與其餘四條同列不換行：高度應與寬螢幕下一致（換行會讓高度倍增）。
+		const narrowHeight = await matchmakerLink.evaluate(
+			(el) => el.getBoundingClientRect().height,
+		);
+
+		await page.setViewportSize(WIDE);
+		const wideHeight = await matchmakerLink.evaluate(
+			(el) => el.getBoundingClientRect().height,
+		);
+
+		expect(narrowHeight).toBeLessThanOrEqual(wideHeight + 4);
+	});
+
 	test("寬螢幕顯示 logo 文字，窄螢幕收合只留圖示", async ({ page }) => {
 		await page.setViewportSize(WIDE);
 		await page.goto("/");
