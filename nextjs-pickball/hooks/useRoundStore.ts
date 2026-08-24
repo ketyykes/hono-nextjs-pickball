@@ -2,20 +2,24 @@
 "use client";
 
 import { useEffect, useReducer, useRef } from "react";
-import { createRound } from "@/lib/matchmaker/round";
-import type { CreateRoundInput, CreateRoundResult } from "@/lib/matchmaker/round";
-import { readRound, writeRound, readHistory } from "@/lib/matchmaker/round-storage";
+import {
+	createRound,
+	resetIncompleteMatches as resetIncompleteMatchesPure,
+	submitScore as submitScorePure,
+	SUBMIT_SCORE_FAILURE_CODE,
+} from "@/lib/matchmaker/round";
+import type { CreateRoundInput, CreateRoundResult, ResetIncompleteMatchesResult, SubmitScoreResult } from "@/lib/matchmaker/round";
+import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
 import type { Round } from "@/lib/matchmaker/round-types";
 import type { Player } from "@/lib/matchmaker/types";
 
-// 回合 store 的 state 形狀。history／droppedCount 目前只由 hydrate 路徑寫入——
-// 本 hook 尚未接上送出比分（round.ts 的 submitScore 尚未在此接線，見 round-lifecycle
-// delta「比分送出的完成流程」Requirement 的「實作位於」只列 round.ts，未列本檔），
-// 兩欄位先在此暴露供 UI 讀取歷史與損壞筆數提示：spec「回合與歷史的持久化與損壞降級」
-// 要求「丟棄筆數大於 0 時 SHALL 對外回報，SHALL NOT 靜默處理」，而 hook 是這條資訊
-// 通往 UI 的唯一路徑；比照 useRosterStore 已匯出 droppedCount 的既有做法。
+// 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
+// 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate
+// 路徑寫入，對外暴露讀取持久化資料時被丟棄的損壞筆數——比照 useRosterStore 已
+// 匯出 droppedCount 的既有做法。現況：本 change（對戰頁）尚未在畫面上消費這個值，
+// 是已知缺口，留給後續處理歷史頁面的 change。
 interface RoundStoreState {
 	round: Round | null;
 	history: MatchHistoryEntry[];
@@ -23,12 +27,15 @@ interface RoundStoreState {
 }
 
 // HYDRATE：mount 後把 localStorage 讀到的回合與歷史灌入 state（沿用 useRosterStore
-// 的 SSR/CSR 一致性理由）。GENERATE_ROUND：只取代 round，restSettlements 的套用
-// 不經過本 reducer——那些 patch 屬於名單（roster port），本 store 不擁有名單狀態
-// （design Decision 7）。
+// 的 SSR/CSR 一致性理由）。GENERATE_ROUND／RESET_INCOMPLETE_MATCHES：只取代 round，
+// 對應的名單／休息次數 patch 不經過本 reducer——那些 patch 屬於名單（roster port），
+// 本 store 不擁有名單狀態（design Decision 7）。SUBMIT_SCORE：取代 round 並把新完成
+// 的一場附加進 history；playerPatches 同樣不經過本 reducer，套用方式見下方 submitScore。
 type RoundStoreAction =
 	| { type: "HYDRATE"; round: Round | null; history: MatchHistoryEntry[]; droppedCount: number }
-	| { type: "GENERATE_ROUND"; round: Round };
+	| { type: "GENERATE_ROUND"; round: Round }
+	| { type: "RESET_INCOMPLETE_MATCHES"; round: Round }
+	| { type: "SUBMIT_SCORE"; round: Round; historyEntry: MatchHistoryEntry };
 
 function createInitialState(): RoundStoreState {
 	return { round: null, history: [], droppedCount: 0 };
@@ -40,6 +47,10 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 			return { round: action.round, history: action.history, droppedCount: action.droppedCount };
 		case "GENERATE_ROUND":
 			return { ...state, round: action.round };
+		case "RESET_INCOMPLETE_MATCHES":
+			return { ...state, round: action.round };
+		case "SUBMIT_SCORE":
+			return { ...state, round: action.round, history: [...state.history, action.historyEntry] };
 		default:
 			return state;
 	}
@@ -67,7 +78,20 @@ export interface UseRoundStoreResult {
 	droppedCount: number;
 	/** 產生新一輪：失敗時（`ok: false`）不套用任何變動，回傳值即失敗結果供 UI 顯示訊息。 */
 	generateRound: (input: GenerateRoundInput) => CreateRoundResult;
+	/** 重排本輪尚未比賽的人：委派 round.ts 的 resetIncompleteMatches，失敗
+	 * （`ok: false`）時不套用任何變動。 */
+	resetIncompleteMatches: () => ResetIncompleteMatchesResult;
+	/** 送出一場比分：委派 round.ts 的 submitScore，成功時依序完成三件事——套用
+	 * 新回合、把 historyEntry 併入歷史、把每筆 playerPatches 交給 roster port 的
+	 * updatePlayer；失敗（`ok: false`）時三者皆不觸碰，不會出現部分更新。 */
+	submitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => SubmitScoreResult;
 }
+
+// 「找不到目前回合」與 round.ts 私有的 MATCH_NOT_FOUND_MESSAGE（「找不到指定的場次」）
+// 是不同情境：後者是「回合存在但 matchId 過期」，前者是「整個回合都不存在」——本頁面
+// 的 submitScore 只會在 CourtCard 渲染時才被呼叫（CourtCard 只存在於 round !== null
+// 的畫面裡），這個分支在目前的 UI 接線下不可達，純為型別安全而設的防線。
+const NO_ROUND_TO_SUBMIT_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
 
 // 整合 reducer 與 localStorage，結構比照 useRosterStore.ts：write effect 放前面
 // （mount 時 ref=false 故跳過）、read/hydrate effect 放後面，避免 read 前就被
@@ -86,6 +110,14 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		if (!hasHydratedRef.current) return;
 		writeRound(state.round);
 	}, [state.round]);
+
+	// 歷史的寫入 effect，結構比照上面的回合寫入 effect：只在 hydrate 完成後才寫回，
+	// 避免 mount 時以初始（空）history 覆蓋 localStorage 既有資料。submitScore 因此
+	// 不需要自己呼叫 writeHistory——dispatch 後 state.history 變動，本 effect 自動接手。
+	useEffect(() => {
+		if (!hasHydratedRef.current) return;
+		writeHistory(state.history);
+	}, [state.history]);
 
 	useEffect(() => {
 		const round = readRound();
@@ -109,7 +141,8 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	// 「原值 + 1」的絕對值 patch 而非差值，重複套用同一份結果相同。不改用「把
 	// state.round 的讀取搬進 reducer」來根治：那會迫使 reducer 呼叫 crypto.randomUUID()
 	// 與 new Date() 而不再是純函式，也讓本函式無法同步回傳 CreateRoundResult 供 UI
-	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。
+	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。resetIncompleteMatches／submitScore
+	// 同樣讀 render scope 的 state.round，適用同一條限制。
 	//
 	// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）：createRound() 一次算出
 	// 新回合與 restSettlements，本函式在同一次同步呼叫內依序 dispatch 新回合、
@@ -134,10 +167,57 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return result;
 	}
 
+	// 重排本輪尚未比賽的人（design Open Questions 2d）：resetIncompleteMatches 回傳值
+	// 刻意不含 restCount patch（重排不是本輪結束，見 round.ts 該函式的註解），本函式因此
+	// 只需 dispatch 新回合，不需要像 generateRound 那樣額外套用休息結算。
+	function resetIncompleteMatches(): ResetIncompleteMatchesResult {
+		const result = resetIncompleteMatchesPure(state.round, players, {
+			newMatchId: () => crypto.randomUUID(),
+		});
+
+		if (result.ok) {
+			dispatch({ type: "RESET_INCOMPLETE_MATCHES", round: result.round });
+		}
+
+		return result;
+	}
+
+	// 原子性由「失敗時不套用任何變動」保證（round.ts submitScore 把 validateScoreInput
+	// 放在最前面完成，失敗時回傳值裡沒有 historyEntry／playerPatches 可用）：本函式只在
+	// result.ok 為 true 時才 dispatch 並呼叫 updatePlayer，失敗時 round／history／名單
+	// 三者皆不觸碰。round／history 的持久化寫入交給上方兩個 write effect 各自對應
+	// state.round／state.history 的變動自動處理，本函式不重複呼叫 writeRound／writeHistory
+	// （比照 generateRound／resetIncompleteMatches 已建立的模式）。
+	function submitScore(matchId: string, rawScoreA: string, rawScoreB: string): SubmitScoreResult {
+		if (state.round === null) {
+			return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.MATCH_NOT_FOUND, message: NO_ROUND_TO_SUBMIT_MESSAGE };
+		}
+
+		const result = submitScorePure({
+			round: state.round,
+			players,
+			matchId,
+			rawScoreA,
+			rawScoreB,
+			now: new Date().toISOString(),
+		});
+
+		if (result.ok) {
+			dispatch({ type: "SUBMIT_SCORE", round: result.round, historyEntry: result.historyEntry });
+			for (const patch of result.playerPatches) {
+				updatePlayer(patch.id, { rating: patch.rating, gamesPlayed: patch.gamesPlayed });
+			}
+		}
+
+		return result;
+	}
+
 	return {
 		round: state.round,
 		history: state.history,
 		droppedCount: state.droppedCount,
 		generateRound,
+		resetIncompleteMatches,
+		submitScore,
 	};
 }

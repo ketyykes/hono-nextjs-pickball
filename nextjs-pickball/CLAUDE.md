@@ -25,7 +25,9 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
 
 - `/` — 匹克球指南（Hero、TocBar、Part 01/02、Conclusion）
 - `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查
-- `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。對戰分配引擎（`lib/matchmaker/` 的 allocation、candidates、pairing、duplication）**已完成但尚未接 UI**，等後續對戰畫面 milestone；同目錄的 roster／types／colors／storage 已由本路由使用
+- `/matchmaker` — 對戰頁（場次舞台：本輪設定、場地色塊網格、比分輸入與送出、休息名單），milestone M5 = matchmaker-match-stage-ui change。**全站 navbar 的 matchmaker 入口指向這裡**，SHALL NOT 同時掛第二條指向名單頁的連結
+- `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
+- 上述兩頁共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 
 matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單、回合、比分都存瀏覽器，不上傳後端）——引擎放前端是刻意決策，不是待搬的後端邏輯。
@@ -58,7 +60,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
   - `guide/HeroTourCta` 是 **server component 例外**（其餘 guide 元件皆標 `"use client"`）；其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 依 capability 分組。跨 capability 歸屬清單的**單一來源**是 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement——**任何** capability 新增 hook 時，其 change 須一併更新該清單（歷史上曾漏更新導致規格失真）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
-  - quiz：`useQuiz`；player-roster：`useRosterStore`
+  - quiz：`useQuiz`；player-roster：`useRosterStore`；round-lifecycle：`useRoundStore`
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）

@@ -346,6 +346,66 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
    歸屬清單。這正是 Decision 3 不在本 change 新增 hook 的理由——兩個並行 worktree 若都去改
    那一份清單，合併時衝突的會是規格文字。
 
+   **→ 已於 apply Step 0（tasks 1.2～1.5）在 `main`（`bbda8ff`）上實測，結果如下。**
+
+   **(a) 常數來源（tasks 1.3、1.4）——與假設一致，無待決事項。**
+   `nextjs-pickball/lib/matchmaker/rating-types.ts` 確實匯出 `RATING_MIN = 1`／`RATING_MAX = 8`，
+   路徑與 Open Questions 第 1 條的假設相同，§6 直接 import 即可。
+   `nextjs-pickball/lib/matchmaker/round-types.ts` 已匯出**可迭代的** `TARGET_SCORE_OPTIONS`
+   （由 `RoundTargetScoreSchema.options` 推導）與 `DEFAULT_TARGET_SCORE = 11`，
+   tasks 1.4 所擔心的「只有型別沒有清單」並未發生，**不需要**回頭改 M4 的模組。
+
+   **(b) 回合資料形狀——與 Decision 9 的假設相容，但隊伍不內嵌 `Player`。**
+   `Round` 為 `{ roundNumber, createdAt, format, courtCount, targetScore, matches, restingPlayerIds,
+   seenSignatures }`；`RoundMatch` 為 `{ id, courtNumber, format, doublesComposition?, teams:
+   [RoundTeam, RoundTeam], status: "pending" | "scoring" | "completed", scores: { teamA, teamB } | null,
+   winner: "teamA" | "teamB" | null, completedAt: string | null, playerRatings[] }`；
+   `RoundTeam` 為 `{ playerIds: string[], rating: number }`。
+   **持久化層刻意只存 id**（M4 註解：回合與名單同時活著，內嵌 `Player` 會產生兩個互相矛盾的
+   真相）。因此 UI 的 `players` prop 不只是為了顯示，而是**解析 `playerIds` 的必要輸入**；
+   `restingPlayerIds` 同樣是 `string[]`，`RestingPanel` 需要的姓名／顏色／`restCount`
+   一律由頁面層以名單查表後傳入。這與 Decision 9 的 props 形狀（`MatchStage ({ round, players,
+   onSubmitScore })`、`CourtCard ({ match, players, ... })`）相容，不需要改 Decision 9。
+
+   **(c) `buildCourtTiles` 的輸入型別（影響 §4／§8 的接縫）——採結構型別。**
+   test-plan 與 tasks 4.2 寫的是「以一場 `Match` 呼叫」，指 `allocation-types.ts` 的 `Match`
+   （`teams[].players` 內嵌完整 `Player`）；但 §8 的 `CourtCard` 拿到的是 `RoundMatch`
+   （`teams[].playerIds`）。把 `RoundMatch` 回填成完整 `Match` 需要偽造 `doublesComposition`
+   （`RoundMatch` 為 optional、`Match` 的 doubles 分支為必填），是靜默補值。
+   **決議**：`buildCourtTiles` 的參數型別放寬為「只要求 `format` 與 `teams[].players`」的結構型別，
+   `allocation-types.ts` 的 `Match` 可直接指派（§4 的測試仍照 test-plan 傳入真正的 `Match`），
+   §8 則傳入由 `playerIds` 解析後的隊伍。分支仍以 `format` 這個判別欄位進行。
+   SHALL NOT 為此在 `stage-layout.ts` 之外另立一份 `RoundMatch → Match` 投影。
+
+   **(d) `useRoundStore` 只接線了 `generateRound`——§11.6 需要擴充該檔。**
+   合併後的 `hooks/useRoundStore.ts` 對外只回傳 `{ round, history, droppedCount, generateRound }`；
+   `setTargetScore`／`resetIncompleteMatches`／`submitScore` 三個 pipeline 只以純函式存在於
+   `lib/matchmaker/round.ts`，**尚未接上 store**（M4 經 Stage 1 裁決的刻意範圍，非遺漏）。
+   tasks 11.6 要求「於 `page.tsx` 接上 M4 的產生／重排／送出 pipeline」，而回合狀態由 store 擁有，
+   頁面無法從外部更新它。因此 **§11 MUST 擴充既有的 `hooks/useRoundStore.ts`**
+   （新增 reducer action 與對外函式）。這**不違反 Decision 3**——Decision 3 禁止的是在 `hooks/`
+   **新增檔案**（會動到 `pickleball-guide-page` 的 hooks 歸屬清單與 `hooksInventory.test.ts`），
+   修改既有檔案不影響那份清單。
+   連帶（M4 交接明文要求）：接 `submitScore` 時 MUST 一併補上 `round-storage.ts` 的 `writeHistory`
+   歷史寫入路徑，並把 `playerPatches` 交給 roster port 的 `updatePlayer`；
+   `submitScore` 的成功結果同時帶 `round`／`historyEntry`／`playerPatches`／`boundaryHits` 四項。
+
+   **(e) 錯誤訊息已是繁體中文，UI 不需自譯。**
+   `createRound`／`resetIncompleteMatches`／`validateScoreInput`／`submitScore` 皆回傳
+   `{ ok: true, ... } | { ok: false, code, message }`，`message` 已是可直接顯示的繁體中文
+   （例如「兩隊比分相同時無法判定勝方，請確認比分後再試一次。」）。UI 的責任只是把 `message`
+   放進 `role="alert"`，SHALL NOT 依 `code` 另寫一份中文對照表。
+
+   **(f) `ROUND_FAILURE_CODE` 的命名（M4 交接事項第 4 點）——本 change 不處理。**
+   M4 建議 M5 接線前把它更名為 `CREATE_ROUND_FAILURE_CODE`（其餘四組皆以函式名命名，只有這組
+   以模組命名）。本 change 的 tasks.md **沒有這一項**，依派工紀律不自行擴權更名，留待後續
+   milestone 或整理型 change 處理。
+
+   **(g) `/matchmaker` 目前確為 404（tasks 1.5）。**
+   `nextjs-pickball/app/matchmaker/` 底下只有 `players/`，無 `page.tsx` 亦無 `layout.tsx`。
+   `tests/e2e/specs/player-roster.spec.ts` 內查無「頁面頂部第一個元素」這類位置性斷言
+   （grep `first()`／`nth(0)`／`heading`／`h1` 皆無命中），新增區段導覽不會使其轉紅。
+
 3. **完成時間的顯示格式**：暫定 `HH:mm`（當地時區），與 `prd.md` 8.2 歷史紀錄的「對戰時間」
    同源。若 M7 的歷史頁決定用別的格式，兩處 SHALL 對齊——但那是 M7 的事，本 change 不預先
    為它抽共用格式化函式（沒有第二個消費者的抽象是負債）。
@@ -353,3 +413,324 @@ E2E 需要預先種入 roster 與 round 的 LocalStorage 資料。種入格式�
 4. **桌面斷點的場次網格欄數**：暫定手機 1 欄、平板起 2 欄。8 場地時桌面是否要 3 欄，等實際看到
    畫面再定；此細節不寫進 spec（spec 只約束「場地內容與休息名單左右並排」），因此調整欄數
    不需要改規格。
+
+5. **apply 階段的中途交接（2026-08-24，第一位 leader 乾淨停止）。**
+
+   **停止理由**：不是脈絡耗盡，而是**單組實耗時間遠超預期**。§2、§3 兩個群組（合計 6 個 task，
+   是本 change 最小的兩組）各花約 50～70 分鐘 wall clock，且**兩組的 Stage 2 都退回一次**。
+   依此速率，剩下 9 組（含 §7、§8、§11 三個最大群組，合計超過 40 個 task）不可能在同一個
+   session 內完成。依 apply 紀律在**派下一組之前**停止，未留下任何「已派工但無人審查」的狀態。
+
+   **已完成並 commit 的群組**（分支 `change/matchmaker-match-stage-ui`）：
+
+   | 群組 | 狀態 | commit |
+   |---|---|---|
+   | §1 前置確認 | 完成（本 Open Question 第 2 條的 (a)～(g) 即其產出） | `0a176d5` |
+   | §2 section-nav.ts | 完成，Stage 1／2 皆 APPROVED | `ee70514` |
+   | §3 round-settings.ts | 完成，Stage 1／2 皆 APPROVED | `4251a2a` |
+
+   **未完成的群組**：§4 stage-layout、§5 tile-style、§6 rating-bounds、§7 RoundControls、
+   §8 CourtCard／PlayerTile／ScoreEntry、§9 RestingPanel、§10 SiteNavbar 第 5 條連結、
+   §11 頁面組裝與 E2E、§12 收尾驗證。**下一組是 §4。**
+
+   **停止當下的驗證數字**（與 `bbda8ff` 的 baseline 逐項對照，無任何退步）：
+
+   | 項目 | baseline | 現在 |
+   |---|---|---|
+   | `pnpm test` 前端 | 46 檔 / 358 測試 passed | **48 檔 / 364 測試 passed** |
+   | `pnpm test` 後端 | 4 檔 / 16 測試 passed | 4 檔 / 16 測試 passed（未動） |
+   | `pnpm -r exec tsc --noEmit` | exit 0 | exit 0 |
+   | `pnpm --filter ./nextjs-pickball lint` | 0 errors / 3 warnings | 0 errors / 3 warnings（同一批既存 warning） |
+
+   E2E 本次**完全未執行**（§10／§11 才會動到）；工作區乾淨，無殘留暫存檔，無殘留 dev server。
+
+   **續作者必須知道的四件事**：
+
+   1. **兩階段審查的 mutation 測試是目前唯一抓到真問題的手段，不可省略。**
+      §2 的 Stage 2 做了 8 次 mutation、**3 次存活**（分頁順序對調、label 對調、多回傳一筆
+      都測不出來，根因是測試只斷言 `active` 欄位）；§3 做了 16 次、**6 次存活**（旗標改用
+      變動前的值、兩個旗標各自硬寫 `false`、上界改用 `MIN` 比、下界改用 `MAX` 比、丟棄
+      `...settings` 展開，根因是測試從未斷言任何旗標為 `true`、也沒有「夾值前後不同」的案例）。
+      兩次都由補斷言解決，補上的斷言**一律是實作後才寫的 regression guard**，已在 tasks.md
+      如實標註。**請把「對本組關鍵斷言做 mutation 測試並回報存活數」寫進每一張 Stage 2 派工單。**
+
+   2. **Implementer 用 `sonnet`，不要用 execution-plan 的預設 `haiku`。** 這是刻意偏離。
+      兩組實測下來 sonnet 的產出品質足夠，被退回的都是「測試斷言不夠密」與「回傳形狀的設計
+      取捨」這類需要判斷力的項目，不是低階錯誤。
+
+   3. **先把 §2／§3 兩次 Stage 2 抓到的 repo 慣例寫進 Implementer 的派工單，可省一輪退回**：
+      ① 單純物件形狀一律 `export interface` 且欄位標 `readonly`（`lib/matchmaker/` 有 18 個既有
+      先例；`export type X = { ... }` 只用於字面量聯集、discriminated union 與 `z.infer` 衍生）；
+      ② 註解引用 design 用短式「（design Decision N）」，SHALL NOT 寫 `openspec/changes/...`
+      完整路徑（歸檔後失效），也 SHALL NOT 在程式碼註解裡寫「§7」這類 tasks 章節編號；
+      ③ 註解只寫「為什麼」，不重述函式名、不在檔頭與 JSDoc 各寫一次同一句話；
+      ④ 回傳「領域物件 + 衍生旗標」時採**巢狀**而非攤平——`round.ts` 的四組 Result 都是巢狀，
+      攤平會讓型別結構相容領域物件而被 `useState` 靜默吞下衍生欄位。
+
+   4. **§7 可以直接用 `courtCountBounds(courtCount)`**（§3 追加的具名匯出）取得初次渲染時
+      加減按鈕的 disabled 狀態，不需要呼叫 `changeCourtCount(settings, 0)`，也 SHALL NOT 在
+      元件內自己寫 `courtCount < MAX_COURT_COUNT`（那會讓邊界判定出現第二處）。
+
+   **本次未觸及、仍待確認的既有事項**（非本次新增，一併記錄以免遺漏）：
+   `app/matchmaker/players/page.tsx` 檔頭註解寫著「刻意不加進全站 navbar——功能尚不完整
+   （有名單但還無法產生對戰），導覽整合待對戰畫面完成後與 site-navbar capability 一併處理」。
+   §10 完成後這句話即過期。tasks.md 沒有列出這一項（12.7 只涵蓋 `nextjs-pickball/CLAUDE.md`），
+   請續作者判斷要納入 §10 還是 §12，或明確決定不動。
+   **→ 第二位 leader（2026-08-24）取得 coordinator 裁決：納入 §10 一併更新該註解，
+   於回報的「偏離」欄記載。理由是這屬本 change 自己造成的文件失準，一句與程式碼矛盾的
+   註解比一個範圍註記糟糕。**
+
+6. **§8 Stage 2 審查結果（未修正時的完整紀錄，2026-08-24）。**
+
+   > 落盤理由：這份審查結果原本只存在於 leader 的對話脈絡中，磁碟上沒有任何副本。
+   > leader 曾因 API 529 中途終止，若再發生一次即永久遺失、續作者只能整組重審。
+   > **本條記錄的是「退回當下」的狀態**；修正是否完成請以 tasks.md 的 checkbox 與 git log 為準。
+
+   **審查狀態**：Stage 1（規格符合度）**APPROVED**；Stage 2（程式品質）**CHANGES_REQUESTED**。
+   Stage 2 跑了 **55 次 mutation，23 次存活**，其中 **11 次非等價且落在契約內**。
+   當時工作區的四個未追蹤檔即 §8 的全部產出：`components/matchmaker/CourtCard.tsx`、
+   `CourtCard.test.tsx`、`PlayerTile.tsx`、`ScoreEntry.tsx`。
+
+   Implementer 交件時的三點自述經 Stage 2 獨立驗證**皆成立**：兩隊 `playerIds` 對調的位置
+   斷言有效、勝方 badge 兩方向都測有效、`data-slot="badge"` 不存在檢查為必要（純文字查詢
+   抓不到只有圖示的 badge）。實作本身 tsc 綠、lint 0 error、無新相依、無比分驗證規則複製、
+   六項 repo 慣例全數符合。
+
+   ---
+
+   **(A) 實質實作缺陷（非 mutation 發現，嚴重度最高）——`ScoreEntry` 的 `Number()` 轉換
+   銷毀了 M4 執行驗證所需的資訊。**
+
+   `lib/matchmaker/round.ts` 的契約是 `SubmitScoreInput { rawScoreA: string; rawScoreB: string }`
+   與 `validateScoreInput(match, rawScoreA, rawScoreB)`，其 `parseScoreField` **靠原字串**
+   才分得出 `EMPTY_FIELD` 與 `INVALID_NUMBER`（該檔註解明寫「SHALL NOT 單獨用 `Number()`
+   或 `parseInt()` 判斷」：`Number("")` 為 0、`Number("   ")` 為 0）。但 `ScoreEntry.handleSubmit`
+   在呼叫父層 callback **之前**就做了 `Number(teamAValue)`。實測傳給父層的值：
+
+   | 使用者輸入 | 實際傳給父層 | M4 會判定成 |
+   |---|---|---|
+   | 兩欄皆空白 | `("match-1", 0, 0)` | **TIE**「兩隊比分相同時無法判定勝方」（正確應為 `EMPTY_FIELD`「兩隊比分皆須填寫」） |
+   | **只填第一隊 `11`** | `("match-1", 11, 0)` | **通過驗證** → 場次被標記完成、寫入 11:0 與評分變動 |
+   | 第二隊填 `abc` | `("match-1", 11, NaN)` | 僥倖正確（`String(NaN)` → `"NaN"` 被 pattern 擋下） |
+
+   第二列是**資料完整性缺陷**：一個空欄位被靜默補成 0 並完成整場。這不算「複製驗證規則」，
+   但等於銷毀了 M4 執行該規則所需的資訊，實質效果與把「空白＝0」搬進 UI 相同，
+   與 spec「比分驗證規則歸屬回合 capability，UI SHALL NOT 複製一份」相衝。
+
+   **leader 裁決的修法**：`ScoreEntryProps.onSubmitScore: (rawScoreA: string, rawScoreB: string) => void`、
+   `CourtCardProps.onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void`，
+   原字串直接往上傳，`ScoreEntry` 內不再出現任何 `Number()`。
+
+   **是否牴觸規格的裁決：不牴觸。** spec Scenario 的 THEN 是「回合 capability 的送出函式被
+   呼叫一次，帶入該場次識別與**兩隊分數**」，未指定型別；tasks 8.3／8.4 亦未指定。
+   test-plan 的 Assertion 欄寫「參數含場次識別與 `[11, 7]`」屬計畫階段示意，**it 名稱不變**
+   （「送出比分會以場次識別與兩隊分數呼叫回合送出函式一次」），驗收錨點仍可機械核對。
+   斷言改為 `toHaveBeenCalledWith("match-42", "11", "7")`。
+   **→ §11 接 `submitScore` 時直接把這兩個原字串餵給 `rawScoreA`／`rawScoreB`，不要再轉型。**
+
+   ---
+
+   **(B) 測試斷言缺口（六個根因，11 次非等價存活）**
+
+   | 代號 | 根因 | 存活的 mutation | 修法 |
+   |---|---|---|---|
+   | R1 | 完成場次色塊樣式的 wiring 完全沒測 | M07（`playerTileStyle` 恆傳 `{ completed: false }`）、M55（把 `completed` 定義反向、再在 disabled／勝方／資訊列三處各補 `!`，只讓色塊受影響的**複合變異**） | 在完成場次的 it 內斷言色塊 `style.opacity`／`style.filter` 有值，未完成的對照組斷言兩者為空字串（**兩個方向都要**） |
+   | R2 | 隊伍文字標籤與 testid 脫鉤 | M09（兩排隊伍標籤文字對調、testid 不動） | 勝方斷言改釘容器**完整文字**（`textContent === "第一隊勝"`／`"第二隊"`），而非只查「頁面某處有『第一隊』」 |
+   | R3 | 完成比分的順序沒釘 | M10（`teamA`／`teamB` 顯示對調） | `expect(scoreRow.textContent).toBe("11:7")` 取代兩次 `getByText`。**與 §4 被退回的是同一個「集合式斷言丟失順序」盲點** |
+   | R4 | **球場網格結構零斷言（最大缺口，7 次存活）** | M06、M35、M36、M37、M49、M50、M51：控制區移到最下（「網」不見）、控制區只跨左半、grid 變四欄、grid 退化單欄、雙打同隊兩人疊同欄、單打兩人被拆成上下排，以及一個**三處互相抵消的複合鏡射**（`[teamB, teamA]` + `gridColumn: 2 - tile.column` + `gridRow: 3 - tile.row * 2`）。根因是**單打的 it 只驗 `gridColumn`、雙打的 it 只驗 `gridRow`** | ① 單打與雙打**兩個 format 都同時斷言 `gridColumn` 與 `gridRow`**；② 為比分／送出控制區容器加 `data-testid`，斷言 `gridRow === "2"` 且 `gridColumn === "1 / 3"`（Decision 4 的「網」）；③ 斷言 grid 容器 `gridTemplateColumns` 為兩欄 |
+   | R5 | 完成時間的補零分支從未被執行 | M12（拿掉 `padStart`）——測試資料 `13:05Z` 在 Asia/Taipei 是 `21:05`，小時本來就兩位數 | 加一組 `completedAt` 落在本地**單位數小時**的案例（如 `"2026-08-23T00:05:00.000Z"` → `08:05`）。期望值仍以 `Date` 推導、不硬寫字串 |
+   | R6 | `scoring` 狀態零覆蓋 | M46（`status === "completed"` 改 `!== "pending"`，使 `scoring` 場次被誤鎖並套完成樣式） | 加一條 `status: "scoring"` 的 it：欄位／送出鈕**未** disabled、不顯示完成資訊列、色塊未套完成樣式。§7 已測 `scoring`，此處應對齊 |
+
+   ---
+
+   **(C) 實作的設計保真修正（leader 裁決要做）**
+
+   1. **雙打的隊伍標籤位置與色塊排列不對應**：兩個標籤同放在色塊網格**上方**一列並以
+      `justify-between` 左右分置，但雙打色塊是**上下分排**（Decision 4）。結果「第二隊」
+      出現在右上角、正好壓在第一隊色塊上方，讀者仍得靠顏色把標籤連回色塊——與 Requirement
+      「色彩 SHALL NOT 作為唯一資訊來源：每支隊伍 MUST 有文字隊伍標籤」的意圖相衝。
+      （單打左右分置是正確的。）
+   2. `completed && match.scores && match.completedAt` 應**拆成兩個獨立條件**：目前
+      `completedAt` 為 `null` 時**比分也一起消失**；schema 的 `superRefine` 讓它實務不可達，
+      但比分不該被時間欄位損壞連坐。
+   3. `style={style as CSSProperties}` 改為 `style={{ ...style }}`：展開成物件字面量會取得
+      隱式索引簽章，**完全通過 tsc、不需任何斷言**，語意不變。（Stage 2 亦確認該 `as` cast
+      並未掩蓋真正的型別錯誤——加一個非 CSS 欄位仍會以 `TS2352` 報錯——所以這只是風格改善。）
+   4. 補「查無球員」的 regression guard：實測雙打缺一人時 `.filter` 濾掉 →
+      **只渲染 3 格、不拋錯、不破圖**。行為可接受（`roster.ts` 的 `removePlayer` 確實不禁止
+      移除場上球員），但完全沒測。
+   5. 補 `min-h-*` 的 class 斷言——design Risks ① 明寫「色塊 **MUST** 設最小高度」。
+      `aspect-square` 與 `truncate` **不必**補（repo 既有元件測試不驗 Tailwind class，
+      只有 `min-h` 是 MUST）。
+
+   ---
+
+   **(D) 明確判定為契約外／近似等價、SHALL NOT 處理的項目**（避免續作者重複爭論）
+
+   送出後是否清空欄位（spec 未規範）、觸界 badge 的 `ArrowUp`／`ArrowDown` 圖示對調
+   （圖示為 `aria-hidden` 裝飾、文字仍正確）、`buildCourtTiles(...).reverse()`
+   （grid 明確定位、視覺等價）、場地標題 `h3`→`span`（spec 只要求「可讀場地標題」）、
+   `type="text"`→`"number"`（spec 只要求 `inputMode`）、完成資訊列條件移除 `completed`
+   （schema 保證 pending 無 scores）、`teams` 長度非預期時解構拋 `TypeError`
+   （有 `z.tuple` + TS tuple 雙重保證）。
+
+   ---
+
+   **(E) Stage 2 對兩個爭議點的獨立判斷**
+
+   - **`CourtCard` 內 `tile.row * 2 + 1`／`tile.column + 1` 算不算第二份版面推導？**
+     判定為**不算**——那是把 `buildCourtTiles` 已算出的座標翻譯成 CSS grid line 的轉換，
+     不是重新推導誰在哪一格。但正因為這四個數字（`repeat(2, …)`／`row*2+1`／控制區的
+     `gridRow: 2`／`gridColumn: "1 / 3"`）之間的耦合只靠人腦維持，才需要 (B) R4 的網格結構斷言。
+   - **`players.find(...)` 找不到球員時的行為**：見 (C) 4，可接受但需補測。
+
+7. **§11 的實作決定與 leader 裁決（2026-08-24，Implementer 交件後、審查回覆前落盤）。**
+
+   > 落盤理由同第 6 條：Implementer 的回報只存在於 leader 的對話脈絡中，磁碟無副本。
+
+   **交付內容**：`app/matchmaker/layout.tsx`、`app/matchmaker/page.tsx`、
+   `components/matchmaker/MatchmakerTabs.tsx`／`MatchStage.tsx`／`EmptyStage.tsx`、
+   `tests/e2e/specs/match-stage.spec.ts`（14 個 test）為新增；`hooks/useRoundStore.ts` 為**修改**
+   （+95/−14，`hooks/` 零新增檔案，符合 Decision 3）。
+   E2E 五個 browser project 共 **70/70 passed**；`player-roster.spec.ts` 與 `navbar-rwd.spec.ts`
+   無回歸；單元測試 381 passed；`tsc` 與 `lint` 乾淨。
+
+   **(a) 派工單的一處事實錯誤（leader 的錯，記錄以免重蹈）：`hooks/useRoundStore.test.tsx` 早就存在。**
+   該檔由 M4 commit（`b557a27`／`1912d38`），含 2 個 test（hydration restore、`generateRound` 的
+   rest-settlement → `updatePlayer` 接線）。leader 的派工單誤述為「不存在」，並據此要求 Implementer
+   在需要新增測試檔時回報 `NEEDS_CONTEXT`。Implementer 因該檔不在可動清單而未編輯它，
+   **導致新增的 `resetIncompleteMatches`／`submitScore` 兩個對外函式沒有任何 hooks 層單元測試**。
+   該檔另有一句註解「submitScore 尚未接線」現已過期。
+
+   **→ leader 裁決**：`useRoundStore.test.tsx` 是**既有檔**，編輯它**不違反 Decision 3**
+   （Decision 3 禁止的是在 `hooks/` 新增檔案，會動到 `pickleball-guide-page` 的 hooks 歸屬清單與
+   `hooksInventory.test.ts`；修改既有檔案不影響那份清單）。**MUST 把它加進 §11 的可動檔案清單，
+   補上兩個新函式的 hooks 層測試，並修掉那句過期註解。** 補上的測試是實作後才寫的
+   **regression guard**，須如實標註。
+
+   **(b) 完全沒有種入 `matchmaker:round:v1`——所有情境走 UI。**
+   含「2 場對戰」「目標分數已鎖定」在內的每個情境都能用 UI 達成（`增加場地數` + `產生本輪對戰`），
+   因此**不存在** Risks 所述的「E2E 種入 `matchmaker:round:v1` 是對 M4 內部格式的硬耦合」，
+   也沒有種回合資料的 helper。tasks 11.6 的「種資料 helper 集中一處並註明格式來源」是 conditional
+   要求（有種資料才需要），design Risks 亦明說「能用 UI 操作產生的狀態**優先用 UI 操作**」。
+   roster 則用 `page.addInitScript` 種入（非 `player-roster.spec.ts` 的 `goto` + `evaluate`——
+   後者只**清**資料、從不**種**資料；`addInitScript` 的先例在 `scoreboard.spec.ts`）。
+
+   **(c) 手機觸控目標 ≥44px 的實作方式——leader 記錄為已知取捨。**
+   `CourtCard`／`ScoreEntry`（§8 產出）渲染的是 `h-8`／`h-9`（32／36px），**低於 44px 要求**。
+   Implementer 未改那兩個檔（不在其可動清單），改在 `MatchStage.tsx` 加
+   `max-md:[&_input]:h-11 max-md:[&_button]:min-h-11` 的 Tailwind 後代選擇器覆寫
+   （只在 <768px、只作用於場地網格內；specificity `(0,1,1)` 勝過 `.h-9` 的 `(0,1,0)`；
+   `[&_svg]:...` 這個 pattern 在 `button.tsx`／`table.tsx` 已有先例）。
+   **已知隱患**：§8 的 `CourtCard` integration 測試把尺寸凍結在 32／36px，兩層對同一件事的認知
+   不一致；若 `CourtCard` 日後被 `MatchStage` 以外的地方重用，44px 保證就消失了。
+   spec 只要求「手機斷點下比分欄位與主要按鈕的可觸控區域 MUST 不小於 44x44」、未規定實作方式。
+
+   **(d) `layout.tsx` 加了 `pt-14`，同時影響 `/matchmaker/players`。**
+   該頁原本沒有上內距、壓在 fixed navbar 底下；引入共用 layout 後一併修正。
+   Decision 1 已預告「`/matchmaker/players` 從此多出一條區段導覽……不改 `player-roster` 的任何
+   Requirement，因此不列為 Modified capability」。`player-roster.spec.ts` 實測 4/4 仍綠。
+
+   **(e) 兩輪 regression guard（Implementer 主動誠實標註）。**
+   11.7／11.8（RWD 三斷點）：RWD 版面在 11.6 的 GREEN 就一併做完（同一個元件的版面決策），
+   三個 RWD test 寫入即綠、零程式碼改動。
+   11.9／11.10（無障礙）：§7～§9 已把 roving tabindex、disabled／focus、`aria-label`／
+   `<Label htmlFor>` 做對，頁面層未引入新的 a11y 邏輯，**11.10 是 no-op、零實作**。
+
+   **(f) 桌面場次網格欄數（Open Questions 4 授權自由決定）**：手機 1 欄、`md:` 起 2 欄；
+   場地內容與休息名單的並排為 `flex-col lg:flex-row`。
+
+   **(g) 一次 flaky**：`--workers=4` 預設併發下曾出現一次失敗（dev-server 競爭），
+   隔離重跑與 `--workers=2` 皆綠，與 repo 既有的 dev-server 緩慢紀錄一致。
+
+8. **§11 兩階段審查結果與 leader 的四項裁決（2026-08-24，退回當下的完整紀錄）。**
+
+   > 落盤理由同第 6、7 條。**本條記錄的是「退回當下」的狀態**；修正是否完成請以 tasks.md 的
+   > checkbox 與 git log 為準。
+
+   **審查狀態**：Stage 1（規格）**CHANGES_REQUESTED**（單一議題）；Stage 2（品質）
+   **CHANGES_REQUESTED**。**兩位 Reviewer 獨立收斂到同一個核心問題**（下方裁決 2）。
+
+   **兩位 Reviewer 都背書、不需修改的項目**（記錄以免後續重複爭論）：
+   `updatePlayer` port 來源正確（頁面層 `useRosterStore()`，hook 內部無呼叫）；`submitScore` 的
+   原子性正確（僅 `result.ok` 分支內動作）；新 `writeHistory` effect 的 `hasHydratedRef` 守門
+   **必要且正確**（Stage 2 實測移除守門會轉紅——三個 effect 的宣告序是 writeRound → writeHistory
+   → hydrate，mount 時若無守門會先用空陣列覆蓋 `matchmaker:history:v1`）；`submitError` 綁定
+   正確；`resting` 查表正確；Tailwind specificity 主張**數學上正確**（`[&_input]:h-11` 為 `(0,1,1)`
+   勝過 `.h-9` 的 `(0,1,0)`，`min-h-11` 更是不同屬性天然勝出；`[&_svg]:` pattern 在 `button.tsx`、
+   `dialog.tsx`、`select.tsx`、`table.tsx` 已有先例）；`pt-14` 是**修正既有 bug**（`/matchmaker/players`
+   原本一直壓在 fixed navbar 下，`app/quiz/page.tsx` 有逐字相同的先例，`player-roster` spec 全文
+   無版面條款，**不需列為 Modified capability**）；不種 `matchmaker:round:v1` **優於**派工單原本
+   要求（消滅了 Risks ① 的硬耦合，符合「能用 UI 產生的優先用 UI」）；`--workers=4` 的 flaky
+   **不該動測試檔**（config 已設 CI 單 worker、repo 無 `test.describe.configure` 先例、根因是
+   dev server 冷啟動）；兩輪 regression guard 的標註**誠實、不構成規避 TDD**
+   （`components/ui/button.tsx` 本就內建 `focus-visible:ring-*` 與原生 `disabled`，11.9 自然全綠）。
+
+   **(A) hooks 層的 12 個 mutation 存活 11 個**（Stage 2 獨立跑，控制組轉紅證明 harness 有效）：
+   `submitScore` 成功時不 dispatch／不呼叫 `updatePlayer`／失敗時仍套用／`playerPatches` 只套
+   第一筆／history 覆蓋而非 append／不更新 round／`resetIncompleteMatches` 成功時不 dispatch／
+   失敗時仍 dispatch／`writeHistory` effect 依賴陣列改 `[]`／整段 effect 刪除／`state.round === null`
+   防線移除。**唯一被守住的是「移除 `hasHydratedRef` 守門」**（由既有 hydration 測試擋下）。
+
+   **(B) E2E 的四條空／缺席斷言**（Stage 2 以閱讀＋推理找出，皆為「改壞實作後 14 個 test 全綠」）：
+   ① **`aria-current="page"` 零斷言**——把該行刪掉／永遠 `"page"`／反轉判定皆全綠，而這是 spec 的
+   MUST；② **「建立第一輪」從未被點過**——`onGenerate` 改成 no-op 或誤接 `handleReset` 皆全綠，
+   而 tasks 11.4 明訂它等同「產生本輪對戰」；③ **focus 樣式斷言是空的**——量測對象是
+   `variant="outline"` 按鈕，其 base class 本就含 `shadow-xs`，**未聚焦時 `boxShadow` 本來就不是
+   `"none"`**，把 `focus-visible:ring-*` 全砍光仍全綠；④ **完全沒有測到失敗路徑**——`roundError`
+   的 `role="alert"` 區塊與 `submitError?.matchId === match.id` 的**逐場次綁定**皆零覆蓋，
+   改成所有場地一起亮紅字仍全綠。
+
+   **(C) 三處逐字重複註解（慣例「不在兩處各寫一次同一句話」，本 change 第四次因此被退回）**：
+   `layout.tsx` ↔ `MatchmakerTabs.tsx`（連括號內的規範引用都一樣）；`page.tsx` ↔ `useRoundStore.ts`
+   （`page.tsx` 已寫「理由見該檔頂端註解」還把理由整段抄一次）；`match-stage.spec.ts` 檔頭 ↔
+   `seedRoster` 上方。另兩處 `§` 章節符號違規。註解密度：`layout.tsx` 41.2%、`MatchStage.tsx` 25.9%，
+   高於既有帶（`PlayerTile` 13.6%、`CourtCard` 13.2%、`RoundControls` 10.1%、`RestingPanel` 20.4%）。
+
+   ---
+
+   **leader 的四項裁決**
+
+   **裁決 1：可動檔案清單擴充三個既有檔。**
+   `hooks/useRoundStore.test.tsx`（**既有檔，M4 已 commit**——leader 派工單誤述它不存在；編輯它
+   不違反 Decision 3，該 Decision 禁止的是**新增**檔案）、`components/matchmaker/RoundControls.test.tsx`
+   （既有檔，理由見裁決 2）、`components/matchmaker/ScoreEntry.tsx`（**只改檔頭註解**）。
+
+   **裁決 2：「鎖定時方向鍵不得改變目標分數」的護欄改放 integration 層。**
+   兩位 Reviewer 獨立得出同一結論：E2E 那段**測不到** `RoundControls.tsx` 的 `if (locked) return;`
+   ——點擊「產生本輪對戰」後 focus 在 radiogroup **之外**（該按鈕是 radiogroup 容器的手足），
+   keydown 不會冒泡進 `handleTargetScoreKeyDown`；且鎖定時三顆 radio 全 `disabled`，鍵盤無法把
+   焦點放進容器。**裁決**：E2E 側刪掉該段並註解誠實記錄「鎖定時三顆皆 disabled，方向鍵在真實
+   鍵盤路徑上不可達」；integration 側在 `RoundControls.test.tsx` 以 `fireEvent.keyDown` **直接對
+   radiogroup 容器派發**（RTL 不受「disabled 元素不可聚焦」限制），補鎖定與未鎖定兩條對照。
+   這順帶補上 §7 完全缺席的鍵盤導覽 integration 覆蓋——§7 的 Stage 2 有三個變異
+   （`tabIndex` 全 0／全 -1、`if (locked) return;` 被刪、自寫索引計算取代 `nextRadioIndex`）
+   當初就是因「交由 §11 E2E」而存活。
+
+   **裁決 3：「主要按鈕」的範圍界定。**
+   spec 對「產生本輪對戰」的原文是「對戰頁 SHALL 提供『產生本輪對戰』**主要操作入口**」，
+   難以主張它不算主要按鈕。**「產生本輪對戰」與「重設／再排」MUST ≥44px（手機斷點），T11 的
+   量測陣列 MUST 擴充納入這兩顆。** 場地數加減（`size="icon-sm"`，32×32）與目標分數／對戰方式的
+   radio（`size="sm"`，32px）**本 change 不擴大範圍**——spec 的 MUST 對象是「比分欄位與主要按鈕」。
+   **此界定明文記錄於此，避免後續 review 再撞一次。**
+
+   **裁決 4：三項記為已知缺口、本 change 不處理。**
+   ① **`page.tsx` 未消費 `useRoundStore` 的 `droppedCount`**——`match-stage` spec 無此 Requirement；
+   M4 的「丟棄筆數大於 0 時 SHALL 對外回報」在 hook 邊界已滿足。留給 `matchmaker-history-page`。
+   （但 `useRoundStore.ts` 那段自稱「hook 是這條資訊通往 UI 的唯一路徑」的註解與現況不符，已要求
+   改為描述現況。）
+   ② **「重設／再排」的 E2E 零覆蓋**——由 hooks 層補測涵蓋，E2E 不加。
+   ③ **`round.matches` 為空時畫面無說明文字**——`round.ts` 已記載此狀態可達（重排時候選池不足），
+   觸發路徑為「單打 1 場地 2 人 → 產生回合 → 把其中一人設暫停 → 按重設／再排」。此時
+   `round !== null` 故不走 `EmptyStage`，畫面只剩休息名單。**非 spec 違規**（spec 的「SHALL NOT
+   建立空回合」作用對象是 `createRound`），且不是死路（「產生本輪對戰」仍可用）。
+
+   **(D) 其餘一併處理的建議項**：T8 的 `rating` 斷言由 `not.toBe(5)` 強化為方向斷言（勝方 `>5`、
+   敗方 `<5`，仍在契約內）並加 history 筆數斷言；`hasActivePlayers` 在 `page.tsx` 與 `MatchStage.tsx`
+   各推導一次，改以 prop 傳入（Decision 9）；`trackConsoleIssues` 只用在 T1（**沒種 roster** 的情境），
+   而 hydration mismatch 最可能發生在「`addInitScript` 種了 roster、SSR 輸出空名單」那條路徑，
+   應補到 T4、T8；`ScoreEntry.tsx` 檔頭補反向指標說明 44px 來自 `MatchStage` 的 `max-md` 覆寫。
+
+   > Stage 2 澄清一項派工單的誤述：**§8 的測試並沒有斷言 32／36px**（happy-dom 無排版引擎、
+   > 量不到高度），所以不存在「兩層被凍結在互相矛盾的數字上」；真正的風險只是 `CourtCard`／
+   > `ScoreEntry` 被重用時看不到 44px 保證的來源線索。

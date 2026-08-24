@@ -19,8 +19,11 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
-- **Initial commit hash**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
+- **Baseline tests**: 2026-08-24 於本 worktree 執行 `pnpm install` 後 `pnpm test` 全綠——
+  `nextjs-pickball` 46 檔 / 358 測試 passed、`hono-pickball` 4 檔 / 16 測試 passed（無 EPERM）。
+  另：`pnpm -r exec tsc --noEmit` exit 0、`pnpm --filter ./nextjs-pickball lint` 0 errors / 3 warnings
+  （既存於 `hooks/useQuiz.ts`、`hooks/useRosterStore.ts`、`hooks/useScoreboardStore.ts`）
+- **Initial commit hash**: `bbda8ff`
 - **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-match-stage-ui`
 
 ## Teardown
