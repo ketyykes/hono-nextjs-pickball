@@ -114,9 +114,9 @@
 - **THEN** 控制項為原生 `disabled`，且畫面顯示繁體中文說明「本輪已開始計分，目標分數不可更改」
 - **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts`，test 名稱「本輪開始計分後目標分數控制項停用並說明原因」
 
-### Requirement: 重設本輪或刪除場次時清除對應計分板進度
+### Requirement: 重排本輪或重置名單時清除對應計分板進度
 
-重設／重排本輪、刪除場次或重置名單時，系統 MUST 一併清除對應場次在 `scoreboard:matches:v1` 的條目。
+重排本輪（`resetIncompleteMatches` 丟棄未完成場次）或重置名單時，系統 MUST 一併清除對應場次在 `scoreboard:matches:v1` 的條目。
 
 此清除是 `scoreboard` capability「該 `matchId` 有條目 ⟺ 綁定有效」不變式的維持者：不清除的話，使用者從舊分頁或書籤回到 `/scoreboard?match=<舊 id>` 會看到一個仍可計分、但分數永遠回填不到任何地方的計分板，而畫面上沒有任何跡象顯示它已成孤兒。孤兒條目同時會無界累積在 LocalStorage 中（`prd.md` §11：LocalStorage 寫入超出配額）。
 

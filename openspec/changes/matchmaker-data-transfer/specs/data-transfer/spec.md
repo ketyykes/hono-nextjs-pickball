@@ -386,8 +386,10 @@ SHALL NOT 使用前綴掃描。清單的**涵蓋範圍 MUST 為「本 app 寫入
 | `matchmaker:history:v1` | 同上 |
 | `scoreboard:current:v1` | `nextjs-pickball/lib/scoreboard/storage.ts` |
 
-實作時若 `scoreboard` capability 已引入計分板的**分槽 key**（`scoreboard:matches:v1`，
-由 `nextjs-pickball/lib/scoreboard/` 下的分槽模組匯出），清單 MUST 一併納入該 key。
+計分板的**分槽 key**（`scoreboard:matches:v1`，由
+`nextjs-pickball/lib/scoreboard/match-slots.ts` 匯出）為**硬前置**：清單 MUST 一併納入該 key，
+它不是「若已存在才納入」的選配項。該模組不存在時，實作 MUST 停止並回報，
+SHALL NOT 靜默地只納入上表四個 key。
 漏掉它的失敗模式是「清除本機資料」留下全部分場計分槽——那正是分槽 capability 自己警告的
 孤兒條目與 LocalStorage 無界累積，也與本操作「回到空白狀態」的承諾及 `prd.md` §10 的
 「全部 LocalStorage 資料」相違。

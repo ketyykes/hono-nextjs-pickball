@@ -261,7 +261,7 @@ tasks.md 的群組相依。§0 是與 M4 的介面對齊，未完成前不能開
 | `lib/matchmaker/round-types.ts`、`history.ts` | **不動** | 只 import `RoundSchema` / `MatchHistoryEntrySchema` |
 | `lib/matchmaker/roster.ts` | **不動** | 只 import `addPlayer` / `nextAutoGradient` |
 | `lib/matchmaker/types.ts`、`colors.ts` | **不動** | 只 import schema 與調色盤 |
-| `lib/scoreboard/**` | **不動** | 只 import 計分板的**全部** key 常數（`storage.ts` 的 `STORAGE_KEY`；M6 已合併時再加分槽模組的 `scoreboard:matches:v1`），由 §0.5 的 grep 逐一列出 |
+| `lib/scoreboard/**` | **不動** | 只 import 計分板的**全部** key 常數（`storage.ts` 的 `STORAGE_KEY`，以及分槽模組 `match-slots.ts` 的 `scoreboard:matches:v1`——M6 為硬前置，該 key 必納入），由 §0.5 的 grep 逐一列出 |
 | `hooks/**` | **不動** | 不新增 hook，避開 hooks 歸屬清單的並行衝突 |
 | `openspec/specs/**` | **不動** | 主 spec 由 archive 階段同步，本 change 只寫 delta |
 | `hono-pickball/**` | **不動** | 全部行為在瀏覽器完成，不呼叫 `/api/*` |

@@ -23,7 +23,7 @@ M5 交付後，使用者已能看到本輪的場地色塊並手動輸入比分�
 - **由對戰進入時目標分數由該輪帶入且不可改**：`matchId !== null` 時 reducer MUST 忽略 `SET_TARGET_SCORE`，UI 以唯讀文字取代目標分數 radiogroup。
 - **對戰頁每個場地色塊新增「進入計分板」入口**：點擊時先寫入該場的計分板初始狀態（seed；已有進度則**不覆蓋**），再導向 `/scoreboard?match=<matchId>`。
 - **返回動線**：綁定模式的設定列提供「返回對戰」按鈕；回到對戰頁時，凡該輪有 `status === "finished"` 的計分板槽且該場尚未完成者，以其比分呼叫**與手動輸入相同的送出 pipeline**（驗證 → 評分更新 → 寫入歷史 → 標示完成），已完成者不重複送出。
-- **失效處理**（`prd.md` §11「由計分板返回時該場次已被刪除或該輪已重設」）：重設本輪或刪除場次時一併清除對應的計分板槽；以 `?match=<已失效 id>` 開啟計分板時顯示繁體中文說明與兩個出口（回到對戰頁／改用獨立計分板），SHALL NOT 顯示技術錯誤碼或白畫面。
+- **失效處理**（`prd.md` §11「由計分板返回時該場次已被刪除或該輪已重設」）：重設／重排本輪時一併清除對應的計分板槽；以 `?match=<已失效 id>` 開啟計分板時顯示繁體中文說明與兩個出口（回到對戰頁／改用獨立計分板），SHALL NOT 顯示技術錯誤碼或白畫面。
 - **開始計分即鎖定本輪目標分數**：該輪只要有任一場次已開始計分（計分板槽的 `status !== "setup"`）或已完成，`targetScore` 即不可更改。反面亦成立——**回合存在但一場都還沒開始計分時，目標分數 MUST 仍可更改**（經 M4 既有的 `setTargetScore`）。這是對 M5 行為的放寬：M5 因當時拿不到「開始計分」的判準而採「有回合就鎖」，本段補上判準後回到 `prd.md` 6.3.1 的原文。
 - **重置名單的清除範圍擴為四個 key**：`matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1` 之外加入 `scoreboard:matches:v1`；`scoreboard:current:v1` 仍不在範圍內。
 
@@ -33,7 +33,7 @@ M5 交付後，使用者已能看到本輪的場地色塊並手動輸入比分�
 - **Undo、全螢幕、專注模式行為不變**。三者的 Requirement 因此**不列入 MODIFIED**——綁定模式只是多帶一個 `matchId` 欄位，`useFocusMode`／`useFullscreen` 與 replay 機制完全不受影響（`matchId` 隨 `mode`／`firstServer`／`targetScore` 一併在 UNDO replay 與 RESET 後保留，見 `scoreboard` delta）。
 - **歷史紀錄頁與 CSV 匯出（M7／M8）不做**。本段只保證回填**寫入**歷史時與手動輸入走同一條 pipeline、欄位同一份 schema；歷史的呈現、篩選與匯出屬 M7／M8。
 - **評分公式與常數（M3）不動**。本段不呼叫評分 API，只透過 M4 的送出 pipeline 間接觸發。
-- **回合的產生、重設／重排（M4）不動**。本段只在「重設本輪／刪除場次」既有流程尾端追加「清除對應計分板槽」一步。
+- **回合的產生、重設／重排（M4）不動**。本段只在「重設／重排本輪」既有流程尾端追加「清除對應計分板槽」一步。
 - **全站 navbar 的 matchmaker 入口不動**。該入口由 M5 以 Modified `site-navbar` 處理，本段不碰 `site-navbar`，也不 MODIFY M5 的對戰頁導覽 Requirement——避免與 M7／M8 的並行 worktree 在同一段落上衝突。
 - **計分板不顯示實際球員姓名**。隊伍標籤維持「我方／對方」；帶入姓名需在 seed 中多帶顯示資料，屬可獨立提出的體驗改善（見 design 的 Open Questions）。
 - **跨分頁即時同步不做**。同一台裝置開兩個分頁分別計兩個場地是**支援**的（各自綁不同 `matchId`），但一個分頁的變更不會即時推播到另一個分頁；PRD 未要求（見 design 的 Open Questions）。
@@ -48,7 +48,7 @@ M5 交付後，使用者已能看到本輪的場地色塊並手動輸入比分�
 
 - `scoreboard`：**MODIFIED** 兩個既有 Requirement——「localStorage 持久化」（單一場次 → 依 `matchId` 分槽、逐筆降級）與「賽前設定與階段鎖定」（綁定模式下目標分數改為唯讀）；**ADDED** 一個新 Requirement 描述綁定的建立、失效判定與返回動線。
 - `match-stage`（M5 建立）：**ADDED** 兩個新 Requirement——場地色塊的計分板入口、計分中場次的標示與返回後呈現；**MODIFIED** 一個既有 Requirement——「目標分數選擇器」的鎖定條件由 M5 的「目前回合存在即鎖」放寬為「本輪已開始計分才鎖」，且鎖定與否改為委派 `lib/matchmaker/scoreboard-binding.ts` 的判定純函式。這一條**必須** MODIFIED：M5 的既有字句直接寫了「目前回合存在時，選擇器 MUST 為 disabled」，本段推翻它而非追加（M5 design Decision 5 已預告「M6 接上場邊計分後若要放寬，那是一次明確的規格變更」）；連帶 M5 的既有單元測試需更新，已列入 tasks（見 design Decision 7）。
-- `round-lifecycle`（M4 建立）：**ADDED** 三個新 Requirement——計分板結果的自動回填共用送出 pipeline、開始計分後鎖定本輪目標分數、重設本輪或刪除場次時清除對應計分板進度。此三條採 ADDED——它們是新的生命週期步驟，沒有推翻 M4 任何既有 Requirement 的字句。
+- `round-lifecycle`（M4 建立）：**ADDED** 三個新 Requirement——計分板結果的自動回填共用送出 pipeline、開始計分後鎖定本輪目標分數、重排本輪或重置名單時清除對應計分板進度。此三條採 ADDED——它們是新的生命週期步驟，沒有推翻 M4 任何既有 Requirement 的字句。
 - `player-roster`（M1 建立、M4 修訂）：**MODIFIED** 一個既有 Requirement——「重置名單與二次確認」的列舉 key 清單由三個擴為四個（新增 `scoreboard:matches:v1`）。清單是該 Requirement 明文擁有的內容（「重置範圍 MUST 以列舉的 key 清單實作」「目前的清單為三個 key」），本段擴大清除範圍即是修訂它；若只在 `round-lifecycle` 追加一句「重置名單須清分槽 key」，歸檔後主 spec 會同時存在兩條互相打架的規定，而實作點 `resetMatchmakerData()` 只有一個。基底 MUST 取 M4 的 MODIFIED 版本（三個 key），不可取主 spec 的單一 key 前身版本。
 
 ## Impact
@@ -66,8 +66,10 @@ M5 交付後，使用者已能看到本輪的場地色塊並手動輸入比分�
 | `components/scoreboard/ScoreboardSetup.tsx` | 綁定模式下以唯讀文字取代目標分數 radiogroup，並顯示場地標示與「返回對戰」 | 例外層（純呈現） |
 | M5 的場地色塊元件（路徑以 M5 實際產出為準） | 加入「進入計分板」入口與「計分中」標示 | 例外層（純呈現） |
 | M5 的目標分數選擇器元件（`components/matchmaker/RoundControls.tsx`，路徑以 M5 實際產出為準） | 鎖定條件改為委派判定純函式；未鎖定時委派 `setTargetScore` | 例外層（純呈現），既有單元測試須更新 |
-| M4 的回合重設／刪除場次流程（路徑以 M4 實際產出為準） | 尾端追加清除對應計分板槽 | 行為邏輯，必 TDD |
-| `lib/matchmaker/storage-keys.ts`（M4 建立） | 列舉的重置 key 清單加入分槽 key（字面值 import 自 `lib/scoreboard/match-slots.ts`） | 行為邏輯，必 TDD |
+| `lib/matchmaker/round.ts`（M4 建立）的 `resetIncompleteMatches` | 尾端追加清除對應計分板槽 | 行為邏輯，必 TDD |
+| `lib/matchmaker/storage.ts`（M1 建立、M4 修訂） | 列舉的重置 key 清單 `RESET_KEYS` 加入分槽 key（字面值 import 自 `lib/scoreboard/match-slots.ts`） | 行為邏輯，必 TDD |
+| `hooks/useRoundStore.ts`（M4 建立、M5 擴充） | 新增 `setTargetScore` 動作（§8.6）；回合 hydrate 後的計分板回填 reconcile（§8.4） | 行為邏輯，必 TDD |
+| `app/matchmaker/page.tsx`（M5 建立） | 把 `setTargetScore` 與回填 reconcile 以 prop 下傳（§8.4、§8.6） | 例外層（入口） |
 
 **新增程式碼**：
 

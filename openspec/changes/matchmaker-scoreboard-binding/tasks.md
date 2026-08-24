@@ -25,7 +25,7 @@
 
 - [ ] 0.1 讀 M4 產出的回合模組，記下：回合型別名稱、`targetScore` 欄位名、對戰清單欄位名、單場的 id 欄位名、場地編號欄位名、兩隊欄位名、完成狀態欄位名、LocalStorage key（應為 `matchmaker:round:v1`）
 - [ ] 0.2 讀 M4 的**送出比分 pipeline** 入口：函式名、簽章、是否為純函式（回傳新回合與歷史）或直接持久化。若不可在單元層呼叫，MUST 把 test-plan 中「回填與手動輸入的送出結果逐欄相同」的 Tier 由 `unit` 調整為 `integration` 並在此註記（design.md Open Question 4）
-- [ ] 0.3 讀 M4 的「重設／重排本輪」與「重置名單」流程入口，確認可在其尾端追加清槽步驟；一併讀 `nextjs-pickball/lib/matchmaker/storage-keys.ts` 的**列舉 key 清單**（M4 版本應為三個 key）與 `resetMatchmakerData()`，確認清單可由外部模組 import 常數併入
+- [ ] 0.3 讀 M4 的「重設／重排本輪」與「重置名單」流程入口，確認可在其尾端追加清槽步驟；一併讀 `nextjs-pickball/lib/matchmaker/storage.ts` 的**列舉 key 清單** `RESET_KEYS`（M4 版本應為三個 key）與同檔的 `resetMatchmakerData()`，確認清單可由外部模組 import 常數併入
 - [ ] 0.4 讀 M5 產出的對戰頁：路由路徑與其常數名、場地色塊元件路徑、手動輸入送出的既有入口、目標分數控制項所在元件**及其既有單元測試檔**（應為 `components/matchmaker/RoundControls.test.tsx`），記下既有的鎖定判斷寫在何處（M5 為「目前回合是否存在」）與 `setTargetScore` 的實際簽章
 - [ ] 0.5 讀 `node_modules/next/dist/docs/` 中 `searchParams` 的段落，確認 Next.js 16 於 server component 的實際簽章（是否為 Promise、是否需 `await`）——依 `nextjs-pickball/AGENTS.md`，**不得**依訓練資料的記憶書寫（design Decision 3）
 - [ ] 0.6 把 0.1～0.5 的實際識別字回填到本檔 §3～§8 的括號佔位處
@@ -95,7 +95,7 @@ Depends on: §1、§5
 - [ ] 6.1 RED: 補 it「重設本輪只清除未完成場次的槽且不動獨立槽」——`m1` 已完成、`m2` 未完成有槽 → 重設後 `m2` 條目被移除、`m1` 的比分／評分／歷史不變、`scoreboard:current:v1` 未被觸碰。確認紅燈
 - [ ] 6.2 GREEN: 在 §0.3 找到的「重設／重排本輪」流程尾端追加清槽；清除範圍**僅限**被重排掉的未完成場次
 - [ ] 6.3 RED: 於 `nextjs-pickball/lib/matchmaker/storage.test.ts` **更新 M4 既有的 it**「重置只移除列舉的 key，不影響 scoreboard 資料」——改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」，並把斷言擴為：預置 `matchmaker:roster:v1`／`matchmaker:round:v1`／`matchmaker:history:v1`／`scoreboard:matches:v1` 與 `scoreboard:current:v1`，呼叫 `resetMatchmakerData()` 後前四者皆被移除、`scoreboard:current:v1` 仍在（`player-roster` delta 的「重置只清除列舉範圍內的 key」Scenario）。確認紅燈（第四個 key 尚未在清單中）並貼出輸出
-- [ ] 6.4 GREEN: `nextjs-pickball/lib/matchmaker/storage-keys.ts` 的列舉清單加入分槽 key，字面值 **import 自** §1.2 的 `MATCH_SLOTS_KEY`（`lib/scoreboard/match-slots.ts`），SHALL NOT 在 matchmaker 側再寫一次字串
+- [ ] 6.4 GREEN: `nextjs-pickball/lib/matchmaker/storage.ts` 的列舉清單 `RESET_KEYS`（`resetMatchmakerData()` 亦在同檔）加入分槽 key，字面值 **import 自** §1.2 的 `MATCH_SLOTS_KEY`（`lib/scoreboard/match-slots.ts`），SHALL NOT 在 matchmaker 側再寫一次字串
 - [ ] 6.5 RED: 於 `scoreboard-binding.test.ts` 補 it「重置名單清除全部場次槽但保留獨立槽」——預置多場條目 → 走重置名單流程 → 分槽 key 的全部條目被清除、`scoreboard:current:v1` 未被觸碰。**若因 6.4 已使整個分槽 key 被移除而寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（把分槽 key 自清單移除看紅、還原看綠）；**SHALL NOT 為了製造紅燈而在重置流程尾端另寫一次清空呼叫**——`resetMatchmakerData()` 的清除範圍只能有一個定義處（`player-roster` delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）
 - [ ] 6.6 REFACTOR: 確認所有「銷毀場次」的路徑都經過同一個清槽函式，沒有任何路徑漏清（design Decision 2 的不變式維持端）；確認「重設本輪」（逐場清）與「重置名單」（整份清）兩條路徑的**清除範圍各自只有一處定義**（無壞味道則註記 skipped）
 
@@ -114,7 +114,7 @@ Depends on: §3
 - [ ] 7.6 GREEN: 依量測結果調整綁定模式設定列的高度預算。**若 7.5 寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（例如暫時把場地標示改為兩行看是否變紅），SHALL NOT 改斷言偽造紅燈
 - [ ] 7.7 REFACTOR: 確認綁定模式與獨立模式共用同一個設定列容器與間距係數，沒有為綁定模式另起一套樣式；`MatchBindingNotice` 不含任何判斷邏輯（無壞味道則註記 skipped）
 
-## 8. 對戰頁 UI 接線（例外層 — 純呈現元件，以 E2E 驗收；§8.5～§8.6 為 M5 既有單元測試的更新與其實作）
+## 8. 對戰頁 UI 接線（例外層 — 純呈現元件，以 E2E 驗收；§8.5～§8.6 為 M5 既有單元測試的更新與其實作）（**例外**：§8.4、§8.6 需改 `hooks/useRoundStore.ts`，該部分屬行為邏輯，MUST 走 TDD 三步，不適用本節的例外層豁免）
 Depends on: §4、§5、§6、§7
 
 - [ ] 8.1 RED: 於 `scoreboard-binding.spec.ts` 補三個 test：「計分中的場次顯示計分中標示與當前比分」、「未完成的計分進度可離開後再進入接續」、「多場地同時計分時各場進度互不覆蓋」。前置以真實路徑鋪設（建立參賽者 → 產生本輪對戰）；耗時不可接受時才改用 `page.addInitScript` 直接寫入 `matchmaker:round:v1`，並於檔頭註明 schema 複製來源（design Risks）。確認紅燈
@@ -126,7 +126,7 @@ Depends on: §4、§5、§6、§7
       ② 新增 it「回合存在但尚未開始計分時目標分數選擇器 enabled 且變更委派 setTargetScore」——回合存在、所有場次 `pending`、無任何槽離開 `setup` → 三顆選項 enabled、選取 21 後 `setTargetScore` 被以 `21` 呼叫一次、畫面不顯示鎖定說明；
       ③ 既有 it「目標分數選項為 11／15／21 且預設選中 11」**名稱與斷言不動**（仍為 spec 驗收錨點）。
       跑單檔確認紅燈（M5 現行實作為「有回合就鎖」，②必紅）並貼出輸出
-- [ ] 8.6 GREEN: 目標分數選擇器的鎖定與否改為委派 §5.10 的判定純函式（SHALL NOT 在元件內以「目前回合是否存在」判斷）並顯示其回傳的繁體中文鎖定原因；未鎖定時的變更委派 §0.4 記下的 `setTargetScore(round, n)`，SHALL NOT 於 UI 層直接改寫回合物件
+- [ ] 8.6 GREEN: 目標分數選擇器的鎖定與否改為委派 §5.10 的判定純函式（SHALL NOT 在元件內以「目前回合是否存在」判斷）並顯示其回傳的繁體中文鎖定原因；未鎖定時的變更委派 §0.4 記下的 `setTargetScore(round, n)`，SHALL NOT 於 UI 層直接改寫回合物件。**注意 `setTargetScore` 目前是懸空的純函式**——`lib/matchmaker/round.ts` 有定義，但 M5 未接上任何非測試呼叫端，`hooks/useRoundStore.ts` 的 `UseRoundStoreResult` 只有 `round`／`history`／`droppedCount`／`generateRound`／`resetIncompleteMatches`／`submitScore`，**沒有套用新回合的入口**。因此本步 MUST 先於 `hooks/useRoundStore.ts` 新增 `setTargetScore(targetScore)` 動作（比照 `resetIncompleteMatches` 的「呼叫純函式 → 判 `ok` → dispatch」形態，**屬行為邏輯、必 TDD**），再由 `app/matchmaker/page.tsx` 以 prop 傳給 `RoundControls`
 - [ ] 8.7 RED: 補兩個 e2e test：「本輪開始計分後目標分數控制項停用並說明原因」、「手動輸入比分的路徑仍可獨立完成一場」。確認紅燈；**兩者若寫下當下即綠**（前者已由 8.6 實作、後者為 M5 既有行為未被破壞），如實標註為 regression guard 並補 mutation 驗證，**不得為了製造紅燈而先破壞它們**
 - [ ] 8.8 GREEN: 依 8.7 的量測補齊對戰頁的鎖定說明呈現（若 8.7 已綠則標註 skipped，不寫任何多餘程式碼）
 - [ ] 8.9 REFACTOR: 確認場地色塊與目標分數選擇器都沒有把「該不該顯示入口」「是否計分中」「是否鎖定」的判斷寫在元件內，而是取用 §4／§5 的純函式輸出（無壞味道則註記 skipped）

@@ -53,7 +53,10 @@ SHALL NOT 以 id 回查名單。
 - 把「整份原子性」變成**結構上的必然**而非註解約束：驗證與寫入拆成兩個函式，
   寫入函式的參數型別只接受**已驗證**的備份物件，想寫入半套資料在型別上就做不到。
 - 讓每一則錯誤都能回答使用者「我現在該做什麼」——列號、欄位、原因、下一步。
-- 全段純函式與新檔案，讓 M6／M7／M9 的並行 worktree 合併時衝突面積接近零。
+- 全段除導覽入口外皆為純函式與新檔案，把並行 worktree 的合併衝突壓在**單一已知點**：
+  資料頁的分頁入口必須改 M5 的 `lib/matchmaker/section-nav.ts`（與其測試），
+  而 M7 也會改同兩處，合併時保留雙方分頁（順序：對戰／參賽者／歷史／資料）。
+  其餘與 M6／M9 的並行面積仍接近零。
 
 **Non-Goals:**
 
@@ -106,7 +109,8 @@ M4 與本段並行，**兩邊同時編輯同一檔案的同一段常數必然衝
 
 因此本段新增 `transfer-storage.ts`，只從 `storage-keys.ts` import 三個 matchmaker key
 與 `hasLocalStorage()`、從 `lib/scoreboard/` 下各模組 import 全部計分板 key 常數
-（`storage.ts` 的獨立槽 key；M6 已合併時再加上分槽模組的 `scoreboard:matches:v1`），
+（`storage.ts` 的獨立槽 key，以及分槽模組 `match-slots.ts` 的 `scoreboard:matches:v1`；
+M6 為硬前置，該 key 必納入），
 再在本檔內組出自己的 `CLEAR_ALL_KEYS`。`storage.ts`、`storage-keys.ts` 與
 `lib/scoreboard/**` 一行都不改。
 
@@ -158,7 +162,7 @@ Scenario 就同時斷言序列化與讀回）。
 ```
 matchmaker:roster:v1    matchmaker:round:v1
 matchmaker:history:v1   scoreboard:current:v1
-（＋ scoreboard:matches:v1，若 M6 已合併）
+＋ scoreboard:matches:v1（M6 為硬前置，必納入）
 ```
 
 前三個 key 的字面值取自 M4 的 `storage-keys.ts`（與 M4 `RESET_KEYS` 同一個來源，
@@ -166,10 +170,15 @@ matchmaker:history:v1   scoreboard:current:v1
 **兩份清單刻意保持不同**：`RESET_KEYS`（重置名單）不含計分板，`CLEAR_ALL_KEYS`
 （清除本機資料）含——它們是 §10 表格裡不同的兩列。
 
-**「列舉」是手段，「涵蓋本 app 全部 key」才是承諾**。本段與 M6（`matchmaker-scoreboard-binding`）
-並行，M6 會新增分槽 key `scoreboard:matches:v1`；若把清單的**內容**寫死成四筆，M6 一合併，
-「清除本機資料」就會留下全部分場計分槽——正是 M6 自己警告的孤兒條目與 LocalStorage 無界累積。
-因此：① spec 的敘述採結果導向（涵蓋本 app 寫入的全部 key，已知者列表，分槽 key 若存在則
+**「列舉」是手段，「涵蓋本 app 全部 key」才是承諾**。M6（`matchmaker-scoreboard-binding`）
+新增分槽 key `scoreboard:matches:v1`；若把清單的**內容**寫死成四筆，
+「清除本機資料」就會留下全部分場計分槽——正是 M6 自己警告的孤兒條目與 LocalStorage 無界累積，
+而且 merge 全綠、測試全綠，錯誤只在使用者身上顯現。
+因此 **M6 MUST 先於本段合併，分槽 key 是硬前置而非選配**：改成「無條件納入」在執行期成立
+（`removeItem` 對不存在的 key 是 no-op），但在**編譯期**不成立——M6 未合併時
+`import { MATCH_SLOTS_KEY } from "@/lib/scoreboard/match-slots"` 會讓 `tsc` 直接失敗；
+改用硬編字串又違反本 capability「字面值 MUST 取自模組匯出的常數」的規定。
+在此前提下：① spec 的敘述採結果導向（涵蓋本 app 寫入的全部 key，已知者列表，分槽 key
 MUST 納入）；② 對應 Scenario **不斷言筆數**，改斷言「`CLEAR_ALL_KEYS` 的集合 ＝ 來源模組
 匯出的 key 常數集合」；③ tasks §0.5 用 grep 把「找出全部 key 常數」變成 apply 時的
 強制步驟，而非只留在本檔的 Open Questions（Open Questions 不會轉紅）。

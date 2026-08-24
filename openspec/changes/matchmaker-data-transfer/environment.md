@@ -12,6 +12,16 @@ Setup commands 建立（不存在）。
 > ⚠️ **開 worktree 前先確認 `main` 已含 M5**（連帶含 M3 與 M4）。
 > 本 change 的 `transfer-types.ts` 必須 import M4 定案的回合與歷史 schema，
 > base 若不含 M4，§2 之後的任務全數無法進行。
+>
+> ⚠️ **`main` 也必須已含 M6（`matchmaker-scoreboard-binding`）**。
+> §7.2 的 `CLEAR_ALL_KEYS` 硬相依於 M6 的 `lib/scoreboard/match-slots.ts`
+> 所匯出的 `MATCH_SLOTS_KEY`，M6 未合併時該 import 會讓 `tsc` 直接失敗，
+> 而改為硬編字串或省略該 key 都違反 delta spec。
+>
+> ⚠️ **M7（`matchmaker-history-page`）若已合併**，本 change 對
+> `lib/matchmaker/section-nav.ts` 與 `section-nav.test.ts` 的改動 MUST 保留 M7 的「歷史」分頁，
+> 最終分頁順序為對戰／參賽者／歷史／資料。
+>
 > 確認方式與未達成時的處置見 `tasks.md` §0.1 與 `execution-plan.md` 的 Escalation。
 
 ## Setup commands
@@ -55,7 +65,8 @@ git branch -d change/matchmaker-data-transfer
   殘留 process 全數 kill，再起單一組；**不要把 `~/.wrangler/registry` 目錄不存在當成根因**。
 - **多個 milestone 的 worktree 會並存**（M6／M7／M9 各自一份），
   它們共用同一組本機 port。跑 E2E 前先確認沒有其他 worktree 的 dev server 佔用 :3005／:8787。
-- 本 change **只允許新增檔案**：`nextjs-pickball/lib/matchmaker/` 下六個新模組與其測試、
+- 本 change **除 `lib/matchmaker/section-nav.ts` 與 `section-nav.test.ts`（新增資料頁分頁，
+  見 `tasks.md` §8.2a）外只允許新增檔案**：`nextjs-pickball/lib/matchmaker/` 下六個新模組與其測試、
   `app/matchmaker/data/page.tsx`、`components/matchmaker/` 下的新元件、一支新 E2E spec，
   以及 `openspec/changes/matchmaker-data-transfer/` 底下的 artifact。
   `git status` 若出現 `openspec/specs/**`、`prd.md` 或 `lib/matchmaker/storage.ts`

@@ -25,7 +25,7 @@
 - 對戰頁每場加「進入計分板／繼續計分」入口，點擊時先寫 seed 再導向。
 - 回到對戰頁時，`finished` 的槽經**同一個**送出 pipeline 回填，送出後清槽（冪等）。
 - 該輪一旦有場次開始計分，`targetScore` 鎖定並說明原因；**尚未開始計分前則解鎖**（放寬 M5 的「有回合就鎖」，改走 M4 的 `setTargetScore`）。
-- 重設本輪／刪除場次／重置名單時一併清除對應的槽；「重置名單」的列舉 key 清單因此由三個擴為四個。
+- 重設／重排本輪或重置名單時一併清除對應的槽；「重置名單」的列舉 key 清單因此由三個擴為四個。
 
 儲存形狀的 before / after：
 
@@ -55,7 +55,7 @@ localStorage
   進入 m2 計分 --> 寫 scoreboard:matches:v1 的 m2
                   ^ 互不覆蓋
 
-  槽有條目 <==> 綁定有效   (重設本輪 / 刪除場次時清槽維持此等價)
+  槽有條目 <==> 綁定有效   (重排本輪 / 重置名單時清槽維持此等價)
 ```
 
 ## UI Mockups
@@ -239,7 +239,7 @@ localStorage
 | `hooks/useScoreboardStore.ts` | 接受 `matchId`、回傳綁定狀態 | §3 | 行為邏輯，必 TDD |
 | `lib/matchmaker/scoreboard-binding.ts` | 新增 | §4、§5、§6 | 行為邏輯，必 TDD |
 | M4 的回合重設流程 | 尾端追加逐場清槽 | §6 | 行為邏輯，必 TDD |
-| `lib/matchmaker/storage-keys.ts`（M4） | 重置名單的列舉 key 清單加入分槽 key | §6 | 行為邏輯，必 TDD |
+| `lib/matchmaker/storage.ts`（M1 建立、M4 修訂） | 重置名單的列舉 key 清單 `RESET_KEYS` 加入分槽 key | §6 | 行為邏輯，必 TDD |
 | M5 的目標分數選擇器與其單元測試 | 鎖定條件改委派判定純函式；未鎖定時委派 `setTargetScore` | §8 | 例外層（純呈現），既有單元測試須更新 |
 | `app/scoreboard/page.tsx` | 讀 `searchParams` 傳 prop | §7 | 例外層（入口），E2E |
 | `components/scoreboard/Scoreboard.tsx` | 接 `matchId` prop、失效分支 | §7 | 例外層（純呈現），E2E |

@@ -100,15 +100,15 @@
 
 **替代方案：把讀取與狀態直接寫進 `app/matchmaker/history/page.tsx`。** 否決理由：`page.tsx` 是 server component 慣例的入口層，塞 `"use client"` 與狀態會讓路由入口同時承擔兩種角色；`player-roster` 的既有做法也是「page 組合、元件持狀態」。
 
-**替代方案：沿用 M4 的 `hooks/useRoundStore.ts`（它同時管回合與歷史的持久化）。** 否決理由：本頁是**唯讀**的，而 `useRoundStore` 是個會在 state 變更時回寫 LocalStorage 的 store——把它掛進一個只想看資料的頁面，等於讓「瀏覽歷史」這個動作具備寫入能力，唯讀保證會從結構保證退化成「目前沒有人去呼叫寫入函式」的口頭承諾。直接呼叫 `readHistory()` 則在型別上就沒有寫入的門路。附帶好處是本頁不會被回合狀態的變動觸發 re-render。
+**替代方案：沿用 M4 的 `hooks/useRoundStore.ts`（它同時管回合與歷史的持久化）。** 否決理由：本頁是**唯讀**的，而 `useRoundStore` 是個會在 state 變更時回寫 LocalStorage 的 store——把它掛進一個只想看資料的頁面，等於讓「瀏覽歷史」這個動作具備寫入能力，唯讀保證會從結構保證退化成「目前沒有人去呼叫寫入函式」的口頭承諾。改為直接呼叫 `readHistory()`——但要誠實記一筆：`readHistory()` 在 `droppedCount > 0` 時會呼叫 `writeHistory()` 回寫清理後的歷史（`lib/matchmaker/round-storage.ts` 第 142～147 行），唯讀在型別層**並無保證**。因此本 change 的唯讀保證範圍是「`HistoryView` 自身不寫入」：不 import `useRoundStore`、不呼叫任何 writer、不碰 `localStorage.setItem`／`removeItem`。附帶好處是本頁不會被回合狀態的變動觸發 re-render。
 
 ### Decision 6：導覽入口以「在 M5 導覽加一個連結」實作，requirement 掛在本 capability
 
 跨 change 共用契約明訂：M5 以 Modified `site-navbar` 處理全站 navbar 的 matchmaker 入口；M7／M8 各自的頁面入口以**自身 capability 的 ADDED requirement** 描述，不去 MODIFY M5 的導覽 requirement。本 change 照辦——spec 只寫「歷史頁 SHALL 可從 matchmaker 區段的既有導覽以連結抵達」，不描述 M5 那條導覽該長什麼樣。
 
-實作上這是本 change **唯一**會觸碰既有檔案的地方（新增一個 `<Link href="/matchmaker/history">`）。M6／M8／M9 若也在同一塊導覽加入口，git 層面會是同一段落的新增衝突——但那是**行級文字衝突，解法顯而易見**（兩個連結都留），與 spec 層的語意衝突不同量級。
+實作上是在 `lib/matchmaker/section-nav.ts` 的清單（`MATCHMAKER_SECTION_HREFS`）與文案（`MATCHMAKER_SECTION_LABELS`）各加一筆，並連帶更新 `lib/matchmaker/section-nav.test.ts` 的 `toEqual` 斷言，共兩個既有檔案；`section-nav.ts` 屬 `lib/**` 的**必 TDD 行為邏輯**，不是例外層。M6／M8／M9 若也在同一塊導覽加入口，git 層面會是同一段落的新增衝突——但那是**行級文字衝突，解法顯而易見**（兩個連結都留），與 spec 層的語意衝突不同量級。
 
-apply 時 MUST 先確認 M5 在 `main` 上實際提供的導覽形狀：若已有 matchmaker 子導覽元件則加入一個項目，否則在對戰頁加入連結。無論哪一種，SHALL NOT 改動 M5 既有連結的行為（見 Open Questions）。
+M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）：在 `lib/matchmaker/section-nav.ts` 加一筆即可，渲染層 `MatchmakerTabs.tsx` 不必動。SHALL NOT 改動 M5 既有連結的行為。
 
 ### Decision 7：「現在」在 hydration 時取樣一次並存入 state
 
@@ -153,6 +153,6 @@ apply 時 MUST 先確認 M5 在 `main` 上實際提供的導覽形狀：若已�
 ## Open Questions
 
 1. **M4 的 `MatchHistoryEntry` 與 `readHistory()` 落地後是否與其 delta spec 一致？** 本文件的欄位表抄自 M4 的 delta spec（撰寫時 M4 尚未實作）。apply 的 §3.1 MUST 以 `main` 上的實際程式碼複核；若有出入，改動範圍限於 `recordTime()` 一處（Decision 4），並在此節回填實際名稱。
-2. **`readHistory()` 回報的 `droppedCount > 0` 時，歷史頁要不要顯示「有 N 筆資料損毀已略過」？** M4 的 delta spec 已明訂 reader「丟棄筆數大於 0 時 SHALL 對外回報，SHALL NOT 靜默處理」，因此該值確定存在。本 change **刻意不承諾**顯示行為，理由有二：① 本 change 的範圍是區間篩選與 8.2 呈現，損壞提示屬另一條使用者可見的行為，該有自己的 requirement 與驗收；② `useRoundStore`（M4）與對戰畫面（M5）也是 reader 的消費端，提示該放在哪一層是跨 milestone 的決定，不該由本 change 單方面定案。apply 時若發現此缺口，MUST 記錄於此節並回報，SHALL NOT 順手實作（會產生沒有 spec 覆蓋的行為）。
-3. **M5 在 `main` 上提供的 matchmaker 導覽是獨立元件還是對戰頁內的連結區？** 決定入口連結加在哪個檔案（Decision 6）。apply 的 §5 開工前確認。
-4. **雙打組成標示的中文文案是否已由 M5 定案？**（男雙／女雙／混雙／一般雙打）若 M5 已有共用的文案對應表則沿用，SHALL NOT 在本頁另寫一份；若無，本頁自行定義並於 §4 的 REFACTOR 檢查是否該抽共用。
+2. **`readHistory()` 回報的 `droppedCount > 0` 時，歷史頁要不要顯示「有 N 筆資料損毀已略過」？** M4 的 delta spec 已明訂 reader「丟棄筆數大於 0 時 SHALL 對外回報，SHALL NOT 靜默處理」，因此該值確定存在。**M4 合併後實地核對 `main` 補充**：`readHistory()` 除了回傳 `droppedCount` 與 `console.warn` 之外，**還會回寫**清理後的歷史（`lib/matchmaker/round-storage.ts` 第 142～147 行在 `droppedCount > 0` 時呼叫 `writeHistory(entries)`），屬「自我修復寫入」——這不是本頁發起的寫入，但代表載入損毀資料時 `matchmaker:history:v1` 的內容確實會變（見 Decision 5 與 tasks §5.4）。本 change **刻意不承諾**顯示行為，理由有二：① 本 change 的範圍是區間篩選與 8.2 呈現，損壞提示屬另一條使用者可見的行為，該有自己的 requirement 與驗收；② `useRoundStore`（M4）與對戰畫面（M5）也是 reader 的消費端，提示該放在哪一層是跨 milestone 的決定，不該由本 change 單方面定案。apply 時若發現此缺口，MUST 記錄於此節並回報，SHALL NOT 順手實作（會產生沒有 spec 覆蓋的行為）。
+3. ~~**M5 在 `main` 上提供的 matchmaker 導覽是獨立元件還是對戰頁內的連結區？**~~ **已確認（M5 合併後實地核對 `main`）：是獨立元件，但入口連結的落點不在元件。** `components/matchmaker/MatchmakerTabs.tsx` 掛在 `app/matchmaker/layout.tsx` 第 14 行，對戰頁與參賽者頁共用；`app/matchmaker/page.tsx` 內**沒有**任何 `<Link>`。`MatchmakerTabs` 只 `tabs.map()` 渲染，分頁清單與文案的單一來源是純函式模組 `lib/matchmaker/section-nav.ts`——`MATCHMAKER_SECTION_HREFS`（第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）。因此 §5 要改的是 `section-nav.ts` 這兩處各加一筆 `/matchmaker/history`，`MatchmakerTabs.tsx` 不必動。連帶兩點 MUST 注意：① `section-nav.ts` 屬 `lib/**`，是**必 TDD** 的行為邏輯，不是 Decision 6 原本設想的例外層 `<Link>` 新增；② `lib/matchmaker/section-nav.test.ts` 第 31～36 行的 regression guard 以 `toEqual` 逐字釘住「分頁清單依序為對戰與參賽者兩筆」，新增分頁必使其轉紅（這是真紅燈），MUST 一併更新該斷言。active 判定用 `===` 精確比對，`/matchmaker/history` 加入後判定仍正確，僅第 23～24 行「目前 app/matchmaker/ 下沒有巢狀路由」的註解需同步。
+4. ~~**雙打組成標示的中文文案是否已由 M5 定案？**~~（男雙／女雙／混雙／一般雙打）**已確認（M5 合併後實地核對 `main`）：M5 有這份對應表，但不是共用模組**——它寫死在 `components/matchmaker/CourtCard.tsx` 第 20～23 行（`mixed: "混雙"`／`mens: "男雙"`／`womens: "女雙"`／`general: "一般雙打"`）。M7 的 `HistoryRecordCard` 需要同一份文案，因此「沿用還是另寫一份」變成「要不要把 `CourtCard` 內的對應表抽成共用模組」——這正是 §4 REFACTOR 要判斷的具體情境。文案本身 MUST 與上述四個字串逐字相同，SHALL NOT 自創別的說法。

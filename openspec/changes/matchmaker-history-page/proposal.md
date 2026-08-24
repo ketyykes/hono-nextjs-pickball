@@ -76,7 +76,8 @@ M4 已把每場完成的賽果寫進 `matchmaker:history:v1`，但**目前沒有
 
 **修改既有檔案**：
 
-- 僅一處——M5 建立的 matchmaker 導覽（元件或對戰頁）加入通往 `/matchmaker/history` 的連結。
+- `lib/matchmaker/section-nav.ts`——M5 的 matchmaker 區段導覽，分頁清單與文案的單一來源；在 `MATCHMAKER_SECTION_HREFS`（第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）各加一筆 `/matchmaker/history`。渲染層 `components/matchmaker/MatchmakerTabs.tsx` 只 map 清單，不需改動。
+- `lib/matchmaker/section-nav.test.ts`——第 31～36 行的 regression guard 以 `toEqual` 逐字釘住「分頁清單依序為對戰與參賽者兩筆」，新增分頁後必轉紅，MUST 一併更新該斷言（`section-nav.ts` 屬 `lib/**`，為必 TDD 的行為邏輯）。
 
 **不動**：`lib/matchmaker/storage.ts` 的 `RESET_KEYS`（重置範圍屬 M4）、`lib/matchmaker/{types,roster,colors,allocation*,candidates,pairing,duplication,rating-math}.ts`、`app/matchmaker/players/**`、`components/layout/SiteNavbar.tsx`、後端 `hono-pickball`、部署設定。
 

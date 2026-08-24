@@ -114,15 +114,18 @@ M3 rating-engine ──merge──> main ──> M4 round-lifecycle ──merge�
 
 | # | change id | worktree（`/Users/m2_24gb/Desktop/project/pickball-worktrees/` 下） | branch | base 前提 | 狀態 |
 |---|---|---|---|---|---|
-| M3 | matchmaker-rating-engine | matchmaker-rating-engine（已存在） | change/matchmaker-rating-engine | main（已滿足） | 15/20，待續跑 |
-| M4 | matchmaker-round-lifecycle | matchmaker-round-lifecycle | change/matchmaker-round-lifecycle | M3 已合併回 main | 未開始 |
-| M5 | matchmaker-match-stage-ui | matchmaker-match-stage-ui | change/matchmaker-match-stage-ui | M4 已合併回 main | 未開始 |
+| M3 | matchmaker-rating-engine | ~~matchmaker-rating-engine~~（已拆） | ~~change/matchmaker-rating-engine~~（已刪） | main（已滿足） | **apply 完成並已合併**，待 verify／archive |
+| M4 | matchmaker-round-lifecycle | ~~matchmaker-round-lifecycle~~（已拆） | ~~change/matchmaker-round-lifecycle~~（已刪） | M3 已合併回 main | **apply 完成並已合併**，待 verify／archive |
+| M5 | matchmaker-match-stage-ui | ~~matchmaker-match-stage-ui~~（已拆） | ~~change/matchmaker-match-stage-ui~~（已刪） | M4 已合併回 main | **apply 完成並已合併**，待 verify／archive |
 | M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding | change/matchmaker-scoreboard-binding | M5 已合併回 main | 未開始 |
 | M7 | matchmaker-history-page | matchmaker-history-page | change/matchmaker-history-page | M5 已合併回 main | 未開始 |
 | M8 | matchmaker-data-transfer | matchmaker-data-transfer | change/matchmaker-data-transfer | M5 已合併回 main | 未開始 |
 | M9 | matchmaker-visual-export | matchmaker-visual-export | change/matchmaker-visual-export | M5 已合併回 main | 未開始 |
 
 ## 接續步驟
+
+> ⚠️ 第 1、2 節是 M3 執行期間的歷史指示，**已全部完成**，保留僅供追溯。
+> 恢復時直接看第 3 節（M6～M9）與下方「M6～M9 預檢結果」。
 
 ### 1. 續跑 M3（不要重開 worktree）
 
@@ -251,15 +254,23 @@ M1～M9 的對照表寫在每個 change 的 `proposal.md` 開頭，刪不刪 prd
 
 **此動作在全部 change 完成後才執行**，現在不要動 `prd.md`（它仍是進行中 change 的需求來源）。
 
-## ⛔ 停止點（使用者 2026-08-24 指示）
+## ~~⛔ 停止點~~（已解除，使用者 2026-08-24 指示續跑 M6～M9）
 
-**做到 M5 完成並合併回本機 `main` 就停止。** 使用者要手動檢視狀況後再決定是否續跑。
+停止點原為「做到 M5 完成就停」，使用者檢視後已指示續跑，並要求**每完成一段就把狀態寫回本檔**。
 
-- **不要**開 M6～M9 的 worktree、**不要**派 M6～M9 的 leader。
-- M5 完成的定義：apply 全部群組做完 → coordinator 獨立驗證（test／tsc／lint／e2e）→
-  `--no-ff` 合併回本機 `main`（不 push）→ 依 environment.md teardown worktree 與分支。
-- 恢復前務必先讀下方「M6～M9 預檢結果」一節：有七項待修文件，
-  以及一條硬性合併順序限制（**M8 必須排在 M6 之後**，否則會產生 git 偵測不到的資料殘留 bug）。
+### M6～M9 的執行順序（硬性，不可調換）
+
+**M6 → M7 → M8 → M9，逐一 apply、逐一合併，不平行開 worktree。**
+
+理由（全部實測，非推測）：
+
+1. **M8 必須在 M6 之後**——M8 的 `CLEAR_ALL_KEYS` 直接 `import` M6 的 `MATCH_SLOTS_KEY`，
+   M6 未合併時 `tsc` 會失敗。已在文件修正中把原本的「若已合併就納入」改成硬前置。
+2. **M7 與 M8 會在 `lib/matchmaker/section-nav.ts` 正面衝突**（兩個常數 + 一支測試）。
+   序列跑則第二個接手時直接看到第一個的分頁，不需解衝突。
+3. **M9 排最後**——它要驗證 `@media print` 有沒有正確隱藏 M7／M8 新加的分頁。
+
+M6 有 **78 個 task／10 個群組**（比 M5 的 64 還大），**預期需要 leader 接力**。
 
 M5 合併後 `/matchmaker` 才會存在（在此之前是 404）。檢視方式：`pnpm dev` 後開
 `http://localhost:3005/matchmaker`（前端在 **:3005** 不是 3000）。
@@ -317,41 +328,77 @@ M8 的 `CLEAR_ALL_KEYS` 有一個「若 M6 已合併則納入分槽 key」的條
 對照 M6 的 `RESET_KEYS` 補齊 `CLEAR_ALL_KEYS`」（兩份「全部 key」清單要人工比對，git 不會提醒）。
 M9 最後，它改同一頁面的另一段，還要驗證 `@media print` 是否正確隱藏 M7／M8 新加的連結。
 
-### 唯一的真實檔案衝突點
+### 唯一的真實檔案衝突點（2026-08-24 實測修正，原判斷是錯的）
 
-集中在**一個檔案**：M5 擁有的 matchmaker 導覽／對戰頁（很可能是 `app/matchmaker/page.tsx`）。
-M7 與 M8 各要在同一段導覽加一個 `<Link>`（相鄰新增，git 幾乎必衝，**解法是兩行都留**），
-M9 在同檔另一段掛 `ExportActions`／`PrintSheet`。
+**原本寫「集中在 `app/matchmaker/page.tsx`」——實測後推翻。** M5 合併後的導覽形狀是：
+
+```
+lib/matchmaker/section-nav.ts        ← 分頁清單與文案的單一來源（純函式，必 TDD）
+  MATCHMAKER_SECTION_HREFS   :13     ← 陣列，M7 加「歷史」、M8 加「資料」
+  MATCHMAKER_SECTION_LABELS  :15-21  ← 對照表，同上
+     ↓
+components/matchmaker/MatchmakerTabs.tsx  ← 只 tabs.map() 渲染，不含清單
+     ↓
+app/matchmaker/layout.tsx :14             ← 掛一份，對戰頁與參賽者頁共用
+```
+
+`app/matchmaker/page.tsx` **全檔沒有任何 `<Link>`**。因此：
+
+- **真正的衝突點是 `lib/matchmaker/section-nav.ts` 的兩個常數，加上 `section-nav.test.ts`。**
+  後者第 31～36 行有個 `toEqual` regression guard 釘死「分頁清單依序為對戰與參賽者兩筆」，
+  M7 與 M8 各自新增分頁時都會讓它轉紅（**那是真紅燈**）。解法是保留雙方分頁，
+  **順序約定為 對戰／參賽者／歷史／資料**。
+- **M9 完全不衝突**：它掛在 `page.tsx` 的 `<main>` 內，與導覽不同檔。
+  原本 design 寫「合併衝突的預估面積是 `page.tsx` 的 import 區塊」，已修正。
+- **M6 也不衝突**：它動的是 `RoundControls.tsx` 與 `CourtCard.tsx`。
+- ⚠️ `section-nav.ts` 屬 `lib/**`，是**必 TDD 的行為邏輯**，不是例外層。
+  M7 與 M8 原本都把它歸在「例外層加一個 `<Link>`」，已修正。
 
 正面訊號：四個 change 都刻意不新增 `hooks/` 檔案，因此**沒有任何一個要動
 `pickleball-guide-page` 的 hooks 歸屬清單**——最容易撞在一起的 spec 段落被成功避開了。
 E2E 也各自獨立成檔，無共用 helper 衝突。
 
-### M5 合併後、派工前必須先修的文件（propose 階段修，不要留到 apply）
+### ✅ 文件修正——已於 2026-08-24 完成並 commit（原七項重新核對後擴為 44 項）
 
-| # | change | 問題 | 修法 |
-|---|---|---|---|
-| 1 | M8 | `proposal.md` 宣稱「不修改任何既有生產程式碼」、`modifiedFiles` 為空，**但它的 spec 與 tasks §8.2 都要求「可從 matchmaker 區段導覽抵達資料頁」** | 把 M5 的導覽檔案補進 Impact／可動檔案清單 |
-| 2 | M8 | tasks §0.1 用 `ls openspec/changes/archive \| grep matchmaker` 確認 M3／M4 已合併。**M3／M4 是以一般 commit 併入 main、未走 archive**，字面執行會誤判未合併而中止 apply | 改成核對程式碼或 `git log` |
-| 3 | M8 | tasks §0.5 的 grep 會命中 `components/scoreboard/OrientationHint.tsx:8` 的 `scoreboard:hint-dismissed`，**但那是 sessionStorage 不是 localStorage** | §0.5 加一句「每個命中的 key 必須確認呼叫的是 localStorage」 |
-| 4 | M6 | `proposal.md` Impact 表第 11 列說重置 key 清單在 `storage-keys.ts`。**實際 `RESET_KEYS` 與 `resetMatchmakerData()` 在 `lib/matchmaker/storage.ts:111-126`**；`storage-keys.ts` 全檔 22 行只有三個 key 常數與 `hasLocalStorage()` | 改一行文件。漏改的後果是靜默的資料殘留 |
-| 5 | M6 | round-lifecycle delta 有一條 Requirement 描述「**刪除場次**」，但 M4 全庫 grep 零命中，只有 `resetIncompleteMatches`（整批丟棄 pending 場次） | 把該 Requirement 收斂成只涵蓋 `resetIncompleteMatches` 與重置名單兩條路徑 |
-| 6 | M9 | design Decision 2 整段建立在「M5 會抽出 `lib/matchmaker/stage-layout.ts` 且 `buildCourtTiles` 回傳 `{ row, column, teamIndex, player }`」上。**這是四個 change 裡對 M5 產出形狀假設最細的一個** | M5 合併後第一件事就是逐項核對這五個具名相依 |
-| 7 | M7 | design Open Question 3 假設 matchmaker 區段已有既有導覽 | M5 合併後回填實際形狀（獨立元件 vs 對戰頁內連結） |
+M5 合併後重新核對，原本的七項有 **6 項仍成立、1 項方向相反**，另外挖出 37 項同源或連帶的問題。
+全部已修正並通過 `openspec validate --all --strict`（17/17）。逐項細節見該 commit 的 diff。
+
+| change | 修了幾項 | 最要緊的是什麼 |
+|---|---|---|
+| M6 | 14 | ① 重置 key 清單指錯檔案（`storage-keys.ts` → `storage.ts` 的 `RESET_KEYS`），**同一個錯有 4 處**；② Requirement 標題「刪除場次」描述不存在的能力，改名並同步 5 處交叉引用；③ `setTargetScore` 懸空 |
+| M7 | 10 | ① 導覽落點與 TDD 歸屬全錯（見上方衝突點）；② `readHistory()` 回傳的是**物件不是陣列**，且 `droppedCount > 0` 時**會回寫** localStorage——design Decision 5 宣稱「型別上沒有寫入的門路」不成立 |
+| M8 | 16 | ① 六處「M6 若已合併」條件句翻轉為硬前置；② §0.1 的 archive grep 會誤判而中止 apply；③ §0.5 的掃描範圍只到 `lib/` |
+| M9 | 7 | ① `buildCourtTiles` 吃的是 `CourtTileSource` 不是 `Match`；② `CourtTile.player` 是**必填**，Decision 8 的「輸出替代文字」在型別上表達不出來；③ App 名稱對齊規則會印出「對戰分配」，違反 `prd.md` 9.4 |
+
+**方向相反的那一項（原 #3）**：預檢說 M8 §0.5 的 grep 會誤收 sessionStorage 的
+`scoreboard:hint-dismissed`。實測**不會**——那兩道 grep 只掃 `nextjs-pickball/lib/`，
+根本掃不到 `components/`。真正的問題是同一段文字自相矛盾：宣稱要列出「本 app 寫入
+LocalStorage 的**全部** key」且「漏列即為 spec 違反」，但指令只掃 `lib/`。已同時補上
+兩件事——擴大掃描範圍，以及逐一確認是 localStorage 而非 sessionStorage。
+
+**M8 的無聲失敗已從「靠合併順序碰巧正確」改成「硬前置 + 停止回報」**。原本
+`CLEAR_ALL_KEYS` 寫「M6 若已合併就納入分槽 key」，M8 先合併時條件走 false，
+`scoreboard:matches:v1` 不進清單，使用者按「清除本機資料」後分槽計分進度整批殘留，
+而 merge 與測試全綠。考慮過「無條件納入，反正 key 不存在時清除是 no-op」——
+**執行期成立、編譯期不成立**（M6 未合併時 `import { MATCH_SLOTS_KEY }` 會讓 `tsc` 直接失敗），
+改硬編字串又違反 delta spec 的「字面值 MUST 取自模組匯出的常數」。
+最終採「必須納入；模組不存在就停止本群組並回報」，等於把 M6 升格為 M8 的硬前置。
 
 ### 已消解的一項（原本評為最嚴重）
 
-預檢指出 M6 假設「`useRoundStore` 已有可接的 UI↔hook↔lib 持久化管線」，而 `main` 上
+預檢指出 M6 假設「`useRoundStore` 已有可接的 UI↔hook↔lib 持久化管線」，而當時 `main` 上
 `useRoundStore` **只匯出 `generateRound`**，`setTargetScore`／`resetIncompleteMatches`／
 `submitScore` 三個純函式全庫零非測試呼叫端——判定 `MISSING`。
 
-**但 M5 的 §1.2 已經自己抓到並處理了**：M5 leader 在 `design.md` Open Questions 第 2 條 (d)
-記載「§11 MUST 擴充既有的 `hooks/useRoundStore.ts`」，並確認這不違反 Decision 3
-（該 Decision 禁止的是在 `hooks/` **新增檔案**，修改既有檔案不動歸屬清單）。
-它也接受了 M4 的交接要求：接 `submitScore` 時一併補 `writeHistory` 與 `updatePlayer`。
+**M5 的 §11 已接上其中兩個。** 現況實測（2026-08-24）：`UseRoundStoreResult` 的欄位為
+`round`／`history`／`droppedCount`／`generateRound`／`resetIncompleteMatches`／`submitScore`，
+`app/matchmaker/page.tsx:19` 解構其中四項。
 
-**注意**：M5 的 `proposal.md` Impact 表沒有把 `hooks/useRoundStore.ts` 列為修改檔案，
-實際可動範圍比文件大。M5 合併後 MUST 實測那三個函式是否真的接上，再決定 M6 能不能平行跑。
+**但 `setTargetScore` 仍然懸空**——`lib/matchmaker/round.ts:352` 有定義，全庫零非測試呼叫端，
+且 `useRoundStore` **沒有任何「套用新回合」的對外入口**。M6 的 §8.6 要求「未鎖定時委派
+`setTargetScore`」，實作時必須先於 `useRoundStore` 新增該動作（**行為邏輯、必 TDD**）。
+這不是開工阻斷，但 §8 的節標題原本自稱「例外層 — 純呈現元件」，會讓 subagent 跳過 TDD——
+已在文件修正中加上例外限定。
 
 ### archive／sync 順序（與程式碼合併是兩回事）
 

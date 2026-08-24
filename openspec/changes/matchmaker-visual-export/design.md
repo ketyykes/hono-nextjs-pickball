@@ -15,7 +15,9 @@
   `app/**/layout.tsx`、純樣式檔與純呈現型元件屬**例外層**（不強制單元 TDD，以 E2E 驗收）；
   行為邏輯 MUST 下放 `lib/` 再對其做 TDD。本段的「可 TDD 的東西」是內容組裝、檔名組成與
   被擋判定三者，不是 canvas 繪製本身。
-- M5 已提供 `lib/matchmaker/stage-layout.ts`（由 `Match` 推導每格的隊伍與 row／column）與
+- M5 已提供 `lib/matchmaker/stage-layout.ts`（`buildCourtTiles(match: CourtTileSource)` 推導每格的
+  隊伍與 row／column；輸入為結構型別 `CourtTileSource`，其 `teams[].players` 必須是**已解析的
+  `Player`**，因此 `export-scene.ts` MUST 先自行把 `RoundTeam.playerIds` 轉成 `Player` 再呼叫）與
   `lib/matchmaker/tile-style.ts`（漸層與前景色推導）。本段**重用前者的版面規則**，
   但不重用後者的回傳值——`tile-style.ts` 產出的是 CSS inline style 物件，canvas 需要的是
   色碼與座標（見 Decision 2）。
@@ -125,6 +127,9 @@ linear-gradient(...)` 這種 CSS 字串，canvas 沒辦法吃，硬解析字串�
 ```
 @media print {
   body:has([data-print="sheet"]) > header { display: none !important; }
+  /* 區段導覽在 app/matchmaker/layout.tsx，不在 page.tsx 的可及範圍（見下方 data-print="hide" 的
+     限制），只能以選擇器隱藏；M7／M8 之後會再加分頁，更需要這條。 */
+  body:has([data-print="sheet"]) nav[aria-label="對戰分配區段導覽"] { display: none !important; }
   [data-print="hide"]  { display: none !important; }
   [data-print="sheet"] { display: block !important; }
   [data-print="court"] { break-inside: avoid; }
@@ -223,6 +228,12 @@ M4 的回合只存 id，使用者可在回合進行中刪除參賽者。三個�
 - **輸出替代文字（採用）** → 該格照常畫出（灰底 + 「已離開名單」之類的可讀文字），
   其餘內容完整。使用者一眼看得出發生什麼事。
 
+實作約束：`CourtTile.player` 的型別是必填 `Player`（`stage-layout.ts`），缺席的 id 無法經由
+`buildCourtTiles` 表達，因此替代文字 MUST 在 `export-scene.ts` 解析 `RoundTeam.playerIds` 的
+階段補上（以灰色色碼的佔位 `Player` 進入版面推導），**SHALL NOT 沿用 M5
+`CourtCard.resolveTeamPlayers` 的 `.filter(...!== undefined)` 丟棄做法**——那正是本節否決的
+「跳過該格」。
+
 這與 M4 `match-history` 的做法在精神上一致：歷史保存**姓名快照**正是為了「刪人不該讓過去
 的資料變空白」。回合沒有快照（刻意的，避免改名產生兩個真相），因此這道退路要在消費端做。
 
@@ -278,34 +289,42 @@ M4 的回合只存 id，使用者可在回合進行中刪除參賽者。三個�
   接受，理由是三者的**受眾與媒介不同**（互動／群組分享／紙本），而它們共用同一份內容組裝，
   真正重複的只有排版。強行讓三者共用一套排版會讓每一種都不好用。
 
-- **[M5 的實際匯出名稱與 `page.tsx` 結構在本 change 撰寫時尚未定案]** → 與 M5 對 M4 的處境
-  同構。緩解：① `ExportActions` 與 `PrintSheet` 一律走 props，不 import 任何 store；
-  ② spec 以**行為**描述契約（「對戰頁 SHALL 提供匯出入口」）而非以 M5 的函式名描述；
-  ③ apply 的 Step 0 MUST 先讀 `main` 上 M5 的實際產出（`stage-layout.ts` 的函式簽章、
-  `page.tsx` 的組裝方式、`Round` 的實際欄位）並把差異補進 Open Questions，
-  **SHALL NOT 在 M5 未合併的情況下憑猜測開工**。
+- **[本文件撰寫時 M5 尚未定案，現已合併，一律以 `main` 實況為準]** → M5 已在 `main` 上提供
+  `lib/matchmaker/stage-layout.ts`（`buildCourtTiles(match: CourtTileSource): CourtTile[]`）與
+  `app/matchmaker/page.tsx`。緩解：① `ExportActions` 與 `PrintSheet` 一律走 props，不 import
+  任何 store；② spec 以**行為**描述契約（「對戰頁 SHALL 提供匯出入口」）而非以 M5 的函式名描述；
+  ③ apply 的 Step 0 MUST 以 `main` 上的實際簽章與 `page.tsx` 組裝方式為準（見 Open Questions
+  1、2 的實測結果），**SHALL NOT 依本文件撰寫時的假設開工**。
 
 - **[匯出入口放在對戰頁，但 M6／M7／M8 也在動 matchmaker 區段]** → 本 change 只碰
   `app/matchmaker/page.tsx` 與 `app/globals.css` 兩個共用檔，且都是**追加**而非改寫既有段落。
-  M7／M8 各自新增的是 `/matchmaker/history`、`/matchmaker/data` 兩個新路由，不動對戰頁。
-  合併衝突的預估面積是 `page.tsx` 的 import 區塊，屬容易解的類型。
+  M7／M8 各自新增的是 `/matchmaker/history`、`/matchmaker/data` 兩個新路由，其導覽入口加在
+  `lib/matchmaker/section-nav.ts`（由 `components/matchmaker/MatchmakerTabs.tsx` 與
+  `app/matchmaker/layout.tsx` 消費），不動對戰頁；M6 動的是 `RoundControls.tsx` 與
+  `CourtCard.tsx`。三者都與本段的掛載點不同檔，`page.tsx` 預期無合併衝突。
 
 ## Open Questions
 
-1. **M5 的 `page.tsx` 如何取得「目前回合」與「名單」？** 本 change 需要這兩份資料才能組出
-   `ExportScene`。預期 M5 的 `page.tsx` 已同時持有（它是唯一 import M4 store 的檔案）。
-   apply Step 0 MUST 確認實際變數與型別，若 M5 的組裝方式不同（例如把回合直接展開成 props
-   丟給 `MatchStage` 而不留在 page 層），MUST 在此補記後再開始 §7 的頁面組裝，
-   SHALL NOT 為了拿資料去改 M5 的元件介面。
+1. **M5 的 `page.tsx` 如何取得「目前回合」與「名單」？（已解答：假設命中）**
+   `app/matchmaker/page.tsx` 第 18～22 行同時持有
+   `const { players, updatePlayer } = useRosterStore();` 與
+   `const { round, generateRound, resetIncompleteMatches, submitScore } = useRoundStore({ players, updatePlayer });`，
+   且第 14～16 行註解明寫它是 `useRoundStore` 唯一的 import 點。可用變數為
+   `round: Round | null` 與 `players: Player[]`，掛載位置在第 48～94 行的 `<main>` 內。
+   因此 §7 的頁面組裝可直接以這兩個變數為輸入，SHALL NOT 為了拿資料去改 M5 的元件介面。
 
-2. **`stage-layout.ts` 的實際函式名與回傳欄位**：design 假設為
-   `buildCourtTiles(match) → { row, column, teamIndex, player… }`。若欄位名不同，
-   `export-scene.ts` 依實際欄位改寫即可（本段只依賴「哪一格屬哪一隊、在第幾列第幾欄」
-   這個語意），但 MUST 在 Step 0 記錄實際簽章，避免每個 task 各自猜。
+2. **`stage-layout.ts` 的實際函式名與回傳欄位（已解答：假設命中）**：實際簽章為
+   `buildCourtTiles(match: CourtTileSource): CourtTile[]`；`CourtTile` 的四個欄位
+   `player`／`teamIndex`／`row`／`column` 全數命中且無其他欄位。版面語意：單打為 row 0、
+   column 0 與 1；雙打為 teamA row 0、teamB row 1。**但**輸入型別是 `CourtTileSource` 而非
+   `Match`（見 Context 一節與 Decision 8 的實作約束），且 `tile-style.ts` 的 `playerTileStyle`
+   對已完成場次另帶 `opacity: 0.6` 與 `filter: saturate(0.5)`——canvas 版若要呈現「已完成」的
+   視覺弱化需自行決定等價作法。
 
-3. **App 名稱的字面值**：暫定「匹克球對戰分配機」（`prd.md` 標題）。若 M5 已在對戰頁標題
-   使用了另一個字串，兩處 SHALL 對齊；對齊方式是本模組的常數改為與畫面一致，
-   **不**反過來去改 M5 的畫面文案。
+3. **App 名稱的字面值**：採「匹克球對戰分配機」（`prd.md` 標題）。M5 對戰頁的 `<h1>` 為
+   「對戰分配」，那是**頁面標題**而非 App 名稱（全站 metadata 標題與 navbar 品牌又各是另外
+   兩個字串），因此**不**套用「與畫面對齊」的規則——`prd.md` 9.4 要的是 App 名稱。
+   SHALL NOT 改用 `<h1>` 的字串，也**不**去改 M5 的畫面文案。
 
 4. **列印版是否顯示各員強度分數**：`prd.md` 9.5 只要求「目前回合與各場次對戰資訊」，
    9.4 的 JPG 也未列強度分數。暫定 JPG 顯示（版面容得下、現場有辨識價值）、列印版不顯示

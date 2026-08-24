@@ -8,7 +8,10 @@
 > **執行相依**：**M5 必須先合併回 main**，本 change 的 worktree 才能從 `main` 開出。
 > 理由是 M8 消費的兩份共用契約都在 M5 之前落地——Round 資料模型與歷史紀錄欄位由 M4 定案、
 > 評分 API 由 M3 定案，而 M5 是 M3／M4 之後的最末一段；`main` 含 M5 即必然含 M3 與 M4。
-> 與 M6（計分板銜接）、M7（歷史頁）、M9（JPG／PDF）**可並行**：本 change 不修改
+> 與 M7（歷史頁）、M9（JPG／PDF）**可並行**；**M6（計分板銜接）必須先合併**——
+> 本 change 的清除清單直接 import M6 的 `MATCH_SLOTS_KEY`
+> （`lib/scoreboard/match-slots.ts`），M6 未合併時 `tsc` 會直接失敗（見 design Decision 5）。
+> 並行的部分仍成立：本 change 不修改
 > `match-stage`、`match-history`、`site-navbar` 任何既有 requirement，也不動 M4 建立的
 > `lib/matchmaker/storage.ts`（見 design Decision 2）。
 
@@ -47,8 +50,9 @@ JSON 匯出的情況下先做清除是危險的——12.4 要求「介面需在�
   兩者**不構成 round-trip**。此不對稱 SHALL 在 UI 上明講，避免使用者誤以為 CSV 可備份還原。
 - **清除本機資料**（§10、12.4）：明確二次確認、載明無法復原、建議先匯出 JSON 備份；
   清除範圍以**列舉的 key 清單**實作（沿用 M1 Decision 6 的原則），且該清單 MUST 涵蓋
-  `matchmaker:*` 與 `scoreboard:*` 兩個資料域**寫入的全部 key**——包含 M6 若已合併所新增的
-  分槽 key `scoreboard:matches:v1`（範圍決策與理由見 design Decision 5）。
+  `matchmaker:*` 與 `scoreboard:*` 兩個資料域**寫入的全部 key**——**必然包含** M6 新增的
+  分槽 key `scoreboard:matches:v1`（M6 為硬前置，該 key MUST 納入；
+  範圍決策與理由見 design Decision 5）。
 - **錯誤處理**（§11）：匯入檔案格式錯誤、LocalStorage 不可用、寫入超出配額三種情況皆
   SHALL NOT 拋出例外中斷操作，一律回傳可判讀的繁體中文訊息並說明可採取的修正方式。
 
@@ -101,11 +105,22 @@ JSON 匯出的情況下先做清除是危險的——12.4 要求「介面需在�
 - **新增（例外層，E2E 驗收）**：`nextjs-pickball/app/matchmaker/data/page.tsx` 與
   `nextjs-pickball/components/matchmaker/` 下的四個區塊元件、一個確認對話框，
   以及 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`
+- **修改（既有生產程式碼，必 TDD）**：`nextjs-pickball/lib/matchmaker/section-nav.ts` 與
+  `nextjs-pickball/lib/matchmaker/section-nav.test.ts`。資料頁的導覽入口不是新檔就能達成——
+  matchmaker 分頁清單與文案的**單一來源**是 `section-nav.ts`（渲染層
+  `components/matchmaker/MatchmakerTabs.tsx` 只讀它），因此 `MATCHMAKER_SECTION_HREFS`
+  （第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）各需加一筆資料頁路徑
+  （標籤「資料」）；`section-nav.test.ts` 第 31～36 行的 `toEqual` regression guard
+  釘死「分頁清單依序為對戰與參賽者兩筆」，會轉紅，MUST 一併更新。
+  `section-nav.ts` 屬 `lib/**`，依專案規則是**必 TDD** 的行為邏輯，非例外層。
+  **M7（歷史頁）也會改同兩處**——兩個 change 合併時會在同一個常數陣列與同一支測試上衝突，
+  解法是保留雙方的分頁（順序：對戰／參賽者／歷史／資料）
 - **重用（唯讀）**：`lib/matchmaker/types.ts`（`PlayerSchema`）、`roster.ts`
   （`addPlayer`／`nextAutoGradient`）、`round-types.ts`（`RoundSchema`）、
   `history.ts`（`MatchHistoryEntrySchema`）、`storage-keys.ts`（三個 key 常數與
   `hasLocalStorage()`）、`lib/scoreboard/**`（計分板的**全部** key 常數：`storage.ts` 的
-  獨立槽 key，以及 M6 已合併時分槽模組的 `scoreboard:matches:v1`）
+  獨立槽 key，以及分槽模組 `match-slots.ts` 的 `scoreboard:matches:v1`——M6 為硬前置，
+  該 key 必然存在且必納入）
 - **不動**：`lib/matchmaker/storage.ts` 與 `storage-keys.ts`（M4 的產物，本段只 import
   不編輯，見 design Decision 2）、`hooks/**`、`app/matchmaker/players/page.tsx`
 - **不新增 `hooks/` 下的檔案**——避免動到 `pickleball-guide-page` 的 hooks 歸屬清單

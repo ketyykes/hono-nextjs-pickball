@@ -25,7 +25,15 @@
 
 - [ ] 0.1 確認 worktree 的 base 已含 M5（`matchmaker-match-stage-ui`），
       並確認 M3（`matchmaker-rating-engine`）與 M4（`matchmaker-round-lifecycle`）
-      皆已在 `main`：`ls openspec/changes/archive | grep matchmaker`。
+      皆已在 `main`。
+      **判定方式為程式碼存在性核對，SHALL NOT 用 `ls openspec/changes/archive | grep matchmaker` 判定**：
+      M3／M4／M5 是以一般 merge commit 併入 `main`、**未走 openspec archive**，
+      `openspec/changes/archive/` 底下看不到它們（字面執行只會命中 M2
+      `2026-08-17-matchmaker-allocation-engine`，誤判為未合併而白白中止 apply）。
+      改跑下列三行，**全部列出檔案**才算通過：
+      `ls nextjs-pickball/lib/matchmaker/rating.ts nextjs-pickball/lib/matchmaker/rating-bounds.ts`（M3）、
+      `ls nextjs-pickball/lib/matchmaker/round-types.ts nextjs-pickball/lib/matchmaker/round-storage.ts`（M4）、
+      `ls nextjs-pickball/lib/matchmaker/section-nav.ts nextjs-pickball/app/matchmaker/page.tsx`（M5）。
       **若任一未合併，停止 apply 並回報**（見 `execution-plan.md` 的 Escalation）
 - [ ] 0.2 `grep -rn "^export " nextjs-pickball/lib/matchmaker/round-types.ts
       nextjs-pickball/lib/matchmaker/history.ts nextjs-pickball/lib/matchmaker/storage-keys.ts
@@ -39,9 +47,20 @@
       （第二道用來抓不是 `export const` 形式的宣告，例如包在物件或陣列裡的字面值）：
       `grep -rnE '^export const [A-Z_]+ = "(matchmaker|scoreboard):' nextjs-pickball/lib/`
       與 `grep -rnE '"(matchmaker|scoreboard):[^"]*"' nextjs-pickball/lib/`。
+      **掃描範圍 MUST 不只 `lib/`**：上述兩道 grep 同時要對
+      `nextjs-pickball/app/`、`nextjs-pickball/components/` 與 `nextjs-pickball/hooks/`
+      各跑一次——`lib/` 之外目前仍有 key 字面值（`components/scoreboard/OrientationHint.tsx`）。
+      只掃 `lib/` 與本項承諾的「**全部** key 常數」自相矛盾，而**漏列即為 spec 違反**。
+      **每一個命中的 key 都 MUST 回到該檔確認呼叫的是 `localStorage` 而非 `sessionStorage`**：
+      `sessionStorage` 的 key（例如 `scoreboard:hint-dismissed`，見
+      `components/scoreboard/OrientationHint.tsx` 第 8、21、30 行）SHALL NOT 列入匯出或清除清單。
+      誤收會讓清除清單多出一個本 app 從未寫進 LocalStorage 的成員，
+      使 §7.1 的集合相等斷言永遠對不上。
       **重點是 `lib/scoreboard/` 不只有 `storage.ts` 的 `STORAGE_KEY`**——M6
-      （`matchmaker-scoreboard-binding`）若已合併，該目錄下會多一個分槽模組匯出
-      `scoreboard:matches:v1`。命中的每一個 key 常數都 MUST 填入下表並成為 §7
+      （`matchmaker-scoreboard-binding`）為本 change 的**硬前置**，該目錄下必然有一個分槽模組
+      `lib/scoreboard/match-slots.ts` 匯出 `scoreboard:matches:v1`；
+      找不到該模組即代表 M6 尚未合併，MUST 停止 apply 並回報（見 §7.2）。
+      命中的每一個 key 常數都 MUST 填入下表並成為 §7
       `CLEAR_ALL_KEYS` 的來源：spec 的「清除本機資料」承諾的是「本 app 寫入的全部 key」
       而非固定四筆，**漏列即為 spec 違反**（會留下整批孤兒分場計分槽）
 - [ ] 0.6 把 0.2～0.5 的核對結果填入下表——§2 之後的每一次派工都要附上此表：
@@ -57,7 +76,7 @@
   | 回合／歷史讀寫 | `readRound`／`writeRound`／`readHistory`／`writeHistory` | _核對後填_ | `lib/matchmaker/round-storage.ts` |
   | 簽章持久化欄位 | `Round.seenSignatures`（三組字串陣列） | _核對後填_ | `lib/matchmaker/round-types.ts` |
   | 計分板獨立槽 key 常數 | `STORAGE_KEY` | _核對後填_ | `lib/scoreboard/storage.ts` |
-  | 計分板分槽 key 常數（M6 已合併時才存在） | `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`） | _核對後填；M6 未合併則填「不存在」_ | `lib/scoreboard/` 下的分槽模組 |
+  | 計分板分槽 key 常數（M6 為硬前置，MUST 存在） | `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`） | _核對後填；找不到即 M6 未合併，停止 apply 並回報_ | `lib/scoreboard/match-slots.ts` |
   | 其他 `matchmaker:`／`scoreboard:` key 常數 | （0.5 的 grep 若還有命中就逐一補列） | _核對後填_ | _核對後填_ |
 
 - [ ] 0.7 跑 `pnpm test` 確認 baseline 全綠，把結果與 commit hash 回填
@@ -210,9 +229,13 @@ Depends on: §0, §3
       卻漏列的情況維持綠燈。確認紅燈
 - [ ] 7.2 GREEN: 實作 `transfer-storage.ts` 的 `CLEAR_ALL_KEYS`（**import**
       `storage-keys.ts` 的三個 matchmaker key 常數，以及 §0.5 grep 出的
-      `lib/scoreboard/` 全部 key 常數——至少 `storage.ts` 的 `STORAGE_KEY`，M6 已合併時
-      還包含分槽模組的 `scoreboard:matches:v1` 常數；SHALL NOT 硬編字串）與
-      `clearAllLocalData()`。
+      `lib/scoreboard/` 全部 key 常數——`storage.ts` 的 `STORAGE_KEY`，以及分槽模組
+      `lib/scoreboard/match-slots.ts` 的 `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`）；
+      SHALL NOT 硬編字串）與 `clearAllLocalData()`。
+      **分槽 key 不是選配**：若 `lib/scoreboard/match-slots.ts` 不存在（M6 尚未合併），
+      MUST 停止本群組並回報，SHALL NOT 靜默地只納入四個 key——那是「merge 全綠、測試全綠，
+      但使用者清除後分槽計分進度整批殘留」的無聲失敗（§7.1 的集合相等斷言只比對當下
+      import 得到的常數，補不出還不存在的模組）。因此 **M6 MUST 先於本 change 合併**。
       **SHALL NOT 編輯 `lib/matchmaker/storage.ts` 或 `storage-keys.ts`**（design Decision 2），
       也 SHALL NOT 編輯 `lib/scoreboard/**`（只 import）
 - [ ] 7.3 RED: 補 it「clearAllLocalData 不呼叫 clear，列舉範圍外的 key 完全不受影響」：
@@ -248,6 +271,15 @@ Depends on: §2, §3, §4, §6, §7
 - [ ] 8.2 GREEN: 建立 `app/matchmaker/data/page.tsx` 與四個區塊元件骨架
       （`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`、
       `ClearLocalDataSection`），含 9.3 不對稱說明文字與從 matchmaker 區段的導覽入口
+- [ ] 8.2a **必 TDD**（`lib/**` 的行為邏輯，非例外層）：導覽入口的單一來源是
+      `nextjs-pickball/lib/matchmaker/section-nav.ts`——在 `MATCHMAKER_SECTION_HREFS`
+      （第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）各加一筆資料頁路徑
+      （標籤「資料」）。`lib/matchmaker/section-nav.test.ts` 第 31～36 行的 `toEqual`
+      regression guard 釘死「分頁清單依序為對戰與參賽者兩筆」，**先更新該測試看紅燈**，
+      再改 `section-nav.ts` 轉綠。渲染層 `components/matchmaker/MatchmakerTabs.tsx`
+      讀同一份常數，不需另外改。
+      漏做的話會拖到 §9.6「`pnpm test` 全套通過」才爆，且那不是 TDD 紅燈而是既有測試被破壞。
+      **M7 也會改同兩處**，合併時保留雙方分頁（順序：對戰／參賽者／歷史／資料）
 - [ ] 8.3 RED: 補 test「匯入合法 JSON 備份後參賽者與歷史一併還原」。確認紅燈
 - [ ] 8.4 GREEN: 接上 `JsonBackupSection` 的匯出（Blob + `<a download>`）與匯入
       （`File.text()` → `parseBackup` → `writeBackup` → `location.reload()`），

@@ -215,7 +215,7 @@ UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 
 
 > **該 `matchId` 在 `scoreboard:matches:v1` 有條目 ⟺ 綁定有效。**
 
-此等價關係 MUST 由「重設本輪或刪除場次時清除對應槽」維持（見 `round-lifecycle` capability）。採此不變式而非反查回合資料，是為了不讓 `scoreboard` capability 反向相依於 matchmaker 的回合模型——該相依會使回合 schema 的任何調整都波及獨立計分板（見 design Decision 2）。
+此等價關係 MUST 由「重排本輪或重置名單時清除對應計分板進度」維持（見 `round-lifecycle` capability）。採此不變式而非反查回合資料，是為了不讓 `scoreboard` capability 反向相依於 matchmaker 的回合模型——該相依會使回合 schema 的任何調整都波及獨立計分板（見 design Decision 2）。
 
 **失效處理**（`prd.md` §11「由計分板返回時該場次已被刪除或該輪已重設」）：以 `?match=<matchId>` 開啟但該 `matchId` 無對應條目時，系統 MUST 顯示繁體中文說明，指出可能原因（該輪已重設或該場次已被刪除）並提供兩個出口：「回到對戰頁」與「改用獨立計分板」。訊息 SHALL NOT 顯示技術錯誤碼、SHALL NOT 顯示空白畫面，也 SHALL NOT 靜默退回獨立計分板——靜默退回會讓使用者以為自己仍在計那一場，最後把分數計在無人接收的獨立槽裡。
 

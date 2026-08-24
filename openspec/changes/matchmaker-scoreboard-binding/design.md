@@ -48,7 +48,7 @@
 
 ### Decision 2：綁定有效性以「分槽有無該條目」判定，計分板不反查回合資料
 
-不變式：**該 `matchId` 在 `scoreboard:matches:v1` 有條目 ⟺ 綁定有效**。維持它的兩端是——對戰頁在導向**前**寫 seed（`match-stage`），回合重設／刪除場次時清槽（`round-lifecycle`）。
+不變式：**該 `matchId` 在 `scoreboard:matches:v1` 有條目 ⟺ 綁定有效**。維持它的兩端是——對戰頁在導向**前**寫 seed（`match-stage`），重設／重排本輪時清槽（`round-lifecycle`）。
 
 替代方案是計分板自行讀 `matchmaker:round:v1` 反查該 `matchId` 是否還在、順便取回 `targetScore`。否決理由有三：
 
@@ -166,3 +166,4 @@
 2. **跨分頁即時同步（`storage` 事件／`BroadcastChannel`）** 是否值得？涉及雙向衝突處理，PRD 未要求，暫不做。
 3. **`firstServer` 是否也該由回合決定？** 目前保留為現場可調。若日後 PRD 加入「發球權輪替」規則，此決定需重審。
 4. **M4 的送出比分入口是否為純函式？** 若它同時負責持久化，「回填與手動輸入逐欄相同」的單元測試需要在同一層比對（比較回傳的回合與歷史物件）。apply 的 §0 對齊步驟需確認這一點；若該入口不可在單元層呼叫，此 Scenario 的 Tier 需由 unit 調整為 integration，並在 tasks 誠實記錄。
+   **已結案（實測）**：該入口是**純函式** `submitScore(input: SubmitScoreInput): SubmitScoreResult`，位於 `nextjs-pickball/lib/matchmaker/round.ts` 第 825 行，不負責持久化、可在單元層直接呼叫。因此 test-plan 的「回填與手動輸入的送出結果逐欄相同」維持 `unit` tier，§0.2 只需複核簽章即可。
