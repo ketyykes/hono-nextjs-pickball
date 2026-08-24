@@ -71,14 +71,15 @@ bab6f19 docs(...): 完成 §0 上游契約對齊並回填 environment 基準
 M6 的「返回對戰」按鈕需要這個路由。leader 判定這不到 execution-plan
 「上游契約不符即停工」的門檻（缺的是匯出而非欄位／型別），未停工，記入 Open Question 5。
 
-**coordinator 裁決：同意不停工。** 但接手者要知道兩個選項的代價：
+**coordinator 裁決：同意不停工，且 leader 已在 design.md OQ5 給出比我想的更好的解法。**
 
-- **把第 13 行改成 `export const`** → 該行**與 M7／M8 必衝突**（它們正是要在同一行的陣列裡
-  加分頁）。衝突好解（`export` 與新分頁兩者都留），但要記得。
-- **M6 自己定一個路由常數** → 零衝突，但製造第二個真相來源，
-  而那個路由 M7／M8 馬上要動。
+它的處置是：在 `section-nav.ts` **新增一行** `export const MATCHMAKER_ROUTE = "/matchmaker"`，
+再讓 `MATCHMAKER_SECTION_HREFS` 由它組成，行為零變更、既有測試不受影響。
+授權依據是同一份 delta 對 `TARGET_SCORE_OPTIONS` 已明文開的同種先例
+（「若該 capability 只匯出型別而沒有可迭代的選項清單，MUST 於其模組補一個具名匯出」）。
 
-兩個都可接受，由 §2 的 leader 或 Stage 2 定案並記入 design.md。
+**而且合併衝突根本不會發生**——M6 排在合併順序第一位，M7／M8 會從**已含 M6 的 `main`**
+開分支，看到的就是改好的版本。這比我原先設想的兩個選項都乾淨。**已核可，不要重新討論。**
 
 **這位 leader 的 commit 粒度是逐 task（`test:` 一個、`feat:` 一個），比 runbook 要求的
 「一組一 commit」更細——這是好事，每次紅燈都獨立留在版控裡，接手者可以直接用
