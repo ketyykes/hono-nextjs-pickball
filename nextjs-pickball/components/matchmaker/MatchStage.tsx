@@ -27,8 +27,9 @@ export interface MatchStageProps {
 // 一份規則同時滿足平板與手機兩列（design Open Questions 4：桌面欄數細節不寫進 spec，
 // 本檔決定手機 1 欄、md 起 2 欄）。
 //
-// 手機斷點觸控目標（≥44px）：CourtCard／ScoreEntry 屬 tasks 7～9 既有產出，不在本組
-// 可動檔案清單內，故不直接修改其原有的 h-8／h-9 尺寸。改由本檔以 Tailwind 的
+// 手機斷點觸控目標（≥44px）：CourtCard／ScoreEntry 屬 tasks 7～9 既有產出，**刻意不改動
+// 其原有的 h-8／h-9 尺寸宣告**——那兩個元件在其他斷點與其他消費端維持既有視覺。
+// 改由本檔以 Tailwind 的
 // arbitrary variant 從外層對其內部 input／button 施加 max-md（<768px）的高度覆寫——
 // `[&_input]:min-h-11` 之類的巢狀選擇器 specificity 為 (0,1,1)，高於單一 class
 // 選擇器（0,1,0），能可靠覆寫而不需更動 CourtCard／ScoreEntry 本身。只用 min-height

@@ -209,12 +209,42 @@ Depends on: §2, §3, §4, §5, §6, §7, §8, §9, §10
 
 ## 12. 收尾驗證
 
-- [ ] 12.1 逐條核對兩份 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
-- [ ] 12.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 與 `--run components/matchmaker/` 全綠，貼出輸出
-- [ ] 12.3 `pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
-- [ ] 12.4 `pnpm typecheck` 通過
-- [ ] 12.5 `pnpm test` 全套通過（確認未破壞 M1～M4 既有測試與 hono-pickball 後端測試）
-- [ ] 12.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**（`mobile-safari` 的預設 viewport 最矮，是最容易破的一個）
-- [ ] 12.7 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：新增 `/matchmaker` 路由說明，並移除「對戰分配引擎已完成但尚未接 UI，等後續對戰畫面 milestone」這句已過期的敘述
-- [ ] 12.8 `DO_NOT_TRACK=1 openspec validate matchmaker-match-stage-ui --strict` 通過
-- [ ] 12.9 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複）
+- [x] 12.1 逐條核對兩份 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
+      - 腳本抽出 **51 條**錨點（match-stage 43 + site-navbar 8），全數「檔案存在且 `it`／`test` 名稱逐字命中」。
+- [x] 12.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 與 `--run components/matchmaker/` 全綠，貼出輸出
+      - `lib/matchmaker/`：18 檔 / **172 passed**；`components/matchmaker/`：3 檔 / **28 passed**。
+- [x] 12.3 `pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
+      - **0 errors / 3 warnings**，三個 warning 全在 `hooks/useQuiz.ts`、`useRosterStore.ts`、`useScoreboardStore.ts`，皆為既有、本 change 未觸碰，與 baseline 完全相同。
+- [x] 12.4 `pnpm typecheck` 通過
+      - exit 0。
+- [x] 12.5 `pnpm test` 全套通過（確認未破壞 M1～M4 既有測試與 hono-pickball 後端測試）
+      - 前端 **54 檔 / 410 passed**（baseline 48 檔 / 364）、後端 **4 檔 / 16 passed**（未動）。
+- [x] 12.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**（`mobile-safari` 的預設 viewport 最矮，是最容易破的一個）
+      - **`--workers=1`（memory 記載的零噪音設定）：244 passed / 0 failed / 21 skipped，五個 project 全跑。這是本項的通過依據。**
+      - **預設併發（`workers=4`）下本機不穩定，且與本 change 無關**——三次全套實測的失敗集合**每次都不同、且會打到本 change 從未觸碰的 spec**：
+        | 執行 | 設定 | 結果 | 失敗項 |
+        |---|---|---|---|
+        | 1 | 預設 | 1 failed / 243 passed | `player-roster` mobile-safari「重整後名單仍在」（ChunkLoadError） |
+        | 2 | 預設 | 4 failed / 240 passed | `player-roster` webkit ×3（ChunkLoadError）＋ `match-stage` mobile-chrome ×1（`page.goto` 30s 逾時） |
+        | 3 | `--workers=2` | 2 failed / 242 passed | **`scoreboard` chromium ×2（本 change 完全未觸碰該 spec）** |
+        | 4 | `--workers=1` | **0 failed / 244 passed** | — |
+      - 隔離重跑亦為機率性：`player-roster` mobile-safari 3 次中 2 次通過；`match-stage` mobile-chrome 3 次中 2 次通過（該次失敗為 `page.goto` 逾時，非斷言失敗）。
+      - 根因與既有紀錄一致（`.claude/agent-memory/nextjs-expert/e2e-webserver-cold-start-chunkloaderror.md`）：Turbopack dev 的延遲 chunk 在高併發下被下一次導覽中斷；該 memory 已用 production build 對照證實 **dev-only、WebKit 系為主**，且明載 `--workers=1` 時零發生。
+      - **但有一項與該 memory 不符、需要後續處理**：memory 寫「**從未看過關鍵首屏 bundle 本身載入失敗**」，本次失敗的卻是第一方 chunk `nextjs-pickball_app_layout_tsx_*`（經同一個 `react-server-dom-turbopack-client` 的 RSC client reference 路徑載入，機制相同、chunk 不同）。`player-roster.spec.ts` 的噪音濾除 `KNOWN_DEV_ONLY_NOISE = /ChunkLoadError.*(hmr-client|global-error)/` 只列舉了兩個 chunk 名，因此擋不住這一個。
+        **本 change 刻意不改 `player-roster.spec.ts`**（該 capability 未列為 Modified，且失敗的是既有測試、既有 chunk）。**建議後續 change 把該 regex 放寬為涵蓋整個 `ChunkLoadError` 類別（維持只作用於 `pageerror`），並更新該 memory。** 留給人類決定。
+- [x] 12.7 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：新增 `/matchmaker` 路由說明，並移除「對戰分配引擎已完成但尚未接 UI，等後續對戰畫面 milestone」這句已過期的敘述
+      - 新增 `/matchmaker` 對戰頁條目、改寫 `/matchmaker/players` 條目（改註明「不在全站 navbar，由區段導覽抵達」）、新增兩頁共用 `app/matchmaker/layout.tsx` 區段導覽的說明；過期敘述已移除。Final Code Review 逐項對照實際程式碼確認三項宣稱皆屬實。
+      - **順帶補上 Final Code Review 發現的既有漂移（S-1）**：CLAUDE.md 的 hooks 歸屬清單缺 `useRoundStore`（M4 遺留，`git show bbda8ff:nextjs-pickball/CLAUDE.md` 同樣缺）。`hooksInventory.test.ts` 比對的是 `openspec/specs/pickleball-guide-page/spec.md` 而非 CLAUDE.md，故綠燈掩蓋了這條漂移。已依主 spec 的歸屬名稱補為「round-lifecycle：`useRoundStore`」。
+- [x] 12.8 `DO_NOT_TRACK=1 openspec validate matchmaker-match-stage-ui --strict` 通過
+      - `Change 'matchmaker-match-stage-ui' is valid`，exit 0。
+- [x] 12.9 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複）
+      - `match-stage`：13 Requirement / 43 Scenario，無重複；`site-navbar`：2 Requirement / 8 Scenario，無重複。合計 15 Requirement / 51 Scenario，與 12.1 抽出的 51 條錨點一致。
+
+## Final Code Review（execution-plan 的最後一關，全部 task 打勾後執行一次）
+
+- [x] 跨群組一致性審查（opus）：**一項必改、四項建議**。
+      - **必改（已修）**：§12 的 `nextjs-pickball/CLAUDE.md` 當時只存在於 working tree、未進任何 commit——若直接 archive／merge 會整段遺失。
+      - **建議（已修三項）**：① CLAUDE.md 的 hooks 清單缺 `useRoundStore`（見 12.7）；② `CourtCard.tsx` 引用了一個**不存在的 design Decision**（「雙打的隊伍標籤位置需與色塊排列對應」是 leader 派工單的措辭，不是 design.md 的條目），已改為引用真實的 Decision 4 並寫出理由本體；`rating-bounds.ts` 的「design Open Questions」已補為「第 1 條」；③ `MatchStage.tsx` 的註解說 `ScoreEntry` 「不在本組可動檔案清單內」，但 §11 後續確實編輯了該檔（只加註解），已改寫為「刻意不改動其尺寸宣告」。
+      - **建議（記錄不改）**：④ `PlayerTile.tsx` 與 `PlayerCard.tsx` 的 `{GENDER_LABEL[...]} · 強度 {rating.toFixed(2)}` 逐字相同——屬 §8 Stage 2 已裁決不合併的 `GENDER_LABEL` 重複的延伸，非新的第三份來源。
+      - **機械確認通過的項目**：五個純函式模組 9/9 `export interface` 且欄位全標 `readonly`、唯一的 `export type` 是字面量聯集；八個元件 props callback 零個 `handleXxx`；`GENDER_LABEL` 恰好兩份無第三份；`linear-gradient` 新檔零新增；隊伍標籤／雙打組成／觸界標示／`HH:mm`／場地數邊界／`PLAYERS_PER_MATCH`／`TARGET_SCORE_OPTIONS` 各只有一處來源；`useRoundStore` 的唯一 import 點是 `app/matchmaker/page.tsx`、零元件 import `lib/matchmaker/round.ts`；`hooks/` 兩個 `M`、零 `A`；`openspec/specs/` 完全未被觸碰；**跨 25 個新／改檔的註解逐字重複掃描結果為「無」**；本 change 的檔案零 `§` 符號、零 `openspec/` 完整路徑；八個新測試檔慣例一致、零 jest-dom 匹配器；`package.json`／`pnpm-lock.yaml` 零改動。
+      - Reviewer 對命名風格的獨立判斷：`buildCourtTiles`／`playerTileStyle` 等名詞式與 `createRoundSettings`／`changeCourtCount` 動詞式的混用**不構成不一致**——既有 46 個 lib 匯出函式的規則是「由輸入推導出一個值用名詞、建構或轉換用動詞」，本 change 五個模組全部落在既有規則內（`buildCourtTiles` 與既有 `buildSignatureIndex` 簽章形狀相同）。

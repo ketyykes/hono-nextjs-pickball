@@ -85,8 +85,9 @@ export function CourtCard({ match, players, onSubmitScore, submitError }: CourtC
 	}
 
 	// 隊伍標籤＋勝方文字標籤：色彩不得作為唯一資訊來源，勝方 MUST 以文字而非僅顏色標示
-	// （prd.md 12.5）。單打時作為 grid 外的左右並列標頭渲染；雙打時貼在各自那一排色塊
-	// 旁（design Decision「雙打的隊伍標籤位置需與色塊排列對應，不可讓標籤與色塊各自漂移」）。
+	// （prd.md 12.5）。標籤位置必須與色塊排列對應：單打左右分置，故作為 grid 外的並列標頭；
+	// 雙打上下分排（design Decision 4），故貼在各自那一排旁——若沿用單打的左右並列，
+	// 「第二隊」會落在第一隊色塊的正上方，讀者仍得靠顏色把標籤連回色塊。
 	function renderTeamLabel(team: "a" | "b") {
 		const index = team === "a" ? 0 : 1;
 		const winnerKey = team === "a" ? "teamA" : "teamB";
