@@ -84,13 +84,13 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 
 ## 2. 綁定欄位與 reducer 鎖定（`lib/scoreboard/types.ts`、`reducer.ts`）
 
-- [ ] 2.1 RED: 於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 補 it「舊版資料缺 matchId 時補為 null 且不清除 key」——寫入不含 `matchId` 的合法舊資料 → `readScoreboard()` 回傳的 `matchId === null`、key 未被移除、分數與 history 完整。確認紅燈
-- [ ] 2.2 GREEN: `types.ts` 的 `ScoreboardStateSchema` 新增 `matchId: z.string().nullable().default(null)`，並把 `matchId` 併入 `MatchSettings`。**SHALL NOT** bump storage key（既有 spec 的向後相容策略）
-- [ ] 2.3 RED: 於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補 it「綁定場次時 setup 階段 ignore SET_TARGET_SCORE」——`matchId: "m1"`、`targetScore: 15`、`status: "setup"` 下 dispatch `SET_TARGET_SCORE(11)` → state 全等於變更前。確認紅燈
-- [ ] 2.4 GREEN: `SET_TARGET_SCORE` 於 `state.matchId !== null` 時直接回傳原 state（與既有 `status !== "setup"` 的 guard 併排，不另開分支結構）
-- [ ] 2.5 RED: 於 `reducer.test.ts` 補 it「UNDO 與 RESET 後保留 matchId，不退回 null」；同時於既有三個 it（「setup 階段可切換 mode…」「setup 階段可切換 firstServer」「setup 階段可切換 targetScore 且保留 mode 與 firstServer」）補上 `matchId` 不變的斷言（**it 名稱不得更動**——它們是 spec 驗收錨點）。確認紅燈
-- [ ] 2.6 GREEN: `createInitialState` 與 `settingsOf` 帶入 `matchId`，使 UNDO 的 replay 與 RESET 皆保留（design Decision 6）
-- [ ] 2.7 REFACTOR: 確認 `matchId` 的保留只透過 `MatchSettings` 一條路徑，沒有任何 case 分支自行複製欄位（無壞味道則註記 skipped）
+- [x] 2.1 RED: 於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 補 it「舊版資料缺 matchId 時補為 null 且不清除 key」——寫入不含 `matchId` 的合法舊資料 → `readScoreboard()` 回傳的 `matchId === null`、key 未被移除、分數與 history 完整。確認紅燈
+- [x] 2.2 GREEN: `types.ts` 的 `ScoreboardStateSchema` 新增 `matchId: z.string().nullable().default(null)`，並把 `matchId` 併入 `MatchSettings`。**SHALL NOT** bump storage key（既有 spec 的向後相容策略）
+- [x] 2.3 RED: 於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補 it「綁定場次時 setup 階段 ignore SET_TARGET_SCORE」——`matchId: "m1"`、`targetScore: 15`、`status: "setup"` 下 dispatch `SET_TARGET_SCORE(11)` → state 全等於變更前。確認紅燈
+- [x] 2.4 GREEN: `SET_TARGET_SCORE` 於 `state.matchId !== null` 時直接回傳原 state（與既有 `status !== "setup"` 的 guard 併排，不另開分支結構）
+- [x] 2.5 RED: 於 `reducer.test.ts` 補 it「UNDO 與 RESET 後保留 matchId，不退回 null」；同時於既有三個 it（「setup 階段可切換 mode…」「setup 階段可切換 firstServer」「setup 階段可切換 targetScore 且保留 mode 與 firstServer」）補上 `matchId` 不變的斷言（**it 名稱不得更動**——它們是 spec 驗收錨點）。確認紅燈
+- [x] 2.6 GREEN: `createInitialState` 與 `settingsOf` 帶入 `matchId`，使 UNDO 的 replay 與 RESET 皆保留（design Decision 6）
+- [x] 2.7 REFACTOR: 確認 `matchId` 的保留只透過 `MatchSettings` 一條路徑，沒有任何 case 分支自行複製欄位（無壞味道則註記 skipped）
 
 ## 3. storage 分派與 hook 綁定（`lib/scoreboard/storage.ts`、`hooks/useScoreboardStore.ts`）
 Depends on: §1、§2
