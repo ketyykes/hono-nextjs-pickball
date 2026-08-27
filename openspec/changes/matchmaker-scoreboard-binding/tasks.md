@@ -111,6 +111,34 @@ Depends on: §1、§2
   - **8-D 空字串邊界**：`storage.ts` 的 `isStandaloneMatchId()` 與 `useScoreboardStore` 的 matchId 正規化皆已在 3.2 完成；另補充 it「matchId 為空字串時視為獨立計分板」（`storage.test.ts`，非 test-plan 逐字條目）補上 mutation 缺口
   - 額外修正：`bindingStatus` 改用 `useReducer`（identity reducer）取代 `useState`，避開 ESLint `react-hooks/set-state-in-effect` 對 effect 內同步呼叫 `useState` setter 的限制（`useReducer` dispatch 不受此規則限制，與既有 HYDRATE dispatch 寫法一致）
 
+### §3 Stage 2（Code-Quality Reviewer）獨立 mutation 結果
+
+Implementer 自述做了 8 次 mutation／1 次存活。Stage 2 **未採信、獨立重做 35 組**（涵蓋反向 mutation
+與逐分支零覆蓋盤點），實測 **10 組存活**，其中 1 組事後判定為等價 mutant。已補測封住的 7 組：
+
+| 存活 mutation | 缺口 | 處置 |
+|---|---|---|
+| `clearScoreboard()` 綁定分支整段刪除（改去 `removeItem` 獨立槽） | 該分支**零測試覆蓋**，且失效形式正是「清除範圍過寬」 | 新增 it「clearScoreboard 帶 matchId 時只清該場次分槽，不動獨立槽與其他場次」 |
+| `readMatchSlot` 忽略 `matchId`、回傳 map 第一筆 | 既有 it 只斷言 `m1`，而 `m1` 恰為第一筆 | 既有 it「寫入某場次的槽不影響其他場次與獨立槽」**加斷言**（it 名稱不變） |
+| hook 邊界拿掉空字串正規化 | `storage.ts` 那層的正規化只保證寫對槽，`bindingStatus` 仍會誤判為 bound／missing | 新增 it「matchId 為空字串時沿用獨立槽並回報 standalone」 |
+| read effect cleanup 的 `hasHydratedRef = false` 改成 `true` | 既有測試全在非 Strict Mode 下 render，design Context 指名要守的競態**零覆蓋** | 新增 it「React Strict Mode 二次 mount 不以初始 state 覆蓋既有進度」 |
+| `writeMatchSlot` 誤加 `status === "finished"` 早退 guard（反向 mutation） | 「綁定模式打到 finished」的 hook + storage 端到端路徑零覆蓋（§5 待送出清單的上游前提） | 新增 it「綁定模式下打到結束並 UNDO 後仍只寫回該槽」 |
+| reducer UNDO replay 掉 `matchId` | §2 只在 reducer 層有防線，hook 層無第二道（Decision 6 的洞在端到端層仍開著） | 同上一個 it（現由 hook 與 reducer 兩層各自擋下） |
+| `storage-keys.ts` 內任一 key 字面值改 v1 → v2 | 所有測試都改用匯出常數，**沒有任何一處釘住字面字串**；key 是持久化契約 | 新增 it「兩個 LocalStorage key 名稱由 storage-keys 單一來源匯出」（比照 `lib/matchmaker/round-storage.test.ts` 既有先例） |
+
+判為**等價 mutant、不補測**：`isStandaloneMatchId` 改寫成 `!matchId`——JS 中 `string | null`
+只有 `""` 與 `null` 為 falsy（`"0"` 是 truthy），語意完全相同。
+
+**仍存活、刻意不補測並升級給 leader 的 2 組**（見 Stage 2 回報）：
+- `bindingStatus` 初始值三元改為恆 `"standalone"`：可測（首次 render 值），但保守初值 `missing`
+  意味著**每一次進入合法綁定場次都會先畫一幀「場次已失效」**（`useEffect` 在 paint 之後才跑，
+  SSR 輸出亦然）。這是 §7 的呈現決策，現在把初值釘死反而會擋住 §7 可能需要的第四種
+  「hydrating」狀態，故不補測，交由 §7 處理。
+- read effect 依賴陣列 `[]` 改為 `[matchId]`：等價於「同一頁面生命週期內 matchId 不變」這個
+  假設**沒有任何測試佐證**。ESLint 亦以 `react-hooks/exhaustive-deps` 警告（全 repo 唯一一處）。
+  §7 的「改用獨立計分板」出口若採 soft navigation，元件不會重新 mount，hook 會永遠停在
+  `missing`：計分不落盤、失效畫面不消失。詳見 Stage 2 回報的處置建議。
+
 ## 4. 計分板入口的純函式層（`lib/matchmaker/scoreboard-binding.ts`）
 Depends on: §1
 
