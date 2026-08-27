@@ -174,4 +174,27 @@ describe("scoreboard-binding", () => {
 
 		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
 	});
+
+	it("已完成的場次不重複送出且連續呼叫為冪等", () => {
+		const round = makeRound({
+			matches: [
+				makeMatch({
+					id: "m1",
+					status: "completed",
+					scores: { teamA: 11, teamB: 7 },
+					winner: "teamA",
+					completedAt: "2026-08-27T00:00:00.000Z",
+				}),
+			],
+		});
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 7 } }),
+		};
+
+		const first = collectFinishedSubmissions(round, slots);
+		const second = collectFinishedSubmissions(round, slots);
+
+		expect(first).toEqual([]);
+		expect(second).toEqual([]);
+	});
 });
