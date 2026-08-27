@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
-import { MATCH_SLOTS_KEY } from "@/lib/scoreboard/match-slots";
+import { MATCH_SLOTS_KEY, writeMatchSlot } from "@/lib/scoreboard/match-slots";
 
 describe("useScoreboardStore", () => {
 	beforeEach(() => {
@@ -119,6 +119,54 @@ describe("useScoreboardStore", () => {
 
 		getItemSpy.mockRestore();
 		setItemSpy.mockRestore();
+	});
+
+	it("帶 matchId 時 hydrate 自對應槽且只寫回該槽", () => {
+		const m1Seed = {
+			mode: "doubles" as const,
+			scores: { us: 8, them: 5 },
+			servingTeam: "us" as const,
+			serverNumber: 2 as const,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON" as const, winner: "us" as const }],
+			status: "playing" as const,
+			winner: null,
+			firstServer: "us" as const,
+			targetScore: 15 as const,
+			matchId: "m1",
+		};
+		writeMatchSlot("m1", m1Seed);
+
+		const { result } = renderHook(() => useScoreboardStore("m1"));
+		const [state, dispatch, bindingStatus] = result.current;
+
+		expect(state.scores).toEqual({ us: 8, them: 5 });
+		expect(state.matchId).toBe("m1");
+		expect(bindingStatus).toBe("bound");
+
+		act(() => {
+			dispatch({ type: "RALLY_WON", winner: "us" });
+		});
+
+		const slots = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
+		expect(slots.m1.scores).toEqual({ us: 9, them: 5 });
+		// 落盤斷言必須到欄位層級：matchId 真的被序列化寫進分槽（見 8-C）
+		expect(slots.m1.matchId).toBe("m1");
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+
+	it("matchId 無對應槽時回報 missing 且不建立新條目", () => {
+		const { result } = renderHook(() => useScoreboardStore("gone"));
+		const [, dispatch, bindingStatus] = result.current;
+
+		expect(bindingStatus).toBe("missing");
+
+		act(() => {
+			dispatch({ type: "RALLY_WON", winner: "us" });
+		});
+
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
 	it("localStorage 不可用（如私密模式）時 hook 不 throw，仍可正常計分", () => {
