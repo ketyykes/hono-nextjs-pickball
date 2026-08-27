@@ -112,6 +112,17 @@ describe("scoreboardReducer — 賽前設定", () => {
 		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 11 });
 		expect(next).toBe(state);
 	});
+
+	it("綁定場次時 setup 階段仍可切換 firstServer", () => {
+		const state = createInitialState({ matchId: "m1", targetScore: 15 });
+		const next = scoreboardReducer(state, { type: "SET_FIRST_SERVER", team: "them" });
+		// 先發球方是每場現場決定的事，綁定不得連帶鎖住它
+		expect(next.firstServer).toBe("them");
+		expect(next.servingTeam).toBe("them");
+		// 切換後仍留在原場次，且該輪分制不變
+		expect(next.matchId).toBe("m1");
+		expect(next.targetScore).toBe(15);
+	});
 });
 
 describe("scoreboardReducer — RALLY_WON", () => {
@@ -224,5 +235,19 @@ describe("scoreboardReducer — RESET", () => {
 		expect(next.status).toBe("setup");
 		expect(next.winner).toBeNull();
 		expect(next.history).toEqual([]);
+	});
+});
+
+describe("scoreboardReducer — HYDRATE", () => {
+	it("HYDRATE 原樣保留帶入的 matchId", () => {
+		const persisted: ScoreboardState = {
+			...createInitialState({ matchId: "m1", targetScore: 15 }),
+			scores: { us: 3, them: 2 },
+			status: "playing",
+		};
+		const next = scoreboardReducer(createInitialState(), { type: "HYDRATE", state: persisted });
+		// hydrate 是重整後唯一的還原路徑，此處掉了 matchId 等同每次重整都靜默脫離綁定
+		expect(next.matchId).toBe("m1");
+		expect(next.scores).toEqual({ us: 3, them: 2 });
 	});
 });
