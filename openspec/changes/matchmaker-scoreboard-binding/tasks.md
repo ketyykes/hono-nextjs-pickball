@@ -96,13 +96,20 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 ## 3. storage 分派與 hook 綁定（`lib/scoreboard/storage.ts`、`hooks/useScoreboardStore.ts`）
 Depends on: §1、§2
 
-- [ ] 3.1 RED: 於 `nextjs-pickball/hooks/useScoreboardStore.test.tsx` 補 it「未帶 matchId 時沿用獨立槽且不觸碰分槽 key」——預置 `scoreboard:current:v1` 的合法進度，不帶 `matchId` render → state 為該進度、`matchId === null`、綁定狀態為 `standalone`，且分槽 key 全程未被讀寫。確認紅燈
-- [ ] 3.2 GREEN: `storage.ts` 的 `readScoreboard(matchId)`／`writeScoreboard(state)`／`clearScoreboard(matchId)` 擴充為依 `matchId` 分派（**寫入槽位一律由 `state.matchId` 推導**，不接受槽位參數）；`useScoreboardStore(matchId)` 接受參數並回傳三元組 `[state, dispatch, bindingStatus]`
-- [ ] 3.3 RED: 補 it「帶 matchId 時 hydrate 自對應槽且只寫回該槽」——預置 `m1`（15 分制、8-5）→ 以 `matchId="m1"` render 並 dispatch 一次 `RALLY_WON` → 只有 `m1` 條目變動，`scoreboard:current:v1` 未被寫入，綁定狀態為 `bound`。確認紅燈
-- [ ] 3.4 GREEN: 補齊綁定路徑的 hydrate 與寫回
-- [ ] 3.5 RED: 補 it「matchId 無對應槽時回報 missing 且不建立新條目」——以不存在的 `matchId` render → 綁定狀態 `missing`、分槽 key 無新增條目、獨立槽未被寫入。確認紅燈
-- [ ] 3.6 GREEN: 實作 `missing` 狀態，且該狀態下**完全不寫入任何槽**（spec 的 SHALL NOT 條款）
-- [ ] 3.7 REFACTOR: 確認既有的 effect 順序（write 在前、read 在後、`hasHydratedRef` 守門、cleanup reset ref）與 Strict Mode 處理**原封不動**；`matchId` 變動時的重新 hydrate 行為需有明確註解說明（無壞味道則註記 skipped）
+- [x] 3.1 RED: 於 `nextjs-pickball/hooks/useScoreboardStore.test.tsx` 補 it「未帶 matchId 時沿用獨立槽且不觸碰分槽 key」——預置 `scoreboard:current:v1` 的合法進度，不帶 `matchId` render → state 為該進度、`matchId === null`、綁定狀態為 `standalone`，且分槽 key 全程未被讀寫。確認紅燈（實測：`expected undefined to be 'standalone'`，見 commit 5385f10）
+- [x] 3.2 GREEN: `storage.ts` 的 `readScoreboard(matchId)`／`writeScoreboard(state)`／`clearScoreboard(matchId)` 擴充為依 `matchId` 分派（**寫入槽位一律由 `state.matchId` 推導**，不接受槽位參數）；`useScoreboardStore(matchId)` 接受參數並回傳三元組 `[state, dispatch, bindingStatus]`（commit 9c821a8）
+- [x] 3.3 RED→regression guard: 補 it「帶 matchId 時 hydrate 自對應槽且只寫回該槽」——寫下當下即為綠燈，因 3.2 的實作已一併涵蓋 bound 路徑（單一 hook 內三種綁定狀態耦合，拆開會產生無意義的半成品）。已以 mutation 測試驗證偵測力：讓 bound 路徑改讀獨立槽 → 轉紅；讓 writeScoreboard 序列化抹掉 matchId → 轉紅（見下方 3.7 mutation 清單）
+- [x] 3.4 GREEN: 綁定路徑的 hydrate 與寫回已隨 3.2 完成，無需額外實作
+- [x] 3.5 RED→regression guard: 補 it「matchId 無對應槽時回報 missing 且不建立新條目」——同上，寫下當下即為綠燈。已以 mutation 測試驗證：拿掉 missing 時的 write guard → 轉紅；讓 missing 誤回報為 bound/standalone → 轉紅
+- [x] 3.6 GREEN: `missing` 狀態的 write guard 已隨 3.2 完成，無需額外實作
+- [x] 3.7 REFACTOR: 效果驗證與收斂如下（commit de382f2）：
+  - effect 順序（write 在前、read 在後、`hasHydratedRef` 守門、cleanup reset ref）與 Strict Mode 處理**原封不動**，未重排、未改用 `useSyncExternalStore`、未搬進 lazy initializer
+  - `matchId` 依賴陣列刻意維持 `[]`（單一頁面生命週期內不會變動），已於程式碼加註解說明
+  - **8-A 必做**：新增 `lib/scoreboard/storage-keys.ts` 收斂 `hasLocalStorage()`／`STORAGE_KEY`／`MATCH_SLOTS_KEY`，`storage.ts` 與 `match-slots.ts` 改為單向依賴，避免 storage.ts import match-slots.ts（分派入口）造成循環匯入；既有匯入點以 re-export 保留，兩份「存取 localStorage 即拋例外」測試均保留
+  - **8-B 必做**：`writeMatchSlot(matchId, state)` 收斂為 `writeMatchSlot(state: ScoreboardState & { matchId: string })`，槽位一律由 `state.matchId` 推導；同步更新 `match-slots.test.ts` 呼叫點，it 名稱與斷言語意不變
+  - **8-C 落盤斷言**：3.3 的 it 已補 `slots.m1.matchId` 欄位層級斷言，並以 mutation（序列化抹掉 matchId）驗證會轉紅
+  - **8-D 空字串邊界**：`storage.ts` 的 `isStandaloneMatchId()` 與 `useScoreboardStore` 的 matchId 正規化皆已在 3.2 完成；另補充 it「matchId 為空字串時視為獨立計分板」（`storage.test.ts`，非 test-plan 逐字條目）補上 mutation 缺口
+  - 額外修正：`bindingStatus` 改用 `useReducer`（identity reducer）取代 `useState`，避開 ESLint `react-hooks/set-state-in-effect` 對 effect 內同步呼叫 `useState` setter 的限制（`useReducer` dispatch 不受此規則限制，與既有 HYDRATE dispatch 寫法一致）
 
 ## 4. 計分板入口的純函式層（`lib/matchmaker/scoreboard-binding.ts`）
 Depends on: §1
