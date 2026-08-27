@@ -34,6 +34,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.isFirstServiceOfGame).toBe(false);
 		// 切換比賽形式不應連帶重設目標分數
 		expect(next.targetScore).toBe(15);
+		// 切換比賽形式不應連帶脫離對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("setup 階段可切換 firstServer", () => {
@@ -45,6 +47,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.servingTeam).toBe("them");
 		// 切換先發球方不應連帶重設目標分數
 		expect(next.targetScore).toBe(21);
+		// 切換先發球方不應連帶脫離對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("setup 階段可切換 targetScore 且保留 mode 與 firstServer", () => {
@@ -54,6 +58,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.mode).toBe("singles");
 		expect(next.firstServer).toBe("them");
 		expect(next.scores).toEqual({ us: 0, them: 0 });
+		// 切換目標分數（獨立計分板）不應連帶產生對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("playing 階段 ignore SET_MODE", () => {
@@ -182,6 +188,18 @@ describe("scoreboardReducer — UNDO", () => {
 		expect(undone.scores).toEqual({ us: 11, them: 0 });
 		// targetScore 若在 replay 時被重設為 11，11-0 會被誤判為比賽結束
 		expect(undone.status).toBe("playing");
+	});
+
+	it("UNDO 與 RESET 後保留 matchId，不退回 null", () => {
+		let state = createInitialState({ matchId: "m1" });
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+		// UNDO 以「重建初始 state 後 replay」實作，若未帶入 matchId 會靜默脫離綁定
+		expect(undone.matchId).toBe("m1");
+
+		const resetState = scoreboardReducer(undone, { type: "RESET" });
+		expect(resetState.matchId).toBe("m1");
 	});
 });
 
