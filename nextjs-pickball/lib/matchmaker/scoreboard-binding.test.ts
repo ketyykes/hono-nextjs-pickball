@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Round, RoundMatch } from "./round-types";
-import { buildMatchSlotSeed } from "./scoreboard-binding";
+import { buildMatchSlotSeed, ensureMatchSlot } from "./scoreboard-binding";
+import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
+import { createInitialState } from "../scoreboard/reducer";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
 function makeRound(overrides: Partial<Round> = {}): Round {
@@ -56,5 +58,27 @@ describe("scoreboard-binding", () => {
 		expect(seed.matchId).toBe("match-1");
 		expect(seed.scores).toEqual({ us: 0, them: 0 });
 		expect(seed.status).toBe("setup");
+	});
+
+	it("已有進度的場次再次進入時保留既有進度不覆蓋", () => {
+		const existing = {
+			...createInitialState({ targetScore: 15, mode: "doubles", matchId: "match-1" }),
+			scores: { us: 8, them: 5 },
+			status: "playing" as const,
+			history: [{ type: "RALLY_WON" as const, winner: "us" as const }],
+			matchId: "match-1",
+		};
+		writeMatchSlot(existing);
+
+		const round = makeRound({ targetScore: 11, format: "singles" });
+		const match = makeMatch({ id: "match-1", format: "singles" });
+		const seed = buildMatchSlotSeed(round, match);
+
+		const result = ensureMatchSlot("match-1", seed);
+
+		expect(result.scores).toEqual({ us: 8, them: 5 });
+		expect(result.history).toEqual(existing.history);
+		expect(result.targetScore).toBe(15);
+		expect(readMatchSlot("match-1")?.scores).toEqual({ us: 8, them: 5 });
 	});
 });
