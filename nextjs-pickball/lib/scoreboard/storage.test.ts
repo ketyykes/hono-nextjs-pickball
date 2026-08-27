@@ -60,6 +60,32 @@ describe("storage", () => {
 		expect(loaded?.history).toHaveLength(1);
 	});
 
+	it("舊版資料缺 matchId 時補為 null 且不清除 key", () => {
+		// 模擬本次變更前寫入的資料：欄位皆合法，但沒有 matchId
+		const legacyState = {
+			mode: "doubles",
+			scores: { us: 7, them: 5 },
+			servingTeam: "us",
+			serverNumber: 1,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON", winner: "us" }],
+			status: "playing",
+			winner: null,
+			firstServer: "us",
+			targetScore: 11,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+		const loaded = readScoreboard();
+
+		// 缺欄位應由 schema 預設值補上，即視為獨立計分板，而非被當成損壞資料
+		expect(loaded?.matchId).toBeNull();
+		// 舊資料不得被清除——否則使用者進行中的比賽會在重整後歸零
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+		expect(loaded?.scores).toEqual({ us: 7, them: 5 });
+		expect(loaded?.history).toHaveLength(1);
+	});
+
 	it("clearScoreboard 移除 key", () => {
 		writeScoreboard(createInitialState());
 		clearScoreboard();
