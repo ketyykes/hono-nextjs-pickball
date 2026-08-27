@@ -316,3 +316,68 @@
    - **授權 Stage 2 直接動手補斷言是划算的**：§2 的 Stage 2 自行 commit `983197e` 封住兩個存活項，省下一次退回 Implementer 的往返。但 MUST 要求它在「偏離」欄如實記載改了什麼、為什麼，且**新增的 it 名稱若不在 test-plan 中 MUST 列出並說明動機**（因為 verify 階段會機械核對 test-plan 與 it 名稱）。
    - **leader 自己要複驗紅燈，不要外包**：本輪三處 `git show <commit>^:<path>` 複驗只花一次 Bash 呼叫，卻是「紅燈要是真的」唯一的機械證據來源。
    - **§2 的實際成本**：Implementer（sonnet）約 11 分鐘／72 tool call、Stage 1（sonnet）約 1.6 分鐘／7 tool call、Stage 2（opus）約 7 分鐘／22 tool call。**§3 觸及 hook 與競態，預期顯著高於此。**
+
+9. **§3「storage 分派與 hook 綁定」完成兩階段審查（2026-08-28，第四棒 leader）**——工作區乾淨、tasks.md **29／78** 勾選（§0 六項 + §1 九項 + §2 七項 + §3 七項）。基準線見 environment.md（`Initial commit hash` = `3fefb02`）。前端單元測試由 §2 結束時的 55 檔／424 測試增為 **55 檔／433 測試全綠**，`pnpm -r exec tsc --noEmit` exit 0，`pnpm lint` 0 error／4 warning（全部既有）。
+
+   **本輪 §3 共 8 個 commit**（`5385f10` → `f1acee4`），全部異動落在白名單 8 檔內，未觸及 `components/**`、`app/**`、`lib/matchmaker/**`、主 spec 與 E2E。
+
+   **§3 實作摘要**：
+   - 新增葉節點 `nextjs-pickball/lib/scoreboard/storage-keys.ts`，收斂 `STORAGE_KEY`、`MATCH_SLOTS_KEY` 與 `hasLocalStorage()` 為單一來源；相依方向確認為 `storage.ts → match-slots.ts → storage-keys.ts` **單向**，`storage.ts` 與 `match-slots.ts` 各留 re-export 維持既有匯入點相容（各 3 個真實匯入點，無 dead export）。
+   - `storage.ts` 的 `readScoreboard(matchId)`／`writeScoreboard(state)`／`clearScoreboard(matchId)` 依 `matchId` 分派；判斷收斂為單一 predicate `isStandaloneMatchId()`（`null` 與 `""` 皆視為獨立槽）。
+   - `writeMatchSlot` 簽章收斂為 `writeMatchSlot(state: ScoreboardState & { matchId: string })`，使「寫入槽位由 `state.matchId` 推導」成為**型別層面的必然**。`readMatchSlot(matchId)`、`clearMatchSlots(matchIds)` 不變。
+   - `useScoreboardStore(matchId?: string | null)` 回傳 `readonly [ScoreboardState, Dispatch<Action>, ScoreboardBindingStatus]`；`ScoreboardBindingStatus` 為 `"standalone" | "bound" | "missing"`，自該檔匯出。空字串在 hook 邊界正規化為 `null`。
+   - **effect 順序、`hasHydratedRef` 守門與 Strict Mode cleanup 一行未改**；`missing` 狀態的「不寫入任何槽」guard 放在 write effect 內（`writeScoreboard` 本身無從得知槽是否存在）。
+   - `bindingStatus` 以 identity-reducer 的 `useReducer` 承載而非 `useState`，因 ESLint `react-hooks/set-state-in-effect` 禁止在 effect 內同步呼叫 setter。依 Escalation「既有 codebase 風格勝出」判為合規（`hooks/useRosterStore.ts` 有同形態前例）。
+
+   **紅燈機械複驗（leader 親自以 `git show <commit>^:<path>` 執行，續作者可直接採信）**：
+   - `5385f10^` 的 `hooks/useScoreboardStore.ts` 完全不含 `bindingStatus` 與 `matchId`（grep 計數 0），3.1 為**真紅燈**。
+   - 3.3 與 3.5 被誠實標為 **regression guard**：測試 commit `b1bc424` 確實排在 GREEN commit `9c821a8` **之後**，git 歷史與自述一致，**無偽造紅燈**。理由是 3.2 的實作把 `standalone`／`bound`／`missing` 建成一個內聚狀態機，拆成部分實作只會產出丟棄式程式碼。兩者皆已補 mutation 驗證。
+
+   **§3 Stage 1（Spec Reviewer, sonnet）判定：`PASS`**：三個 Scenario 全數有對應測試、it 名稱與 test-plan 逐字相符（機械 grep 核對）；`bound` 已斷言到 `slots.m1.matchId` 欄位層級（滿足 §2 移交的 8-C）；`standalone` 以 `vi.spyOn` 斷言分槽 key **全程**未被讀寫而非只測「沒被寫」；`missing` 覆蓋「不建立新條目」與「獨立槽未寫入」兩項 SHALL NOT。無 scope creep（未碰 `app/`、`Scoreboard.tsx`、`MatchBindingNotice.tsx`，未提前讀 `searchParams`）。`git diff | grep '^[-+].*it('` 只有 4 行 `+`、**0 行 `-`**，既有 it 名稱一個都沒被動。
+
+   **§3 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**，**獨立 mutation 35 組，25 轉紅／10 存活**（Implementer 自述為 8 次 1 存活 —— **第四度證實自述不可採信**）。補測後 7 組轉紅、3 組維持存活（其中 1 組為等價 mutant、2 組升級給 leader）。
+   - Stage 2 新增 commit `2f5c11b`（補 5 個 it + 1 個既有 it 加斷言，**未改任何實作檔一行**）與 `f1acee4`（落盤 mutation 結果）。
+   - **五個 test-plan 之外的新 it**（verify 階段機械核對時需知悉，皆為偵測力補強、非行為新增）：
+     ① `storage.test.ts`「clearScoreboard 帶 matchId 時只清該場次分槽，不動獨立槽與其他場次」——封 `clearScoreboard` **綁定分支零覆蓋**（此為本輪最嚴重缺口，失效形式正是「清除範圍過寬」：清一個場次卻清掉獨立計分板）。
+     ② `storage.test.ts`「兩個 LocalStorage key 名稱由 storage-keys 單一來源匯出」——封「key 字面值無人釘住」（所有測試都用匯出常數，改 v1→v2 全綠）。寫法比照既有 `lib/matchmaker/round-storage.test.ts`。
+     ③ `useScoreboardStore.test.tsx`「matchId 為空字串時沿用獨立槽並回報 standalone」——封 hook 層正規化零覆蓋。
+     ④ `useScoreboardStore.test.tsx`「綁定模式下打到結束並 UNDO 後仍只寫回該槽」——封 finished 落盤與 Decision 6 在 hook 層的第二道防線。
+     ⑤ `useScoreboardStore.test.tsx`「React Strict Mode 二次 mount 不以初始 state 覆蓋既有進度」——封 design Context 指名要守的競態，**原本零覆蓋**（既有測試全在非 Strict Mode 下 render）。
+     另：既有 it「寫入某場次的槽不影響其他場次與獨立槽」加一行 `readMatchSlot("m2")` 斷言（**名稱未改**），封「`readMatchSlot` 忽略 matchId 回傳 map 第一筆」。
+   - Stage 2 的一次**自我修正**值得記錄：它曾為「`isStandaloneMatchId` 放寬成 `!matchId`」補一個 it，實測仍存活後才發現那是**等價 mutant**（JS 中 `string | null` 只有 `""` 與 `null` falsy，`"0"` 是 truthy），遂在 commit 前**移除該 it**——留著會是一條註解陳述為假的測試。最終測試數 433 而非 434。
+
+   **leader 對 Stage 2 兩項升級的裁決（皆已核可，§7 MUST 照做，不得重新討論）**：
+
+   1. **【soft navigation 會讓綁定 hook 卡死 —— §7 必處理】** read effect 的依賴陣列刻意留空（`[]`），假設「單一頁面生命週期內 `matchId` 不變」。該假設**目前無測試佐證**，且 ESLint 的 `react-hooks/exhaustive-deps` 對此發出**全 repo 唯一一處**警告。
+      具體失效路徑：§7 失效畫面的「改用獨立計分板」若以 `<Link href="/scoreboard">` 或 `router.replace()` 導向，Next.js 做 **soft navigation**，`Scoreboard` 元件在同一位置被 reconcile、**不會 remount**；hook 收到新的 `matchId = null` 但 read effect 不重跑 → `bindingStatus` 永遠停在 `missing` → write effect 被 guard 擋住 → **使用者可以計分但完全不落盤，且失效畫面不會消失**。
+      **已核可的處置**：§7 於 `Scoreboard` 掛 `key={matchId ?? "standalone"}` 強制 remount（或改用整頁導覽 `window.location.assign`）。這是最小改動，且**不必動 §3 已被 E2E 驗證過的 effect 結構**。
+      ❌ **不採**「把 `matchId` 放進 read effect 依賴陣列」：那會牽動 `hasHydratedRef` 的語意（re-hydrate 時 state 不會回到初始值），屬結構性變更，違反 design Context「MUST 沿用這個結構」。
+      §7 的 E2E test「失效畫面可切換為獨立計分板並恢復計分」正是這條路徑的驗收，**MUST 確認它真的通過而非被 reuse 的舊 DOM 蒙混**。
+
+   2. **【合法綁定場次會先畫一幀「場次已失效」—— §7 必處理】** `bindingStatus` 的初始值在 `matchId !== null` 時保守設為 `"missing"`，而 `useEffect` 在 paint **之後**才跑（SSR 輸出亦然）。§7 若直接用 `bindingStatus === "missing"` 決定要不要渲染失效畫面，**每次進入正常場次都會閃一下錯誤訊息**。
+      **已核可的處置**：§7 MUST 引入「hydrating／尚未判定」的呈現狀態（例如在 `hasHydratedRef` 尚未為真時不渲染 `MatchBindingNotice`），SHALL NOT 只靠 `bindingStatus === "missing"` 分支。
+      Stage 2 **刻意沒有**把 `bindingStatus` 初值釘進測試，就是為了不擋住 §7 這個決定 —— 對應的 mutation「初始值恆為 `standalone`」目前仍存活，**這是有意保留的自由度，不是缺口**，§7 完成後應由 Final Code Review 複查是否該補測。
+
+   **§3 已固定的契約（§4～§8 會依賴）**：
+   - `useScoreboardStore(matchId?: string | null)` → `readonly [ScoreboardState, Dispatch<Action>, ScoreboardBindingStatus]`；`ScoreboardBindingStatus = "standalone" | "bound" | "missing"`，自 `hooks/useScoreboardStore.ts` 匯出。
+   - `writeMatchSlot(state: ScoreboardState & { matchId: string })`（**單參數**）、`readMatchSlot(matchId)`、`clearMatchSlots(matchIds)`、`clearAllMatchSlots()`、`readMatchSlots()`。
+   - `MATCH_SLOTS_KEY` 與 `STORAGE_KEY` 的單一來源為 `lib/scoreboard/storage-keys.ts`，但兩者在 `storage.ts`／`match-slots.ts` 皆有 re-export——**§6.4 由 matchmaker 側 import `MATCH_SLOTS_KEY` 時，MUST 自 `lib/scoreboard/match-slots.ts` 匯入**（`lib/matchmaker/` 不應直接依賴 `lib/scoreboard/storage-keys.ts` 這個內部葉節點）。
+   - 空字串 `matchId` 已在 hook 與 `storage.ts` 兩層正規化為 `null`。**§7 讀 `searchParams` 時仍 MUST 在自己那層再正規化一次**（§2 Stage 2 的原始交辦，§3 只負責 storage／hook 層）。
+   - `components/scoreboard/Scoreboard.tsx` **仍解構 2-tuple**（`const [state, dispatch] = useScoreboardStore();`）。這是刻意的——該檔屬 §7 範圍。**§7 MUST 把它改為 3-tuple 並接上 `matchId` prop。**
+
+   **給 §5 的一項**：`writeMatchSlot` 對 `finished` 狀態的落盤現在有端到端測試護著（Stage 2 新增的第 ④ 個 it）。§5 的 `collectFinishedSubmissions` 可以放心假設「打完的場次會以 `status: "finished"` 留在槽裡」。
+
+   **給 §6 與 Final Code Review 的一項觀察**：`clearScoreboard()` 至今**沒有任何生產端呼叫**（只有測試用），它是 §3 之前就存在的匯出，§3 只是依 tasks 3.2 為它加上分派。若 §6 的清槽走 `clearMatchSlots`／`clearAllMatchSlots` 而不用它，Final Code Review **MUST 重新評估** `clearScoreboard` 的 `matchId` 參數是否落入 dead-export 判準。
+
+   **⚠️ 本輪無未落盤事項**：§3 的 Stage 1 與 Stage 2 判定全文、紅燈機械複驗結論、10 個 mutation 存活項的處置、兩項升級的 leader 裁決，皆已寫在本項內。
+
+   **這一輪的坑與提醒（補充第 6、7、8 項，不重複）**：
+   - **「零覆蓋盤點」比「隨手改壞幾處」有效得多**。連續三輪，Stage 2 找到的最嚴重缺口**全部**是「某個分支從未被任何測試執行」（§1 是 `readMatchSlots()` 的非物件分支、§2 是 `HYDRATE` action、§3 是 `clearScoreboard` 的綁定分支與 read effect 的 cleanup）。**後續群組的 Implementer 派工單 MUST 要求在 REFACTOR 步驟做一次逐分支機械盤點**，而不只是憑直覺挑幾處改壞——§3 的 Implementer 自述做了 8 次卻仍漏掉 5 個零覆蓋分支，正是因為只做了後者。
+   - **常數的「值」本身要有人釘住**。所有測試都用匯出常數時，把 `"scoreboard:matches:v1"` 改成 `v2` 會全綠——而 storage key 是**持久化契約**，改動等同讓所有既有使用者的資料消失。`lib/matchmaker/round-storage.test.ts` 早有這個前例，§3 之前沒人沿用。
+   - **等價 mutant 要辨識出來，不要為它補測**。Stage 2 自我修正的那一次示範了正確做法：補了測試仍存活 → 重新推理 → 確認語意等價 → **移除該測試**。為等價 mutant 補的測試會是一條「註解陳述為假」的測試，比沒有更糟。
+   - **§3 的實際成本**：Implementer（sonnet）約 16 分鐘／88 tool call、Stage 1（sonnet）約 3 分鐘／17 tool call、Stage 2（opus）約 **23 分鐘／27 tool call**（35 組 mutation）。Stage 2 是最貴的一環，但四輪下來每次都找到 Implementer 漏掉的實質缺口，**不可省**。
+
+   **下一步（依序，SHALL NOT 跳過）**：
+   1. 派 **§4「計分板入口的純函式層」**（`lib/matchmaker/scoreboard-binding.ts`，tasks 4.1～4.7）。這是**新檔**、純函式、無 hook 無 UI，是本 change 中風險最低的一組。注意 §4.7 的單向相依驗收：該模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（Decision 2）。
+   2. §4 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
+   3. 全部群組完成後才做 Final Code Review（`opus`）。
