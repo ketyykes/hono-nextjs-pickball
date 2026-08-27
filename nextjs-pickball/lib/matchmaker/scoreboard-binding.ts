@@ -1,4 +1,5 @@
 import { createInitialState } from "../scoreboard/reducer";
+import { readMatchSlot, writeMatchSlot } from "../scoreboard/match-slots";
 import type { ScoreboardState } from "../scoreboard/types";
 import type { Round, RoundMatch } from "./round-types";
 
@@ -18,4 +19,21 @@ export function buildMatchSlotSeed(
 		}),
 		matchId: match.id,
 	};
+}
+
+/**
+ * 確保該場次的計分板槽存在：已有條目時原樣回傳、SHALL NOT 覆蓋既有進度
+ * （覆蓋會讓「未完成的計分進度可離開後再進入接續」靜默失效，見 spec 的 SHALL NOT 條款）。
+ */
+export function ensureMatchSlot(
+	matchId: string,
+	seed: ScoreboardState & { matchId: string },
+): ScoreboardState & { matchId: string } {
+	const existing = readMatchSlot(matchId);
+	if (existing !== null) {
+		return existing as ScoreboardState & { matchId: string };
+	}
+
+	writeMatchSlot(seed);
+	return seed;
 }
