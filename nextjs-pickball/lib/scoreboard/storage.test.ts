@@ -86,6 +86,19 @@ describe("storage", () => {
 		expect(loaded?.history).toHaveLength(1);
 	});
 
+	it("matchId 為空字串時視為獨立計分板", () => {
+		// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉
+		// isStandaloneMatchId() 的空字串分支在既有測試下不會轉紅——`/scoreboard?match=`
+		// 這種空 query param 會產生 ""，而非 null，若不正規化，reducer 現行的
+		// SET_TARGET_SCORE guard 會誤判為「已綁定」（見 design 8-D）。
+		const state = { ...createInitialState(), matchId: "" };
+		writeScoreboard(state);
+
+		expect(readScoreboard("")).toEqual(state);
+		// 空字串應落在獨立槽，而非分槽 key
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+	});
+
 	it("clearScoreboard 移除 key", () => {
 		writeScoreboard(createInitialState());
 		clearScoreboard();
