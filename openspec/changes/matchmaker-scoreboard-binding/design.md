@@ -381,3 +381,71 @@
    1. 派 **§4「計分板入口的純函式層」**（`lib/matchmaker/scoreboard-binding.ts`，tasks 4.1～4.7）。這是**新檔**、純函式、無 hook 無 UI，是本 change 中風險最低的一組。注意 §4.7 的單向相依驗收：該模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（Decision 2）。
    2. §4 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
    3. 全部群組完成後才做 Final Code Review（`opus`）。
+
+10. **§4「計分板入口的純函式層」完成兩階段審查（2026-08-28，第四棒 leader）**——工作區乾淨、tasks.md **38／78** 勾選（§0 六 + §1 九 + §2 七 + §3 七 + §4 七 + §4 補記兩項不佔 checkbox）。前端單元測試由 §3 結束時的 55 檔／433 測試增為 **56 檔／438 測試全綠**，`pnpm -r exec tsc --noEmit` exit 0。
+
+   **本輪 §4 共 10 個 commit**（`e657d19` → `3b3689e`），異動**僅 3 檔**：新增 `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts`、新增 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts`、`tasks.md`。未動任何 M4／M5 既有檔。
+
+   **紅燈機械複驗（leader 親自執行，續作者可直接採信）——三處皆為真紅燈**：
+   - `e657d19^` 該模組**不存在**（`git show` 回 `fatal: path ... exists on disk, but not in 'e657d19^'`），4.1 必紅。
+   - `9ca27cb^` 的模組內 `ensureMatchSlot` 計數為 0，4.3 必紅。
+   - `bc366d8^` 的模組內 `mapTeamScores` 計數為 0，4.5 必紅。
+
+   **§4 Stage 1（Spec Reviewer, sonnet）判定：初判 `NEEDS_CHANGES`，唯一不合規項為文件缺漏，leader 修正後結案為 `PASS`**：
+   - 三個 Scenario 全數有對應測試、it 名稱與 test-plan 逐字相符；seed 的五項斷言齊全；「不覆蓋」的 `history` 未被漏測；隊伍對應的**中間值** `{us:11, them:7}` 有獨立斷言（不是只驗往返相等 —— 兩邊都顛倒時往返仍會相等，這正是 spec 警告的失效模式）。
+   - 隊伍對應「只有一處定義」有機械證據；匯出清單無 §5 外洩；`as any`／`as unknown as` 零違規。
+   - 不合規項：`da30638` 新增的 it 未記載於 tasks.md。**leader 已於 commit `248b98a` 補上**（動機、非 test-plan 條目、屬偵測力補強）。
+   - **Stage 1 另抓到 leader 派工單的一處轉錄誤差**：派工單寫 §4 的 `Depends on: §1、§2`，tasks.md 實際為 `Depends on: §1`。不影響實作（§1～§3 皆已完成），但**續作者請注意：派工單的每一段引用都要從檔案複製，不要憑記憶重打**。
+
+   **§4 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**，**獨立 mutation 第一輪 31 組／12 存活**（Implementer 自述 8 次／1 存活 —— **第五度證實自述不可採信**），修復後第二輪 35 組／**僅 3 存活**。
+   - Stage 2 新增 commit `3b3689e`，**自行修復了三件實質問題**：
+     ① **`ensureMatchSlot(matchId, seed)` 收斂為 `ensureMatchSlot(seed)`**（已核可）。證據是兩個 mutation 雙雙存活：`readMatchSlot(matchId)` 與 `writeMatchSlot(seed)` 用的是**不同**來源，不一致時會「讀甲場的槽、寫乙場的 seed」，是真正的靜默覆蓋。§3 對 `writeMatchSlot` 的收斂論證逐字適用，且此處更糟。行為不變、當時無生產端呼叫者，收斂零成本。
+     ② **移除 `existing as ScoreboardState & { matchId: string }` 型別斷言**，改為 `{ ...existing, matchId: seed.matchId }`。原斷言會讓「槽內容 `matchId` 為 `null`（Decision 6 的 `.default(null)` 向後相容路徑正會產生此值）或屬於別場」的資料**靜默通過型別檢查**，下游 §5／§8 會把它當 `string` 用。
+     ③ 移除 `createInitialState` overrides 內冗餘的 `matchId: match.id`（外層 spread 本就覆寫），使 `matchId` 只在一處決定。
+   - **零覆蓋盤點揭露的重點**：`buildMatchSlotSeed` 的 `firstServer`、`servingTeam`、`serverNumber`、`isFirstServiceOfGame`、`winner`、`history` **六個欄位審前完全無人釘住**（改成任意值都全綠）。Stage 2 以整體斷言 `toEqual(createInitialState({...}))` 一次封住。**這是「零覆蓋盤點」第四度找到 Implementer 逐項 mutation 抓不到的東西。**
+   - **另一個關鍵發現**：原測試資料讓 `round.format` 與 `match.format` **取相同值**，因此把 `mode: round.format` 誤改為 `match.format` 時**測試全綠**。Stage 2 已把 4.1 的 `match.format` 改為與 `round.format` 相異。**教訓：易混淆的同義欄位，測試資料 MUST 刻意取相異值**，否則取錯來源時測試不會紅。
+   - **兩個 test-plan 之外的新 it**（verify 階段機械核對時需知悉）：
+     ① 「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」（Implementer 補，封寫入分支零覆蓋與 `mode` 硬編碼）
+     ② 「SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed」（Stage 2 補，封 `readMatchSlot` 回 null + `writeMatchSlot` no-op 的**組合路徑**零覆蓋）
+   - **最終 3 個存活 mutation 判為可接受殘留**：皆為「誤加一個目前不存在的 guard」型反向 mutation（依 `match.status` 早退、`match.teams` 長度檢查、空 `matchId` 檢查）。spec 未要求任何一項，`match.teams` 是長度恆為 2 的 tuple 型別且 §4 根本不讀它。要封住必須**新增生產行為**——**leader 裁決：不加**，維持 §4 只做 spec 要求的事。
+
+   **leader 對 Stage 2 升級的橋接問題之裁決（已核可，§5 MUST 照做）**：
+
+   **問題**：`RoundMatch.scores` 的實際形狀是 `{ teamA, teamB }`，而 §4 的 `RoundTeamScores` 是 `{ first, second }`。§5 回填時若直接寫 `{ first: m.scores.teamA, second: m.scores.teamB }`，**那就是 spec 明文禁止的第二處隊伍對應定義**，且是最危險的一種——寫反了比分仍是合法數字，任何驗證都攔不下來。
+
+   **裁決：採 Stage 2 的方案 (b)，不採 (a)。**
+   - ✅ **§5 MUST 把 `{teamA,teamB}` ↔ `{first,second}` 的橋接寫成 `lib/matchmaker/scoreboard-binding.ts` 內的具名匯出**（例如 `roundMatchScoresOf(match)` / `toRoundMatchScores(scores)`），使 `teamA ↔ first` 的對應在全 repo **只有一個定義處**。**SHALL NOT** 在 §5 的呼叫點就地展開成物件字面量。
+   - ❌ **不採 (a)「把 `RoundTeamScores` 直接改成 `{teamA, teamB}`」**：那會動到 tasks 4.5 與 test-plan 明文寫死的 `{first: 11, second: 7}`，也會改到 Stage 1 已核可的錨點 it 斷言形狀。**apply 階段不應為了型別美觀而改寫已核可的驗收文字** —— 方案 (b) 同樣讓「唯一來源」成立，代價只是多一個具名函式。
+   - **Final Code Review MUST 機械驗證**：全 repo 只有一處把 `teamA` 對應到 `first`／`us`。這是 Final Reviewer checklist「隊伍對應是否真的只有一份定義」的具體查法。
+
+   **§4 已固定的契約（§5～§8 會 import）**：
+   ```ts
+   // nextjs-pickball/lib/matchmaker/scoreboard-binding.ts
+   export function buildMatchSlotSeed(round: Round, match: RoundMatch): ScoreboardState & { matchId: string };
+   export function ensureMatchSlot(seed: ScoreboardState & { matchId: string }): ScoreboardState & { matchId: string };  // ⚠️ 單參數
+   export interface RoundTeamScores { first: number; second: number; }
+   export interface ScoreboardTeamScores { us: number; them: number; }
+   export function mapTeamScores(scores: RoundTeamScores, toward: "scoreboard"): ScoreboardTeamScores;
+   export function mapTeamScores(scores: ScoreboardTeamScores, toward: "round"): RoundTeamScores;
+   ```
+   - **`ensureMatchSlot` 是單參數**（Stage 2 收斂）。**§8 的 UI 派工單若沿用舊的兩參數寫法 MUST 更正。**
+   - `mapTeamScores` 是 overload，第二參數的字面值決定回傳型別；**沒有單一參數版本**。
+   - §4 的三個匯出**目前皆無生產端呼叫者**（§8 的 UI 才會接上），這是**預期狀態、不是 dead export**，Final Review 不應據此判不通過。
+
+   **給 §5 的其他提醒**：
+   - **SSR 下 `ensureMatchSlot` 不會持久化**（`readMatchSlot` 回 null → `writeMatchSlot` no-op → 回傳 seed，不 throw）。**§8 的入口 MUST 在 client 事件處理器中呼叫**，否則導向後計分板會判定「場次已失效」。
+   - 測試工廠 `makeRound()` 的 `matches` 恆為 `[]`、與傳入的 match 無關聯。**§5 若需要「回合含該場」的寫實資料，得自行組裝**（`collectFinishedSubmissions` 的「場次仍在回合中」條件正需要這種資料）。
+   - `mapTeamScores` 對 §5 已足夠：六種顛倒／同值 mutation 全紅，偵測力充分。
+
+   **⚠️ 本輪無未落盤事項**：§4 的 Stage 1 與 Stage 2 判定全文、紅燈機械複驗結論、12 個 mutation 存活項的處置、3 個可接受殘留的裁決、橋接問題的裁決，皆已寫在本項內。
+
+   **這一輪的坑與提醒（補充第 6～9 項，不重複）**：
+   - **「整體斷言」比「逐欄斷言」更能封住零覆蓋**。§4 原測試逐欄斷言了 5 個欄位，卻讓另外 6 個欄位完全裸奔；Stage 2 用一行 `toEqual(createInitialState({...}))` 就全部封住。**後續群組若有「以某個工廠函式為基底再覆寫少數欄位」的實作，MUST 有一個整體相等斷言**，否則工廠帶出的欄位全部無人看管。
+   - **易混淆的同義欄位，測試資料 MUST 取相異值**。`round.format` vs `match.format`、`round.targetScore` vs `DEFAULT_TARGET_SCORE` 都是這種陷阱。取相同值時，「取錯來源」這個 mutation 永遠不會紅。
+   - **型別斷言（`as`）會掩蓋真實不一致**，在有 `.default(null)` 向後相容欄位的專案裡尤其危險。能用 spread 重建就不要用 `as`。
+   - **§4 的實際成本**：Implementer（sonnet）約 8 分鐘／60 tool call、Stage 1（sonnet）約 2.4 分鐘／11 tool call、Stage 2（opus）約 9 分鐘／19 tool call。§4 是全新檔案、無 hook 無 UI，是本 change 中最便宜的一組。
+
+   **下一步（依序，SHALL NOT 跳過）**：
+   1. 派 **§5「回填清單與目標分數鎖定判定」**（同一個 `lib/matchmaker/scoreboard-binding.ts`，tasks 5.1～5.11，**11 個 task，是本 change 最大的一組**）。派工單 MUST 帶入上方的橋接裁決、§4 的確切簽章、以及 §2 Stage 2 移交的「`SET_MODE` 在綁定模式的定位屬 UI 層決策」一項。
+   2. §5 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
+   3. 全部群組完成後才做 Final Code Review（`opus`）。
