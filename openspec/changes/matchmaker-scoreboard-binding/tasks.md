@@ -91,6 +91,7 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 - [x] 2.5 RED: 於 `reducer.test.ts` 補 it「UNDO 與 RESET 後保留 matchId，不退回 null」；同時於既有三個 it（「setup 階段可切換 mode…」「setup 階段可切換 firstServer」「setup 階段可切換 targetScore 且保留 mode 與 firstServer」）補上 `matchId` 不變的斷言（**it 名稱不得更動**——它們是 spec 驗收錨點）。確認紅燈
 - [x] 2.6 GREEN: `createInitialState` 與 `settingsOf` 帶入 `matchId`，使 UNDO 的 replay 與 RESET 皆保留（design Decision 6）
 - [x] 2.7 REFACTOR: 確認 `matchId` 的保留只透過 `MatchSettings` 一條路徑，沒有任何 case 分支自行複製欄位（無壞味道則註記 skipped）
+  - **skipped（無壞味道）**：`matchId` 只在 `reducer.ts` 的 `settingsOf()` 與 `createInitialState()` 兩處集中處理，`SET_MODE`／`SET_FIRST_SERVER`／`SET_TARGET_SCORE`／`UNDO`／`RESET` 五個 case 皆經 `createInitialState(settingsOf(state))` 重建，`RALLY_WON` 走 `...afterRally` 全量展開，無任何 case 分支自行複製該欄位。經 Stage 2（opus）獨立核實成立。
 
 ## 3. storage 分派與 hook 綁定（`lib/scoreboard/storage.ts`、`hooks/useScoreboardStore.ts`）
 Depends on: §1、§2

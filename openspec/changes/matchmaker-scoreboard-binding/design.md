@@ -265,3 +265,54 @@
    - **`MatchSlotsSchema` 這類 dead export 的判準**：Stage 2 的移除理由值得沿用——「留著一個具名、已匯出、看起來完全正確的整份 schema，等於在陷阱旁邊放一塊寫著『請勿使用』的牌子」。後續若再出現「定義了但註解說刻意不用」的符號，一律移除。
    - **subagent 無法被 leader 用 TaskStop 中止**（實測：`Task ... is owned by ...; agent ... cannot stop it`）。要召回進行中的 subagent，只能用 `SendMessage` 送停止指令，它會在下一個 tool round 收到。**因此「脈絡將盡時就在派下一組之前停止」這條規則要更保守地執行**——一旦派出去就收不回即時控制權。
    - **一次只派一位、派完立刻等結果**：本輪 §1 Stage 2 跑了約 13 分鐘（opus、27 次 mutation、35 個 tool call）。估算後續每組 Implementer + Stage 1 + Stage 2 至少三次派工，時間成本要納入交棒判斷。
+
+8. **apply 階段於 §2 完成兩階段審查後暫停（2026-08-27，非設計問題，為接力交棒）**——工作區乾淨、tasks.md **22／78** 勾選（§0 六項 + §1 九項 + §2 七項）。基準線見 environment.md（`Initial commit hash` = `3fefb02`）。
+
+   **本輪（第三棒 leader）完成的事：§2「綁定欄位與 reducer 鎖定」實作 + Stage 1 `PASS` + Stage 2 `PASS`，共 8 個 commit。**
+
+   **§2 實作摘要**：`types.ts` 的 `ScoreboardStateSchema` 新增 `matchId: z.string().nullable().default(null)` 並併入 `MatchSettings`（四欄位）；`reducer.ts` 的 `SET_TARGET_SCORE` guard 併排為單行 `if (state.status !== "setup" || state.matchId !== null) return state;`；`createInitialState` 與 `settingsOf` 帶入 `matchId`。未 bump 任何 storage key。
+
+   **紅燈機械複驗（leader 親自以 `git show <commit>^:<path>` 執行，續作者可直接採信）——三處皆為真紅燈**：
+   - `f51804a^` 的 `types.ts` 完全不含 `matchId`（`grep -c matchId` = 0），2.1 的新測試必紅。
+   - `51765a4^` 的 `SET_TARGET_SCORE` 只有 `if (state.status !== "setup") return state;`，無 `matchId` 條件，2.3 必紅。
+   - `35d5647^` 的 `createInitialState` 與 `settingsOf` 皆無 `matchId`，2.5 必紅。
+   另：commit `a65f649`（2.4 GREEN）當下會讓既有 it「setup 階段可切換 targetScore 且保留 mode 與 firstServer」**暫時**失敗（`createInitialState` 尚未帶入 `matchId`，值為 `undefined` 而非 `null`），至 `bdea5e7`（2.6）修復。Implementer 已在該 commit message 中誠實揭露，兩階段審查均判定為正當的 TDD 中繼狀態。
+
+   **§2 Stage 1（Spec Reviewer, sonnet）判定：`PASS`**：四個 Scenario 全數有對應測試、it 名稱逐字相符；既有 it 名稱**一個都沒被改**（`git diff` 中 `it(` 行只有新增 2 筆、無刪除）；既有三個 setup 轉換 it 皆已補 `matchId` 不變斷言；`z.string().nullable().default(null)` 逐字相符且 `STORAGE_KEY` 未動；`SET_MODE` 與 `SET_FIRST_SERVER` **未**被多鎖（無 scope creep）；`rules.test.ts` 僅四處機械補 `matchId: null`。Stage 1 明文移交兩項給 Stage 2（見下）。
+
+   **§2 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**，**獨立 mutation 26 組，原狀 22 轉紅／4 存活**（Implementer 自述為 5 組全紅 —— **第三度證實 Implementer 自述不可採信，Stage 2 的獨立 mutation 不可省略**）。四個存活項的處置：
+   - **`SET_FIRST_SERVER` 誤加 `matchId` guard → 存活，已補測封住。** spec 明文「`firstServer` 仍 SHALL 於 setup 階段可調整」，但原本沒有任何測試直接驗證「`matchId` 非 null 時 `SET_FIRST_SERVER` 仍生效」。
+   - **`HYDRATE` 抹掉 `matchId` → 存活，已補測封住。** `HYDRATE` 原為**零測試覆蓋**（`grep HYDRATE reducer.test.ts` 無結果），而它是重整後唯一的還原路徑，掉欄位等同每次重整就靜默脫離綁定。
+   - **`createInitialState` 的 `??` 改成 `||` → 存活，刻意不補**（見下方移交 §3／§5 第 1 點）。
+   - **`writeScoreboard` 序列化時抹掉 `matchId` → 存活，移交 §3**（見下方第 2 點）。
+   Stage 2 為此新增 commit `983197e`，只改 `reducer.test.ts`，新增兩個 it：「綁定場次時 setup 階段仍可切換 firstServer」與「HYDRATE 原樣保留帶入的 matchId」（兩者皆**不在** test-plan 中，屬測試偵測力補強而非行為新增；既有 it 名稱未動）。
+   Stage 2 對 Stage 1 移交第二項的裁決：**「`matchId:"m1"` + `status:"playing"` 組合測試不值得補」** —— M12（拿掉 `matchId` 條件）與 M16（`||` 改 `&&`）各自獨立轉紅，兩個條件都已被獨立把關，組合案例在現行 OR 結構下不增加任何偵測力。
+   交件驗證：`tsc --noEmit` exit 0、`lib/scoreboard/` 5 files／69 tests 全綠、**完整前端單元 55 files／424 tests 全綠**（§1 完成後基準為 419，§2 淨增 5）、ESLint exit 0。
+
+   **§2 已固定的契約（§3～§5 會依賴）**：
+   - `ScoreboardState` 多一個**必填**欄位 `matchId: string | null`；`MatchSettings` 由三欄位變**四欄位**（`mode`、`firstServer`、`targetScore`、`matchId`）。
+   - `SET_TARGET_SCORE` 的 guard 為單行 `if (state.status !== "setup" || state.matchId !== null) return state;`。**SHALL NOT** 為了加條件而把它拆成兩個獨立 `if` —— Stage 2 的偵測力論證依賴目前的 OR 結構。
+   - reducer 層**刻意不鎖** `SET_MODE`（UI 不提供切換入口是 §5 的事）。
+
+   **Stage 2 移交給後續群組的三項（MUST 寫進對應派工單）**：
+   1. **空字串 `matchId` 的邊界正規化（§3 與 §5）**：`/scoreboard?match=`（空 query param）會產生 `""`，而 `""` 不是 `null`，現行 guard 會視其為「已綁定」。**§5 讀 `searchParams` 時 MUST 把空字串正規化為 `null`**，否則使用者會進入「綁定到不存在場次」的 `missing` 狀態。**§3 的 `readScoreboard`／`writeScoreboard` 分派也 MUST 對 `""` 有明確定義。** Stage 2 刻意**不**在 §2 補「`createInitialState({matchId:""})` 應保留 `""`」的斷言，理由是那會把正規化責任釘死在 reducer 層，妨礙 §3／§5 在邊界處理 —— `??`（而非 `||`）是較忠實的寫法：原樣傳遞，正規化交給邊界。
+   2. **`writeScoreboard` 的 `matchId` 落盤（§3）**：目前**沒有**任何測試證明 `matchId` 真的被序列化寫進 localStorage（mutation M26 存活）。§3 的 3.3「只有 `m1` 條目變動、`scoreboard:current:v1` 未被寫入」MUST 確實斷言到欄位層級，否則此洞會延續到 §3 之後。
+   3. **`SET_MODE` 在綁定模式的定位（§5）**：reducer 層刻意不鎖。若 §5 決定 UI 也要鎖（綁定場次的單／雙打由該輪的對戰方式決定），MUST 在 §5 明確記載那是 **UI 層決策**，SHALL NOT 回頭改 reducer 而不更新 spec。
+
+   **§3 派工單 MUST 一併帶入的既有交辦（來自第 6 項「Stage 2 移交給 §3 的三項」，此處不重複全文，直接抄那一段）**：
+   1. `hasLocalStorage()` 三份收斂的目標形態（新增葉節點 `nextjs-pickball/lib/scoreboard/storage-keys.ts`），含**兩個被否決的做法及其理由**（循環匯入、`lib/scoreboard/` 對 `lib/matchmaker/` 的單向相依）。
+   2. `writeMatchSlot` 的簽章收斂為由 `state.matchId` 推導（§2 已讓 `ScoreboardState` 長出 `matchId`，**§3 的 REFACTOR 步驟 MUST 做**）。`readMatchSlot(matchId)` 與 `clearMatchSlots(matchIds)` 不變。
+   3. `__proto__` 作為 matchId 的非阻擋觀察（僅記錄，不需處理）。
+
+   **下一步（依序，SHALL NOT 跳過）**：
+   1. 派 **§3「storage 分派與 hook 綁定」**（`lib/scoreboard/storage.ts`、`hooks/useScoreboardStore.ts`）。⚠️ **execution-plan 的 Implementer 升級條款在 §3 觸發**：該組觸及 `hooks/useScoreboardStore.ts` 的 effect 順序（write 在前、read 在後、`hasHydratedRef` 守門、cleanup 時 reset ref 是刻意設計，改壞的失敗模式是靜默競態）。使用者硬性規定 Implementer 一律用 `sonnet`，此升級條款正好與之一致。
+   2. §3 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §4 → §5 → §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
+   3. 全部群組完成後才做 Final Code Review（`opus`）。
+
+   **⚠️ 本輪無未落盤事項**：§2 的 Stage 1 與 Stage 2 判定全文、紅燈機械複驗結論、四個 mutation 存活項的處置，皆已寫在本項內。
+
+   **這一輪的坑與提醒（補充第 6、7 項，不重複）**：
+   - **Stage 2 的獨立 mutation 連續三次證明有價值**：§1 是「Implementer 自述 1 存活 → Stage 2 找到 9」，§2 是「Implementer 自述 0 存活 → Stage 2 找到 4」。**兩次找到的最嚴重缺口都是「某個分支零測試覆蓋」**（§1 是 `readMatchSlots()` 的「解析成功但不是物件」分支，§2 是 `HYDRATE` action）。給 Stage 2 的派工單 MUST 明列「反向 mutation」（把 guard **誤加**到不該加的 case）與「零覆蓋盤點」兩種手法 —— §2 的兩個實質缺口正是靠這兩招找到的。
+   - **授權 Stage 2 直接動手補斷言是划算的**：§2 的 Stage 2 自行 commit `983197e` 封住兩個存活項，省下一次退回 Implementer 的往返。但 MUST 要求它在「偏離」欄如實記載改了什麼、為什麼，且**新增的 it 名稱若不在 test-plan 中 MUST 列出並說明動機**（因為 verify 階段會機械核對 test-plan 與 it 名稱）。
+   - **leader 自己要複驗紅燈，不要外包**：本輪三處 `git show <commit>^:<path>` 複驗只花一次 Bash 呼叫，卻是「紅燈要是真的」唯一的機械證據來源。
+   - **§2 的實際成本**：Implementer（sonnet）約 11 分鐘／72 tool call、Stage 1（sonnet）約 1.6 分鐘／7 tool call、Stage 2（opus）約 7 分鐘／22 tool call。**§3 觸及 hook 與競態，預期顯著高於此。**
