@@ -82,6 +82,22 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("match-1")?.scores).toEqual({ us: 8, them: 5 });
 	});
 
+	// 額外補（不在 test-plan 內）：ensureMatchSlot 的「無條目 → 寫入 seed」分支
+	// 在既有兩個 it 裡都沒被執行到——4.1 未呼叫 ensureMatchSlot，4.3 一律先寫入既有進度
+	// 再呼叫，只會走「已有條目」分支。缺這個 it 會讓寫入分支零覆蓋。
+	it("尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed", () => {
+		const round = makeRound({ targetScore: 21, format: "singles" });
+		const match = makeMatch({ id: "match-2", format: "singles" });
+		const seed = buildMatchSlotSeed(round, match);
+
+		const result = ensureMatchSlot("match-2", seed);
+
+		expect(seed.mode).toBe("singles");
+		expect(seed.targetScore).toBe(21);
+		expect(result).toEqual(seed);
+		expect(readMatchSlot("match-2")).toEqual(seed);
+	});
+
 	it("第一隊對應 us、第二隊對應 them，來回轉換不顛倒", () => {
 		const original = { first: 11, second: 7 };
 
