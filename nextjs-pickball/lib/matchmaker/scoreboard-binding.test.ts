@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Round, RoundMatch } from "./round-types";
-import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "./scoreboard-binding";
+import {
+	buildMatchSlotSeed,
+	ensureMatchSlot,
+	mapTeamScores,
+	collectFinishedSubmissions,
+} from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
+import type { MatchSlots } from "../scoreboard/match-slots";
 import { createInitialState } from "../scoreboard/reducer";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
@@ -139,5 +145,33 @@ describe("scoreboard-binding", () => {
 
 		const backToRound = mapTeamScores(toScoreboard, "round");
 		expect(backToRound).toEqual(original);
+	});
+
+	// makeSlot：只在測試檔內組裝計分板槽的寫實資料，狀態欄位由呼叫端逐一指定，
+	// 不使用 as any——與檔頭 makeRound／makeMatch 的原則一致。
+	function makeSlot(overrides: Partial<ReturnType<typeof createInitialState>> = {}) {
+		return {
+			...createInitialState({ matchId: "placeholder" }),
+			...overrides,
+		};
+	}
+
+	it("只有 finished 的槽才進入待送出清單", () => {
+		const round = makeRound({
+			matches: [
+				makeMatch({ id: "m1" }),
+				makeMatch({ id: "m2" }),
+				makeMatch({ id: "m3" }),
+			],
+		});
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 7 } }),
+			m2: makeSlot({ matchId: "m2", status: "playing", scores: { us: 5, them: 3 } }),
+			// m3：刻意無槽
+		};
+
+		const result = collectFinishedSubmissions(round, slots);
+
+		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
 	});
 });
