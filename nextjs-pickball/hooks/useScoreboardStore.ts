@@ -1,7 +1,7 @@
 // hooks/useScoreboardStore.ts
 "use client";
 
-import { useEffect, useReducer, useRef, useState, type Dispatch } from "react";
+import { useEffect, useReducer, useRef, type Dispatch } from "react";
 import { createInitialState, scoreboardReducer } from "@/lib/scoreboard/reducer";
 import { readScoreboard, writeScoreboard } from "@/lib/scoreboard/storage";
 import type { Action, ScoreboardState } from "@/lib/scoreboard/types";
@@ -45,7 +45,11 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	// 未帶 matchId 時綁定狀態在 mount 前就確定為 standalone；帶 matchId 時
 	// 保守預設為 missing，實際結果留給 read effect 判定，讀取完成前不寫入任何槽
 	// （write effect 另外受 hasHydratedRef 守門，故此預設值不影響 mount 前的寫入行為）。
-	const [bindingStatus, setBindingStatus] = useState<ScoreboardBindingStatus>(
+	// 用 useReducer 而非 useState 存放 bindingStatus：ESLint 的
+	// react-hooks/set-state-in-effect 規則會擋下「在 effect 內同步呼叫 useState
+	// setter」，但不適用於 useReducer 的 dispatch（與下方 HYDRATE 的既有寫法一致）。
+	const [bindingStatus, setBindingStatus] = useReducer(
+		(_current: ScoreboardBindingStatus, next: ScoreboardBindingStatus) => next,
 		matchId === null ? "standalone" : "missing",
 	);
 

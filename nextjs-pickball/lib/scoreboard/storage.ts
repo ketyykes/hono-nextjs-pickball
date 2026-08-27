@@ -1,17 +1,12 @@
 import { ScoreboardStateSchema } from "./types";
 import type { ScoreboardState } from "./types";
 import { readMatchSlot, writeMatchSlot, clearMatchSlots } from "./match-slots";
+import { STORAGE_KEY, hasLocalStorage } from "./storage-keys";
 
-export const STORAGE_KEY = "scoreboard:current:v1";
-
-/** 確認 localStorage 可用（SSR / 私密模式下可能不存在） */
-function hasLocalStorage(): boolean {
-	try {
-		return typeof window !== "undefined" && !!window.localStorage;
-	} catch {
-		return false;
-	}
-}
+// re-export（非改名）：既有匯入點（storage.test.ts、useScoreboardStore.test.tsx 等）
+// 都是 import { STORAGE_KEY } from "./storage"，key 本體已搬到 storage-keys.ts
+// 單一來源（見 storage-keys.ts 頁首註解），保留這行 re-export 讓既有匯入點不必改動。
+export { STORAGE_KEY };
 
 // 空字串視為未綁定（等同 null）：`/scoreboard?match=` 這種空 query param 會產生 ""，
 // 而非 null，若不正規化，reducer 現行的 SET_TARGET_SCORE guard 會誤判為「已綁定」
@@ -66,7 +61,9 @@ export function readScoreboard(matchId: string | null = null): ScoreboardState |
  */
 export function writeScoreboard(state: ScoreboardState): void {
 	if (!isStandaloneMatchId(state.matchId)) {
-		writeMatchSlot(state.matchId as string, state);
+		// matchId 已由 isStandaloneMatchId 排除 null／空字串，此處縮限為 string，
+		// 交給 writeMatchSlot 從 state.matchId 推導槽位（見該函式的簽章收斂說明）。
+		writeMatchSlot(state as ScoreboardState & { matchId: string });
 		return;
 	}
 

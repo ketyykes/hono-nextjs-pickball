@@ -1,22 +1,17 @@
 import { ScoreboardStateSchema } from "./types";
 import type { ScoreboardState } from "./types";
+import { MATCH_SLOTS_KEY, hasLocalStorage } from "./storage-keys";
 
-export const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
+// re-export（非改名）：既有匯入點（match-slots.test.ts、useScoreboardStore.test.tsx 等）
+// 都是 import { MATCH_SLOTS_KEY } from "./match-slots"，key 本體已搬到 storage-keys.ts
+// 單一來源（見 storage-keys.ts 頁首註解），保留這行 re-export 讓既有匯入點不必改動。
+export { MATCH_SLOTS_KEY };
 
 export type MatchSlots = Record<string, ScoreboardState>;
 
 export interface ReadMatchSlotsResult {
 	slots: MatchSlots;
 	droppedCount: number;
-}
-
-/** 確認 localStorage 可用（SSR / 私密模式下可能不存在），沿用 storage.ts 既有守門 */
-function hasLocalStorage(): boolean {
-	try {
-		return typeof window !== "undefined" && !!window.localStorage;
-	} catch {
-		return false;
-	}
 }
 
 /**
@@ -74,12 +69,17 @@ export function readMatchSlot(matchId: string): ScoreboardState | null {
 /**
  * 寫入單一場次的分槽 state。map 形態下任一次寫入都要重寫整份 map（design Decision 4），
  * 代價可忽略：場地數上限為 8（prd.md 4.3）。
+ *
+ * 槽位由 state.matchId 推導，不接受呼叫端另傳 matchId 參數——舊簽章
+ * writeMatchSlot(matchId, state) 讓 matchId !== state.matchId 成為可能的靜默失效
+ * （呼叫端傳錯槽位、state 卻含另一個 matchId），此收斂使「寫入槽位由 state.matchId
+ * 推導」成為結構上的必然，而非事後檢查（見 spec 的 SHALL NOT 條款）。
  */
-export function writeMatchSlot(matchId: string, state: ScoreboardState): void {
+export function writeMatchSlot(state: ScoreboardState & { matchId: string }): void {
 	if (!hasLocalStorage()) return;
 	try {
 		const { slots } = readMatchSlots();
-		slots[matchId] = state;
+		slots[state.matchId] = state;
 		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify(slots));
 	} catch (err) {
 		console.warn("[scoreboard] 分槽資料寫入失敗", err);

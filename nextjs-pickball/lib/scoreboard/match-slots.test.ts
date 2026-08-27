@@ -20,15 +20,16 @@ describe("match-slots", () => {
 			scores: { us: 8, them: 5 },
 			history: [{ type: "RALLY_WON" as const, winner: "us" as const }],
 		};
-		writeMatchSlot("m1", m1State);
-		writeMatchSlot("m2", createInitialState());
+		writeMatchSlot({ ...m1State, matchId: "m1" });
+		writeMatchSlot({ ...createInitialState(), matchId: "m2" });
 
 		const m2Updated = {
 			...createInitialState(),
 			scores: { us: 3, them: 1 },
 			history: [{ type: "RALLY_WON" as const, winner: "us" as const }],
+			matchId: "m2",
 		};
-		writeMatchSlot("m2", m2Updated);
+		writeMatchSlot(m2Updated);
 
 		const m1AfterUpdate = readMatchSlot("m1");
 		expect(m1AfterUpdate?.scores).toEqual({ us: 8, them: 5 });
@@ -73,10 +74,10 @@ describe("match-slots", () => {
 	});
 
 	it("批次清除只移除指定場次且忽略不存在的 id", () => {
-		const m2State = createInitialState();
-		writeMatchSlot("m1", createInitialState());
-		writeMatchSlot("m2", m2State);
-		writeMatchSlot("m3", createInitialState());
+		const m2State = { ...createInitialState(), matchId: "m2" };
+		writeMatchSlot({ ...createInitialState(), matchId: "m1" });
+		writeMatchSlot(m2State);
+		writeMatchSlot({ ...createInitialState(), matchId: "m3" });
 
 		expect(() => clearMatchSlots(["m1", "m3", "nope"])).not.toThrow();
 
@@ -97,7 +98,7 @@ describe("match-slots", () => {
 			expect(typeof window).toBe("undefined");
 			expect(readMatchSlots()).toEqual({ slots: {}, droppedCount: 0 });
 			expect(readMatchSlot("m1")).toBeNull();
-			expect(() => writeMatchSlot("m2", createInitialState())).not.toThrow();
+			expect(() => writeMatchSlot({ ...createInitialState(), matchId: "m2" })).not.toThrow();
 			expect(() => clearMatchSlots(["m1"])).not.toThrow();
 			expect(() => clearAllMatchSlots()).not.toThrow();
 		} finally {
@@ -126,7 +127,7 @@ describe("match-slots", () => {
 			expect(() => window.localStorage).toThrow();
 			expect(readMatchSlots()).toEqual({ slots: {}, droppedCount: 0 });
 			expect(readMatchSlot("m1")).toBeNull();
-			expect(() => writeMatchSlot("m1", createInitialState())).not.toThrow();
+			expect(() => writeMatchSlot({ ...createInitialState(), matchId: "m1" })).not.toThrow();
 			expect(() => clearMatchSlots(["m1"])).not.toThrow();
 			expect(() => clearAllMatchSlots()).not.toThrow();
 		} finally {
@@ -182,14 +183,14 @@ describe("match-slots", () => {
 	// console.warn 拿掉後全綠。寫入超出配額是 design Risks 明列的失效模式，
 	// 寫法比照 storage.test.ts 的「writeScoreboard localStorage 拋例外時不 throw，僅 warn」。
 	it("寫入與批次清除遇 localStorage 拋例外時不 throw，僅 warn", () => {
-		writeMatchSlot("m1", createInitialState());
+		writeMatchSlot({ ...createInitialState(), matchId: "m1" });
 
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const setItemSpy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
 			throw new DOMException("QuotaExceededError");
 		});
 
-		expect(() => writeMatchSlot("m2", createInitialState())).not.toThrow();
+		expect(() => writeMatchSlot({ ...createInitialState(), matchId: "m2" })).not.toThrow();
 		expect(warnSpy).toHaveBeenCalledOnce();
 
 		warnSpy.mockClear();

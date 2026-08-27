@@ -135,7 +135,7 @@ describe("useScoreboardStore", () => {
 			targetScore: 15 as const,
 			matchId: "m1",
 		};
-		writeMatchSlot("m1", m1Seed);
+		writeMatchSlot(m1Seed);
 
 		const { result } = renderHook(() => useScoreboardStore("m1"));
 		const [state, dispatch, bindingStatus] = result.current;
