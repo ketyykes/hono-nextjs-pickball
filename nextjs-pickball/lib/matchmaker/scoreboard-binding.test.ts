@@ -197,4 +197,19 @@ describe("scoreboard-binding", () => {
 		expect(first).toEqual([]);
 		expect(second).toEqual([]);
 	});
+
+	it("槽對應的場次已不在回合中時略過且不拋錯", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1" })] });
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 7 } }),
+			gone: makeSlot({ matchId: "gone", status: "finished", scores: { us: 9, them: 4 } }),
+		};
+
+		let result: ReturnType<typeof collectFinishedSubmissions> = [];
+		expect(() => {
+			result = collectFinishedSubmissions(round, slots);
+		}).not.toThrow();
+
+		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
+	});
 });
