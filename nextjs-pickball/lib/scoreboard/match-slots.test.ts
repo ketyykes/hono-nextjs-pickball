@@ -35,6 +35,10 @@ describe("match-slots", () => {
 		expect(m1AfterUpdate?.scores).toEqual({ us: 8, them: 5 });
 		expect(m1AfterUpdate?.history).toEqual(m1State.history);
 		expect(m1AfterUpdate?.targetScore).toBe(15);
+		// Stage 2 mutation 補強：只斷言 m1 時，「readMatchSlot 忽略參數、一律回傳 map
+		// 第一筆」的 mutation 會存活（m1 恰為第一筆）。加驗 m2 才能證明讀取真的以
+		// matchId 為鍵，而非碰巧取到正確的那一筆。
+		expect(readMatchSlot("m2")?.scores).toEqual({ us: 3, them: 1 });
 		expect(localStorage.getItem("scoreboard:current:v1")).toBeNull();
 	});
 

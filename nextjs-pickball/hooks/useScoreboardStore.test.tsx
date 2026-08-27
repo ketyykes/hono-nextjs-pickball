@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { StrictMode } from "react";
 import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
 import { MATCH_SLOTS_KEY, writeMatchSlot } from "@/lib/scoreboard/match-slots";
+import { createInitialState } from "@/lib/scoreboard/reducer";
 
 describe("useScoreboardStore", () => {
 	beforeEach(() => {
@@ -167,6 +169,101 @@ describe("useScoreboardStore", () => {
 
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現拿掉 hook 邊界的空字串
+	// 正規化後全套仍綠——storage.ts 那一層的正規化只讓「寫哪個槽」正確，bindingStatus
+	// 仍會被判成 bound／missing，使 `/scoreboard?match=` 這種空 query param 在 §7 顯示
+	// 場次失效畫面。正規化在 hook 與 storage 各做一次，兩處都需要各自的偵測力。
+	it("matchId 為空字串時沿用獨立槽並回報 standalone", () => {
+		const seed = {
+			mode: "singles",
+			scores: { us: 5, them: 3 },
+			servingTeam: "us",
+			serverNumber: 1,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON", winner: "us" }],
+			status: "playing",
+			winner: null,
+			firstServer: "us",
+			targetScore: 11,
+			matchId: null,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+
+		const { result } = renderHook(() => useScoreboardStore(""));
+		const [state, , bindingStatus] = result.current;
+
+		expect(bindingStatus).toBe("standalone");
+		expect(state.scores).toEqual({ us: 5, them: 3 });
+		expect(state.matchId).toBeNull();
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現「綁定模式下打到
+	// finished、再 UNDO」這條 hook + storage 端到端路徑零覆蓋——§2 只在 reducer 層驗過
+	// UNDO 保留 matchId。兩個 mutation 因此存活／僅由 reducer 單元測試擋下：
+	// ① writeMatchSlot 對 finished 狀態誤加早退 guard（§5 的待送出清單全部落空）；
+	// ② UNDO replay 掉 matchId（design Decision 6 的洞：同時失去綁定並把整場比賽
+	//    寫進獨立槽 scoreboard:current:v1）——hook 層原本沒有第二道防線。
+	it("綁定模式下打到結束並 UNDO 後仍只寫回該槽", () => {
+		writeMatchSlot({ ...createInitialState({ targetScore: 11 }), matchId: "m1" });
+
+		const { result } = renderHook(() => useScoreboardStore("m1"));
+		expect(result.current[2]).toBe("bound");
+
+		// 發球方連得 11 分結束該局（匹克球只有發球方得分）
+		for (let i = 0; i < 11; i++) {
+			act(() => {
+				result.current[1]({ type: "RALLY_WON", winner: "us" });
+			});
+		}
+
+		const finished = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
+		expect(result.current[0].status).toBe("finished");
+		expect(finished.m1.status).toBe("finished");
+		expect(finished.m1.scores).toEqual({ us: 11, them: 0 });
+		expect(finished.m1.matchId).toBe("m1");
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+		act(() => {
+			result.current[1]({ type: "UNDO" });
+		});
+
+		const afterUndo = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
+		expect(afterUndo.m1.scores).toEqual({ us: 10, them: 0 });
+		expect(afterUndo.m1.status).toBe("playing");
+		// UNDO 以「重建初始 state 後 replay」還原，matchId 必須隨之保留，
+		// 否則下一次 write effect 會把整場比賽寫進獨立槽
+		expect(afterUndo.m1.matchId).toBe("m1");
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 read effect cleanup 的
+	// `hasHydratedRef.current = false` 改成 true 後全套仍綠——那正是 design Context 指名
+	// 要守住的 Strict Mode 二次 mount 競態：write effect 會以初始 state（0-0）覆蓋
+	// localStorage 中已儲存的進度。既有測試全都在非 Strict Mode 下 render，碰不到這條路徑。
+	it("React Strict Mode 二次 mount 不以初始 state 覆蓋既有進度", () => {
+		const seed = {
+			mode: "singles",
+			scores: { us: 5, them: 3 },
+			servingTeam: "us",
+			serverNumber: 1,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON", winner: "us" }],
+			status: "playing",
+			winner: null,
+			firstServer: "us",
+			targetScore: 11,
+			matchId: null,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+
+		const { result } = renderHook(() => useScoreboardStore(), { wrapper: StrictMode });
+
+		expect(result.current[0].scores).toEqual({ us: 5, them: 3 });
+		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		expect(stored.scores).toEqual({ us: 5, them: 3 });
 	});
 
 	it("localStorage 不可用（如私密模式）時 hook 不 throw，仍可正常計分", () => {

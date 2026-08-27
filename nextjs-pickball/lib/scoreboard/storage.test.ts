@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readScoreboard, writeScoreboard, clearScoreboard, STORAGE_KEY } from "./storage";
+import { MATCH_SLOTS_KEY, writeMatchSlot } from "./match-slots";
 import { createInitialState } from "./reducer";
 
 describe("storage", () => {
@@ -97,6 +98,31 @@ describe("storage", () => {
 		expect(readScoreboard("")).toEqual(state);
 		// 空字串應落在獨立槽，而非分槽 key
 		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 clearScoreboard() 的
+	// **綁定分支完全沒有測試覆蓋**——把該分支整段刪掉（使帶 matchId 的清除改去 removeItem
+	// 獨立槽）後全套仍綠。那正是 spec 最忌的「清除範圍過寬」：清一個場次卻清掉獨立計分板。
+	it("clearScoreboard 帶 matchId 時只清該場次分槽，不動獨立槽與其他場次", () => {
+		writeMatchSlot({ ...createInitialState(), matchId: "m1" });
+		writeMatchSlot({ ...createInitialState(), matchId: "m2" });
+		writeScoreboard(createInitialState());
+
+		clearScoreboard("m1");
+
+		const slots = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
+		expect(Object.keys(slots)).toEqual(["m2"]);
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現改動 storage-keys.ts 內
+	// 任一 key 的字面值（v1 → v2）後全套仍綠——所有測試都改用匯出常數，沒有任何一處釘住
+	// 字面字串。key 是持久化契約，改動會讓既有使用者進行中的比賽靜默消失。
+	// 比照 lib/matchmaker/round-storage.test.ts 的同性質既有測試。
+	it("兩個 LocalStorage key 名稱由 storage-keys 單一來源匯出", () => {
+		// 唯一允許出現 key 字面字串的地方——這裡就是在驗證常數的值本身
+		expect(STORAGE_KEY).toBe("scoreboard:current:v1");
+		expect(MATCH_SLOTS_KEY).toBe("scoreboard:matches:v1");
 	});
 
 	it("clearScoreboard 移除 key", () => {
