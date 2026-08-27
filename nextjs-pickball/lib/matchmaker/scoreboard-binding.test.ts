@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Round, RoundMatch } from "./round-types";
-import { buildMatchSlotSeed, ensureMatchSlot } from "./scoreboard-binding";
+import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import { createInitialState } from "../scoreboard/reducer";
 
@@ -80,5 +80,15 @@ describe("scoreboard-binding", () => {
 		expect(result.history).toEqual(existing.history);
 		expect(result.targetScore).toBe(15);
 		expect(readMatchSlot("match-1")?.scores).toEqual({ us: 8, them: 5 });
+	});
+
+	it("第一隊對應 us、第二隊對應 them，來回轉換不顛倒", () => {
+		const original = { first: 11, second: 7 };
+
+		const toScoreboard = mapTeamScores(original, "scoreboard");
+		expect(toScoreboard).toEqual({ us: 11, them: 7 });
+
+		const backToRound = mapTeamScores(toScoreboard, "round");
+		expect(backToRound).toEqual(original);
 	});
 });
