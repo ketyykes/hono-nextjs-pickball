@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
+import { MATCH_SLOTS_KEY } from "@/lib/scoreboard/match-slots";
 
 describe("useScoreboardStore", () => {
 	beforeEach(() => {
@@ -80,6 +81,44 @@ describe("useScoreboardStore", () => {
 		expect(result.current[0].status).toBe("setup");
 		expect(localStorage.getItem(STORAGE_KEY)).not.toBe(corrupted);
 		warnSpy.mockRestore();
+	});
+
+	it("未帶 matchId 時沿用獨立槽且不觸碰分槽 key", () => {
+		const seed = {
+			mode: "singles",
+			scores: { us: 5, them: 3 },
+			servingTeam: "us",
+			serverNumber: 1,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON", winner: "us" }],
+			status: "playing",
+			winner: null,
+			firstServer: "us",
+			targetScore: 11,
+			matchId: null,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+
+		const getItemSpy = vi.spyOn(localStorage, "getItem");
+		const setItemSpy = vi.spyOn(localStorage, "setItem");
+
+		const { result } = renderHook(() => useScoreboardStore());
+		const [state, dispatch, bindingStatus] = result.current;
+
+		expect(state.scores).toEqual({ us: 5, them: 3 });
+		expect(state.matchId).toBeNull();
+		expect(bindingStatus).toBe("standalone");
+
+		act(() => {
+			dispatch({ type: "RALLY_WON", winner: "us" });
+		});
+
+		// 分槽 key 全程未被讀寫，證明未帶 matchId 時完全不碰分槽儲存區
+		expect(getItemSpy.mock.calls.some(([key]) => key === MATCH_SLOTS_KEY)).toBe(false);
+		expect(setItemSpy.mock.calls.some(([key]) => key === MATCH_SLOTS_KEY)).toBe(false);
+
+		getItemSpy.mockRestore();
+		setItemSpy.mockRestore();
 	});
 
 	it("localStorage 不可用（如私密模式）時 hook 不 throw，仍可正常計分", () => {
