@@ -1,5 +1,6 @@
 import { createInitialState } from "../scoreboard/reducer";
 import { readMatchSlot, writeMatchSlot } from "../scoreboard/match-slots";
+import type { MatchSlots } from "../scoreboard/match-slots";
 import type { ScoreboardState } from "../scoreboard/types";
 import type { Round, RoundMatch } from "./round-types";
 
@@ -80,4 +81,23 @@ export function mapTeamScores(
 	}
 	const { us, them } = scores as ScoreboardTeamScores;
 	return { first: us, second: them };
+}
+
+/** 待送出清單的單一項目：`matchId` 與轉換為回合側形狀（`first`／`second`）的兩隊比分。 */
+export interface FinishedSubmission {
+	readonly matchId: string;
+	readonly scores: RoundTeamScores;
+}
+
+/**
+ * 計算目前回合中「應回填」的待送出清單：純函式，輸入為目前回合與計分板槽集合，
+ * 不觸碰 localStorage（spec「回填條件」）。
+ */
+export function collectFinishedSubmissions(round: Round, slots: MatchSlots): FinishedSubmission[] {
+	const result: FinishedSubmission[] = [];
+	for (const [matchId, slot] of Object.entries(slots)) {
+		if (slot.status !== "finished") continue;
+		result.push({ matchId, scores: mapTeamScores(slot.scores, "round") });
+	}
+	return result;
 }
