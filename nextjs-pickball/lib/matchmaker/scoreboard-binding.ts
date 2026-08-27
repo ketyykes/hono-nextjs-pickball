@@ -37,3 +37,40 @@ export function ensureMatchSlot(
 	writeMatchSlot(seed);
 	return seed;
 }
+
+/** 該場的第一隊／第二隊分數（回合側的比分形狀） */
+export interface RoundTeamScores {
+	first: number;
+	second: number;
+}
+
+/** 計分板側的比分形狀（`us` 為我方、`them` 為對方） */
+export interface ScoreboardTeamScores {
+	us: number;
+	them: number;
+}
+
+/**
+ * 隊伍對應的唯一實作：第一隊 ↔ `us`、第二隊 ↔ `them`。入口建立 seed 與回填
+ * 都呼叫同一個函式的兩個方向，SHALL NOT 在兩處各自硬編碼一份——兩處若不一致，
+ * 回填的比分會左右顛倒，而比分本身仍是合法數字，任何驗證都攔不下來（見 spec）。
+ */
+export function mapTeamScores(
+	scores: RoundTeamScores,
+	toward: "scoreboard",
+): ScoreboardTeamScores;
+export function mapTeamScores(
+	scores: ScoreboardTeamScores,
+	toward: "round",
+): RoundTeamScores;
+export function mapTeamScores(
+	scores: RoundTeamScores | ScoreboardTeamScores,
+	toward: "scoreboard" | "round",
+): ScoreboardTeamScores | RoundTeamScores {
+	if (toward === "scoreboard") {
+		const { first, second } = scores as RoundTeamScores;
+		return { us: first, them: second };
+	}
+	const { us, them } = scores as ScoreboardTeamScores;
+	return { first: us, second: them };
+}
