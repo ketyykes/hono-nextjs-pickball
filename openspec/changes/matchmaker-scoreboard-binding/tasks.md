@@ -142,13 +142,14 @@ Implementer 自述做了 8 次 mutation／1 次存活。Stage 2 **未採信、�
 ## 4. 計分板入口的純函式層（`lib/matchmaker/scoreboard-binding.ts`）
 Depends on: §1
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts`，寫 it「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」——15 分制雙打回合 + 未開打場次 → seed 的 `targetScore === 15`、`mode === "doubles"`、`matchId` 為該場 id、分數 0-0、`status === "setup"`。確認紅燈（模組不存在）
-- [ ] 4.2 GREEN: 實作 `buildMatchSlotSeed(round, match)`：以 `createInitialState` 為基底帶入該輪的 `round.targetScore`、對戰方式（`round.format`，值域與 scoreboard 的 `Mode` 同為 `"singles" | "doubles"`）與 `matchId`（`match.id`），`firstServer` 取預設值
-- [ ] 4.3 RED: 補 it「已有進度的場次再次進入時保留既有進度不覆蓋」——槽已有 8-5／`playing` → 再次呼叫後分數、history 與 `targetScore` 完全不變。確認紅燈
-- [ ] 4.4 GREEN: 實作 `ensureMatchSlot(matchId, seed)`：已有條目則原樣回傳、不寫入
-- [ ] 4.5 RED: 補 it「第一隊對應 us、第二隊對應 them，來回轉換不顛倒」——`{first: 11, second: 7}` → `{us: 11, them: 7}` → 轉回後仍為 `{first: 11, second: 7}`。確認紅燈
-- [ ] 4.6 GREEN: 實作**單一**的隊伍對應函式（入口與回填共用），SHALL NOT 在兩處各寫一次
-- [ ] 4.7 REFACTOR: 確認本模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（design Decision 2 的單向相依）（無壞味道則註記 skipped）
+- [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts`，寫 it「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」——15 分制雙打回合 + 未開打場次 → seed 的 `targetScore === 15`、`mode === "doubles"`、`matchId` 為該場 id、分數 0-0、`status === "setup"`。確認紅燈（模組不存在）
+- [x] 4.2 GREEN: 實作 `buildMatchSlotSeed(round, match)`：以 `createInitialState` 為基底帶入該輪的 `round.targetScore`、對戰方式（`round.format`，值域與 scoreboard 的 `Mode` 同為 `"singles" | "doubles"`）與 `matchId`（`match.id`），`firstServer` 取預設值
+- [x] 4.3 RED: 補 it「已有進度的場次再次進入時保留既有進度不覆蓋」——槽已有 8-5／`playing` → 再次呼叫後分數、history 與 `targetScore` 完全不變。確認紅燈
+- [x] 4.4 GREEN: 實作 `ensureMatchSlot(matchId, seed)`：已有條目則原樣回傳、不寫入
+- [x] 4.5 RED: 補 it「第一隊對應 us、第二隊對應 them，來回轉換不顛倒」——`{first: 11, second: 7}` → `{us: 11, them: 7}` → 轉回後仍為 `{first: 11, second: 7}`。確認紅燈
+- [x] 4.6 GREEN: 實作**單一**的隊伍對應函式（入口與回填共用），SHALL NOT 在兩處各寫一次
+- [x] 4.7 REFACTOR: 確認本模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（design Decision 2 的單向相依）（無壞味道則註記 skipped）
+  - **skipped（無壞味道）**：機械驗證——`grep -rn "scoreboard-binding" nextjs-pickball/lib/scoreboard/` 無結果（`lib/scoreboard/` 底下沒有任何一行 import 本模組）；`grep -n "^import" nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 顯示僅 import `../scoreboard/reducer`、`../scoreboard/match-slots`、`../scoreboard/types`（型別）與本 workspace 的 `./round-types`（型別），相依方向與 design Decision 2 一致，單向、無需重構。
 
 ## 5. 回填清單與目標分數鎖定判定（`lib/matchmaker/scoreboard-binding.ts`）
 Depends on: §4
