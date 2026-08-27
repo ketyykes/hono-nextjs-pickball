@@ -14,6 +14,7 @@ export function createInitialState(
 	const mode: Mode = overrides.mode ?? "doubles";
 	const firstServer: Team = overrides.firstServer ?? "us";
 	const targetScore: TargetScore = overrides.targetScore ?? 11;
+	const matchId: string | null = overrides.matchId ?? null;
 	const isDoubles = mode === "doubles";
 
 	return {
@@ -29,15 +30,17 @@ export function createInitialState(
 		winner: null,
 		firstServer,
 		targetScore,
+		matchId,
 	};
 }
 
-// 從 state 取出三項賽前設定，供重建初始狀態時原樣帶入
+// 從 state 取出四項賽前設定，供重建初始狀態時原樣帶入
 function settingsOf(state: ScoreboardState): MatchSettings {
 	return {
 		mode: state.mode,
 		firstServer: state.firstServer,
 		targetScore: state.targetScore,
+		matchId: state.matchId,
 	};
 }
 
