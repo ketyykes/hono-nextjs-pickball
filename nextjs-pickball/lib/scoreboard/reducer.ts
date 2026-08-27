@@ -62,8 +62,9 @@ export function scoreboardReducer(
 			return createInitialState({ ...settingsOf(state), firstServer: action.team });
 		}
 		case "SET_TARGET_SCORE": {
-			// playing/finished 階段不允許變更設定
-			if (state.status !== "setup") return state;
+			// playing/finished 階段、或已綁定對戰場次時皆不允許變更目標分數
+			// （綁定場次的目標分數由該輪統一決定，setup 階段也不可調整）
+			if (state.status !== "setup" || state.matchId !== null) return state;
 			// 重新建立初始狀態，保留現有的模式與先發球隊設定
 			return createInitialState({ ...settingsOf(state), targetScore: action.targetScore });
 		}
