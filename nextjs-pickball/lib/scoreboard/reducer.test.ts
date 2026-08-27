@@ -97,6 +97,15 @@ describe("scoreboardReducer — 賽前設定", () => {
 		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 15 });
 		expect(next).toBe(state);
 	});
+
+	it("綁定場次時 setup 階段 ignore SET_TARGET_SCORE", () => {
+		const state: ScoreboardState = {
+			...createInitialState({ matchId: "m1", targetScore: 15 }),
+			status: "setup",
+		};
+		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 11 });
+		expect(next).toBe(state);
+	});
 });
 
 describe("scoreboardReducer — RALLY_WON", () => {
