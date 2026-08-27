@@ -91,6 +91,18 @@ Hook 層既有包裝為 `useRoundStore().submitScore(matchId, rawScoreA, rawScor
 - [x] 2.5 RED: 於 `reducer.test.ts` 補 it「UNDO 與 RESET 後保留 matchId，不退回 null」；同時於既有三個 it（「setup 階段可切換 mode…」「setup 階段可切換 firstServer」「setup 階段可切換 targetScore 且保留 mode 與 firstServer」）補上 `matchId` 不變的斷言（**it 名稱不得更動**——它們是 spec 驗收錨點）。確認紅燈
 - [x] 2.6 GREEN: `createInitialState` 與 `settingsOf` 帶入 `matchId`，使 UNDO 的 replay 與 RESET 皆保留（design Decision 6）
 - [x] 2.7 REFACTOR: 確認 `matchId` 的保留只透過 `MatchSettings` 一條路徑，沒有任何 case 分支自行複製欄位（無壞味道則註記 skipped）
+  - **Stage 2 的偵測力補強**（Code-Quality Reviewer 獨立 mutation，35 組／12 存活 → 3 存活）：
+    ① 4.1 的測試資料改為 `round.format: "doubles"` 搭配 `match.format: "singles"`（刻意相異），
+    並補整體斷言 `expect(seed).toEqual(createInitialState({ mode, targetScore, matchId }))`——原本
+    `mode` 誤取 `match.format`、以及覆寫 `firstServer`／`servingTeam`／`serverNumber`／`history`
+    等未列欄位時皆不會轉紅；② 4.3 補 `expect(result).toEqual(existing)`——原本只斷言三欄，
+    竄改 `mode`／`matchId`／`status`／`firstServer` 不會轉紅；③ 新增 it
+    「SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed」——`readMatchSlot`／
+    `writeMatchSlot` 各自的 SSR 降級已在 §1 測過，但兩者組合後的行為在本模組零覆蓋；
+    ④ 實作端移除 `existing as ScoreboardState & { matchId: string }` 型別斷言，改為
+    `{ ...existing, matchId: seed.matchId }`（斷言會讓槽內 `matchId` 為 null 的舊資料靜默通過），
+    並移除 `createInitialState` overrides 內冗餘的 `matchId`（外層 spread 已覆寫，兩處寫同一件事）。
+    以上皆為偵測力／型別強化，不新增生產行為分支，三個驗收錨點 it 名稱未變。
   - **skipped（無壞味道）**：`matchId` 只在 `reducer.ts` 的 `settingsOf()` 與 `createInitialState()` 兩處集中處理，`SET_MODE`／`SET_FIRST_SERVER`／`SET_TARGET_SCORE`／`UNDO`／`RESET` 五個 case 皆經 `createInitialState(settingsOf(state))` 重建，`RALLY_WON` 走 `...afterRally` 全量展開，無任何 case 分支自行複製該欄位。經 Stage 2（opus）獨立核實成立。
 
 ## 3. storage 分派與 hook 綁定（`lib/scoreboard/storage.ts`、`hooks/useScoreboardStore.ts`）
@@ -145,11 +157,28 @@ Depends on: §1
 - [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts`，寫 it「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」——15 分制雙打回合 + 未開打場次 → seed 的 `targetScore === 15`、`mode === "doubles"`、`matchId` 為該場 id、分數 0-0、`status === "setup"`。確認紅燈（模組不存在）
 - [x] 4.2 GREEN: 實作 `buildMatchSlotSeed(round, match)`：以 `createInitialState` 為基底帶入該輪的 `round.targetScore`、對戰方式（`round.format`，值域與 scoreboard 的 `Mode` 同為 `"singles" | "doubles"`）與 `matchId`（`match.id`），`firstServer` 取預設值
 - [x] 4.3 RED: 補 it「已有進度的場次再次進入時保留既有進度不覆蓋」——槽已有 8-5／`playing` → 再次呼叫後分數、history 與 `targetScore` 完全不變。確認紅燈
-- [x] 4.4 GREEN: 實作 `ensureMatchSlot(matchId, seed)`：已有條目則原樣回傳、不寫入
+- [x] 4.4 GREEN: 實作 `ensureMatchSlot`：已有條目則原樣回傳、不寫入
+  - **Stage 2 簽章收斂**：實作時為 `ensureMatchSlot(matchId, seed)`（本條原文），Stage 2 的 mutation 實測顯示
+    把 `readMatchSlot(matchId)` 改成 `readMatchSlot(seed.matchId)`、以及加上「`seed.matchId !== matchId` 即拋錯」
+    的反向 guard **都不會轉紅**——代表兩個參數是同一件事的兩個真實來源、且不一致情境零覆蓋。
+    這與 §3 把 `writeMatchSlot(matchId, state)` 收斂為單參數的論證同構，故收斂為
+    `ensureMatchSlot(seed)`，槽位由 `seed.matchId` 推導。行為不變、無生產端呼叫者。
 - [x] 4.5 RED: 補 it「第一隊對應 us、第二隊對應 them，來回轉換不顛倒」——`{first: 11, second: 7}` → `{us: 11, them: 7}` → 轉回後仍為 `{first: 11, second: 7}`。確認紅燈
 - [x] 4.6 GREEN: 實作**單一**的隊伍對應函式（入口與回填共用），SHALL NOT 在兩處各寫一次
 - [x] 4.7 REFACTOR: 確認本模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（design Decision 2 的單向相依）（無壞味道則註記 skipped）
   - **Stage 2 前的自測補強（非 test-plan 逐字條目）**：交件前 mutation 自測發現兩個缺口——`ensureMatchSlot` 的**寫入分支零覆蓋**（既有兩個 it 都只走「已有條目」路徑），以及把 `mode: round.format` 硬編碼為 `"doubles"` 時**仍全綠**（無測試檢查 singles 情境）。因此補 it「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」（`scoreboard-binding.test.ts`），以 singles／21 分制的回合斷言 `seed.mode` 與 `seed.targetScore`，兩個 mutation 補測後皆轉紅。此 it 屬**偵測力補強**、不新增任何生產程式碼分支，不影響三個驗收錨點的 it 名稱與斷言。
+  - **Stage 2 的偵測力補強**（Code-Quality Reviewer 獨立 mutation，35 組／12 存活 → 3 存活）：
+    ① 4.1 的測試資料改為 `round.format: "doubles"` 搭配 `match.format: "singles"`（刻意相異），
+    並補整體斷言 `expect(seed).toEqual(createInitialState({ mode, targetScore, matchId }))`——原本
+    `mode` 誤取 `match.format`、以及覆寫 `firstServer`／`servingTeam`／`serverNumber`／`history`
+    等未列欄位時皆不會轉紅；② 4.3 補 `expect(result).toEqual(existing)`——原本只斷言三欄，
+    竄改 `mode`／`matchId`／`status`／`firstServer` 不會轉紅；③ 新增 it
+    「SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed」——`readMatchSlot`／
+    `writeMatchSlot` 各自的 SSR 降級已在 §1 測過，但兩者組合後的行為在本模組零覆蓋；
+    ④ 實作端移除 `existing as ScoreboardState & { matchId: string }` 型別斷言，改為
+    `{ ...existing, matchId: seed.matchId }`（斷言會讓槽內 `matchId` 為 null 的舊資料靜默通過），
+    並移除 `createInitialState` overrides 內冗餘的 `matchId`（外層 spread 已覆寫，兩處寫同一件事）。
+    以上皆為偵測力／型別強化，不新增生產行為分支，三個驗收錨點 it 名稱未變。
   - **skipped（無壞味道）**：機械驗證——`grep -rn "scoreboard-binding" nextjs-pickball/lib/scoreboard/` 無結果（`lib/scoreboard/` 底下沒有任何一行 import 本模組）；`grep -n "^import" nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 顯示僅 import `../scoreboard/reducer`、`../scoreboard/match-slots`、`../scoreboard/types`（型別）與本 workspace 的 `./round-types`（型別），相依方向與 design Decision 2 一致，單向、無需重構。
 
 ## 5. 回填清單與目標分數鎖定判定（`lib/matchmaker/scoreboard-binding.ts`）

@@ -15,8 +15,9 @@ export function buildMatchSlotSeed(
 		...createInitialState({
 			mode: round.format,
 			targetScore: round.targetScore,
-			matchId: match.id,
 		}),
+		// matchId 只在這裡決定一次：createInitialState 的 matchId 型別為 string | null，
+		// 在此覆寫同時完成型別窄化，故不再重複傳進 overrides——兩處寫同一件事會分歧。
 		matchId: match.id,
 	};
 }
@@ -24,14 +25,20 @@ export function buildMatchSlotSeed(
 /**
  * 確保該場次的計分板槽存在：已有條目時原樣回傳、SHALL NOT 覆蓋既有進度
  * （覆蓋會讓「未完成的計分進度可離開後再進入接續」靜默失效，見 spec 的 SHALL NOT 條款）。
+ *
+ * 只收 seed 一個參數、槽位由 seed.matchId 推導：另傳一個 matchId 參數會讓
+ * matchId !== seed.matchId 成為可能的靜默失效（讀甲場的槽卻寫入乙場的 seed），
+ * 與 match-slots.ts 對 writeMatchSlot 的收斂同一理由。
  */
 export function ensureMatchSlot(
-	matchId: string,
 	seed: ScoreboardState & { matchId: string },
 ): ScoreboardState & { matchId: string } {
-	const existing = readMatchSlot(matchId);
+	const existing = readMatchSlot(seed.matchId);
 	if (existing !== null) {
-		return existing as ScoreboardState & { matchId: string };
+		// 重申 matchId 而非用型別斷言：ScoreboardState.matchId 型別為 string | null，
+		// 斷言會讓「槽內容的 matchId 為 null 或屬於別場」的舊資料靜默通過；
+		// 槽位既以 seed.matchId 為 key 讀出，這裡重寫回該值才是結構上的保證。
+		return { ...existing, matchId: seed.matchId };
 	}
 
 	writeMatchSlot(seed);
