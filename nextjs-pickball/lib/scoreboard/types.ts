@@ -32,6 +32,10 @@ export const ScoreboardStateSchema = z.object({
 	winner: TeamSchema.nullable(),
 	firstServer: TeamSchema,
 	targetScore: TargetScoreSchema,
+	// 對戰場次綁定：null 為獨立計分板。.default(null) 是向後相容的關鍵——本欄位加入前
+	// 寫入 scoreboard:current:v1 的資料不含 matchId，若判為驗證失敗會被清除，
+	// 使用者進行中的比賽會在重整後靜默歸零（與 targetScore 的向後相容理由同構）。
+	matchId: z.string().nullable().default(null),
 });
 
 export type Mode = z.infer<typeof ModeSchema>;
@@ -49,6 +53,7 @@ export interface MatchSettings {
 	mode: Mode;
 	firstServer: Team;
 	targetScore: TargetScore;
+	matchId: string | null;
 }
 
 // Action 為純記憶體型別，不會落 localStorage，無需 zod 驗證
