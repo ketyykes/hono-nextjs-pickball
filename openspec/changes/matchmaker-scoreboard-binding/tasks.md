@@ -149,6 +149,7 @@ Depends on: §1
 - [x] 4.5 RED: 補 it「第一隊對應 us、第二隊對應 them，來回轉換不顛倒」——`{first: 11, second: 7}` → `{us: 11, them: 7}` → 轉回後仍為 `{first: 11, second: 7}`。確認紅燈
 - [x] 4.6 GREEN: 實作**單一**的隊伍對應函式（入口與回填共用），SHALL NOT 在兩處各寫一次
 - [x] 4.7 REFACTOR: 確認本模組只相依 `lib/scoreboard/match-slots.ts` 與回合型別，**不被** `lib/scoreboard/` 反向 import（design Decision 2 的單向相依）（無壞味道則註記 skipped）
+  - **Stage 2 前的自測補強（非 test-plan 逐字條目）**：交件前 mutation 自測發現兩個缺口——`ensureMatchSlot` 的**寫入分支零覆蓋**（既有兩個 it 都只走「已有條目」路徑），以及把 `mode: round.format` 硬編碼為 `"doubles"` 時**仍全綠**（無測試檢查 singles 情境）。因此補 it「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」（`scoreboard-binding.test.ts`），以 singles／21 分制的回合斷言 `seed.mode` 與 `seed.targetScore`，兩個 mutation 補測後皆轉紅。此 it 屬**偵測力補強**、不新增任何生產程式碼分支，不影響三個驗收錨點的 it 名稱與斷言。
   - **skipped（無壞味道）**：機械驗證——`grep -rn "scoreboard-binding" nextjs-pickball/lib/scoreboard/` 無結果（`lib/scoreboard/` 底下沒有任何一行 import 本模組）；`grep -n "^import" nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 顯示僅 import `../scoreboard/reducer`、`../scoreboard/match-slots`、`../scoreboard/types`（型別）與本 workspace 的 `./round-types`（型別），相依方向與 design Decision 2 一致，單向、無需重構。
 
 ## 5. 回填清單與目標分數鎖定判定（`lib/matchmaker/scoreboard-binding.ts`）
