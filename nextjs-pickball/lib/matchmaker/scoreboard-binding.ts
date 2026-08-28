@@ -92,22 +92,38 @@ export interface FinishedSubmission {
 }
 
 /**
+ * 回填條件的具名 predicate（refactor 5.11）：spec「回填條件」的三者需同時成立才列入，
+ * 抽成具名函式讓三個條件各自可讀，也讓日後補測試時能單獨鎖定這個判斷，而不必重新
+ * 展開整個 collectFinishedSubmissions 的迴圈。`match is RoundMatch` 收斂型別，
+ * 呼叫端不需要再對 `match` 做一次非空檢查。
+ */
+function isEligibleForBackfill(
+	match: RoundMatch | undefined,
+	slot: ScoreboardState,
+): match is RoundMatch {
+	// 條件一：槽已判定勝負。
+	if (slot.status !== "finished") return false;
+
+	// 條件二：場次仍在回合中。槽對應的場次可能因重排等原因已從回合消失（prd.md §11），
+	// 此時該槽是孤兒資料，SHALL NOT 拋錯——略過即可，等 §6 的清槽流程收尾。
+	if (match === undefined) return false;
+
+	// 條件三（冪等的第二道防線，design Decision 5）：清槽是主要機制，此條件是清槽失敗
+	// （例如 LocalStorage 寫入被配額擋下）時的最後防線，避免評分被重複雙倍更新。
+	if (match.status === "completed") return false;
+
+	return true;
+}
+
+/**
  * 計算目前回合中「應回填」的待送出清單：純函式，輸入為目前回合與計分板槽集合，
  * 不觸碰 localStorage（spec「回填條件」）。
  */
 export function collectFinishedSubmissions(round: Round, slots: MatchSlots): FinishedSubmission[] {
 	const result: FinishedSubmission[] = [];
 	for (const [matchId, slot] of Object.entries(slots)) {
-		if (slot.status !== "finished") continue;
-
-		// 場次仍在回合中：槽對應的場次可能因重排等原因已從回合消失（prd.md §11），
-		// 此時該槽是孤兒資料，SHALL NOT 拋錯——略過即可，等 §6 的清槽流程收尾。
 		const match = round.matches.find((m) => m.id === matchId);
-		if (match === undefined) continue;
-
-		// 冪等的第二道防線（design Decision 5）：清槽是主要機制，此條件是清槽失敗
-		// （例如 LocalStorage 寫入被配額擋下）時的最後防線，避免評分被重複雙倍更新。
-		if (match.status === "completed") continue;
+		if (!isEligibleForBackfill(match, slot)) continue;
 
 		result.push({ matchId, scores: mapTeamScores(slot.scores, "round") });
 	}
