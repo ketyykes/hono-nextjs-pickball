@@ -32,10 +32,10 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		await page.goto("/scoreboard?match=gone");
 
 		await expect(
-			page.getByRole("button", { name: "回到對戰頁" }),
+			page.getByRole("link", { name: "回到對戰頁" }),
 		).toBeVisible();
 		await expect(
-			page.getByRole("button", { name: "改用獨立計分板" }),
+			page.getByRole("link", { name: "改用獨立計分板" }),
 		).toBeVisible();
 
 		// 不得顯示技術錯誤碼或堆疊字樣，避免使用者誤以為是系統壞掉
@@ -46,7 +46,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 	test("失效畫面可切換為獨立計分板並恢復計分", async ({ page }) => {
 		await page.goto("/scoreboard?match=gone");
 
-		await page.getByRole("button", { name: "改用獨立計分板" }).click();
+		await page.getByRole("link", { name: "改用獨立計分板" }).click();
 		await expect(page).toHaveURL(/\/scoreboard$/);
 
 		const usButton = page.getByRole("button", { name: /我方贏這一球/ });

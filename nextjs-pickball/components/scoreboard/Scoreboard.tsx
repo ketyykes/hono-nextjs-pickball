@@ -13,6 +13,7 @@ import { TeamPanel } from "@/components/scoreboard/TeamPanel";
 import { ActionBar } from "@/components/scoreboard/ActionBar";
 import { OrientationHint } from "@/components/scoreboard/OrientationHint";
 import { GameOverDialog } from "@/components/scoreboard/GameOverDialog";
+import { MatchBindingNotice } from "@/components/scoreboard/MatchBindingNotice";
 import { cn } from "@/lib/utils";
 import type { ScoreboardState } from "@/lib/scoreboard/types";
 
@@ -46,9 +47,15 @@ function deriveRallyFeedback(
 	return null;
 }
 
+export interface ScoreboardProps {
+	// 由 app/scoreboard/page.tsx 讀 searchParams 後以 prop 注入（design Decision 3），
+	// 不在此元件內用 useSearchParams()。null 為未綁定的獨立計分板。
+	matchId?: string | null;
+}
+
 // 計分器主容器：組合所有子元件，依 orientation 切換橫/直式排版
-export function Scoreboard() {
-	const [state, dispatch] = useScoreboardStore();
+export function Scoreboard({ matchId = null }: ScoreboardProps) {
+	const [state, dispatch, bindingStatus] = useScoreboardStore(matchId);
 	const orientation = useOrientation();
 	const { isSupported, isFullscreen, toggle } = useFullscreen();
 	const { focusMode, toggleFocusMode } = useFocusMode({ isFullscreen });
@@ -78,6 +85,14 @@ export function Scoreboard() {
 		if (msg !== null) {
 			setFeedback({ msg, key: (feedback?.key ?? 0) + 1 });
 		}
+	}
+
+	// 場次已失效（重排或刪除）：SHALL NOT 顯示計分板本體，改顯示說明與兩個出口
+	// （spec「對戰場次綁定與失效處理」Requirement）。此判斷須排在所有 hook 呼叫
+	// 之後，避免早退造成 hook 呼叫順序不一致。pending（尚未判定）視同一般畫面，
+	// 不提早顯示失效說明，否則合法綁定場次仍會閃一幀（見 useScoreboardStore §7.0c）。
+	if (bindingStatus === "missing") {
+		return <MatchBindingNotice />;
 	}
 
 	const locked = state.status !== "setup";
