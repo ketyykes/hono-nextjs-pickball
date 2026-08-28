@@ -184,17 +184,17 @@ Depends on: §1
 ## 5. 回填清單與目標分數鎖定判定（`lib/matchmaker/scoreboard-binding.ts`）
 Depends on: §4
 
-- [ ] 5.1 RED: 補 it「只有 finished 的槽才進入待送出清單」——`m1: finished`／`m2: playing`／`m3: 無槽` → 清單只含 `m1`。確認紅燈
-- [ ] 5.2 GREEN: 實作 `collectFinishedSubmissions(round, slots)`：回傳待送出清單（含 `matchId` 與轉換後的兩隊比分）
-- [ ] 5.3 RED: 補 it「已完成的場次不重複送出且連續呼叫為冪等」——`m1` 槽為 `finished` 且回合中已完成 → 清單為空；連續呼叫兩次皆為空。確認紅燈
-- [ ] 5.4 GREEN: 加入「該場尚未完成」條件（冪等的第二道防線，design Decision 5）
-- [ ] 5.5 RED: 補 it「槽對應的場次已不在回合中時略過且不拋錯」——槽有 `gone` 的 `finished` 條目、回合不含 `gone` → 清單不含 `gone`。確認紅燈
-- [ ] 5.6 GREEN: 加入「場次仍在回合中」條件
-- [ ] 5.7 RED: 補 it「回填與手動輸入的送出結果逐欄相同」——同一回合同一場、比分 11-7，兩條路徑各跑一次 → 回合物件與歷史紀錄逐欄相同（比分、勝方、賽前分數、賽後分數、對戰方式、雙打組成標示），僅完成時間可相異。確認紅燈（§0.2 已確認 `submitScore` 為純函式，**Tier 維持 `unit`**）
-- [ ] 5.8 GREEN: 讓回填呼叫 §0.2 找到的**同一個**送出入口 `submitScore(input: SubmitScoreInput)`（`lib/matchmaker/round.ts`），SHALL NOT 另寫平行寫入路徑
-- [ ] 5.9 RED: 補四個 it：「無任何場次完成且無計分板槽時目標分數未鎖定」、「任一場次的計分板槽非 setup 時目標分數鎖定」、「槽存在但仍為 setup 時不視為已開始計分」、「已有場次完成時目標分數鎖定，不論比分來源」。確認紅燈
-- [ ] 5.10 GREEN: 實作鎖定判定純函式，輸出布林值與繁體中文的鎖定原因字串
-- [ ] 5.11 REFACTOR: 三個條件的判定與隊伍對應是否有重複邏輯；`collectFinishedSubmissions` 的過濾條件抽為具名 predicate（無壞味道則註記 skipped）
+- [x] 5.1 RED: 補 it「只有 finished 的槽才進入待送出清單」——`m1: finished`／`m2: playing`／`m3: 無槽` → 清單只含 `m1`。確認紅燈
+- [x] 5.2 GREEN: 實作 `collectFinishedSubmissions(round, slots)`：回傳待送出清單（含 `matchId` 與轉換後的兩隊比分）
+- [x] 5.3 RED: 補 it「已完成的場次不重複送出且連續呼叫為冪等」——`m1` 槽為 `finished` 且回合中已完成 → 清單為空；連續呼叫兩次皆為空。確認紅燈
+- [x] 5.4 GREEN: 加入「該場尚未完成」條件（冪等的第二道防線，design Decision 5）
+- [x] 5.5 RED: 補 it「槽對應的場次已不在回合中時略過且不拋錯」——槽有 `gone` 的 `finished` 條目、回合不含 `gone` → 清單不含 `gone`。確認紅燈
+- [x] 5.6 GREEN: 加入「場次仍在回合中」條件
+- [x] 5.7 RED: 補 it「回填與手動輸入的送出結果逐欄相同」——同一回合同一場、比分 11-7，兩條路徑各跑一次 → 回合物件與歷史紀錄逐欄相同（比分、勝方、賽前分數、賽後分數、對戰方式、雙打組成標示），僅完成時間可相異。確認紅燈（§0.2 已確認 `submitScore` 為純函式，**Tier 維持 `unit`**）。真紅燈：`TypeError: toSubmitScoreInput is not a function`（commit `3223d79`）
+- [x] 5.8 GREEN: 讓回填呼叫 §0.2 找到的**同一個**送出入口 `submitScore(input: SubmitScoreInput)`（`lib/matchmaker/round.ts`），SHALL NOT 另寫平行寫入路徑。新增橋接 `toSubmitScoreInput`（commit `f53343b`）
+- [x] 5.9 RED: 補四個 it：「無任何場次完成且無計分板槽時目標分數未鎖定」、「任一場次的計分板槽非 setup 時目標分數鎖定」、「槽存在但仍為 setup 時不視為已開始計分」、「已有場次完成時目標分數鎖定，不論比分來源」。確認紅燈（`TypeError: isTargetScoreLocked is not a function`，commit `c3fee9a`）
+- [x] 5.10 GREEN: 實作鎖定判定純函式，輸出布林值與繁體中文的鎖定原因字串（`isTargetScoreLocked`，commit `6729507`）
+- [x] 5.11 REFACTOR: `collectFinishedSubmissions` 的三個過濾條件抽為具名 predicate `isEligibleForBackfill`（`match is RoundMatch` 收斂型別）。鎖定判定的兩個條件已各自具名變數（`anyMatchFinished`／`anySlotStarted`），隊伍對應已由 `mapTeamScores` 單一實作，未發現其餘重複邏輯，故該部分 skipped（commit `d25082e`）
 
 ## 6. 清除範圍（`lib/matchmaker/scoreboard-binding.ts` 與 M4 的回合流程）
 Depends on: §1、§5
