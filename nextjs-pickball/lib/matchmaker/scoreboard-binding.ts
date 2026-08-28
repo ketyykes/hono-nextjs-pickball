@@ -98,10 +98,14 @@ export function collectFinishedSubmissions(round: Round, slots: MatchSlots): Fin
 	for (const [matchId, slot] of Object.entries(slots)) {
 		if (slot.status !== "finished") continue;
 
+		// 場次仍在回合中：槽對應的場次可能因重排等原因已從回合消失（prd.md §11），
+		// 此時該槽是孤兒資料，SHALL NOT 拋錯——略過即可，等 §6 的清槽流程收尾。
+		const match = round.matches.find((m) => m.id === matchId);
+		if (match === undefined) continue;
+
 		// 冪等的第二道防線（design Decision 5）：清槽是主要機制，此條件是清槽失敗
 		// （例如 LocalStorage 寫入被配額擋下）時的最後防線，避免評分被重複雙倍更新。
-		const match = round.matches.find((m) => m.id === matchId);
-		if (match !== undefined && match.status === "completed") continue;
+		if (match.status === "completed") continue;
 
 		result.push({ matchId, scores: mapTeamScores(slot.scores, "round") });
 	}
