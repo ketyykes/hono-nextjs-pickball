@@ -449,3 +449,78 @@
    1. 派 **§5「回填清單與目標分數鎖定判定」**（同一個 `lib/matchmaker/scoreboard-binding.ts`，tasks 5.1～5.11，**11 個 task，是本 change 最大的一組**）。派工單 MUST 帶入上方的橋接裁決、§4 的確切簽章、以及 §2 Stage 2 移交的「`SET_MODE` 在綁定模式的定位屬 UI 層決策」一項。
    2. §5 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §6 → §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
    3. 全部群組完成後才做 Final Code Review（`opus`）。
+
+11. **§5「回填清單與目標分數鎖定判定」完成兩階段審查（2026-08-28，第四棒 leader）**——工作區乾淨、tasks.md **47／78** 勾選（§0 六 + §1 九 + §2 七 + §3 七 + §4 七 + §5 十一）。前端單元測試由 §4 結束時的 56 檔／438 測試增為 **56 檔／453 測試全綠**，`pnpm -r exec tsc --noEmit` exit 0。HEAD `151eb87`。
+
+    **⚠️ 本輪發生一次工具層停擺，處理方式記錄於此（續作者請沿用）**：§5 的第一位 Implementer 在 5.6 完成後失聯，**回報未回到 leader 手上**，留下未提交的 5.6 GREEN 達 7 小時。coordinator 介入後 leader 接手：
+    - 先 `git diff` 盤點未提交內容 → 判定為合理的 5.6 GREEN。
+    - **實跑驗證而非採信**：`git stash` 掉該修改後 it「槽對應的場次已不在回合中時略過且不拋錯」確實失敗，還原後 8 測試全綠 → 證實 5.5 是真紅燈、該 diff 是最小 GREEN。
+    - 補上 commit `2993c88`，再派第二位 Implementer 續作 5.7～5.11。
+    - **教訓一（流程）**：派出 subagent 後**不可結束回合**；脈絡將盡時應在**派工之前**乾淨停止並落盤。但單靠這條無法防「通知本身遺失」這個失效模式，因此 leader 另加了**獨立於 subagent 通知的進度監看**（輪詢 worktree `git log`，有新 commit 即發事件，長時間無進展主動示警）。**此法實測有效，續作者建議沿用。**
+    - **教訓二（我自己造成的缺陷）**：原 §5 派工單的單檔測試範例誤寫成 `pnpm --filter ./nextjs-pickball test --run nextjs-pickball/lib/...`——**多了 `nextjs-pickball/` 前綴**，vitest 會回 `No test files found`。正確路徑**相對於 workspace**（`lib/matchmaker/...`）。**派工單的每一段引用都要從檔案複製，不要憑記憶重打**（Stage 1 另抓到我把 §4 的 `Depends on: §1` 誤寫為 `§1、§2`，同一類錯誤）。
+
+    **§5 共 13 個 commit**（`7aa70dc` → `151eb87`），異動僅 3 檔：`lib/matchmaker/scoreboard-binding.ts`、`lib/matchmaker/scoreboard-binding.test.ts`、`tasks.md`。**`lib/matchmaker/round.ts` 一行未改**（Stage 1 機械確認）。
+
+    **紅燈機械複驗（leader 親自執行，續作者可直接採信）——三處皆為真紅燈**：
+    - 5.5：stash 掉 5.6 的修改後該 it 確實失敗（見上）。
+    - 5.7：`3223d79^` 的實作檔匯出清單只到 `collectFinishedSubmissions`，`rawScore` 計數為 **0**（橋接函式不存在）。
+    - 5.9：`c3fee9a^` 的實作檔 `lock`／`鎖定` 計數為 **0**（鎖定判定不存在）。
+
+    **§5 Stage 1（Spec Reviewer, sonnet）判定：`PASS`**：八個 Scenario 全數有對應測試、it 名稱逐字相符（機械 grep）；`round.ts` 一行未改；匯出清單無多餘項；`as any`／`as unknown as` 零違規；既有 it 名稱 0 刪除。
+    - **「回填與手動輸入的送出結果逐欄相同」的專項判定（本組最重要的一項）**：(a) 確實走「`collectFinishedSubmissions` → `toSubmitScoreInput` → `submitScore`」這條鏈，不是手工組輸入；(b) 比對方式為**先各自斷言 `completedAt`／`playedAt` 相異，再以 `stripCompletedAt`／`stripPlayedAt` 排除該欄後對整個 `round` 物件與整個 `historyEntry` 物件 `toEqual`**——是「排除完成時間後全欄比對」而非只挑幾欄，另多比了 `playerPatches` 與 `boundaryHits`；(c) 兩條路徑的 `now` 分別為 `T01:00` 與 `T02:00`，確為相異值。
+
+    **§5 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**，**獨立 mutation 40 組，13 組有效存活**（Implementer 自述 10 次／**0 存活** —— **第六度證實自述不可採信**）。補 7 個 it 後 11 組轉紅，剩 1 組等價 mutation、1 組升級。
+    - Stage 2 新增 commit `151eb87`，**生產程式碼一行未改**，只加測試與 tasks.md 紀錄。
+    - **七個 test-plan 之外的新 it**（verify 階段機械核對時需知悉，皆為偵測力補強）：
+      ① 「多個符合條件的槽一次全數回傳且維持走訪順序」——封「push 後 break」「回傳 slice(0,1)」「回傳前 sort 反序」三連存活（**既有 it 的預期結果只有 0 或 1 筆，完全無法分辨「一次全回」與「只回第一筆」**）
+      ② 「待送出清單的 matchId 取自槽的鍵而非槽內容」——封「改用 `slot.matchId`」（槽鍵與 `slot.matchId` 在既有測試中恆等，分歧時無人發現）
+      ③ 「槽為 0-0 卻已 finished 仍列入，slots 為空時回傳空清單」——封「誤加平手排除條件」＋補 `slots={}` 零覆蓋
+      ④ 「場次為 scoring 尚未完成時仍列入待送出清單」——封「條件三收緊為 `!== "pending"`」
+      ⑤ 「toSubmitScoreInput 的六個欄位分別取自 submission 與 context」——封「`matchId` 改取 `context.round.matches[0].id`」並直接釘住六個輸出欄位
+      ⑥ 「鎖定判定掃描全部場次與全部槽而非只看第一筆」——封「只看第一筆」「第二條改 `=== "playing"`／`=== "finished"`」四項
+      ⑦ 「槽已不在回合中但非 setup 時仍判定為鎖定」——封「鎖定判定誤加『槽須在回合中』」，並把 fail-closed 取捨明文釘住
+    - **Stage 2 的兩項重要判斷（leader 認可）**：
+      - **`toSubmitScoreInput` 的 `context` 不需要一致性檢查**，與 §4 的 `ensureMatchSlot` 雙參數問題**不同構**：`submission.matchId` 是 `SubmitScoreInput.matchId` 的**唯一**來源，`context` 完全不提供 matchId，沒有兩個來源可分歧。在純函式層再加檢查反而會製造第二個「決定 matchId 有效性」的地方。
+      - **`isTargetScoreLocked` 刻意不檢查槽是否仍在回合中**（與 `collectFinishedSubmissions` 的條件②不對稱），這是 **fail-closed 取捨**：誤鎖只是改不了分制，誤放行會讓同輪各場地打不同分制。已用 it ⑦ 釘住。**§6／§8 若有人「順手補上一致性」會被測試抓到——請先回 spec 討論，不要直接改。**
+
+    **leader 對 Stage 2 升級項（M36）的裁決 —— 已核可，下一棒的第一件事**：
+
+    **問題**：`setTargetScore` 的拒絕條件是 `round.matches.some((m) => m.status !== "pending")`（`round.ts` 第 353 行），而 `isTargetScoreLocked` 的第一條是 `match.status === "completed"`。**差集精確等於 `status === "scoring"`**——該狀態下 `setTargetScore` 會拒絕但 `isTargetScoreLocked` 回報未鎖定，**正是 spec 明文「相反方向 SHALL NOT 出現」所禁止的方向**。mutation M36（把第一條改為 `!== "pending"`）**存活**，證明沒有任何測試守在這條界線上。
+
+    **leader 已機械驗證的前提**：`round.ts` 只在第 109 行寫 `status: "pending"`、第 895 行寫 `status: "completed"`，**全前端生產程式碼無任何路徑寫入 `"scoring"`**（其餘出現處為 `round-types.ts:13` 的 enum 定義、`round.ts:196` 的**讀取**、`RoundControls.tsx:59` 的註解）。因此該方向目前**不可達**。
+
+    **裁決：對齊為 `match.status !== "pending"`，並補一個 it「場次為 scoring 時目標分數鎖定」。** 理由：
+    1. `isTargetScoreLocked` 是**純函式**，型別接受任何合法 `Round`，而 `RoundSchema` 明文允許 `scoring`。就函式契約而言，它對「型別允許的輸入」確實產生 spec 禁止的方向；「目前沒有寫入路徑」只讓該輸入暫時不可達，不等於函式本身方向一致。
+    2. **§8 必須修改的 `components/matchmaker/RoundControls.test.tsx` 第 247 行已存在 `status: "scoring"` 的 fixture**，§8 一旦讓元件委派此判定，這個雷幾乎必然被踩到（UI 顯示未鎖定、但 `setTargetScore` 拒絕 → 使用者按了沒反應也沒說明）。
+    3. 改動為一行、fail-closed、與 spec 的「若場次進入 `scoring`，該值 MUST 同時被納入第一條」逐字一致。
+    **執行方式：MUST 走 TDD 三步**（先寫「場次為 scoring 時目標分數鎖定」的失敗測試並在 shell 看到紅燈，再改那一行）。**不得**順手改其他條件。此 it 不在 test-plan 中，MUST 在 tasks.md 誠實記載為 Stage 2 升級後的補強。
+
+    **§5 已固定的契約（§6～§8 會 import）**：
+    ```ts
+    export interface FinishedSubmission { readonly matchId: string; readonly scores: RoundTeamScores; }
+    export function collectFinishedSubmissions(round: Round, slots: MatchSlots): FinishedSubmission[];
+    export interface SubmitScoreContext { readonly round: Round; readonly players: readonly Player[]; readonly now: string; }
+    export function toSubmitScoreInput(submission: FinishedSubmission, context: SubmitScoreContext): SubmitScoreInput;
+    export interface TargetScoreLockResult { readonly locked: boolean; readonly reason: string | null; }
+    export function isTargetScoreLocked(round: Round, slots: MatchSlots): TargetScoreLockResult;
+    ```
+    - **`toSubmitScoreInput` 是全 repo 唯一把 `first` 對應到 `rawScoreA` 的地方**（leader 已機械驗證：其餘 `rawScoreA` 出現處皆為 `round.ts` 的參數定義，或手動輸入路徑把使用者填的字串原樣往下傳，不涉及 `first↔teamA` 語意）。**§8 SHALL NOT 在呼叫點就地展開。**
+    - `TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可更改。"` **未匯出**。**§8 應讀 `result.reason` 而非匯出該常數**（維持單一來源）。
+    - **`collectFinishedSubmissions` 的輸出順序已被測試釘住為 `Object.entries(slots)` 的插入順序。** §6／§8 若要改成依場地編號排序會踩到該 it——那是預期的，改行為前請走 spec。
+    - §5 的匯出目前**皆無生產端呼叫者**（§8 的 UI 才會接上），這是**預期狀態、不是 dead export**。
+
+    **leader 對 Stage 1 另一項觀察的裁決**：Stage 1 指出 `TARGET_SCORE_LOCKED_REASON` 只陳述狀態、**未指出可採取的修正方式**，與 spec 引用的 `prd.md` §11 要求有落差。**觀察成立，但裁決為不改**：① 該字串與 spec 明文給出的範例逐字相同，spec 自身即權威；② test-plan 的 §8 E2E 錨點斷言「畫面含『本輪已開始計分，目標分數不可更改』」，改文案會直接打斷已核可的驗收錨點。**apply 階段不得為此改 spec 或改驗收文字**；若要補「請待本輪結束後再調整」應另開 change。
+
+    **⚠️ 本輪無未落盤事項**：§5 的 Stage 1 與 Stage 2 判定全文、三處紅燈機械複驗、13 個 mutation 存活項的處置、M36 的裁決、文案的裁決，皆已寫在本項內。
+
+    **這一輪的坑與提醒（補充第 6～10 項，不重複）**：
+    - **「既有測試的預期結果太小，會讓整類 mutation 無法被分辨」**。§5 的三連存活（break／slice／sort）根源是既有 it 的期望清單長度只有 0 或 1——**回傳集合的函式 MUST 有一個「多筆同時符合」的測試**，否則「只回第一筆」與「全部回傳」在測試眼中完全相同。這是本輪最有價值的發現，後續群組凡有回傳陣列／集合的函式都適用。
+    - **「兩個恆等的欄位」會讓來源錯誤無法被偵測**。槽的鍵與 `slot.matchId` 在既有測試中永遠相同，因此「改用 `slot.matchId`」全綠。與 §4 的 `round.format` vs `match.format` 是同一類陷阱：**易混淆的同源欄位，測試資料 MUST 刻意讓它們相異**。
+    - **等價 mutation 要辨識出來，不要為它補測**（§4 已有先例，本輪 Stage 2 再次正確處理 `String(Number(x))`）。
+    - **§5 的實際成本**：Implementer 甲（sonnet，5.1～5.6，中途失聯）、Implementer 乙（sonnet，5.7～5.11）約 12 分鐘、Stage 1（sonnet）約 2.3 分鐘／16 tool call、Stage 2（opus）約 **9 分鐘／23 tool call**（40 組 mutation）。
+
+    **下一步（依序，SHALL NOT 跳過）**：
+    1. **先做 M36 對齊**（見上方裁決）：TDD 補 it「場次為 scoring 時目標分數鎖定」→ 把 `isTargetScoreLocked` 第一條改為 `match.status !== "pending"`。可併入 §6 的派工單或單獨派一位 Implementer，但 **MUST 在 §8 動 `RoundControls` 之前完成**。
+    2. 派 **§6「清除範圍」**（tasks 6.1～6.6）。⚠️ §6 會動 **M4 的既有檔**（`lib/matchmaker/storage.ts` 的 `RESET_KEYS`、`hooks/useRoundStore.ts` 的 `resetIncompleteMatches`）與**更新 M4 既有的一個 it**（`lib/matchmaker/storage.test.ts` 的「重置只移除列舉的 key，不影響 scoreboard 資料」→ 改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」）。派工單 MUST 附上 `player-roster` delta 的 MODIFIED 全文與 design Decision 7，讓 Implementer 知道自己是在**改寫**既有行為而非追加。§6.4 的 `MATCH_SLOTS_KEY` **MUST 自 `lib/scoreboard/match-slots.ts` 匯入**（不要直接依賴 `lib/scoreboard/storage-keys.ts` 這個內部葉節點）。
+    3. §6 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
+    4. 全部群組完成後才做 Final Code Review（`opus`）。
