@@ -3,6 +3,8 @@ import { readMatchSlot, writeMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
 import type { ScoreboardState } from "../scoreboard/types";
 import type { Round, RoundMatch } from "./round-types";
+import type { SubmitScoreInput } from "./round";
+import type { Player } from "./types";
 
 /**
  * 建立場地區塊「進入計分板」入口所需的 seed：帶入該輪的目標分數與對戰方式，
@@ -110,4 +112,31 @@ export function collectFinishedSubmissions(round: Round, slots: MatchSlots): Fin
 		result.push({ matchId, scores: mapTeamScores(slot.scores, "round") });
 	}
 	return result;
+}
+
+/** toSubmitScoreInput 的外部脈絡：呼叫端持有回合、名單與時間，本函式不推導這三者。 */
+export interface SubmitScoreContext {
+	readonly round: Round;
+	readonly players: readonly Player[];
+	readonly now: string;
+}
+
+/**
+ * 唯一的橋接：把 collectFinishedSubmissions 的輸出（回合側形狀 `{first, second}`）轉為
+ * submitScore 的輸入（`rawScoreA`／`rawScoreB` 字串）。`first ↔ teamA/rawScoreA` 的對應
+ * 全 repo 只在此處定義一次——回填與手動輸入因此走同一個 submitScore 入口
+ * （spec「計分板結果的自動回填共用送出 pipeline」），SHALL NOT 在呼叫點就地展開。
+ */
+export function toSubmitScoreInput(
+	submission: FinishedSubmission,
+	context: SubmitScoreContext,
+): SubmitScoreInput {
+	return {
+		round: context.round,
+		players: context.players,
+		matchId: submission.matchId,
+		rawScoreA: String(submission.scores.first),
+		rawScoreB: String(submission.scores.second),
+		now: context.now,
+	};
 }
