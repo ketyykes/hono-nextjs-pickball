@@ -7,11 +7,13 @@ import {
 	collectFinishedSubmissions,
 	toSubmitScoreInput,
 	isTargetScoreLocked,
+	clearDiscardedMatchSlots,
 } from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
 import { createInitialState } from "../scoreboard/reducer";
 import { submitScore } from "./round";
+import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 import type { Player } from "./types";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
@@ -512,5 +514,35 @@ describe("scoreboard-binding", () => {
 
 		expect(result.locked).toBe(true);
 		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
+	});
+
+	it("重設本輪只清除未完成場次的槽且不動獨立槽", () => {
+		const m1 = makeMatch({
+			id: "m1",
+			status: "completed",
+			scores: { teamA: 11, teamB: 7 },
+			winner: "teamA",
+			completedAt: "2026-08-27T00:00:00.000Z",
+			playerRatings: [{ playerId: "p1", before: 3, after: 3.2 }],
+		});
+		const m2 = makeMatch({ id: "m2", status: "pending" });
+		// previousRound：重排前的回合，m1 已完成、m2 未完成。
+		const previousRound = makeRound({ matches: [m1, m2] });
+		// nextRound：重排後的回合——m2（pending）被丟棄，m1（completed）原封不動保留。
+		const nextRound = makeRound({ matches: [m1] });
+
+		const m1Slot = { ...createInitialState({ matchId: "m1" }), status: "finished" as const, scores: { us: 11, them: 7 }, matchId: "m1" };
+		const m2Slot = { ...createInitialState({ matchId: "m2" }), status: "playing" as const, scores: { us: 3, them: 1 }, matchId: "m2" };
+		writeMatchSlot(m1Slot);
+		writeMatchSlot(m2Slot);
+		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
+
+		clearDiscardedMatchSlots(previousRound, nextRound);
+
+		expect(readMatchSlot("m2")).toBeNull();
+		expect(readMatchSlot("m1")).toEqual(m1Slot);
+		// m1 的比分／評分／歷史（存於 match 物件本身）不受清槽影響。
+		expect(nextRound.matches[0]).toEqual(m1);
+		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 });
