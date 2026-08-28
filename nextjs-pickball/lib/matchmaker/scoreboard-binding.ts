@@ -140,3 +140,29 @@ export function toSubmitScoreInput(
 		now: context.now,
 	};
 }
+
+/** isTargetScoreLocked 的輸出：布林值與繁體中文鎖定原因（未鎖定時為 null）。 */
+export interface TargetScoreLockResult {
+	readonly locked: boolean;
+	readonly reason: string | null;
+}
+
+const TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可更改。";
+
+/**
+ * 判定本輪目標分數是否已鎖定（spec「開始計分後鎖定本輪目標分數」）：
+ * 任一場次已完成、或任一計分板槽存在且非 `"setup"`，兩者為 OR、任一成立即鎖定。
+ *
+ * 本函式不為場次 status 新增轉換規則：「進行中」目前只由計分板槽表達
+ * （`status !== "setup"`）。若日後實作讓場次進入 `"scoring"`，該值 MUST 同時被納入
+ * 第一條（場次完成／scoring 兩者皆視為已開始），否則兩處會對同一狀態給出相反答案——
+ * 目前 MatchStatus 的產生路徑只會寫 pending／completed（round-types.ts 註解），
+ * 尚未有測試涵蓋 scoring 分支，故先不擴充，等該分支真的出現時再補紅燈。
+ */
+export function isTargetScoreLocked(round: Round, slots: MatchSlots): TargetScoreLockResult {
+	const anyMatchFinished = round.matches.some((match) => match.status === "completed");
+	const anySlotStarted = Object.values(slots).some((slot) => slot.status !== "setup");
+
+	const locked = anyMatchFinished || anySlotStarted;
+	return { locked, reason: locked ? TARGET_SCORE_LOCKED_REASON : null };
+}
