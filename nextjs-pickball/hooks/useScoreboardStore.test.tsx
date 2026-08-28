@@ -176,6 +176,22 @@ describe("useScoreboardStore", () => {
 		expect(renderedStatuses[0]).toBe("pending");
 	});
 
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現初值三元的 standalone
+	// 半邊零覆蓋——把初值改為恆 "pending" 後全套仍綠，因為 read effect 事後補設
+	// standalone 把它掩蓋掉了。7.0c 明文要求「未帶 matchId 時初值維持 standalone
+	// 逐字不變」，需要一條在 render 階段（effect 執行前）取值的斷言才釘得住。
+	it("未帶 matchId 時首次 render 的綁定狀態為 standalone", () => {
+		const renderedStatuses: ScoreboardBindingStatus[] = [];
+		renderHook(() => {
+			const [, , bindingStatus] = useScoreboardStore();
+			// 於 render 階段（非 effect）同步記錄，第一筆即為 effect 執行前的值
+			renderedStatuses.push(bindingStatus);
+			return bindingStatus;
+		});
+
+		expect(renderedStatuses[0]).toBe("standalone");
+	});
+
 	it("matchId 無對應槽時回報 missing 且不建立新條目", () => {
 		const { result } = renderHook(() => useScoreboardStore("gone"));
 		const [, dispatch, bindingStatus] = result.current;
