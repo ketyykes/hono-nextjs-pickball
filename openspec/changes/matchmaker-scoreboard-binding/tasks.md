@@ -227,6 +227,22 @@ Implementer 自述做了 10 次 mutation／0 存活。Stage 2 **未採信、獨�
 目前 `round.ts` 只寫入 `pending`／`completed`（第 109、895 行），故現況不會發生，
 但缺一道 guard。補測需改變行為，不在 Stage 2 授權範圍。
 
+### M36：isTargetScoreLocked 與 setTargetScore 方向對齊（Stage 2 升級後補強）
+
+上一節「仍存活、刻意不補測並升級給 leader 的 1 組」經 leader 核可後，以 TDD 三步完成行為對齊，
+不再只是升級擱置。
+
+- **裁決**：`isTargetScoreLocked` 第一條由 `match.status === "completed"` 改為 `!== "pending"`，
+  與 `setTargetScore`（`lib/matchmaker/round.ts`）的拒絕條件方向對齊，封住 spec 明文禁止的
+  「該入口拒絕但本判定未鎖」相反方向（差集精確等於 `status === "scoring"`）。
+- 新增 it「場次為 scoring 時目標分數鎖定」**不在 test-plan 中**，屬 Stage 2 升級後的偵測力＋
+  行為補強，非原始驗收錨點。
+- 紅燈為真（實際輸出）：`AssertionError: expected false to be true // Object.is equality` （斷言
+  `expect(result.locked).toBe(true)` 於改動前失敗）。
+- 兩個 commit：
+  - `0179249` `test(matchmaker): 補場次為 scoring 時目標分數鎖定的紅燈`
+  - `3c4cdc0` `feat(matchmaker): 對齊 isTargetScoreLocked 與 setTargetScore 的拒絕方向`
+
 ## 6. 清除範圍（`lib/matchmaker/scoreboard-binding.ts` 與 M4 的回合流程）
 Depends on: §1、§5
 
