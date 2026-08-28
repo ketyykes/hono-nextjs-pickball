@@ -500,4 +500,17 @@ describe("scoreboard-binding", () => {
 		expect(result.locked).toBe(true);
 		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
 	});
+
+	// M36（Stage 2 升級、leader 已核可）：isTargetScoreLocked 的第一條與 setTargetScore
+	// 的拒絕條件（round.ts 的 `status !== "pending"`）方向必須一致，差集精確等於
+	// `status === "scoring"`。此 it 釘住 scoring 場次也視為已開始計分。
+	it("場次為 scoring 時目標分數鎖定", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "scoring" })] });
+		const slots: MatchSlots = {};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(true);
+		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
+	});
 });
