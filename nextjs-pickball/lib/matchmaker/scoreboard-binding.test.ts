@@ -13,6 +13,7 @@ import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
 import { createInitialState } from "../scoreboard/reducer";
 import { submitScore } from "./round";
+import { resetMatchmakerData } from "./storage";
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 import type { Player } from "./types";
 
@@ -543,6 +544,23 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("m1")).toEqual(m1Slot);
 		// m1 的比分／評分／歷史（存於 match 物件本身）不受清槽影響。
 		expect(nextRound.matches[0]).toEqual(m1);
+		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
+	});
+
+	// regression guard（6.5）：6.4 已讓 resetMatchmakerData() 把整個 MATCH_SLOTS_KEY
+	// 移除，此 it 寫下當下即綠——偵測力以 mutation 驗證（見 tasks.md 6.5 的記錄），
+	// 不在此另寫一次清空呼叫（清除範圍只能有一處定義，見 spec SHALL NOT 條款）。
+	it("重置名單清除全部場次槽但保留獨立槽", () => {
+		const m1Slot = { ...createInitialState({ matchId: "m1" }), status: "finished" as const, scores: { us: 11, them: 7 }, matchId: "m1" };
+		const m2Slot = { ...createInitialState({ matchId: "m2" }), status: "playing" as const, scores: { us: 3, them: 1 }, matchId: "m2" };
+		writeMatchSlot(m1Slot);
+		writeMatchSlot(m2Slot);
+		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
+
+		resetMatchmakerData();
+
+		expect(readMatchSlot("m1")).toBeNull();
+		expect(readMatchSlot("m2")).toBeNull();
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 });
