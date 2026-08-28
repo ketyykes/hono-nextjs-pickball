@@ -42,6 +42,13 @@ describe("match-slots", () => {
 		expect(localStorage.getItem("scoreboard:current:v1")).toBeNull();
 	});
 
+	it("分槽 write 後 read 可取回 courtNumber", () => {
+		// 證明 courtNumber 真的落盤而非被 zod schema 剝除
+		writeMatchSlot({ ...createInitialState({ courtNumber: 3 }), matchId: "m1" });
+
+		expect(readMatchSlot("m1")?.courtNumber).toBe(3);
+	});
+
 	it("單筆損壞只丟該筆並回報 droppedCount，其餘場次保留", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const m2State = createInitialState();
