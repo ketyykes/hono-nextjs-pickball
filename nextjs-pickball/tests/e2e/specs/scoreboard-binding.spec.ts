@@ -16,6 +16,38 @@ import { test, expect } from "@playwright/test";
 const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
 const CURRENT_KEY = "scoreboard:current:v1";
 
+// 種入單一場次的分槽條目，欄位形狀複製自 ScoreboardStateSchema（見頁首註解）。
+// 以 addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀到綁定資料。
+function seedMatchSlot(
+	page: import("@playwright/test").Page,
+	matchId: string,
+	overrides: { targetScore?: 11 | 15 | 21; courtNumber?: number | null } = {},
+) {
+	const seed = {
+		mode: "doubles",
+		scores: { us: 0, them: 0 },
+		servingTeam: "us",
+		serverNumber: 2,
+		isFirstServiceOfGame: true,
+		history: [],
+		status: "playing",
+		winner: null,
+		firstServer: "us",
+		targetScore: overrides.targetScore ?? 15,
+		matchId,
+		courtNumber: overrides.courtNumber ?? 3,
+	};
+	return page.addInitScript(
+		(arg: { key: string; id: string; state: unknown }) => {
+			const raw = window.localStorage.getItem(arg.key);
+			const slots = raw ? JSON.parse(raw) : {};
+			slots[arg.id] = arg.state;
+			window.localStorage.setItem(arg.key, JSON.stringify(slots));
+		},
+		{ key: MATCH_SLOTS_KEY, id: matchId, state: seed },
+	);
+}
+
 test.describe("/scoreboard 對戰場次綁定", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto("/");
@@ -58,5 +90,23 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 			CURRENT_KEY,
 		);
 		expect(stored).toContain('"us":1');
+	});
+
+	test("綁定模式設定列以唯讀文字顯示目標分數且無比賽形式下拉", async ({ page }) => {
+		await seedMatchSlot(page, "m1", { targetScore: 15 });
+		await page.goto("/scoreboard?match=m1");
+
+		await expect(page.getByText("本輪 15 分制")).toBeVisible();
+		await expect(page.getByRole("radiogroup", { name: "目標分數" })).toHaveCount(0);
+		await expect(page.getByRole("combobox", { name: "比賽形式" })).toHaveCount(0);
+	});
+
+	test("綁定模式顯示場地標示且返回對戰可回到對戰頁", async ({ page }) => {
+		await seedMatchSlot(page, "m1", { courtNumber: 3 });
+		await page.goto("/scoreboard?match=m1");
+
+		await expect(page.getByText("場地 3")).toBeVisible();
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
 	});
 });
