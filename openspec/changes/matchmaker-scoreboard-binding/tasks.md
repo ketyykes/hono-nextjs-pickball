@@ -350,8 +350,15 @@ Depends on: §3
 > 純呈現型元件**不強制單元 TDD**，兩者以 Playwright E2E 驗收。
 > 行為邏輯已於 §1～§6 下放到 `lib/` 與 `hooks/` 並各自 TDD，本節不再於元件內放任何判斷邏輯。
 
+> **三個已落盤的必處理坑**（前五棒累積，MUST 於 7.1 之前完成 7.0a～7.0c）：
+> ① soft navigation 會讓綁定 hook 卡死；② 合法場次會先閃一幀失效畫面；③ 路由常數尚未具名匯出。
+
+- [ ] 7.0a RED→GREEN: **`MATCHMAKER_ROUTE` 具名匯出**（§0.4 記下的落差，coordinator 已核可）：於 `nextjs-pickball/lib/matchmaker/section-nav.ts` 新增一行 `export const MATCHMAKER_ROUTE = "/matchmaker"`，並讓既有的 `MATCHMAKER_SECTION_HREFS` 由它組成（`[MATCHMAKER_ROUTE, \`${MATCHMAKER_ROUTE}/players\`]`），**行為零變更**、既有測試須原樣全綠。此為對 M5 檔案的**最小**改動，SHALL NOT 順手重構該模組的其他部分。屬純常數重整、無新行為，因此不強制紅燈，但 MUST 跑 `section-nav` 既有測試確認零迴歸
+- [ ] 7.0b RED: **綁定狀態需要「尚未判定」**——`hooks/useScoreboardStore.ts` 目前帶 `matchId` 時把 `bindingStatus` 初值設為 `"missing"`，而判定發生在 `useEffect`（paint 之後），因此**每一次進入合法綁定場次都會先畫一幀「場次已失效」**。於 `nextjs-pickball/hooks/useScoreboardStore.test.tsx` 補 it「帶 matchId 時首次 render 的綁定狀態為 pending 而非 missing」——以存在的槽 render，斷言**首次 render**（effect 執行前）取得的綁定狀態為 `"pending"`。確認紅燈並貼出輸出。屬 `hooks/` 行為邏輯，**MUST 走 TDD 三步**
+- [ ] 7.0c GREEN: `ScoreboardBindingStatus` 新增第四種值 `"pending"`，帶 `matchId` 時的初值改為 `"pending"`，read effect 判定後才轉為 `"bound"`／`"missing"`；未帶 `matchId` 時初值維持 `"standalone"` **逐字不變**。write effect 的 SHALL NOT 寫入條件 MUST 一併涵蓋 `"pending"`（尚未判定時同樣不得建立條目，理由與 `missing` 同）。既有三個驗收錨點 it（「帶 matchId 時 hydrate 自對應槽且只寫回該槽」「未帶 matchId 時沿用獨立槽且不觸碰分槽 key」「matchId 無對應槽時回報 missing 且不建立新條目」）**名稱與斷言語意不得更動**且須原樣全綠
+
 - [ ] 7.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts`，寫兩個 test：「場次失效時顯示繁中說明與兩個出口且不顯示技術錯誤碼」、「失效畫面可切換為獨立計分板並恢復計分」。每個 test 前清空 `scoreboard:matches:v1` 與 `scoreboard:current:v1`。跑 `pnpm --filter ./nextjs-pickball test:e2e --grep "scoreboard-binding"` 確認紅燈並貼出輸出
-- [ ] 7.2 GREEN: `app/scoreboard/page.tsx` 讀 `searchParams` 的 `match` 並以 prop 傳入（簽章依 §0.5：頁面改為 `async`，prop 型別 `searchParams: Promise<{ [key: string]: string | string[] | undefined }>`，MUST `await` 後取 `match`；值可能是 `string[]`，需收斂為單一 `string | null`）；`Scoreboard.tsx` 接受 `matchId` prop 並傳給 `useScoreboardStore`；新增 `components/scoreboard/MatchBindingNotice.tsx` 呈現失效說明與「回到對戰頁」「改用獨立計分板」兩個出口。文案為繁體中文且說明可採取的修正方式
+- [ ] 7.2 GREEN: `app/scoreboard/page.tsx` 讀 `searchParams` 的 `match` 並以 prop 傳入（簽章依 §0.5：頁面改為 `async`，prop 型別 `searchParams: Promise<{ [key: string]: string | string[] | undefined }>`，MUST `await` 後取 `match`；值可能是 `string[]`，需收斂為單一 `string | null`）；`Scoreboard.tsx` 接受 `matchId` prop 並傳給 `useScoreboardStore`；新增 `components/scoreboard/MatchBindingNotice.tsx` 呈現失效說明與「回到對戰頁」「改用獨立計分板」兩個出口。文案為繁體中文且說明可採取的修正方式。**另 MUST 於 `page.tsx` 對 `<Scoreboard>` 加上 `key={matchId ?? "standalone"}`**——「改用獨立計分板」出口若走 soft navigation，元件不會重新 mount，`useScoreboardStore` 的 read effect（依賴陣列為 `[]`）不會重跑，hook 會永遠停在原綁定狀態：計分不落盤、失效畫面不消失（§3 Stage 2 升級項）
 - [ ] 7.3 RED: 補兩個 test：「綁定模式設定列以唯讀文字顯示目標分數且無比賽形式下拉」、「綁定模式顯示場地標示且返回對戰可回到對戰頁」。確認紅燈
 - [ ] 7.4 GREEN: `ScoreboardSetup.tsx` 加入綁定模式分支——顯示場地標示與「本輪 N 分制」唯讀文字、不渲染比賽形式下拉與目標分數 radiogroup、加入「返回對戰」按鈕（路由常數取自 §0.4 補上的 `MATCHMAKER_ROUTE`，`lib/matchmaker/section-nav.ts`）。獨立模式的既有渲染**逐字不變**（design Decision 8）
 - [ ] 7.5 RED: 補 test「綁定模式多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見」——四個 viewport（390x844、844x390、768x1024、1024x600）下斷言 `scrollHeight <= clientHeight + 1` 且四顆核心按鈕 boundingBox 完整落在 viewport 內。確認紅燈
@@ -373,6 +380,8 @@ Depends on: §4、§5、§6、§7
 - [ ] 8.6 GREEN: 目標分數選擇器的鎖定與否改為委派 §5.10 的判定純函式（SHALL NOT 在元件內以「目前回合是否存在」判斷）並顯示其回傳的繁體中文鎖定原因；未鎖定時的變更委派 §0.4 記下的 `setTargetScore(round: Round, targetScore: RoundTargetScore): SetTargetScoreResult`（`lib/matchmaker/round.ts` 第 352 行），SHALL NOT 於 UI 層直接改寫回合物件。**注意 `setTargetScore` 目前是懸空的純函式**——`lib/matchmaker/round.ts` 有定義，但 M5 未接上任何非測試呼叫端，`hooks/useRoundStore.ts` 的 `UseRoundStoreResult` 只有 `round`／`history`／`droppedCount`／`generateRound`／`resetIncompleteMatches`／`submitScore`，**沒有套用新回合的入口**。因此本步 MUST 先於 `hooks/useRoundStore.ts` 新增 `setTargetScore(targetScore)` 動作（比照 `resetIncompleteMatches` 的「呼叫純函式 → 判 `ok` → dispatch」形態，**屬行為邏輯、必 TDD**），再由 `app/matchmaker/page.tsx` 以 prop 傳給 `RoundControls`
 - [ ] 8.7 RED: 補兩個 e2e test：「本輪開始計分後目標分數控制項停用並說明原因」、「手動輸入比分的路徑仍可獨立完成一場」。確認紅燈；**兩者若寫下當下即綠**（前者已由 8.6 實作、後者為 M5 既有行為未被破壞），如實標註為 regression guard 並補 mutation 驗證，**不得為了製造紅燈而先破壞它們**
 - [ ] 8.8 GREEN: 依 8.7 的量測補齊對戰頁的鎖定說明呈現（若 8.7 已綠則標註 skipped，不寫任何多餘程式碼）
+- [ ] 8.10 RED: 補 e2e test「重設本輪後回到舊計分板連結顯示失效說明」（`round-lifecycle` delta 的 Scenario「回到已失效場次的計分板時顯示說明」，test-plan 第 145 列）——於場地 2 的計分板計到 5-2 → 回對戰頁重設／重排本輪 → 重新開啟該場的舊 `?match=` 連結 → 顯示失效說明與「回到對戰頁」「改用獨立計分板」兩個出口，且畫面不含技術錯誤碼。**此錨點在前五棒的 tasks.md 中被遺漏**（§7、§8 皆未涵蓋），由第六棒 leader 依 §9.1 的逐條核對要求補上。**若寫下當下即綠**（§6 的清槽與 §7 的失效畫面已合力達成），如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈
+- [ ] 8.11 GREEN: 依 8.10 的量測補齊（若 8.10 已綠則標註 skipped，不寫任何多餘程式碼）
 - [ ] 8.9 REFACTOR: 確認場地色塊與目標分數選擇器都沒有把「該不該顯示入口」「是否計分中」「是否鎖定」的判斷寫在元件內，而是取用 §4／§5 的純函式輸出（無壞味道則註記 skipped）
 
 ## 9. 收尾驗證（對應 root `README.md` 部署前手動檢查清單）
