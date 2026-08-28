@@ -7,137 +7,134 @@
 > 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
 > **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 狀態快照（最後更新 2026-08-24）
+## 狀態快照（最後更新 2026-08-29）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `3fefb02`（docs：M6～M9 派工前的 44 項文件缺陷修正） |
+| `main` HEAD | `e363bb0`（docs：更新 M6 中斷點） |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
-| M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**（第一位在 §3 後因單組 wall clock 過長主動停止；第二位中途被 API 529 打斷，以 SendMessage 從 transcript 恢復後跑完）。worktree 與分支已 teardown |
-| M6 | **進行中，已依使用者指示暫停**（2026-08-24，使用者開會）。見下方「M6 中斷點」 |
+| M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
+| M6 | **進行中，已依使用者指示暫停**（2026-08-29）。**71/78**。見下方「M6 中斷點」 |
 | M7～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
 
-## 🔖 M6 中斷點（2026-08-24，使用者要求暫停）
+## 🔖 M6 中斷點（2026-08-29，使用者要求暫停）
 
 | 項目 | 值 |
 |---|---|
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
 | Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
 | Base | `main` @ `3fefb02` |
-| 進度 | **15/78 勾選、17 個 commit**，工作區乾淨（`git status --short` 為空） |
-| 已完成 | §0 上游契約對齊、**§1 分槽儲存已正式結案**（實作 + Stage 1 `PASS` + Stage 2 `PASS`） |
-| 中斷於 | **§2 綁定欄位與 reducer 鎖定，乾淨的未開始狀態**（曾派工後隨即召回，0 檔案異動、0 commit） |
-| 跑過幾棒 | **兩棒**。第一棒做到 §1 實作完成；第二棒補跑 §1 的 Stage 2 |
+| HEAD | `cf4fe79`（docs：落盤 §7 Stage 2 審查結論與等價變異判定） |
+| 進度 | **71/78 勾選、97 個 commit** |
+| 工作區 | ⚠️ **不乾淨**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts` 有 195 行未提交 |
+| 已完成 | §0～§7、M36 方向對齊、courtNumber delta，**全部含 Stage 1 + Stage 2 審查** |
+| 中斷於 | **§8.1**（e2e RED 測試寫到一半） |
+| 跑過幾棒 | **七棒**（第七棒剛啟動即被使用者喊停） |
 
-## ▶️ 續跑起點：§2 綁定欄位與 reducer 鎖定
+### ▶️ 續跑起點：§8.1
 
-**§1 已完全結案，不必再碰。** 接手 leader 直接從 §2 開始。
-先讀 `design.md` 的 `## Open Questions` **第 6、7 項**（兩棒的完整交接），
-再讀 `tasks.md` 勾選狀態與 `git log main..HEAD` 對齊現況。
+接手 leader 的**第一件事**是盤點那份未提交的 diff：
 
-### §1 Stage 2 判定 `PASS`，但過程值得記住
-
-**Stage 2 獨立跑 27 次 mutation，原狀 9 次存活**——而 Implementer 自述是「6 次、1 存活」。
-補完斷言後 27/27 全數轉紅。**這是「Stage 2 不得採信 Implementer 自述」這條規則的第六次實證。**
-
-最嚴重的一項：`readMatchSlots()` 的「**解析成功但不是物件**」分支**零覆蓋**。
-既有測試用 `"{{{"`，那會在 `JSON.parse` 就拋錯而走 catch 分支，
-所以 `Array.isArray(parsed)` 這道 guard 從未被執行過——拿掉它、整段刪除、
-或改成只 warn 不清除，測試全部照樣綠。而 spec 逐字寫著
-「不是合法 JSON（**或解析後不是物件**）」，`"[]"` 這類 JSON 陣列正是該 guard 存在的唯一理由。
-
-其餘存活缺口：`clearAllMatchSlots()` 的 SSR 守門、`writeMatchSlot`／`clearMatchSlots`
-的 `console.warn`、`raw === null` 早退、`hasLocalStorage()` 的 try/catch。
-補了 4 個新 it、強化 1 個既有 it，**既有五個 it 名稱未動**（仍是 spec 驗收錨點）。
-
-### 三項移交裁決的結果
-
-1. **`MatchSlotsSchema` → 移除**（commit `a783873`，coordinator 已複驗全庫零殘留）。
-   Stage 2 的理由值得引用：「留著一個具名、已匯出、看起來完全正確的整份 schema，
-   等於在陷阱旁邊放一塊寫著『請勿使用』的牌子」——§3 接線時最自然的動作就是順手改用它，
-   而那正是 design Decision 4 明文否決的連坐失效模式。**命名契約已同步更新。**
-2. **`console.warn` 措辭 → 維持現狀。** 依 execution-plan Escalation
-   「風格爭議時既有 codebase 風格勝出」；實測現況幾乎是既有訊息的逐字改寫。
-3. **`hasLocalStorage()` 三份收斂 → 已完整寫進 §3 的派工指示**，含目標形態
-   （**新增葉節點 `lib/scoreboard/storage-keys.ts`**）與兩個被否決做法的理由：
-   讓 `storage.ts` 匯出會與 §3 的 `storage.ts → match-slots.ts` 形成**循環匯入**；
-   連 matchmaker 那份一起收會違反 design Decision 2 的單向相依。
-
-### §2 開工前就該知道的兩件事（第二棒已實測定位，非推測）
-
-1. **`matchId` 變必填後，`lib/scoreboard/rules.test.ts` 會有四處 tsc 失敗**——
-   coordinator 已複驗：第 5 行 `singlesInitial()`、第 83 行 `doublesPlaying()`、
-   第 145 與 164 行兩個 inline 字面量，各補一行 `matchId: null` 即可。
-   `reducer.test.ts` **不會**炸（12 處都以 `{ ...createInitialState() }` 為基底）。
-   因此 §2 的可改檔案清單由四個擴為五個，**`rules.test.ts` 僅限機械性補 `matchId: null`**。
-2. **`writeMatchSlot(matchId, state)` 的簽章收斂已核可，但延到 §3 做。**
-   §2 讓 state 長出 `matchId` 之後就有 `matchId !== state.matchId` 的靜默失效可能，
-   應收斂為由 `state.matchId` 推導。§1 當下做不到（欄位還不存在）。
-
-分支上的 commit（新到舊，17 筆）：
-
+```bash
+cd /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding
+git diff nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts
 ```
-1703843 docs(...): 落盤 §1 審查完成後的中斷狀態          ← 第二棒
-a94d63e docs(...): 落盤 §1 Stage 2 審查判定並修訂命名契約   ← 第二棒
-4a885ab test(scoreboard): 補分槽儲存五處 mutation 存活缺口的斷言  ← 第二棒
-a783873 refactor(scoreboard): 移除分槽儲存的 dead export MatchSlotsSchema  ← 第二棒
-4164608 docs(...): 補落盤 §1 Stage 1 審查判定
-d74ac4a docs(...): 落盤 §1 完成後的中斷狀態
-4ef61ad test(scoreboard): 補分槽 SSR 守門的 mutation 偵測缺口
-faebeed docs(...): 標註 §1.9 REFACTOR 為 skipped
-6b88de0 feat(scoreboard): 實作分槽批次清除
-68e460d test(scoreboard): 新增批次清除指定場次分槽的失敗測試
-0e21031 feat(scoreboard): 整份分槽資料損壞時只清該 key
-3b3313b test(scoreboard): 新增整份非 JSON 時應清除分槽 key 的失敗測試
-6885063 feat(scoreboard): 分槽讀取改為逐筆降級
-95bf96e test(scoreboard): 新增分槽逐筆損壞降級的失敗測試
-1120d21 feat(scoreboard): 建立分槽儲存模組的 key、schema 與單筆讀寫
-35551ad test(scoreboard): 新增分槽寫入互不覆蓋的失敗測試
-bab6f19 docs(...): 完成 §0 上游契約對齊並回填 environment 基準
-```
+
+內容是 8.1 要求的三個 e2e test，**test 名稱與 tasks.md 逐字相符**（coordinator 已核對）：
+`計分中的場次顯示計分中標示與當前比分`、`未完成的計分進度可離開後再進入接續`、`多場地同時計分時各場進度互不覆蓋`。
+**但它未經任何審查、也未確認紅燈** —— 接手者 MUST 自行實跑判定，不可直接採信。
+
+剩餘工作：**§8（10 task）→ §9（9 task）→ Final Code Review**。
+
+### ⚠️ 兩次工具層停擺的教訓（務必寫進派工單）
+
+1. **`EMFILE: too many open files` 打斷了第六棒。** 根因是 worktree 累積 **9 個殘留 dev server process**
+   （兩組 `wrangler dev` 互搶 `:8787`、一組 `next dev`、四個 `workerd`）。
+   派工單 MUST 要求：跑 E2E／preview **之前**先 `lsof -i :3005 -i :8787` 與
+   `ps aux | grep -E "wrangler|workerd|next"` 查殘留並全數 kill；**跑完立刻清掉自己起的 process**。
+2. **第四棒派出 subagent 後結束回合，鏈斷了 7 小時 16 分。**
+   已列為硬規則：**派出 subagent 之後不可以結束回合**；脈絡將盡就在**派工之前**乾淨停止並落盤。
+   第五棒示範了正確做法 —— 遇到需人類裁決的事，停在派工**之前**回報。
+3. **coordinator 的停擺偵測門檻要放寬到 3 小時。** leader 的 transcript 寫入是爆發式的
+   （等 subagent 時完全不寫），45 分鐘與 75 分鐘門檻都實測誤報過。
+
+### 🔑 Stage 2 獨立 mutation ——「自述不可採信」已七度實證
+
+| 群組 | Implementer 自述 | Stage 2 獨立實測 |
+|---|---|---|
+| §1 | 6 次 / 1 存活 | 27 組 / **9 存活** |
+| §3 | 8 次 / 1 存活 | 35 組 / **10 存活** |
+| §4 | 8 次 / 1 存活 | 31 組 / **12 存活** |
+| §5 | 10 次 / **0 存活** | 40 組 / **13 存活** |
+| §6 | 6 次 / **0 存活** | 35 組 / **10 存活** |
+
+**最嚴重缺口每次都是「分支或欄位零覆蓋」與「多筆同時符合零覆蓋」，不是斷言太弱。**
+派工單要求 Stage 2 **逐分支機械盤點覆蓋率**，不要只加強既有斷言。
+§6 另抓到一條**恆真斷言**（`toEqual` 兩邊是同一物件參考，零偵測力）——
+要求 Stage 2 一併檢查斷言兩邊是否為同一參考。
+
+### 已核可、不得重新討論的裁決
+
+1. **`MatchSlotsSchema` 移除**（commit `a783873`）。命名契約已同步更新。
+2. **`writeMatchSlot` 簽章收斂**為由 `state.matchId` 推導（§3 已完成）。
+3. **`hasLocalStorage()` 收斂**為新增葉節點 `lib/scoreboard/storage-keys.ts`（§3 已完成）。
+4. **`MATCHMAKER_ROUTE` 補匯出**：在 `lib/matchmaker/section-nav.ts` 新增一行
+   `export const MATCHMAKER_ROUTE = "/matchmaker"`，再讓 `MATCHMAKER_SECTION_HREFS` 由它組成，行為零變更。
+   合併衝突不會發生 —— M6 排合併順序第一位，M7／M8 從已含 M6 的 `main` 開分支。
+5. **M36 方向對齊**：`isTargetScoreLocked` 第一條由 `=== "completed"` 改為 `!== "pending"`（已完成）。
+6. **courtNumber delta（coordinator 2026-08-28 裁決 (A)）**：`ScoreboardStateSchema` 新增
+   `courtNumber`（`.nullable().default(null)`），納入 `MatchSettings`／`createInitialState`／`settingsOf`，
+   由 `buildMatchSlotSeed` 帶入。依據：`specs/scoreboard/spec.md:18` 的「向後相容策略」**明文預先授權**
+   以 `.default()` 新增欄位且不得 bump storage key；spec:25 的「保存內容**含**…」是非窮舉表述；
+   場地編號由對戰頁寫進 seed，**design Decision 2 的單向相依完全不受損**。
+   否決 (B)（刪 MUST）—— 會讓 `prd.md` 13.4 的多場地辨識手段消失。
+   **裁決同時決定不重跑 §2／§4 整組審查**，改為對 delta 做完整 TDD + scoped Stage 1／Stage 2。
+
+### §8 開工前就該知道的事（從 tasks.md 複製，勿憑記憶）
+
+- **8.2**：點擊入口時先 `ensureMatchSlot` 再導向 `/scoreboard?match=<matchId>`，**順序不可對調**。
+- **8.4**：reconcile 以「回合已 hydrate」為觸發條件，**不用獨立的 mount effect**（design Risks）。
+- **8.6**：`setTargetScore` **目前仍是懸空的純函式**（`lib/matchmaker/round.ts:352` 有定義，M5 未接上
+  任何非測試呼叫端）。MUST **先於 `hooks/useRoundStore.ts` 新增 `setTargetScore(targetScore)` 動作**
+  （比照 `resetIncompleteMatches` 的「呼叫純函式 → 判 `ok` → dispatch」形態，**屬行為邏輯、必 TDD**），
+  再由 `app/matchmaker/page.tsx` 以 prop 傳給 `RoundControls`。
+- **8.7／8.10／8.11**：若寫下當下即綠，**如實標註 regression guard 並補 mutation 驗證**，
+  SHALL NOT 為了製造紅燈而先破壞它們。
+- **8.10 是第六棒補上的遺漏錨點**（前五棒的 tasks.md 中 §7、§8 皆未涵蓋）。
+
+### §9 收尾驗證的三個陷阱
+
+- **9.2 必須用 root `CLAUDE.md` 指定的 python 計數法**，**不得用** BSD `uniq`
+  （macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）。
+- **9.5**：本 change **唯一容許變動的既有測試只有三處**（§6.3 改名的 `player-roster` it、
+  §8.5 更新的 `RoundControls` it、§8.5 新增的一個 it），其餘既有測試轉紅**一律視為迴歸**。
+- **9.6 E2E 必須帶 `--workers=1`**；既有 `scoreboard.spec.ts` 必須**原樣**通過。
+- **9.8 Rollback 相容性必須實測**，不得只憑推論。
+
+### §7 落盤的三個坑（已處理，記錄供追溯）
+
+1. soft navigation 會讓綁定 hook 卡死 → 用 `key={matchId ?? "standalone"}` 強制 remount。
+2. 合法場次會先閃一幀失效畫面 → 需「尚未判定」呈現狀態。
+3. §4 遺留 3 個可接受的存活 mutation（假設性 guard，spec 未要求）—— 已裁決不加。
+
+### §1 Stage 2 的歷史教訓（保留供追溯）
+
+`readMatchSlots()` 的「解析成功但不是物件」分支曾**零覆蓋**：既有測試用 `"{{{"`，
+那會在 `JSON.parse` 就拋錯而走 catch 分支，所以 `Array.isArray(parsed)` 這道 guard 從未被執行過。
+spec 逐字寫著「不是合法 JSON（**或解析後不是物件**）」，`"[]"` 這類 JSON 陣列正是該 guard 存在的唯一理由。
 
 ⚠️ **分支基底停在 `3fefb02`，而 `main` 已前進四個 commit**
-（`f0bf406`、`a395174`、`36cb52d`、`7087508`）。四個都是 docs-only
-（M6 中斷點紀錄與 runbook 整理），**無程式碼衝突風險**，未做 rebase。
+（`f0bf406`、`a395174`、`36cb52d`、`7087508`、`e363bb0`）。全是 docs-only，**無程式碼衝突風險**，未做 rebase。
 
-### 一個待裁決的判斷（leader 主動標記「若不同意可推翻」）
+Baseline（§0 回填進 `environment.md`）：前端 54 檔／410 測試、後端 4 檔／16 測試全綠，
+`Initial commit hash` = `3fefb02`。§7 完成時實測：56 檔／460+ 測試全綠、`tsc` exit 0、
+`openspec validate --strict` 通過。
 
-§0.4 發現**M5 沒有可 import 的 `/matchmaker` 路由常數**——
-`lib/matchmaker/section-nav.ts:13` 的 `MATCHMAKER_SECTION_HREFS` 是
-`const` 而**非** `export const`（coordinator 已複驗屬實）。
-M6 的「返回對戰」按鈕需要這個路由。leader 判定這不到 execution-plan
-「上游契約不符即停工」的門檻（缺的是匯出而非欄位／型別），未停工，記入 Open Question 5。
+**續跑方式**：worktree 已存在，**不要重開、不要重跑 `pnpm install`、不要重建 baseline**。
+派一位 opus leader，接續點為 **§8.1**（先盤點那份未提交的 diff）。
 
-**coordinator 裁決：同意不停工，且 leader 已在 design.md OQ5 給出比我想的更好的解法。**
-
-它的處置是：在 `section-nav.ts` **新增一行** `export const MATCHMAKER_ROUTE = "/matchmaker"`，
-再讓 `MATCHMAKER_SECTION_HREFS` 由它組成，行為零變更、既有測試不受影響。
-授權依據是同一份 delta 對 `TARGET_SCORE_OPTIONS` 已明文開的同種先例
-（「若該 capability 只匯出型別而沒有可迭代的選項清單，MUST 於其模組補一個具名匯出」）。
-
-**而且合併衝突根本不會發生**——M6 排在合併順序第一位，M7／M8 會從**已含 M6 的 `main`**
-開分支，看到的就是改好的版本。這比我原先設想的兩個選項都乾淨。**已核可，不要重新討論。**
-
-**這位 leader 的 commit 粒度是逐 task（`test:` 一個、`feat:` 一個），比 runbook 要求的
-「一組一 commit」更細——這是好事，每次紅燈都獨立留在版控裡，接手者可以直接用
-`git show <commit>^:<path>` 機械複驗，不必採信任何回報。**
-
-Baseline（§0 回填進 `environment.md`，已驗證與 coordinator 在 `main` 上的實測一致）：
-前端 54 檔／410 測試、後端 4 檔／16 測試全綠，`Initial commit hash` = `3fefb02`。
-
-中斷當下的分支狀態（**coordinator 獨立實跑，非採信回報**）：
-`pnpm --filter ./nextjs-pickball test --run` → **55 檔／419 測試**全綠
-（baseline 54／410，即 +1 檔 +9 測試，無迴歸）；後端 4 檔／16；
-`pnpm -r exec tsc --noEmit` → exit 0。E2E 與 lint 未跑（§7 之前不需要）。
-
-紅燈誠信：§1 的四次紅燈宣稱，第一棒都用 `git show <commit>^:<path>` 機械複驗過，
-**四次皆為真紅燈**，§1 無任何一項需標為 regression guard。
-
-**續跑方式**：worktree 已存在且乾淨，**不要重開、不要重跑 `pnpm install`、
-不要重建 baseline**。派一位 opus leader，接續點為 **§2**（§1 已結案）。
-
-### 這兩棒跑下來確認有效的做法（續跑時保留）
+### 七棒跑下來確認有效的做法（續跑時保留）
 
 - **編輯器診斷在 worktree 內大量謊報**（整批 `Cannot find module 'react'` 之類）。
   一律以 `pnpm -r exec tsc --noEmit` 的 exit code 為準，本輪實測 exit 0。
@@ -265,7 +262,7 @@ M3 ──merge──> main ──> M4 ──merge──> main ──> M5 ──m
 | M3 | matchmaker-rating-engine | ~~matchmaker-rating-engine~~（已拆） | ~~change/matchmaker-rating-engine~~（已刪） | main（已滿足） | **apply 完成並已合併**，待 verify／archive |
 | M4 | matchmaker-round-lifecycle | ~~matchmaker-round-lifecycle~~（已拆） | ~~change/matchmaker-round-lifecycle~~（已刪） | M3 已合併回 main | **apply 完成並已合併**，待 verify／archive |
 | M5 | matchmaker-match-stage-ui | ~~matchmaker-match-stage-ui~~（已拆） | ~~change/matchmaker-match-stage-ui~~（已刪） | M4 已合併回 main | **apply 完成並已合併**，待 verify／archive |
-| M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding（**已存在，勿重開**） | change/matchmaker-scoreboard-binding | main @ `3fefb02`（已滿足） | **apply 進行中，已暫停**。見「M6 中斷點」 |
+| M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding（**已存在，勿重開**） | change/matchmaker-scoreboard-binding | main @ `3fefb02`（已滿足） | **apply 進行中，已暫停於 71/78**。見「M6 中斷點」 |
 | M7 | matchmaker-history-page | 尚未建立 | change/matchmaker-history-page | **M6 已合併回 main** | 未開始 |
 | M8 | matchmaker-data-transfer | 尚未建立 | change/matchmaker-data-transfer | **M6 與 M7 都已合併回 main** | 未開始 |
 | M9 | matchmaker-visual-export | 尚未建立 | change/matchmaker-visual-export | **M6～M8 都已合併回 main** | 未開始 |
