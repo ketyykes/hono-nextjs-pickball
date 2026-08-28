@@ -626,3 +626,21 @@
     **未受影響、可直接採信的部分**：§0～§6 與 M36 全部結案，56 檔／460 測試全綠、`pnpm -r exec tsc --noEmit` exit 0、工作區乾淨。本阻塞**只影響 §7.3／§7.4（及其後續的 §7.5～§7.7 高度預算量測）**；§7.1／§7.2（失效畫面與 `searchParams` 接線）與 §8、§9 的其餘部分不受此決定影響，但依 execution-plan「群組之間嚴格序列」不得跳過 §7 先做 §8。
 
     **接續點**：人類就上述 (A)／(B)／(C) 給出裁決後，第六棒 leader 自「§7 計分板 UI 接線」開始，並依第 12 項列出的三個必處理坑（soft navigation 的 `key={matchId ?? "standalone"}`、失效畫面的「尚未判定」狀態、`MATCHMAKER_ROUTE` 具名匯出）執行。
+
+14. **coordinator 對第 13 項的裁決：採 (A)，已核可（2026-08-28，第六棒 leader 落盤）**
+
+    **裁決**：`ScoreboardStateSchema` 新增 `courtNumber`，以 `.nullable().default(null)` 定義，
+    納入 `MatchSettings`、`createInitialState()`／`settingsOf()`，由 `buildMatchSlotSeed()` 自
+    該場次的 `match.courtNumber`（§0.1 對齊結果表的實際欄位名）帶入。**不修改 delta spec**——
+    「localStorage 持久化」Requirement 的向後相容策略已明文預先授權新增欄位的做法，
+    「分數自動保存」Scenario 的「保存內容**含**…」為非窮舉表述，design Decision 2 的單向相依
+    亦不受損（場地編號由對戰頁在導向前寫進 seed，計分板不反查 `matchmaker:round:v1`）。
+    否決 (B)：刪掉場地標示的 MUST 會讓 `prd.md` 13.4 的多場地辨識手段消失。
+
+    **審查範圍裁決**：**不重跑 §2／§4 整組**（重審 14 個已結案 task 的成本與風險面不對稱），
+    改為對本 delta 做完整 TDD（真紅燈）＋ **scoped Stage 1／Stage 2**，範圍限定新欄位真正
+    經過的四條路徑：schema `.default(null)` 補值、`createInitialState`／`settingsOf` 的保留、
+    `buildMatchSlotSeed` 的帶入、storage 讀寫 round-trip。Stage 2 仍須獨立 mutation 並逐分支
+    機械盤點這四條路徑。
+
+    落盤為 tasks.md 的 **M37** 節（八個 task）。接續順序：M37 → §7 → §8 → §9 → Final Code Review。

@@ -316,6 +316,33 @@ Implementer 自述做了 6 次 mutation／0 存活。Stage 2 **未採信、獨�
 ②刪除 `dispatch` 該行 → 轉紅（`round.matches[0].id` 未更新為新場次 id）。
 兩次皆已還原並重跑確認回綠、`git status` 乾淨。commit `3acdfa8`。
 
+### M37：綁定模式場地標示的資料來源（coordinator 裁決 (A)，2026-08-28）
+
+第五棒 leader 於 §7 開工前發現「綁定模式的場地標示沒有任何資料來源」而停工（design.md
+Open Questions 第 13 項）。coordinator 裁決採 **(A)**：把場地編號納入落盤狀態。
+
+- **裁決內容**：`ScoreboardStateSchema` 新增 `courtNumber`，以 `.nullable().default(null)` 定義，
+  並納入 `MatchSettings`、`createInitialState()`／`settingsOf()`，由 `buildMatchSlotSeed()`
+  自該場次的 `match.courtNumber`（§0.1 對齊結果表的實際欄位名）帶入。
+- **不需要修改 delta spec**：`scoreboard` delta「localStorage 持久化」Requirement 的
+  **向後相容策略**已明文預先授權往 `ScoreboardStateSchema` 新增欄位的做法
+  （MUST 以 zod `.default()` 補值、SHALL NOT bump storage key）；「分數自動保存」Scenario 的
+  「保存內容**含**…」為非窮舉表述。design Decision 2（單向相依）不受損——場地編號由對戰頁
+  在導向前寫進 seed，計分板不反查 `matchmaker:round:v1`。
+- **審查範圍**：coordinator 裁決**不重跑 §2／§4 整組**，改為對本 delta 做完整 TDD 與
+  **scoped Stage 1／Stage 2**，範圍限定在新欄位真正經過的四條路徑：schema `.default(null)` 補值、
+  `createInitialState`／`settingsOf` 的保留、`buildMatchSlotSeed` 的帶入、storage 讀寫 round-trip。
+- 本節新增的 it **皆不在 test-plan 中**（原始驗收錨點不含 `courtNumber`），屬裁決後的資料來源補強。
+
+- [ ] M37.1 RED: 於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 補 it「舊版資料缺 courtNumber 時補為 null 且不清除 key」——寫入不含 `courtNumber` 的合法舊資料至 `scoreboard:current:v1` → `readScoreboard()` 回傳的 `courtNumber === null`、key 未被移除、分數與 history 完整。確認紅燈並貼出輸出
+- [ ] M37.2 GREEN: `nextjs-pickball/lib/scoreboard/types.ts` 的 `ScoreboardStateSchema` 新增 `courtNumber: z.number().int().positive().nullable().default(null)`，並把 `courtNumber: number | null` 併入 `MatchSettings`。**SHALL NOT** bump storage key
+- [ ] M37.3 RED: 於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補 it「UNDO 與 RESET 後保留 courtNumber，不退回 null」——`courtNumber: 3`、比賽進行中且 `history.length > 0` → dispatch UNDO 後 `courtNumber === 3`，再 dispatch RESET 後仍為 `3`。確認紅燈並貼出輸出
+- [ ] M37.4 GREEN: `nextjs-pickball/lib/scoreboard/reducer.ts` 的 `createInitialState()` 與 `settingsOf()` 帶入 `courtNumber`（與 `matchId` 同一條 `MatchSettings` 路徑，SHALL NOT 於任何 case 分支自行複製欄位）
+- [ ] M37.5 RED: 於 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts` 補 it「seed 帶入該場次的場地編號」——回合含場地編號為 3 的場次 → `buildMatchSlotSeed(round, match).courtNumber === 3`。確認紅燈並貼出輸出
+- [ ] M37.6 GREEN: `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 的 `buildMatchSlotSeed()` 由 `match.courtNumber` 帶入 `courtNumber`
+- [ ] M37.7 RED: 於 `nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補 it「分槽 write 後 read 可取回 courtNumber」——寫入 `courtNumber: 3` 的槽 → `readMatchSlot` 取回的 `courtNumber === 3`（證明新欄位真的落盤而非被 zod 剝除）。**若寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈
+- [ ] M37.8 REFACTOR: 確認 `courtNumber` 的保留只透過 `MatchSettings` 一條路徑、`buildMatchSlotSeed` 內只有一處決定場地編號，且未在 `lib/scoreboard/` 內出現任何對 `matchmaker:round:v1` 的讀取（無壞味道則註記 skipped）
+
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
 
