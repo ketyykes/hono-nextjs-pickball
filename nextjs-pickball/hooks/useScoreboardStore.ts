@@ -8,9 +8,12 @@ import type { Action, ScoreboardState } from "@/lib/scoreboard/types";
 
 // 對戰場次綁定狀態：
 // - standalone：未帶 matchId，沿用獨立計分板（scoreboard:current:v1）
+// - pending：帶 matchId 但尚未判定（read effect 尚未執行完成的暫定值）——
+//   若省略此態直接以 missing 起手，合法綁定場次會在 read effect 判定完成前
+//   先閃一幀「場次已失效」畫面（§7.0b）
 // - bound：帶 matchId 且分槽（scoreboard:matches:v1）內有對應條目
 // - missing：帶 matchId 但分槽內無對應條目，場次已失效（重排或刪除）
-export type ScoreboardBindingStatus = "standalone" | "bound" | "missing";
+export type ScoreboardBindingStatus = "standalone" | "pending" | "bound" | "missing";
 
 // 整合 reducer 與 localStorage：
 // - 初始用 createInitialState 避免 SSR/CSR 不一致
@@ -43,22 +46,24 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	);
 	const hasHydratedRef = useRef(false);
 	// 未帶 matchId 時綁定狀態在 mount 前就確定為 standalone；帶 matchId 時
-	// 保守預設為 missing，實際結果留給 read effect 判定，讀取完成前不寫入任何槽
-	// （write effect 另外受 hasHydratedRef 守門，故此預設值不影響 mount 前的寫入行為）。
+	// 初值為 pending（尚未判定），實際結果（bound／missing）留給 read effect 判定，
+	// 讀取完成前不寫入任何槽（write effect 另外受 hasHydratedRef 守門，
+	// 故此預設值不影響 mount 前的寫入行為）。
 	// 用 useReducer 而非 useState 存放 bindingStatus：ESLint 的
 	// react-hooks/set-state-in-effect 規則會擋下「在 effect 內同步呼叫 useState
 	// setter」，但不適用於 useReducer 的 dispatch（與下方 HYDRATE 的既有寫法一致）。
 	const [bindingStatus, setBindingStatus] = useReducer(
 		(_current: ScoreboardBindingStatus, next: ScoreboardBindingStatus) => next,
-		matchId === null ? "standalone" : "missing",
+		matchId === null ? "standalone" : "pending",
 	);
 
 	useEffect(() => {
 		if (!hasHydratedRef.current) return;
-		// missing 狀態下場次已失效，SHALL NOT 建立新條目，也 SHALL NOT 寫入獨立槽
-		// （spec 的 SHALL NOT 條款）——這個 guard 必須在 hook 層，storage.ts 的
-		// writeScoreboard 只看 state.matchId，無法得知分槽是否存在。
-		if (bindingStatus === "missing") return;
+		// pending／missing 狀態下尚未判定或場次已失效，SHALL NOT 建立新條目，
+		// 也 SHALL NOT 寫入獨立槽（spec 的 SHALL NOT 條款）——這個 guard 必須在
+		// hook 層，storage.ts 的 writeScoreboard 只看 state.matchId，
+		// 無法得知分槽是否存在或是否已判定完成。
+		if (bindingStatus === "pending" || bindingStatus === "missing") return;
 		writeScoreboard(state);
 	}, [state, bindingStatus]);
 
