@@ -334,14 +334,14 @@ Open Questions 第 13 項）。coordinator 裁決採 **(A)**：把場地編號�
   `createInitialState`／`settingsOf` 的保留、`buildMatchSlotSeed` 的帶入、storage 讀寫 round-trip。
 - 本節新增的 it **皆不在 test-plan 中**（原始驗收錨點不含 `courtNumber`），屬裁決後的資料來源補強。
 
-- [ ] M37.1 RED: 於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 補 it「舊版資料缺 courtNumber 時補為 null 且不清除 key」——寫入不含 `courtNumber` 的合法舊資料至 `scoreboard:current:v1` → `readScoreboard()` 回傳的 `courtNumber === null`、key 未被移除、分數與 history 完整。確認紅燈並貼出輸出
-- [ ] M37.2 GREEN: `nextjs-pickball/lib/scoreboard/types.ts` 的 `ScoreboardStateSchema` 新增 `courtNumber: z.number().int().positive().nullable().default(null)`，並把 `courtNumber: number | null` 併入 `MatchSettings`。**SHALL NOT** bump storage key
-- [ ] M37.3 RED: 於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補 it「UNDO 與 RESET 後保留 courtNumber，不退回 null」——`courtNumber: 3`、比賽進行中且 `history.length > 0` → dispatch UNDO 後 `courtNumber === 3`，再 dispatch RESET 後仍為 `3`。確認紅燈並貼出輸出
-- [ ] M37.4 GREEN: `nextjs-pickball/lib/scoreboard/reducer.ts` 的 `createInitialState()` 與 `settingsOf()` 帶入 `courtNumber`（與 `matchId` 同一條 `MatchSettings` 路徑，SHALL NOT 於任何 case 分支自行複製欄位）
-- [ ] M37.5 RED: 於 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts` 補 it「seed 帶入該場次的場地編號」——回合含場地編號為 3 的場次 → `buildMatchSlotSeed(round, match).courtNumber === 3`。確認紅燈並貼出輸出
-- [ ] M37.6 GREEN: `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 的 `buildMatchSlotSeed()` 由 `match.courtNumber` 帶入 `courtNumber`
-- [ ] M37.7 RED: 於 `nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補 it「分槽 write 後 read 可取回 courtNumber」——寫入 `courtNumber: 3` 的槽 → `readMatchSlot` 取回的 `courtNumber === 3`（證明新欄位真的落盤而非被 zod 剝除）。**若寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈
-- [ ] M37.8 REFACTOR: 確認 `courtNumber` 的保留只透過 `MatchSettings` 一條路徑、`buildMatchSlotSeed` 內只有一處決定場地編號，且未在 `lib/scoreboard/` 內出現任何對 `matchmaker:round:v1` 的讀取（無壞味道則註記 skipped）
+- [x] M37.1 RED: 於 `nextjs-pickball/lib/scoreboard/storage.test.ts` 補 it「舊版資料缺 courtNumber 時補為 null 且不清除 key」——寫入不含 `courtNumber` 的合法舊資料至 `scoreboard:current:v1` → `readScoreboard()` 回傳的 `courtNumber === null`、key 未被移除、分數與 history 完整。確認紅燈並貼出輸出。**真紅燈**：`expected undefined to be null`（schema 尚無 `courtNumber` 欄位）
+- [x] M37.2 GREEN: `nextjs-pickball/lib/scoreboard/types.ts` 的 `ScoreboardStateSchema` 新增 `courtNumber: z.number().int().positive().nullable().default(null)`，並把 `courtNumber: number | null` 併入 `MatchSettings`。**SHALL NOT** bump storage key
+- [x] M37.3 RED: 於 `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補 it「UNDO 與 RESET 後保留 courtNumber，不退回 null」——`courtNumber: 3`、比賽進行中且 `history.length > 0` → dispatch UNDO 後 `courtNumber === 3`，再 dispatch RESET 後仍為 `3`。確認紅燈並貼出輸出。**真紅燈**：`expected undefined to be 3`（`createInitialState` 尚未帶入 `courtNumber`）
+- [x] M37.4 GREEN: `nextjs-pickball/lib/scoreboard/reducer.ts` 的 `createInitialState()` 與 `settingsOf()` 帶入 `courtNumber`（與 `matchId` 同一條 `MatchSettings` 路徑，SHALL NOT 於任何 case 分支自行複製欄位）
+- [x] M37.5 RED: 於 `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts` 補 it「seed 帶入該場次的場地編號」——回合含場地編號為 3 的場次 → `buildMatchSlotSeed(round, match).courtNumber === 3`。確認紅燈並貼出輸出。**真紅燈**：`expected null to be 3`（`buildMatchSlotSeed` 尚未帶入 `match.courtNumber`）
+- [x] M37.6 GREEN: `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 的 `buildMatchSlotSeed()` 由 `match.courtNumber` 帶入 `courtNumber`
+- [x] M37.7 RED: 於 `nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補 it「分槽 write 後 read 可取回 courtNumber」——寫入 `courtNumber: 3` 的槽 → `readMatchSlot` 取回的 `courtNumber === 3`（證明新欄位真的落盤而非被 zod 剝除）。**若寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈。**regression guard**：courtNumber 已在 M37.2/M37.4/M37.6 落地，寫下當下即綠；以 mutation 驗證（暫時拿掉 schema 的 `courtNumber` 欄位）證明本 it 與另兩筆既有 it 轉紅，還原後全綠
+- [x] M37.8 REFACTOR: 確認 `courtNumber` 的保留只透過 `MatchSettings` 一條路徑、`buildMatchSlotSeed` 內只有一處決定場地編號，且未在 `lib/scoreboard/` 內出現任何對 `matchmaker:round:v1` 的讀取（無壞味道則註記 skipped）。**skipped**：`grep -rn "matchmaker:round:v1" lib/scoreboard/` 無結果；`courtNumber` 只在 `reducer.ts` 的 `createInitialState`／`settingsOf`（經 `MatchSettings`）與 `scoreboard-binding.ts` 的 `buildMatchSlotSeed` 各一處決定，無重複邏輯
 
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
