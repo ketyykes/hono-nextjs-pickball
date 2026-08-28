@@ -8,6 +8,7 @@ import {
 	submitScore as submitScorePure,
 	SUBMIT_SCORE_FAILURE_CODE,
 } from "@/lib/matchmaker/round";
+import { clearDiscardedMatchSlots } from "@/lib/matchmaker/scoreboard-binding";
 import type { CreateRoundInput, CreateRoundResult, ResetIncompleteMatchesResult, SubmitScoreResult } from "@/lib/matchmaker/round";
 import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
@@ -170,13 +171,21 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	// 重排本輪尚未比賽的人（design Open Questions 2d）：resetIncompleteMatches 回傳值
 	// 刻意不含 restCount patch（重排不是本輪結束，見 round.ts 該函式的註解），本函式因此
 	// 只需 dispatch 新回合，不需要像 generateRound 那樣額外套用休息結算。
+	//
+	// 先保留 dispatch 前的 state.round（重排前回合）：resetIncompleteMatchesPure 成功時
+	// 保證呼叫當下 state.round 不為 null（否則會回傳 NO_ROUND 失敗），但型別上
+	// 仍是 Round | null，故在此以區域變數收斂——清槽（round-lifecycle 的清槽
+	// Requirement）需要「重排前」與「重排後」兩份回合比對出被丟棄的場次 id，
+	// 清除範圍的判斷只在 clearDiscardedMatchSlots 一處定義，本函式只負責接線。
 	function resetIncompleteMatches(): ResetIncompleteMatchesResult {
-		const result = resetIncompleteMatchesPure(state.round, players, {
+		const previousRound = state.round;
+		const result = resetIncompleteMatchesPure(previousRound, players, {
 			newMatchId: () => crypto.randomUUID(),
 		});
 
-		if (result.ok) {
+		if (result.ok && previousRound !== null) {
 			dispatch({ type: "RESET_INCOMPLETE_MATCHES", round: result.round });
+			clearDiscardedMatchSlots(previousRound, result.round);
 		}
 
 		return result;

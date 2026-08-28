@@ -5,6 +5,8 @@ import { createRound, submitScore, SUBMIT_SCORE_FAILURE_CODE } from "@/lib/match
 import { readRound, readHistory, writeRound, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { CreateRoundResult, ResetIncompleteMatchesResult, SubmitScoreResult } from "@/lib/matchmaker/round";
 import type { Player } from "@/lib/matchmaker/types";
+import { writeMatchSlot, readMatchSlot } from "@/lib/scoreboard/match-slots";
+import { createInitialState } from "@/lib/scoreboard/reducer";
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位（沿用 round.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -326,6 +328,33 @@ describe("useRoundStore", () => {
 		});
 		expect(failAllCompletedResult?.ok).toBe(false);
 		expect(result.current.round).toBe(roundAfterComplete);
+	});
+
+	// 不在 test-plan 內：本 repo TDD 規範要求 hooks/** 的行為邏輯模組另有 hook 層把關
+	// （round-lifecycle 的清槽驗收錨點在 lib/matchmaker/scoreboard-binding.test.ts，
+	// 此處只驗證 useRoundStore 是否真的把重排前後的回合接線進 clearDiscardedMatchSlots，
+	// 殺「清槽呼叫被拿掉」或「忘記在 dispatch 前保留重排前的回合參考」兩類變異）。
+	it("resetIncompleteMatches 成功時清除被丟棄場次的計分板槽（殺清槽呼叫被拿掉的變異）", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1 });
+		});
+		const originalMatchId = result.current.round!.matches[0].id;
+		writeMatchSlot({
+			...createInitialState({ matchId: originalMatchId }),
+			matchId: originalMatchId,
+			status: "playing",
+		});
+		expect(readMatchSlot(originalMatchId)).not.toBeNull();
+
+		act(() => {
+			result.current.resetIncompleteMatches();
+		});
+
+		expect(readMatchSlot(originalMatchId)).toBeNull();
 	});
 
 	it("送出比分後 history 確實持久化到 localStorage（殺 write effect 依賴陣列改 [] 或整個 effect 被刪除的變異）", () => {

@@ -246,8 +246,8 @@ Implementer 自述做了 10 次 mutation／0 存活。Stage 2 **未採信、獨�
 ## 6. 清除範圍（`lib/matchmaker/scoreboard-binding.ts` 與 M4 的回合流程）
 Depends on: §1、§5
 
-- [ ] 6.1 RED: 補 it「重設本輪只清除未完成場次的槽且不動獨立槽」——`m1` 已完成、`m2` 未完成有槽 → 重設後 `m2` 條目被移除、`m1` 的比分／評分／歷史不變、`scoreboard:current:v1` 未被觸碰。確認紅燈
-- [ ] 6.2 GREEN: 在 §0.3 找到的「重設／重排本輪」流程（`hooks/useRoundStore.ts` 的 `resetIncompleteMatches()`，內部委派 `round.ts` 的 `resetIncompleteMatches(round, players, { newMatchId })`）尾端追加清槽；清除範圍**僅限**被重排掉的未完成場次
+- [x] 6.1 RED: 補 it「重設本輪只清除未完成場次的槽且不動獨立槽」——`m1` 已完成、`m2` 未完成有槽 → 重設後 `m2` 條目被移除、`m1` 的比分／評分／歷史不變、`scoreboard:current:v1` 未被觸碰。確認紅燈（真紅：`clearDiscardedMatchSlots is not a function`）。commit 見下
+- [x] 6.2 GREEN: 在 §0.3 找到的「重設／重排本輪」流程（`hooks/useRoundStore.ts` 的 `resetIncompleteMatches()`，內部委派 `round.ts` 的 `resetIncompleteMatches(round, players, { newMatchId })`）尾端追加清槽；清除範圍**僅限**被重排掉的未完成場次。實作為 `scoreboard-binding.ts` 新增具名純函式 `clearDiscardedMatchSlots(previousRound, nextRound)`（以兩份回合比對出消失的 matchId，委派 `clearMatchSlots`），`useRoundStore.ts` 只負責在 `result.ok` 時接線呼叫；另補 hook 層把關測試（TDD 規範要求、不在 test-plan 內）
 - [ ] 6.3 RED: 於 `nextjs-pickball/lib/matchmaker/storage.test.ts` **更新 M4 既有的 it**「重置只移除列舉的 key，不影響 scoreboard 資料」——改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」，並把斷言擴為：預置 `matchmaker:roster:v1`／`matchmaker:round:v1`／`matchmaker:history:v1`／`scoreboard:matches:v1` 與 `scoreboard:current:v1`，呼叫 `resetMatchmakerData()` 後前四者皆被移除、`scoreboard:current:v1` 仍在（`player-roster` delta 的「重置只清除列舉範圍內的 key」Scenario）。確認紅燈（第四個 key 尚未在清單中）並貼出輸出
 - [ ] 6.4 GREEN: `nextjs-pickball/lib/matchmaker/storage.ts` 的列舉清單 `RESET_KEYS`（`resetMatchmakerData()` 亦在同檔）加入分槽 key，字面值 **import 自** §1.2 的 `MATCH_SLOTS_KEY`（`lib/scoreboard/match-slots.ts`），SHALL NOT 在 matchmaker 側再寫一次字串
 - [ ] 6.5 RED: 於 `scoreboard-binding.test.ts` 補 it「重置名單清除全部場次槽但保留獨立槽」——預置多場條目 → 走重置名單流程 → 分槽 key 的全部條目被清除、`scoreboard:current:v1` 未被觸碰。**若因 6.4 已使整個分槽 key 被移除而寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（把分槽 key 自清單移除看紅、還原看綠）；**SHALL NOT 為了製造紅燈而在重置流程尾端另寫一次清空呼叫**——`resetMatchmakerData()` 的清除範圍只能有一個定義處（`player-roster` delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）

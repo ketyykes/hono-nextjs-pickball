@@ -1,5 +1,5 @@
 import { createInitialState } from "../scoreboard/reducer";
-import { readMatchSlot, writeMatchSlot } from "../scoreboard/match-slots";
+import { readMatchSlot, writeMatchSlot, clearMatchSlots } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
 import type { ScoreboardState } from "../scoreboard/types";
 import type { Round, RoundMatch } from "./round-types";
@@ -181,4 +181,21 @@ export function isTargetScoreLocked(round: Round, slots: MatchSlots): TargetScor
 
 	const locked = anyMatchStarted || anySlotStarted;
 	return { locked, reason: locked ? TARGET_SCORE_LOCKED_REASON : null };
+}
+
+/**
+ * 重設本輪時清除被丟棄場次的計分板槽（round-lifecycle 的「重排本輪或重置名單時
+ * 清除對應計分板進度」Requirement）：以「重排前」與「重排後」兩份回合比對出消失的
+ * matchId，即被丟棄的未完成場次——`resetIncompleteMatches`（round.ts）只丟棄
+ * `pending` 場次、保留其餘場次原封不動，保留場次的 id 因此仍存在於 nextRound 中，
+ * 不會被本函式誤清。清除範圍只透過 clearMatchSlots 委派，SHALL NOT 觸碰
+ * scoreboard:current:v1（獨立計分板與回合無關）。
+ */
+export function clearDiscardedMatchSlots(previousRound: Round, nextRound: Round): void {
+	const keptMatchIds = new Set(nextRound.matches.map((match) => match.id));
+	const discardedMatchIds = previousRound.matches
+		.map((match) => match.id)
+		.filter((matchId) => !keptMatchIds.has(matchId));
+
+	clearMatchSlots(discardedMatchIds);
 }
