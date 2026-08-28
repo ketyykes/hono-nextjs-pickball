@@ -574,3 +574,55 @@
     1. 派 **§7「計分板 UI 接線」**（tasks 7.1～7.7）。⚠️ 三個必處理的坑（§3 落盤）：(a) soft navigation 會讓綁定 hook 卡死，需在 `Scoreboard` 外層用 `key={matchId ?? "standalone"}` 強制 remount；(b) 合法場次會先閃一幀失效畫面，需有「尚未判定」的呈現狀態；(c) §7.4 的路由常數需先在 `lib/matchmaker/section-nav.ts` **新增一行** `export const MATCHMAKER_ROUTE = "/matchmaker"` 並讓既有的 `MATCHMAKER_SECTION_HREFS` 由它組成（行為零變更，第 5 項已核可）。
     2. §7 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
     3. 全部群組完成後才做 Final Code Review（`opus`）。
+
+13. **⛔ §7 開工前發現的阻塞：綁定模式的「場地標示」目前沒有任何資料來源（2026-08-28，第五棒 leader，尚未解決）**
+
+    **狀態**：§7 **一個 task 都還沒派**，工作區乾淨、HEAD 為 `4ffdbc5`、tasks.md 53／78。M36 與 §6 皆已結案（見第 12 項）。**這不是實作缺陷，是計畫本身的洞**，依 execution-plan 的 Escalation「計畫本身錯誤 → 升級給人類」停在派工**之前**。
+
+    **落差**：`scoreboard` delta 的「對戰場次綁定與失效處理」Requirement 第 224 行明文要求
+
+    > **返回動線**：綁定模式的設定列 MUST 提供「返回對戰」入口導回對戰頁，並 MUST 顯示該場的**場地標示（形如「場地 3」）**，使多場地並行時使用者能確認自己正在計哪一場。
+
+    且其 Scenario「綁定模式顯示場地標示與返回入口」的 GIVEN 是**只帶 `?match=` 一個參數**：
+
+    > - **GIVEN** 以 `/scoreboard?match=<場地 3 的 matchId>` 開啟
+    > - **驗收**：`tests/e2e/specs/scoreboard-binding.spec.ts`，test 名稱「綁定模式顯示場地標示且返回對戰可回到對戰頁」
+
+    但**計分板拿不到場地編號**。leader 已機械確認三件事：
+    - `lib/scoreboard/` 全目錄 `grep -i court` **零命中** —— `ScoreboardStateSchema`（`types.ts:21-39`）的欄位為 `mode`／`scores`／`servingTeam`／`serverNumber`／`isFirstServiceOfGame`／`history`／`status`／`winner`／`firstServer`／`targetScore`／`matchId`，**沒有場地編號**。
+    - `buildMatchSlotSeed`（§4，`lib/matchmaker/scoreboard-binding.ts`）`grep courtNumber` **零命中** —— 它收得到 `match.courtNumber`（§0 對齊表已記載此欄位名），但沒有寫進 seed；即使寫了，zod 物件預設會**剝除**未知欄位，落盤時會被丟掉。
+    - Decision 2 明文**禁止**計分板自行讀 `matchmaker:round:v1` 反查（「會讓 `scoreboard` capability 反向相依於 matchmaker 的回合模型」）。
+
+    ⇒ 三條路全斷：**槽裡沒有、seed 不帶、不准反查**。§7.3／§7.4 的驗收錨點在現況下**無法滿足**。
+
+    **leader 已排除的替代方案**：
+    - ❌ **改由 URL 傳（`?match=<id>&court=3`）**：直接牴觸上述 Scenario 的 GIVEN（明文只帶 `?match=`），且會讓「場地標示」可被使用者竄改。
+    - ❌ **計分板讀 `matchmaker:round:v1` 取場地編號**：Decision 2 的禁令雖然字面寫的是「來推導目標分數或場次是否存在」，但其理由（避免反向相依於回合 schema）對場地編號**完全同等適用**，屬明顯違反設計意圖。
+    - ❌ **不顯示場地標示**：該句是 MUST，且它是 `prd.md` 13.4「多場地同時計分」的辨識手段；design Open Question 1 也把「場地標示」當成「不顯示球員姓名」的**緩解措施**，拿掉等於同時廢掉兩者。
+
+    **leader 建議的解法（需人類核可後才可執行）**：把場地編號納入落盤狀態。
+
+    具體範圍（已盤點，全部是**重新打開已結案的群組**）：
+    1. `lib/scoreboard/types.ts`：`ScoreboardStateSchema` 新增 `courtNumber: z.number().int().positive().nullable().default(null)`，並把它加進 `MatchSettings`（它必須在 UNDO／RESET 後被保留，與 `matchId` 同理——Decision 6 的失效路徑對它同構）。→ **§2 的範圍**
+    2. `lib/scoreboard/reducer.ts`：`createInitialState()` 與 `settingsOf()` 各加一欄。→ **§2 的範圍**
+    3. `lib/matchmaker/scoreboard-binding.ts`：`buildMatchSlotSeed()` 由 `match.courtNumber` 帶入。→ **§4 的範圍**
+    4. 對應的 RED 測試（`reducer.test.ts`／`storage.test.ts`／`scoreboard-binding.test.ts`），含「舊版資料缺 `courtNumber` 時補為 `null` 且不清除 key」的向後相容測試。
+
+    **為何 leader 判斷此解法「與 delta spec 相容、不需要改 spec」（供人類覆核）**：
+    - 「分數自動保存」Scenario 的措辭是「保存內容**含**分數、發球狀態、history、`mode`、`firstServer`、`targetScore` 與 `matchId`」——**「含」為非窮舉**，多一個欄位不使該句為假。
+    - 同一 Requirement 的**向後相容策略**已明文**預先授權**新增欄位的做法：「往 `ScoreboardStateSchema` 新增欄位時 MUST 以 zod `.default()` 提供預設值……SHALL NOT 因新增欄位而 bump storage key」。本解法逐字照辦。
+    - 「賽前設定與階段鎖定」只說「`matchId` MUST 隨 `mode`、`firstServer`、`targetScore` 一併被視為『重建初始狀態時要原樣帶入』的欄位」，未排除其他欄位。
+
+    **為何 leader 仍不自行裁決而升級（誠實說明）**：
+    - 它動的是**持久化契約**（`ScoreboardStateSchema`），而該 Requirement 自己就用整段篇幅警告此處改壞的失效模式是**靜默的**（使用者重整後分數歸零）。這是本 change 風險最高的一處。
+    - 它需要**重新打開 §2 與 §4 兩個已通過兩階段審查的群組**，而 execution-plan 對「已結案群組的再開啟」沒有任何規範（沒說要不要重跑該組的 Stage 1／Stage 2）。
+    - 誤判的成本不對稱：若人類其實傾向「改 spec 拿掉場地標示」或「§7 先不做這一條、另開 change」，leader 逕行擴充 schema 會製造一個難以回收的既成事實。
+
+    **需要人類決定的三個選項**：
+    - **(A)** 核可上述解法（擴充 `ScoreboardStateSchema` 的 `courtNumber`）。若核可，請一併指示：**§2／§4 是否需要重跑 Stage 1／Stage 2**，或以「§7 的兩階段審查一併涵蓋這四項改動」處理。
+    - **(B)** 改 delta spec：拿掉「場地標示」的 MUST 與其 Scenario（連同 test-plan 的對應列），§7 只做「返回對戰」入口。**代價**：`prd.md` 13.4 的多場地辨識手段消失，且 Open Question 1 的緩解措施失效。
+    - **(C)** 其他做法（例如把場地標示改為顯示 `matchId` 尾碼之類的替代辨識），由人類指定。
+
+    **未受影響、可直接採信的部分**：§0～§6 與 M36 全部結案，56 檔／460 測試全綠、`pnpm -r exec tsc --noEmit` exit 0、工作區乾淨。本阻塞**只影響 §7.3／§7.4（及其後續的 §7.5～§7.7 高度預算量測）**；§7.1／§7.2（失效畫面與 `searchParams` 接線）與 §8、§9 的其餘部分不受此決定影響，但依 execution-plan「群組之間嚴格序列」不得跳過 §7 先做 §8。
+
+    **接續點**：人類就上述 (A)／(B)／(C) 給出裁決後，第六棒 leader 自「§7 計分板 UI 接線」開始，並依第 12 項列出的三個必處理坑（soft navigation 的 `key={matchId ?? "standalone"}`、失效畫面的「尚未判定」狀態、`MATCHMAKER_ROUTE` 具名匯出）執行。
