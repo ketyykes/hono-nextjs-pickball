@@ -314,7 +314,7 @@ Implementer 自述做了 6 次 mutation／0 存活。Stage 2 **未採信、獨�
 ①刪除清槽的 `if (previousRound !== null) { clearDiscardedMatchSlots(...) }` 區塊 →
 `hooks/useRoundStore.test.tsx` 轉紅（`readMatchSlot(originalMatchId)` 未被清除）；
 ②刪除 `dispatch` 該行 → 轉紅（`round.matches[0].id` 未更新為新場次 id）。
-兩次皆已還原並重跑確認回綠、`git status` 乾淨。commit `2d4c3e1`。
+兩次皆已還原並重跑確認回綠、`git status` 乾淨。commit `3acdfa8`。
 
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
