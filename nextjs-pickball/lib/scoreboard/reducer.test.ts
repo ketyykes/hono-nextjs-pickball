@@ -212,6 +212,19 @@ describe("scoreboardReducer — UNDO", () => {
 		const resetState = scoreboardReducer(undone, { type: "RESET" });
 		expect(resetState.matchId).toBe("m1");
 	});
+
+	it("UNDO 與 RESET 後保留 courtNumber，不退回 null", () => {
+		let state = createInitialState({ courtNumber: 3 });
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+		// courtNumber 與 matchId 的失效路徑同構：UNDO 以「重建初始 state 後 replay」實作，
+		// 若未帶入 courtNumber 會在使用者按下 Undo 的瞬間靜默清掉場地標示
+		expect(undone.courtNumber).toBe(3);
+
+		const resetState = scoreboardReducer(undone, { type: "RESET" });
+		expect(resetState.courtNumber).toBe(3);
+	});
 });
 
 describe("scoreboardReducer — RESET", () => {
