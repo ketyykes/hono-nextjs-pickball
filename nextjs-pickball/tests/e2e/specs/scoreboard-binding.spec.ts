@@ -109,4 +109,56 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		await page.getByRole("link", { name: "返回對戰" }).click();
 		await expect(page).toHaveURL(/\/matchmaker$/);
 	});
+
+	// design Decision 8：綁定模式設定列組成改變（少三顆按鈕、多場地標示與返回入口），
+	// 既有的零捲動測試只驗過獨立模式 URL，不會自動覆蓋綁定 URL，故需在此重跑一次。
+	test("綁定模式多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見", async ({
+		page,
+	}) => {
+		await seedMatchSlot(page, "m1");
+
+		const viewports = [
+			{ width: 390, height: 844 }, // 手機直向
+			{ width: 844, height: 390 }, // 手機橫向
+			{ width: 768, height: 1024 }, // 平板直向
+			{ width: 1024, height: 600 }, // 桌機臨界
+		];
+		for (const vp of viewports) {
+			await page.setViewportSize(vp);
+			await page.goto("/scoreboard?match=m1");
+			await expect(page.getByText("我方", { exact: true })).toBeVisible();
+
+			if (vp.width > vp.height) {
+				await expect(
+					page.getByRole("status").filter({ hasText: "建議橫向使用" }),
+				).toBeHidden();
+			}
+
+			const { scrollHeight, clientHeight } = await page.evaluate(() => ({
+				scrollHeight: document.scrollingElement!.scrollHeight,
+				clientHeight: document.scrollingElement!.clientHeight,
+			}));
+			expect(
+				scrollHeight,
+				`${vp.width}x${vp.height} 不應有垂直捲動`,
+			).toBeLessThanOrEqual(clientHeight + 1);
+
+			const coreButtons = [
+				page.getByRole("button", { name: /我方贏這一球/ }),
+				page.getByRole("button", { name: /對方贏這一球/ }),
+				page.getByRole("button", { name: "撤銷上一分" }),
+				page.getByRole("button", { name: "重置比賽" }),
+			];
+			for (const button of coreButtons) {
+				const box = await button.boundingBox();
+				expect(box, `${vp.width}x${vp.height} 按鈕應可見`).not.toBeNull();
+				if (box) {
+					expect(box.y).toBeGreaterThanOrEqual(0);
+					expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+					expect(box.x).toBeGreaterThanOrEqual(0);
+					expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+				}
+			}
+		}
+	});
 });
