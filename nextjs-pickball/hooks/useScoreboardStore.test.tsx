@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { StrictMode } from "react";
 import { renderHook, act } from "@testing-library/react";
-import { useScoreboardStore } from "./useScoreboardStore";
+import { useScoreboardStore, type ScoreboardBindingStatus } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
 import { MATCH_SLOTS_KEY, writeMatchSlot } from "@/lib/scoreboard/match-slots";
 import { createInitialState } from "@/lib/scoreboard/reducer";
@@ -157,6 +157,23 @@ describe("useScoreboardStore", () => {
 		// 落盤斷言必須到欄位層級：matchId 真的被序列化寫進分槽（見 8-C）
 		expect(slots.m1.matchId).toBe("m1");
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+
+	// §7.0b：帶 matchId 時判定發生在 read effect（paint 之後），若初值直接設為
+	// missing，合法綁定場次會先閃一幀「場次已失效」畫面。此 test 在 render 階段
+	// （effect 執行前）同步記錄 bindingStatus，藉此驗證首次 render 的暫定值。
+	it("帶 matchId 時首次 render 的綁定狀態為 pending 而非 missing", () => {
+		writeMatchSlot({ ...createInitialState({ targetScore: 11 }), matchId: "m1" });
+
+		const renderedStatuses: ScoreboardBindingStatus[] = [];
+		renderHook(() => {
+			const [, , bindingStatus] = useScoreboardStore("m1");
+			// 於 render 階段（非 effect）同步記錄，第一筆即為 effect 執行前的暫定值
+			renderedStatuses.push(bindingStatus);
+			return bindingStatus;
+		});
+
+		expect(renderedStatuses[0]).toBe("pending");
 	});
 
 	it("matchId 無對應槽時回報 missing 且不建立新條目", () => {
