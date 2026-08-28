@@ -133,6 +133,12 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 					targetScore={state.targetScore}
 					locked={locked}
 					isFocusMode={focusMode}
+					// 綁定模式的判斷用頁面傳入的 matchId prop 而非 state.matchId：
+					// prop 在 mount 當下即已知，state.matchId 要等 read effect
+					// HYDRATE 後才會有值，用 prop 可避免 pending 期間短暫顯示
+					// 獨立模式的設定列
+					matchId={matchId}
+					courtNumber={state.courtNumber}
 					onModeChange={(mode) => dispatch({ type: "SET_MODE", mode })}
 					onFirstServerChange={(team) => dispatch({ type: "SET_FIRST_SERVER", team })}
 					onTargetScoreChange={(targetScore) =>
