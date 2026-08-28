@@ -644,3 +644,18 @@
     機械盤點這四條路徑。
 
     落盤為 tasks.md 的 **M37** 節（八個 task）。接續順序：M37 → §7 → §8 → §9 → Final Code Review。
+
+15. **M37 完成兩階段審查（2026-08-28，第六棒 leader）**——tasks.md **61／86** 勾選（原 78 項＋M37 八項＋§7 三項＋§8 兩項），前端 **56 檔／466 測試全綠**、`pnpm -r exec tsc --noEmit` exit 0、工作區乾淨。
+
+    **Stage 1（Spec Reviewer, sonnet）判定 `PASS`**：四個新增 it 名稱與 task 文字逐字相符；未 bump storage key；未觸碰 delta spec 與主 spec；`grep -rn "matchmaker:round:v1" lib/scoreboard/` 無命中（Decision 2 的單向相依成立）；既有 it 名稱與斷言均未被弱化（對既有測試檔的改動純為型別補欄 `courtNumber: null`）；M37.7 的 regression guard 標註經 `git show 19cd142^:...types.ts` 機械複驗**屬實**。
+
+    **Stage 2（Code-Quality Reviewer, opus）判定 `PASS`（補測後）**：**未採信 Implementer 自述的「1 組／0 存活」，獨立重做 28 組，實測 4 組真缺口**（第八度實證自述不可採信）：
+    - **M4／M5／M6**：`z.number().int().positive()` 的三個約束**完全零覆蓋**——放寬成 `z.any()` 全套 464 測試無一轉紅。補 it「courtNumber 不合法的分槽條目被逐筆丟棄，合法者保留」，以 `0`／`-1`／`2.5`／`"3"` 四種值逐一釘住，並同時涵蓋「缺 `courtNumber` 但也缺其他欄位」的逐筆降級（`droppedCount === 5`）。
+    - **M13（紅得不對）**：既有 it 的 `makeRound()` 其 `matches` 為**空陣列**，`round.matches[0]` 讀到 `undefined` 才轉紅——這不是「分辨得出該場與第一場」，正是本專案反覆出現的「只取第一筆零覆蓋」。補 it「多場次時 seed 取該場自己的場地編號，而非回合的第一場」（兩場 `courtNumber` 為 1／4，雙向斷言）。
+    - **M27**：`ensureMatchSlot` 回傳既有槽時抹掉 `courtNumber` 完全無人察覺——既有 it 的 fixture 兩邊 `courtNumber` 皆為 `null`，`expect(result).toEqual(existing)` 對該欄位**零偵測力**。fixture 改為 `courtNumber: 3` 並補逐欄斷言（it 名稱未動）。
+    - 判定等價／不可達而不補測：`?? null` → `|| null`（差異只在 `0`，而 `positive()` 已排除）；overrides 與外層 spread 兩處同寫（外層必勝、不可觀測，且真正危險的**語句順序反轉**已轉紅）；`writeScoreboard` 獨立槽路徑剝除 `courtNumber`（該路徑上 `courtNumber` 恆為 `null`）。
+    - commit：`7f4f1c1`（補測，未動生產程式碼）／`bd32cf1`（落盤結論）。
+
+    **leader 對 Stage 2 升級項的裁決**：
+    1. 「讓 `buildMatchSlotSeed` 一律走 `createInitialState` 的 overrides（連 `matchId` 一起），使『兩處寫』在結構上不可能」——**否決**。§4 的 Stage 2 已裁決過**相反方向**（移除 overrides 內冗餘的 `matchId`，理由是「兩處寫同一件事會分歧」），現在回頭改回去等於推翻一個已結案的審查結論，且該 mutation 本身不可觀測（無行為差異）。維持現狀，以既有註解為防護。
+    2. 「`ScoreboardStateSchema.matchId` 的 `z.string()` 約束同樣未被釘住」——**認可為事實但不處理**。屬 §2／§4 舊帳，coordinator 已明令不重跑該兩組，且 `matchId` 的失效模式與 `courtNumber` 不同（`matchId` 只作為 map 的 key 使用，型別放寬不會造成靜默資料損壞）。記錄於此供日後參考。
