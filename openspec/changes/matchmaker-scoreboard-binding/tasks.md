@@ -253,6 +253,55 @@ Depends on: §1、§5
 - [x] 6.5 RED: 於 `scoreboard-binding.test.ts` 補 it「重置名單清除全部場次槽但保留獨立槽」——預置多場條目 → 走重置名單流程 → 分槽 key 的全部條目被清除、`scoreboard:current:v1` 未被觸碰。**若因 6.4 已使整個分槽 key 被移除而寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（把分槽 key 自清單移除看紅、還原看綠）；**SHALL NOT 為了製造紅燈而在重置流程尾端另寫一次清空呼叫**——`resetMatchmakerData()` 的清除範圍只能有一個定義處（`player-roster` delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）。**寫下當下即綠**（如實標註為 regression guard）：已補 mutation 驗證，把 `RESET_KEYS` 的 `MATCH_SLOTS_KEY` 移除後此 it 真紅（`readMatchSlot("m1")` 收到槽內容而非 `null`），還原後回綠
 - [x] 6.6 REFACTOR: skipped——已用 `grep -rn "clearMatchSlots\|clearAllMatchSlots\|MATCH_SLOTS_KEY\|removeItem"` 掃過 `lib/`、`hooks/`、`components/`（排除 `.test.`），確認：①「重設本輪」路徑只有 `scoreboard-binding.ts` 的 `clearDiscardedMatchSlots` 一處呼叫 `clearMatchSlots`；②「重置名單」路徑只有 `storage.ts` 的 `RESET_KEYS`（含 `MATCH_SLOTS_KEY`）一處列舉範圍；`lib/scoreboard/storage.ts` 另有一處 `clearMatchSlots([matchId])`，那是 scoreboard 內部既有邏輯（非本 change 新增、不在本組範圍），不構成第二個「重設本輪」或「重置名單」的清除範圍定義處。兩條路徑清除範圍各自只有一處定義，無壞味道
 
+### §6 Stage 2（Code-Quality Reviewer）獨立 mutation 結果
+
+Implementer 自述做了 6 次 mutation／0 存活。Stage 2 **未採信、獨立重做 40 組**
+（含反向 mutation：把 guard 誤加到不該加的地方、交換兩個來源、交換兩條語句的順序），
+**第一輪 35 組存活 10 組**；補測後重跑，40 組中僅餘 7 組存活，且全部判定為等價或超出本組範圍。
+
+**已由 Stage 2 補測封住（3 組）**——新增 3 個 it，並修掉 1 條恆真斷言
+（皆為偵測力補強，不動生產程式碼、不改任何既有 it 名稱）：
+
+- 「同時丟棄多場時每一場的槽都被清除」→ 封住 `clearMatchSlots(discardedMatchIds.slice(0, 1))`
+  與 `.slice(-1)`（既有 it 只有 `m2` 一場被丟棄，「只處理第一筆／最後一筆」無從分辨）
+- 「被丟棄的場次不是 pending 時同樣清除其槽」→ 封住「在 `clearDiscardedMatchSlots` 內
+  另依 `match.status === "pending"` 再判定一次清除範圍」的反向 mutation
+  （那會讓「決定清哪些槽」出現第二個定義處，違反 spec 的單一定義處要求）
+- 「沒有場次被丟棄時不清除任何槽」→ 邊界（`previousRound` 與 `nextRound` 相同），
+  封住 filter 恆真與「kept 集合永遠為空」
+- 恆真斷言修正：既有 it 內 `expect(nextRound.matches[0]).toEqual(m1)` 中
+  `nextRound.matches[0]` 與 `m1` 是**同一個物件參考**，該斷言永遠成立、零偵測力。
+  改為與呼叫前的 `structuredClone(m1)` 比對後，「就地竄改保留場次的 status／scores」
+  兩組 mutation 由存活轉紅。
+
+**判定為等價、刻意不補測（6 組）**：
+
+- `clearMatchSlots([...discardedMatchIds].sort())` 與 `.reverse()`——`clearMatchSlots`
+  以 `delete slots[matchId]` 逐一移除，走訪順序不影響最終 map，語意等價。
+- 清單為空時提前 `return`（跳過 `clearMatchSlots([])`）——公開讀取 API
+  （`readMatchSlots`／`readMatchSlot`）的結果完全相同，差別僅在分槽 key 原本不存在時
+  現行實作會寫入一個空物件 `{}`。無 requirement 涵蓋此位元層差異，判定等價
+  （另註：此路徑從 hook 不可達，`resetIncompleteMatchesPure` 在無 pending 場次時回 `NO_PENDING_MATCH` 失敗）。
+- hook 內 `dispatch` 與 `clearDiscardedMatchSlots` **交換順序**——`clearMatchSlots` 全程包在
+  try/catch 內、`hasLocalStorage()` 亦不拋錯，兩者無法互相影響；`dispatch` 不同步變更
+  `state`，清槽讀到的仍是同一份參考。無可觀察差異，等價。
+- hook 條件移除 `previousRound !== null`——`resetIncompleteMatchesPure` 在 `round === null`
+  時必回 `ok: false`，該條件為不可達分支（見下方「升級項」）。
+- hook 內改為呼叫時才取 `state.round!`——`state` 為該次 render 的捕獲值，`dispatch` 不會就地
+  改寫，與事先取區域變數等價。
+
+**存活但超出本組範圍（1 組）**：移除 `resetMatchmakerData()` 的 `hasLocalStorage()` 守門仍全綠。
+該守門為 M1 既有程式碼、非本組新增（本組只改 `RESET_KEYS` 的內容），且 happy-dom 下
+`window.localStorage` 恆存在，單元層無法造出反例。不在本組補測範圍。
+
+**升級給 leader 的觀察（不阻擋，未自行修改生產程式碼）**：
+`hooks/useRoundStore.ts` 的 `if (result.ok && previousRound !== null)` 中，
+`previousRound !== null` 為**不可達分支**（純函式在 `round === null` 時必回 `ok: false`）。
+它同時守住 `dispatch` 與清槽兩條語句——若日後純函式契約改變而出現
+「`ok: true` 但 `previousRound === null`」，成功的重排會**連 `dispatch` 一起被靜默跳過**，
+屬於「遮蔽真實錯誤」而非單純的型別收斂。較安全的等價寫法是條件維持 `result.ok`、
+在呼叫處以非空斷言收斂型別。此為生產程式碼行為變更，不在 Stage 2 授權範圍，留待裁決。
+
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
 

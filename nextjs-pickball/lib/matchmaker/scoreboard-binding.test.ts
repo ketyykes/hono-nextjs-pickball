@@ -538,12 +538,17 @@ describe("scoreboard-binding", () => {
 		writeMatchSlot(m2Slot);
 		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
 
+		// 先取「呼叫前」的深拷貝：nextRound.matches[0] 與 m1 是同一個物件參考，
+		// 直接 expect(nextRound.matches[0]).toEqual(m1) 是恆真斷言、零偵測力。
+		const m1Before = structuredClone(m1);
+
 		clearDiscardedMatchSlots(previousRound, nextRound);
 
 		expect(readMatchSlot("m2")).toBeNull();
 		expect(readMatchSlot("m1")).toEqual(m1Slot);
-		// m1 的比分／評分／歷史（存於 match 物件本身）不受清槽影響。
-		expect(nextRound.matches[0]).toEqual(m1);
+		// m1 的比分／評分／歷史（存於 match 物件本身）不受清槽影響——與呼叫前的深拷貝比對，
+		// 才擋得住「就地竄改 match 物件」的實作。
+		expect(nextRound.matches[0]).toEqual(m1Before);
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 
@@ -563,4 +568,78 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("m2")).toBeNull();
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
+
+	// Stage 2 補（不在 test-plan 內）：既有 it 只有「一場」被丟棄（m2），
+	// 「只處理第一筆」「只處理最後一筆」兩類變異因此完全偵測不到。
+	// 本 it 讓三場同時被丟棄，殺 clearMatchSlots(discardedMatchIds.slice(0, 1))
+	// 與 .slice(-1) 的變異。
+	it("同時丟棄多場時每一場的槽都被清除", () => {
+		const kept = makeMatch({
+			id: "kept",
+			status: "completed",
+			scores: { teamA: 11, teamB: 7 },
+			winner: "teamA",
+			completedAt: "2026-08-27T00:00:00.000Z",
+		});
+		const dropA = makeMatch({ id: "drop-a", status: "pending" });
+		const dropB = makeMatch({ id: "drop-b", status: "pending" });
+		const dropC = makeMatch({ id: "drop-c", status: "pending" });
+		const previousRound = makeRound({ matches: [kept, dropA, dropB, dropC] });
+		// 重排後：保留場次原封不動，另補一場全新 id 的場次（round.ts 以 newMatchId 產生）。
+		const nextRound = makeRound({ matches: [kept, makeMatch({ id: "fresh", status: "pending" })] });
+
+		const keptSlot = { ...createInitialState({ matchId: "kept" }), status: "finished" as const, matchId: "kept" };
+		writeMatchSlot(keptSlot);
+		for (const matchId of ["drop-a", "drop-b", "drop-c"]) {
+			writeMatchSlot({ ...createInitialState({ matchId }), status: "playing" as const, matchId });
+		}
+
+		clearDiscardedMatchSlots(previousRound, nextRound);
+
+		expect(readMatchSlot("drop-a")).toBeNull();
+		expect(readMatchSlot("drop-b")).toBeNull();
+		expect(readMatchSlot("drop-c")).toBeNull();
+		expect(readMatchSlot("kept")).toEqual(keptSlot);
+	});
+
+	// Stage 2 補（不在 test-plan 內）：清除範圍的定義是「兩份回合比對出消失的 matchId」，
+	// SHALL NOT 在本函式再依 match.status 判定一次（那會變成第二個「決定清哪些槽」的地方）。
+	// 本 it 讓被丟棄的場次為 scoring 而非 pending，殺
+	// 「.filter((match) => match.status === "pending")」這類補上多餘 guard 的變異。
+	it("被丟棄的場次不是 pending 時同樣清除其槽", () => {
+		const kept = makeMatch({ id: "kept", status: "pending" });
+		const goneScoring = makeMatch({ id: "gone-scoring", status: "scoring" });
+		const previousRound = makeRound({ matches: [kept, goneScoring] });
+		const nextRound = makeRound({ matches: [kept] });
+
+		writeMatchSlot({ ...createInitialState({ matchId: "gone-scoring" }), status: "playing" as const, matchId: "gone-scoring" });
+		const keptSlot = { ...createInitialState({ matchId: "kept" }), status: "setup" as const, matchId: "kept" };
+		writeMatchSlot(keptSlot);
+
+		clearDiscardedMatchSlots(previousRound, nextRound);
+
+		expect(readMatchSlot("gone-scoring")).toBeNull();
+		expect(readMatchSlot("kept")).toEqual(keptSlot);
+	});
+
+	// Stage 2 補（不在 test-plan 內）：邊界——沒有任何場次消失時不得清掉任何槽，
+	// 殺 filter 恆真（.filter(() => true)）與「來源取反」的變異。
+	it("沒有場次被丟棄時不清除任何槽", () => {
+		const m1 = makeMatch({ id: "m1", status: "pending" });
+		const m2 = makeMatch({ id: "m2", status: "scoring" });
+		const round = makeRound({ matches: [m1, m2] });
+
+		const m1Slot = { ...createInitialState({ matchId: "m1" }), status: "setup" as const, matchId: "m1" };
+		const m2Slot = { ...createInitialState({ matchId: "m2" }), status: "playing" as const, matchId: "m2" };
+		writeMatchSlot(m1Slot);
+		writeMatchSlot(m2Slot);
+		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
+
+		clearDiscardedMatchSlots(round, round);
+
+		expect(readMatchSlot("m1")).toEqual(m1Slot);
+		expect(readMatchSlot("m2")).toEqual(m2Slot);
+		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
+	});
+
 });
