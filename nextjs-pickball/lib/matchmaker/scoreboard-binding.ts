@@ -167,18 +167,18 @@ const TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可�
 
 /**
  * 判定本輪目標分數是否已鎖定（spec「開始計分後鎖定本輪目標分數」）：
- * 任一場次已完成、或任一計分板槽存在且非 `"setup"`，兩者為 OR、任一成立即鎖定。
+ * 任一場次已開始（非 `pending`）、或任一計分板槽存在且非 `"setup"`，兩者為 OR、
+ * 任一成立即鎖定。
  *
- * 本函式不為場次 status 新增轉換規則：「進行中」目前只由計分板槽表達
- * （`status !== "setup"`）。若日後實作讓場次進入 `"scoring"`，該值 MUST 同時被納入
- * 第一條（場次完成／scoring 兩者皆視為已開始），否則兩處會對同一狀態給出相反答案——
- * 目前 MatchStatus 的產生路徑只會寫 pending／completed（round-types.ts 註解），
- * 尚未有測試涵蓋 scoring 分支，故先不擴充，等該分支真的出現時再補紅燈。
+ * 第一條與 `setTargetScore`（round.ts）的拒絕條件方向 MUST 一致：該入口以
+ * `status !== "pending"` 判定是否拒絕變更，因此本判定同樣採 `!== "pending"`，
+ * 而非只認 `"completed"`——spec 明文禁止「該入口拒絕但本判定未鎖」的相反方向，
+ * 兩者的差集精確等於 `status === "scoring"`，故 `scoring` 場次同樣視為已開始。
  */
 export function isTargetScoreLocked(round: Round, slots: MatchSlots): TargetScoreLockResult {
-	const anyMatchFinished = round.matches.some((match) => match.status === "completed");
+	const anyMatchStarted = round.matches.some((match) => match.status !== "pending");
 	const anySlotStarted = Object.values(slots).some((slot) => slot.status !== "setup");
 
-	const locked = anyMatchFinished || anySlotStarted;
+	const locked = anyMatchStarted || anySlotStarted;
 	return { locked, reason: locked ? TARGET_SCORE_LOCKED_REASON : null };
 }
