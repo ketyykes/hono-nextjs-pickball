@@ -177,15 +177,24 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	// 仍是 Round | null，故在此以區域變數收斂——清槽（round-lifecycle 的清槽
 	// Requirement）需要「重排前」與「重排後」兩份回合比對出被丟棄的場次 id，
 	// 清除範圍的判斷只在 clearDiscardedMatchSlots 一處定義，本函式只負責接線。
+	//
+	// `previousRound !== null` 這個型別收斂目前是不可達分支（純函式契約保證 ok 時
+	// previousRound 必不為 null），只用來滿足 clearDiscardedMatchSlots 的參數型別，
+	// 因此判斷範圍只包住清槽這一條語句：dispatch 只依賴 result.ok，不受此收斂牽連。
+	// 這樣一來，若日後純函式契約改變而真的出現「ok 為 true 但 previousRound 為 null」
+	// 的情況，頂多是清槽被跳過，成功的重排仍會照常 dispatch、回合仍會更新——不會因為
+	// 一個本來只為型別安全而設的判斷，把整次成功的重排連同 dispatch 一起靜默吞掉。
 	function resetIncompleteMatches(): ResetIncompleteMatchesResult {
 		const previousRound = state.round;
 		const result = resetIncompleteMatchesPure(previousRound, players, {
 			newMatchId: () => crypto.randomUUID(),
 		});
 
-		if (result.ok && previousRound !== null) {
+		if (result.ok) {
 			dispatch({ type: "RESET_INCOMPLETE_MATCHES", round: result.round });
-			clearDiscardedMatchSlots(previousRound, result.round);
+			if (previousRound !== null) {
+				clearDiscardedMatchSlots(previousRound, result.round);
+			}
 		}
 
 		return result;

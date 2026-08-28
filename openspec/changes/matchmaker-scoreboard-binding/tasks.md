@@ -251,7 +251,7 @@ Depends on: §1、§5
 - [x] 6.3 RED: 於 `nextjs-pickball/lib/matchmaker/storage.test.ts` **更新 M4 既有的 it**「重置只移除列舉的 key，不影響 scoreboard 資料」——改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」，並把斷言擴為：預置 `matchmaker:roster:v1`／`matchmaker:round:v1`／`matchmaker:history:v1`／`scoreboard:matches:v1` 與 `scoreboard:current:v1`，呼叫 `resetMatchmakerData()` 後前四者皆被移除、`scoreboard:current:v1` 仍在（`player-roster` delta 的「重置只清除列舉範圍內的 key」Scenario）。確認紅燈（第四個 key 尚未在清單中）並貼出輸出。真紅：`localStorage.getItem(MATCH_SLOTS_KEY)` 收到內容而非 `null`
 - [x] 6.4 GREEN: `nextjs-pickball/lib/matchmaker/storage.ts` 的列舉清單 `RESET_KEYS`（`resetMatchmakerData()` 亦在同檔）加入分槽 key，字面值 **import 自** §1.2 的 `MATCH_SLOTS_KEY`（`lib/scoreboard/match-slots.ts`），SHALL NOT 在 matchmaker 側再寫一次字串
 - [x] 6.5 RED: 於 `scoreboard-binding.test.ts` 補 it「重置名單清除全部場次槽但保留獨立槽」——預置多場條目 → 走重置名單流程 → 分槽 key 的全部條目被清除、`scoreboard:current:v1` 未被觸碰。**若因 6.4 已使整個分槽 key 被移除而寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（把分槽 key 自清單移除看紅、還原看綠）；**SHALL NOT 為了製造紅燈而在重置流程尾端另寫一次清空呼叫**——`resetMatchmakerData()` 的清除範圍只能有一個定義處（`player-roster` delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）。**寫下當下即綠**（如實標註為 regression guard）：已補 mutation 驗證，把 `RESET_KEYS` 的 `MATCH_SLOTS_KEY` 移除後此 it 真紅（`readMatchSlot("m1")` 收到槽內容而非 `null`），還原後回綠
-- [x] 6.6 REFACTOR: skipped——已用 `grep -rn "clearMatchSlots\|clearAllMatchSlots\|MATCH_SLOTS_KEY\|removeItem"` 掃過 `lib/`、`hooks/`、`components/`（排除 `.test.`），確認：①「重設本輪」路徑只有 `scoreboard-binding.ts` 的 `clearDiscardedMatchSlots` 一處呼叫 `clearMatchSlots`；②「重置名單」路徑只有 `storage.ts` 的 `RESET_KEYS`（含 `MATCH_SLOTS_KEY`）一處列舉範圍；`lib/scoreboard/storage.ts` 另有一處 `clearMatchSlots([matchId])`，那是 scoreboard 內部既有邏輯（非本 change 新增、不在本組範圍），不構成第二個「重設本輪」或「重置名單」的清除範圍定義處。兩條路徑清除範圍各自只有一處定義，無壞味道
+- [x] 6.6 REFACTOR: skipped——已用 `grep -rn "clearMatchSlots\|clearAllMatchSlots\|MATCH_SLOTS_KEY\|removeItem"` 掃過 `lib/`、`hooks/`、`components/`（排除 `.test.`），確認：①「重設本輪」路徑只有 `scoreboard-binding.ts` 的 `clearDiscardedMatchSlots` 一處呼叫 `clearMatchSlots`；②「重置名單」路徑只有 `storage.ts` 的 `RESET_KEYS`（含 `MATCH_SLOTS_KEY`）一處列舉範圍；`lib/scoreboard/storage.ts` 另有一處 `clearMatchSlots([matchId])`，那是 scoreboard 內部既有邏輯（非本 change 新增、不在本組範圍），不構成第二個「重設本輪」或「重置名單」的清除範圍定義處。兩條路徑清除範圍各自只有一處定義，無壞味道（Stage 2 另外找出 `resetIncompleteMatches()` 的 null 判斷作用範圍問題並已於本次完成，見下方「leader 裁決後執行」段落）
 
 ### §6 Stage 2（Code-Quality Reviewer）獨立 mutation 結果
 
@@ -301,6 +301,20 @@ Implementer 自述做了 6 次 mutation／0 存活。Stage 2 **未採信、獨�
 「`ok: true` 但 `previousRound === null`」，成功的重排會**連 `dispatch` 一起被靜默跳過**，
 屬於「遮蔽真實錯誤」而非單純的型別收斂。較安全的等價寫法是條件維持 `result.ok`、
 在呼叫處以非空斷言收斂型別。此為生產程式碼行為變更，不在 Stage 2 授權範圍，留待裁決。
+
+**leader 裁決後執行（行為不變 refactor，非新增 checkbox 項）**：leader 核可上述升級項，
+裁決做法為把 `previousRound !== null` 的判斷範圍**只縮到清槽那一條語句**，`dispatch`
+只依賴 `result.ok`（不採用「呼叫處非空斷言」的寫法——本 repo 生產程式碼禁止使用非空斷言
+`!`）。改動內容：`resetIncompleteMatches()` 原本 `if (result.ok && previousRound !== null)`
+同時守住 `dispatch` 與 `clearDiscardedMatchSlots` 兩條語句，改為 `if (result.ok)` 只包
+`dispatch`，`clearDiscardedMatchSlots` 移到內層 `if (previousRound !== null)`。理由：
+避免日後純函式契約改變、出現「`ok: true` 但 `previousRound === null`」時，成功的重排
+連 `dispatch` 一起被不可達分支靜默吞掉。並在函式上方既有註解補上這段理由。
+既有測試原樣全綠、未改任何測試檔（56 檔／460 測試）。兩次 mutation 驗證：
+①刪除清槽的 `if (previousRound !== null) { clearDiscardedMatchSlots(...) }` 區塊 →
+`hooks/useRoundStore.test.tsx` 轉紅（`readMatchSlot(originalMatchId)` 未被清除）；
+②刪除 `dispatch` 該行 → 轉紅（`round.matches[0].id` 未更新為新場次 id）。
+兩次皆已還原並重跑確認回綠、`git status` 乾淨。commit `2d4c3e1`。
 
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
