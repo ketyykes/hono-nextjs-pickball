@@ -6,6 +6,7 @@ import {
 	mapTeamScores,
 	collectFinishedSubmissions,
 	toSubmitScoreInput,
+	isTargetScoreLocked,
 } from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
@@ -303,5 +304,61 @@ describe("scoreboard-binding", () => {
 		// 最重要的偵測點：11-7 讓第一隊（teamA）勝，橋接寫反時 winner 會變 teamB。
 		expect(manualResult.round.matches[0].winner).toBe("teamA");
 		expect(backfillResult.round.matches[0].winner).toBe("teamA");
+	});
+
+	it("無任何場次完成且無計分板槽時目標分數未鎖定", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
+		const slots: MatchSlots = {};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(false);
+		expect(result.reason).toBeNull();
+	});
+
+	it("任一場次的計分板槽非 setup 時目標分數鎖定", () => {
+		const round = makeRound({
+			matches: [makeMatch({ id: "m1", status: "pending" }), makeMatch({ id: "m2", status: "pending" })],
+		});
+		const slots: MatchSlots = {
+			m1: { ...createInitialState({ matchId: "m1" }), status: "playing" },
+		};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(true);
+		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
+	});
+
+	it("槽存在但仍為 setup 時不視為已開始計分", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
+		const slots: MatchSlots = {
+			m1: { ...createInitialState({ matchId: "m1" }), status: "setup", scores: { us: 0, them: 0 } },
+		};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(false);
+		expect(result.reason).toBeNull();
+	});
+
+	it("已有場次完成時目標分數鎖定，不論比分來源", () => {
+		const round = makeRound({
+			matches: [
+				makeMatch({
+					id: "m1",
+					status: "completed",
+					scores: { teamA: 11, teamB: 7 },
+					winner: "teamA",
+					completedAt: "2026-08-27T00:00:00.000Z",
+				}),
+			],
+		});
+		const slots: MatchSlots = {};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(true);
+		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
 	});
 });
