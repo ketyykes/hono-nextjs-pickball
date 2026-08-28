@@ -75,10 +75,15 @@ describe("scoreboard-binding", () => {
 		expect(seed.scores).toEqual({ us: 0, them: 0 });
 		expect(seed.status).toBe("setup");
 		// 整體比對：除上述三個來源欄位外，其餘（firstServer 的預設值、servingTeam、
-		// serverNumber、空 history…）一律等同 createInitialState。逐欄斷言漏掉的欄位
-		// 被 seed 偷偷覆寫時不會紅，整體比對才擋得住。
+		// serverNumber、空 history、courtNumber…）一律等同 createInitialState。逐欄斷言
+		// 漏掉的欄位被 seed 偷偷覆寫時不會紅，整體比對才擋得住。
 		expect(seed).toEqual(
-			createInitialState({ mode: "doubles", targetScore: 15, matchId: "match-1" }),
+			createInitialState({
+				mode: "doubles",
+				targetScore: 15,
+				matchId: "match-1",
+				courtNumber: match.courtNumber,
+			}),
 		);
 	});
 

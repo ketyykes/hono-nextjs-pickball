@@ -9,6 +9,9 @@ import type { Player } from "./types";
 /**
  * 建立場地區塊「進入計分板」入口所需的 seed：帶入該輪的目標分數與對戰方式，
  * 分數與 history 一律自 0-0、空白起手（見 spec「場地區塊的計分板入口」）。
+ *
+ * courtNumber 取自 match.courtNumber（唯一決定處）：計分板 SHALL NOT 反查
+ * matchmaker:round:v1 來取得場地標示，seed 建立當下就是它唯一的資料來源。
  */
 export function buildMatchSlotSeed(
 	round: Round,
@@ -22,6 +25,7 @@ export function buildMatchSlotSeed(
 		// matchId 只在這裡決定一次：createInitialState 的 matchId 型別為 string | null，
 		// 在此覆寫同時完成型別窄化，故不再重複傳進 overrides——兩處寫同一件事會分歧。
 		matchId: match.id,
+		courtNumber: match.courtNumber,
 	};
 }
 
