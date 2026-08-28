@@ -6,6 +6,9 @@ import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 // roster 的 key 沿用既有的 STORAGE_KEY（storage.ts re-export 自 storage-keys.ts，見 2.4）；
 // round／history 兩個新 key 沒有既存名稱可用，直接自單一來源匯入。
 import { ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
+// 分槽 key 取自 match-slots.ts 的具名匯出（跨 capability 對外契約），
+// SHALL NOT 在本檔重複寫死字串——見 player-roster delta 的「單一來源」條款。
+import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
 import type { Player } from "./types";
 
 /** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位。 */
@@ -110,11 +113,12 @@ describe("storage", () => {
 		expect(() => writeRoster([])).not.toThrow();
 	});
 
-	it("重置只移除列舉的 key，不影響 scoreboard 資料", () => {
+	it("重置只移除列舉的四個 key，不影響獨立計分板資料", () => {
 		const roster = { version: 1, players: [makePlayer()] };
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(roster));
 		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ round: true }));
 		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ history: true }));
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify({ "match-1": { untouched: true } }));
 		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
 
 		resetMatchmakerData();
@@ -122,6 +126,7 @@ describe("storage", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBeNull();
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 });
