@@ -381,6 +381,35 @@ Depends on: §3
 - [x] 7.6 GREEN: 依量測結果調整綁定模式設定列的高度預算。**若 7.5 寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證（例如暫時把場地標示改為兩行看是否變紅），SHALL NOT 改斷言偽造紅燈。**結果**：無需調整高度預算（既有 flex 版面本就吸收綁定模式少三顆按鈕、多場地標示與返回入口的高度差）。標註為 regression guard，並以 mutation 驗證偵測力：暫時將場地標示撐高 `height: 400px`，5 個 browser project 全數轉紅（`Expected: <= 390, Received: 543`），還原後恢復全綠
 - [x] 7.7 REFACTOR: 確認綁定模式與獨立模式共用同一個設定列容器與間距係數，沒有為綁定模式另起一套樣式；`MatchBindingNotice` 不含任何判斷邏輯（無壞味道則註記 skipped）。**結果**：兩模式共用同一個 `flex flex-wrap items-center gap-3 border-b border-border px-4 py-2` 容器，僅內部子項目以 `isBound` 分流，無另立樣式集；`MatchBindingNotice` 為純 JSX 呈現，不含任何 if/判斷邏輯。無壞味道，**skipped**
 
+### §7 Stage 2（Code-Quality Reviewer）審查補洞
+
+Stage 2 獨立重做 **39 組 mutation**（17 組 unit ＋ 22 組 E2E，全數還原並確認回綠），
+**9 組存活**。其中 6 組為真缺口、已補測封住並重跑確認轉紅，3 組判定為等價變異。
+補測**只動測試檔**，未變更任何生產程式碼行為（無偏離）。
+
+真缺口（已補測）：
+
+| 存活的 mutation | 缺口 | 處置 |
+|---|---|---|
+| 初值三元改為恆 `"pending"` | `standalone` 半邊只在 effect 後被斷言，初值零覆蓋 | 新增 it「未帶 matchId 時首次 render 的綁定狀態為 standalone」 |
+| `Array.isArray(rawMatch)` 收斂改為 `rawMatch as string` | `?match=a&match=b` 零覆蓋 | 新增 test「match query 重複出現時取第一個值仍能綁定該場次」 |
+| 場地標示改為常數 `場地 3` | 測試資料的 `courtNumber` 剛好等於 mutation 常數 3 | seed 改用 `courtNumber: 7`（與 `targetScore` 刻意相異） |
+| 「本輪 N 分制」改為常數 `本輪 15` | 同上，`targetScore` 剛好等於 15 | seed 改用 `targetScore: 21` |
+| `courtNumber !== null` 改為恆真 | `courtNumber === null` 的綁定分支零覆蓋——`seedMatchSlot` 的 `?? 3` 連 null 都表達不出來 | helper 改用 `in` 判斷；新增 test「綁定模式 courtNumber 為 null 時不渲染場地標示且維持零捲動」 |
+| 刪除失效畫面標題與說明段落 | 7.1 的 test 只斷言兩個出口，「顯示繁中說明」未被斷言 | 於既有 test（名稱不變）補文案正向斷言；另新增 test「場次失效畫面多 viewport 零捲動」——說明畫面自成 `h-dvh` 容器，7.5 完全涵蓋不到 |
+
+判定為等價變異（不補測，理由如下，一併見「升級項」）：
+
+- **write effect guard 拿掉 `pending` 那一半**（7.0c 明文 SHALL NOT）：以 stderr 探針實測整份
+  `useScoreboardStore.test.tsx`，`pending` 僅與 `hasHydratedRef.current === false` 同時出現
+  （16 筆 `bound true`／2 筆 `missing true`／4 筆 `pending false`／10+10 筆 `standalone`），
+  即該半邊在現行 effect 結構下**不可達**，屬 defense-in-depth。`missing` 那一半反之可達，
+  拿掉即轉紅。
+- read effect 內的 `setBindingStatus("standalone")`：初值已是 `standalone`，此呼叫冗餘。
+  但與上一列的初值 mutation 互相掩蓋——兩者**同時**改壞會使獨立模式永不落盤，該組合會轉紅。
+- hook 的 `matchIdParam === undefined` 正規化改為 `?? null`：語意完全相同。
+
+
 ## 8. 對戰頁 UI 接線（例外層 — 純呈現元件，以 E2E 驗收；§8.5～§8.6 為 M5 既有單元測試的更新與其實作）（**例外**：§8.4、§8.6 需改 `hooks/useRoundStore.ts`，該部分屬行為邏輯，MUST 走 TDD 三步，不適用本節的例外層豁免）
 Depends on: §4、§5、§6、§7
 
