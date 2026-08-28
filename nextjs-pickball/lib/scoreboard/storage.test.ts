@@ -87,6 +87,33 @@ describe("storage", () => {
 		expect(loaded?.history).toHaveLength(1);
 	});
 
+	it("舊版資料缺 courtNumber 時補為 null 且不清除 key", () => {
+		// 模擬本次變更前寫入的資料：欄位皆合法，但沒有 courtNumber（M37：場地標示的資料來源）
+		const legacyState = {
+			mode: "doubles",
+			scores: { us: 7, them: 5 },
+			servingTeam: "us",
+			serverNumber: 1,
+			isFirstServiceOfGame: false,
+			history: [{ type: "RALLY_WON", winner: "us" }],
+			status: "playing",
+			winner: null,
+			firstServer: "us",
+			targetScore: 11,
+			matchId: null,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+		const loaded = readScoreboard();
+
+		// 缺欄位應由 schema 預設值補上，而非被當成損壞資料
+		expect(loaded?.courtNumber).toBeNull();
+		// 舊資料不得被清除——否則使用者進行中的比賽會在重整後歸零
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+		expect(loaded?.scores).toEqual({ us: 7, them: 5 });
+		expect(loaded?.history).toHaveLength(1);
+	});
+
 	it("matchId 為空字串時視為獨立計分板", () => {
 		// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉
 		// isStandaloneMatchId() 的空字串分支在既有測試下不會轉紅——`/scoreboard?match=`
