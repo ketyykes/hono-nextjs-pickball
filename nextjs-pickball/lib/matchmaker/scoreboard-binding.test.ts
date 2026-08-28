@@ -82,6 +82,16 @@ describe("scoreboard-binding", () => {
 		);
 	});
 
+	it("seed 帶入該場次的場地編號", () => {
+		// M37：計分板不得反查 matchmaker:round:v1，場地標示必須在 seed 建立時一併帶入
+		const round = makeRound();
+		const match = makeMatch({ id: "match-1", courtNumber: 3 });
+
+		const seed = buildMatchSlotSeed(round, match);
+
+		expect(seed.courtNumber).toBe(3);
+	});
+
 	it("已有進度的場次再次進入時保留既有進度不覆蓋", () => {
 		const existing = {
 			...createInitialState({ targetScore: 15, mode: "doubles", matchId: "match-1" }),
