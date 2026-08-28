@@ -196,6 +196,37 @@ Depends on: §4
 - [x] 5.10 GREEN: 實作鎖定判定純函式，輸出布林值與繁體中文的鎖定原因字串（`isTargetScoreLocked`，commit `6729507`）
 - [x] 5.11 REFACTOR: `collectFinishedSubmissions` 的三個過濾條件抽為具名 predicate `isEligibleForBackfill`（`match is RoundMatch` 收斂型別）。鎖定判定的兩個條件已各自具名變數（`anyMatchFinished`／`anySlotStarted`），隊伍對應已由 `mapTeamScores` 單一實作，未發現其餘重複邏輯，故該部分 skipped（commit `d25082e`）
 
+### §5 Stage 2（Code-Quality Reviewer）獨立 mutation 結果
+
+Implementer 自述做了 10 次 mutation／0 存活。Stage 2 **未採信、獨立重做 40 組**（含反向 mutation：
+把 guard 誤加到不該加的地方），**存活 15 組**（其中 M25／M26 兩組因字串取代命中前一個同形條件，
+實為 M07／M08 的重複，去重後為 13 組有效存活）。
+
+**已由 Stage 2 補測封住（12 組）**——新增 7 個 it（皆為偵測力補強，不動生產程式碼、
+不改 §4 的 5 個與 §5 的 8 個驗收錨點 it 名稱）：
+
+- 「多個符合條件的槽一次全數回傳且維持走訪順序」→ 封住「迴圈提早 break」「回傳前重新排序」
+  「只回傳第一筆」三組（既有 it 的預期結果都只有 0 或 1 筆，無從分辨）
+- 「待送出清單的 matchId 取自槽的鍵而非槽內容」→ 封住「改用 `slot.matchId`」
+- 「槽為 0-0 卻已 finished 仍列入，slots 為空時回傳空清單」→ 封住「誤加平手排除的第四條件」，
+  並補上 `slots` 為空物件（迴圈零次）的零覆蓋路徑
+- 「場次為 scoring 尚未完成時仍列入待送出清單」→ 封住「條件三收緊為 `!== "pending"`」
+- 「toSubmitScoreInput 的六個欄位分別取自 submission 與 context」→ 封住「matchId 改取
+  `round.matches[0].id`」，並直接釘住六個輸出欄位（原本只透過 `submitScore` 的結果間接觀察）
+- 「鎖定判定掃描全部場次與全部槽而非只看第一筆」→ 封住「只看第一場」「只看第一個槽」
+  「第二條改為 `=== "playing"`／`=== "finished"`」四組
+- 「槽已不在回合中但非 setup 時仍判定為鎖定」→ 封住「誤加『槽須在回合中』的一致性檢查」，
+  同時把 `isTargetScoreLocked` 對孤兒槽 fail-closed 的取捨明文釘住
+
+**等價 mutation（非缺口，不補測）**：`String(x)` → `String(Number(x))`——`x` 型別已是 `number`，
+兩者輸出恆等。
+
+**仍存活、刻意不補測並升級給 leader 的 1 組**：`isTargetScoreLocked` 第一條由
+`match.status === "completed"` 改為 `!== "pending"` 仍全綠。這正是 spec「相反方向 SHALL NOT
+出現」所指的差集（`scoring` 態時 `setTargetScore` 會拒絕、本判定卻回報未鎖定）。機械驗證確認
+目前 `round.ts` 只寫入 `pending`／`completed`（第 109、895 行），故現況不會發生，
+但缺一道 guard。補測需改變行為，不在 Stage 2 授權範圍。
+
 ## 6. 清除範圍（`lib/matchmaker/scoreboard-binding.ts` 與 M4 的回合流程）
 Depends on: §1、§5
 

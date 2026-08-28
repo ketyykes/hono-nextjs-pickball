@@ -217,6 +217,68 @@ describe("scoreboard-binding", () => {
 		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
 	});
 
+	// 額外補（不在 test-plan 內）：Stage 2 的 mutation 盤點發現「迴圈提早 break」「回傳前重新
+	// 排序」「只回傳第一筆」三種竄改全數存活——既有三個 it 的預期結果都只有 0 或 1 筆，
+	// 無從分辨。此 it 釘住「一次回傳全部符合者」與「維持槽的走訪順序」。
+	it("多個符合條件的槽一次全數回傳且維持走訪順序", () => {
+		const round = makeRound({
+			matches: [makeMatch({ id: "m1" }), makeMatch({ id: "m2" }), makeMatch({ id: "m3" })],
+		});
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 7 } }),
+			m2: makeSlot({ matchId: "m2", status: "finished", scores: { us: 6, them: 11 } }),
+			m3: makeSlot({ matchId: "m3", status: "playing", scores: { us: 3, them: 2 } }),
+		};
+
+		expect(collectFinishedSubmissions(round, slots)).toEqual([
+			{ matchId: "m1", scores: { first: 11, second: 7 } },
+			{ matchId: "m2", scores: { first: 6, second: 11 } },
+		]);
+	});
+
+	// 額外補（不在 test-plan 內）：槽的鍵與槽內容自帶的 matchId 是兩個來源，既有測試中
+	// 兩者恆等，因此「改用 slot.matchId」的竄改存活。鍵才是槽位的真實來源
+	// （writeMatchSlot 以 seed.matchId 為鍵寫入），舊資料內容若不同步不應污染送出對象。
+	it("待送出清單的 matchId 取自槽的鍵而非槽內容", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1" })] });
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "stale-id", status: "finished", scores: { us: 11, them: 9 } }),
+		};
+
+		expect(collectFinishedSubmissions(round, slots)).toEqual([
+			{ matchId: "m1", scores: { first: 11, second: 9 } },
+		]);
+	});
+
+	// 額外補（不在 test-plan 內）：spec 的三個回填條件不含任何比分條件，但既有測試的
+	// finished 槽比分恆為一勝一負，因此「誤加平手排除」這類第四條件會存活。同時補上
+	// slots 為空物件的路徑（迴圈零次），既有 it 均未涵蓋。
+	it("槽為 0-0 卻已 finished 仍列入，slots 為空時回傳空清單", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1" })] });
+		const tiedSlots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 0, them: 0 } }),
+		};
+
+		expect(collectFinishedSubmissions(round, tiedSlots)).toEqual([
+			{ matchId: "m1", scores: { first: 0, second: 0 } },
+		]);
+		expect(collectFinishedSubmissions(round, {})).toEqual([]);
+	});
+
+	// 額外補（不在 test-plan 內）：條件三是「尚未完成」，不是「必須為 pending」。既有測試
+	// 只有 pending 與 completed 兩種場次，把條件三收緊成 `!== "pending"` 會存活——那會讓
+	// scoring 場次（MatchStatus 的第三個合法值）永遠回填不了。
+	it("場次為 scoring 尚未完成時仍列入待送出清單", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "scoring" })] });
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 4 } }),
+		};
+
+		expect(collectFinishedSubmissions(round, slots)).toEqual([
+			{ matchId: "m1", scores: { first: 11, second: 4 } },
+		]);
+	});
+
 	// makePlayer：submitScore 需要真實 players 才能算評分，逐欄手寫、不使用 as any。
 	// 兩隊 rating 刻意取不同值（1000 分制不適用——這裡沿用 PlayerSchema 的 1~8 分制），
 	// 讓評分變動的 mutation（例如隊伍對應顛倒）會造成可觀察差異。
@@ -306,6 +368,34 @@ describe("scoreboard-binding", () => {
 		expect(backfillResult.round.matches[0].winner).toBe("teamA");
 	});
 
+	// 額外補（不在 test-plan 內）：上一個 it 只透過 submitScore 的結果間接觀察橋接，
+	// round 只有一場時「matchId 改取 round.matches[0].id」的竄改會存活。此 it 直接比對
+	// toSubmitScoreInput 的完整輸出，六個欄位各自被釘住。
+	it("toSubmitScoreInput 的六個欄位分別取自 submission 與 context", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2", rating: 6 })];
+		// round 刻意含兩場且目標場次不是第一場，讓「取第一場」的實作被抓到。
+		const round = makeRound({
+			matches: [makeMatch({ id: "other" }), makeMatch({ id: "m2" })],
+		});
+
+		const input = toSubmitScoreInput(
+			{ matchId: "m2", scores: { first: 11, second: 8 } },
+			{ round, players, now: "2026-08-27T03:00:00.000Z" },
+		);
+
+		expect(input).toEqual({
+			round,
+			players,
+			matchId: "m2",
+			rawScoreA: "11",
+			rawScoreB: "8",
+			now: "2026-08-27T03:00:00.000Z",
+		});
+		// 同一參考而非僅內容相同：本函式只做轉交，SHALL NOT 複製或改寫 round／players。
+		expect(input.round).toBe(round);
+		expect(input.players).toBe(players);
+	});
+
 	it("無任何場次完成且無計分板槽時目標分數未鎖定", () => {
 		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
 		const slots: MatchSlots = {};
@@ -355,6 +445,55 @@ describe("scoreboard-binding", () => {
 			],
 		});
 		const slots: MatchSlots = {};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(true);
+		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
+	});
+
+	// 額外補（不在 test-plan 內）：既有四個 lock 的 it 都只有一場或一個槽，因此
+	// 「只檢查第一場」「只檢查第一個槽」的竄改全數存活。兩個 some() 都必須掃完全部。
+	it("鎖定判定掃描全部場次與全部槽而非只看第一筆", () => {
+		const laterCompleted = makeRound({
+			matches: [
+				makeMatch({ id: "m1", status: "pending" }),
+				makeMatch({
+					id: "m2",
+					status: "completed",
+					scores: { teamA: 11, teamB: 7 },
+					winner: "teamA",
+					completedAt: "2026-08-27T00:00:00.000Z",
+				}),
+			],
+		});
+		expect(isTargetScoreLocked(laterCompleted, {}).locked).toBe(true);
+
+		const allPending = makeRound({
+			matches: [makeMatch({ id: "m1" }), makeMatch({ id: "m2" })],
+		});
+		const laterStarted: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "setup" }),
+			m2: makeSlot({ matchId: "m2", status: "playing" }),
+		};
+		expect(isTargetScoreLocked(allPending, laterStarted).locked).toBe(true);
+
+		// 條件是「非 setup」而非「等於 playing」：finished 槽（Status 的第三個值）同樣要鎖。
+		const finishedSlot: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "finished", scores: { us: 11, them: 5 } }),
+		};
+		expect(isTargetScoreLocked(allPending, finishedSlot).locked).toBe(true);
+	});
+
+	// 額外補（不在 test-plan 內）：collectFinishedSubmissions 會略過「已不在回合中」的孤兒槽，
+	// isTargetScoreLocked 則刻意不做這道檢查——鎖定判定的錯誤方向是不對稱的：誤鎖只是使用者
+	// 改不了分制，誤放行則讓同輪各場地打不同分制。此 it 釘住這個 fail-closed 的取捨，
+	// 日後若有人「順手補上一致性」會被抓到，需先回到 spec 討論。
+	it("槽已不在回合中但非 setup 時仍判定為鎖定", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
+		const slots: MatchSlots = {
+			gone: makeSlot({ matchId: "gone", status: "playing", scores: { us: 4, them: 2 } }),
+		};
 
 		const result = isTargetScoreLocked(round, slots);
 
