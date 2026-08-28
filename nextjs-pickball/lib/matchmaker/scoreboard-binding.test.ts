@@ -97,9 +97,27 @@ describe("scoreboard-binding", () => {
 		expect(seed.courtNumber).toBe(3);
 	});
 
+	it("多場次時 seed 取該場自己的場地編號，而非回合的第一場", () => {
+		// Stage 2 mutation 補強：round.matches 為空陣列時，「誤取 round.matches[0]」的
+		// mutation 只是因為讀到 undefined 才轉紅，並非真的分辨得出「該場」與「第一場」。
+		const first = makeMatch({ id: "match-1", courtNumber: 1 });
+		const second = makeMatch({ id: "match-2", courtNumber: 4 });
+		const round = makeRound({ matches: [first, second] });
+
+		expect(buildMatchSlotSeed(round, second).courtNumber).toBe(4);
+		expect(buildMatchSlotSeed(round, first).courtNumber).toBe(1);
+	});
+
 	it("已有進度的場次再次進入時保留既有進度不覆蓋", () => {
 		const existing = {
-			...createInitialState({ targetScore: 15, mode: "doubles", matchId: "match-1" }),
+			// courtNumber 給非 null 值：兩邊都是 null 時，ensureMatchSlot 在回傳既有槽時
+			// 把 courtNumber 抹成 null 的 mutation 不會轉紅（Stage 2 mutation 補強）。
+			...createInitialState({
+				targetScore: 15,
+				mode: "doubles",
+				matchId: "match-1",
+				courtNumber: 3,
+			}),
 			scores: { us: 8, them: 5 },
 			status: "playing" as const,
 			history: [{ type: "RALLY_WON" as const, winner: "us" as const }],
@@ -116,6 +134,7 @@ describe("scoreboard-binding", () => {
 		expect(result.scores).toEqual({ us: 8, them: 5 });
 		expect(result.history).toEqual(existing.history);
 		expect(result.targetScore).toBe(15);
+		expect(result.courtNumber).toBe(3);
 		// 「原樣保留」是整份 state 的保留，不只這三欄——只斷言三欄時，
 		// 竄改 mode／matchId 的實作不會紅。
 		expect(result).toEqual(existing);

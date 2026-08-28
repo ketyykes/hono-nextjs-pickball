@@ -49,6 +49,30 @@ describe("match-slots", () => {
 		expect(readMatchSlot("m1")?.courtNumber).toBe(3);
 	});
 
+	it("courtNumber 不合法的分槽條目被逐筆丟棄，合法者保留", () => {
+		// Stage 2 mutation 補強：schema 的 number()／int()／positive() 三個約束原本零覆蓋——
+		// 放寬為 z.number() 或 z.any() 時全套測試皆不轉紅。本 it 逐一釘住這三個約束，
+		// 並一併涵蓋「同時缺 courtNumber 與其他欄位」仍走逐筆降級（而非整份清除）的情形。
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const validState = createInitialState({ courtNumber: 3 });
+		const rawSlots: Record<string, unknown> = {
+			zero: { ...validState, courtNumber: 0 },
+			negative: { ...validState, courtNumber: -1 },
+			fractional: { ...validState, courtNumber: 2.5 },
+			stringTyped: { ...validState, courtNumber: "3" },
+			missingMany: { mode: "doubles" },
+			ok: validState,
+		};
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify(rawSlots));
+
+		const { slots, droppedCount } = readMatchSlots();
+
+		expect(Object.keys(slots)).toEqual(["ok"]);
+		expect(slots.ok?.courtNumber).toBe(3);
+		expect(droppedCount).toBe(5);
+		warnSpy.mockRestore();
+	});
+
 	it("單筆損壞只丟該筆並回報 droppedCount，其餘場次保留", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const m2State = createInitialState();
