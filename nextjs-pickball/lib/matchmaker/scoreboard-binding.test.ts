@@ -5,10 +5,13 @@ import {
 	ensureMatchSlot,
 	mapTeamScores,
 	collectFinishedSubmissions,
+	toSubmitScoreInput,
 } from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
 import { createInitialState } from "../scoreboard/reducer";
+import { submitScore } from "./round";
+import type { Player } from "./types";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
 function makeRound(overrides: Partial<Round> = {}): Round {
@@ -211,5 +214,94 @@ describe("scoreboard-binding", () => {
 		}).not.toThrow();
 
 		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
+	});
+
+	// makePlayer：submitScore 需要真實 players 才能算評分，逐欄手寫、不使用 as any。
+	// 兩隊 rating 刻意取不同值（1000 分制不適用——這裡沿用 PlayerSchema 的 1~8 分制），
+	// 讓評分變動的 mutation（例如隊伍對應顛倒）會造成可觀察差異。
+	function makePlayer(overrides: Partial<Player> = {}): Player {
+		return {
+			id: "p1",
+			name: "player",
+			gender: "other",
+			colorFrom: "#000000",
+			colorTo: "#ffffff",
+			rating: 4,
+			restCount: 0,
+			gamesPlayed: 0,
+			isActive: true,
+			createdAt: "2026-08-27T00:00:00.000Z",
+			...overrides,
+		};
+	}
+
+	it("回填與手動輸入的送出結果逐欄相同", () => {
+		const players: Player[] = [
+			makePlayer({ id: "p1", rating: 5 }),
+			makePlayer({ id: "p2", rating: 6 }),
+			makePlayer({ id: "p3", rating: 2 }),
+			makePlayer({ id: "p4", rating: 3 }),
+		];
+		const match = makeMatch({
+			id: "m1",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 5.5 },
+				{ playerIds: ["p3", "p4"], rating: 2.5 },
+			],
+		});
+		const round = makeRound({ matches: [match] });
+
+		// 手動輸入路徑：直接以字串呼叫 submitScore。
+		const manualResult = submitScore({
+			round,
+			players,
+			matchId: "m1",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: "2026-08-27T01:00:00.000Z",
+		});
+
+		// 回填路徑：先由 collectFinishedSubmissions 從 finished 槽算出待送出清單，
+		// 再經橋接函式餵給同一個 submitScore——不得自己手工組出 submitScore 的輸入，
+		// 否則會失去「兩條路徑真的共用同一入口」這件事的偵測力。
+		const slots: MatchSlots = {
+			m1: { ...createInitialState({ matchId: "m1" }), status: "finished", scores: { us: 11, them: 7 } },
+		};
+		const submissions = collectFinishedSubmissions(round, slots);
+		expect(submissions).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
+
+		const backfillInput = toSubmitScoreInput(submissions[0], {
+			round,
+			players,
+			now: "2026-08-27T02:00:00.000Z",
+		});
+		const backfillResult = submitScore(backfillInput);
+
+		if (!manualResult.ok || !backfillResult.ok) {
+			throw new Error("兩條路徑皆預期成功，測試資料設計有誤");
+		}
+
+		// 完成時間必然相異（分別注入的 now）：先各自挑出比對，再從整份物件排除後比對其餘全部，
+		// 避免只挑幾欄漏掉某個沒被挑到的欄位分岔。
+		expect(manualResult.round.matches[0].completedAt).toBe("2026-08-27T01:00:00.000Z");
+		expect(backfillResult.round.matches[0].completedAt).toBe("2026-08-27T02:00:00.000Z");
+		expect(manualResult.historyEntry.playedAt).toBe("2026-08-27T01:00:00.000Z");
+		expect(backfillResult.historyEntry.playedAt).toBe("2026-08-27T02:00:00.000Z");
+
+		const stripCompletedAt = (r: typeof manualResult.round) => ({
+			...r,
+			matches: r.matches.map((m) => ({ ...m, completedAt: null })),
+		});
+		expect(stripCompletedAt(backfillResult.round)).toEqual(stripCompletedAt(manualResult.round));
+
+		const stripPlayedAt = (h: typeof manualResult.historyEntry) => ({ ...h, playedAt: null });
+		expect(stripPlayedAt(backfillResult.historyEntry)).toEqual(stripPlayedAt(manualResult.historyEntry));
+
+		expect(backfillResult.playerPatches).toEqual(manualResult.playerPatches);
+		expect(backfillResult.boundaryHits).toEqual(manualResult.boundaryHits);
+
+		// 最重要的偵測點：11-7 讓第一隊（teamA）勝，橋接寫反時 winner 會變 teamB。
+		expect(manualResult.round.matches[0].winner).toBe("teamA");
+		expect(backfillResult.round.matches[0].winner).toBe("teamA");
 	});
 });
