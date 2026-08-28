@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { PlayerSchema } from "./types";
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalStorage } from "./storage-keys";
+// 分槽 key 取自 scoreboard 對外的具名匯出（match-slots.ts），不取 scoreboard 內部的
+// storage-keys.ts——跨 capability 只透過對外契約取用，字面值 SHALL NOT 在本檔重複寫死
+// （見 player-roster delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）。
+import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
 import type { Player } from "./types";
 
 // re-export（非改名）：M1 既有的匯入點（hooks/useRosterStore.ts 等）與既有測試
@@ -108,11 +112,13 @@ export function clearRoster(): void {
  * 掃描式清除會誤刪未來加入、不該被重置的使用者偏好資料，改用列舉可強制在新增
  * 資料域時主動決定是否納入重置範圍。
  */
-const RESET_KEYS = [ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY] as const;
+const RESET_KEYS = [ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, MATCH_SLOTS_KEY] as const;
 
 /**
- * 重置 matchmaker 相關的 localStorage 資料。只移除 RESET_KEYS 列舉的 key，
- * 不影響其他 capability（如 scoreboard）的資料。
+ * 重置 matchmaker 相關的 localStorage 資料。只移除 RESET_KEYS 列舉的 key
+ * （含分槽 key `scoreboard:matches:v1`，回合被清掉後那些條目即成孤兒，見
+ * round-lifecycle 的清槽 Requirement），SHALL NOT 影響獨立計分板
+ * scoreboard:current:v1。
  */
 export function resetMatchmakerData(): void {
 	if (!hasLocalStorage()) return;
