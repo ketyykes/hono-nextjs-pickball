@@ -343,6 +343,22 @@ Open Questions 第 13 項）。coordinator 裁決採 **(A)**：把場地編號�
 - [x] M37.7 RED: 於 `nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補 it「分槽 write 後 read 可取回 courtNumber」——寫入 `courtNumber: 3` 的槽 → `readMatchSlot` 取回的 `courtNumber === 3`（證明新欄位真的落盤而非被 zod 剝除）。**若寫下當下即綠**，如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈。**regression guard**：courtNumber 已在 M37.2/M37.4/M37.6 落地，寫下當下即綠；以 mutation 驗證（暫時拿掉 schema 的 `courtNumber` 欄位）證明本 it 與另兩筆既有 it 轉紅，還原後全綠
 - [x] M37.8 REFACTOR: 確認 `courtNumber` 的保留只透過 `MatchSettings` 一條路徑、`buildMatchSlotSeed` 內只有一處決定場地編號，且未在 `lib/scoreboard/` 內出現任何對 `matchmaker:round:v1` 的讀取（無壞味道則註記 skipped）。**skipped**：`grep -rn "matchmaker:round:v1" lib/scoreboard/` 無結果；`courtNumber` 只在 `reducer.ts` 的 `createInitialState`／`settingsOf`（經 `MatchSettings`）與 `scoreboard-binding.ts` 的 `buildMatchSlotSeed` 各一處決定，無重複邏輯
 
+**M37 Stage 2（Code-Quality Reviewer）結論：PASS**。獨立重做 28 組 mutation（不採信
+Implementer 自述的 1 組／0 存活），涵蓋 schema 補值與約束、`createInitialState`／
+`settingsOf` 的保留、`buildMatchSlotSeed` 的來源、`storage.ts`／`match-slots.ts` 落盤
+四條路徑，並含反向 mutation（誤加 guard、交換資料來源、反轉語句順序、只處理第一筆／
+最後一筆）。**偏離**：Stage 2 自行補測封住三個零覆蓋缺口（commit `7f4f1c1`，僅測試變更、
+未動生產程式碼）——① schema 的 `number()`／`int()`／`positive()` 三個約束零覆蓋；
+② `buildMatchSlotSeed` 的「只取第一筆」在單場次 fixture 下無法分辨；③ `ensureMatchSlot`
+回傳既有槽時抹除 `courtNumber` 的 mutation 存活（fixture 兩邊皆 null，整體比對無偵測力，
+已將該 fixture 改為 `courtNumber: 3`，it 名稱未變動）。剩餘存活 mutation 三組，
+皆判定為等價：`?? null` → `|| null`（差異僅在 `0`，而 `RoundMatchSchema` 與
+`ScoreboardStateSchema` 皆要求 positive）；`courtNumber` 於 `createInitialState`
+overrides 與外層 spread 兩處同時寫（外層必勝，行為不可觀測，屬可維護性而非行為缺陷）；
+`writeScoreboard` 獨立槽路徑剝除 `courtNumber`（不可達——`courtNumber` 非 null 必然
+伴隨 `matchId` 非 null，該路徑會分派到 match slot）。恆真斷言檢查：新增與被改動的
+斷言兩邊皆非同一物件參考。交件時 56 檔／466 測試全綠、tsc exit 0、`git status` 乾淨。
+
 ## 7. 計分板 UI 接線（例外層 — 入口與純呈現元件，以 E2E 驗收）
 Depends on: §3
 
