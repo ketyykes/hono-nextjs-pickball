@@ -524,3 +524,53 @@
     2. 派 **§6「清除範圍」**（tasks 6.1～6.6）。⚠️ §6 會動 **M4 的既有檔**（`lib/matchmaker/storage.ts` 的 `RESET_KEYS`、`hooks/useRoundStore.ts` 的 `resetIncompleteMatches`）與**更新 M4 既有的一個 it**（`lib/matchmaker/storage.test.ts` 的「重置只移除列舉的 key，不影響 scoreboard 資料」→ 改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」）。派工單 MUST 附上 `player-roster` delta 的 MODIFIED 全文與 design Decision 7，讓 Implementer 知道自己是在**改寫**既有行為而非追加。§6.4 的 `MATCH_SLOTS_KEY` **MUST 自 `lib/scoreboard/match-slots.ts` 匯入**（不要直接依賴 `lib/scoreboard/storage-keys.ts` 這個內部葉節點）。
     3. §6 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §7 → §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
     4. 全部群組完成後才做 Final Code Review（`opus`）。
+
+12. **M36 對齊與 §6「清除範圍」完成兩階段審查（2026-08-28，第五棒 leader）**——工作區乾淨、tasks.md **53／78** 勾選（§0 六 + §1 九 + §2 七 + §3 七 + §4 七 + §5 十一 + §6 六）。前端單元測試由 §5 結束時的 56 檔／453 測試增為 **56 檔／460 測試全綠**，`pnpm -r exec tsc --noEmit` exit 0。HEAD `1b8c7c1`。
+
+    **M36 已結案**（第 11 項的裁決，本輪第一件事）。三個 commit：`0179249`（RED）／`3c4cdc0`（GREEN）／`fc5a452`（記錄）。
+    - **紅燈機械複驗（leader 親自執行）**：`git show 0179249^:.../scoreboard-binding.ts` 顯示第一條當時仍為 `=== "completed"`，新 it「場次為 scoring 時目標分數鎖定」必失敗（實測輸出 `expected false to be true`）——**真紅燈**。
+    - GREEN 只改一行（`anyMatchFinished` → `anyMatchStarted`，判定改為 `!== "pending"`）並改寫該函式 JSDoc（原註解「尚未有測試涵蓋 scoring 分支，故先不擴充」已不成立）。第二條、`TARGET_SCORE_LOCKED_REASON` 與其他函式一行未改。
+    - Implementer 自測 4 組 mutation 全數轉紅。**§8 現在可以安全地讓 `RoundControls` 委派此判定**——該檔第 247 行的 `status: "scoring"` fixture 不再會踩到「UI 顯示未鎖定但 `setTargetScore` 拒絕」的雷。
+
+    **§6 共 10 個 commit**（`a7247fa` → `1b8c7c1`），異動 6 個生產／測試檔 + `tasks.md`：`lib/matchmaker/scoreboard-binding.ts`／`.test.ts`、`lib/matchmaker/storage.ts`／`.test.ts`、`hooks/useRoundStore.ts`／`.test.tsx`。**`lib/matchmaker/round.ts` 一行未改**（Stage 1 機械確認，`git diff` 對該檔為空）；`components/**`、`app/**`、`tests/e2e/**` 全未觸及。
+
+    **紅燈機械複驗（leader 親自執行，續作者可直接採信）——兩處皆為真紅燈**：
+    - 6.1：`git show a7247fa^:.../scoreboard-binding.ts` 的 `clearDiscardedMatchSlots` 計數為 **0**（函式不存在），紅燈形式為 `TypeError: clearDiscardedMatchSlots is not a function`。
+    - 6.3：`git show 7007fa0^:.../storage.ts` 的 `RESET_KEYS` 為三元素（無 `MATCH_SLOTS_KEY`），改名擴充後的 it 必失敗。
+    - 6.5 標為 **regression guard**（寫下當下即綠，因 6.4 已讓整個分槽 key 被 `removeItem`）——標註誠實，Stage 2 獨立複驗 M20（移除 `MATCH_SLOTS_KEY`）確實轉紅。
+
+    **§6 的實作形狀（§7／§8 會用到）**：
+    ```ts
+    export function clearDiscardedMatchSlots(previousRound: Round, nextRound: Round): void;
+    ```
+    - 以「重排前」與「重排後」兩份回合的 `matches[].id` 取差集算出被丟棄的場次，委派 `clearMatchSlots(ids)`。**刻意不依 `match.status` 二次判定**——那會製造第二個「決定清哪些槽」的定義處（spec SHALL NOT 條款），已由 Stage 2 新增的 it「被丟棄的場次不是 pending 時同樣清除其槽」釘住。
+    - `hooks/useRoundStore.ts` 的 `resetIncompleteMatches()` 只負責接線：`result.ok` → `dispatch` → `clearDiscardedMatchSlots(previousRound, result.round)`。
+    - `lib/matchmaker/storage.ts` 的 `RESET_KEYS` 現為**四元素**，第四個是 `MATCH_SLOTS_KEY`，**import 自 `lib/scoreboard/match-slots.ts`**（不是 `lib/scoreboard/storage-keys.ts` 這個內部葉節點）。matchmaker 側全域無第二份 `"scoreboard:matches:v1"` 字面值（Stage 1 grep 確認，測試檔也是 import）。
+
+    **§6 Stage 1（Spec Reviewer, sonnet）判定：`PASS`**：三個驗收錨點 it 名稱逐字相符（機械 grep）；舊名稱「重置只移除列舉的 key，不影響 scoreboard 資料」全 repo 已不存在（§9.1 會再核一次）；四條 SHALL NOT 全數有測試把關；唯一新增匯出符號為 `clearDiscardedMatchSlots`，無 scope creep；`round.ts` 與 `ResetRosterDialog.tsx` 皆一行未改；6.6 skipped 的理由經自行 grep 複驗成立。
+
+    **§6 Stage 2（Code-Quality Reviewer, opus）判定：`PASS`**，**獨立 mutation 35 組，10 組存活**（Implementer 自述 6 次／**0 存活** —— **第七度證實自述不可採信**）。補 3 個 it 後轉紅 3 組，其餘判為等價或超出本組範圍。
+    - Stage 2 新增 commit `030068d`，**生產程式碼一行未改**。
+    - **三個 test-plan 之外的新 it**（verify 階段機械核對時需知悉，皆為偵測力補強）：
+      ① 「同時丟棄多場時每一場的槽都被清除」——封住「只處理第一筆」（`.slice(0,1)`）與「只清最後一筆」（`.slice(-1)`）兩組。**既有 it 只有一場被丟棄，完全無法分辨「全清」與「只清一筆」** —— 這是第 11 項那條教訓（回傳／處理集合的邏輯 MUST 有「多筆同時符合」的測試）在本輪的**再次命中**。
+      ② 「被丟棄的場次不是 pending 時同樣清除其槽」——封住反向 mutation「在 `clearDiscardedMatchSlots` 內再依 status 判定一次」。
+      ③ 「沒有場次被丟棄時不清除任何槽」——零筆丟棄路徑的邊界覆蓋。
+    - **另修掉一條恆真斷言**（派工單點名的高風險盲點，實測命中）：原 `expect(nextRound.matches[0]).toEqual(m1)` 中 `nextRound = makeRound({ matches: [m1] })`，`nextRound.matches[0]` **就是 `m1` 本身**，斷言恆真、零偵測力。改為與呼叫前 `structuredClone(m1)` 比對後，「就地竄改保留場次的 status／scores」兩組 mutation 由存活轉紅。**Stage 2 動了既有 it 內的一條斷言（it 名稱未動），leader 認可**——留著零偵測力的斷言比改掉它更糟。
+    - **邊界已實測（非推論）**：`previousRound.matches` 空陣列、場次 id 重複、`setItem` 拋 `QuotaExceededError`、`MATCH_SLOTS_KEY` 不存在時 `resetMatchmakerData()` —— 四項皆安全。`previousRound === nextRound` 時會呼叫 `clearMatchSlots([])`，有一次多餘的 `setItem`（key 原不存在時會被建成 `{}`），行為層無影響，已記入 tasks.md 為觀察。
+
+    **leader 對 Stage 2 唯一升級項的裁決 —— 已核可並完成（commit `3acdfa8`、`1b8c7c1`）**：
+    - **問題**：`useRoundStore.resetIncompleteMatches()` 原寫成 `if (result.ok && previousRound !== null)`。`previousRound !== null` 是**不可達分支**（`resetIncompleteMatchesPure` 在 `round === null` 時必回 `ok: false`），但它同時守住了 `dispatch` **與**清槽兩條語句——若日後純函式契約改變而出現「`ok: true` 但 `previousRound === null`」，成功的重排會連 `dispatch` 一起被靜默跳過（回合完全不更新且無任何錯誤回報）。這是**遮蔽真實錯誤**，不是無害的型別收斂。
+    - **裁決**：把 null 判斷的作用範圍縮到**只包住清槽**，`dispatch` 只依賴 `result.ok`。屬**行為不變的 refactor**（該分支不可達），故不走新紅燈，改以「既有測試原樣全綠 + 兩組 mutation」證明把關仍在（刪清槽 → 紅、刪 dispatch → 紅，皆已實測）。
+    - **不使用非空斷言 `!`** —— leader 機械確認本 repo 生產程式碼一處都沒有，改採「條件範圍縮小」的等價寫法。
+
+    **§6 的實際成本**：Implementer（sonnet，6.1～6.6）約 12 分鐘／86 tool call、Stage 1（sonnet）約 2.3 分鐘／23 tool call、Stage 2（opus）約 **8 分鐘／24 tool call**（35 組 mutation）、refactor Implementer（sonnet）約 4 分鐘。
+
+    **這一輪的坑與提醒（補充第 6～11 項，不重複）**：
+    - **「恆真斷言」是新的一類偵測力缺口，且極難以目視發現**。`expect(nextRound.matches[0]).toEqual(m1)` 看起來很像在驗證「保留場次不變」，實際上兩邊是**同一個物件參考**。凡是「用同一批 fixture 物件組出輸入、又拿其中一個去比對輸出」的斷言都有此風險——**要比對「不被就地竄改」，MUST 與呼叫前的深拷貝（`structuredClone`）比對**。後續 §7／§8 的派工單已加入此檢查點。
+    - **第 11 項的「多筆同時符合」教訓在本輪再次命中**（§5 是三連存活、§6 是兩連存活）。這已是連續兩組，**凡函式處理集合／陣列，測試資料 MUST 至少放兩筆同時符合的項目**——請直接寫進後續每一張派工單。
+    - **「不可達分支的 guard 放錯位置」是靜默失效的來源**。守住多條語句的 guard，其不可達性是靠上游契約保證的；契約一改，被連坐跳過的是那些**不需要**該 guard 的語句。原則：**guard 的作用範圍 MUST 只包住真正需要它的那一條語句。**
+
+    **下一步（依序，SHALL NOT 跳過）**：
+    1. 派 **§7「計分板 UI 接線」**（tasks 7.1～7.7）。⚠️ 三個必處理的坑（§3 落盤）：(a) soft navigation 會讓綁定 hook 卡死，需在 `Scoreboard` 外層用 `key={matchId ?? "standalone"}` 強制 remount；(b) 合法場次會先閃一幀失效畫面，需有「尚未判定」的呈現狀態；(c) §7.4 的路由常數需先在 `lib/matchmaker/section-nav.ts` **新增一行** `export const MATCHMAKER_ROUTE = "/matchmaker"` 並讓既有的 `MATCHMAKER_SECTION_HREFS` 由它組成（行為零變更，第 5 項已核可）。
+    2. §7 完成後跑 Stage 1（`sonnet`）→ Stage 2（`opus`），再依序 §8 → §9。**群組之間嚴格序列，禁止平行派 Implementer。**
+    3. 全部群組完成後才做 Final Code Review（`opus`）。
