@@ -98,6 +98,7 @@ describe("useScoreboardStore", () => {
 			firstServer: "us",
 			targetScore: 11,
 			matchId: null,
+			courtNumber: null,
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
 
@@ -136,6 +137,7 @@ describe("useScoreboardStore", () => {
 			firstServer: "us" as const,
 			targetScore: 15 as const,
 			matchId: "m1",
+			courtNumber: null,
 		};
 		writeMatchSlot(m1Seed);
 
@@ -188,6 +190,7 @@ describe("useScoreboardStore", () => {
 			firstServer: "us",
 			targetScore: 11,
 			matchId: null,
+			courtNumber: null,
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
 
@@ -256,6 +259,7 @@ describe("useScoreboardStore", () => {
 			firstServer: "us",
 			targetScore: 11,
 			matchId: null,
+			courtNumber: null,
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
 
