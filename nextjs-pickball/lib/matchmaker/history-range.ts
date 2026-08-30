@@ -2,6 +2,8 @@
 // 或 Date.now()，理由見 spec「歷史區間切點計算」——PRD 驗算例皆綁定特定日期，
 // 函式若自行取系統時鐘就無法被決定性地驗證。
 
+import type { MatchHistoryEntry } from "./history";
+
 /** `computeRangeCutoffs()` 的回傳形狀：由近至遠的四個切點（毫秒時間戳）。 */
 export interface RangeCutoffs {
 	c0: number;
@@ -86,4 +88,21 @@ export function rangeOfTime(time: number, now: Date): HistoryRange {
 	}
 
 	return HISTORY_RANGES[4];
+}
+
+function recordTime(entry: MatchHistoryEntry): number {
+	return new Date(entry.playedAt).getTime();
+}
+
+/**
+ * 篩選出指定區間內的歷史紀錄，並依對戰時間由新到舊排序。
+ */
+export function filterHistoryByRange(
+	entries: MatchHistoryEntry[],
+	range: HistoryRange,
+	now: Date,
+): MatchHistoryEntry[] {
+	return entries
+		.sort((a, b) => recordTime(b) - recordTime(a))
+		.filter((entry) => rangeOfTime(recordTime(entry), now) === range);
 }
