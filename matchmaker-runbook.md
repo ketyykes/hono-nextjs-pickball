@@ -26,18 +26,32 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
 | Branch | `change/matchmaker-history-page`（**保留，未刪**） |
 | Base | `main` @ `85889ca` |
-| HEAD | `abedcd3`（docs：落盤 §3 Stage 1 審查結論） |
-| 進度 | **24/47 勾選、27 個 commit** |
+| HEAD | `9f32023`（docs：落盤 §3 Stage 2 審查結論） |
+| 進度 | **24/47 勾選、30 個 commit** |
 | 工作區 | ✅ **乾淨** |
-| 已完成 | §1 區間切點計算（11 task，Stage 1 PASS／Stage 2 PASS_WITH_NITS、0 Blocking）、§2 區間歸屬（7 task，兩階段皆 PASS）、**§3 篩選與排序實作完成＋Stage 1 PASS（coordinator 親跑），Stage 2 未跑** |
+| 已完成 | §1 區間切點計算（11 task）、§2 區間歸屬（7 task）、§3 篩選與排序（6 task）——**三組全部完成兩階段審查、0 Blocking** |
 | 未開工 | §4～§6（23 task）＋ Final Code Review |
-| 跑過幾棒 | 一棒（`a1aa193b821da7a91`），逐 task commit 紀律良好，**無事故**，中斷純因使用者關機 |
+| 品質狀態 | 前端 **57 檔／486 tests 全綠**、`tsc` exit 0 |
+| 跑過幾棒 | 一棒 leader（`a1aa193b821da7a91`，逐 task commit 紀律良好、**無事故**）＋ coordinator 親跑 §3 兩階段審查 |
 
-### ▶️ 續跑起點：先補 §3 的 Stage 2，再進 §4.1
+### ▶️ 續跑起點：§4.1（§1～§3 皆已結案，不需重跑任何審查）
 
-1. **§3 的 Stage 1 已完成（`PASS`，commit `abedcd3`），不需重跑**；結論全文在 `design.md` Open Questions 第 6 點，含錨點比對、紅燈機械複驗、五條 SHALL NOT 逐條查核的完整證據。
-2. **§3 的 Stage 2 尚未跑**，審查範圍 `2d1e1f2..ba4eb5c`（8 個 commit）。Stage 1 已明文移交兩項：① `ba4eb5c` 補的斷言目前只有 Implementer 自述、**MUST 獨立 mutation 複核**；② 循「分支或欄位零覆蓋」方向擴大盤點，已附五個具體建議變異（見 design.md 第 6 點結尾）。
-3. 補審通過後才進 **§4.1**。
+1. **§4.1**：新增 `tests/e2e/specs/matchmaker-history.spec.ts` 的兩個 E2E test，真紅燈為路由不存在的 404。§4 起進入例外層（`app/**/page.tsx` 與純呈現元件），RED 一律由 Playwright E2E 承擔。
+2. §4／§5 的 Implementer **MUST 用 `sonnet` 起跳**（本專案常設覆寫）。
+3. 開工前必看 `design.md` Open Questions 的三件事：§4 的 E2E seed 容器形狀為 `{"version":1,"entries":[...]}`；§5 的 `section-nav.ts` 因 M6 合併有行號位移、且該檔**兩個常數皆未 export**；分頁順序為「對戰／參賽者／歷史／資料」。
+4. **§3 Stage 2 留給 §4 的一則 Nit**：`filterHistoryByRange` 對空陣列無測試——若 §4 要呈現「今日無紀錄」的空狀態，該情境屆時須由 E2E 覆蓋。
+
+### 📌 §3 Stage 2 抓到的真缺口：`range` 參數零覆蓋（本輪最有價值的發現）
+
+Implementer 自測 12 組宣稱無存活，coordinator 獨立跑 20 組抓到 **3 個**，最嚴重的一個是：
+**把 `range` 參數完全忽略、`=== range` 寫死成 `=== "today"`，全部測試仍綠。**
+原因是 §3 的兩個測試**只用過 `"today"` 一個值**，這個函式最核心的契約（依指定區間篩選）
+對其餘四個區間零保護。另兩個是 `.slice()` 換成 `.slice(0,3)` 與 `.slice(0,-1)` 也存活——
+**截斷可以冒充篩選**，因為 fixture 剛好讓被截掉的那筆也正是該被濾掉的那筆。
+
+**這是 runbook 反覆記載的形態的極端版**：§1 的 `getUTCFullYear` 零覆蓋（取樣年份剛好相同）、
+M6 §6 的「多筆同時符合零覆蓋」都是同一類——**不是斷言太弱，是取樣讓某條路徑從未被走過**。
+派 Stage 2 時要求它**逐參數盤點值域覆蓋**，不要只在既有 fixture 上加強斷言。
 3. **完整續跑手記在 `design.md` 的 `## Open Questions` 第 5 點**（leader 親自寫的，比本檔詳細），含三件開工前就該知道的事：
    - §4 的 E2E seed 容器形狀為 `{"version":1,"entries":[...]}`
    - §5 的 `section-nav.ts` 因 M6 合併有行號位移，且該檔**兩個常數皆未 export**
