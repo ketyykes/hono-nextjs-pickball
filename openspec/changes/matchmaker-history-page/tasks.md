@@ -59,7 +59,7 @@ Depends on: §3
 > 不寫單元測試；RED 一律以 Playwright E2E 承擔，仍維持「先看到紅燈再實作」的順序。
 
 - [x] 4.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，每個 test 前清空 `matchmaker:history:v1`；寫入 test「直接開啟 /matchmaker/history 可載入歷史頁」與「沒有任何歷史紀錄時顯示引導空狀態」。執行 E2E 看到紅燈並貼出輸出（**真紅燈**：路由不存在，Next.js 回應預設 404 頁，`heading「對戰歷史」`／五個 `radio`／引導文案「完成對戰後才會有紀錄」皆 `element(s) not found`，2 個 test 失敗）
-- [ ] 4.2 GREEN: 建立 `app/matchmaker/history/page.tsx`（入口，組合下述元件）、`components/matchmaker/HistoryView.tsx`（`"use client"`，於 hydration 的 `useEffect` 內取一次 `new Date()` 與 `readHistory()` 的結果存進 state；**不得**改用 `useRoundStore`，見 design Decision 5、7）、`components/matchmaker/EmptyHistory.tsx`（引導型空狀態，繁體中文並說明「完成對戰後才會有紀錄」）。重跑至綠
+- [x] 4.2 GREEN: 建立 `app/matchmaker/history/page.tsx`（入口，組合下述元件）、`components/matchmaker/HistoryView.tsx`（`"use client"`，於 hydration 的 `useEffect` 內取一次 `new Date()` 與 `readHistory()` 的結果存進 state；**不得**改用 `useRoundStore`，見 design Decision 5、7）、`components/matchmaker/EmptyHistory.tsx`（引導型空狀態，繁體中文並說明「完成對戰後才會有紀錄」）。重跑至綠——2 個 test 皆綠（首次冷啟編譯耗時較長屬環境正常現象，非行為缺陷，重跑確認穩定綠）
 - [ ] 4.3 RED: 補兩個 test：「開啟歷史頁預設顯示今日區間」（seed 今日與更早各一筆，斷言今日篩選為選中狀態且列表只含今日那筆）與「切換區間後只顯示該區間的紀錄」（seed 今日與上月各一筆，切到上月後只出現上月那筆）。看到紅燈
 - [ ] 4.4 GREEN: 建立 `components/matchmaker/HistoryRangeFilter.tsx`，提供今日／本週／本月／上月／更早五個篩選，初次開啟預設選中今日；選取狀態只存在元件 state，**不寫入 LocalStorage**。重跑至綠
 - [ ] 4.5 RED: 補三個 test：「雙打紀錄顯示 8.2 全部欄位含雙打組成標示」、「單打紀錄不顯示雙打組成標示」、「每位球員同時顯示賽前與賽後分數」（賽前 4.20、賽後 4.35 兩值同時出現）。看到紅燈
