@@ -164,4 +164,116 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(page.getByText("上月對戰員A")).toBeVisible();
 		await expect(page.getByText("今日對戰員C")).toHaveCount(0);
 	});
+
+	test("雙打紀錄顯示 8.2 全部欄位含雙打組成標示", async ({ page }) => {
+		const matchId = "e2e-history-doubles-1";
+		const playedAt = isoToday(14);
+		await seedHistory(page, [
+			{
+				matchId,
+				courtNumber: 3,
+				playedAt,
+				format: "doubles",
+				doublesComposition: "mixed",
+				teamA: {
+					players: [
+						{ id: "p-doubles-a1", name: "雙打今日員A1", ratingBefore: 4.0, ratingAfter: 4.1 },
+						{ id: "p-doubles-a2", name: "雙打今日員A2", ratingBefore: 3.8, ratingAfter: 3.9 },
+					],
+					rating: 3.9,
+				},
+				teamB: {
+					players: [
+						{ id: "p-doubles-b1", name: "雙打今日員B1", ratingBefore: 3.5, ratingAfter: 3.4 },
+						{ id: "p-doubles-b2", name: "雙打今日員B2", ratingBefore: 3.6, ratingAfter: 3.5 },
+					],
+					rating: 3.55,
+				},
+				scoreA: 11,
+				scoreB: 7,
+				winner: "teamA",
+			},
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const card = page.getByTestId(`history-record-${matchId}`);
+		await expect(card).toBeVisible();
+		// 對戰 ID、場地、對戰時間、對戰方式、雙打組成標示。
+		await expect(card.getByText(matchId)).toBeVisible();
+		await expect(card.getByText("第 3 場地")).toBeVisible();
+		await expect(card.locator(`time[datetime="${playedAt}"]`)).toBeVisible();
+		await expect(card.getByText("雙打", { exact: true })).toBeVisible();
+		await expect(card.getByText("混雙")).toBeVisible();
+		// 兩隊球員與比分、勝方。
+		await expect(card.getByText("雙打今日員A1")).toBeVisible();
+		await expect(card.getByText("雙打今日員A2")).toBeVisible();
+		await expect(card.getByText("雙打今日員B1")).toBeVisible();
+		await expect(card.getByText("雙打今日員B2")).toBeVisible();
+		await expect(card.getByTestId(`history-record-${matchId}-score`)).toHaveText("11:7");
+		await expect(card.getByTestId(`history-record-${matchId}-team-a`)).toContainText("勝");
+		await expect(card.getByTestId(`history-record-${matchId}-team-b`)).not.toContainText("勝");
+	});
+
+	test("單打紀錄不顯示雙打組成標示", async ({ page }) => {
+		const matchId = "e2e-history-singles-1";
+		await seedHistory(page, [
+			{
+				matchId,
+				courtNumber: 2,
+				playedAt: isoToday(15),
+				format: "singles",
+				teamA: {
+					players: [{ id: "p-singles-a", name: "單打今日員A", ratingBefore: 3.7, ratingAfter: 3.8 }],
+					rating: 3.7,
+				},
+				teamB: {
+					players: [{ id: "p-singles-b", name: "單打今日員B", ratingBefore: 3.6, ratingAfter: 3.5 }],
+					rating: 3.6,
+				},
+				scoreA: 11,
+				scoreB: 9,
+				winner: "teamA",
+			},
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const card = page.getByTestId(`history-record-${matchId}`);
+		await expect(card).toBeVisible();
+		await expect(card.getByText("單打", { exact: true })).toBeVisible();
+		// 單打不得帶任何雙打組成標示文字（四種寫死文案逐一確認不存在）。
+		for (const label of ["混雙", "男雙", "女雙", "一般雙打"]) {
+			await expect(card.getByText(label)).toHaveCount(0);
+		}
+	});
+
+	test("每位球員同時顯示賽前與賽後分數", async ({ page }) => {
+		const matchId = "e2e-history-rating-1";
+		await seedHistory(page, [
+			{
+				matchId,
+				courtNumber: 1,
+				playedAt: isoToday(16),
+				format: "singles",
+				teamA: {
+					players: [{ id: "p-rating-a", name: "分數變化員A", ratingBefore: 4.2, ratingAfter: 4.35 }],
+					rating: 4.2,
+				},
+				teamB: {
+					players: [{ id: "p-rating-b", name: "分數變化員B", ratingBefore: 3.9, ratingAfter: 3.8 }],
+					rating: 3.9,
+				},
+				scoreA: 11,
+				scoreB: 6,
+				winner: "teamA",
+			},
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const card = page.getByTestId(`history-record-${matchId}`);
+		await expect(card.getByText("4.20")).toBeVisible();
+		await expect(card.getByText("4.35")).toBeVisible();
+	});
 });
