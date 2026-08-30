@@ -492,7 +492,23 @@ Depends on: §4、§5、§6、§7
       **實測（2026-08-30，第十棒 leader）：exit 0，`334 passed / 21 skipped`（6.6m）、0 failed。** 指令為 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（依 design.md Open Questions 第 19 項的更正，`test:e2e -- …` 吃不到 `--workers`）。逐 project 計數：chromium 71、firefox 64、webkit 64、mobile-chrome 71、mobile-safari 64，合計 334 ——**五個 browser project 全綠**。
       `scoreboard.spec.ts` **原樣通過**：該檔相對 base `3fefb02` 零 diff（見 9.5 的 `git diff --stat`），本輪 85 筆執行全數 ✓。
       Process 紀律：開跑前 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd"` 皆空；跑完再查一次亦皆空（Playwright 的 webServer 已自行收束），無殘留
-- [ ] 9.7 `pnpm --filter ./nextjs-pickball preview` — workerd runtime 下開啟 `/scoreboard` 與 `/scoreboard?match=<id>` 皆正常，無 console error
+- [x] 9.7 `pnpm --filter ./nextjs-pickball preview` — workerd runtime 下開啟 `/scoreboard` 與 `/scoreboard?match=<id>` 皆正常，無 console error
+
+      **實測（2026-08-30，第十棒 leader）：PASS。** `opennextjs-cloudflare build` 完整跑完（`✓ Compiled successfully in 4.0s`、`✓ Generating static pages (8/8)`、`Worker saved in .open-next/worker.js`），`[wrangler:info] Ready on http://localhost:8787`，binding `env.HONO_API (hono-pickball)` 顯示 `local [connected]`。
+      以 headless chromium 對 workerd server 逐頁檢查（掛 `console` 與 `pageerror` 兩個 listener），八項全過：
+      | 檢查 | 結果 |
+      |---|---|
+      | `/scoreboard` HTTP 狀態 | 200 |
+      | `/scoreboard` 渲染雙方面板（我方／對方） | ✅ |
+      | `/scoreboard` console error | **0 筆** |
+      | `/scoreboard?match=<id>` HTTP 狀態 | 200 |
+      | 綁定模式顯示場地標示 | ✅（實際渲染出「場地 2」） |
+      | 綁定模式未落入失效畫面 | ✅ |
+      | 綁定模式 hydrate 自分槽（種入 5–3、15 分制、courtNumber 2） | ✅ |
+      | `/scoreboard?match=<id>` console error | **0 筆** |
+
+      實際 body 摘要：`🏓 匹克球指南 / 首頁 / 完整體驗 / 計分板 / 測驗 / 對戰分配 / 場地 2 / 先發：我方 / 本輪 15 分制 / 返回對戰 / 我方 · 15 分制 / 5 / Server #2 · 左場 / 贏這球 + / 對方 · 15 分制 / 3 / …` ——場地標示、本輪分制、返回對戰出口、hydrate 的比分皆正確。
+      Process 紀律：驗證完**在同一回合內**立即 `pkill` 自起的 `opennextjs-cloudflare preview`／`wrangler dev`／`workerd`，事後 `lsof -i :3005 -i :8787` 與 `ps aux` 皆為空，未留跨回合 process
 - [x] 9.8 Rollback 相容性實測（design Migration Plan 要求，不得只憑推論）：以本次變更**前**的 `ScoreboardStateSchema` 解析一份含 `matchId` 欄位的資料，確認 zod 剝除未知欄位而非拒絕；結果如實記錄於此，若為拒絕則 MUST 更新 design.md 的 Rollback 段並提出補救
 
       **實測（2026-08-30）：PASS，zod 剝除未知欄位而非拒絕。** 做法：以 `git show 3fefb02:nextjs-pickball/lib/scoreboard/types.ts` 的 `ScoreboardStateSchema` **逐字重建**變更前的 schema（無 `matchId`、無 `courtNumber`），用 worktree 內的 zod 4.4.3 解析一份**變更後**形狀的資料（含 `matchId: "m-2026-08-30-001"` 與 `courtNumber: 3`）。結果：`safeParse().success === true`；`Object.keys(result.data)` 為 `firstServer, history, isFirstServiceOfGame, mode, scores, serverNumber, servingTeam, status, targetScore, winner` ——`matchId` 與 `courtNumber` **皆被剝除**，既有欄位值完整保留（`targetScore: 15`、`scores: {us:7,them:4}`）。
