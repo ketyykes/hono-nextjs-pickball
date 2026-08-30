@@ -451,7 +451,7 @@ Depends on: §4、§5、§6、§7
 - [x] 8.8 GREEN: 依 8.7 的量測補齊對戰頁的鎖定說明呈現（若 8.7 已綠則標註 skipped，不寫任何多餘程式碼）。**結果**：skipped——8.7 兩個 test 皆已由既有實作（8.2／8.6）滿足，未新增任何生產程式碼
 - [x] 8.10 RED: 補 e2e test「重設本輪後回到舊計分板連結顯示失效說明」（`round-lifecycle` delta 的 Scenario「回到已失效場次的計分板時顯示說明」，test-plan 第 145 列）——於場地 2 的計分板計到 5-2 → 回對戰頁重設／重排本輪 → 重新開啟該場的舊 `?match=` 連結 → 顯示失效說明與「回到對戰頁」「改用獨立計分板」兩個出口，且畫面不含技術錯誤碼。**此錨點在前五棒的 tasks.md 中被遺漏**（§7、§8 皆未涵蓋），由第六棒 leader 依 §9.1 的逐條核對要求補上。**若寫下當下即綠**（§6 的清槽與 §7 的失效畫面已合力達成），如實標註為 regression guard 並補 mutation 驗證，SHALL NOT 改斷言偽造紅燈。**結果**：寫下當下即綠，標註為 regression guard。mutation 驗證：暫時讓 `useRoundStore.resetIncompleteMatches` 略過 `clearDiscardedMatchSlots` 呼叫 → 轉紅，還原後回綠。5 個 browser project、5/5 全綠。commit `ca5e28f`
 - [x] 8.11 GREEN: 依 8.10 的量測補齊（若 8.10 已綠則標註 skipped，不寫任何多餘程式碼）。**結果**：skipped——8.10 已由既有實作（§6／§7）滿足，未新增任何生產程式碼
-- [ ] 8.9 REFACTOR: 確認場地色塊與目標分數選擇器都沒有把「該不該顯示入口」「是否計分中」「是否鎖定」的判斷寫在元件內，而是取用 §4／§5 的純函式輸出（無壞味道則註記 skipped）
+- [x] 8.9 REFACTOR: 確認場地色塊與目標分數選擇器都沒有把「該不該顯示入口」「是否計分中」「是否鎖定」的判斷寫在元件內，而是取用 §4／§5 的純函式輸出（無壞味道則註記 skipped）。**skipped**：機械核對——`grep -n "isTargetScoreLocked\|mapTeamScores\|ensureMatchSlot\|buildMatchSlotSeed"` 確認 `RoundControls.tsx` 的鎖定與否 100% 委派 `isTargetScoreLocked(round, matchSlots)`（`round !== null` 只是呼叫前的型別窄化，非鎖定判斷本身）、`CourtCard.tsx` 的「是否計分中」與比分轉換 100% 委派 `mapTeamScores`，入口寫入委派 `ensureMatchSlot(buildMatchSlotSeed(...))`。唯一未委派純函式的判斷是 `completed = match.status === "completed"`——此為 M5 既有欄位讀取（同時供本次「是否顯示入口」、既有的樣式減弱、`ScoreEntry` disabled 等多處共用），§4／§5 未替這個欄位讀取定義專屬純函式，不屬於本次要收斂的「該不該顯示入口」判斷邏輯（判斷本身只是 `!completed` 一行條件，沒有第二處重複定義）。無壞味道
 
 ## 9. 收尾驗證（對應 root `README.md` 部署前手動檢查清單）
 
