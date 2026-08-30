@@ -6,14 +6,22 @@ import {
 	createRound,
 	resetIncompleteMatches as resetIncompleteMatchesPure,
 	submitScore as submitScorePure,
+	setTargetScore as setTargetScorePure,
 	SUBMIT_SCORE_FAILURE_CODE,
+	SET_TARGET_SCORE_FAILURE_CODE,
 } from "@/lib/matchmaker/round";
 import { clearDiscardedMatchSlots } from "@/lib/matchmaker/scoreboard-binding";
-import type { CreateRoundInput, CreateRoundResult, ResetIncompleteMatchesResult, SubmitScoreResult } from "@/lib/matchmaker/round";
+import type {
+	CreateRoundInput,
+	CreateRoundResult,
+	ResetIncompleteMatchesResult,
+	SubmitScoreResult,
+	SetTargetScoreResult,
+} from "@/lib/matchmaker/round";
 import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
-import type { Round } from "@/lib/matchmaker/round-types";
+import type { Round, RoundTargetScore } from "@/lib/matchmaker/round-types";
 import type { Player } from "@/lib/matchmaker/types";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
@@ -36,7 +44,8 @@ type RoundStoreAction =
 	| { type: "HYDRATE"; round: Round | null; history: MatchHistoryEntry[]; droppedCount: number }
 	| { type: "GENERATE_ROUND"; round: Round }
 	| { type: "RESET_INCOMPLETE_MATCHES"; round: Round }
-	| { type: "SUBMIT_SCORE"; round: Round; historyEntry: MatchHistoryEntry };
+	| { type: "SUBMIT_SCORE"; round: Round; historyEntry: MatchHistoryEntry }
+	| { type: "SET_TARGET_SCORE"; round: Round };
 
 function createInitialState(): RoundStoreState {
 	return { round: null, history: [], droppedCount: 0 };
@@ -52,6 +61,8 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 			return { ...state, round: action.round };
 		case "SUBMIT_SCORE":
 			return { ...state, round: action.round, history: [...state.history, action.historyEntry] };
+		case "SET_TARGET_SCORE":
+			return { ...state, round: action.round };
 		default:
 			return state;
 	}
@@ -86,6 +97,10 @@ export interface UseRoundStoreResult {
 	 * 新回合、把 historyEntry 併入歷史、把每筆 playerPatches 交給 roster port 的
 	 * updatePlayer；失敗（`ok: false`）時三者皆不觸碰，不會出現部分更新。 */
 	submitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => SubmitScoreResult;
+	/** 更改本輪目標分數：委派 round.ts 的 setTargetScore（該輪所有場次皆為 pending
+	 * 時才允許），失敗（`ok: false`）時不套用任何變動（match-stage 的 MODIFIED
+	 * 「目標分數選擇器」——8.6 起才有非測試呼叫端接上這個原本懸空的純函式）。 */
+	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
 }
 
 // 「找不到目前回合」與 round.ts 私有的 MATCH_NOT_FOUND_MESSAGE（「找不到指定的場次」）
@@ -93,6 +108,13 @@ export interface UseRoundStoreResult {
 // 的 submitScore 只會在 CourtCard 渲染時才被呼叫（CourtCard 只存在於 round !== null
 // 的畫面裡），這個分支在目前的 UI 接線下不可達，純為型別安全而設的防線。
 const NO_ROUND_TO_SUBMIT_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
+
+// setTargetScore 只會在 RoundControls 已經拿到非 null 的 round 時才被呼叫（該元件
+// 自己判斷「回合是否存在」以決定要呼叫 onSettingsChange 還是本函式，見 RoundControls.tsx），
+// 這裡的 null 檢查與 submitScore 的 NO_ROUND_TO_SUBMIT_MESSAGE 同樣是不可達的型別安全
+// 防線，並非真的會被觸發的分支。SetTargetScoreFailureCode 目前只有 SCORING_STARTED
+// 一個成員，沿用它純粹是型別上沒有更貼切的選項，不代表本情境真的是「已開始計分」。
+const NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
 
 // 整合 reducer 與 localStorage，結構比照 useRosterStore.ts：write effect 放前面
 // （mount 時 ref=false 故跳過）、read/hydrate effect 放後面，避免 read 前就被
@@ -230,6 +252,26 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return result;
 	}
 
+	// 更改本輪目標分數（match-stage 的 MODIFIED「目標分數選擇器」）：委派 round.ts 的
+	// 純函式，成功時 dispatch 新回合；失敗（該輪已有場次非 pending）時不套用任何變動，
+	// 形態比照 resetIncompleteMatches 的「呼叫純函式 → 判 ok → dispatch」。
+	function setTargetScore(targetScore: RoundTargetScore): SetTargetScoreResult {
+		if (state.round === null) {
+			return {
+				ok: false,
+				code: SET_TARGET_SCORE_FAILURE_CODE.SCORING_STARTED,
+				message: NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE,
+			};
+		}
+
+		const result = setTargetScorePure(state.round, targetScore);
+		if (result.ok) {
+			dispatch({ type: "SET_TARGET_SCORE", round: result.round });
+		}
+
+		return result;
+	}
+
 	return {
 		round: state.round,
 		history: state.history,
@@ -237,5 +279,6 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		generateRound,
 		resetIncompleteMatches,
 		submitScore,
+		setTargetScore,
 	};
 }
