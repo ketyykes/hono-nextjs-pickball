@@ -1,6 +1,25 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeRangeCutoffs, rangeOfTime, HISTORY_RANGES } from "./history-range";
+import { computeRangeCutoffs, rangeOfTime, filterHistoryByRange, HISTORY_RANGES } from "./history-range";
 import type { HistoryRange } from "./history-range";
+import type { MatchHistoryEntry } from "./history";
+
+/**
+ * 建立最小合法的單打歷史紀錄 fixture，只有 `playedAt`／`matchId` 因測試需要而變動，
+ * 其餘欄位固定為任意合法值（本組測試只關心排序與純函式語意，不關心欄位內容本身）。
+ */
+function makeHistoryEntry(playedAt: string, matchId: string): MatchHistoryEntry {
+	return {
+		matchId,
+		courtNumber: 1,
+		playedAt,
+		format: "singles",
+		teamA: { players: [{ id: "p1", name: "球員一", ratingBefore: 1000, ratingAfter: 1010 }], rating: 1000 },
+		teamB: { players: [{ id: "p2", name: "球員二", ratingBefore: 1000, ratingAfter: 990 }], rating: 1000 },
+		scoreA: 11,
+		scoreB: 9,
+		winner: "teamA",
+	};
+}
 
 describe("history-range", () => {
 	it("一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日", () => {
@@ -165,5 +184,21 @@ describe("history-range", () => {
 				expect(range).toBe("lastMonth");
 			}
 		}
+	});
+
+	it("篩選結果依對戰時間由新到舊排序", () => {
+		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00，皆落在今日區間
+		const oldest = makeHistoryEntry(new Date(2026, 7, 15, 8, 0).toISOString(), "match-oldest");
+		const middle = makeHistoryEntry(new Date(2026, 7, 15, 12, 0).toISOString(), "match-middle");
+		const newest = makeHistoryEntry(new Date(2026, 7, 15, 18, 0).toISOString(), "match-newest");
+
+		// 亂序傳入，斷言回傳順序為對戰時間遞減
+		const result = filterHistoryByRange([middle, newest, oldest], "today", now);
+
+		expect(result.map((entry) => entry.matchId)).toEqual([
+			"match-newest",
+			"match-middle",
+			"match-oldest",
+		]);
 	});
 });
