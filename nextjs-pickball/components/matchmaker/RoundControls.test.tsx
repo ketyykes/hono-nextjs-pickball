@@ -7,19 +7,32 @@ import type { RoundControlsProps } from "./RoundControls";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
+import { createInitialState } from "@/lib/scoreboard/reducer";
+import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 測試專用預設 props：settings 給合法初始值，其餘 callback 一律用 vi.fn()——
 // 本元件不持有任何 store（design Decision 9），測試因此不需要 mock 任何東西。
+// matchSlots／setTargetScore 為 8.6 新增的必填 props：matchSlots 預設空集合
+// （無任何場次開始場邊計分），setTargetScore 預設 vi.fn()——多數既有測試不涉及
+// 目標分數鎖定判定或變更委派，給這兩個預設值即可，需要的測試再各自 override。
 function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsProps {
 	return {
 		settings: createRoundSettings(),
 		onSettingsChange: vi.fn(),
 		round: null,
 		activePlayerCount: 10,
+		matchSlots: {},
+		setTargetScore: vi.fn(),
 		onGenerate: vi.fn(),
 		onReset: vi.fn(),
 		...overrides,
 	};
+}
+
+// 建立計分板槽測試 fixture：只在需要模擬「該場已開始場邊計分」的測試中使用，
+// 逐欄沿用 createInitialState 的預設值再覆寫 status，不使用 as any。
+function buildSlot(overrides: Partial<ReturnType<typeof createInitialState>> = {}) {
+	return { ...createInitialState({ matchId: "match-1" }), ...overrides };
 }
 
 function buildSettings(overrides: Partial<RoundSettings> = {}): RoundSettings {
@@ -122,9 +135,15 @@ describe("RoundControls", () => {
 		expect(screen.queryByText(/本輪已鎖定/)).toBeNull();
 	});
 
-	it("目前回合存在時目標分數選擇器 disabled 並顯示已鎖定說明", () => {
-		const round = buildRound({ targetScore: 15 });
-		render(<RoundControls {...buildProps({ round })} />);
+	// match-stage delta 的 MODIFIED「目標分數選擇器」（8.5①）：M5 的舊規則是「有回合就
+	// 鎖」，本 change 放寬為「本輪已開始計分才鎖」——鎖定與否 MUST 委派 §5.10 的
+	// isTargetScoreLocked(round, matchSlots)。此處以「計分板槽非 setup」這個新增的
+	// OR 條件觸發鎖定（場次本身仍為 pending），驗證元件確實把 matchSlots 一併考慮進去，
+	// 而不是只看回合是否存在。
+	it("本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因", () => {
+		const round = buildRound({ targetScore: 15, matches: [buildMatch({ status: "pending" })] });
+		const matchSlots: MatchSlots = { "match-1": buildSlot({ status: "playing" }) };
+		render(<RoundControls {...buildProps({ round, matchSlots })} />);
 		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
 		const radios = within(targetGroup).getAllByRole("radio");
 
@@ -134,7 +153,30 @@ describe("RoundControls", () => {
 		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
 		expect(checked).toHaveLength(1);
 		expect(checked[0].textContent).toBe("15");
-		expect(screen.queryByText(/本輪已鎖定/)).not.toBeNull();
+		// 畫面顯示的是 isTargetScoreLocked 回傳的鎖定原因，而非元件自行硬寫的文案。
+		expect(screen.getByText("本輪已開始計分，目標分數不可更改。")).not.toBeNull();
+	});
+
+	// 8.5②：本次放寬的唯一可觀察差異——回合存在但尚未開始計分時仍可更改，
+	// 變更委派回合 capability 的 setTargetScore（而非 onSettingsChange，那是給
+	// 「尚無回合」情境下的未來設定值用的）。
+	it("回合存在但尚未開始計分時目標分數選擇器 enabled 且變更委派 setTargetScore", async () => {
+		const user = userEvent.setup();
+		const round = buildRound({ targetScore: 11, matches: [buildMatch({ status: "pending" })] });
+		const setTargetScore = vi.fn();
+		render(<RoundControls {...buildProps({ round, matchSlots: {}, setTargetScore })} />);
+		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
+		const radios = within(targetGroup).getAllByRole("radio");
+
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(false);
+		});
+
+		await user.click(within(targetGroup).getByRole("radio", { name: "21" }));
+
+		expect(setTargetScore).toHaveBeenCalledTimes(1);
+		expect(setTargetScore).toHaveBeenCalledWith(21);
+		expect(screen.queryByText(/本輪已開始計分/)).toBeNull();
 	});
 
 	it("按下產生本輪對戰會以目前設定呼叫回合產生函式一次", async () => {
@@ -297,18 +339,24 @@ describe("RoundControls", () => {
 		expect(onSettingsChange).toHaveBeenCalledTimes(4);
 	});
 
-	// regression guard：補強 Decision 5 嚴格版鎖定條件——「有回合就鎖」不依場次是否存在，
-	// 不對應任何 spec 驗收錨點（spec 的鎖定 Scenario 用的固定資料一律帶至少一場）。
-	it("回合存在但尚無場次時目標分數仍鎖定，且不顯示重設再排入口", () => {
+	// 8.5 的必要連帶調整（非官方列出的三項之一，見本次交付說明）：這條 M5 既有 it
+	// 原本斷言「有回合就鎖」，M5 的固定資料剛好是 matches: []。MODIFIED 規則改為
+	// isTargetScoreLocked(round, matchSlots)——沒有任何場次即代表「所有場次皆為
+	// pending」與「沒有任何槽離開 setup」皆 vacuously 成立，依 spec 的放寬條件應為
+	// 未鎖定。若不更新此斷言，8.6 SHALL NOT 在元件內以「round !== null」判斷鎖定的
+	// 要求將無法達成（該要求與此斷言互斥，兩者不可能同時成立）。
+	it("回合存在但尚無場次時目標分數未鎖定（所有條件 vacuously 成立）", () => {
 		const round = buildRound({ matches: [] });
 		render(<RoundControls {...buildProps({ round })} />);
 
 		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
 		const radios = within(targetGroup).getAllByRole("radio");
 		radios.forEach((radio) => {
-			expect((radio as HTMLButtonElement).disabled).toBe(true);
+			expect((radio as HTMLButtonElement).disabled).toBe(false);
 		});
-		expect(screen.queryByText(/本輪已鎖定/)).not.toBeNull();
+		expect(screen.queryByText(/本輪已開始計分/)).toBeNull();
+		// 沒有任何場次時「重設／再排」入口本就不該顯示（hasIncompleteMatch 與鎖定判定
+		// 是各自獨立的判斷，此斷言不受本次鎖定規則放寬影響）。
 		expect(screen.queryByRole("button", { name: "重設／再排" })).toBeNull();
 	});
 
@@ -318,11 +366,20 @@ describe("RoundControls", () => {
 	// 這條防線本身改由這裡的 fireEvent.keyDown 直接對容器派發事件覆蓋——RTL 的 fireEvent
 	// 不受「disabled 元素不可聚焦」限制，能真正命中 handler 內部邏輯。
 	it("目標分數鎖定時方向鍵不得呼叫 onSettingsChange 或改變選取（覆蓋 if (locked) return; 防線）", () => {
+		// 8.5 的必要連帶調整：round 本身不再等於鎖定（MODIFIED 規則），此處額外帶一個
+		// 非 setup 的計分板槽讓本輪確實「已開始計分」，維持這條 it 原本要驗證的
+		// 「鎖定時方向鍵無效」意圖不變。
 		const round = buildRound({ targetScore: 15 });
+		const matchSlots: MatchSlots = { "match-1": buildSlot({ status: "playing" }) };
 		const onSettingsChange = vi.fn();
 		render(
 			<RoundControls
-				{...buildProps({ round, settings: buildSettings({ targetScore: 15 }), onSettingsChange })}
+				{...buildProps({
+					round,
+					matchSlots,
+					settings: buildSettings({ targetScore: 15 }),
+					onSettingsChange,
+				})}
 			/>,
 		);
 
