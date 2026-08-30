@@ -659,3 +659,30 @@
     **leader 對 Stage 2 升級項的裁決**：
     1. 「讓 `buildMatchSlotSeed` 一律走 `createInitialState` 的 overrides（連 `matchId` 一起），使『兩處寫』在結構上不可能」——**否決**。§4 的 Stage 2 已裁決過**相反方向**（移除 overrides 內冗餘的 `matchId`，理由是「兩處寫同一件事會分歧」），現在回頭改回去等於推翻一個已結案的審查結論，且該 mutation 本身不可觀測（無行為差異）。維持現狀，以既有註解為防護。
     2. 「`ScoreboardStateSchema.matchId` 的 `z.string()` 約束同樣未被釘住」——**認可為事實但不處理**。屬 §2／§4 舊帳，coordinator 已明令不重跑該兩組，且 `matchId` 的失效模式與 `courtNumber` 不同（`matchId` 只作為 map 的 key 使用，型別放寬不會造成靜默資料損壞）。記錄於此供日後參考。
+
+16. **§9.5 的「唯一容許變動的既有測試」由三處修訂為六處（2026-08-30，第八棒 leader）——待 coordinator 追認**
+
+    §9.5 原文寫「**這三處是本 change 唯一容許變動的既有測試**，其餘既有測試若轉紅一律視為迴歸」。
+    §8 實作後實際為**六處**。增加的三處全部源自同一個原因：§8.6 的 MODIFIED Requirement 把目標分數的
+    鎖定條件由「目前回合存在即鎖」放寬為「本輪已開始計分才鎖」，因此**凡是既有測試把「回合存在」
+    當成鎖定前置條件者，在新規則下一律轉紅**——這正是 design Decision 7 早已預告的後果
+    （「M5 既有的單元測試（`RoundControls.test.tsx`）會被本段的行為直接打紅——衝突會在實作時
+    以測試失敗的形式爆出來」），只是 §9.5 撰寫當時只估到三處。
+
+    增加的三處（明細與裁決摘要見 tasks.md §9.5 的表格）：
+    - `RoundControls.test.tsx`「回合存在但尚無場次時目標分數仍鎖定」→ 改名並反轉斷言為未鎖定
+    - `RoundControls.test.tsx`「目標分數鎖定時方向鍵不得呼叫 onSettingsChange」→ 補 `playing` 槽還原前置
+    - `tests/e2e/specs/match-stage.spec.ts`「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」
+      → 僅改尾端鎖定情境的建立手法（此 test 在 spec 中標註「既有，不要動」）
+
+    **§8 Stage 1 Spec Reviewer 已逐項獨立裁決**（非採信 Implementer 自述）：(a) 三處皆為 MODIFIED
+    規則的必然結果，不改就必然假紅；(b) 皆保留原意圖，其中「反轉斷言」那項經實測**不是恆真**
+    ——實作若退回舊寫法該測試仍會轉紅，它現在守護的是「不得只憑回合存在與否判斷鎖定」這條
+    SHALL NOT；(c) 未發現任何一項在掩蓋真實迴歸；(d) 被標註「不要動」的 e2e，其方向鍵導覽與
+    roving tabindex 核心斷言（第 386～401 行）逐字未改，動的只是前置情境的建立手法。
+
+    **處置與待辦**：leader 已把 §9.5 的文字更新為列舉全部六處並附各自理由與出處，使 §9.5 執行時
+    不會把這三處誤判為迴歸。**但這是對驗收標準本身的修訂，leader 不自行認定為終局**——
+    依 execution-plan 的 Escalation（「計畫本身錯誤 → 升級給人類」），此項 MUST 由 coordinator 追認。
+    若 coordinator 不同意放寬，替代方案是把第 4～6 項回復原狀並改為在 §9.5 明列為「已知的預期失敗」，
+    但那會讓 `pnpm test` 無法全綠，與 §9.5 的「前後端皆綠」直接衝突，因此不建議。

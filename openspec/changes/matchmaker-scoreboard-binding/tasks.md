@@ -459,7 +459,21 @@ Depends on: §4、§5、§6、§7
 - [ ] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法逐標題計數，**不使用** BSD `uniq`（macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）
 - [ ] 9.3 `pnpm lint` — 0 errors（既有 warning 清單須與變更前一致，不得新增）
 - [ ] 9.4 `pnpm typecheck` — 通過
-- [ ] 9.5 `pnpm test` 全套 — 前後端皆綠。既有 `scoreboard` 測試須**全數原樣**通過；`player-roster` 除 §6.3 改名並擴充斷言的那一個 it 外無迴歸；M5 的 `match-stage` 測試除 §8.5 更新的那一個 it 與新增的一個 it 外無迴歸（**這三處是本 change 唯一容許變動的既有測試**，其餘既有測試若轉紅一律視為迴歸）
+- [ ] 9.5 `pnpm test` 全套 — 前後端皆綠。既有 `scoreboard` 測試須**全數原樣**通過；其餘既有測試除下列**六處**外無迴歸（**這六處是本 change 唯一容許變動的既有測試**，其餘既有測試若轉紅一律視為迴歸）
+
+      **原文只列三處，實際為六處**——三處是 §8.6 的 MODIFIED Requirement（鎖定條件由「目前回合存在即鎖」放寬為「本輪已開始計分才鎖」）的**必然連帶**：凡是既有測試把「回合存在」當成鎖定前置條件者，在新規則下一律轉紅。design Decision 7 已預告此事（「M5 既有的單元測試（`RoundControls.test.tsx`）會被本段的行為直接打紅——衝突會在實作時以測試失敗的形式爆出來」），但 §9.5 撰寫時只估到三處。三處增列已由 §8 Stage 1 Spec Reviewer 逐項裁決為「MODIFIED 的必然結果、保留原意圖、未掩蓋迴歸、未削弱核心斷言」（見下方 (4)～(6) 的裁決摘要）。**此為對驗收標準的修訂，已記入 design.md Open Questions 第 7 項，待 coordinator 追認。**
+
+      | # | 檔案 | 既有測試 | 變動 | 出處 |
+      |---|---|---|---|---|
+      | 1 | `lib/matchmaker/storage.test.ts` | 「重置只移除列舉的 key，不影響 scoreboard 資料」 | 改名為「重置只移除列舉的四個 key，不影響獨立計分板資料」並擴充斷言 | §6.3（原已授權） |
+      | 2 | `components/matchmaker/RoundControls.test.tsx` | 「目前回合存在時目標分數選擇器 disabled 並顯示已鎖定說明」 | 改名為「本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因」，前置與斷言同步更新 | §8.5①（原已授權） |
+      | 3 | `components/matchmaker/RoundControls.test.tsx` | （新增）「回合存在但尚未開始計分時目標分數選擇器 enabled 且變更委派 setTargetScore」 | 新增 | §8.5②（原已授權） |
+      | 4 | `components/matchmaker/RoundControls.test.tsx` | 「回合存在但尚無場次時目標分數仍鎖定」 | 改名並**反轉斷言**為未鎖定（`matches: []` 時兩個鎖定條件皆 vacuously 為假） | §8.5 連帶 |
+      | 5 | `components/matchmaker/RoundControls.test.tsx` | 「目標分數鎖定時方向鍵不得呼叫 onSettingsChange」 | 補上 `status: "playing"` 的 matchSlot，讓前置真正符合「已開始計分」；斷言不變 | §8.5 連帶 |
+      | 6 | `tests/e2e/specs/match-stage.spec.ts` | 「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」 | **僅**尾端鎖定情境的建立方式改為「產生本輪後手動完成該場」；方向鍵導覽與 roving tabindex 的核心斷言**逐字未動** | §8.6 連帶 |
+
+      **第 4 項的反轉斷言不是恆真**（Stage 1 實測確認）：若實作退回「`round !== null` 就鎖」的舊寫法，`matches: []` 情境下仍會回報鎖定，該測試會轉紅 —— 它現在守護的是「不得只憑回合存在與否判斷鎖定」這條 SHALL NOT。
+      **第 6 項雖動到 spec 標註「既有，不要動」的 test**，但動的是**前置情境的建立手法**而非測試主體；其 Scenario 名稱所指涉的核心行為（方向鍵移動即選取、roving tabindex 僅選中項為 0）第 386～401 行逐字未改。
 - [ ] 9.6 `pnpm test:e2e` 全套 — 五個 browser project 全綠。既有 `scoreboard.spec.ts` 必須**原樣**通過（證明獨立用法零行為變更）
 - [ ] 9.7 `pnpm --filter ./nextjs-pickball preview` — workerd runtime 下開啟 `/scoreboard` 與 `/scoreboard?match=<id>` 皆正常，無 console error
 - [ ] 9.8 Rollback 相容性實測（design Migration Plan 要求，不得只憑推論）：以本次變更**前**的 `ScoreboardStateSchema` 解析一份含 `matchId` 欄位的資料，確認 zod 剝除未知欄位而非拒絕；結果如實記錄於此，若為拒絕則 MUST 更新 design.md 的 Rollback 段並提出補救
