@@ -150,4 +150,20 @@ describe("history-range", () => {
 		expect(() => rangeOfTime(t, now)).not.toThrow();
 		expect(rangeOfTime(t, now)).toBe("today");
 	});
+
+	it("跨月週時沒有任何時間點落入本月", () => {
+		const now = new Date(2026, 7, 1); // 2026-08-01（週六，本週一落在 7/27）
+
+		for (let day = 1; day <= 31; day++) {
+			const t = new Date(2026, 6, day, 12, 0).getTime(); // 7/1～7/31，取中午避開跨日誤差
+			const range = rangeOfTime(t, now);
+
+			expect(range).not.toBe("thisMonth");
+			if (day >= 27) {
+				expect(range).toBe("thisWeek");
+			} else {
+				expect(range).toBe("lastMonth");
+			}
+		}
+	});
 });
