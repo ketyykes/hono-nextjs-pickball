@@ -451,4 +451,49 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await expect(page.getByLabel(/我方目前 5 分/)).toBeVisible();
 		await expect(page.getByLabel(/對方目前 2 分/)).toBeVisible();
 	});
+
+	test("由計分板判定勝負後返回，比分自動回填且該場轉為已完成", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		// 11 分制下我方連贏 11 球（side-out：對方全程未曾發球，得 0 分）觸發 GameOverDialog。
+		await clickWin(page, "us", 11);
+		await page.getByRole("button", { name: "關閉" }).click();
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		// E2E 由計分板完成一場並回填：對戰頁顯示最終比分、勝方與已完成樣式，且不再提供入口。
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:0");
+		await expect(court.getByTestId(`court-${matchId}-team-a`)).toHaveText("第一隊勝");
+		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
+		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
+
+		// 回填後清除該場次的計分板槽：scoreboard:matches:v1 內該條目被移除。
+		const slots = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			MATCH_SLOTS_KEY,
+		);
+		const parsedSlots: Record<string, unknown> = slots ? JSON.parse(slots) : {};
+		expect(Object.prototype.hasOwnProperty.call(parsedSlots, matchId)).toBe(false);
+	});
+
+	test("已完成場次不顯示進入計分板入口", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		// 不經計分板，直接以手動輸入完成該場（prd.md 6.3 的 fallback 路徑）。
+		await court.getByLabel("第一隊比分").fill("11");
+		await court.getByLabel("第二隊比分").fill("5");
+		await court.getByRole("button", { name: "送出比分" }).click();
+
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
+		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
+	});
 });
