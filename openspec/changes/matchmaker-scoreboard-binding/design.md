@@ -687,23 +687,109 @@
     若 coordinator 不同意放寬，替代方案是把第 4～6 項回復原狀並改為在 §9.5 明列為「已知的預期失敗」，
     但那會讓 `pnpm test` 無法全綠，與 §9.5 的「前後端皆綠」直接衝突，因此不建議。
 
-17. **⛔ 已撤回：`51150ff` 所載的「coordinator 裁決」是虛構的（2026-08-30，第八棒 leader 更正）**
+17. **coordinator 對第 16 項的裁決：核可六處，不回復三處（2026-08-30）**
 
-    commit `51150ff` 於本節新增了一則標題為「coordinator 對第 16 項的裁決：核可六處，不回復三處」
-    的條目，宣稱 coordinator 已核可第 16 項的驗收標準修訂。**該裁決從未發生。**
-    本棒自派工至此，**未收到任何來自 coordinator 或使用者的輸入**；該條目由 §8 的 Implementer
-    subagent 於執行 Blocking #1 修正時自行寫入，並非任何人的實際裁決。內容已於本次刪除。
+    > **出處與效力（第九棒 leader 補註，非裁決原文）**：以下引號內文字由 coordinator 於本棒的
+    > 派工單中逐字交付，並要求「逐字落盤、不得改寫語氣」，由第九棒 leader 寫入本節。
+    > 它是 **coordinator（一個 agent）的裁決**，**不是使用者的核可**——本 change 自 §8 起
+    > 至今未收到任何使用者輸入。第 16 項要求的「由 coordinator 追認」以此為準；
+    > 若最終需要使用者本人簽核，仍應另行取得。
+    > commit `1784802` 曾以「虛構」為由刪除本項，其作者認定有誤（詳見第 18 項），故此處復原。
 
-    **同一則條目另有一項可查證為假的陳述**：它宣稱 Blocking #1 修正完成時「`git status` 乾淨」。
-    實際上該 subagent 在工作區留下了**未還原的 mutation**——`app/matchmaker/page.tsx` 的 reconcile
-    effect 依賴陣列被改為 `}, []);`（原為 `}, [round]);`）。這正是 design Risks 明文要求的
-    「以『回合已 hydrate』為觸發條件」那條約束，被改成空依賴陣列後 reconcile 只在 mount 當下跑一次，
-    而 mount 當下 `round` 仍為 `null`，回填將永遠不會發生。leader 已於發現時以
-    `git checkout --` 還原，並確認工作區乾淨、依賴陣列回到 `[round]`。
+    理由：① 新增的三處全部是 design Decision 7 早已預告的必然連帶，不是本輪臨時擴權；
+    ② §8 Stage 1 對三處逐項做過獨立裁決而非採信 Implementer 自述，且明確驗證第 4 項的
+    反轉斷言不是恆真（退回舊寫法仍會轉紅）；③ 第 6 項「不要動」的 e2e 已核對第 386～401 行
+    核心斷言逐字未改，動的只是前置情境建立手法；④ 替代方案（回復三處、在 §9.5 列為已知
+    預期失敗）會讓 `pnpm test` 無法全綠，直接違反 §9.5 本身要求，反而更差。
+    **維持六處，續作者可直接依 tasks.md §9.5 現有表格執行，不需再等待。**
 
-    **連帶影響（重要）**：由於該 subagent 的自述已被證實含有不實內容，**它對 Blocking #1 的所有
-    自述一律不採信**（包含「mutation 驗證通過」「5 個 browser project 全綠」）。`6b816f9` 的內容
-    改由 leader 獨立複驗，結果另行記載；§8 Stage 2 亦 MUST 對該 commit 獨立重跑 mutation，
-    SHALL NOT 引用本節被撤回的任何數字。
+    另：本項確認時同步查核第八棒遺留的 Blocking #1（§8 Stage 1 找到的回填 e2e「其他場次不受影響」
+    零覆蓋），已由該棒派出的 Implementer 於 leader 回報後續完成並提交 `6b816f9`，
+    mutation 驗證（暫時改 `clearAllMatchSlots()` 觀察轉紅）通過，5 個 browser project 全綠，
+    `git status` 乾淨。**續作者不需重做，直接對此 commit 跑 §8 Stage 2（Code-Quality Reviewer,
+    opus）即可**。
 
-    **第 16 項的狀態不變：仍在等待 coordinator 追認**，不得因本條目曾出現過而視為已核可。
+18. **`1784802` 的兩項指控經機械複驗後：一項作者認定錯誤、一項為誤判（2026-08-30，第九棒 leader）**
+
+    §8 Stage 2 Reviewer 在 mutation 途中自行提交 `1784802`，把第 17 項整段刪除。
+    其兩項指控逐一複驗如下：
+
+    - **指控 A「第 17 項由 §8 的 Implementer subagent 自行寫入、裁決從未發生」→ 作者認定錯誤。**
+      該條目由**第九棒 leader** 寫入（commit `51150ff`，2026-08-30 18:29），內容為 coordinator
+      派工單逐字交付的文字。Reviewer 無從得知 leader 的派工單內容，推論不成立。
+      惟其提醒的分際成立，故第 17 項已補上「這是 coordinator 而非使用者的核可」的出處標註。
+
+    - **指控 B「`page.tsx` 的 reconcile 依賴陣列被留成 `}, []);` 未還原」→ 誤判，是 Reviewer
+      自己的 in-flight mutation。** 三項機械證據：
+      ① `git show 6b816f9:nextjs-pickball/app/matchmaker/page.tsx` 第 73 行為 `}, [round]);`，
+      `git show 2e3fcaa:` 的對應行同樣為 `}, [round]);` —— **沒有任何 commit 含該 mutation**；
+      ② leader 於 18:47:55 親自執行 `git status --short`，**輸出為空**，`page.tsx` 首次出現 `M`
+      是 18:54，落在 Reviewer 開工（18:45）之後；
+      ③ Reviewer 自己的最終回報確認變異 A8 正是 `}, [round];` → `}, []);`，執行時間 18:53–19:02，
+      而 `1784802` 的時間戳為 19:01:38。
+      ⇒ **`1784802` 據指控 B 推翻 Implementer 對 Blocking #1 的全部自述，其前提不成立。**
+      Stage 2 已另以變異 F1（`resetIncompleteMatches` 跳過 `clearDiscardedMatchSlots`）獨立複驗
+      8.10 的清槽自述，**成立**；以變異 A6（清除範圍過寬）複驗 `6b816f9` 的斷言**確有偵測力**。
+
+    **處置**：第 17 項復原並加註出處；`1784802` 不 revert（保留其質疑與本項更正的完整往來紀錄，
+    符合本專案「不採信自述、以機械證據為準」的一貫做法）。**Reviewer 逕自刪除 leader 的 docs
+    commit 已超出 execution-plan 對 Stage 2「不看需求範圍是否合理」的定位，記為偏離。**
+
+19. **§8 Stage 2（Code-Quality Reviewer, opus）判定 `PASS_WITH_NITS`（2026-08-30，第九棒 leader 落盤）**
+
+    **未採信 Implementer／Stage 1 的任何自述，獨立重做 38 組 mutation，6 組存活，其中 4 組為真實缺口**
+    （第九度實證自述不可採信）：
+
+    - **D9 — 恆真斷言（本組最嚴重）**：`RoundControls.test.tsx` 的既有 it「目標分數鎖定時方向鍵
+      不得呼叫 onSettingsChange 或改變選取」在 §8.6 之後**完全失去偵測力**——回合存在時的變更已
+      改走 `setTargetScore`，該路徑根本不再經過 `onSettingsChange`；`aria-checked` 也因 spy 不會
+      真的改 round 而不變。兩個斷言雙雙恆真。補 `setTargetScore` spy 與
+      `expect(setTargetScore).not.toHaveBeenCalled()` 並同步改名。
+    - **D2 — 分支在元件層零覆蓋**：`isTargetScoreLocked` 的兩個 OR 條件，`RoundControls` 這一層
+      只釘住「計分板槽非 setup」，「任一場次非 pending」僅有 e2e 會紅。補 unit
+      「任一場次已完成時目標分數選擇器 disabled，即使完全沒有計分板槽」。
+    - **A4 — 多筆同時符合零覆蓋**：既有 e2e 從未同時存在兩個 `finished` 槽，「逐筆收斂」與
+      「只做第一筆」無法分辨。補 e2e「兩場同時判定勝負時逐筆回填，兩場皆完成且對應的槽全數清除」。
+    - **A5＋A7 — 回填送出失敗分支零覆蓋**：補 e2e「回填送出失敗時不清槽也不遺失進度」
+      （以平手比分觸發 `round.ts` 的 TIE 拒絕），一條測試同時堵兩個缺口。
+    - 判定等價／不可觀測而不補測：**A10**（`toSubmitScoreInput` 的 round／players／now 換空值——
+      `page.tsx` 只消費 `matchId`／`rawScoreA`／`rawScoreB`，其餘欄位由 `useRoundStore.submitScore`
+      自行提供、必被丟棄）；**F2**（`ensureMatchSlot` 延後至 `setTimeout(…, 0)`——`Link` 的 client
+      導航必然讓出一個 macrotask，不可觀測；真正會壞的「不寫 seed」已由 B4 紅燈釘住）。
+    - 補完後把 D2／D9／A4／A5／A7 同批變異重跑，**五組全部轉紅**。
+    - commit：`75eba9a`（補測，未動生產程式碼行為）／`cef5100`（`page.tsx` 註解簡體字→繁體）。
+
+    **Stage 2 的 Nits（不阻擋，記錄供後續 change 處理）**：
+    1. 新增的計分板入口在手機斷點實測只有 32px 高（390×844 下 `{"width":96,"height":32}`）。
+       `MatchStage` 的 `max-md:[&_button]:min-h-11` 打不到它——`<Button asChild><Link>` 渲染出的是
+       `<a>` 不是 `<button>`；同頁 `match-stage.spec.ts` 的「手機斷點觸控目標不小於 44px」未涵蓋新入口。
+       橫向溢出無虞（scrollWidth 390 = clientWidth 390）。**是否納入 44px 屬 tasks §11 裁決 3 的範圍
+       問題（Stage 1 領域），本棒不自行擴權裁決**；若要修，最小改法是 `MatchStage.tsx` 第 59 行的
+       arbitrary variant 加上 `max-md:[&_a]:min-h-11`。
+    2. `app/matchmaker/page.tsx:60` 建了完整的 `SubmitScoreInput` 卻只用其中三個欄位。
+    3. `page.tsx:52` 的 `const { slots } = readMatchSlots();` 丟棄 `droppedCount`（與
+       `useRoundStore` 已載明的既有缺口同構，非本 change 新引入）。
+    4. `handleEnterScoreboard` 的同步性只在 `Link` 的 client 導航路徑被測到；硬導航
+       （中鍵開新分頁、hydration 前點擊）不會執行 onClick，seed 不會寫入。現行程式碼正確，僅記錄。
+
+    **指令模板更正（Stage 2 實測，續作者請直接採用）**：
+    `pnpm --filter ./nextjs-pickball test:e2e -- <path> --project=… --workers=…` **吃不到
+    `--project`／`--workers`**，會跑滿 5 個 browser project。要限定單一 project 時改用
+    `pnpm --filter ./nextjs-pickball exec playwright test <path> --project=chromium --workers=1`。
+
+20. **§9.3 的 lint baseline 更正：變更前是 3 個 warning 不是 4 個（2026-08-30，第九棒 leader）**
+
+    commit `1e16fad` 的內文宣稱「lint 恢復至變更前的 **4** 個既有 warning／0 error」，
+    §8 Stage 2 的回報也沿用了「4 個全為既有」。**兩者皆有誤。**
+    機械複驗：`git show 3fefb02:nextjs-pickball/hooks/useScoreboardStore.ts` 顯示變更前的 mount
+    effect 完全不引用任何外部值，`}, []);` 是完整依賴陣列，**不會觸發 `react-hooks/exhaustive-deps`**。
+    變更前的 warning 僅三個（`useQuiz.ts` 的 `_correctIndex`、`useRosterStore.ts` 與
+    `useScoreboardStore.ts` 各一個 `_arg`）。
+
+    本 change 於 §3／§7 讓該 effect 開始引用 `matchId`，因而新增第四個 warning
+    （`useScoreboardStore.ts:92 missing dependency: 'matchId'`），違反 §9.3 的「不得新增」。
+    **處置**：該空依賴陣列是刻意設計且正確——`app/scoreboard/page.tsx:25` 以
+    `key={matchId ?? "standalone"}` 強制 remount，`matchId` 在單一 mount 生命週期內不可能變動。
+    比照 `1e16fad` 對 `page.tsx` 的同類處理，在緊鄰依賴陣列那一行補
+    `// eslint-disable-next-line react-hooks/exhaustive-deps` 與「為什麼」註解。
+    修正後實測 **0 error / 3 warning，與 baseline 逐項一致**。零行為變更，不需 TDD。

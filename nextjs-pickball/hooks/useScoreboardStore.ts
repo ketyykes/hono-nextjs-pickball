@@ -89,6 +89,9 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 			// 的 write effect 不會以初始 state 覆蓋 localStorage。
 			hasHydratedRef.current = false;
 		};
+		// 頁面以 key={matchId ?? "standalone"} 強制 remount（app/scoreboard/page.tsx），
+		// matchId 在單一 mount 生命週期內不可能變動，列入 deps 只會多一次無意義的重讀。
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	return [state, dispatch, bindingStatus] as const;
