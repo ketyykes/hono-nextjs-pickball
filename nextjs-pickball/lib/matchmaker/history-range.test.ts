@@ -59,6 +59,16 @@ describe("history-range", () => {
 		expect(c0Date.getSeconds()).toBe(0);
 		expect(c0Date.getMilliseconds()).toBe(0);
 		expect(c0).toBe(new Date(2026, 7, 15).getTime());
+
+		// 跨年當天的凌晨與深夜是「年份誤讀成 UTC」唯一會露餡的時刻：上面 8 月的取樣
+		// 無論用 getFullYear() 或 getUTCFullYear() 都得到 2026，攔不下這種混讀。
+		// 兩個方向各取一點，UTC+ 與 UTC- 時區皆可攔下。
+		expect(computeRangeCutoffs(new Date(2027, 0, 1, 3, 30)).c0).toBe(
+			new Date(2027, 0, 1).getTime(),
+		);
+		expect(computeRangeCutoffs(new Date(2026, 11, 31, 23, 30)).c0).toBe(
+			new Date(2026, 11, 31).getTime(),
+		);
 	});
 
 	it("一月時上月切點落在去年 12 月 1 日", () => {
