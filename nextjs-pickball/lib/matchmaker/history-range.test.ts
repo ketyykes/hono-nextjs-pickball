@@ -187,13 +187,15 @@ describe("history-range", () => {
 	});
 
 	it("篩選結果依對戰時間由新到舊排序", () => {
-		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00，皆落在今日區間
+		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00
 		const oldest = makeHistoryEntry(new Date(2026, 7, 15, 8, 0).toISOString(), "match-oldest");
 		const middle = makeHistoryEntry(new Date(2026, 7, 15, 12, 0).toISOString(), "match-middle");
 		const newest = makeHistoryEntry(new Date(2026, 7, 15, 18, 0).toISOString(), "match-newest");
+		// 落在「更早」區間的紀錄，用來確認回傳結果確實經過篩選而非原樣回傳全部
+		const notToday = makeHistoryEntry(new Date(2026, 6, 1, 8, 0).toISOString(), "match-not-today");
 
-		// 亂序傳入，斷言回傳順序為對戰時間遞減
-		const result = filterHistoryByRange([middle, newest, oldest], "today", now);
+		// 亂序傳入，斷言回傳順序為對戰時間遞減，且不含區間外的紀錄
+		const result = filterHistoryByRange([middle, newest, oldest, notToday], "today", now);
 
 		expect(result.map((entry) => entry.matchId)).toEqual([
 			"match-newest",
