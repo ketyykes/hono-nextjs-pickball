@@ -175,15 +175,11 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
      因既有取樣日期全在 8 月與 1/5，兩種讀法年份相同。已補跨年邊界斷言，commit `05f3a79`）。
    - §2 區間歸屬：Stage 1 `PASS`；Stage 2 `PASS`（獨立跑 **45 組 mutation，0 存活**）。
      Stage 2 另修正註解中的懸空群組編號（commit `2d1e1f2`）。
-   - §3 篩選與排序：**Stage 1 `PASS`（由 coordinator 於 2026-08-30 親自執行，見下方第 6 點）；
-     Stage 2 尚未執行。** Implementer 自測 12 組 mutation，發現 1 組存活並補斷言（commit `ba4eb5c`）。
+   - §3 篩選與排序：**Stage 1 `PASS`／Stage 2 `PASS_WITH_NITS`，0 Blocking——兩階段皆已完成**
+     （由 coordinator 於 2026-08-30 親自執行，見下方第 6、7 點）。Stage 2 獨立跑 20 組 mutation，
+     抓到 **3 個 Implementer 自測 12 組未發現的真缺口**，已補斷言（commit `aadf0df`）。
 
-   **⚠️ 續跑的第一件事：補跑 §3 的 Stage 2 審查**（審查範圍 `git log --oneline 2d1e1f2..ba4eb5c`，
-   8 個 commit）。Stage 1 已完成，**不需重跑**。Stage 2 MUST 自行獨立跑一輪 mutation，
-   不採信 Implementer 自述——§1 的實證是 Implementer 自測 5 組／Stage 2 獨立 44 組才抓到真缺口。
-   §3 的 Implementer 自己已承認第 6 組 mutation（拿掉 `filter`）第一次跑是**存活**的，
-   原因是三筆 fixture 全落在同一區間、「區間外被排除」零覆蓋——正是本專案反覆出現的
-   「分支或欄位零覆蓋」形態，Stage 2 應循此方向再擴大盤點。
+   **⚠️ 續跑的第一件事：§4.1**（§1～§3 皆已完成兩階段審查，**不需重跑任何審查**）。
 
    **接續點：§4.1**（新增 `tests/e2e/specs/matchmaker-history.spec.ts` 的兩個 E2E test，
    真紅燈為路由不存在的 404）。§4 起進入例外層（`app/**/page.tsx` 與純呈現元件），
@@ -259,3 +255,50 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
    2. **循「分支或欄位零覆蓋」方向擴大盤點**（本專案最常見的缺口形態）。具體建議至少涵蓋：
       `recordTime` 改回傳固定值、`filter` 的比較改為 `!==`、排序改為遞增、`slice()` 拿掉、
       `rangeOfTime` 的引數順序對調。
+   → **兩項皆已由下方第 7 點的 Stage 2 結案。**
+
+7. **§3「篩選與排序」Stage 2（Code-Quality Reviewer）判定：`PASS_WITH_NITS`，0 Blocking
+   （2026-08-30，由 coordinator 親自執行）**
+
+   **偏離說明**：同第 6 點——execution-plan 指定 `opus` subagent，因使用者即將關機、
+   派背景 agent 會產生孤兒，改由 coordinator（opus）親跑。變異腳本留在 scratchpad，
+   可完整複驗；每組變異皆以 `git checkout --` 還原並在收尾確認工作區乾淨。
+
+   **獨立跑 20 組 mutation，未採信 Implementer 自述（其自測 12 組、宣稱補完後無存活）。**
+
+   **第一輪 14 組：全數轉紅、0 存活。** 涵蓋 `recordTime` 的三種壞法（固定值／NaN／正負號反轉）、
+   `filter` 的三種（`!==`／恆真／恆假）、comparator 的三種（方向反轉／恆 0／只比單邊）、
+   `rangeOfTime` 引數的兩種，以及整段刪除三種（拿掉 `slice()`／`filter()`／`sort()`）。
+   **其中「拿掉 `filter()`」轉紅，即獨立證實了 Stage 1 移交第 1 項**——`ba4eb5c` 補的斷言
+   確實有偵測力，Implementer 該項自述屬實。
+
+   **第二輪 6 組（針對「參數／分支零覆蓋」設計）：3 組存活，全部是真缺口。**
+   | 代號 | 變異 | 為何會存活 |
+   |---|---|---|
+   | **F1（最嚴重）** | `range` 參數被完全忽略、`=== range` 寫死成 `=== "today"` | 既有兩個 it **只用過 `"today"` 一個值**，函式最核心的契約「依指定區間篩選」對其餘四個區間**零保護** |
+   | F2 | `.slice()` → `.slice(0, 3)` | **截斷可冒充篩選**——fixture 剛好讓被截掉的那筆也正是該被濾掉的那筆 |
+   | F3 | `.slice()` → `.slice(0, -1)` | 同上，丟掉末筆恰好無害 |
+
+   **F1 正是本專案反覆出現的形態的極端版**：不是斷言太弱，是**參數的值域從未被走過**。
+   §1 的 `getUTCFullYear` 零覆蓋（取樣日期年份剛好相同）、§6（M6）的「多筆同時符合零覆蓋」
+   都是同一類——**取樣讓某條路徑從未被執行**。
+
+   **修正**（commit `aadf0df`，只動測試、未動生產程式碼）：新增 it
+   「依傳入的區間篩選，且不因截斷而遺漏區間內的紀錄」——以「同一組輸入分別查 `today` 與
+   `lastMonth` 兩個區間」堵住 F1，以「五筆輸入中今日佔四筆、上月那筆刻意置中」堵住 F2／F3。
+   寫下當下即綠，**如實標註 regression guard**。
+   **複驗**：補完後 F1／F2／F3 同批重跑**全數轉紅**，20/20 mutation 皆 killed。
+
+   **既有兩個 it 的名稱與斷言未更動**（仍是 spec 驗收錨點）。
+
+   **交件驗證**：前端 **57 檔／486 tests 全綠**、`pnpm -r exec tsc --noEmit` **exit 0**、
+   工作區乾淨、變更範圍僅 `history-range.test.ts` 一檔。
+
+   **Nits（不阻擋，供 §4 起參考）**：
+   1. `filterHistoryByRange` 對**空陣列**與**對戰時間相同的兩筆（排序穩定性）**皆無測試。
+      前者行為顯然（回傳空陣列），後者 `Array.prototype.sort` 在 V8 已保證穩定，
+      判定不值得為此增加 fixture 複雜度，故不補——**但 §4 的 E2E 若要呈現「今日無紀錄」的
+      空狀態，該情境屆時仍須覆蓋**。
+   2. `recordTime()` 對 `playedAt` 為非法 ISO 字串時回傳 `NaN`，會讓該筆靜默落入
+      `rangeOfTime` 的最後一個分支（`earlier`）而非被丟棄。M4 的 reader 已在讀取時
+      `safeParse` 過一輪，實務上到不了這裡；**若日後 §4 直接吃未經 reader 的資料則需重審**。
