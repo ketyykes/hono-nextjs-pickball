@@ -11,39 +11,26 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e363bb0`（docs：更新 M6 中斷點）——**M6 尚未合併，main 未變動** |
+| `main` HEAD | `5547e62`（feat：合併計分板綁定） |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
-| M6 | **進行中，§0～§8 全部完成，§9 剩 9.6／9.7 兩項＋Final Code Review**。第十棒進行中。見下方「M6 中斷點」 |
+| M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
 | M7～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
 
-## 🔖 M6 中斷點（2026-08-30 更新，第十棒進行中）
+## ✅ M6 完成紀錄（2026-08-30，供追溯）
 
 | 項目 | 值 |
 |---|---|
-| Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
-| Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
-| Base | `main` @ `3fefb02` |
-| HEAD（截至本次落盤） | `90211f3`（docs：落盤 §9.1～9.5、9.8、9.9 實測結果） |
-| 進度 | **89/91 勾選**（tasks.md 目前總數為 91，非原本估的 78——過程中新增 M36、M37、courtNumber delta 等補漏） |
-| 工作區 | 上次確認為**乾淨**（無未提交變更） |
-| 已完成 | §0～§9.5、9.8、9.9，M36／M37 方向對齊、courtNumber delta，**全部含 Stage 1 + Stage 2 審查** |
-| 尚未完成 | **9.6**（`pnpm test:e2e` 全套五個 browser project）、**9.7**（`pnpm --filter ./nextjs-pickball preview` 手動驗證）、**Final Code Review** |
-| 跑過幾棒 | **十棒**，第十棒（`abb3326eb8a2b2b89`）**截至本次落盤時仍在背景執行中**，尚未回報完成 |
+| 合併 commit | `5547e62`（feat：合併計分板綁定，`--no-ff`） |
+| 分支最終 HEAD（合併前） | `1ff319c` |
+| 進度 | **91/91 勾選**（tasks.md 過程中從原估的 78 擴為 91——新增 M36、M37、courtNumber delta 等補漏，且 §9.5 白名單三處擴為六處） |
+| 跑過幾棒 | **十棒**，含一起雙 leader 撞同一 worktree 的事故（第八棒誤判並錯誤撤回 coordinator 裁決，第九棒用機械證據訂正，細節見下方「事故」一節與 worktree 保存前的 `design.md` Open Questions 第 16～18 項） |
+| coordinator 獨立驗證（合併前，於 worktree 內） | `pnpm test` 56 檔/472＋4 檔/16 全綠、`tsc --noEmit` exit 0、`lint` 0 error/3 既存 warning、`playwright --workers=1` 334 passed/21 skipped |
+| coordinator 獨立驗證（合併後，於 main 上複驗） | `tsc --noEmit` exit 0、`pnpm test` 56 檔/472＋4 檔/16 全綠，**無迴歸** |
+| Teardown | 已執行（`git worktree remove` + `git branch -d change/matchmaker-scoreboard-binding`），使用者確認後執行 |
 
-### ▶️ 續跑起點：確認第十棒是否已完成，否則從 9.6 開始
-
-**若重啟新 session 接手**：
-
-1. 先跑 `cd /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding && git log --oneline -5 && git status --short`，
-   不要相信本檔的 HEAD 值——第十棒可能在本檔落盤後已經繼續往下做完。
-2. 若 `git log` 的 HEAD 仍是 `90211f3` 且 tasks.md 9.6／9.7 仍未勾選：**第十棒已經死掉**（背景 agent 不會跨 session 存活），
-   直接派新 leader 接續 9.6／9.7／Final Code Review，起手前務必 `lsof -i :3005 -i :8787` 與
-   `ps aux | grep -E "wrangler|workerd|next"` 清殘留 process（上一輪就在這裡出過事，見下方教訓）。
-3. 若 HEAD 已前進且 tasks.md 全勾：檢查是否有留言／commit 宣稱「M6 apply 已完成」，
-   coordinator 獨立跑一次 `pnpm test`、`tsc`、`lint`、`test:e2e --workers=1`、`preview` 驗證後才能合併，
-   **不要只憑 leader 回報就合併**。
+**M8 的硬前置條件已滿足**：`main` 現在含 `MATCH_SLOTS_KEY`（`lib/scoreboard/match-slots.ts`），M8 可以正常 import。
 
 ## ⚠️ 2026-08-30 事故：兩個 leader 同時在同一個 worktree 工作（重要教訓）
 
@@ -311,8 +298,8 @@ M3 ──merge──> main ──> M4 ──merge──> main ──> M5 ──m
 | M3 | matchmaker-rating-engine | ~~matchmaker-rating-engine~~（已拆） | ~~change/matchmaker-rating-engine~~（已刪） | main（已滿足） | **apply 完成並已合併**，待 verify／archive |
 | M4 | matchmaker-round-lifecycle | ~~matchmaker-round-lifecycle~~（已拆） | ~~change/matchmaker-round-lifecycle~~（已刪） | M3 已合併回 main | **apply 完成並已合併**，待 verify／archive |
 | M5 | matchmaker-match-stage-ui | ~~matchmaker-match-stage-ui~~（已拆） | ~~change/matchmaker-match-stage-ui~~（已刪） | M4 已合併回 main | **apply 完成並已合併**，待 verify／archive |
-| M6 | matchmaker-scoreboard-binding | matchmaker-scoreboard-binding（**已存在，勿重開**） | change/matchmaker-scoreboard-binding | main @ `3fefb02`（已滿足） | **apply 進行中，已暫停於 71/78**。見「M6 中斷點」 |
-| M7 | matchmaker-history-page | 尚未建立 | change/matchmaker-history-page | **M6 已合併回 main** | 未開始 |
+| M6 | matchmaker-scoreboard-binding | ~~matchmaker-scoreboard-binding~~（已拆） | ~~change/matchmaker-scoreboard-binding~~（已刪） | main @ `3fefb02`（已滿足） | **apply 完成並已合併**（`5547e62`），待 verify／archive |
+| M7 | matchmaker-history-page | 尚未建立 | change/matchmaker-history-page | **M6 已合併回 main（已滿足）** | 進行中，見下方 |
 | M8 | matchmaker-data-transfer | 尚未建立 | change/matchmaker-data-transfer | **M6 與 M7 都已合併回 main** | 未開始 |
 | M9 | matchmaker-visual-export | 尚未建立 | change/matchmaker-visual-export | **M6～M8 都已合併回 main** | 未開始 |
 
