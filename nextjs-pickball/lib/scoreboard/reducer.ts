@@ -14,6 +14,8 @@ export function createInitialState(
 	const mode: Mode = overrides.mode ?? "doubles";
 	const firstServer: Team = overrides.firstServer ?? "us";
 	const targetScore: TargetScore = overrides.targetScore ?? 11;
+	const matchId: string | null = overrides.matchId ?? null;
+	const courtNumber: number | null = overrides.courtNumber ?? null;
 	const isDoubles = mode === "doubles";
 
 	return {
@@ -29,15 +31,19 @@ export function createInitialState(
 		winner: null,
 		firstServer,
 		targetScore,
+		matchId,
+		courtNumber,
 	};
 }
 
-// 從 state 取出三項賽前設定，供重建初始狀態時原樣帶入
+// 從 state 取出五項賽前設定，供重建初始狀態時原樣帶入
 function settingsOf(state: ScoreboardState): MatchSettings {
 	return {
 		mode: state.mode,
 		firstServer: state.firstServer,
 		targetScore: state.targetScore,
+		matchId: state.matchId,
+		courtNumber: state.courtNumber,
 	};
 }
 
@@ -62,8 +68,9 @@ export function scoreboardReducer(
 			return createInitialState({ ...settingsOf(state), firstServer: action.team });
 		}
 		case "SET_TARGET_SCORE": {
-			// playing/finished 階段不允許變更設定
-			if (state.status !== "setup") return state;
+			// playing/finished 階段、或已綁定對戰場次時皆不允許變更目標分數
+			// （綁定場次的目標分數由該輪統一決定，setup 階段也不可調整）
+			if (state.status !== "setup" || state.matchId !== null) return state;
 			// 重新建立初始狀態，保留現有的模式與先發球隊設定
 			return createInitialState({ ...settingsOf(state), targetScore: action.targetScore });
 		}

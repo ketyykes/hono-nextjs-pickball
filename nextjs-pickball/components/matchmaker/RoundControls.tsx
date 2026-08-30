@@ -11,9 +11,12 @@ import { PLAYERS_PER_MATCH } from "@/lib/matchmaker/allocation-types";
 import type { MatchFormat } from "@/lib/matchmaker/allocation-types";
 import { TARGET_SCORE_OPTIONS } from "@/lib/matchmaker/round-types";
 import type { Round, RoundTargetScore } from "@/lib/matchmaker/round-types";
+import type { SetTargetScoreResult } from "@/lib/matchmaker/round";
+import { isTargetScoreLocked } from "@/lib/matchmaker/scoreboard-binding";
 // nextRadioIndex 與 capability 無關，位置為歷史因素（design Decision 6）；
 // matchmaker 與 scoreboard 的目標分數選擇器共用同一份 WAI-ARIA radio group 方向鍵索引計算。
 import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
+import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 對戰方式的顯示文字，亦作為人數不足說明的措辭來源，避免兩處各自寫一份中文。
 const FORMAT_LABEL: Record<MatchFormat, string> = {
@@ -29,9 +32,15 @@ export interface RoundControlsProps {
 	settings: RoundSettings;
 	onSettingsChange: (settings: RoundSettings) => void;
 	round: Round | null;
+	// 該輪各場次的計分板槽，供 isTargetScoreLocked 判定「是否已開始計分」
+	// （match-stage 的 MODIFIED「目標分數選擇器」）。
+	matchSlots: MatchSlots;
 	activePlayerCount: number;
 	onGenerate: (settings: RoundSettings) => void;
 	onReset: () => void;
+	/** 回合存在但尚未開始計分時，變更目標分數委派此入口（round.ts 的 setTargetScore，
+	 * 經 useRoundStore 接線）。SHALL NOT 於本元件內直接改寫回合物件。 */
+	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
 }
 
 // 本輪設定控制項：對戰方式、場地數、目標分數，以及「產生本輪對戰」操作入口。
@@ -42,16 +51,21 @@ export function RoundControls({
 	settings,
 	onSettingsChange,
 	round,
+	matchSlots,
 	activePlayerCount,
 	onGenerate,
 	onReset,
+	setTargetScore: commitTargetScore,
 }: RoundControlsProps) {
 	// 目標分數 radiogroup 的三顆按鈕 DOM 參照，供方向鍵導覽後 .focus() 新選中項。
 	const targetScoreButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 	const courtBounds = courtCountBounds(settings.courtCount);
-	// 有回合就鎖（design Decision 5 的嚴格版）：不判斷「是否已開始計分」——
-	// 該中間態要等場邊計分（M6）接上才有意義。
-	const locked = round !== null;
+	// 鎖定與否 MUST 委派 isTargetScoreLocked（match-stage 的 MODIFIED「目標分數選擇器」），
+	// SHALL NOT 在本元件內以「round 是否存在」判斷——round 為 null 時談不上「已開始計分」，
+	// 這裡的判斷只是型別安全防線（isTargetScoreLocked 要求非 null 的 Round），不是本元件
+	// 自行決定鎖定與否。
+	const lockResult = round !== null ? isTargetScoreLocked(round, matchSlots) : { locked: false, reason: null };
+	const locked = lockResult.locked;
 	const displayedTargetScore: RoundTargetScore = round ? round.targetScore : settings.targetScore;
 	// 每場所需人數唯一取自 PLAYERS_PER_MATCH，不得另行寫死 2／4。
 	const requiredPlayers = PLAYERS_PER_MATCH[settings.format];
@@ -69,7 +83,14 @@ export function RoundControls({
 		onSettingsChange(changeCourtCount(settings, delta).settings);
 	}
 
+	// 回合存在時（且未鎖定，見下方 disabled 與 handleTargetScoreKeyDown 的 guard）變更
+	// 委派 setTargetScore（round.ts 的純函式，經 useRoundStore 接線），SHALL NOT 直接
+	// 改寫回合物件；回合尚不存在時沿用 M4 既有行為，變更僅影響「產生本輪對戰」的預備設定。
 	function handleTargetScoreChange(targetScore: RoundTargetScore) {
+		if (round !== null) {
+			commitTargetScore(targetScore);
+			return;
+		}
 		onSettingsChange({ ...settings, targetScore });
 	}
 
@@ -164,10 +185,8 @@ export function RoundControls({
 						</Button>
 					))}
 				</div>
-				{locked && (
-					<p className="text-xs text-muted-foreground">
-						本輪已鎖定，換分制請先產生下一輪。
-					</p>
+				{lockResult.locked && (
+					<p className="text-xs text-muted-foreground">{lockResult.reason}</p>
 				)}
 			</div>
 

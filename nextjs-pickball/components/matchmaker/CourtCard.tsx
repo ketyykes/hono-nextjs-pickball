@@ -1,14 +1,18 @@
 // components/matchmaker/CourtCard.tsx
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { buildCourtTiles } from "@/lib/matchmaker/stage-layout";
 import type { CourtTileSource } from "@/lib/matchmaker/stage-layout";
 import type { DoublesComposition } from "@/lib/matchmaker/allocation-types";
 import type { Player } from "@/lib/matchmaker/types";
-import type { RoundMatch } from "@/lib/matchmaker/round-types";
+import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
+import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "@/lib/matchmaker/scoreboard-binding";
+import type { ScoreboardState } from "@/lib/scoreboard/types";
 import { PlayerTile } from "./PlayerTile";
 import { ScoreEntry } from "./ScoreEntry";
 
@@ -26,6 +30,12 @@ const DOUBLES_COMPOSITION_LABEL: Record<DoublesComposition, string> = {
 export interface CourtCardProps {
 	match: RoundMatch;
 	players: readonly Player[];
+	// round 為必填（非 optional）：計分板入口的 seed 建立需要該輪的 targetScore／format，
+	// CourtCard 在實際的 MatchStage 版面下必然伴隨 round 存在，沒有理由把型別放寬成
+	// optional 只為了遷就舊測試（見 CourtCard.test.tsx 的 buildProps 已同步補上預設值）。
+	round: Round;
+	// 該場次目前的計分板槽，null 代表尚未開始場邊計分（spec「計分中場次的標示與返回後呈現」）。
+	matchSlot: ScoreboardState | null;
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: string | null;
 }
@@ -55,10 +65,24 @@ function formatCompletedTime(completedAt: string): string {
 // 本檔不得另寫一份 row／column 或漸層計算。tileGridRow／scoreEntryGridRow 只是把
 // buildCourtTiles 已推導好的邏輯座標（0 起算）翻譯成本檔選定版面下的 CSS grid 列號，
 // 不是重新決定「誰在第幾排」。
-export function CourtCard({ match, players, onSubmitScore, submitError }: CourtCardProps) {
+export function CourtCard({ match, players, round, matchSlot, onSubmitScore, submitError }: CourtCardProps) {
 	const completed = match.status === "completed";
 	const isDoubles = match.format === "doubles";
 	const [teamA, teamB] = match.teams;
+
+	// 計分中判定：只要有槽即視為「計分中」（spec「計分中場次的標示與返回後呈現」）。
+	// 槽為 finished 但該場尚未完成的短暫過渡（回填 effect 尚未跑完）仍歸在此分支——
+	// effect 一旦完成會清槽並讓 match.status 轉為 completed，不需要在本元件另外特判。
+	const inProgress = matchSlot !== null;
+	const liveScore = matchSlot ? mapTeamScores(matchSlot.scores, "round") : null;
+	const entryLabel = inProgress ? "繼續計分" : "進入計分板";
+
+	// 進入計分板：先寫 seed 再導向（spec「場地區塊的計分板入口」明訂順序不可對調）。
+	// Next.js Link 會先呼叫這裡傳入的 onClick，再執行自身的導航邏輯，故本函式同步
+	// 完成 ensureMatchSlot（寫入 localStorage）之後，Link 才會開始換頁。
+	function handleEnterScoreboard() {
+		ensureMatchSlot(buildMatchSlotSeed(round, match));
+	}
 
 	const tileSource: CourtTileSource = {
 		format: match.format,
@@ -107,7 +131,7 @@ export function CourtCard({ match, players, onSubmitScore, submitError }: CourtC
 	}
 
 	return (
-		<Card className="gap-3 py-4">
+		<Card className="gap-3 py-4" data-testid={`court-${match.id}`}>
 			<CardContent className="flex flex-col gap-3 px-4">
 				<div className="flex items-center justify-between gap-2">
 					<h3 className="text-sm font-semibold">第 {match.courtNumber} 場地</h3>
@@ -115,6 +139,27 @@ export function CourtCard({ match, players, onSubmitScore, submitError }: CourtC
 						<Badge variant="secondary">{DOUBLES_COMPOSITION_LABEL[match.doublesComposition]}</Badge>
 					)}
 				</div>
+
+				{/* 計分板入口與計分中標示（spec「場地區塊的計分板入口」「計分中場次的標示與
+				    返回後呈現」）：已完成場次 SHALL NOT 提供入口（prd.md 6.5），本區塊整段不渲染。
+				    「計分中」MUST 併同文字而非只靠顏色（prd.md 12.5），故與 Badge 同時顯示比分文字。 */}
+				{!completed && (
+					<div className="flex items-center justify-between gap-2 text-sm">
+						{inProgress && liveScore ? (
+							<div className="flex items-center gap-2">
+								<Badge variant="secondary">計分中</Badge>
+								<span className="font-semibold">{`${liveScore.first}:${liveScore.second}`}</span>
+							</div>
+						) : (
+							<span />
+						)}
+						<Button asChild variant="outline" size="sm">
+							<Link href={`/scoreboard?match=${match.id}`} onClick={handleEnterScoreboard}>
+								{entryLabel}
+							</Link>
+						</Button>
+					</div>
+				)}
 
 				{!isDoubles && (
 					<div className="flex items-center justify-between">

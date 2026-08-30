@@ -23,8 +23,8 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填（格式：`PASS` / `FAIL` + 一行結果摘要，例如 `PASS — hono-pickball 4 files / 16 tests，nextjs-pickball N files / M tests 全數通過`）
-- **Initial commit hash**: 尚未執行——由 apply Step 0 建立 worktree 時執行 `git rev-parse HEAD` 並回填
+- **Baseline tests**: `PASS` — hono-pickball 4 files / 16 tests，nextjs-pickball 54 files / 410 tests 全數通過（2026-08-24 於本 worktree 執行 `pnpm install` 後 `pnpm test`；未出現 `listen EPERM 127.0.0.1`）
+- **Initial commit hash**: `3fefb029cf3cfe11b042709b03fb9760366ced84`
 - **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`
 
 ## Teardown

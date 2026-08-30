@@ -34,6 +34,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.isFirstServiceOfGame).toBe(false);
 		// 切換比賽形式不應連帶重設目標分數
 		expect(next.targetScore).toBe(15);
+		// 切換比賽形式不應連帶脫離對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("setup 階段可切換 firstServer", () => {
@@ -45,6 +47,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.servingTeam).toBe("them");
 		// 切換先發球方不應連帶重設目標分數
 		expect(next.targetScore).toBe(21);
+		// 切換先發球方不應連帶脫離對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("setup 階段可切換 targetScore 且保留 mode 與 firstServer", () => {
@@ -54,6 +58,8 @@ describe("scoreboardReducer — 賽前設定", () => {
 		expect(next.mode).toBe("singles");
 		expect(next.firstServer).toBe("them");
 		expect(next.scores).toEqual({ us: 0, them: 0 });
+		// 切換目標分數（獨立計分板）不應連帶產生對戰場次綁定
+		expect(next.matchId).toBeNull();
 	});
 
 	it("playing 階段 ignore SET_MODE", () => {
@@ -96,6 +102,26 @@ describe("scoreboardReducer — 賽前設定", () => {
 		const state: ScoreboardState = { ...createInitialState(), status: "finished" };
 		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 15 });
 		expect(next).toBe(state);
+	});
+
+	it("綁定場次時 setup 階段 ignore SET_TARGET_SCORE", () => {
+		const state: ScoreboardState = {
+			...createInitialState({ matchId: "m1", targetScore: 15 }),
+			status: "setup",
+		};
+		const next = scoreboardReducer(state, { type: "SET_TARGET_SCORE", targetScore: 11 });
+		expect(next).toBe(state);
+	});
+
+	it("綁定場次時 setup 階段仍可切換 firstServer", () => {
+		const state = createInitialState({ matchId: "m1", targetScore: 15 });
+		const next = scoreboardReducer(state, { type: "SET_FIRST_SERVER", team: "them" });
+		// 先發球方是每場現場決定的事，綁定不得連帶鎖住它
+		expect(next.firstServer).toBe("them");
+		expect(next.servingTeam).toBe("them");
+		// 切換後仍留在原場次，且該輪分制不變
+		expect(next.matchId).toBe("m1");
+		expect(next.targetScore).toBe(15);
 	});
 });
 
@@ -174,6 +200,31 @@ describe("scoreboardReducer — UNDO", () => {
 		// targetScore 若在 replay 時被重設為 11，11-0 會被誤判為比賽結束
 		expect(undone.status).toBe("playing");
 	});
+
+	it("UNDO 與 RESET 後保留 matchId，不退回 null", () => {
+		let state = createInitialState({ matchId: "m1" });
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+		// UNDO 以「重建初始 state 後 replay」實作，若未帶入 matchId 會靜默脫離綁定
+		expect(undone.matchId).toBe("m1");
+
+		const resetState = scoreboardReducer(undone, { type: "RESET" });
+		expect(resetState.matchId).toBe("m1");
+	});
+
+	it("UNDO 與 RESET 後保留 courtNumber，不退回 null", () => {
+		let state = createInitialState({ courtNumber: 3 });
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+		// courtNumber 與 matchId 的失效路徑同構：UNDO 以「重建初始 state 後 replay」實作，
+		// 若未帶入 courtNumber 會在使用者按下 Undo 的瞬間靜默清掉場地標示
+		expect(undone.courtNumber).toBe(3);
+
+		const resetState = scoreboardReducer(undone, { type: "RESET" });
+		expect(resetState.courtNumber).toBe(3);
+	});
 });
 
 describe("scoreboardReducer — RESET", () => {
@@ -197,5 +248,19 @@ describe("scoreboardReducer — RESET", () => {
 		expect(next.status).toBe("setup");
 		expect(next.winner).toBeNull();
 		expect(next.history).toEqual([]);
+	});
+});
+
+describe("scoreboardReducer — HYDRATE", () => {
+	it("HYDRATE 原樣保留帶入的 matchId", () => {
+		const persisted: ScoreboardState = {
+			...createInitialState({ matchId: "m1", targetScore: 15 }),
+			scores: { us: 3, them: 2 },
+			status: "playing",
+		};
+		const next = scoreboardReducer(createInitialState(), { type: "HYDRATE", state: persisted });
+		// hydrate 是重整後唯一的還原路徑，此處掉了 matchId 等同每次重整都靜默脫離綁定
+		expect(next.matchId).toBe("m1");
+		expect(next.scores).toEqual({ us: 3, them: 2 });
 	});
 });

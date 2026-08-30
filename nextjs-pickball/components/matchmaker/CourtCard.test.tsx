@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { CourtCard } from "./CourtCard";
 import type { CourtCardProps } from "./CourtCard";
 import type { Player } from "@/lib/matchmaker/types";
-import type { RoundMatch } from "@/lib/matchmaker/round-types";
+import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
 
 // 測試專用預設球員：colorFrom／colorTo 沿用調色盤既有第一組即可，色塊背景本身不是本檔
 // 斷言重點（漸層與對比已由 tile-style.test.ts、colors.test.ts 涵蓋），這裡只需要合法 hex。
@@ -46,8 +46,26 @@ function buildMatch(overrides: Partial<RoundMatch> = {}): RoundMatch {
 	};
 }
 
+// round 只需型別合法：CourtCard 只在使用者點擊計分板入口時才會讀取 round.format／
+// round.targetScore（建立 seed），本檔既有測試皆不涉及點擊入口，給合法預設值即可。
+function buildRound(overrides: Partial<Round> = {}): Round {
+	return {
+		roundNumber: 1,
+		createdAt: "2026-08-23T00:00:00.000Z",
+		format: "singles",
+		courtCount: 1,
+		targetScore: 11,
+		matches: [buildMatch()],
+		restingPlayerIds: [],
+		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+		...overrides,
+	};
+}
+
 // 測試專用預設 props：match／players 給合法單打初始值，其餘 callback 一律用 vi.fn()——
 // CourtCard 不持有任何 store（design Decision 9），測試不需要 mock 任何東西。
+// round／matchSlot 為 8.2 新增的必填 props：round 給合法預設值，matchSlot 預設 null
+// （尚未開始場邊計分），既有測試皆不涉及計分板接線，不受影響。
 function buildProps(overrides: Partial<CourtCardProps> = {}): CourtCardProps {
 	return {
 		match: buildMatch(),
@@ -55,6 +73,8 @@ function buildProps(overrides: Partial<CourtCardProps> = {}): CourtCardProps {
 			buildPlayer({ id: "p1" }),
 			buildPlayer({ id: "p2", name: "陳小華", gender: "female" }),
 		],
+		round: buildRound(),
+		matchSlot: null,
 		onSubmitScore: vi.fn(),
 		submitError: null,
 		...overrides,

@@ -8,9 +8,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
 import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
+import { MATCHMAKER_ROUTE } from "@/lib/matchmaker/section-nav";
 import type { Mode, Team, TargetScore } from "@/lib/scoreboard/types";
 
 // 2026 USA Pickleball 的三種官方分制，皆為 win by 2
@@ -22,6 +24,12 @@ interface ScoreboardSetupProps {
 	targetScore: TargetScore;
 	locked: boolean;
 	isFocusMode: boolean;
+	// 綁定對戰場次時（matchId !== null）設定列改為唯讀目標分數 + 場地標示 + 返回對戰，
+	// 不渲染比賽形式下拉與目標分數 radiogroup（design Decision 8、MODIFIED Requirement）。
+	matchId: string | null;
+	// 綁定模式下顯示的場地標示來源；null 時不渲染場地標示（見 courtNumber 為 null 時
+	// 的呈現決策：與其顯示「場地 -」等佔位文字誤導使用者，不如乾脆不顯示這塊）。
+	courtNumber: number | null;
 	onModeChange: (mode: Mode) => void;
 	onFirstServerChange: (team: Team) => void;
 	onTargetScoreChange: (targetScore: TargetScore) => void;
@@ -43,11 +51,15 @@ export function ScoreboardSetup({
 	targetScore,
 	locked,
 	isFocusMode,
+	matchId,
+	courtNumber,
 	onModeChange,
 	onFirstServerChange,
 	onTargetScoreChange,
 	onToggleFocus,
 }: ScoreboardSetupProps) {
+	const isBound = matchId !== null;
+
 	// 目標分數 radiogroup 的三顆按鈕 DOM 參照，供方向鍵導覽後 .focus() 新選中項
 	const targetScoreButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -69,23 +81,34 @@ export function ScoreboardSetup({
 
 	return (
 		<div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
-			<Select
-				value={mode}
-				onValueChange={(v) => onModeChange(v as Mode)}
-				disabled={locked}
-			>
-				<SelectTrigger className="w-32" aria-label="比賽形式">
-					<SelectValue />
-				</SelectTrigger>
-				{/* position="popper"：shadcn 預設的 "item-aligned" 會把面板上移、讓目前
-				選中項對齊觸發器——設定列緊貼在 navbar 下方，選到第二個選項時面板上緣會
-				壓進 navbar 而把第一個選項切掉一半（實測面板 top 33.8 < navbar bottom 56）。
-				popper 固定在觸發器下方展開並自帶碰撞偵測，不會被上方元素吃掉。 */}
-				<SelectContent position="popper">
-					<SelectItem value="doubles">雙打</SelectItem>
-					<SelectItem value="singles">單打</SelectItem>
-				</SelectContent>
-			</Select>
+			{isBound ? (
+				<>
+					{/* courtNumber 為 null 時不渲染此段——見 props 註解的呈現決策 */}
+					{courtNumber !== null && (
+						<span className="text-sm font-medium">場地 {courtNumber}</span>
+					)}
+					{/* 目標分數由該輪統一決定，UI MUST NOT 提供切換入口（MODIFIED Requirement），
+					故綁定模式不渲染比賽形式下拉，直接略過 */}
+				</>
+			) : (
+				<Select
+					value={mode}
+					onValueChange={(v) => onModeChange(v as Mode)}
+					disabled={locked}
+				>
+					<SelectTrigger className="w-32" aria-label="比賽形式">
+						<SelectValue />
+					</SelectTrigger>
+					{/* position="popper"：shadcn 預設的 "item-aligned" 會把面板上移、讓目前
+					選中項對齊觸發器——設定列緊貼在 navbar 下方，選到第二個選項時面板上緣會
+					壓進 navbar 而把第一個選項切掉一半（實測面板 top 33.8 < navbar bottom 56）。
+					popper 固定在觸發器下方展開並自帶碰撞偵測，不會被上方元素吃掉。 */}
+					<SelectContent position="popper">
+						<SelectItem value="doubles">雙打</SelectItem>
+						<SelectItem value="singles">單打</SelectItem>
+					</SelectContent>
+				</Select>
+			)}
 			<Select
 				value={firstServer}
 				onValueChange={(v) => onFirstServerChange(v as Team)}
@@ -100,31 +123,42 @@ export function ScoreboardSetup({
 					<SelectItem value="them">先發：對方</SelectItem>
 				</SelectContent>
 			</Select>
-			<div
-				role="radiogroup"
-				aria-label="目標分數"
-				className="flex items-center gap-1 rounded-md border border-input p-1"
-				onKeyDown={handleTargetScoreKeyDown}
-			>
-				{TARGET_SCORE_OPTIONS.map((score, index) => (
-					<Button
-						key={score}
-						ref={(el) => {
-							targetScoreButtonRefs.current[index] = el;
-						}}
-						type="button"
-						role="radio"
-						aria-checked={targetScore === score}
-						tabIndex={targetScore === score ? 0 : -1}
-						disabled={locked}
-						variant={targetScore === score ? "default" : "ghost"}
-						size="sm"
-						onClick={() => onTargetScoreChange(score)}
-					>
-						{score}
-					</Button>
-				))}
-			</div>
+			{isBound ? (
+				// 唯讀文字取代 radiogroup：disabled 的互動控制項會暗示「這裡本來可以改」，
+				// 但綁定模式下永遠不會解鎖，唯讀文字才誠實（design Decision 8）
+				<span className="text-sm font-medium">本輪 {targetScore} 分制</span>
+			) : (
+				<div
+					role="radiogroup"
+					aria-label="目標分數"
+					className="flex items-center gap-1 rounded-md border border-input p-1"
+					onKeyDown={handleTargetScoreKeyDown}
+				>
+					{TARGET_SCORE_OPTIONS.map((score, index) => (
+						<Button
+							key={score}
+							ref={(el) => {
+								targetScoreButtonRefs.current[index] = el;
+							}}
+							type="button"
+							role="radio"
+							aria-checked={targetScore === score}
+							tabIndex={targetScore === score ? 0 : -1}
+							disabled={locked}
+							variant={targetScore === score ? "default" : "ghost"}
+							size="sm"
+							onClick={() => onTargetScoreChange(score)}
+						>
+							{score}
+						</Button>
+					))}
+				</div>
+			)}
+			{isBound && (
+				<Button asChild variant="outline" size="sm">
+					<Link href={MATCHMAKER_ROUTE}>返回對戰</Link>
+				</Button>
+			)}
 			<div className="ml-auto">
 				<Button
 					variant="outline"

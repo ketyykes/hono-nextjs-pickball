@@ -10,7 +10,10 @@ export interface MatchmakerSectionTab {
 	readonly active: boolean;
 }
 
-const MATCHMAKER_SECTION_HREFS = ["/matchmaker", "/matchmaker/players"] as const;
+/** matchmaker 主頁路由——對戰頁與計分板返回動線共用此常數，避免路徑字面值重複 */
+export const MATCHMAKER_ROUTE = "/matchmaker";
+
+const MATCHMAKER_SECTION_HREFS = [MATCHMAKER_ROUTE, `${MATCHMAKER_ROUTE}/players`] as const;
 
 const MATCHMAKER_SECTION_LABELS: Record<
 	(typeof MATCHMAKER_SECTION_HREFS)[number],
