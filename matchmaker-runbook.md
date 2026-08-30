@@ -16,7 +16,30 @@
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
 | M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
-| M7～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
+| M7 | **進行中**（2026-08-30，使用者關機暫停）。**24/47**。見下方「M7 中斷點」 |
+| M8～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
+
+## 🔖 M7 中斷點（2026-08-30，使用者關機暫停）
+
+| 項目 | 值 |
+|---|---|
+| Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
+| Branch | `change/matchmaker-history-page`（**保留，未刪**） |
+| Base | `main` @ `85889ca` |
+| HEAD（截至本次落盤） | `ccb8cbd`（docs：更新 tasks.md §3 篩選與排序的完成狀態） |
+| 進度 | **24/47 勾選** |
+| 工作區 | ⚠️ **不乾淨**：`nextjs-pickball/lib/matchmaker/history-range.test.ts`、`history-range.ts` 有未提交變更（§3 或 §4 進行中的 TDD 步驟） |
+| 已完成 | §1（區間切點計算）、§2（區間歸屬）、§3（篩選與排序）3.2～3.6 |
+| 中斷於 | §3 尾聲或 §4 開頭，確切位置**未經確認**——coordinator 已請 leader 停手落盤但關機前未收到確認回報 |
+| 跑過幾棒 | 一棒（`a1aa193b821da7a91`），過程順暢、逐 task commit 紀律良好，**無事故** |
+
+### ▶️ 續跑起點
+
+1. 先盤點未提交的 diff（`git diff nextjs-pickball/lib/matchmaker/history-range.test.ts nextjs-pickball/lib/matchmaker/history-range.ts`），判斷是完整的 TDD 一步還是半成品，完整就補齊紅燈/綠燈證據後 commit，半成品就 `git checkout --` 丟棄後重來。**不可直接採信**，實跑判定。
+2. 對照 `tasks.md` 的 checkbox 與 `git log` 確認實際完成到哪個 task（本檔的「已完成」欄是 coordinator 關機前的粗略推斷，非精確值）。
+3. 剩餘工作：§3 尾聲（若有）→ §4（歷史頁與紀錄呈現，例外層 E2E 驗收）→ §5（導覽入口＋唯讀保證）→ §6（收尾驗證）→ Final Code Review。
+4. `.claude/commands/opsx/apply.md`、`execution-plan.md`、`design.md`、`test-plan.md` 已由第一棒讀過，續棒仍應重讀一次以取得完整脈絡。
+5. 沿用 M6 的硬規則：Implementer 用 `sonnet`、Stage 2 獨立 mutation、`git show <hash>^:<path>` 機械複驗紅燈、跑 E2E/preview 前後查殘留 process、派出 subagent 後不可結束回合、不可用背景 process 跑掉不等結果。
 
 ## ✅ M6 完成紀錄（2026-08-30，供追溯）
 
