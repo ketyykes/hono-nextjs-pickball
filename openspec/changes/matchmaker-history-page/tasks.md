@@ -16,8 +16,8 @@
 
 ## 1. 區間切點計算（`nextjs-pickball/lib/matchmaker/history-range.ts` — 行為邏輯，必 TDD）
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-range.test.ts`，寫入 it「一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日」——以 `now = new Date(2026, 7, 15)`（2026-08-15 週六）呼叫 `computeRangeCutoffs(now)`，斷言 `c0`／`c1`／`c2`／`c3` 依序等於 `new Date(2026, 7, 15)`、`new Date(2026, 7, 10)`、`new Date(2026, 7, 1)`、`new Date(2026, 6, 1)` 的時間戳。跑單檔看到紅燈並貼出輸出（**真紅燈**：模組尚不存在，import 解析失敗）
-- [ ] 1.2 GREEN: 建立 `history-range.ts`，實作 `computeRangeCutoffs(now: Date): RangeCutoffs`，回傳四個當地時區 00:00 的時間戳。此步**先各自獨立計算**四個切點（今天、本週一、當月 1 日、上月 1 日），尚不套用 `min()`——`min()` 由 1.4 依 1.3 的紅燈驅動加入。重跑至綠
+- [x] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-range.test.ts`，寫入 it「一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日」——以 `now = new Date(2026, 7, 15)`（2026-08-15 週六）呼叫 `computeRangeCutoffs(now)`，斷言 `c0`／`c1`／`c2`／`c3` 依序等於 `new Date(2026, 7, 15)`、`new Date(2026, 7, 10)`、`new Date(2026, 7, 1)`、`new Date(2026, 6, 1)` 的時間戳。跑單檔看到紅燈並貼出輸出（**真紅燈**：模組尚不存在，import 解析失敗）
+- [x] 1.2 GREEN: 建立 `history-range.ts`，實作 `computeRangeCutoffs(now: Date): RangeCutoffs`，回傳四個當地時區 00:00 的時間戳。此步**先各自獨立計算**四個切點（今天、本週一、當月 1 日、上月 1 日），尚不套用 `min()`——`min()` 由 1.4 依 1.3 的紅燈驅動加入。重跑至綠
 - [ ] 1.3 RED: 補兩個 it：「跨月週時當月切點取本週一而非當月 1 日」（`now = new Date(2026, 7, 1)`，2026-08-01 週六、本週一為 7/27，斷言 `c1` 與 `c2` 皆為 `new Date(2026, 6, 27)`、`c3` 為 `new Date(2026, 6, 1)`）與「四個切點單調不遞增」（對月初、月中、週一、週日、跨年五組 `now` 逐一斷言 `c3 <= c2 <= c1 <= c0`）。看到紅燈（**真紅燈**：1.2 未套 `min()` 時 `c2 = 8/1 > c1 = 7/27`）
 - [ ] 1.4 GREEN: 依 design Decision 1 逐層套用 `min()`：`c1 = min(本週一, c0)`、`c2 = min(當月 1 日, c1)`、`c3 = min(上月 1 日, c2)`。重跑 1.1／1.3 三個 it 全綠
 - [ ] 1.5 RED: 補 it「週起始為週一，週日的本週一為六天前」——`now = new Date(2026, 7, 16)`（週日），斷言 `c1` 為 `new Date(2026, 7, 10)` 而非 `new Date(2026, 7, 17)`。看到紅燈（若 1.2 已用 `(getDay() + 6) % 7` 正確處理，此項會直接綠燈——**如實標註為 regression guard**，不得偽造紅燈）
