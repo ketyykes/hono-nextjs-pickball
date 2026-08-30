@@ -1,7 +1,7 @@
 // app/matchmaker/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { EmptyStage } from "@/components/matchmaker/EmptyStage";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError } from "@/components/matchmaker/MatchStage";
@@ -27,7 +27,13 @@ export default function MatchmakerPage() {
 	const [settings, setSettings] = useState<RoundSettings>(() => createRoundSettings());
 	const [roundError, setRoundError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null);
-	const [matchSlots, setMatchSlots] = useState<MatchSlots>({});
+	// 用 useReducer 而非 useState 存放 matchSlots：ESLint 的 react-hooks/set-state-in-effect
+	// 規則會擋下「在 effect 內同步呼叫 useState setter」，但不適用於 useReducer 的
+	// dispatch（與 hooks/useScoreboardStore.ts 的 bindingStatus 既有寫法一致）。
+	const [matchSlots, setMatchSlots] = useReducer(
+		(_current: MatchSlots, next: MatchSlots) => next,
+		{} as MatchSlots,
+	);
 
 	const activePlayerCount = players.filter((player) => player.isActive).length;
 	const hasActivePlayers = activePlayerCount > 0;
@@ -40,9 +46,6 @@ export default function MatchmakerPage() {
 	// 已知限制，見該檔頂端註解），同一次呼叫內連續送出多筆會讓後面呼叫的結果覆蓋前面
 	// 的——因此每次 effect 只處理待送出清單的第一筆，dispatch 成功後 round 變動會觸發
 	// 本 effect 重新執行，逐筆收斂直到 collectFinishedSubmissions 回傳空清單為止。
-	// eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意只依賴 round：players／
-	// submitScore 每次 render 都换新參考，列入 deps 會讓本 effect 在每次 render 後都重跑，
-	// 而非只在「回合資料就緒或變動」時才觸發。
 	useEffect(() => {
 		if (round === null) return;
 
@@ -61,7 +64,12 @@ export default function MatchmakerPage() {
 		}
 		// 其餘待送出項目留給下一次 effect 執行（round 因本次 dispatch 而變動後）處理，
 		// 這裡先反映目前讀到的槽（含尚未處理的那些），避免畫面短暫顯示錯誤的計分中狀態。
+		//
+		// 依賴陣列刻意只放 round：players／submitScore 每次 render 都换新參考，
+		// 列入 deps 會讓本 effect 在每次 render 後都重跑，而非只在「回合資料就緒
+		// 或變動」時才觸發。
 		setMatchSlots(slots);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [round]);
 
 	// generateRound 一次互動只呼叫一次（useRoundStore 的已知限制，見該檔註解）：
