@@ -26,20 +26,30 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
 | Branch | `change/matchmaker-history-page`（**保留，未刪**） |
 | Base | `main` @ `85889ca` |
-| HEAD | `9f32023`（docs：落盤 §3 Stage 2 審查結論） |
-| 進度 | **24/47 勾選、30 個 commit** |
+| HEAD | `fd4f725`（refactor：抽出單一 E2E 紀錄 fixture 組裝函式，§4.9） |
+| 進度 | **33/47 勾選** |
 | 工作區 | ✅ **乾淨** |
-| 已完成 | §1 區間切點計算（11 task）、§2 區間歸屬（7 task）、§3 篩選與排序（6 task）——**三組全部完成兩階段審查、0 Blocking** |
-| 未開工 | §4～§6（23 task）＋ Final Code Review |
-| 品質狀態 | 前端 **57 檔／486 tests 全綠**、`tsc` exit 0 |
-| 跑過幾棒 | 一棒 leader（`a1aa193b821da7a91`，逐 task commit 紀律良好、**無事故**）＋ coordinator 親跑 §3 兩階段審查 |
+| 已完成 | §1（11 task）、§2（7 task）、§3（6 task）——**三組皆已完成兩階段審查、0 Blocking**；§4 歷史頁與紀錄呈現（9 task）——**實作完成，但兩階段審查皆未跑** |
+| 未開工 | §5（5 task）、§6（9 task）＋ Final Code Review |
+| 跑過幾棒 | 兩棒 leader ＋ coordinator 親跑 §3 兩階段審查。**第二棒（§4）於 §4 做完後停擺**（stream watchdog 判定 600 秒無進度），停在乾淨邊界 |
 
-### ▶️ 續跑起點：§4.1（§1～§3 皆已結案，不需重跑任何審查）
+### ▶️ 續跑起點：先補 §4 的兩階段審查，再進 §5.1
 
-1. **§4.1**：新增 `tests/e2e/specs/matchmaker-history.spec.ts` 的兩個 E2E test，真紅燈為路由不存在的 404。§4 起進入例外層（`app/**/page.tsx` 與純呈現元件），RED 一律由 Playwright E2E 承擔。
-2. §4／§5 的 Implementer **MUST 用 `sonnet` 起跳**（本專案常設覆寫）。
-3. 開工前必看 `design.md` Open Questions 的三件事：§4 的 E2E seed 容器形狀為 `{"version":1,"entries":[...]}`；§5 的 `section-nav.ts` 因 M6 合併有行號位移、且該檔**兩個常數皆未 export**；分頁順序為「對戰／參賽者／歷史／資料」。
-4. **§3 Stage 2 留給 §4 的一則 Nit**：`filterHistoryByRange` 對空陣列無測試——若 §4 要呈現「今日無紀錄」的空狀態，該情境屆時須由 E2E 覆蓋。
+1. **§4 的 Stage 1／Stage 2 皆未跑**，審查範圍 `git log --oneline 9f32023..fd4f725`。§1～§3 已結案，**不需重跑**。
+2. §5／§6 的 Implementer **MUST 用 `sonnet` 起跳**（本專案常設覆寫）。
+3. 開工前必看 `design.md` Open Questions：§5 的 `section-nav.ts` 因 M6 合併有行號位移、且該檔**兩個常數皆未 export**；分頁順序為「對戰／參賽者／歷史／資料」；§5.3 的 seed **MUST 全數使用合法紀錄**（`readHistory()` 在 `droppedCount > 0` 時會回寫 localStorage，會讓「內容不變」失守）。
+4. **§6.8 的第 ⑤ 項已由 coordinator 在 §3 Stage 2 實測確認轉紅**（出處：`design.md` 第 7 點），可直接引用不必重跑；①～④ 仍須實跑。
+
+### ⚠️ 第二棒停擺又洩漏了 9 個 process（同一個坑第二次）
+
+停擺當下 `pnpm dev` 的整組 process（`next dev` + 兩組 `wrangler dev` + 四個 `workerd`）全部留著，佔用 `:3005` 與 `:8787`，由 coordinator 手動清除。**這與 M6 第九棒是同一個失敗模式。**
+
+**派工單已寫了「跑完立刻清掉自己起的 process」仍然發生**——因為 leader 是**非自願**中斷（watchdog 判定停擺），根本來不及執行清理。結論：**這條規則對非自願中斷無效，coordinator MUST 在每次收到 leader 失敗／停擺通知後主動查殘留**：
+
+```bash
+lsof -i :3005 -i :8787
+ps aux | grep -E "wrangler|workerd|next" | grep <worktree 名稱>
+```
 
 ### 📌 §3 Stage 2 抓到的真缺口：`range` 參數零覆蓋（本輪最有價值的發現）
 
