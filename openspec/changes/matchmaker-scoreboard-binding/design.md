@@ -686,3 +686,18 @@
     依 execution-plan 的 Escalation（「計畫本身錯誤 → 升級給人類」），此項 MUST 由 coordinator 追認。
     若 coordinator 不同意放寬，替代方案是把第 4～6 項回復原狀並改為在 §9.5 明列為「已知的預期失敗」，
     但那會讓 `pnpm test` 無法全綠，與 §9.5 的「前後端皆綠」直接衝突，因此不建議。
+
+17. **coordinator 對第 16 項的裁決：核可六處，不回復三處（2026-08-30）**
+
+    理由：① 新增的三處全部是 design Decision 7 早已預告的必然連帶，不是本輪臨時擴權；
+    ② §8 Stage 1 對三處逐項做過獨立裁決而非採信 Implementer 自述，且明確驗證第 4 項的
+    反轉斷言不是恆真（退回舊寫法仍會轉紅）；③ 第 6 項「不要動」的 e2e 已核對第 386～401 行
+    核心斷言逐字未改，動的只是前置情境建立手法；④ 替代方案（回復三處、在 §9.5 列為已知
+    預期失敗）會讓 `pnpm test` 無法全綠，直接違反 §9.5 本身要求，反而更差。
+    **維持六處，續作者可直接依 tasks.md §9.5 現有表格執行，不需再等待。**
+
+    另：本項確認時同步查核第八棒遺留的 Blocking #1（§8 Stage 1 找到的回填 e2e「其他場次不受影響」
+    零覆蓋），已由該棒派出的 Implementer 於 leader 回報後續完成並提交 `6b816f9`，
+    mutation 驗證（暫時改 `clearAllMatchSlots()` 觀察轉紅）通過，5 個 browser project 全綠，
+    `git status` 乾淨。**續作者不需重做，直接對此 commit 跑 §8 Stage 2（Code-Quality Reviewer,
+    opus）即可**。
