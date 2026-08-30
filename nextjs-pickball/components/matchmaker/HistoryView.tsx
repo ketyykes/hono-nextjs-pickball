@@ -49,7 +49,12 @@ export function HistoryView() {
 			<HistoryRangeFilter value={selectedRange} onChange={setSelectedRange} />
 
 			{entries.length === 0 ? (
-				<EmptyHistory />
+				// 整份歷史完全沒有資料：引導型空狀態（spec「空區間的友善空狀態」）。
+				<EmptyHistory range={null} />
+			) : filteredEntries.length === 0 ? (
+				// 整份歷史非空，只是目前區間內沒有紀錄：MUST 視為正常結果而非錯誤，
+				// 跨月週使「本月」成為空區間即屬此分支（design Risks）。
+				<EmptyHistory range={selectedRange} />
 			) : (
 				<div className="flex flex-col gap-3">
 					{filteredEntries.map((entry) => (
