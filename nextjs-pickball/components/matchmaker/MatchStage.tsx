@@ -5,6 +5,7 @@ import { CourtCard } from "./CourtCard";
 import { RestingPanel } from "./RestingPanel";
 import type { Player } from "@/lib/matchmaker/types";
 import type { Round } from "@/lib/matchmaker/round-types";
+import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 /** 送出比分失敗時要顯示在哪一場地卡片上——nested 而非攤平：matchId 決定「哪一格」、
  * message 是要顯示的內容，兩者只在同一次失敗時同時存在，拆成兩個獨立 props 會讓
@@ -18,6 +19,9 @@ export interface MatchStageProps {
 	round: Round;
 	players: readonly Player[];
 	hasActivePlayers: boolean;
+	// 各場次的計分板槽（matchId → 槽 state），由對戰頁的 reconcile effect 提供，
+	// 供各場地區塊呈現「計分中」標示（見 CourtCard 的 matchSlot 用途）。
+	matchSlots: MatchSlots;
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: MatchStageSubmitError | null;
 }
@@ -36,7 +40,14 @@ export interface MatchStageProps {
 // 而非同時疊加 height：min-height 會在比較後取較大值蓋掉原本較小的固定 height，
 // 效果等同又不必同時宣告兩個屬性。作用範圍僅本容器內的 input／button（court 網格），
 // 不影響 RoundControls 或 MatchmakerTabs 的按鈕。
-export function MatchStage({ round, players, hasActivePlayers, onSubmitScore, submitError }: MatchStageProps) {
+export function MatchStage({
+	round,
+	players,
+	hasActivePlayers,
+	matchSlots,
+	onSubmitScore,
+	submitError,
+}: MatchStageProps) {
 	const resting = round.restingPlayerIds
 		.map((id) => players.find((player) => player.id === id))
 		.filter((player): player is Player => player !== undefined);
@@ -52,6 +63,8 @@ export function MatchStage({ round, players, hasActivePlayers, onSubmitScore, su
 						key={match.id}
 						match={match}
 						players={players}
+						round={round}
+						matchSlot={matchSlots[match.id] ?? null}
 						onSubmitScore={onSubmitScore}
 						submitError={submitError?.matchId === match.id ? submitError.message : null}
 					/>

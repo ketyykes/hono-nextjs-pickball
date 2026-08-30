@@ -1,7 +1,7 @@
 // app/matchmaker/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EmptyStage } from "@/components/matchmaker/EmptyStage";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError } from "@/components/matchmaker/MatchStage";
@@ -10,6 +10,8 @@ import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
+import { readMatchSlots } from "@/lib/scoreboard/match-slots";
+import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點
 // （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
@@ -24,9 +26,22 @@ export default function MatchmakerPage() {
 	const [settings, setSettings] = useState<RoundSettings>(() => createRoundSettings());
 	const [roundError, setRoundError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null);
+	const [matchSlots, setMatchSlots] = useState<MatchSlots>({});
 
 	const activePlayerCount = players.filter((player) => player.isActive).length;
 	const hasActivePlayers = activePlayerCount > 0;
+
+	// 讀取各場次的計分板槽狀態（spec「計分中場次的標示與返回後呈現」）：以「回合已
+	// hydrate」為觸發條件（依賴陣列只放 round），而非獨立的 mount effect——mount 當下
+	// round 可能仍是 useRoundStore hydrate 前的 null，此時讀到的槽無法對應任何場次。
+	// 回填 reconcile（design Decision 5）由 8.4 接續擴充本 effect，此處先只負責讀取
+	// 顯示用的槽狀態。
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意只依賴 round：round
+	// 變動（產生新一輪／重排／完成一場）才需要重新讀取計分板槽。
+	useEffect(() => {
+		if (round === null) return;
+		setMatchSlots(readMatchSlots().slots);
+	}, [round]);
 
 	// generateRound 一次互動只呼叫一次（useRoundStore 的已知限制，見該檔註解）：
 	// 本函式是 RoundControls／EmptyStage 兩個入口共用的唯一呼叫點。
@@ -86,6 +101,7 @@ export default function MatchmakerPage() {
 						round={round}
 						players={players}
 						hasActivePlayers={hasActivePlayers}
+						matchSlots={matchSlots}
 						onSubmitScore={handleSubmitScore}
 						submitError={submitError}
 					/>
