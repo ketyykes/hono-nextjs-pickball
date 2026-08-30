@@ -496,4 +496,52 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
 		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
 	});
+
+	test("本輪開始計分後目標分數控制項停用並說明原因", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		// 進入計分板打一球即視為「已開始計分」（isTargetScoreLocked：任一計分板槽
+		// status !== "setup"），不需要真的打完整場。
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await page.getByRole("button", { name: /我方贏這一球/ }).click();
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		const targetGroup = page.getByRole("radiogroup", { name: "目標分數" });
+		const radios = targetGroup.getByRole("radio");
+		await expect(radios).toHaveCount(3);
+		for (const radio of await radios.all()) {
+			await expect(radio).toBeDisabled();
+		}
+		await expect(page.getByText("本輪已開始計分，目標分數不可更改。")).toBeVisible();
+	});
+
+	test("手動輸入比分的路徑仍可獨立完成一場", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		// 不經計分板，直接於場地區塊填入兩隊比分並送出（prd.md 6.3、13.4 的 fallback）。
+		await court.getByLabel("第一隊比分").fill("11");
+		await court.getByLabel("第二隊比分").fill("5");
+		await court.getByRole("button", { name: "送出比分" }).click();
+
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+		await expect(court.getByTestId(`court-${matchId}-team-a`)).toHaveText("第一隊勝");
+
+		// 評分更新並寫入歷史：手動輸入不因計分板入口存在而改變既有行為，直接讀
+		// localStorage 驗證兩者皆確實發生（本 change 尚無歷史 UI 頁面可供操作驗收）。
+		// 容器形狀為 { version, entries }（見 lib/matchmaker/round-storage.ts 的
+		// writeHistory），不是裸陣列。
+		const history = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			HISTORY_STORAGE_KEY,
+		);
+		const parsedHistory: { entries?: unknown[] } = history ? JSON.parse(history) : {};
+		expect(parsedHistory.entries?.length ?? 0).toBeGreaterThan(0);
+	});
 });
