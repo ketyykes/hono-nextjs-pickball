@@ -47,4 +47,25 @@ describe("history-range", () => {
 
 		expect(c1).toBe(new Date(2026, 7, 10).getTime());
 	});
+
+	it("切點為當地時區 00:00 而非 UTC 00:00", () => {
+		const now = new Date(2026, 7, 15, 23, 30); // 當地 2026-08-15 23:30
+
+		const { c0 } = computeRangeCutoffs(now);
+		const c0Date = new Date(c0);
+
+		expect(c0Date.getHours()).toBe(0);
+		expect(c0Date.getMinutes()).toBe(0);
+		expect(c0Date.getSeconds()).toBe(0);
+		expect(c0Date.getMilliseconds()).toBe(0);
+		expect(c0).toBe(new Date(2026, 7, 15).getTime());
+	});
+
+	it("一月時上月切點落在去年 12 月 1 日", () => {
+		const now = new Date(2027, 0, 5); // 2027-01-05
+
+		const { c3 } = computeRangeCutoffs(now);
+
+		expect(c3).toBe(new Date(2026, 11, 1).getTime());
+	});
 });
