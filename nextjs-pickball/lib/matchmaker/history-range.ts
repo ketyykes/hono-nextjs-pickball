@@ -98,11 +98,13 @@ function recordTime(entry: MatchHistoryEntry): number {
  * 篩選出指定區間內的歷史紀錄，並依對戰時間由新到舊排序。
  */
 export function filterHistoryByRange(
-	entries: MatchHistoryEntry[],
+	entries: readonly MatchHistoryEntry[],
 	range: HistoryRange,
 	now: Date,
 ): MatchHistoryEntry[] {
+	// slice() 先複製一份再排序，避免 sort() 原地改動呼叫端持有的輸入陣列。
 	return entries
+		.slice()
 		.sort((a, b) => recordTime(b) - recordTime(a))
 		.filter((entry) => rangeOfTime(recordTime(entry), now) === range);
 }
