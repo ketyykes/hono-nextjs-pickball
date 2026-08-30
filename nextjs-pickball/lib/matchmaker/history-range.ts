@@ -11,12 +11,14 @@ export interface RangeCutoffs {
 }
 
 /**
- * 歷史頁五個區間的具名鍵值，由近至遠排列，供 §2 的 `rangeOfTime()` 回傳型別、
- * 以及 §3 起 UI 端逐一渲染分頁時共用同一份順序（design Decision 8）。
+ * 歷史頁五個區間的具名鍵值，由近至遠排列，供 `rangeOfTime()` 回傳型別、
+ * 以及 UI 端逐一渲染分頁時共用同一份順序（design Decision 8）。
+ *
+ * 順序本身有語意：`rangeOfTime()` 以索引對應切點序列，調整排列會改變區間判定結果。
  */
 export const HISTORY_RANGES = ["today", "thisWeek", "thisMonth", "lastMonth", "earlier"] as const;
 
-/** `HISTORY_RANGES` 的元素型別，供 §2 的 `rangeOfTime()` 作為回傳型別。 */
+/** `HISTORY_RANGES` 的元素型別，供 `rangeOfTime()` 作為回傳型別。 */
 export type HistoryRange = (typeof HISTORY_RANGES)[number];
 
 /**
