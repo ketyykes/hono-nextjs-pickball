@@ -142,4 +142,12 @@ describe("history-range", () => {
 		expect(rangeOfTime(c3, now)).toBe("lastMonth");
 		expect(rangeOfTime(c3 - 1, now)).toBe("earlier");
 	});
+
+	it("晚於現在的時間點仍歸入今日而非落空", () => {
+		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00
+		const t = new Date(2026, 7, 15, 23, 59).getTime(); // 晚於「現在」
+
+		expect(() => rangeOfTime(t, now)).not.toThrow();
+		expect(rangeOfTime(t, now)).toBe("today");
+	});
 });
