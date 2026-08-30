@@ -29,6 +29,12 @@ function isoLastMonth(day = 15, hour = 10): string {
 function isoEarlier(): string {
 	return new Date(2000, 0, 1, 10, 0, 0).toISOString();
 }
+// 跨月週固定情境：假時鐘固定於 2026-08-01（週六），該週週一落在 2026-07-27，
+// 使「本月」（8/1 起算的當月）與「本週」的左端點皆為 7/27，讓「本月」自然成為
+// 空區間（design Risks：跨月週時本月顯示空狀態而非錯誤）。
+function isoCrossMonthWeek(day: number, hour = 10): string {
+	return new Date(2026, 6, day, hour, 0, 0).toISOString();
+}
 
 // 種入一批歷史紀錄：外層容器 MUST 是 { version: 1, entries: [...] }（round-storage.ts
 // 的 writeHistory() 寫入形狀），裸陣列會被 readHistory() 判為結構層級損壞而整份清空。
@@ -41,6 +47,29 @@ function seedHistory(page: Page, entries: unknown[]) {
 		},
 		{ key: HISTORY_STORAGE_KEY, value: JSON.stringify({ version: 1, entries }) },
 	);
+}
+
+// 最小的單打紀錄 fixture：欄位形狀複製自 lib/matchmaker/history.ts 的
+// MatchHistoryEntrySchema（singles 分支）。跨月週測試只需分辨「哪幾筆該出現」，
+// 不需要 8.2 全部欄位的細節斷言（那些由 4.5／4.6 的三個 test 專責覆蓋）。
+function buildSinglesEntry(matchId: string, playedAt: string, playerName: string) {
+	return {
+		matchId,
+		courtNumber: 1,
+		playedAt,
+		format: "singles" as const,
+		teamA: {
+			players: [{ id: `${matchId}-a`, name: playerName, ratingBefore: 3.5, ratingAfter: 3.6 }],
+			rating: 3.5,
+		},
+		teamB: {
+			players: [{ id: `${matchId}-b`, name: `${playerName}的對手`, ratingBefore: 3.4, ratingAfter: 3.3 }],
+			rating: 3.4,
+		},
+		scoreA: 11,
+		scoreB: 5,
+		winner: "teamA" as const,
+	};
 }
 
 test.describe("/matchmaker/history 對戰歷史頁", () => {
@@ -275,5 +304,33 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		const card = page.getByTestId(`history-record-${matchId}`);
 		await expect(card.getByText("4.20")).toBeVisible();
 		await expect(card.getByText("4.35")).toBeVisible();
+	});
+
+	test("跨月週時本月顯示空狀態而非錯誤", async ({ page }) => {
+		const days = [27, 28, 29, 30, 31];
+		const entries = days.map((day) =>
+			buildSinglesEntry(`e2e-history-crossmonth-${day}`, isoCrossMonthWeek(day), `跨月週球員${day}`),
+		);
+		await seedHistory(page, entries);
+
+		// MUST 在 page.goto() 之前呼叫：只固定 Date，不暫停 timer（design Risks）。
+		await page.clock.setFixedTime(new Date(2026, 7, 1, 12, 0, 0));
+		await page.goto(HISTORY_PAGE);
+
+		await page.getByRole("radio", { name: "本月" }).click();
+
+		// 本月為空：友善空狀態可見，且不出現任何錯誤字樣（正向斷言空狀態本身，
+		// 不只是斷言「沒有錯誤」——避免頁面整個壞掉、什麼都沒 render 時誤判通過）。
+		await expect(page.getByTestId("empty-history-range")).toBeVisible();
+		await expect(page.getByTestId(/^history-record-e2e-history-crossmonth-/)).toHaveCount(0);
+		const bodyText = await page.locator("body").innerText();
+		expect(bodyText).not.toMatch(/Error/);
+
+		await page.getByRole("radio", { name: "本週" }).click();
+
+		// 本週如常列出該批紀錄：正向對照，證明不是整份資料都消失。
+		for (const day of days) {
+			await expect(page.getByTestId(`history-record-e2e-history-crossmonth-${day}`)).toBeVisible();
+		}
 	});
 });
