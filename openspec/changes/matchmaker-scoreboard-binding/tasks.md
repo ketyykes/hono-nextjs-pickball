@@ -437,8 +437,8 @@ Depends on: §4、§5、§6、§7
   丟棄後複驗：三個 test 於 chromium **3/3 全紅**（testid 不存在／入口連結點不到），紅燈為真。
   被丟棄的內容另存為 leader 手上的 prior-art patch，交給 Implementer 當**參考而非答案**，逐 task 重新導出。
 
-- [ ] 8.1 RED: 於 `scoreboard-binding.spec.ts` 補三個 test：「計分中的場次顯示計分中標示與當前比分」、「未完成的計分進度可離開後再進入接續」、「多場地同時計分時各場進度互不覆蓋」。前置以真實路徑鋪設（建立參賽者 → 產生本輪對戰）；耗時不可接受時才改用 `page.addInitScript` 直接寫入 `matchmaker:round:v1`，並於檔頭註明 schema 複製來源（design Risks）。確認紅燈
-- [ ] 8.2 GREEN: M5 的場地色塊元件加入「進入計分板／繼續計分」入口（點擊時先 `ensureMatchSlot` 再導向 `/scoreboard?match=<matchId>`，順序不可對調）與「計分中」文字標示＋當前比分
+- [x] 8.1 RED: 於 `scoreboard-binding.spec.ts` 補三個 test：「計分中的場次顯示計分中標示與當前比分」、「未完成的計分進度可離開後再進入接續」、「多場地同時計分時各場進度互不覆蓋」。前置以真實路徑鋪設（建立參賽者 → 產生本輪對戰）；耗時不可接受時才改用 `page.addInitScript` 直接寫入 `matchmaker:round:v1`，並於檔頭註明 schema 複製來源（design Risks）。確認紅燈。**結果**：沿用第七棒遺留草稿並修正兩處 side-out 記分換算錯誤（接發方第一次贏球只換發球權不得分），chromium 3/3 真紅（找不到「進入計分板」入口），commit `2403d73`
+- [x] 8.2 GREEN: M5 的場地色塊元件加入「進入計分板／繼續計分」入口（點擊時先 `ensureMatchSlot` 再導向 `/scoreboard?match=<matchId>`，順序不可對調）與「計分中」文字標示＋當前比分。**結果**：CourtCard 新增必填 `round`／`matchSlot` props（不採前七棒草稿的 optional 寫法，理由：兩者在實際版面下必然由 MatchStage 提供，放寬成 optional 只是為了遷就舊測試，型別因此鬆掉），對戰頁新增讀取 `scoreboard:matches:v1` 的 effect（依賴 `round`）。8.1 三個 test 於 5 個 browser project 全綠（15/15），56 檔／468 單元測試全綠，commit `4c2533a`
 - [ ] 8.3 RED: 補兩個 test：「由計分板判定勝負後返回，比分自動回填且該場轉為已完成」、「已完成場次不顯示進入計分板入口」。確認紅燈
 - [ ] 8.4 GREEN: 對戰頁在回合資料就緒後執行 reconcile（以「回合已 hydrate」為觸發條件，不用獨立的 mount effect，見 design Risks），把 `collectFinishedSubmissions` 的結果逐筆送進 §0.2 的送出入口（`useRoundStore().submitScore(matchId, rawScoreA, rawScoreB)`，比分需轉為字串）並清槽；已完成場次不渲染入口
 - [ ] 8.5 RED: **更新 M5 既有的 `nextjs-pickball/components/matchmaker/RoundControls.test.tsx`**（`match-stage` delta 的 MODIFIED「目標分數選擇器」）：
