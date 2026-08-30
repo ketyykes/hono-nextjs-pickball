@@ -32,7 +32,7 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 補兩個 it：「任一時間點恰好落入五個區間中的一個」（`now = 2026-08-15`，取一組含 `new Date(1970, 0, 1)` 與 `new Date(2100, 0, 1)` 兩個極端值、橫跨五個區間的時間點，對每點以五個區間範圍逐一判定，斷言恰有一個成立且與 `rangeOfTime` 回傳值一致）與「時間點恰為切點時歸入較新的區間」（`t` 為 `c0`／`c1`／`c2`／`c3` 時依序得 `"today"`／`"thisWeek"`／`"thisMonth"`／`"lastMonth"`，`c3 - 1` 得 `"earlier"`）。看到紅燈（**真紅燈**：`rangeOfTime` 尚不存在）
+- [x] 2.1 RED: 補兩個 it：「任一時間點恰好落入五個區間中的一個」（`now = 2026-08-15`，取一組含 `new Date(1970, 0, 1)` 與 `new Date(2100, 0, 1)` 兩個極端值、橫跨五個區間的時間點，對每點以五個區間範圍逐一判定，斷言恰有一個成立且與 `rangeOfTime` 回傳值一致）與「時間點恰為切點時歸入較新的區間」（`t` 為 `c0`／`c1`／`c2`／`c3` 時依序得 `"today"`／`"thisWeek"`／`"thisMonth"`／`"lastMonth"`，`c3 - 1` 得 `"earlier"`）。看到紅燈（**真紅燈**：`rangeOfTime` 尚不存在）**真紅燈**：`TypeError: rangeOfTime is not a function`，2 個 it 失敗
 - [ ] 2.2 GREEN: 實作 `rangeOfTime(time, now): HistoryRange`，依 design Decision 8 採由新到遠的單向 `if / else if` 掃描（`>= c0` → today、`>= c1` → thisWeek、`>= c2` → thisMonth、`>= c3` → lastMonth、否則 earlier），最後一個分支**無條件回傳**，不得有 `undefined` 或 `throw` 路徑。重跑至綠
 - [ ] 2.3 RED: 補 it「晚於現在的時間點仍歸入今日而非落空」——`now` 為 2026-08-15 20:00、`t` 為 2026-08-15 23:59，斷言回傳 `"today"` 且不拋出例外。看到紅燈（若 2.2 未替今日設上界則為 regression guard，**如實標註**；若 2.2 誤照 PRD 表格寫成 `t <= now` 的上界則為真紅燈）
 - [ ] 2.4 GREEN: 確認今日的上界為 `+∞`（實作上即「不設上界」），SHALL NOT 以「現在」為上界（design Decision 3）。重跑至綠

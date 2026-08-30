@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeRangeCutoffs } from "./history-range";
+import { computeRangeCutoffs, rangeOfTime, HISTORY_RANGES } from "./history-range";
+import type { HistoryRange } from "./history-range";
 
 describe("history-range", () => {
 	it("一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日", () => {
@@ -94,5 +95,51 @@ describe("history-range", () => {
 			c2: new Date(2026, 7, 1).getTime(),
 			c3: new Date(2026, 6, 1).getTime(),
 		});
+	});
+
+	it("任一時間點恰好落入五個區間中的一個", () => {
+		const now = new Date(2026, 7, 15); // 2026-08-15
+		const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
+
+		// 橫跨五個區間並含兩個極端值的取樣時間點。
+		const samples = [
+			new Date(1970, 0, 1).getTime(), // 遠早於 c3，落入更早
+			c3 - 1, // 剛好落不進上月，落入更早
+			c3, // 上月左端點
+			c2 - 1, // 上月最後一毫秒
+			c2, // 本月左端點（此 now 下與 c1 相同，本月為空，見另一 it）
+			c1, // 本週左端點
+			c0 - 1, // 本週最後一毫秒
+			c0, // 今日左端點
+			c0 + 1000, // 今日內
+			new Date(2100, 0, 1).getTime(), // 遠晚於 c0，落入今日
+		];
+
+		for (const t of samples) {
+			// 獨立於 rangeOfTime 本身，直接依 spec 的半開區間定義寫出五個區間 predicate。
+			const predicates: Record<HistoryRange, boolean> = {
+				today: t >= c0,
+				thisWeek: t >= c1 && t < c0,
+				thisMonth: t >= c2 && t < c1,
+				lastMonth: t >= c3 && t < c2,
+				earlier: t < c3,
+			};
+
+			const matched = HISTORY_RANGES.filter((range) => predicates[range]);
+
+			expect(matched).toHaveLength(1);
+			expect(rangeOfTime(t, now)).toBe(matched[0]);
+		}
+	});
+
+	it("時間點恰為切點時歸入較新的區間", () => {
+		const now = new Date(2026, 7, 15); // 2026-08-15
+		const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
+
+		expect(rangeOfTime(c0, now)).toBe("today");
+		expect(rangeOfTime(c1, now)).toBe("thisWeek");
+		expect(rangeOfTime(c2, now)).toBe("thisMonth");
+		expect(rangeOfTime(c3, now)).toBe("lastMonth");
+		expect(rangeOfTime(c3 - 1, now)).toBe("earlier");
 	});
 });
