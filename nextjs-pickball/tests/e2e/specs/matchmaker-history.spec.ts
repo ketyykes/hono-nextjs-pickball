@@ -110,6 +110,15 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		}, HISTORY_STORAGE_KEY);
 	});
 
+	test("可由對戰頁的連結進入歷史頁", async ({ page }) => {
+		await page.goto("/matchmaker");
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await nav.getByRole("link", { name: "歷史", exact: true }).click();
+
+		await expect(page).toHaveURL(/\/matchmaker\/history$/);
+		await expect(page.getByRole("heading", { name: "對戰歷史" })).toBeVisible();
+	});
+
 	test("直接開啟 /matchmaker/history 可載入歷史頁", async ({ page }) => {
 		await page.goto(HISTORY_PAGE);
 
