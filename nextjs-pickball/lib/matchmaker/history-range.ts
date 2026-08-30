@@ -90,6 +90,12 @@ export function rangeOfTime(time: number, now: Date): HistoryRange {
 	return HISTORY_RANGES[4];
 }
 
+/**
+ * 對戰時間的唯一取值點：M4 欄位命名的唯一對齊點（design Decision 4）。
+ *
+ * `filterHistoryByRange` 依此欄位判定歸屬區間與排序順序，若日後 `playedAt`
+ * 改名或改型別，只需改這一個函式，不必到呼叫端逐一尋找散落的欄位讀取。
+ */
 function recordTime(entry: MatchHistoryEntry): number {
 	return new Date(entry.playedAt).getTime();
 }
