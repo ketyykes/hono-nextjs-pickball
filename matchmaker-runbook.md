@@ -26,20 +26,30 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
 | Branch | `change/matchmaker-history-page`（**保留，未刪**） |
 | Base | `main` @ `85889ca` |
-| HEAD（截至本次落盤） | `ccb8cbd`（docs：更新 tasks.md §3 篩選與排序的完成狀態） |
-| 進度 | **24/47 勾選** |
-| 工作區 | ⚠️ **不乾淨**：`nextjs-pickball/lib/matchmaker/history-range.test.ts`、`history-range.ts` 有未提交變更（§3 或 §4 進行中的 TDD 步驟） |
-| 已完成 | §1（區間切點計算）、§2（區間歸屬）、§3（篩選與排序）3.2～3.6 |
-| 中斷於 | §3 尾聲或 §4 開頭，確切位置**未經確認**——coordinator 已請 leader 停手落盤但關機前未收到確認回報 |
-| 跑過幾棒 | 一棒（`a1aa193b821da7a91`），過程順暢、逐 task commit 紀律良好，**無事故** |
+| HEAD | `018b631`（docs：記錄 apply 中斷點，24/47） |
+| 進度 | **24/47 勾選、26 個 commit** |
+| 工作區 | ✅ **乾淨**（leader 已依指示落盤後停手） |
+| 已完成 | §1 區間切點計算（11 task，Stage 1 PASS／Stage 2 PASS_WITH_NITS、0 Blocking）、§2 區間歸屬（7 task，兩階段皆 PASS）、**§3 篩選與排序實作完成但兩階段審查皆未跑** |
+| 未開工 | §4～§6（23 task）＋ Final Code Review |
+| 跑過幾棒 | 一棒（`a1aa193b821da7a91`），逐 task commit 紀律良好，**無事故**，中斷純因使用者關機 |
 
-### ▶️ 續跑起點
+### ▶️ 續跑起點：先補 §3 的兩階段審查，再進 §4.1
 
-1. 先盤點未提交的 diff（`git diff nextjs-pickball/lib/matchmaker/history-range.test.ts nextjs-pickball/lib/matchmaker/history-range.ts`），判斷是完整的 TDD 一步還是半成品，完整就補齊紅燈/綠燈證據後 commit，半成品就 `git checkout --` 丟棄後重來。**不可直接採信**，實跑判定。
-2. 對照 `tasks.md` 的 checkbox 與 `git log` 確認實際完成到哪個 task（本檔的「已完成」欄是 coordinator 關機前的粗略推斷，非精確值）。
-3. 剩餘工作：§3 尾聲（若有）→ §4（歷史頁與紀錄呈現，例外層 E2E 驗收）→ §5（導覽入口＋唯讀保證）→ §6（收尾驗證）→ Final Code Review。
-4. `.claude/commands/opsx/apply.md`、`execution-plan.md`、`design.md`、`test-plan.md` 已由第一棒讀過，續棒仍應重讀一次以取得完整脈絡。
+1. **§3 的 Stage 1／Stage 2 尚未跑**，審查範圍 `2d1e1f2..ba4eb5c`（8 個 commit）。Stage 2 MUST 自行獨立 mutation，**不可採信** §3 Implementer 自述（它自測時已發現 1 組存活並補了斷言 `ba4eb5c`，但那組未經獨立複核）。
+2. 補審通過後才進 **§4.1**。
+3. **完整續跑手記在 `design.md` 的 `## Open Questions` 第 5 點**（leader 親自寫的，比本檔詳細），含三件開工前就該知道的事：
+   - §4 的 E2E seed 容器形狀為 `{"version":1,"entries":[...]}`
+   - §5 的 `section-nav.ts` 因 M6 合併有行號位移，且該檔**兩個常數皆未 export**
+   - 分頁順序為「對戰／參賽者／歷史／資料」
+4. 剩餘：§3 補審 → §4（歷史頁與紀錄呈現，例外層 E2E 驗收）→ §5（導覽入口＋唯讀保證）→ §6（收尾驗證）→ Final Code Review。
 5. 沿用 M6 的硬規則：Implementer 用 `sonnet`、Stage 2 獨立 mutation、`git show <hash>^:<path>` 機械複驗紅燈、跑 E2E/preview 前後查殘留 process、派出 subagent 後不可結束回合、不可用背景 process 跑掉不等結果。
+
+### 📌 §1 Stage 2 抓到的真缺口（供 §3～§6 的 Stage 2 參考同類手法）
+
+Implementer 自測 5 組、Stage 2 獨立 **44 組**，找到一個零覆蓋：把 `getFullYear()` 換成 `getUTCFullYear()` 時**測試全綠**——因為既有取樣日期全在 8 月與 1/5，兩種讀法年份剛好相同。已補跨年邊界斷言（`05f3a79`）。
+**這正是 runbook 反覆強調的「分支或欄位零覆蓋」類型**：不是斷言太弱，是取樣讓某條路徑從未被走到。
+
+另有一項有價值的反面判定：`c1`／`c3` 兩層 `min()` 經跨 10 個時區、1970–2100 逐日窮舉確認為**數學等價突變**（0 反例），判定不需補測試——存活的 mutation 不必然是缺口，要先證明它可觀測。
 
 ## ✅ M6 完成紀錄（2026-08-30，供追溯）
 
