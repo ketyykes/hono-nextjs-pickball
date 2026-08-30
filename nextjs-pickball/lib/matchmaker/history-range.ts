@@ -13,15 +13,23 @@ export interface RangeCutoffs {
 /**
  * 依 prd.md 8.1 由近至遠計算四個區間切點。
  *
- * 此版本先各自獨立計算四個切點，尚未套用 min() —— 跨月週時 c2（當月 1 日）
- * 可能晚於 c1（本週一），單調性由後續步驟補上（design Decision 1）。
+ * 四個候選切點（今天、本週一、當月 1 日、上月 1 日）逐層套用 min()：
+ * c1 = min(本週一, c0)、c2 = min(當月 1 日, c1)、c3 = min(上月 1 日, c2)。
+ * 少了任一層 min()，跨月週會讓「本月」變成左端大於右端的空洞區間，
+ * 且與「本週」重疊（design Decision 1）。
  */
 export function computeRangeCutoffs(now: Date): RangeCutoffs {
 	const c0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
 	const mondayOffset = now.getDay() - 1;
-	const c1 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).getTime();
-	const c2 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-	const c3 = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+	const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).getTime();
+	const c1 = Math.min(monday, c0);
+
+	const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+	const c2 = Math.min(firstOfMonth, c1);
+
+	const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+	const c3 = Math.min(firstOfLastMonth, c2);
 
 	return { c0, c1, c2, c3 };
 }
