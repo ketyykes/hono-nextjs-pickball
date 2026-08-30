@@ -175,12 +175,12 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
      因既有取樣日期全在 8 月與 1/5，兩種讀法年份相同。已補跨年邊界斷言，commit `05f3a79`）。
    - §2 區間歸屬：Stage 1 `PASS`；Stage 2 `PASS`（獨立跑 **45 組 mutation，0 存活**）。
      Stage 2 另修正註解中的懸空群組編號（commit `2d1e1f2`）。
-   - §3 篩選與排序：**Implementer 已完成並自測 12 組 mutation（發現 1 組存活並補斷言，commit `ba4eb5c`），
-     但 Stage 1／Stage 2 審查尚未執行。**
+   - §3 篩選與排序：**Stage 1 `PASS`（由 coordinator 於 2026-08-30 親自執行，見下方第 6 點）；
+     Stage 2 尚未執行。** Implementer 自測 12 組 mutation，發現 1 組存活並補斷言（commit `ba4eb5c`）。
 
-   **⚠️ 續跑的第一件事：補跑 §3 的 Stage 1 與 Stage 2 審查**（審查範圍 `git log --oneline 2d1e1f2..ba4eb5c`，
-   8 個 commit）。Stage 2 MUST 自行獨立跑一輪 mutation，不採信 Implementer 自述——
-   §1 的實證是 Implementer 自測 5 組／Stage 2 獨立 44 組才抓到真缺口。
+   **⚠️ 續跑的第一件事：補跑 §3 的 Stage 2 審查**（審查範圍 `git log --oneline 2d1e1f2..ba4eb5c`，
+   8 個 commit）。Stage 1 已完成，**不需重跑**。Stage 2 MUST 自行獨立跑一輪 mutation，
+   不採信 Implementer 自述——§1 的實證是 Implementer 自測 5 組／Stage 2 獨立 44 組才抓到真缺口。
    §3 的 Implementer 自己已承認第 6 組 mutation（拿掉 `filter`）第一次跑是**存活**的，
    原因是三筆 fixture 全落在同一區間、「區間外被排除」零覆蓋——正是本專案反覆出現的
    「分支或欄位零覆蓋」形態，Stage 2 應循此方向再擴大盤點。
@@ -213,3 +213,49 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
 
    **未解的裁決或阻塞：無。** 本次中斷純因 session 即將結束，非技術阻塞。
    Open Questions 第 1、2 點已於 §3.1 完成實地複核並回填；第 3、4 點在 M5 合併後已結案。
+
+6. **§3「篩選與排序」Stage 1（Spec Reviewer）判定：`PASS`（2026-08-30，由 coordinator 親自執行）**
+
+   **偏離說明**：依 execution-plan，Stage 1 應派 `sonnet` 的 Spec Reviewer subagent。本次由
+   coordinator（opus）親自執行，原因是使用者即將關機，派背景 subagent 會產生無人接收回報的
+   孤兒 agent（M6 第九棒的失敗模式）。審查內容與標準未打折，全部為機械查核並留下可複驗的證據。
+
+   **審查範圍**：`2d1e1f2..ba4eb5c`（8 個 commit），對應 tasks 3.1～3.6。
+
+   **① 驗收錨點逐字比對：2/2 命中。** delta spec 的兩個 Scenario 各要求一個 it 名稱，
+   實測 `grep -c 'it("<名稱>"'` 皆為 **1**：
+   - 「篩選結果依對戰時間由新到舊排序」（`history-range.test.ts:189`）
+   - 「篩選不修改輸入的紀錄陣列」（`:207`）
+
+   **② 紅燈宣稱機械複驗：2/2 皆為真紅燈**（`git show <commit>^:<path>`，非採信自述）：
+   - **3.2**（RED commit `bfab871`）：父版本的 `history-range.ts` 內 `filterHistoryByRange`
+     出現次數為 **0**——函式根本不存在，紅燈形式為 `TypeError`，成立。
+   - **3.4**（RED commit `c29c096`）：父版本的實作**逐字**為
+     `return entries.sort(...).filter(...)`——直接對輸入參照排序、無 `slice()`，
+     必然原地改動呼叫端陣列，紅燈成立。tasks.md 3.3 自述「刻意寫成原地排序供 3.4 產生真紅燈」屬實。
+
+   **③ Requirement 的五條 SHALL NOT 逐條查核，全部有把關**：
+   | SHALL NOT | 查核方式與結果 |
+   |---|---|
+   | 不得在多處各自讀取 `playedAt` | `grep -n playedAt` 全檔僅 2 處命中，其中 `:96` 是註解、`:100` 在 `recordTime()` 內。**單一取值點成立** |
+   | 不得自行定義歷史紀錄型別 | `:5` `import type { MatchHistoryEntry } from "./history"`，取用 M4 型別，未自訂 |
+   | 不得修改輸入的 `records` 陣列 | 由 it「篩選不修改輸入的紀錄陣列」把關，且簽章收為 `readonly MatchHistoryEntry[]`，**編譯期另加一道護欄**（強於 task 要求） |
+   | 不得讀寫 LocalStorage | `grep localStorage` 全檔 **0 命中** |
+   | 不得取用系統時鐘 | 無參數的 `new Date()` 與 `Date.now()` 全檔 **0 命中**（三處字面命中皆在註解內）。`:100` 的 `new Date(entry.playedAt)` 帶引數，是解析 ISO 字串而非讀時鐘，不違反 |
+
+   **④ 3.6 REFACTOR 的匯出清單宣稱屬實**：實測 `grep '^export'` 恰為 6 項且與 task 逐字相符——
+   `RangeCutoffs`／`HISTORY_RANGES`／`HistoryRange`／`computeRangeCutoffs`／`rangeOfTime`／
+   `filterHistoryByRange`，無多餘匯出。
+
+   **⑤ 無 scope creep**：§3 只新增 2 個 it（即上述兩個錨點），`ba4eb5c` 補的是**既有 it 內的斷言**
+   而非新 it；未新增任何 spec 未要求的行為分支、storage key 或匯出。
+
+   **⑥ 交件驗證**：`pnpm --filter ./nextjs-pickball test --run lib/matchmaker/history-range.test.ts`
+   → **13 passed**（§1 七個＋§2 四個＋§3 兩個）。
+
+   **移交 Stage 2 的兩項**（Stage 1 依分工不審，明文移交）：
+   1. **`ba4eb5c` 補的斷言是否真的堵住那個缺口，MUST 由 Stage 2 獨立以 mutation 複核**——
+      Implementer 自述「拿掉 `filter` 第一次跑存活」，補斷言後轉紅，但此為**自述**，未經獨立驗證。
+   2. **循「分支或欄位零覆蓋」方向擴大盤點**（本專案最常見的缺口形態）。具體建議至少涵蓋：
+      `recordTime` 改回傳固定值、`filter` 的比較改為 `!==`、排序改為遞增、`slice()` 拿掉、
+      `rangeOfTime` 的引數順序對調。
