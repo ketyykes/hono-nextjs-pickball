@@ -44,7 +44,7 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 **（非實作項）複核 M4 的紀錄 schema**：讀 worktree 內 `main` 已合併的 M4 程式碼——`lib/matchmaker/history.ts` 的 `MatchHistoryEntry`／`MatchHistoryEntrySchema`、`lib/matchmaker/round-storage.ts` 的 `readHistory()`、`lib/matchmaker/storage-keys.ts` 的 key 常數——確認對戰時間欄位確為 `playedAt`（ISO 8601）且 reader 匯出名稱一致，把實際結果回填 design.md `## Open Questions` 第 1、2 點。**只讀程式碼，不讀其他 change 的計畫檔**；若與 design.md 的欄位表不符，以程式碼為準且**不得**改動 M4 的型別；`readHistory()` 回報的 `droppedCount` 只記錄不實作（超出本 change 的 spec 範圍）
+- [x] 3.1 **（非實作項）複核 M4 的紀錄 schema**：讀 worktree 內 `main` 已合併的 M4 程式碼——`lib/matchmaker/history.ts` 的 `MatchHistoryEntry`／`MatchHistoryEntrySchema`、`lib/matchmaker/round-storage.ts` 的 `readHistory()`、`lib/matchmaker/storage-keys.ts` 的 key 常數——確認對戰時間欄位確為 `playedAt`（ISO 8601）且 reader 匯出名稱一致，把實際結果回填 design.md `## Open Questions` 第 1、2 點。**只讀程式碼，不讀其他 change 的計畫檔**；若與 design.md 的欄位表不符，以程式碼為準且**不得**改動 M4 的型別；`readHistory()` 回報的 `droppedCount` 只記錄不實作（超出本 change 的 spec 範圍）——**複核結果：程式碼與 design.md 欄位表完全一致，無出入，已回填 Open Questions 第 1、2 點**
 - [ ] 3.2 RED: 補 it「篩選結果依對戰時間由新到舊排序」——同一區間內三筆紀錄以時間亂序傳入 `filterHistoryByRange(records, "today", now)`，斷言回傳順序為對戰時間遞減。看到紅燈（**真紅燈**：函式尚不存在）
 - [ ] 3.3 GREEN: 實作 `filterHistoryByRange(entries, range, now)`：以模組內單一 `recordTime(entry)` 取出 `playedAt` 並轉為時間戳（design Decision 4），`filter` 出 `rangeOfTime(...) === range` 者後依時間遞減排序。重跑至綠
 - [ ] 3.4 RED: 補 it「篩選不修改輸入的紀錄陣列」——傳入亂序紀錄後，斷言輸入陣列的長度、元素順序與各紀錄內容皆與呼叫前相同（以 `structuredClone` 前後比對），且回傳值與輸入不是同一參照。看到紅燈（**真紅燈**：3.3 若直接 `records.sort()` 會原地改動輸入）
