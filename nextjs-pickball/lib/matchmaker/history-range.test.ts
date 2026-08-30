@@ -39,4 +39,12 @@ describe("history-range", () => {
 			expect(c1).toBeLessThanOrEqual(c0);
 		}
 	});
+
+	it("週起始為週一，週日的本週一為六天前", () => {
+		const now = new Date(2026, 7, 16); // 2026-08-16（週日）
+
+		const { c1 } = computeRangeCutoffs(now);
+
+		expect(c1).toBe(new Date(2026, 7, 10).getTime());
+	});
 });
