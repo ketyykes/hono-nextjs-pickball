@@ -19,7 +19,7 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
 	const { players, updatePlayer } = useRosterStore();
-	const { round, generateRound, resetIncompleteMatches, submitScore } = useRoundStore({
+	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore } = useRoundStore({
 		players,
 		updatePlayer,
 	});
@@ -108,9 +108,11 @@ export default function MatchmakerPage() {
 					settings={settings}
 					onSettingsChange={setSettings}
 					round={round}
+					matchSlots={matchSlots}
 					activePlayerCount={activePlayerCount}
 					onGenerate={handleGenerate}
 					onReset={handleReset}
+					setTargetScore={setTargetScore}
 				/>
 			</div>
 
