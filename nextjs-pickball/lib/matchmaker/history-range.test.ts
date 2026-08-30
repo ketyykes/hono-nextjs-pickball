@@ -219,4 +219,31 @@ describe("history-range", () => {
 		// 回傳值與輸入不是同一參照
 		expect(result).not.toBe(input);
 	});
+
+	// regression guard（寫下當下即綠）：補 Stage 2 獨立 mutation 找到的三個零覆蓋。
+	// 既有兩個 it 只用過 "today" 一個區間、且輸入筆數不足以區分「篩選」與「截斷」，
+	// 導致三種壞法全部存活：① 忽略 range 參數寫死 "today" ② slice(0, 3) ③ slice(0, -1)。
+	// 本 it 以「同一組輸入分別查兩個區間」堵住 ①，以「五筆輸入中今日佔四筆」堵住 ②③。
+	it("依傳入的區間篩選，且不因截斷而遺漏區間內的紀錄", () => {
+		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00
+		const t1 = makeHistoryEntry(new Date(2026, 7, 15, 6, 0).toISOString(), "today-1");
+		const t2 = makeHistoryEntry(new Date(2026, 7, 15, 9, 0).toISOString(), "today-2");
+		const t3 = makeHistoryEntry(new Date(2026, 7, 15, 12, 0).toISOString(), "today-3");
+		const t4 = makeHistoryEntry(new Date(2026, 7, 15, 15, 0).toISOString(), "today-4");
+		// 2026-07-10 落在上月（上月切點為 2026-07-01、當月切點為 2026-08-01）
+		const lastMonth = makeHistoryEntry(new Date(2026, 6, 10, 8, 0).toISOString(), "last-month");
+		// 上月那筆刻意放在中間，使「丟掉首筆或末筆」無法與「正確篩選」得到相同結果
+		const entries = [t1, lastMonth, t2, t3, t4];
+
+		// 同一組輸入換一個 range 就必須得到不同結果——range 參數不得被忽略
+		expect(filterHistoryByRange(entries, "today", now).map((entry) => entry.matchId)).toEqual([
+			"today-4",
+			"today-3",
+			"today-2",
+			"today-1",
+		]);
+		expect(filterHistoryByRange(entries, "lastMonth", now).map((entry) => entry.matchId)).toEqual([
+			"last-month",
+		]);
+	});
 });
