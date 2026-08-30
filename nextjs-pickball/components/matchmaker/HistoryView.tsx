@@ -8,6 +8,7 @@ import { readHistory } from "@/lib/matchmaker/round-storage";
 import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
 import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
+import { HistoryRecordCard } from "./HistoryRecordCard";
 
 // hydration 後一次取樣的「現在」與讀回的歷史紀錄（design Decision 7）：render 期間
 // SHALL NOT 取用時鐘或 localStorage，避免 SSR／CSR 輸出不一致產生 hydration mismatch。
@@ -50,14 +51,11 @@ export function HistoryView() {
 			{entries.length === 0 ? (
 				<EmptyHistory />
 			) : (
-				// 最小列表呈現：4.6 會替換為 HistoryRecordCard，補齊 prd.md 8.2 全部欄位。
-				<ul className="flex flex-col gap-2">
+				<div className="flex flex-col gap-3">
 					{filteredEntries.map((entry) => (
-						<li key={entry.matchId} className="text-sm">
-							{[...entry.teamA.players, ...entry.teamB.players].map((player) => player.name).join("、")}
-						</li>
+						<HistoryRecordCard key={entry.matchId} entry={entry} />
 					))}
-				</ul>
+				</div>
 			)}
 		</div>
 	);
