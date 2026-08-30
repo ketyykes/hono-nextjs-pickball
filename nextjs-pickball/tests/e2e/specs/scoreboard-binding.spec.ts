@@ -544,4 +544,35 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		const parsedHistory: { entries?: unknown[] } = history ? JSON.parse(history) : {};
 		expect(parsedHistory.entries?.length ?? 0).toBeGreaterThan(0);
 	});
+
+	// round-lifecycle delta 的 Scenario「回到已失效場次的計分板時顯示說明」——重排本輪
+	// 會丟棄未完成場次並清除對應計分板槽（§6），使舊的 ?match= 連結指向的槽消失，
+	// 落地於 §7 已完成的 MatchBindingNotice。此測試補上「從對戰頁實際重排」這條真實
+	// 前置路徑的驗收（前五棒遺漏、由第六棒 leader 於 tasks.md 補上此錨點）。
+	test("重設本輪後回到舊計分板連結顯示失效說明", async ({ page }) => {
+		await seedRoster(page, 8);
+		await generateRound(page, 2);
+		const matchId2 = await courtMatchId(page, 1);
+		const court2 = page.getByTestId(`court-${matchId2}`);
+
+		await court2.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId2}$`));
+		await clickWin(page, "us", 5);
+		await clickWin(page, "them", 3);
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		// 重設／再排：兩場皆未完成，符合 hasIncompleteMatch，丟棄所有 pending 場次
+		// 並改配出新的場次 id，matchId2 因此不再對應任何場次。
+		await page.getByRole("button", { name: "重設／再排" }).click();
+
+		// 重新開啟該場舊的 ?match= 連結。
+		await page.goto(`/scoreboard?match=${matchId2}`);
+
+		await expect(page.getByText("這場比賽目前無法計分")).toBeVisible();
+		await expect(page.getByRole("link", { name: "回到對戰頁" })).toBeVisible();
+		await expect(page.getByRole("link", { name: "改用獨立計分板" })).toBeVisible();
+		const bodyText = await page.locator("body").innerText();
+		expect(bodyText).not.toMatch(/Error/);
+	});
 });
