@@ -487,7 +487,11 @@ Depends on: §4、§5、§6、§7
       **白名單機械複驗（非採信回報）**：`git diff --stat 3fefb02..HEAD -- "*.test.ts" "*.test.tsx" "*.spec.ts"` 顯示 12 檔異動、**+2173／−19**；再以 `git diff … | grep -E "^-[^-]"` 逐行檢視全部 19 行刪除，全數落在白名單內——`RoundControls.test.tsx` 的三個 `it(` 改名（表格第 2／4／5 項）、`lib/matchmaker/storage.test.ts` 的一個 `it(` 改名（第 1 項）、`match-stage.spec.ts` 的四行註解（第 6 項，前置手法改動）、以及 `CourtCard.test.tsx`／`useRoundStore.test.tsx`／`useScoreboardStore.test.tsx` 的 import 行調整（非測試主體）。**除白名單外沒有任何既有 `it(`／`test(` 被刪改**。
       **`tests/e2e/specs/scoreboard.spec.ts` 相對 base `3fefb02` 完全未出現在 diff 中**，即「既有 `scoreboard` 測試全數原樣通過」成立。
       註：表格第 5 項的 it 於 §8 Stage 2（design Open Questions 第 19 項變異 D9）另補 `setTargetScore` spy 並同步改名為「…不得呼叫 onSettingsChange 或 setTargetScore，也不改變選取…」，理由為原斷言在 §8.6 後已恆真；此改動已在 Stage 2 落盤，屬第 5 項授權範圍內
-- [ ] 9.6 `pnpm test:e2e` 全套 — 五個 browser project 全綠。既有 `scoreboard.spec.ts` 必須**原樣**通過（證明獨立用法零行為變更）
+- [x] 9.6 `pnpm test:e2e` 全套 — 五個 browser project 全綠。既有 `scoreboard.spec.ts` 必須**原樣**通過（證明獨立用法零行為變更）
+
+      **實測（2026-08-30，第十棒 leader）：exit 0，`334 passed / 21 skipped`（6.6m）、0 failed。** 指令為 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（依 design.md Open Questions 第 19 項的更正，`test:e2e -- …` 吃不到 `--workers`）。逐 project 計數：chromium 71、firefox 64、webkit 64、mobile-chrome 71、mobile-safari 64，合計 334 ——**五個 browser project 全綠**。
+      `scoreboard.spec.ts` **原樣通過**：該檔相對 base `3fefb02` 零 diff（見 9.5 的 `git diff --stat`），本輪 85 筆執行全數 ✓。
+      Process 紀律：開跑前 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd"` 皆空；跑完再查一次亦皆空（Playwright 的 webServer 已自行收束），無殘留
 - [ ] 9.7 `pnpm --filter ./nextjs-pickball preview` — workerd runtime 下開啟 `/scoreboard` 與 `/scoreboard?match=<id>` 皆正常，無 console error
 - [x] 9.8 Rollback 相容性實測（design Migration Plan 要求，不得只憑推論）：以本次變更**前**的 `ScoreboardStateSchema` 解析一份含 `matchId` 欄位的資料，確認 zod 剝除未知欄位而非拒絕；結果如實記錄於此，若為拒絕則 MUST 更新 design.md 的 Rollback 段並提出補救
 
