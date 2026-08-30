@@ -160,3 +160,56 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
    **apply 3.1 複核補充（2026-08-30）**：本次複核確認 `droppedCount` 的行為與上述記載一致，`filterHistoryByRange` 與 `recordTime()` 皆不消費 `droppedCount`，僅使用 `readHistory().entries`；沿用上述「不顯示」決議，不順手實作。
 3. ~~**M5 在 `main` 上提供的 matchmaker 導覽是獨立元件還是對戰頁內的連結區？**~~ **已確認（M5 合併後實地核對 `main`）：是獨立元件，但入口連結的落點不在元件。** `components/matchmaker/MatchmakerTabs.tsx` 掛在 `app/matchmaker/layout.tsx` 第 14 行，對戰頁與參賽者頁共用；`app/matchmaker/page.tsx` 內**沒有**任何 `<Link>`。`MatchmakerTabs` 只 `tabs.map()` 渲染，分頁清單與文案的單一來源是純函式模組 `lib/matchmaker/section-nav.ts`——`MATCHMAKER_SECTION_HREFS`（第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）。因此 §5 要改的是 `section-nav.ts` 這兩處各加一筆 `/matchmaker/history`，`MatchmakerTabs.tsx` 不必動。連帶兩點 MUST 注意：① `section-nav.ts` 屬 `lib/**`，是**必 TDD** 的行為邏輯，不是 Decision 6 原本設想的例外層 `<Link>` 新增；② `lib/matchmaker/section-nav.test.ts` 第 31～36 行的 regression guard 以 `toEqual` 逐字釘住「分頁清單依序為對戰與參賽者兩筆」，新增分頁必使其轉紅（這是真紅燈），MUST 一併更新該斷言。active 判定用 `===` 精確比對，`/matchmaker/history` 加入後判定仍正確，僅第 23～24 行「目前 app/matchmaker/ 下沒有巢狀路由」的註解需同步。
 4. ~~**雙打組成標示的中文文案是否已由 M5 定案？**~~（男雙／女雙／混雙／一般雙打）**已確認（M5 合併後實地核對 `main`）：M5 有這份對應表，但不是共用模組**——它寫死在 `components/matchmaker/CourtCard.tsx` 第 20～23 行（`mixed: "混雙"`／`mens: "男雙"`／`womens: "女雙"`／`general: "一般雙打"`）。M7 的 `HistoryRecordCard` 需要同一份文案，因此「沿用還是另寫一份」變成「要不要把 `CourtCard` 內的對應表抽成共用模組」——這正是 §4 REFACTOR 要判斷的具體情境。文案本身 MUST 與上述四個字串逐字相同，SHALL NOT 自創別的說法。
+5. **apply 中斷點手記（2026-08-30，第一棒 leader 因 session 即將中斷而停止）**
+
+   **進度：24／47 勾選（§1 11／11、§2 7／7、§3 6／6 全數完成；§4 起未開工）。**
+   分支 `change/matchmaker-history-page`，中斷時 HEAD 為 `ba4eb5c`，`git status --porcelain` **乾淨**，
+   無殘留 dev server process（`lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 皆空）。
+
+   **Step 0 baseline**（已回填 environment.md）：`Initial commit hash` = `85889ca`，
+   `pnpm test` 前端 56 檔 472 tests、後端 4 檔 16 tests 全綠。
+
+   **已完成群組的審查結論（皆已過兩階段審查，0 Blocking）**：
+   - §1 區間切點計算：Stage 1 `PASS`；Stage 2 `PASS_WITH_NITS`（獨立跑 **44 組 mutation**，
+     抓到 1 個 Implementer 未發現的真缺口——`getFullYear` 改成 `getUTCFullYear` 時**零覆蓋**，
+     因既有取樣日期全在 8 月與 1/5，兩種讀法年份相同。已補跨年邊界斷言，commit `05f3a79`）。
+   - §2 區間歸屬：Stage 1 `PASS`；Stage 2 `PASS`（獨立跑 **45 組 mutation，0 存活**）。
+     Stage 2 另修正註解中的懸空群組編號（commit `2d1e1f2`）。
+   - §3 篩選與排序：**Implementer 已完成並自測 12 組 mutation（發現 1 組存活並補斷言，commit `ba4eb5c`），
+     但 Stage 1／Stage 2 審查尚未執行。**
+
+   **⚠️ 續跑的第一件事：補跑 §3 的 Stage 1 與 Stage 2 審查**（審查範圍 `git log --oneline 2d1e1f2..ba4eb5c`，
+   8 個 commit）。Stage 2 MUST 自行獨立跑一輪 mutation，不採信 Implementer 自述——
+   §1 的實證是 Implementer 自測 5 組／Stage 2 獨立 44 組才抓到真缺口。
+   §3 的 Implementer 自己已承認第 6 組 mutation（拿掉 `filter`）第一次跑是**存活**的，
+   原因是三筆 fixture 全落在同一區間、「區間外被排除」零覆蓋——正是本專案反覆出現的
+   「分支或欄位零覆蓋」形態，Stage 2 應循此方向再擴大盤點。
+
+   **接續點：§4.1**（新增 `tests/e2e/specs/matchmaker-history.spec.ts` 的兩個 E2E test，
+   真紅燈為路由不存在的 404）。§4 起進入例外層（`app/**/page.tsx` 與純呈現元件），
+   RED 一律由 Playwright E2E 承擔。依 execution-plan 的 Roles，§4／§5 的 Implementer
+   **MUST 用 `sonnet` 起跳**（本專案常設覆寫：Implementer 一律 sonnet，不用 plan 預設的 haiku）。
+
+   **§4 開工前就該知道的事**（避免重查）：
+   - E2E seed 的 LocalStorage 值必須是 **`{"version":1,"entries":[...]}`** 這個外層容器形狀，
+     不是裸陣列——`writeHistory()` 寫的是 `{ version: 1, entries }`（`round-storage.ts`），
+     外層 version 不符會被 reader 判為結構層級損壞而清空整份。
+   - `readHistory()` 回傳 **`{ entries, droppedCount }` 物件而非陣列**（見上方第 1 點）。
+   - §4.7 的跨月週情境 MUST 用 Playwright 假時鐘固定在 2026-08-01，
+     SHALL NOT 用「依當下日期動態算資料」繞過（design Risks 明令）。
+   - E2E **必須帶 `--workers=1`**（root `CLAUDE.md`：預設併發下本機不穩定）；
+     跑之前先 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 清殘留，
+     **跑完立刻清掉自己起的 process**。
+
+   **§5 開工前的補充（本棒實地核對 `main`，修正 Decision 6 與上方第 3 點的行號）**：
+   M6 合併後 `lib/matchmaker/section-nav.ts` 已新增 `MATCHMAKER_ROUTE = "/matchmaker"`（第 14 行），
+   使兩個常數的行號位移——`MATCHMAKER_SECTION_HREFS` 現在在**第 16 行**（且由 `MATCHMAKER_ROUTE`
+   組成：`[MATCHMAKER_ROUTE, \`${MATCHMAKER_ROUTE}/players\`]`）、`MATCHMAKER_SECTION_LABELS`
+   在**第 18～24 行**、「目前 app/matchmaker/ 下沒有巢狀路由」的註解在**第 26～27 行**（非第 23～24 行）。
+   兩個常數**皆未 export**（模組私有），`matchmakerSectionTabs()` 才是唯一對外入口。
+   `section-nav.test.ts` 的 regression guard it 名稱為「分頁清單依序為對戰與參賽者兩筆」，
+   位於第 31～36 行，新增分頁後該名稱本身也需一併更新（例如改為「…對戰、參賽者與歷史三筆」）。
+   分頁順序依 runbook 既定約定為 **對戰／參賽者／歷史／資料**，「歷史」插在 `players` 之後。
+
+   **未解的裁決或阻塞：無。** 本次中斷純因 session 即將結束，非技術阻塞。
+   Open Questions 第 1、2 點已於 §3.1 完成實地複核並回填；第 3、4 點在 M5 合併後已結案。
