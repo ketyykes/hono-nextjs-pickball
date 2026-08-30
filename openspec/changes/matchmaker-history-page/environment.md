@@ -18,8 +18,8 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填（屆時填 PASS / FAIL 與一行結果摘要，例如 `PASS：hono-pickball 4 檔 16 tests、nextjs-pickball 39 檔 274 tests 全綠`）
-- **Initial commit hash**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填（`git rev-parse HEAD` 的 SHA）
+- **Baseline tests**: PASS（2026-08-30 apply Step 0 實跑 `pnpm test`）：`hono-pickball` 4 檔 16 tests、`nextjs-pickball` 56 檔 472 tests 全綠。後端未出現 `listen EPERM 127.0.0.1`。
+- **Initial commit hash**: `85889ca9be058fee31e7459976b44cd8047f0262`（`85889ca docs: M6 完成並合併，更新 runbook 準備開 M7`）
 - **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`
 
 ## Teardown
