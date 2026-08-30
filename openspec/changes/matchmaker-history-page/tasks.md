@@ -26,7 +26,7 @@
 - [x] 1.8 GREEN: 確認四個切點一律以 `new Date(y, m, d)` 本地建構（**不得**使用 `Date.UTC` 或 `getUTC*`），上月以 `new Date(y, m - 1, 1)` 取得並倚賴月份 `-1` 的跨年正規化（design Decision 2）。重跑至綠
 - [x] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）**regression guard**：`computeRangeCutoffs` 自 1.2 起就只用參數 `now`，從未取用系統時鐘，加入時直接綠燈
 - [x] 1.10 GREEN: 確認 `history-range.ts` 全檔沒有任何 `new Date()`（無參數）、`Date.now()` 或其他系統時鐘取用；「現在」一律由參數注入。重跑至綠
-- [ ] 1.11 REFACTOR: 把「取某年月日的當地 00:00」抽成模組內具名 helper（例如 `startOfLocalDay`），使四個切點共用同一條正規化路徑；`RangeCutoffs` 型別與 `HISTORY_RANGES` 常數以 `as const` 匯出。確認無重複的日期建構邏輯，無壞味道則註記 skipped
+- [x] 1.11 REFACTOR: 把「取某年月日的當地 00:00」抽成模組內具名 helper（例如 `startOfLocalDay`），使四個切點共用同一條正規化路徑；`RangeCutoffs` 型別與 `HISTORY_RANGES` 常數以 `as const` 匯出。確認無重複的日期建構邏輯，無壞味道則註記 skipped
 
 ## 2. 區間歸屬（`history-range.ts`）
 

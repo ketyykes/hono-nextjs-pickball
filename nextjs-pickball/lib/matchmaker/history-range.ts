@@ -11,6 +11,24 @@ export interface RangeCutoffs {
 }
 
 /**
+ * 歷史頁五個區間的具名鍵值，由近至遠排列，供 §2 的 `rangeOfTime()` 回傳型別、
+ * 以及 §3 起 UI 端逐一渲染分頁時共用同一份順序（design Decision 8）。
+ */
+export const HISTORY_RANGES = ["today", "thisWeek", "thisMonth", "lastMonth", "earlier"] as const;
+
+/** `HISTORY_RANGES` 的元素型別，供 §2 的 `rangeOfTime()` 作為回傳型別。 */
+export type HistoryRange = (typeof HISTORY_RANGES)[number];
+
+/**
+ * 取得某年月日在當地時區的 00:00 時間戳。四個切點（今天、本週一、當月 1 日、
+ * 上月 1 日）皆是「當地某一天的起點」，抽成單一 helper 讓正規化路徑只有一條——
+ * 避免四處各自呼叫 `new Date(y, m, d)` 而在其中一處誤用 `Date.UTC` 或漏寫某個分量。
+ */
+function startOfLocalDay(year: number, month: number, day: number): number {
+	return new Date(year, month, day).getTime();
+}
+
+/**
  * 依 prd.md 8.1 由近至遠計算四個區間切點。
  *
  * 四個候選切點（今天、本週一、當月 1 日、上月 1 日）逐層套用 min()：
@@ -19,18 +37,24 @@ export interface RangeCutoffs {
  * 且與「本週」重疊（design Decision 1）。
  */
 export function computeRangeCutoffs(now: Date): RangeCutoffs {
-	const c0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+	const year = now.getFullYear();
+	const month = now.getMonth();
+	const date = now.getDate();
+
+	const c0 = startOfLocalDay(year, month, date);
 
 	// getDay() 以週日為 0，直接減 1 會在週日算出負偏移（日期反而往後推）；
 	// (getDay() + 6) % 7 把週一映射為 0、週日映射為 6，讓週日正確歸入六天前的本週一。
 	const mondayOffset = (now.getDay() + 6) % 7;
-	const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).getTime();
+	const monday = startOfLocalDay(year, month, date - mondayOffset);
 	const c1 = Math.min(monday, c0);
 
-	const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+	const firstOfMonth = startOfLocalDay(year, month, 1);
 	const c2 = Math.min(firstOfMonth, c1);
 
-	const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+	// month - 1 天然處理跨年：1 月（month === 0）時 month - 1 = -1，
+	// new Date() 會自動正規化成去年 12 月（design Decision 2）。
+	const firstOfLastMonth = startOfLocalDay(year, month - 1, 1);
 	const c3 = Math.min(firstOfLastMonth, c2);
 
 	return { c0, c1, c2, c3 };
