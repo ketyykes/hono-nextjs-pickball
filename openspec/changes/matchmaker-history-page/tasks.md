@@ -21,7 +21,7 @@
 - [x] 1.3 RED: 補兩個 it：「跨月週時當月切點取本週一而非當月 1 日」（`now = new Date(2026, 7, 1)`，2026-08-01 週六、本週一為 7/27，斷言 `c1` 與 `c2` 皆為 `new Date(2026, 6, 27)`、`c3` 為 `new Date(2026, 6, 1)`）與「四個切點單調不遞增」（對月初、月中、週一、週日、跨年五組 `now` 逐一斷言 `c3 <= c2 <= c1 <= c0`）。看到紅燈（**真紅燈**：1.2 未套 `min()` 時 `c2 = 8/1 > c1 = 7/27`）
 - [x] 1.4 GREEN: 依 design Decision 1 逐層套用 `min()`：`c1 = min(本週一, c0)`、`c2 = min(當月 1 日, c1)`、`c3 = min(上月 1 日, c2)`。重跑 1.1／1.3 三個 it 全綠
 - [x] 1.5 RED: 補 it「週起始為週一，週日的本週一為六天前」——`now = new Date(2026, 7, 16)`（週日），斷言 `c1` 為 `new Date(2026, 7, 10)` 而非 `new Date(2026, 7, 17)`。看到紅燈（若 1.2 已用 `(getDay() + 6) % 7` 正確處理，此項會直接綠燈——**如實標註為 regression guard**，不得偽造紅燈）**真紅燈**：1.2/1.4 使用的 `getDay() - 1` 對週日（getDay()=0）算出 offset=-1，日期反而往後推一天，得 8/17 而非預期的 8/10
-- [ ] 1.6 GREEN: 以 `(now.getDay() + 6) % 7` 推算本週一的天數偏移（週一為 0、週日為 6），確保週日歸入前一週。重跑至綠
+- [x] 1.6 GREEN: 以 `(now.getDay() + 6) % 7` 推算本週一的天數偏移（週一為 0、週日為 6），確保週日歸入前一週。重跑至綠
 - [ ] 1.7 RED: 補兩個 it：「切點為當地時區 00:00 而非 UTC 00:00」（`now` 為當地 2026-08-15 23:30，斷言 `new Date(c0)` 的 `getHours()`／`getMinutes()`／`getSeconds()`／`getMilliseconds()` 皆為 0，且 `c0 === new Date(2026, 7, 15).getTime()`）與「一月時上月切點落在去年 12 月 1 日」（`now = new Date(2027, 0, 5)`，斷言 `c3 === new Date(2026, 11, 1).getTime()`）。看到紅燈（若 1.2 已用 `new Date(y, m, d)` 本地建構且以 `m - 1` 取上月，兩項可能直接綠燈——**如實標註為 regression guard**）
 - [ ] 1.8 GREEN: 確認四個切點一律以 `new Date(y, m, d)` 本地建構（**不得**使用 `Date.UTC` 或 `getUTC*`），上月以 `new Date(y, m - 1, 1)` 取得並倚賴月份 `-1` 的跨年正規化（design Decision 2）。重跑至綠
 - [ ] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）

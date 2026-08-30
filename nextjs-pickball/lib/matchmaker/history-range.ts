@@ -21,7 +21,9 @@ export interface RangeCutoffs {
 export function computeRangeCutoffs(now: Date): RangeCutoffs {
 	const c0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-	const mondayOffset = now.getDay() - 1;
+	// getDay() 以週日為 0，直接減 1 會在週日算出負偏移（日期反而往後推）；
+	// (getDay() + 6) % 7 把週一映射為 0、週日映射為 6，讓週日正確歸入六天前的本週一。
+	const mondayOffset = (now.getDay() + 6) % 7;
 	const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).getTime();
 	const c1 = Math.min(monday, c0);
 
