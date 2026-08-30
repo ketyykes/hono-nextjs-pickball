@@ -454,9 +454,16 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 
 	test("由計分板判定勝負後返回，比分自動回填且該場轉為已完成", async ({ page }) => {
 		await seedRoster(page, 4);
-		await generateRound(page, 1);
+		// 兩個場地：第二場用來驗證回填只清除該場次的槽，不動其他場次的槽
+		// （spec「回填後清除該場次的計分板槽」Scenario 的「其他場次的條目不受影響」半句，
+		// 只用一個場次時沒有「其他場次」可供斷言，Stage 1 review 判定為零覆蓋）。
+		await generateRound(page, 2);
 		const matchId = await courtMatchId(page, 0);
+		const otherMatchId = await courtMatchId(page, 1);
 		const court = page.getByTestId(`court-${matchId}`);
+
+		const otherScores = { us: 3, them: 1 };
+		await writeMatchSlot(page, otherMatchId, { scores: otherScores, status: "playing" });
 
 		await court.getByRole("link", { name: "進入計分板" }).click();
 		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
@@ -472,13 +479,17 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
 		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
 
-		// 回填後清除該場次的計分板槽：scoreboard:matches:v1 內該條目被移除。
+		// 回填後清除該場次的計分板槽：scoreboard:matches:v1 內該條目被移除，
+		// 其他場次的條目不受影響——逐欄比對 scores 而非只斷言 key 存在，否則
+		// 「清槽時把其他槽的內容清空但保留 key」這種壞法會存活。
 		const slots = await page.evaluate(
 			(key) => window.localStorage.getItem(key),
 			MATCH_SLOTS_KEY,
 		);
-		const parsedSlots: Record<string, unknown> = slots ? JSON.parse(slots) : {};
+		const parsedSlots: Record<string, { scores?: unknown }> = slots ? JSON.parse(slots) : {};
 		expect(Object.prototype.hasOwnProperty.call(parsedSlots, matchId)).toBe(false);
+		expect(Object.prototype.hasOwnProperty.call(parsedSlots, otherMatchId)).toBe(true);
+		expect(parsedSlots[otherMatchId].scores).toEqual(otherScores);
 	});
 
 	test("已完成場次不顯示進入計分板入口", async ({ page }) => {
