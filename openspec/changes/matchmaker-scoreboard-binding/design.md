@@ -793,3 +793,37 @@
     比照 `1e16fad` 對 `page.tsx` 的同類處理，在緊鄰依賴陣列那一行補
     `// eslint-disable-next-line react-hooks/exhaustive-deps` 與「為什麼」註解。
     修正後實測 **0 error / 3 warning，與 baseline 逐項一致**。零行為變更，不需 TDD。
+
+21. **§9 全部完成、Final Code Review 全綠，apply 階段結案（2026-08-30，第十棒 leader）**
+
+    **前提處置**：第九棒回報 9.5／9.6 全綠後即消失，未落盤也未 commit。依「沒有落盤等於沒發生」，
+    本棒**未採信其任何口頭回報，9.1～9.6 全部重新實跑**。牠遺留的 preview process 已由 coordinator 清除。
+
+    **§9 逐項實測結果（明細與出處逐條寫在 tasks.md §9，此處僅摘要）**：
+
+    | 項次 | 結果 |
+    |---|---|
+    | 9.1 | 腳本核對四份 delta spec 的 **64 組驗收錨點全數逐字命中、0 失敗**；兩個改名測試到位，三個舊名稱 0 殘留 |
+    | 9.2 | python 逐標題計數，四份 spec 皆**無重複**（未使用 BSD `uniq`） |
+    | 9.3 | `pnpm lint` **0 error / 3 warning**，與第 20 項更正後的 baseline 逐項一致，且三處已用 `git show 3fefb02:` 複驗為變更前既存 |
+    | 9.4 | `pnpm typecheck` exit 0；另補跑後端 `test/tsconfig.json` 那段亦 exit 0 |
+    | 9.5 | `pnpm test` exit 0，前端 **56 檔／472**、後端 **4 檔／16**。白名單以 `git diff` 逐行複驗：**19 行刪除全數落在六處白名單內**，`scoreboard.spec.ts` 相對 base 零 diff |
+    | 9.6 | `playwright --workers=1` exit 0，**334 passed／21 skipped／0 failed**，五個 browser project 全綠（71／64／64／71／64） |
+    | 9.7 | workerd preview 下 `/scoreboard` 與 `/scoreboard?match=<id>` 皆 200，綁定模式正確渲染「場地 2」並自分槽 hydrate 出 5–3，**兩頁 console error 皆 0 筆** |
+    | 9.8 | 以變更前 schema 實測：`safeParse` **成功**且 `matchId`／`courtNumber` 被剝除，既有欄位完整保留 ⇒ rollback 相容，design 的 Rollback 段不需修改 |
+    | 9.9 | `openspec validate --strict` exit 0，0 error |
+
+    **Final Code Review（完整重跑一輪，結果與 §9 一致）**：`pnpm test` exit 0（56/472 + 4/16）、
+    `pnpm -r exec tsc --noEmit` exit 0、`pnpm --filter ./nextjs-pickball lint` 0 error/3 warning、
+    `playwright --workers=1` exit 0（334 passed／21 skipped）、`preview` 八項檢查全過。
+    另補一輪機械掃描：新增行**無** TODO／FIXME／`console.log`／`debugger`；**無簡體字**；
+    分支上全部 commit **無** `🤖 Generated` 與 `Co-Authored-By`。
+
+    **tasks.md 勾選狀態：91／91，0 未勾。工作區乾淨。**
+
+    **Process 紀律**：E2E 與 preview 開跑前後皆以 `lsof -i :3005 -i :8787` 與
+    `ps aux | grep -E "wrangler|workerd|next"` 查核；preview 於**同一回合內**驗證完即 `pkill`，
+    未留任何跨回合 process（此即第九棒的教訓）。
+
+    **未解問題**：無阻擋項。第 19 項的四則 Stage 2 Nits（手機斷點入口 32px、`SubmitScoreInput`
+    只用三欄、`readMatchSlots` 丟棄 `droppedCount`、硬導航不寫 seed）已明列為不阻擋，留待後續 change 處理。
