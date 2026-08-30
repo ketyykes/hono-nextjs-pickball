@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 // /scoreboard?match=<matchId> 對戰場次綁定的 E2E 驗收。
 // 對應 matchmaker-scoreboard-binding change §7 的 test-plan：失效說明與出口、
@@ -15,6 +16,9 @@ import { test, expect } from "@playwright/test";
 
 const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
 const CURRENT_KEY = "scoreboard:current:v1";
+const ROSTER_STORAGE_KEY = "matchmaker:roster:v1";
+const ROUND_STORAGE_KEY = "matchmaker:round:v1";
+const HISTORY_STORAGE_KEY = "matchmaker:history:v1";
 
 // 零捲動驗收共用的四個 viewport（手機直向／手機橫向／平板直向／桌機臨界）
 const VIEWPORTS = [
@@ -250,5 +254,201 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 				`${vp.width}x${vp.height} 失效畫面不應有垂直捲動`,
 			).toBeLessThanOrEqual(clientHeight + 1);
 		}
+	});
+});
+
+// /matchmaker 對戰頁的計分板接線 E2E 驗收（§8）。
+// 對應 test-plan：計分中標示與當前比分、離開後再進入接續、多場地互不覆蓋、
+// 回填後轉為已完成、已完成場次不顯示入口、鎖定說明、手動輸入路徑不受影響、
+// 重設本輪後舊連結顯示失效說明。
+//
+// 前置以真實路徑鋪設（建立參賽者 → 產生本輪對戰，見 seedRoster／generateRound），
+// 沿用 match-stage.spec.ts 的既有慣例（seedRoster 用 addInitScript）。matchId 由
+// crypto.randomUUID() 產生，測試無法預先得知，改由 courtMatchId() 從 CourtCard
+// 既有的 data-testid（`court-${match.id}-grid`）反解析取得（design Risks：
+// 能用 UI 操作產生的狀態優先用 UI 操作）。
+//
+// 種入「計分中」的槽狀態時改用 page.evaluate 直接寫 localStorage（而非
+// addInitScript）：此時頁面已完成一次真實的產生本輪對戰，需要在既有頁面基礎上
+// 疊加一個槽，而非在下一次載入前重新佔用整個 localStorage。槽欄位形狀複製自
+// lib/scoreboard/types.ts 的 ScoreboardStateSchema（同上方 seedMatchSlot() 的
+// 既有慣例），schema 若異動需同步更新本檔。
+test.describe("/matchmaker 對戰頁的計分板接線", () => {
+	function buildTestPlayer(index: number) {
+		return {
+			id: `e2e-binding-player-${index}`,
+			name: `計分板測試員${index}`,
+			gender: "other" as const,
+			colorFrom: "#4f46e5",
+			colorTo: "#818cf8",
+			rating: 5,
+			restCount: 0,
+			gamesPlayed: 0,
+			isActive: true,
+			createdAt: "2026-01-01T00:00:00.000Z",
+		};
+	}
+
+	async function seedRoster(page: Page, count: number): Promise<void> {
+		const players = Array.from({ length: count }, (_, i) => buildTestPlayer(i + 1));
+		await page.addInitScript(
+			({ key, value }) => {
+				window.localStorage.setItem(key, value);
+			},
+			{ key: ROSTER_STORAGE_KEY, value: JSON.stringify({ version: 1, players }) },
+		);
+	}
+
+	async function generateRound(page: Page, courtCount = 1): Promise<void> {
+		await page.goto("/matchmaker");
+		for (let i = 1; i < courtCount; i++) {
+			await page.getByRole("button", { name: "增加場地數" }).click();
+		}
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(
+			page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]'),
+		).toHaveCount(courtCount);
+	}
+
+	// 從場地色塊既有的 data-testid（`court-${match.id}-grid`）反解析出 matchId——
+	// 貪婪比對 `.*` 再要求結尾為 `-grid` 是刻意的：matchId 本身（crypto.randomUUID()）
+	// 含連字號，非貪婪比對會在第一個連字號就截斷，取到錯誤的子字串。
+	async function courtMatchId(page: Page, courtIndex: number): Promise<string> {
+		const grids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		const testId = await grids.nth(courtIndex).getAttribute("data-testid");
+		const match = /^court-(.*)-grid$/.exec(testId ?? "");
+		if (!match) {
+			throw new Error(`無法從 data-testid 解析 matchId：${String(testId)}`);
+		}
+		return match[1];
+	}
+
+	// 直接寫入單一場次的計分板槽（模擬「已在場邊計分到一半」的既有進度），
+	// 欄位形狀複製自 ScoreboardStateSchema（見本 describe 頁首註解）。
+	async function writeMatchSlot(
+		page: Page,
+		matchId: string,
+		overrides: {
+			scores: { us: number; them: number };
+			status?: "setup" | "playing" | "finished";
+			targetScore?: 11 | 15 | 21;
+			courtNumber?: number | null;
+		},
+	): Promise<void> {
+		await page.evaluate(
+			(arg: { key: string; id: string; state: unknown }) => {
+				const raw = window.localStorage.getItem(arg.key);
+				const slots = raw ? JSON.parse(raw) : {};
+				slots[arg.id] = arg.state;
+				window.localStorage.setItem(arg.key, JSON.stringify(slots));
+			},
+			{
+				key: MATCH_SLOTS_KEY,
+				id: matchId,
+				state: {
+					mode: "singles",
+					scores: overrides.scores,
+					servingTeam: "us",
+					serverNumber: 2,
+					isFirstServiceOfGame: true,
+					history: [],
+					status: overrides.status ?? "playing",
+					winner: null,
+					firstServer: "us",
+					targetScore: overrides.targetScore ?? 11,
+					matchId,
+					courtNumber: overrides.courtNumber ?? null,
+				},
+			},
+		);
+	}
+
+	async function clickWin(page: Page, side: "us" | "them", times: number): Promise<void> {
+		const label = side === "us" ? /我方贏這一球/ : /對方贏這一球/;
+		const button = page.getByRole("button", { name: label });
+		for (let i = 0; i < times; i++) {
+			await button.click();
+		}
+	}
+
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/");
+		await page.evaluate(
+			(keys) => {
+				for (const key of keys) window.localStorage.removeItem(key);
+			},
+			[MATCH_SLOTS_KEY, CURRENT_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY],
+		);
+	});
+
+	test("計分中的場次顯示計分中標示與當前比分", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 2);
+		const matchId = await courtMatchId(page, 1);
+
+		await writeMatchSlot(page, matchId, { scores: { us: 8, them: 5 }, status: "playing" });
+		await page.reload();
+
+		const court = page.getByTestId(`court-${matchId}`);
+		await expect(court.getByText("計分中")).toBeVisible();
+		await expect(court.getByText("8:5")).toBeVisible();
+		await expect(court.getByRole("link", { name: "繼續計分" })).toBeVisible();
+	});
+
+	test("未完成的計分進度可離開後再進入接續", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 2);
+		const matchId = await courtMatchId(page, 1);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await clickWin(page, "us", 8);
+		// side-out 記分：我方先發、連贏 8 球後我方持續發球（比分 8:0）；接下來對方
+		// 第 1 次贏球只換發球權不得分，第 2～6 次贏球才各 +1 分——6 次點擊使對方得 5 分
+		// （見 tasks.md §8 開工盤點的實測與 lib/scoreboard/rules.ts 的 applyRallyResult）。
+		await clickWin(page, "them", 6);
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		await court.getByRole("link", { name: "繼續計分" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await expect(page.getByLabel(/我方目前 8 分/)).toBeVisible();
+		await expect(page.getByLabel(/對方目前 5 分/)).toBeVisible();
+		// targetScore 仍為該輪設定值（createRoundSettings 預設 11）——確認接續進入時
+		// 沒有被覆蓋成別的值（見 spec「已有進度時再次進入不覆蓋」）。
+		await expect(page.getByText("本輪 11 分制")).toBeVisible();
+	});
+
+	test("多場地同時計分時各場進度互不覆蓋", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 2);
+		const matchId1 = await courtMatchId(page, 0);
+		const matchId2 = await courtMatchId(page, 1);
+		const court1 = page.getByTestId(`court-${matchId1}`);
+		const court2 = page.getByTestId(`court-${matchId2}`);
+
+		await court1.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId1}$`));
+		await clickWin(page, "us", 5);
+		// side-out 記分：對方第 1 次贏球只換發球權不得分，故需點擊 3 次才能讓對方
+		// 得 2 分（同上方測試的計算方式）。
+		await clickWin(page, "them", 3);
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		await court2.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId2}$`));
+		await clickWin(page, "us", 3);
+		await clickWin(page, "them", 2);
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		await expect(court1.getByText("5:2")).toBeVisible();
+		await expect(court2.getByText("3:1")).toBeVisible();
+
+		await court1.getByRole("link", { name: "繼續計分" }).click();
+		await expect(page.getByLabel(/我方目前 5 分/)).toBeVisible();
+		await expect(page.getByLabel(/對方目前 2 分/)).toBeVisible();
 	});
 });
