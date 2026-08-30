@@ -16,6 +16,29 @@ import type { Page } from "@playwright/test";
 const HISTORY_STORAGE_KEY = "matchmaker:history:v1";
 const HISTORY_PAGE = "/matchmaker/history";
 
+// 已知的 dev-only 噪音，不視為本測試的失敗（沿用 match-stage.spec.ts／
+// player-roster.spec.ts 的既有慣例）：Turbopack 的 HMR client 與 Next 內建
+// global-error boundary 是背景延遲載入的 chunk，高並發 E2E 下偶爾被下一次
+// page.goto() 中斷，已證實與頁面本身的產品邏輯無關。
+const KNOWN_DEV_ONLY_NOISE = /ChunkLoadError.*(hmr-client|global-error)/;
+
+// 監控瀏覽器 console：收集 error 與 warning，並收集未捕捉的 pageerror。特別留意
+// hydration mismatch——歷史頁在 render 期間 SHALL NOT 取用 localStorage 或系統
+// 時鐘，若寫錯會在此以 warning 或 error 現形（spec「歷史頁唯讀消費既有紀錄」）。
+function trackConsoleIssues(page: Page): string[] {
+	const issues: string[] = [];
+	page.on("console", (msg) => {
+		if (msg.type() === "error" || msg.type() === "warning") {
+			issues.push(`[console.${msg.type()}] ${msg.text()}`);
+		}
+	});
+	page.on("pageerror", (error) => {
+		if (KNOWN_DEV_ONLY_NOISE.test(error.message)) return;
+		issues.push(`[pageerror] ${error.message}`);
+	});
+	return issues;
+}
+
 // 三個區間各自的固定取樣時間，皆以測試執行當下的「現在」為基準運算，避免寫死
 // 絕對日期造成測試在未來某天失效。isoEarlier() 刻意用一個遠早於任何「上月」判定
 // 的絕對日期（2000 年）——「更早」是無下界的兜底區間，不需要相對於現在計算。
@@ -401,5 +424,72 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		for (const day of days) {
 			await expect(page.getByTestId(`history-record-e2e-history-crossmonth-${day}`)).toBeVisible();
 		}
+	});
+
+	test("瀏覽與切換區間後 matchmaker:history:v1 內容不變", async ({ page }) => {
+		// 種入的兩筆皆為合法紀錄（buildEntry 產出符合 schema 的形狀）：readHistory()
+		// 只在 droppedCount > 0 時才會回寫清理後的歷史（round-storage.ts 第 142～147
+		// 行），全數合法即可避免踩到 M4 的回寫路徑而讓「內容不變」誤判失守。
+		const entries = [
+			buildEntry({
+				matchId: "e2e-history-readonly-1",
+				playedAt: isoToday(9),
+				teamA: [player("p-readonly-a1", "唯讀驗證員A1")],
+				teamB: [player("p-readonly-b1", "唯讀驗證員B1")],
+			}),
+			buildEntry({
+				matchId: "e2e-history-readonly-2",
+				playedAt: isoLastMonth(),
+				teamA: [player("p-readonly-a2", "唯讀驗證員A2")],
+				teamB: [player("p-readonly-b2", "唯讀驗證員B2")],
+			}),
+		];
+		const rawValue = JSON.stringify({ version: 1, entries });
+
+		// 開頁前直接寫入並記下原始字串：與 seedHistory() 的 addInitScript 寫法
+		// 不同，這裡刻意先 goto("/") 佔一次導覽，確保「記下開頁前的原始字串」
+		// 這個動作真的發生在歷史頁載入之前，而不是與其競態。
+		await page.goto("/");
+		await page.evaluate(
+			(arg: { key: string; value: string }) => {
+				window.localStorage.setItem(arg.key, arg.value);
+			},
+			{ key: HISTORY_STORAGE_KEY, value: rawValue },
+		);
+
+		await page.goto(HISTORY_PAGE);
+		await expect(page.getByText("唯讀驗證員A1")).toBeVisible();
+
+		// 依序切換五個區間（含切回最初的今日）。
+		for (const rangeName of ["本週", "本月", "上月", "更早", "今日"] as const) {
+			await page.getByRole("radio", { name: rangeName }).click();
+		}
+
+		const afterValue = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			HISTORY_STORAGE_KEY,
+		);
+		expect(afterValue).toBe(rawValue);
+	});
+
+	test("紀錄於 hydration 後顯示且無 console error", async ({ page }) => {
+		const consoleIssues = trackConsoleIssues(page);
+		await seedHistory(page, [
+			buildEntry({
+				matchId: "e2e-history-hydration-1",
+				playedAt: isoToday(9),
+				teamA: [player("p-hydration-a", "hydration顯示員A")],
+				teamB: [player("p-hydration-b", "hydration顯示員B")],
+			}),
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		await expect(page.getByText("hydration顯示員A")).toBeVisible();
+
+		expect(
+			consoleIssues,
+			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
+		).toEqual([]);
 	});
 });
