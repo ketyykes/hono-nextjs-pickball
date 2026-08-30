@@ -201,4 +201,20 @@ describe("history-range", () => {
 			"match-oldest",
 		]);
 	});
+
+	it("篩選不修改輸入的紀錄陣列", () => {
+		const now = new Date(2026, 7, 15, 20, 0); // 2026-08-15 20:00
+		const oldest = makeHistoryEntry(new Date(2026, 7, 15, 8, 0).toISOString(), "match-oldest");
+		const middle = makeHistoryEntry(new Date(2026, 7, 15, 12, 0).toISOString(), "match-middle");
+		const newest = makeHistoryEntry(new Date(2026, 7, 15, 18, 0).toISOString(), "match-newest");
+		const input = [middle, newest, oldest];
+		const inputSnapshot = structuredClone(input);
+
+		const result = filterHistoryByRange(input, "today", now);
+
+		// 呼叫前後輸入陣列的長度、元素順序與各紀錄內容皆相同
+		expect(input).toEqual(inputSnapshot);
+		// 回傳值與輸入不是同一參照
+		expect(result).not.toBe(input);
+	});
 });
