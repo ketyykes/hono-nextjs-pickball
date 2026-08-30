@@ -65,7 +65,7 @@ export default function MatchmakerPage() {
 		// 其餘待送出項目留給下一次 effect 執行（round 因本次 dispatch 而變動後）處理，
 		// 這裡先反映目前讀到的槽（含尚未處理的那些），避免畫面短暫顯示錯誤的計分中狀態。
 		//
-		// 依賴陣列刻意只放 round：players／submitScore 每次 render 都换新參考，
+		// 依賴陣列刻意只放 round：players／submitScore 每次 render 都換新參考，
 		// 列入 deps 會讓本 effect 在每次 render 後都重跑，而非只在「回合資料就緒
 		// 或變動」時才觸發。
 		setMatchSlots(slots);
