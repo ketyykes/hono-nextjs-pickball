@@ -13,7 +13,11 @@ export interface MatchmakerSectionTab {
 /** matchmaker 主頁路由——對戰頁與計分板返回動線共用此常數，避免路徑字面值重複 */
 export const MATCHMAKER_ROUTE = "/matchmaker";
 
-const MATCHMAKER_SECTION_HREFS = [MATCHMAKER_ROUTE, `${MATCHMAKER_ROUTE}/players`] as const;
+const MATCHMAKER_SECTION_HREFS = [
+	MATCHMAKER_ROUTE,
+	`${MATCHMAKER_ROUTE}/players`,
+	`${MATCHMAKER_ROUTE}/history`,
+] as const;
 
 const MATCHMAKER_SECTION_LABELS: Record<
 	(typeof MATCHMAKER_SECTION_HREFS)[number],
@@ -21,10 +25,11 @@ const MATCHMAKER_SECTION_LABELS: Record<
 > = {
 	"/matchmaker": "對戰",
 	"/matchmaker/players": "參賽者",
+	"/matchmaker/history": "歷史",
 };
 
-// 精確比對（===）是刻意的：目前 app/matchmaker/ 下沒有巢狀路由，非本區段的
-// 路徑（例如子路由未來若存在）一律回傳全部非 active，不做前綴比對。
+// 精確比對（===）是刻意的：app/matchmaker/ 下已有巢狀路由（例如 /matchmaker/history），
+// 但非本區段清單內的路徑一律回傳全部非 active，不做前綴比對。
 export function matchmakerSectionTabs(
 	pathname: string,
 ): MatchmakerSectionTab[] {
