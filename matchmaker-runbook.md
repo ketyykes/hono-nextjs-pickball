@@ -26,17 +26,18 @@
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
 | Branch | `change/matchmaker-history-page`（**保留，未刪**） |
 | Base | `main` @ `85889ca` |
-| HEAD | `018b631`（docs：記錄 apply 中斷點，24/47） |
-| 進度 | **24/47 勾選、26 個 commit** |
-| 工作區 | ✅ **乾淨**（leader 已依指示落盤後停手） |
-| 已完成 | §1 區間切點計算（11 task，Stage 1 PASS／Stage 2 PASS_WITH_NITS、0 Blocking）、§2 區間歸屬（7 task，兩階段皆 PASS）、**§3 篩選與排序實作完成但兩階段審查皆未跑** |
+| HEAD | `abedcd3`（docs：落盤 §3 Stage 1 審查結論） |
+| 進度 | **24/47 勾選、27 個 commit** |
+| 工作區 | ✅ **乾淨** |
+| 已完成 | §1 區間切點計算（11 task，Stage 1 PASS／Stage 2 PASS_WITH_NITS、0 Blocking）、§2 區間歸屬（7 task，兩階段皆 PASS）、**§3 篩選與排序實作完成＋Stage 1 PASS（coordinator 親跑），Stage 2 未跑** |
 | 未開工 | §4～§6（23 task）＋ Final Code Review |
 | 跑過幾棒 | 一棒（`a1aa193b821da7a91`），逐 task commit 紀律良好，**無事故**，中斷純因使用者關機 |
 
-### ▶️ 續跑起點：先補 §3 的兩階段審查，再進 §4.1
+### ▶️ 續跑起點：先補 §3 的 Stage 2，再進 §4.1
 
-1. **§3 的 Stage 1／Stage 2 尚未跑**，審查範圍 `2d1e1f2..ba4eb5c`（8 個 commit）。Stage 2 MUST 自行獨立 mutation，**不可採信** §3 Implementer 自述（它自測時已發現 1 組存活並補了斷言 `ba4eb5c`，但那組未經獨立複核）。
-2. 補審通過後才進 **§4.1**。
+1. **§3 的 Stage 1 已完成（`PASS`，commit `abedcd3`），不需重跑**；結論全文在 `design.md` Open Questions 第 6 點，含錨點比對、紅燈機械複驗、五條 SHALL NOT 逐條查核的完整證據。
+2. **§3 的 Stage 2 尚未跑**，審查範圍 `2d1e1f2..ba4eb5c`（8 個 commit）。Stage 1 已明文移交兩項：① `ba4eb5c` 補的斷言目前只有 Implementer 自述、**MUST 獨立 mutation 複核**；② 循「分支或欄位零覆蓋」方向擴大盤點，已附五個具體建議變異（見 design.md 第 6 點結尾）。
+3. 補審通過後才進 **§4.1**。
 3. **完整續跑手記在 `design.md` 的 `## Open Questions` 第 5 點**（leader 親自寫的，比本檔詳細），含三件開工前就該知道的事：
    - §4 的 E2E seed 容器形狀為 `{"version":1,"entries":[...]}`
    - §5 的 `section-nav.ts` 因 M6 合併有行號位移，且該檔**兩個常數皆未 export**
