@@ -59,3 +59,30 @@ export function computeRangeCutoffs(now: Date): RangeCutoffs {
 
 	return { c0, c1, c2, c3 };
 }
+
+/**
+ * 判定某時間點所屬的歷史區間。由新到遠單向掃描：一旦命中即回傳，
+ * 最後一個分支無條件回傳 "earlier"，因此不存在 undefined 或 throw 的路徑，
+ * 完整覆蓋是控制流的必然結果而非額外保證（design Decision 8）。
+ *
+ * 今日刻意不設上界（`>= c0` 即成立），SHALL NOT 改用「現在」當上界——
+ * 裝置時鐘超前或紀錄時間有毫秒級誤差時，會讓晚於「現在」的紀錄找不到區間，
+ * 違反「完整覆蓋」的硬性要求（design Decision 3）。
+ */
+export function rangeOfTime(time: number, now: Date): HistoryRange {
+	const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
+
+	if (time >= c0) {
+		return "today";
+	}
+	if (time >= c1) {
+		return "thisWeek";
+	}
+	if (time >= c2) {
+		return "thisMonth";
+	}
+	if (time >= c3) {
+		return "lastMonth";
+	}
+	return "earlier";
+}
