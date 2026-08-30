@@ -455,11 +455,19 @@ Depends on: §4、§5、§6、§7
 
 ## 9. 收尾驗證（對應 root `README.md` 部署前手動檢查清單）
 
-- [ ] 9.1 以腳本逐條核對**四份** delta spec（`scoreboard`／`match-stage`／`round-lifecycle`／`player-roster`）的每個「驗收」錨點：檔案存在、it／test 名稱**逐字**相符（不靠目視）。特別確認兩個**改名**的既有測試已改到位：`RoundControls.test.tsx` 的「本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因」（§8.5）與 `lib/matchmaker/storage.test.ts` 的「重置只移除列舉的四個 key，不影響獨立計分板資料」（§6.3），且**舊名稱已不存在**於測試檔中。不符即修測試名稱，**不改 spec**
-- [ ] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法逐標題計數，**不使用** BSD `uniq`（macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）
-- [ ] 9.3 `pnpm lint` — 0 errors（既有 warning 清單須與變更前一致，不得新增）
-- [ ] 9.4 `pnpm typecheck` — 通過
-- [ ] 9.5 `pnpm test` 全套 — 前後端皆綠。既有 `scoreboard` 測試須**全數原樣**通過；其餘既有測試除下列**六處**外無迴歸（**這六處是本 change 唯一容許變動的既有測試**，其餘既有測試若轉紅一律視為迴歸）
+- [x] 9.1 以腳本逐條核對**四份** delta spec（`scoreboard`／`match-stage`／`round-lifecycle`／`player-roster`）的每個「驗收」錨點：檔案存在、it／test 名稱**逐字**相符（不靠目視）。特別確認兩個**改名**的既有測試已改到位：`RoundControls.test.tsx` 的「本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因」（§8.5）與 `lib/matchmaker/storage.test.ts` 的「重置只移除列舉的四個 key，不影響獨立計分板資料」（§6.3），且**舊名稱已不存在**於測試檔中。不符即修測試名稱，**不改 spec**
+
+      **實測（2026-08-30，第十棒 leader）：PASS。** 以 python 腳本抽出四份 delta spec 全部 `**驗收**` 行的檔案路徑與「」內名稱，逐一確認檔案存在且名稱**逐字**出現於該檔——**64 組全數命中，0 失敗**（同一行列出 unit + e2e 兩個檔者，名稱只需命中其中一個）。兩個改名測試機械複驗：`RoundControls.test.tsx:143` 為 `it("本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因"`、`lib/matchmaker/storage.test.ts:116` 為 `it("重置只移除列舉的四個 key，不影響獨立計分板資料"`，皆為真正的 `it()` 標題而非文中提及。舊名稱殘留掃描（`grep -rn` 全 `nextjs-pickball/**/*.ts(x)`，排除 `node_modules`）：「目前回合存在時目標分數選擇器 disabled 並顯示已鎖定說明」**0 命中**、「重置只移除列舉的 key，不影響 scoreboard 資料」**0 命中**、「回合存在但尚無場次時目標分數仍鎖定」**0 命中**。未修改任何 spec
+- [x] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法逐標題計數，**不使用** BSD `uniq`（macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）
+
+      **實測（2026-08-30）：四份 delta spec 皆「無重複」。** 計數範圍含 `### Requirement:`、`#### Scenario:` 與 `## ADDED／MODIFIED／REMOVED` 標題行；全程使用 python `collections.Counter`，未使用 BSD `uniq`
+- [x] 9.3 `pnpm lint` — 0 errors（既有 warning 清單須與變更前一致，不得新增）
+
+      **實測（2026-08-30）：`✖ 3 problems (0 errors, 3 warnings)`。** 三個 warning 為 `hooks/useQuiz.ts:33 _correctIndex`、`hooks/useRosterStore.ts:112 _arg`、`hooks/useScoreboardStore.ts:45 _arg`，與 design.md Open Questions 第 20 項更正後的 baseline（**3 個，不是 4 個**）逐項一致。已用 `git show 3fefb02:<path>` 機械複驗三處在變更前即存在。**未新增任何 warning**
+- [x] 9.4 `pnpm typecheck` — 通過
+
+      **實測（2026-08-30）：`pnpm -r exec tsc --noEmit` exit 0。** 另補跑 `pnpm --filter ./hono-pickball typecheck`（含 `test/tsconfig.json` 那段，root 的 `pnpm typecheck` 不涵蓋）亦 exit 0
+- [x] 9.5 `pnpm test` 全套 — 前後端皆綠。既有 `scoreboard` 測試須**全數原樣**通過；其餘既有測試除下列**六處**外無迴歸（**這六處是本 change 唯一容許變動的既有測試**，其餘既有測試若轉紅一律視為迴歸）
 
       **原文只列三處，實際為六處**——三處是 §8.6 的 MODIFIED Requirement（鎖定條件由「目前回合存在即鎖」放寬為「本輪已開始計分才鎖」）的**必然連帶**：凡是既有測試把「回合存在」當成鎖定前置條件者，在新規則下一律轉紅。design Decision 7 已預告此事（「M5 既有的單元測試（`RoundControls.test.tsx`）會被本段的行為直接打紅——衝突會在實作時以測試失敗的形式爆出來」），但 §9.5 撰寫時只估到三處。三處增列已由 §8 Stage 1 Spec Reviewer 逐項裁決為「MODIFIED 的必然結果、保留原意圖、未掩蓋迴歸、未削弱核心斷言」（見下方 (4)～(6) 的裁決摘要）。**此為對驗收標準的修訂，已記入 design.md Open Questions 第 7 項，待 coordinator 追認。**
 
@@ -474,7 +482,17 @@ Depends on: §4、§5、§6、§7
 
       **第 4 項的反轉斷言不是恆真**（Stage 1 實測確認）：若實作退回「`round !== null` 就鎖」的舊寫法，`matches: []` 情境下仍會回報鎖定，該測試會轉紅 —— 它現在守護的是「不得只憑回合存在與否判斷鎖定」這條 SHALL NOT。
       **第 6 項雖動到 spec 標註「既有，不要動」的 test**，但動的是**前置情境的建立手法**而非測試主體；其 Scenario 名稱所指涉的核心行為（方向鍵移動即選取、roving tabindex 僅選中項為 0）第 386～401 行逐字未改。
+
+      **實測（2026-08-30，第十棒 leader）：`pnpm test` exit 0。** 前端 **56 檔／472 測試 passed**、後端 **4 檔／16 測試 passed**（baseline 為前端 54 檔／410、後端 4 檔／16）。
+      **白名單機械複驗（非採信回報）**：`git diff --stat 3fefb02..HEAD -- "*.test.ts" "*.test.tsx" "*.spec.ts"` 顯示 12 檔異動、**+2173／−19**；再以 `git diff … | grep -E "^-[^-]"` 逐行檢視全部 19 行刪除，全數落在白名單內——`RoundControls.test.tsx` 的三個 `it(` 改名（表格第 2／4／5 項）、`lib/matchmaker/storage.test.ts` 的一個 `it(` 改名（第 1 項）、`match-stage.spec.ts` 的四行註解（第 6 項，前置手法改動）、以及 `CourtCard.test.tsx`／`useRoundStore.test.tsx`／`useScoreboardStore.test.tsx` 的 import 行調整（非測試主體）。**除白名單外沒有任何既有 `it(`／`test(` 被刪改**。
+      **`tests/e2e/specs/scoreboard.spec.ts` 相對 base `3fefb02` 完全未出現在 diff 中**，即「既有 `scoreboard` 測試全數原樣通過」成立。
+      註：表格第 5 項的 it 於 §8 Stage 2（design Open Questions 第 19 項變異 D9）另補 `setTargetScore` spy 並同步改名為「…不得呼叫 onSettingsChange 或 setTargetScore，也不改變選取…」，理由為原斷言在 §8.6 後已恆真；此改動已在 Stage 2 落盤，屬第 5 項授權範圍內
 - [ ] 9.6 `pnpm test:e2e` 全套 — 五個 browser project 全綠。既有 `scoreboard.spec.ts` 必須**原樣**通過（證明獨立用法零行為變更）
 - [ ] 9.7 `pnpm --filter ./nextjs-pickball preview` — workerd runtime 下開啟 `/scoreboard` 與 `/scoreboard?match=<id>` 皆正常，無 console error
-- [ ] 9.8 Rollback 相容性實測（design Migration Plan 要求，不得只憑推論）：以本次變更**前**的 `ScoreboardStateSchema` 解析一份含 `matchId` 欄位的資料，確認 zod 剝除未知欄位而非拒絕；結果如實記錄於此，若為拒絕則 MUST 更新 design.md 的 Rollback 段並提出補救
-- [ ] 9.9 `DO_NOT_TRACK=1 openspec validate matchmaker-scoreboard-binding --strict` — 0 error
+- [x] 9.8 Rollback 相容性實測（design Migration Plan 要求，不得只憑推論）：以本次變更**前**的 `ScoreboardStateSchema` 解析一份含 `matchId` 欄位的資料，確認 zod 剝除未知欄位而非拒絕；結果如實記錄於此，若為拒絕則 MUST 更新 design.md 的 Rollback 段並提出補救
+
+      **實測（2026-08-30）：PASS，zod 剝除未知欄位而非拒絕。** 做法：以 `git show 3fefb02:nextjs-pickball/lib/scoreboard/types.ts` 的 `ScoreboardStateSchema` **逐字重建**變更前的 schema（無 `matchId`、無 `courtNumber`），用 worktree 內的 zod 4.4.3 解析一份**變更後**形狀的資料（含 `matchId: "m-2026-08-30-001"` 與 `courtNumber: 3`）。結果：`safeParse().success === true`；`Object.keys(result.data)` 為 `firstServer, history, isFirstServiceOfGame, mode, scores, serverNumber, servingTeam, status, targetScore, winner` ——`matchId` 與 `courtNumber` **皆被剝除**，既有欄位值完整保留（`targetScore: 15`、`scores: {us:7,them:4}`）。
+      結論：使用者若回退到變更前版本，進行中的比賽資料**不會被判為驗證失敗而清除 key**，只會失去綁定資訊而退化為獨立計分板。design.md 的 Rollback 段陳述成立，**不需修改**
+- [x] 9.9 `DO_NOT_TRACK=1 openspec validate matchmaker-scoreboard-binding --strict` — 0 error
+
+      **實測（2026-08-30）：exit 0，輸出 `Change 'matchmaker-scoreboard-binding' is valid`，0 error**
