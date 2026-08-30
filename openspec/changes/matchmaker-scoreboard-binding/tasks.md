@@ -413,6 +413,30 @@ Stage 2 獨立重做 **39 組 mutation**（17 組 unit ＋ 22 組 E2E，全數�
 ## 8. 對戰頁 UI 接線（例外層 — 純呈現元件，以 E2E 驗收；§8.5～§8.6 為 M5 既有單元測試的更新與其實作）（**例外**：§8.4、§8.6 需改 `hooks/useRoundStore.ts`，該部分屬行為邏輯，MUST 走 TDD 三步，不適用本節的例外層豁免）
 Depends on: §4、§5、§6、§7
 
+### ⚠️ 第八棒開工盤點：第七棒遺留的未提交程式碼處置（2026-08-30）
+
+接手時工作區有 **4 個未提交檔案**（303 增／5 刪），全部**無 commit、無紅燈證據、無 Stage 1／Stage 2 審查**：
+`tests/e2e/specs/scoreboard-binding.spec.ts`（8.1 的三個 test）、`components/matchmaker/CourtCard.tsx`
+與 `components/matchmaker/MatchStage.tsx`（8.2 形狀）、`app/matchmaker/page.tsx`（8.4 形狀）。
+判定為第七棒在 8.1～8.4 之間跳著寫、未及依「逐 task commit」收斂即被中斷 —— **8.3 的兩個 RED test
+完全不存在，8.4 的實作卻已寫下**，等於實作先於測試，TDD 順序已被破壞。
+
+**實測結果（非推論）**：`pnpm --filter ./nextjs-pickball test --run` 56 檔／468 測試全綠、
+`pnpm -r exec tsc --noEmit` exit 0；但那三個 e2e test 在**保留實作**的情況下 chromium 跑出 **1 過 2 敗**。
+逐項查失敗畫面快照後確認：**敗因在測試而不在實作** —— 測試假設「按 N 次得 N 分」，
+但匹克球的 side-out 記分下接發球方第一次贏球只換發球權不得分（實測 8 次我方點擊得 8 分、
+5 次對方點擊得 4 分）。失敗當下的頁面快照顯示對戰頁確實正確渲染了「計分中 5:1」與「繼續計分」連結。
+
+**處置**：
+- **保留** `scoreboard-binding.spec.ts`（三個 test 名稱與 8.1 逐字相符），但視為**未審查草稿**：
+  §8 的 Implementer MUST 逐條對照 delta spec 驗證其斷言、修正上述 side-out 誤算，再確認紅燈後提交。
+  屬「非本棒寫的紅燈，回溯補證」。
+- **丟棄** `CourtCard.tsx`／`MatchStage.tsx`／`page.tsx` 三份實作（`git checkout --`）。理由：
+  ① 8.4 無對應 RED 測試，保留等於把「實作先於測試」寫進 commit 歷史；
+  ② 三份皆未經 Stage 1／Stage 2；③ 丟棄後紅燈才是真的。
+  丟棄後複驗：三個 test 於 chromium **3/3 全紅**（testid 不存在／入口連結點不到），紅燈為真。
+  被丟棄的內容另存為 leader 手上的 prior-art patch，交給 Implementer 當**參考而非答案**，逐 task 重新導出。
+
 - [ ] 8.1 RED: 於 `scoreboard-binding.spec.ts` 補三個 test：「計分中的場次顯示計分中標示與當前比分」、「未完成的計分進度可離開後再進入接續」、「多場地同時計分時各場進度互不覆蓋」。前置以真實路徑鋪設（建立參賽者 → 產生本輪對戰）；耗時不可接受時才改用 `page.addInitScript` 直接寫入 `matchmaker:round:v1`，並於檔頭註明 schema 複製來源（design Risks）。確認紅燈
 - [ ] 8.2 GREEN: M5 的場地色塊元件加入「進入計分板／繼續計分」入口（點擊時先 `ensureMatchSlot` 再導向 `/scoreboard?match=<matchId>`，順序不可對調）與「計分中」文字標示＋當前比分
 - [ ] 8.3 RED: 補兩個 test：「由計分板判定勝負後返回，比分自動回填且該場轉為已完成」、「已完成場次不顯示進入計分板入口」。確認紅燈
