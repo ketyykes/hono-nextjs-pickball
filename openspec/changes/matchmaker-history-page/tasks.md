@@ -38,7 +38,7 @@ Depends on: §1
 - [x] 2.4 GREEN: 確認今日的上界為 `+∞`（實作上即「不設上界」），SHALL NOT 以「現在」為上界（design Decision 3）。重跑至綠
 - [x] 2.5 RED: 補 it「跨月週時沒有任何時間點落入本月」——`now = new Date(2026, 7, 1)`，對 7/1～8/1 逐日取樣，斷言 7/27～7/31 皆回傳 `"thisWeek"`、7/1～7/26 皆回傳 `"lastMonth"`、整段無任何一點回傳 `"thisMonth"`。看到紅燈（若 §1 的 `min()` 已正確 clamp 則為 regression guard，**如實標註**）**regression guard**：§1 的 `min()` 已正確 clamp（此 now 下 `c2 === c1`），加入時直接綠燈
 - [x] 2.6 GREEN: 確認空區間是 `c2 === c1` 的自然結果，SHALL NOT 為此加任何特例分支。重跑至綠
-- [ ] 2.7 REFACTOR: 以 `HISTORY_RANGES` 常數與切點序列驅動比較，消除五段結構重複的 `if`；確認回傳型別為 `HistoryRange` 而非 `string`。無壞味道則註記 skipped
+- [x] 2.7 REFACTOR: 以 `HISTORY_RANGES` 常數與切點序列驅動比較，消除五段結構重複的 `if`；確認回傳型別為 `HistoryRange` 而非 `string`。無壞味道則註記 skipped——改以 `[c0, c1, c2, c3]` 與 `HISTORY_RANGES` 索引對應的 for 迴圈掃描，命中即回傳 `HISTORY_RANGES[i]`，迴圈跑完（未命中）落到迴圈外無條件回傳 `HISTORY_RANGES[4]`；未用 `find()`，保住 Decision 8「無 undefined／throw 路徑」的保證。`tsc --noEmit` 通過（若 `HISTORY_RANGES[i]` 型別寬化為 `string`，因函式宣告回傳型別為 `HistoryRange`，`tsc` 會直接報型別不符，故通過即確認回傳型別正確）
 
 ## 3. 篩選與排序（`history-range.ts`）
 

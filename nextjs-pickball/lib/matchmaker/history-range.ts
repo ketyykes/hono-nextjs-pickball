@@ -72,17 +72,16 @@ export function computeRangeCutoffs(now: Date): RangeCutoffs {
 export function rangeOfTime(time: number, now: Date): HistoryRange {
 	const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
 
-	if (time >= c0) {
-		return "today";
+	// 切點依 HISTORY_RANGES 由近至遠的順序排列，逐一比對其左端點；
+	// 最末的 "earlier" 沒有對應切點（左端為 -∞），故不列入此陣列，
+	// 迴圈找不到命中時直接落到迴圈外的無條件回傳。
+	const cutoffs = [c0, c1, c2, c3];
+
+	for (let i = 0; i < cutoffs.length; i++) {
+		if (time >= cutoffs[i]) {
+			return HISTORY_RANGES[i];
+		}
 	}
-	if (time >= c1) {
-		return "thisWeek";
-	}
-	if (time >= c2) {
-		return "thisMonth";
-	}
-	if (time >= c3) {
-		return "lastMonth";
-	}
-	return "earlier";
+
+	return HISTORY_RANGES[4];
 }
