@@ -146,6 +146,8 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await page.goto(HISTORY_PAGE);
 
 		await expect(page.getByRole("radio", { name: "今日", checked: true })).toBeVisible();
+		// 只斷言「今日為選中」擋不住「每個按鈕都標成選中」，另取一個區間確認其為未選中。
+		await expect(page.getByRole("radio", { name: "上月", checked: false })).toBeVisible();
 		// 雙向斷言：該出現的今日紀錄出現，不該出現的更早紀錄消失。
 		await expect(page.getByText("今日對戰員A")).toBeVisible();
 		await expect(page.getByText("更早對戰員A")).toHaveCount(0);
@@ -178,11 +180,28 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		// 切換後：雙向斷言——上月紀錄出現，今日紀錄消失。
 		await expect(page.getByText("上月對戰員A")).toBeVisible();
 		await expect(page.getByText("今日對戰員C")).toHaveCount(0);
+		// 選取狀態也 MUST 隨之轉移，否則「每個按鈕都標成選中」照樣通過。
+		await expect(page.getByRole("radio", { name: "上月", checked: true })).toBeVisible();
+		await expect(page.getByRole("radio", { name: "今日", checked: false })).toBeVisible();
+
+		await page.getByRole("radio", { name: "本週" }).click();
+
+		// 切到一個沒有紀錄的區間：MUST 顯示該區間自己的文案，不得沿用別的區間。
+		// 兩筆種資料分別落在今日與上月，本週因此必為空區間。
+		await expect(page.getByTestId("empty-history-range")).toHaveText("本週目前沒有任何對戰紀錄。");
+		await expect(page.getByText("今日對戰員C")).toHaveCount(0);
+		await expect(page.getByText("上月對戰員A")).toHaveCount(0);
 	});
 
 	test("雙打紀錄顯示 8.2 全部欄位含雙打組成標示", async ({ page }) => {
 		const matchId = "e2e-history-doubles-1";
 		const playedAt = isoToday(14);
+		// 第二筆刻意在每個欄位上都與第一筆相異（場地 5、比分 8:11、第二隊獲勝、男雙）：
+		// 只種一筆時，把 courtNumber／scoreA／winner／doublesComposition 任一項寫死成第一筆
+		// 的值，測試依然全綠——單一取值的欄位等於零保護。第三、四筆補滿剩下兩種組成文案。
+		const mensMatchId = "e2e-history-doubles-2";
+		const womensMatchId = "e2e-history-doubles-3";
+		const generalMatchId = "e2e-history-doubles-4";
 		await seedHistory(page, [
 			buildEntry({
 				matchId,
@@ -200,6 +219,32 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 				scoreA: 11,
 				scoreB: 7,
 			}),
+			buildEntry({
+				matchId: mensMatchId,
+				playedAt: isoToday(13),
+				courtNumber: 5,
+				doublesComposition: "mens",
+				// 球員姓名刻意不含「男雙」等字樣，否則 getByText 會同時命中姓名與組成標示。
+				teamA: [player("p-mens-a1", "甲組今日員A1"), player("p-mens-a2", "甲組今日員A2")],
+				teamB: [player("p-mens-b1", "甲組今日員B1"), player("p-mens-b2", "甲組今日員B2")],
+				scoreA: 8,
+				scoreB: 11,
+				winner: "teamB",
+			}),
+			buildEntry({
+				matchId: womensMatchId,
+				playedAt: isoToday(12),
+				doublesComposition: "womens",
+				teamA: [player("p-womens-a1", "乙組今日員A1"), player("p-womens-a2", "乙組今日員A2")],
+				teamB: [player("p-womens-b1", "乙組今日員B1"), player("p-womens-b2", "乙組今日員B2")],
+			}),
+			buildEntry({
+				matchId: generalMatchId,
+				playedAt: isoToday(11),
+				doublesComposition: "general",
+				teamA: [player("p-general-a1", "丙組今日員A1"), player("p-general-a2", "丙組今日員A2")],
+				teamB: [player("p-general-b1", "丙組今日員B1"), player("p-general-b2", "丙組今日員B2")],
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -210,6 +255,10 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(card.getByText(matchId)).toBeVisible();
 		await expect(card.getByText("第 3 場地")).toBeVisible();
 		await expect(card.locator(`time[datetime="${playedAt}"]`)).toBeVisible();
+		// 人眼可讀的對戰時間 MUST 是當地時區：預期值由與 fixture 同一個 now 取當地時間
+		// 分量組出，元件若改用 getUTC* 會在此轉紅（只驗 <time datetime> 驗不到這件事）。
+		const expectedPlayedAtText = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")} 14:00`;
+		await expect(card.locator(`time[datetime="${playedAt}"]`)).toHaveText(expectedPlayedAtText);
 		await expect(card.getByText("雙打", { exact: true })).toBeVisible();
 		await expect(card.getByText("混雙")).toBeVisible();
 		// 兩隊球員與比分、勝方。
@@ -220,6 +269,25 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(card.getByTestId(`history-record-${matchId}-score`)).toHaveText("11:7");
 		await expect(card.getByTestId(`history-record-${matchId}-team-a`)).toContainText("勝");
 		await expect(card.getByTestId(`history-record-${matchId}-team-b`)).not.toContainText("勝");
+		// 兩隊各自的文字標籤與成員 MUST 對得起來，否則兩隊內容互換也測不出來。
+		await expect(card.getByTestId(`history-record-${matchId}-team-a`)).toContainText("第一隊");
+		await expect(card.getByTestId(`history-record-${matchId}-team-a`)).toContainText("雙打今日員A1");
+		await expect(card.getByTestId(`history-record-${matchId}-team-b`)).toContainText("第二隊");
+		await expect(card.getByTestId(`history-record-${matchId}-team-b`)).toContainText("雙打今日員B1");
+
+		// 第二筆：場地、比分與勝方皆與第一筆相異，逐一鎖住這些欄位真的讀自紀錄。
+		const mensCard = page.getByTestId(`history-record-${mensMatchId}`);
+		await expect(mensCard.getByText("第 5 場地")).toBeVisible();
+		await expect(mensCard.getByText("男雙")).toBeVisible();
+		await expect(mensCard.getByTestId(`history-record-${mensMatchId}-score`)).toHaveText("8:11");
+		await expect(mensCard.getByTestId(`history-record-${mensMatchId}-team-b`)).toContainText("勝");
+		await expect(mensCard.getByTestId(`history-record-${mensMatchId}-team-a`)).not.toContainText("勝");
+
+		// 剩下兩種雙打組成的文案（女雙、一般雙打）逐字覆蓋。
+		await expect(page.getByTestId(`history-record-${womensMatchId}`).getByText("女雙")).toBeVisible();
+		await expect(
+			page.getByTestId(`history-record-${generalMatchId}`).getByText("一般雙打"),
+		).toBeVisible();
 	});
 
 	test("單打紀錄不顯示雙打組成標示", async ({ page }) => {
@@ -241,6 +309,8 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		const card = page.getByTestId(`history-record-${matchId}`);
 		await expect(card).toBeVisible();
 		await expect(card.getByText("單打", { exact: true })).toBeVisible();
+		// 場地取自本筆紀錄（雙打那個 test 用的是 3 與 5），三個相異值才擋得住寫死。
+		await expect(card.getByText("第 2 場地")).toBeVisible();
 		// 單打不得帶任何雙打組成標示文字（四種寫死文案逐一確認不存在）。
 		for (const label of ["混雙", "男雙", "女雙", "一般雙打"]) {
 			await expect(card.getByText(label)).toHaveCount(0);
@@ -289,13 +359,36 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		// 本月為空：友善空狀態可見，且不出現任何錯誤字樣（正向斷言空狀態本身，
 		// 不只是斷言「沒有錯誤」——避免頁面整個壞掉、什麼都沒 render 時誤判通過）。
 		await expect(page.getByTestId("empty-history-range")).toBeVisible();
+		await expect(page.getByTestId("empty-history-range")).toHaveText("本月目前沒有任何對戰紀錄。");
 		await expect(page.getByTestId(/^history-record-e2e-history-crossmonth-/)).toHaveCount(0);
 		const bodyText = await page.locator("body").innerText();
 		expect(bodyText).not.toMatch(/Error/);
 
+		// 此時鐘下今日（8/1）、上月（7/1～7/26）與更早（7/1 之前）也都是空區間，
+		// 三者各自的文案 MUST 不同：只驗其中一個區間時，把 range 參數忽略、寫死成
+		// 單一文案照樣全綠（§3 出現過同型缺口）。
+		for (const [rangeName, expectedText] of [
+			["今日", "今日目前沒有任何對戰紀錄。"],
+			["上月", "上月沒有任何對戰紀錄。"],
+			["更早", "沒有更早的對戰紀錄。"],
+		] as const) {
+			await page.getByRole("radio", { name: rangeName }).click();
+			await expect(page.getByTestId("empty-history-range")).toHaveText(expectedText);
+		}
+
 		await page.getByRole("radio", { name: "本週" }).click();
 
 		// 本週如常列出該批紀錄：正向對照，證明不是整份資料都消失。
+		for (const day of days) {
+			await expect(page.getByTestId(`history-record-e2e-history-crossmonth-${day}`)).toBeVisible();
+		}
+
+		// design Decision 7：「現在」只在 hydration 取樣一次，之後的 render SHALL NOT
+		// 再取時鐘。把假時鐘推到 2026-08-10（週一）——若元件在 render 期間重取，
+		// 7/27～7/31 會被改判為「上月」，本週隨即變成空狀態而在此轉紅。
+		await page.clock.setFixedTime(new Date(2026, 7, 10, 12, 0, 0));
+		await page.getByRole("radio", { name: "本月" }).click();
+		await page.getByRole("radio", { name: "本週" }).click();
 		for (const day of days) {
 			await expect(page.getByTestId(`history-record-e2e-history-crossmonth-${day}`)).toBeVisible();
 		}

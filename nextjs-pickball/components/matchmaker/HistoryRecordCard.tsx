@@ -15,9 +15,9 @@ const FORMAT_LABEL: Record<MatchHistoryEntry["format"], string> = {
 	doubles: "雙打",
 };
 
-// 雙打組成的中文標示，MUST 與 CourtCard.tsx 既有寫死的 DOUBLES_COMPOSITION_LABEL
-// 逐字相同（tasks.md §4 開工前盤點第 6 點）。是否抽成共用模組留給 4.9 REFACTOR 判斷，
-// 且不得改動 CourtCard 的任何行為。
+// 雙打組成的中文標示，MUST 與 CourtCard.tsx 各自持有的同名對照表逐字相同
+// （design Open Question 4 的結案裁決）。刻意不抽成共用模組：僅 4 個項目的穩定對照表，
+// 抽出需連動修改本 change 範圍外的 CourtCard.tsx，風險與收益不成比例。
 const DOUBLES_COMPOSITION_LABEL = {
 	mixed: "混雙",
 	mens: "男雙",
