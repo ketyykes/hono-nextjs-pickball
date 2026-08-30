@@ -49,27 +49,57 @@ function seedHistory(page: Page, entries: unknown[]) {
 	);
 }
 
-// 最小的單打紀錄 fixture：欄位形狀複製自 lib/matchmaker/history.ts 的
-// MatchHistoryEntrySchema（singles 分支）。跨月週測試只需分辨「哪幾筆該出現」，
-// 不需要 8.2 全部欄位的細節斷言（那些由 4.5／4.6 的三個 test 專責覆蓋）。
-function buildSinglesEntry(matchId: string, playedAt: string, playerName: string) {
-	return {
-		matchId,
-		courtNumber: 1,
-		playedAt,
-		format: "singles" as const,
-		teamA: {
-			players: [{ id: `${matchId}-a`, name: playerName, ratingBefore: 3.5, ratingAfter: 3.6 }],
-			rating: 3.5,
-		},
-		teamB: {
-			players: [{ id: `${matchId}-b`, name: `${playerName}的對手`, ratingBefore: 3.4, ratingAfter: 3.3 }],
-			rating: 3.4,
-		},
-		scoreA: 11,
-		scoreB: 5,
-		winner: "teamA" as const,
+// 單一球員 fixture 組裝點，ratingBefore／ratingAfter 給預設值——多數 test 不關心
+// 實際分數，只有「每位球員同時顯示賽前與賽後分數」需要指定精確值。
+interface PlayerFixture {
+	id: string;
+	name: string;
+	ratingBefore: number;
+	ratingAfter: number;
+}
+function player(id: string, name: string, ratingBefore = 3.5, ratingAfter = 3.6): PlayerFixture {
+	return { id, name, ratingBefore, ratingAfter };
+}
+
+function averageRating(players: readonly PlayerFixture[]): number {
+	return players.reduce((sum, p) => sum + p.ratingBefore, 0) / players.length;
+}
+
+type DoublesComposition = "mixed" | "mens" | "womens" | "general";
+
+interface EntryFixtureOptions {
+	matchId: string;
+	playedAt: string;
+	teamA: PlayerFixture[];
+	teamB: PlayerFixture[];
+	courtNumber?: number;
+	scoreA?: number;
+	scoreB?: number;
+	winner?: "teamA" | "teamB";
+	doublesComposition?: DoublesComposition;
+}
+
+// 唯一的歷史紀錄 fixture 組裝點（4.9 REFACTOR）：欄位形狀複製自
+// lib/matchmaker/history.ts 的 MatchHistoryEntrySchema。format 依 teamA／teamB
+// 人數自動推導（任一隊 > 1 人即為雙打），doublesComposition 只在雙打時附加，
+// 與 schema 的 discriminated union（單打不得帶、雙打必須帶）保持一致——本檔六個
+// 需要種資料的 test 皆呼叫本函式，不再各自拼一份 JSON 物件字面量。
+function buildEntry(options: EntryFixtureOptions) {
+	const isDoubles = options.teamA.length > 1 || options.teamB.length > 1;
+	const base = {
+		matchId: options.matchId,
+		courtNumber: options.courtNumber ?? 1,
+		playedAt: options.playedAt,
+		teamA: { players: options.teamA, rating: averageRating(options.teamA) },
+		teamB: { players: options.teamB, rating: averageRating(options.teamB) },
+		scoreA: options.scoreA ?? 11,
+		scoreB: options.scoreB ?? 5,
+		winner: options.winner ?? ("teamA" as const),
 	};
+	if (isDoubles) {
+		return { ...base, format: "doubles" as const, doublesComposition: options.doublesComposition ?? "mixed" };
+	}
+	return { ...base, format: "singles" as const };
 }
 
 test.describe("/matchmaker/history 對戰歷史頁", () => {
@@ -99,40 +129,18 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 
 	test("開啟歷史頁預設顯示今日區間", async ({ page }) => {
 		await seedHistory(page, [
-			{
+			buildEntry({
 				matchId: "e2e-history-today-1",
-				courtNumber: 1,
 				playedAt: isoToday(),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-today-a", name: "今日對戰員A", ratingBefore: 3.5, ratingAfter: 3.6 }],
-					rating: 3.5,
-				},
-				teamB: {
-					players: [{ id: "p-today-b", name: "今日對戰員B", ratingBefore: 3.4, ratingAfter: 3.3 }],
-					rating: 3.4,
-				},
-				scoreA: 11,
-				scoreB: 5,
-				winner: "teamA",
-			},
-			{
+				teamA: [player("p-today-a", "今日對戰員A")],
+				teamB: [player("p-today-b", "今日對戰員B")],
+			}),
+			buildEntry({
 				matchId: "e2e-history-earlier-1",
-				courtNumber: 1,
 				playedAt: isoEarlier(),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-earlier-a", name: "更早對戰員A", ratingBefore: 3.0, ratingAfter: 3.1 }],
-					rating: 3.0,
-				},
-				teamB: {
-					players: [{ id: "p-earlier-b", name: "更早對戰員B", ratingBefore: 3.2, ratingAfter: 3.1 }],
-					rating: 3.2,
-				},
-				scoreA: 11,
-				scoreB: 8,
-				winner: "teamA",
-			},
+				teamA: [player("p-earlier-a", "更早對戰員A")],
+				teamB: [player("p-earlier-b", "更早對戰員B")],
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -145,40 +153,18 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 
 	test("切換區間後只顯示該區間的紀錄", async ({ page }) => {
 		await seedHistory(page, [
-			{
+			buildEntry({
 				matchId: "e2e-history-today-2",
-				courtNumber: 1,
 				playedAt: isoToday(),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-today2-a", name: "今日對戰員C", ratingBefore: 3.5, ratingAfter: 3.6 }],
-					rating: 3.5,
-				},
-				teamB: {
-					players: [{ id: "p-today2-b", name: "今日對戰員D", ratingBefore: 3.4, ratingAfter: 3.3 }],
-					rating: 3.4,
-				},
-				scoreA: 11,
-				scoreB: 5,
-				winner: "teamA",
-			},
-			{
+				teamA: [player("p-today2-a", "今日對戰員C")],
+				teamB: [player("p-today2-b", "今日對戰員D")],
+			}),
+			buildEntry({
 				matchId: "e2e-history-lastmonth-1",
-				courtNumber: 1,
 				playedAt: isoLastMonth(),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-lastmonth-a", name: "上月對戰員A", ratingBefore: 3.1, ratingAfter: 3.2 }],
-					rating: 3.1,
-				},
-				teamB: {
-					players: [{ id: "p-lastmonth-b", name: "上月對戰員B", ratingBefore: 3.3, ratingAfter: 3.2 }],
-					rating: 3.3,
-				},
-				scoreA: 11,
-				scoreB: 9,
-				winner: "teamA",
-			},
+				teamA: [player("p-lastmonth-a", "上月對戰員A")],
+				teamB: [player("p-lastmonth-b", "上月對戰員B")],
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -198,30 +184,22 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		const matchId = "e2e-history-doubles-1";
 		const playedAt = isoToday(14);
 		await seedHistory(page, [
-			{
+			buildEntry({
 				matchId,
-				courtNumber: 3,
 				playedAt,
-				format: "doubles",
+				courtNumber: 3,
 				doublesComposition: "mixed",
-				teamA: {
-					players: [
-						{ id: "p-doubles-a1", name: "雙打今日員A1", ratingBefore: 4.0, ratingAfter: 4.1 },
-						{ id: "p-doubles-a2", name: "雙打今日員A2", ratingBefore: 3.8, ratingAfter: 3.9 },
-					],
-					rating: 3.9,
-				},
-				teamB: {
-					players: [
-						{ id: "p-doubles-b1", name: "雙打今日員B1", ratingBefore: 3.5, ratingAfter: 3.4 },
-						{ id: "p-doubles-b2", name: "雙打今日員B2", ratingBefore: 3.6, ratingAfter: 3.5 },
-					],
-					rating: 3.55,
-				},
+				teamA: [
+					player("p-doubles-a1", "雙打今日員A1", 4.0, 4.1),
+					player("p-doubles-a2", "雙打今日員A2", 3.8, 3.9),
+				],
+				teamB: [
+					player("p-doubles-b1", "雙打今日員B1", 3.5, 3.4),
+					player("p-doubles-b2", "雙打今日員B2", 3.6, 3.5),
+				],
 				scoreA: 11,
 				scoreB: 7,
-				winner: "teamA",
-			},
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -247,23 +225,15 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 	test("單打紀錄不顯示雙打組成標示", async ({ page }) => {
 		const matchId = "e2e-history-singles-1";
 		await seedHistory(page, [
-			{
+			buildEntry({
 				matchId,
-				courtNumber: 2,
 				playedAt: isoToday(15),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-singles-a", name: "單打今日員A", ratingBefore: 3.7, ratingAfter: 3.8 }],
-					rating: 3.7,
-				},
-				teamB: {
-					players: [{ id: "p-singles-b", name: "單打今日員B", ratingBefore: 3.6, ratingAfter: 3.5 }],
-					rating: 3.6,
-				},
+				courtNumber: 2,
+				teamA: [player("p-singles-a", "單打今日員A", 3.7, 3.8)],
+				teamB: [player("p-singles-b", "單打今日員B", 3.6, 3.5)],
 				scoreA: 11,
 				scoreB: 9,
-				winner: "teamA",
-			},
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -280,23 +250,14 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 	test("每位球員同時顯示賽前與賽後分數", async ({ page }) => {
 		const matchId = "e2e-history-rating-1";
 		await seedHistory(page, [
-			{
+			buildEntry({
 				matchId,
-				courtNumber: 1,
 				playedAt: isoToday(16),
-				format: "singles",
-				teamA: {
-					players: [{ id: "p-rating-a", name: "分數變化員A", ratingBefore: 4.2, ratingAfter: 4.35 }],
-					rating: 4.2,
-				},
-				teamB: {
-					players: [{ id: "p-rating-b", name: "分數變化員B", ratingBefore: 3.9, ratingAfter: 3.8 }],
-					rating: 3.9,
-				},
+				teamA: [player("p-rating-a", "分數變化員A", 4.2, 4.35)],
+				teamB: [player("p-rating-b", "分數變化員B", 3.9, 3.8)],
 				scoreA: 11,
 				scoreB: 6,
-				winner: "teamA",
-			},
+			}),
 		]);
 
 		await page.goto(HISTORY_PAGE);
@@ -308,9 +269,15 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 
 	test("跨月週時本月顯示空狀態而非錯誤", async ({ page }) => {
 		const days = [27, 28, 29, 30, 31];
-		const entries = days.map((day) =>
-			buildSinglesEntry(`e2e-history-crossmonth-${day}`, isoCrossMonthWeek(day), `跨月週球員${day}`),
-		);
+		const entries = days.map((day) => {
+			const matchId = `e2e-history-crossmonth-${day}`;
+			return buildEntry({
+				matchId,
+				playedAt: isoCrossMonthWeek(day),
+				teamA: [player(`${matchId}-a`, `跨月週球員${day}`)],
+				teamB: [player(`${matchId}-b`, `跨月週球員${day}的對手`)],
+			});
+		});
 		await seedHistory(page, entries);
 
 		// MUST 在 page.goto() 之前呼叫：只固定 Date，不暫停 timer（design Risks）。

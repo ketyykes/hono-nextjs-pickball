@@ -66,7 +66,7 @@ Depends on: §3
 - [x] 4.6 GREEN: 建立 `components/matchmaker/HistoryRecordCard.tsx`，呈現 `prd.md` 8.2 全部欄位；雙打組成標示只在雙打時渲染；勝方以文字或圖示標示而非僅靠顏色（`prd.md` 12.5）；分數一律照 M4 寫入值原樣顯示，不重算。重跑至綠——7 個 test 全綠，`HistoryView` 改用 `HistoryRecordCard` 取代 4.4 的最小列表
 - [x] 4.7 RED: 補 test「跨月週時本月顯示空狀態而非錯誤」——以假時鐘把時間固定在 2026-08-01 並 seed 7/27～7/31 的紀錄，斷言本月顯示友善空狀態且畫面無錯誤字樣、本週如常列出該批紀錄。看到紅燈（**不得**改用「依當下日期動態算出資料」的寫法繞過假時鐘，見 design Risks）——**真紅燈**：`getByTestId("empty-history-range")` 找不到元素；目前邏輯只判斷「整份歷史是否為空」，切到本月後 `filteredEntries` 為空但 `entries.length > 0`，falls through 到卡片列表分支渲染出 0 張卡片、畫面留白且無任何提示文字，1 個 test 失敗、既有 7 個 test 仍綠
 - [x] 4.8 GREEN: 讓每個區間各自擁有空狀態文案，並確保「本月為空」走的是正常空狀態路徑而非錯誤路徑。重跑至綠——8 個 test 全綠。`EmptyHistory` 改為 `range: HistoryRange | null` 判斷兩種空狀態：`null` 為引導型（整份歷史皆空）、指定區間為該區間各自的友善文案；`HistoryView` 依「整份是否為空」→「篩選後是否為空」兩層 ternary 分流，本月為空與其他區間為空走同一條正常路徑
-- [ ] 4.9 REFACTOR: 把 E2E 的 seed 邏輯抽成單一 helper（一處組裝紀錄 fixture），確認五個 test 不各自重複拼 JSON；元件皆標 `"use client"` 且與 `components/matchmaker/` 既有命名風格一致。無壞味道則註記 skipped
+- [x] 4.9 REFACTOR: 把 E2E 的 seed 邏輯抽成單一 helper（一處組裝紀錄 fixture），確認五個 test 不各自重複拼 JSON；元件皆標 `"use client"` 且與 `components/matchmaker/` 既有命名風格一致。無壞味道則註記 skipped——新增 `player()`／`buildEntry()` 兩個組裝函式，六個需種資料的 test 皆改呼叫 `buildEntry()`（format 依隊伍人數自動推導），不再各自拼 JSON 物件字面量；重跑 8 個 test 全綠。`HistoryView`／`EmptyHistory`／`HistoryRangeFilter`／`HistoryRecordCard` 皆已標 `"use client"`，命名與既有 `CourtCard`／`PlayerTile`／`EmptyStage` 風格一致。另評估「`DOUBLES_COMPOSITION_LABEL` 是否抽成 `CourtCard.tsx` 與 `HistoryRecordCard.tsx` 共用模組」——判定**不抽**：僅 4 個項目的穩定對照表，抽出需連動修改範圍外的 `CourtCard.tsx`，與 Rule 3「不得改動 CourtCard 任何行為」的風險不成比例，維持兩檔各自持有一份
 
 ## 5. 導覽入口（必 TDD）與唯讀保證（例外層）
 
