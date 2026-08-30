@@ -492,6 +492,59 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(parsedSlots[otherMatchId].scores).toEqual(otherScores);
 	});
 
+	// Stage 2 mutation 補洞（多筆同時符合零覆蓋）：reconcile effect 刻意寫成「每次只處理
+	// 待送出清單的第一筆，靠 round 變動觸發重跑逐筆收斂」，但既有 e2e 從未同時存在兩個
+	// finished 槽——把 clearMatchSlots([first.matchId]) 改成一次清掉 finished 全部的
+	// matchId（只送出第一筆、其餘進度靜默遺失）後，全套仍綠。這條同時釘住「兩筆都會被
+	// 送出」與「兩筆的槽都會被清掉」。
+	test("兩場同時判定勝負時逐筆回填，兩場皆完成且對應的槽全數清除", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 2);
+		const matchId1 = await courtMatchId(page, 0);
+		const matchId2 = await courtMatchId(page, 1);
+
+		// 兩場的比分刻意不同、且勝方分屬不同隊：只用同一組比分時，「兩筆都送出」與
+		// 「送出第一筆兩次」在畫面上看起來一模一樣。
+		await writeMatchSlot(page, matchId1, { scores: { us: 11, them: 4 }, status: "finished" });
+		await writeMatchSlot(page, matchId2, { scores: { us: 7, them: 11 }, status: "finished" });
+		await page.reload();
+
+		const court1 = page.getByTestId(`court-${matchId1}`);
+		const court2 = page.getByTestId(`court-${matchId2}`);
+		await expect(court1.getByTestId(`court-${matchId1}-score`)).toHaveText("11:4");
+		await expect(court1.getByTestId(`court-${matchId1}-team-a`)).toHaveText("第一隊勝");
+		await expect(court2.getByTestId(`court-${matchId2}-score`)).toHaveText("7:11");
+		await expect(court2.getByTestId(`court-${matchId2}-team-b`)).toHaveText("第二隊勝");
+
+		const slots = await page.evaluate((key) => window.localStorage.getItem(key), MATCH_SLOTS_KEY);
+		const parsedSlots: Record<string, unknown> = slots ? JSON.parse(slots) : {};
+		expect(Object.keys(parsedSlots)).toEqual([]);
+	});
+
+	// Stage 2 mutation 補洞（分支零覆蓋）：回填送出失敗這條路徑從未被執行到——把
+	// `if (result.ok) { clearMatchSlots(...) }` 的 ok 判定拿掉、或把送出分支尾端的
+	// setMatchSlots(slots) 刪掉，全套皆仍綠。槽內比分平手是唯一能從資料面觸發
+	// submitScore 失敗（TIE）而又通過回填三條件的情境，故以它當載體。
+	test("回填送出失敗時不清槽也不遺失進度", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		await writeMatchSlot(page, matchId, { scores: { us: 5, them: 5 }, status: "finished" });
+		await page.reload();
+
+		// 送出被 round.ts 以「比分平手」拒絕：該場不得轉為已完成，槽也不得被清掉，
+		// 且畫面仍要反映槽內既有進度（使用者才有機會回計分板改完比分）。
+		await expect(court.getByText("計分中")).toBeVisible();
+		await expect(court.getByText("5:5")).toBeVisible();
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveCount(0);
+
+		const slots = await page.evaluate((key) => window.localStorage.getItem(key), MATCH_SLOTS_KEY);
+		const parsedSlots: Record<string, { scores?: unknown }> = slots ? JSON.parse(slots) : {};
+		expect(parsedSlots[matchId]?.scores).toEqual({ us: 5, them: 5 });
+	});
+
 	test("已完成場次不顯示進入計分板入口", async ({ page }) => {
 		await seedRoster(page, 4);
 		await generateRound(page, 1);

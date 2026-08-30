@@ -157,6 +157,33 @@ describe("RoundControls", () => {
 		expect(screen.getByText("本輪已開始計分，目標分數不可更改。")).not.toBeNull();
 	});
 
+	// Stage 2 mutation 補洞：isTargetScoreLocked 的兩個鎖定條件是 OR，本檔原本只以
+	// 「計分板槽非 setup」觸發過鎖定，另一條（任一場次非 pending）在本元件層零覆蓋——
+	// 把傳入的 round.matches 換成空陣列，本檔所有測試仍全綠（只有 match-stage.spec.ts
+	// 的 e2e 會轉紅）。這條補上「有已完成場次但完全沒有計分板槽」的情境，讓兩個條件
+	// 在元件層各自被釘住。
+	it("任一場次已完成時目標分數選擇器 disabled，即使完全沒有計分板槽", () => {
+		const round = buildRound({
+			targetScore: 15,
+			matches: [
+				buildMatch({
+					status: "completed",
+					scores: { teamA: 11, teamB: 5 },
+					winner: "teamA",
+					completedAt: "2026-08-23T01:00:00.000Z",
+				}),
+			],
+		});
+		render(<RoundControls {...buildProps({ round, matchSlots: {} })} />);
+		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
+		const radios = within(targetGroup).getAllByRole("radio");
+
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(true);
+		});
+		expect(screen.getByText("本輪已開始計分，目標分數不可更改。")).not.toBeNull();
+	});
+
 	// 8.5②：本次放寬的唯一可觀察差異——回合存在但尚未開始計分時仍可更改，
 	// 變更委派回合 capability 的 setTargetScore（而非 onSettingsChange，那是給
 	// 「尚無回合」情境下的未來設定值用的）。
@@ -365,13 +392,20 @@ describe("RoundControls", () => {
 	// match-stage.spec.ts 的「目標分數 radiogroup」測試）因此只驗 disabled／aria-checked，
 	// 這條防線本身改由這裡的 fireEvent.keyDown 直接對容器派發事件覆蓋——RTL 的 fireEvent
 	// 不受「disabled 元素不可聚焦」限制，能真正命中 handler 內部邏輯。
-	it("目標分數鎖定時方向鍵不得呼叫 onSettingsChange 或改變選取（覆蓋 if (locked) return; 防線）", () => {
+	it("目標分數鎖定時方向鍵不得呼叫 onSettingsChange 或 setTargetScore，也不改變選取（覆蓋 if (locked) return; 防線）", () => {
 		// 8.5 的必要連帶調整：round 本身不再等於鎖定（MODIFIED 規則），此處額外帶一個
 		// 非 setup 的計分板槽讓本輪確實「已開始計分」，維持這條 it 原本要驗證的
 		// 「鎖定時方向鍵無效」意圖不變。
+		//
+		// Stage 2 mutation 補洞：M5 時代 round 存在即走 onSettingsChange，故「不得呼叫
+		// onSettingsChange」足以殺掉「拿掉 if (locked) return;」的變異。8.6 把回合存在時的
+		// 變更改為委派 setTargetScore 後，這條路徑不再經過 onSettingsChange，原斷言變成恆真
+		// （aria-checked 也不會變，因為 setTargetScore 是 spy、不會真的改動 round）——
+		// 必須連 setTargetScore 一起釘住，這條防線才重新有偵測力。
 		const round = buildRound({ targetScore: 15 });
 		const matchSlots: MatchSlots = { "match-1": buildSlot({ status: "playing" }) };
 		const onSettingsChange = vi.fn();
+		const setTargetScore = vi.fn();
 		render(
 			<RoundControls
 				{...buildProps({
@@ -379,6 +413,7 @@ describe("RoundControls", () => {
 					matchSlots,
 					settings: buildSettings({ targetScore: 15 }),
 					onSettingsChange,
+					setTargetScore,
 				})}
 			/>,
 		);
@@ -387,6 +422,7 @@ describe("RoundControls", () => {
 		fireEvent.keyDown(targetGroup, { key: "ArrowRight" });
 
 		expect(onSettingsChange).not.toHaveBeenCalled();
+		expect(setTargetScore).not.toHaveBeenCalled();
 		const radios = within(targetGroup).getAllByRole("radio");
 		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
 		expect(checked).toHaveLength(1);
