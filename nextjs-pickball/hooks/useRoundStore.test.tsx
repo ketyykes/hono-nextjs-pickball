@@ -3,7 +3,12 @@ import { act, renderHook } from "@testing-library/react";
 import { useRoundStore } from "./useRoundStore";
 import { createRound, submitScore, SUBMIT_SCORE_FAILURE_CODE } from "@/lib/matchmaker/round";
 import { readRound, readHistory, writeRound, writeHistory } from "@/lib/matchmaker/round-storage";
-import type { CreateRoundResult, ResetIncompleteMatchesResult, SubmitScoreResult } from "@/lib/matchmaker/round";
+import type {
+	CreateRoundResult,
+	ResetIncompleteMatchesResult,
+	SubmitScoreResult,
+	SetTargetScoreResult,
+} from "@/lib/matchmaker/round";
 import type { Player } from "@/lib/matchmaker/types";
 import { writeMatchSlot, readMatchSlot } from "@/lib/scoreboard/match-slots";
 import { createInitialState } from "@/lib/scoreboard/reducer";
@@ -355,6 +360,53 @@ describe("useRoundStore", () => {
 		});
 
 		expect(readMatchSlot(originalMatchId)).toBeNull();
+	});
+
+	// 8.6：setTargetScore 是 M4 早已存在但全庫零非測試呼叫端的懸空純函式，本 change
+	// 首次接上 hook 層——比照 resetIncompleteMatches 的「呼叫純函式 → 判 ok → dispatch」
+	// 形態。失敗情境用「已完成一場」（已開始計分）觸發 round.ts 的 SCORING_STARTED 拒絕，
+	// round 參考需維持不變（toBe，非 toEqual，殺「失敗仍 dispatch」變異）。
+	it("setTargetScore 成功時套用新目標分數、已開始計分時拒絕且 round 參考不變", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1 });
+		});
+		expect(result.current.round?.targetScore).toBe(11);
+
+		let successResult: SetTargetScoreResult | undefined;
+		act(() => {
+			successResult = result.current.setTargetScore(21);
+		});
+		expect(successResult?.ok).toBe(true);
+		expect(result.current.round?.targetScore).toBe(21);
+
+		// 完成該場後已開始計分，變更應被拒絕，round 參考不變。
+		act(() => {
+			result.current.submitScore(result.current.round!.matches[0].id, "21", "10");
+		});
+		const roundAfterComplete = result.current.round;
+		let failResult: SetTargetScoreResult | undefined;
+		act(() => {
+			failResult = result.current.setTargetScore(15);
+		});
+		expect(failResult?.ok).toBe(false);
+		expect(result.current.round).toBe(roundAfterComplete);
+	});
+
+	it("尚無目前回合時呼叫 setTargetScore 回傳失敗且不 dispatch（殺 state.round === null 防線被移除的變異）", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		let failResult: SetTargetScoreResult | undefined;
+		act(() => {
+			failResult = result.current.setTargetScore(15);
+		});
+		expect(failResult?.ok).toBe(false);
+		expect(result.current.round).toBeNull();
 	});
 
 	it("送出比分後 history 確實持久化到 localStorage（殺 write effect 依賴陣列改 [] 或整個 effect 被刪除的變異）", () => {
