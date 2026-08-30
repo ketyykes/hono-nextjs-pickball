@@ -7,45 +7,94 @@
 > 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
 > **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 狀態快照（最後更新 2026-08-29）
+## 狀態快照（最後更新 2026-08-30）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e363bb0`（docs：更新 M6 中斷點） |
+| `main` HEAD | `e363bb0`（docs：更新 M6 中斷點）——**M6 尚未合併，main 未變動** |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
-| M6 | **進行中，已依使用者指示暫停**（2026-08-29）。**71/78**。見下方「M6 中斷點」 |
+| M6 | **進行中，§0～§8 全部完成，§9 剩 9.6／9.7 兩項＋Final Code Review**。第十棒進行中。見下方「M6 中斷點」 |
 | M7～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
 
-## 🔖 M6 中斷點（2026-08-29，使用者要求暫停）
+## 🔖 M6 中斷點（2026-08-30 更新，第十棒進行中）
 
 | 項目 | 值 |
 |---|---|
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding`（**保留，未拆**） |
 | Branch | `change/matchmaker-scoreboard-binding`（**保留，未刪**） |
 | Base | `main` @ `3fefb02` |
-| HEAD | `cf4fe79`（docs：落盤 §7 Stage 2 審查結論與等價變異判定） |
-| 進度 | **71/78 勾選、97 個 commit** |
-| 工作區 | ⚠️ **不乾淨**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts` 有 195 行未提交 |
-| 已完成 | §0～§7、M36 方向對齊、courtNumber delta，**全部含 Stage 1 + Stage 2 審查** |
-| 中斷於 | **§8.1**（e2e RED 測試寫到一半） |
-| 跑過幾棒 | **七棒**（第七棒剛啟動即被使用者喊停） |
+| HEAD（截至本次落盤） | `90211f3`（docs：落盤 §9.1～9.5、9.8、9.9 實測結果） |
+| 進度 | **89/91 勾選**（tasks.md 目前總數為 91，非原本估的 78——過程中新增 M36、M37、courtNumber delta 等補漏） |
+| 工作區 | 上次確認為**乾淨**（無未提交變更） |
+| 已完成 | §0～§9.5、9.8、9.9，M36／M37 方向對齊、courtNumber delta，**全部含 Stage 1 + Stage 2 審查** |
+| 尚未完成 | **9.6**（`pnpm test:e2e` 全套五個 browser project）、**9.7**（`pnpm --filter ./nextjs-pickball preview` 手動驗證）、**Final Code Review** |
+| 跑過幾棒 | **十棒**，第十棒（`abb3326eb8a2b2b89`）**截至本次落盤時仍在背景執行中**，尚未回報完成 |
 
-### ▶️ 續跑起點：§8.1
+### ▶️ 續跑起點：確認第十棒是否已完成，否則從 9.6 開始
 
-接手 leader 的**第一件事**是盤點那份未提交的 diff：
+**若重啟新 session 接手**：
 
-```bash
-cd /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding
-git diff nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts
-```
+1. 先跑 `cd /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-scoreboard-binding && git log --oneline -5 && git status --short`，
+   不要相信本檔的 HEAD 值——第十棒可能在本檔落盤後已經繼續往下做完。
+2. 若 `git log` 的 HEAD 仍是 `90211f3` 且 tasks.md 9.6／9.7 仍未勾選：**第十棒已經死掉**（背景 agent 不會跨 session 存活），
+   直接派新 leader 接續 9.6／9.7／Final Code Review，起手前務必 `lsof -i :3005 -i :8787` 與
+   `ps aux | grep -E "wrangler|workerd|next"` 清殘留 process（上一輪就在這裡出過事，見下方教訓）。
+3. 若 HEAD 已前進且 tasks.md 全勾：檢查是否有留言／commit 宣稱「M6 apply 已完成」，
+   coordinator 獨立跑一次 `pnpm test`、`tsc`、`lint`、`test:e2e --workers=1`、`preview` 驗證後才能合併，
+   **不要只憑 leader 回報就合併**。
 
-內容是 8.1 要求的三個 e2e test，**test 名稱與 tasks.md 逐字相符**（coordinator 已核對）：
-`計分中的場次顯示計分中標示與當前比分`、`未完成的計分進度可離開後再進入接續`、`多場地同時計分時各場進度互不覆蓋`。
-**但它未經任何審查、也未確認紅燈** —— 接手者 MUST 自行實跑判定，不可直接採信。
+## ⚠️ 2026-08-30 事故：兩個 leader 同時在同一個 worktree 工作（重要教訓）
 
-剩餘工作：**§8（10 task）→ §9（9 task）→ Final Code Review**。
+**起因**：coordinator 派出第八棒 leader 後，其派出的 Implementer subagent 完成 Blocking 修正時，
+`SendMessage` 想回覆給「Stage 1 reviewer」但該名字無法解析，訊息被轉發到 `main`（coordinator）。
+coordinator 收到後派出第九棒接手，**但幾乎同時**，另一條路徑把同一則訊息也送回了「已完成」的第八棒本身，
+**把第八棒重新喚醒**，導致第八棒與第九棒在同一時間點都在寫同一個 worktree。
+
+**造成的損害**：第八棒看到 worktree 裡多了一個牠不認識的 commit（第九棒落盤 coordinator 裁決的
+`51150ff`）與一段牠不認識的檔案異動（第九棒的 Stage 2 reviewer 正在跑的 in-flight mutation 測試），
+誤判為「虛構裁決」與「未還原的殘留」，**做了一次錯誤的撤回 commit（`1784802`）**。
+
+**如何發現與訂正**：第八棒發現 worktree 不乾淨時**正確地選擇立刻停手回報**而不是硬幹下去
+（"I'm stopping all work on the branch immediately... I will not make further commits until you decide"）——
+這是本次事故沒有擴大的關鍵。coordinator 確認裁決屬實後指示第八棒永久停手。
+第九棒之後**獨立用機械證據**（`git show <hash>^:<path>` 比對三個 commit 的內容、比對 `git status`
+時間戳與 Reviewer 開工時間）查明兩項指控都不成立，**復原內容並附上出處註記，不刪除 `1784802` 本身**
+（保留質疑與訂正的完整往來紀錄，符合本專案「不採信自述、以機械證據為準」的一貫做法）。
+細節見 worktree 內 `design.md` 的 `## Open Questions` 第 16～18 項。
+
+**新增硬規則**：
+
+1. **coordinator 對「已顯示 completed 的 agent」保持警覺**：`ListAgents` 顯示 completed 不代表
+   它不會再被喚醒——任何管道（包含其他 subagent 的 SendMessage 轉發）都可能把它叫回來繼續動 worktree。
+   一旦已經為同一個 worktree 派出新 leader，**不要再對舊 leader 送出任何訊息**（除非明確要求它停手），
+   降低它被動觸發、又跑起來動同一份檔案的機率。
+2. **leader 若發現 worktree 出現自己不認得的 commit 或未提交異動，第一反應是懷疑「可能有第二個
+   session 在動同一個 worktree」，而不是預設為「上一棒的殘骸」**——尤其異動內容看起來像「暫時改壞
+   某一行」這種 mutation 測試常見手法時。正確做法是**立刻停手回報，不要自行 `git checkout` 或 `git revert`**。
+3. **coordinator 收到「發現第二個 leader、已停手」的回報時，不要重新啟動舊 leader 去驗證**——
+   直接讓它保持停手狀態，改用新 leader 或親自查核 `git show`／時間戳。
+
+## ⚠️ 2026-08-30 事故：leader 用 `run_in_background` 起長時間 process 後結束回合，process 洩漏
+
+第九棒為了跑 9.7 的 `pnpm --filter ./nextjs-pickball preview` 手動驗證，把它丟到背景執行後就**結束了自己的回合**，
+期待之後被「叫醒」——但這不是 subagent 呼叫，沒有任何機制會在背景 bash process 跑完時把已結束回合的 leader
+重新啟動。結果：第九棒就此消失、9.6／9.7 的口頭回報（宣稱已綠燈）**完全沒有落盤**，等於沒發生；
+留下的 `wrangler dev`／`workerd`／`opennextjs-cloudflare preview` process（共 12 個 PID）持續佔用到
+coordinator 下一次檢查時才被手動 kill。
+
+**新增硬規則**：跑 `preview`、長時間 e2e 等需要背景 process 的驗證，**必須在同一個回合內等到結果出來、
+落盤、清掉自己起的 process 之後才能結束回合**。不可用「起了就結束回合、指望之後被通知」的模式處理
+非 subagent 的背景工作。
+
+## 已核可的驗收標準修訂（2026-08-30，追加）
+
+7. **§9.5「本 change 唯一容許變動的既有測試」由三處擴為六處，coordinator 已核可**。
+   多出的三處全是 §8.6 的 MODIFIED Requirement（目標分數鎖定條件由「回合存在即鎖」放寬為
+   「本輪已開始計分才鎖」）的必然連帶，design Decision 7 已預告此事，§8 Stage 1 對三處逐項獨立
+   裁決（非採信自述）確認：皆為必然結果、保留原意圖、未掩蓋迴歸、核心斷言未削弱。
+   完整六處清單與理由見 tasks.md §9.5 的表格、design.md Open Questions 第 16～17 項。
 
 ### ⚠️ 兩次工具層停擺的教訓（務必寫進派工單）
 
