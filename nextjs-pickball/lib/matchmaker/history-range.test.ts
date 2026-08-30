@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { computeRangeCutoffs } from "./history-range";
 
 describe("history-range", () => {
@@ -67,5 +67,22 @@ describe("history-range", () => {
 		const { c3 } = computeRangeCutoffs(now);
 
 		expect(c3).toBe(new Date(2026, 11, 1).getTime());
+	});
+
+	it("切點依注入的 now 計算，與系統時鐘無關", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(2030, 2, 3));
+
+		const now = new Date(2026, 7, 15); // 仍傳入 2026-08-15，與系統時鐘的 2030-03-03 無關
+		const result = computeRangeCutoffs(now);
+
+		vi.useRealTimers();
+
+		expect(result).toEqual({
+			c0: new Date(2026, 7, 15).getTime(),
+			c1: new Date(2026, 7, 10).getTime(),
+			c2: new Date(2026, 7, 1).getTime(),
+			c3: new Date(2026, 6, 1).getTime(),
+		});
 	});
 });

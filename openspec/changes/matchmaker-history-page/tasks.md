@@ -24,8 +24,8 @@
 - [x] 1.6 GREEN: 以 `(now.getDay() + 6) % 7` 推算本週一的天數偏移（週一為 0、週日為 6），確保週日歸入前一週。重跑至綠
 - [x] 1.7 RED: 補兩個 it：「切點為當地時區 00:00 而非 UTC 00:00」（`now` 為當地 2026-08-15 23:30，斷言 `new Date(c0)` 的 `getHours()`／`getMinutes()`／`getSeconds()`／`getMilliseconds()` 皆為 0，且 `c0 === new Date(2026, 7, 15).getTime()`）與「一月時上月切點落在去年 12 月 1 日」（`now = new Date(2027, 0, 5)`，斷言 `c3 === new Date(2026, 11, 1).getTime()`）。看到紅燈（若 1.2 已用 `new Date(y, m, d)` 本地建構且以 `m - 1` 取上月，兩項可能直接綠燈——**如實標註為 regression guard**）**regression guard**：1.2 起就一律用 `new Date(y, m, d)` 本地建構、上月用 `m - 1`，兩個 it 加入時直接綠燈
 - [x] 1.8 GREEN: 確認四個切點一律以 `new Date(y, m, d)` 本地建構（**不得**使用 `Date.UTC` 或 `getUTC*`），上月以 `new Date(y, m - 1, 1)` 取得並倚賴月份 `-1` 的跨年正規化（design Decision 2）。重跑至綠
-- [ ] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）
-- [ ] 1.10 GREEN: 確認 `history-range.ts` 全檔沒有任何 `new Date()`（無參數）、`Date.now()` 或其他系統時鐘取用；「現在」一律由參數注入。重跑至綠
+- [x] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）**regression guard**：`computeRangeCutoffs` 自 1.2 起就只用參數 `now`，從未取用系統時鐘，加入時直接綠燈
+- [x] 1.10 GREEN: 確認 `history-range.ts` 全檔沒有任何 `new Date()`（無參數）、`Date.now()` 或其他系統時鐘取用；「現在」一律由參數注入。重跑至綠
 - [ ] 1.11 REFACTOR: 把「取某年月日的當地 00:00」抽成模組內具名 helper（例如 `startOfLocalDay`），使四個切點共用同一條正規化路徑；`RangeCutoffs` 型別與 `HISTORY_RANGES` 常數以 `as const` 匯出。確認無重複的日期建構邏輯，無壞味道則註記 skipped
 
 ## 2. 區間歸屬（`history-range.ts`）
