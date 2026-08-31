@@ -81,9 +81,19 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
   matcher 不含 MultiEdit。
 - **wrangler → cf-typegen**（PostToolUse）：改任一 workspace 的 `wrangler.(jsonc|json|toml)`
   後自動重跑該 workspace 的 `pnpm cf-typegen`，不必手動跑。
-- **Stop → tsc**（Stop）：session 停止時跑 `pnpm -r exec tsc --noEmit`，失敗以 exit 2 擋下。
-  ⚠️ 此指令**不含 `hono-pickball/test/**` 的型別**（那段只在該 workspace `pnpm typecheck`
-  的第二段）—— Stop hook 綠燈不代表後端測試檔型別無誤。
+- **Stop → tsc**（Stop）：session 停止時跑 `.claude/hooks/stop-typecheck.sh`，
+  對**所有 git worktree**（主 repo ＋ 所有 linked worktree）各跑一次 `pnpm -r exec tsc --noEmit`。
+  分級處置：**主 worktree 失敗以 exit 2 擋下**；**linked worktree 失敗只以 systemMessage 提示、不擋**。
+  linked worktree 不擋是刻意的——前端 tsconfig 的 include 為 `**/*.ts`，測試檔全在範圍內，
+  而 TDD 的 RED（測試 import 尚不存在的模組）本身就是型別錯誤且會單獨 commit；
+  在 worktree 擋下等於逼 agent 跳過或偽造紅燈。理由全文見該腳本開頭註解。
+  ⚠️ 三個限制：① 此指令**不含 `hono-pickball/test/**` 的型別**（那段只在該 workspace
+  `pnpm typecheck` 的第二段）—— Stop hook 綠燈不代表後端測試檔型別無誤。
+  ② linked worktree 只提示不擋，**綠燈不代表 worktree 型別無誤**，合併前仍須自行實跑。
+  ③ 提示走 `systemMessage`，只顯示在終端機，**不會進入 Claude 的 context**。
+  **不要改回 settings.json 內的一行 `pnpm -r exec tsc --noEmit`**——`pnpm -r` 的範圍由
+  cwd 的 `pnpm-workspace.yaml` 決定（只含兩個相對路徑的 workspace），當 session 開在主 repo、
+  實作卻在 linked worktree 內進行時（本專案 openspec apply 的常態），它檢查的是沒被改動的主 repo。
 
 ## Cloudflare Workers 部署架構
 
