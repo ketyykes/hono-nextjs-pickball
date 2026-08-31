@@ -16,33 +16,44 @@
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
 | M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
-| M7 | **進行中**（2026-08-30，使用者關機暫停）。**24/47**。見下方「M7 中斷點」 |
+| M7 | **進行中**（2026-08-31，第三棒因電腦睡眠中斷暫停）。tasks.md 勾選 **33/47（勾選數已過時，實際進度見下方）**。見下方「M7 中斷點」 |
 | M8～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
 
-## 🔖 M7 中斷點（2026-08-30，使用者關機暫停）
+## 🔖 M7 中斷點（2026-08-31，第三棒因電腦睡眠中斷、coordinator 複驗後暫停）
 
 | 項目 | 值 |
 |---|---|
 | Worktree | `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-history-page`（**保留，未拆**） |
 | Branch | `change/matchmaker-history-page`（**保留，未刪**） |
 | Base | `main` @ `85889ca` |
-| HEAD | `fd4f725`（refactor：抽出單一 E2E 紀錄 fixture 組裝函式，§4.9） |
-| 進度 | **33/47 勾選** |
+| HEAD | `29aabaf`（test：補唯讀保證與 hydration 無錯誤的 regression guard，§5.3） |
+| tasks.md 勾選數 | **33/47（已過時，不可信——見下方「勾選數落後於實際 commit」）** |
 | 工作區 | ✅ **乾淨** |
-| 已完成 | §1（11 task）、§2（7 task）、§3（6 task）——**三組皆已完成兩階段審查、0 Blocking**；§4 歷史頁與紀錄呈現（9 task）——**實作完成，但兩階段審查皆未跑** |
-| 未開工 | §5（5 task）、§6（9 task）＋ Final Code Review |
-| 跑過幾棒 | 兩棒 leader ＋ coordinator 親跑 §3 兩階段審查。**第二棒（§4）於 §4 做完後停擺**（stream watchdog 判定 600 秒無進度），停在乾淨邊界 |
+| 已完成 | §1／§2／§3（三組皆已完成兩階段審查、0 Blocking，記錄在 `design.md`）；§4 歷史頁與紀錄呈現（9 task，實作＋兩階段審查**皆已完成**，30 組 mutation、14 存活、已修正 `d412607`，**但審查結論尚未寫回 `design.md`——只存在於該 commit message**）；§5.1 RED（`6bf402a`）、§5.2 GREEN（`7e9bcd0`）、§5.3 RED/regression guard（`29aabaf`）**皆已完成，但 tasks.md 勾選框仍是空的** |
+| 未開工 | §5.4、§5.5；§6（9 task）＋ Final Code Review |
+| 跑過幾棒 | 兩棒 leader ＋ coordinator 親跑 §3 兩階段審查 ＋ **第三棒**（做完 §4 兩階段審查與 §5.1～5.3 後，於 §5.4 前**電腦睡眠導致 API 中斷**，非 watchdog 停擺、非自身錯誤） |
+| coordinator 中斷後獨立複驗 | ① `git status` 乾淨、`git log` 確認上述 4 個 commit 皆已落盤 ② unit test（`history-range.test.ts` + `section-nav.test.ts`）**16/16 綠** ③ `pnpm -r exec tsc --noEmit` **exit 0** ④ 全量 E2E `--grep matchmaker-history --workers=1` **53 passed／2 failed**——2 個失敗皆為 `Tearing down "context" exceeded the test timeout`（context 關閉逾時，非斷言錯誤），單獨重跑該兩項 **4/4 全綠**，判定為資源壓力造成的假紅燈，非真缺陷 ⑤ `lsof -i :3005 -i :8787` 與 `ps aux` **無殘留 process**（這次沒有洩漏） |
 
-### ▶️ 續跑起點：先補 §4 的兩階段審查，再進 §5.1
+### ⚠️ 新教訓：tasks.md 勾選數落後於實際 commit，續跑前 MUST 以 git log 為準
 
-1. **§4 的 Stage 1／Stage 2 皆未跑**，審查範圍 `git log --oneline 9f32023..fd4f725`。§1～§3 已結案，**不需重跑**。
-2. §5／§6 的 Implementer **MUST 用 `sonnet` 起跳**（本專案常設覆寫）。
-3. 開工前必看 `design.md` Open Questions：§5 的 `section-nav.ts` 因 M6 合併有行號位移、且該檔**兩個常數皆未 export**；分頁順序為「對戰／參賽者／歷史／資料」；§5.3 的 seed **MUST 全數使用合法紀錄**（`readHistory()` 在 `droppedCount > 0` 時會回寫 localStorage，會讓「內容不變」失守）。
-4. **§6.8 的第 ⑤ 項已由 coordinator 在 §3 Stage 2 實測確認轉紅**（出處：`design.md` 第 7 點），可直接引用不必重跑；①～④ 仍須實跑。
+第三棒完成 §5.1～§5.3 三個 commit 後，還沒來得及勾 `tasks.md` 的 5.1～5.3 就被電腦睡眠中斷。
+**若只看 tasks.md 的「33/47」會誤判 §5 完全沒開工，導致重做已完成的工作。**
+**續跑前 MUST 先跑 `git log --oneline <上一個確認點>..HEAD` 核對實際 commit，再對照 tasks.md 判斷真正的續跑起點**，
+不能只信任勾選框（這與「不可信任 IDE 診斷、以 tsc exit code 為準」是同一類教訓的延伸：
+**自動化或人為維護的進度標記都可能落後於實際狀態，機械證據——commit、測試結果——才是唯一來源**）。
 
-### ⚠️ 第二棒停擺又洩漏了 9 個 process（同一個坑第二次）
+### ▶️ 續跑起點：先補齊 tasks.md 勾選與 §4 審查結論回填，再做 §5.4
 
-停擺當下 `pnpm dev` 的整組 process（`next dev` + 兩組 `wrangler dev` + 四個 `workerd`）全部留著，佔用 `:3005` 與 `:8787`，由 coordinator 手動清除。**這與 M6 第九棒是同一個失敗模式。**
+1. **先補勾 tasks.md**：4.1～4.9（已完成）、5.1～5.3（已完成，commit 見上表）。**不得**因為要補勾而重跑已完成的項目。
+2. **§4 的 Stage 1／Stage 2 結論尚未寫回 `design.md`**——目前只存在於 `d412607` 的 commit message（30 組 mutation、14 存活、成因與修法皆已寫明）。下一棒 MUST 把這段結論整理成 `design.md` `## Open Questions` 的新一條（比照 §3 第 6、7 點的格式：Stage 1 判定、Stage 2 mutation 表、交件驗證），**不必重跑審查**，只是把已有的機械證據正式落地。
+3. **續跑實作從 §5.4 開始**：確認 `HistoryView.tsx` 只呼叫 `readHistory()`、全檔無 `localStorage.setItem`／`removeItem`／`writeHistory()`／`writeRound()`、無 import `useRoundStore`、render 期間不取用 `new Date()`／`Date.now()`／`localStorage`。接著 §5.5 REFACTOR，再進 §6。
+4. §5／§6 的 Implementer **MUST 用 `sonnet` 起跳**（本專案常設覆寫）。
+5. 開工前必看 `design.md` Open Questions：§5 的 `section-nav.ts` 因 M6 合併有行號位移、且該檔**兩個常數皆未 export**；分頁順序為「對戰／參賽者／歷史／資料」；§5.3 的 seed **MUST 全數使用合法紀錄**（`readHistory()` 在 `droppedCount > 0` 時會回寫 localStorage，會讓「內容不變」失守——§5.3 已依此正確處理，可參考其 seed 寫法）。
+6. **§6.8 的第 ⑤ 項已由 coordinator 在 §3 Stage 2 實測確認轉紅**（出處：`design.md` 第 7 點），可直接引用不必重跑；①～④ 仍須實跑。
+
+### ⚠️ 第二棒停擺又洩漏了 9 個 process（同一個坑第二次；第三棒這次沒有洩漏）
+
+第二棒停擺當下 `pnpm dev` 的整組 process（`next dev` + 兩組 `wrangler dev` + 四個 `workerd`）全部留著，佔用 `:3005` 與 `:8787`，由 coordinator 手動清除。**這與 M6 第九棒是同一個失敗模式。**
 
 **派工單已寫了「跑完立刻清掉自己起的 process」仍然發生**——因為 leader 是**非自願**中斷（watchdog 判定停擺），根本來不及執行清理。結論：**這條規則對非自願中斷無效，coordinator MUST 在每次收到 leader 失敗／停擺通知後主動查殘留**：
 
@@ -50,6 +61,8 @@
 lsof -i :3005 -i :8787
 ps aux | grep -E "wrangler|workerd|next" | grep <worktree 名稱>
 ```
+
+（第三棒因電腦睡眠中斷，複驗時查過一次，**這次乾淨、無殘留**——但仍要每次查，不能因為上次乾淨就跳過。）
 
 ### 📌 §3 Stage 2 抓到的真缺口：`range` 參數零覆蓋（本輪最有價值的發現）
 
