@@ -236,9 +236,12 @@ Depends on: §0, §1
       3 筆可新增、0 筆錯誤。確認紅燈
 - [x] 5.2 GREEN: 實作 `parseRosterCsv(text)`：委派 `csv.ts` 的 `parseCsv`，
       **依標題名稱**（非欄位位置）對應五個欄位，逐列產出可新增列
-- [ ] 5.3 RED: 補 it「性別欄接受中英文常見寫法並忽略大小寫與前後空白」：
-      `男`／`female`／` M `／`不指定` → `male`／`female`／`male`／`other`。確認紅燈
-- [ ] 5.4 GREEN: 實作性別正規化對照表（trim + toLowerCase 後查表）
+- [x] 5.3 RED（regression guard）: 補 it「性別欄接受中英文常見寫法並忽略大小寫與前後空白」：
+      `男`／`female`／` M `／`不指定` → `male`／`female`／`male`／`other`。
+      5.2 的實作已提前納入完整性別對照表，寫入即綠燈，非真實 TDD 紅燈；
+      改以 mutation 驗證：移除 `.trim().toLowerCase()` 正規化後兩個相關 it 皆轉紅
+      （`M`／` M `／大小寫混雜案例失敗），還原後轉綠
+- [x] 5.4 GREEN（同上，已於 5.2 提前完成）: 性別正規化對照表（trim + toLowerCase 後查表）
 - [ ] 5.5 RED: 補 it「無法對應的性別記為該列錯誤而非靜默歸為 other」。確認紅燈
 - [ ] 5.6 GREEN: 查表失敗時產生該列錯誤，SHALL NOT 回退為 `other`
 - [ ] 5.7 RED: 補 it「每筆錯誤指出試算表列號、欄位與繁體中文原因」：

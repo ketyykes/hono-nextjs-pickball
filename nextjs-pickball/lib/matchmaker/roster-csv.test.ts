@@ -32,4 +32,54 @@ describe("parseRosterCsv", () => {
 			{ name: "林小華", gender: "other", rating: 6.0 },
 		]);
 	});
+
+	it("性別欄接受中英文常見寫法並忽略大小寫與前後空白", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,男,5.0,,",
+			"乙,female,5.0,,",
+			"丙, M ,5.0,,",
+			"丁,不指定,5.0,,",
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows.map((row) => row.gender)).toEqual(["male", "female", "male", "other"]);
+	});
+
+	/**
+	 * 補充測試（非六條必要測試之一）：性別對照表的九種常見寫法逐一覆蓋，
+	 * 避免只測其中三四個造成查表其餘分支零覆蓋（Stage 2 mutation 教訓）。
+	 */
+	it("性別對照表的每個常見寫法都能正確對應", () => {
+		const cases: ReadonlyArray<{ input: string; expected: string }> = [
+			{ input: "男", expected: "male" },
+			{ input: "male", expected: "male" },
+			{ input: "M", expected: "male" },
+			{ input: "女", expected: "female" },
+			{ input: "female", expected: "female" },
+			{ input: "F", expected: "female" },
+			{ input: "其他", expected: "other" },
+			{ input: "不指定", expected: "other" },
+			{ input: "other", expected: "other" },
+		];
+		const csv = [
+			HEADER_LINE,
+			...cases.map((c, index) => `第${index}人,${c.input},5.0,,`),
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows.map((row) => row.gender)).toEqual(cases.map((c) => c.expected));
+	});
 });
