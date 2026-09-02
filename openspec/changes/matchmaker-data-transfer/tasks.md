@@ -535,3 +535,34 @@ Depends on: §2, §3, §4, §6, §7
 - [x] 10.9 收尾複驗：`pnpm --filter ./nextjs-pickball test --run` 全綠、`pnpm test`
       全套全綠、`pnpm -r exec tsc --noEmit` exit 0、`pnpm --filter ./nextjs-pickball
       lint` 0 errors、`CI=1 pnpm test:e2e` 五個瀏覽器 project 全綠
+
+### Leader 獨立複驗（第二棒 leader，非採信 Implementer 自述）
+
+- **M1**：刪掉 `missingRosterCsvHeaders` 最後一段「請…」→ `backup.test.ts` 的
+  「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」轉紅（1 failed / 14 passed），還原後轉綠
+- **M2**：`writeRosterPlayers` 改為永遠回 `{ ok: true }` → E2E
+  「LocalStorage 寫入失敗時 CSV 匯入確認後不誤 reload 且顯示訊息」**三次 retry 全紅**
+  （`expect(locator).toBeVisible() failed / element(s) not found`），還原後轉綠
+- **M3**：`historyCsvFileName` 前綴改壞 → `history-csv.test.ts` 的
+  「historyCsvFileName 依注入時間產生含日期的檔名」轉紅，還原後轉綠
+- **M4**：`grep "const RATING_MIN"` 於 `roster-csv.ts` 無命中，且確認
+  `import { RATING_MIN, RATING_MAX } from "./rating-types"` 存在
+- 每次 mutation 後皆 `git checkout --` 還原並確認 `git status` 乾淨
+
+### §9.7 全套 E2E 的一次假失敗（已排除，記錄以免日後誤判）
+
+修正輪後的第一次全套 E2E 出現 **10 個 webkit 失敗**，但：
+
+1. 全部失敗的錯誤都是 `browserContext.newPage: Test timeout of 30000ms exceeded`
+   ——**瀏覽器連新分頁都開不出來**，不是任何斷言失敗；
+2. 該次總耗時 **45.1 分鐘**（正常為 8.9 分鐘），機器當時仍有前一輪 mutation 驗證的殘留負載；
+3. 失敗集合包含 `match-stage.spec.ts` 等**與 M8 完全無關**的既有 spec，
+   而 `matchmaker-data-transfer.spec.ts` 的 webkit 案例反而**全部 ✓ 通過**。
+
+清乾淨全部殘留 process 後：`--project=webkit` 單獨複跑 **90 passed / 0 failed**；
+再跑一次完整五個 project 為 **464 passed / 0 failed / 0 flaky / 21 skipped，exit 0，8.9 分鐘**。
+判定為機器資源耗盡造成的假失敗，非 M8 造成的迴歸。
+
+**教訓**：跑全套 E2E 前務必確認 `lsof -i :3005 -i :8787` 與
+`ps aux | grep -E "wrangler|workerd|next|playwright"` 皆無殘留；
+若總耗時明顯偏離 ~9 分鐘且失敗集中在 `newPage` 逾時，先清 process 重跑再判斷。

@@ -414,7 +414,7 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
 
 ---
 
-## Apply 續跑狀態（2026-09-02，第一棒 leader 因脈絡將盡於群組邊界乾淨停止）
+## Apply 續跑狀態（已於第二棒 leader 收官，全部完成）
 
 > 本節是**跨 session 的接續點**，不是設計內容。§6 開工前務必整段讀完。
 > 停止時機刻意選在「§5 完全收官、§6 尚未派工」的乾淨邊界，**沒有任何 subagent 在飛行中**，
@@ -422,7 +422,9 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
 
 ### 接續點
 
-**下一步：§6（CSV 匯入的預覽與附加寫入，`roster-csv.ts` 的 `applyRosterImport`）的 Implementer 派工。**
+> **✅ 已無接續點——M8 apply 於 2026-09-02 由第二棒 leader 全部完成。**
+> 本節以下的「已完成／未開工／開工前必看事項」保留為**歷史紀錄**（記錄第一棒交棒當下的狀態），
+> 不再是待辦。第二棒的完成情形見本節末的「第二棒完成紀錄」。
 
 ### 已完成（52 / 94 tasks，全部已在 `change/matchmaker-data-transfer` 上 commit）
 
@@ -484,3 +486,46 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
 - 越界檢查：`git diff --name-only da9cfd2..HEAD` 中**沒有**
   `openspec/specs/**`、`prd.md`、`lib/matchmaker/storage.ts`／`roster.ts`／`types.ts`／`colors.ts`、`hooks/**`
 - 尚未跑過 E2E（§8 尚未開工，新的 E2E spec 還不存在）
+
+---
+
+### 第二棒完成紀錄（2026-09-02）
+
+§6～§9 全部完成，`tasks.md` 共 **110 個 checkbox 全數勾選**
+（原 94 項 ＋ §7 修正輪追加的 7.12～7.18 ＋ Final Review 修正輪的 §10 共 9 項）。
+
+| 群組 | 兩階段審查結果 | leader 獨立抽驗 |
+|---|---|---|
+| §6（6.1～6.11） | Stage 1 CHANGES REQUESTED（1 Blocker：`ids.length` 不符的 throw 零覆蓋）；Stage 2 存活率 **62.9%**（22/35，1 Blocker＋4 Major） | 6 組 mutation 全數轉紅 |
+| §7（7.1～7.18） | Stage 1／Stage 2 皆 CHANGES REQUESTED；Stage 2 存活率 **50%**（18/36，含 `readSnapshot`／`writeBackup` 正常路徑**完全零覆蓋**兩個 Blocker） | 6 組 mutation 全數轉紅 |
+| §8（8.1～8.9 含 8.2a） | Stage 1 1 Major；Stage 2 存活率 **67.9%**（19/28，**4 個 Blocker**，含 `HistoryCsvSection` 匯出功能完全零覆蓋） | 6 組 mutation 全數轉紅 |
+| §9（9.1～9.10） | Final Code Reviewer（opus）CHANGES REQUESTED：**0 Blocker、4 Major、9 Minor** | M1／M2／M3／M4 逐一 mutation 轉紅 |
+
+**每一組都退回修正過一次**（與前五組一致，八組八退），修正後才放行。
+
+#### 收尾驗證（最終實跑數據）
+
+- `pnpm test`：hono 4 檔 16 tests ＋ nextjs 62 檔 **570 tests** 全綠
+- `pnpm -r exec tsc --noEmit`：exit 0
+- `pnpm lint`：**0 errors**、3 warnings（皆既有，位於 `hooks/useQuiz.ts`／`useRosterStore.ts`／`useScoreboardStore.ts`）
+- `CI=1 pnpm test:e2e`（五個瀏覽器 project）：**exit 0、464 passed、0 failed、0 flaky、21 skipped**
+- `DO_NOT_TRACK=1 openspec validate matchmaker-data-transfer --strict`：通過
+- 越界檢查：`git diff --name-only da9cfd2..HEAD` 中**沒有** `openspec/specs/**`、`prd.md`、
+  `lib/matchmaker/storage.ts`／`storage-keys.ts`／`round-storage.ts`／`rating-types.ts`／
+  `roster.ts`／`types.ts`／`colors.ts`、`lib/scoreboard/**`、`hooks/**`、`components/ui/**`、
+  `playwright.config.ts`。唯二被修改的既有檔為 `lib/matchmaker/section-nav.ts` 與
+  `section-nav.test.ts`（§8.2a 新增「資料」分頁，environment.md 明文允許），其餘全為新增檔
+- `git status`：乾淨；無殘留 dev server／process
+
+#### 兩個值得帶走的踩坑紀錄
+
+1. **`window.localStorage.setItem = fn` 只在 Chromium 有效**。`Storage` 定義了 named property
+   setter，Firefox／WebKit 會把對實例的屬性指派解讀為「寫入一筆 key 為 `setItem` 的資料」而非
+   遮蔽該方法——原生 `setItem` 依然生效，測試只在 Chromium 綠。E2E 抽換 localStorage
+   **MUST 用 `Storage.prototype.setItem`**（commit `edda9f3`）。
+2. **跨群組缺口只有 Final Reviewer 看得到**。§8 的 `HistoryCsvSection` 是「附加、未列入 tasks」
+   的功能，因此沒有任何 Stage 1／Stage 2 reviewer 依 spec 審過它；§5 在 §3 建立的
+   `TRANSFER_MESSAGES` 表**外面**新增了一則訊息，因而逃過遍歷 guard；§8 的 CSV 匯入路徑踩進了
+   §7 特地為 JSON 路徑繞開的「靜默吞例外」坑。這三者都是單一群組 reviewer 結構上看不到的死角。
+
+**下一步（不在本次 apply 範圍）**：verify → archive，並依使用者規定由人工決定何時合併回 main。
