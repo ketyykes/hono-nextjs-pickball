@@ -161,8 +161,11 @@ Depends on: §0
 - [x] 2.7 RED: 補 it「backupFileName 依注入時間產生含日期的檔名」：
       `exportedAt = "2026-08-23T01:02:03.000Z"` → `matchmaker-backup-2026-08-23.json`。確認紅燈
 - [x] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`
-- [ ] 2.9 REFACTOR: 確認 `transfer-types.ts` 內**沒有任何函式**（純 schema 與常數），
-      且 `buildBackup` 未重複實作任何既有模組已提供的轉換
+- [x] 2.9 REFACTOR（skipped，無壞味道）: 已用
+      `grep -nE "function|=>" nextjs-pickball/lib/matchmaker/transfer-types.ts`
+      確認無命中——`transfer-types.ts` 僅含 `BackupSchema`／`Backup` 兩個匯出，無任何函式。
+      `buildBackup` 的 Set→排序字串陣列正規化（`toSortedSignatureKeys`）為本 capability
+      新邏輯，未與既有模組（`round-types.ts`／`history.ts`／`types.ts`）的任何轉換重複。
 
 ## 3. 備份匯入的驗證與錯誤訊息（`backup.ts`）
 Depends on: §2
