@@ -549,3 +549,48 @@ tasks 10.8 明列兩項只能由人親手做的檢查，apply 階段**無法代�
 E2E「列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容」已**逐一斷言這四個分頁連結
 在列印媒體下皆不可見**，五個 browser project 全數通過——
 **M7／M8 新增的分頁確認不會被印進紙本**。
+
+---
+
+## Final Code Review 的結果（2026-09-03）
+
+**裁決：PASS（零 Blocker、零 Major）。** 七項跨群組 checklist 全數通過，重點機械證據：
+
+- `buildExportScene` 的**產品呼叫點唯一**（`app/matchmaker/page.tsx`）；`PrintSheet.tsx` 與
+  `scene-canvas.ts` 皆零 `Round`／`Player` import——JPG 與列印版確實共用同一份 `ExportScene`。
+- `package.json`／`pnpm-lock.yaml`／`hooks/`／M5 四個元件檔／`hono-pickball/` 的 diff **全空**。
+- 零 `print:` utility class；`body:has()` 的收斂仍在，且兩個選擇器都實際命中既有 DOM。
+- `ExportScene` 的 **14 個欄位全數有消費端，零 dead data**。
+
+### 已於本 change 內處理的兩個 Minor
+
+- **F-2**：`TILE_ROWS_BY_FORMAT` 與 `courtBlockHeight` 的 `export` **已無任何外部消費端**，
+  且為它們辯護的 BLOCKED 註解**兩項前提都已失效**（`resolveCourtFormat` 全 repo 零實作、
+  `ExportActions.test.tsx` 已有 `blockHeight`）。§7 修正輪把 `blockHeight` 補進 `ExportCourt`
+  之後忘了回滾。已收回 private 並改寫兩段過期註解。
+- **F-1**：`nextjs-pickball/CLAUDE.md` 的 TDD 例外清單未收錄 `scene-canvas.ts`——本 change
+  archive 後，規範文件與「`lib/` 下有一個零單元測試的模組」的實況會出現無法自解的落差。
+  已把它連同理由加進例外清單。
+
+### 交還人類的三項建議（**本 change 刻意不處理**）
+
+- **F-3｜尚無回合時列印，全站導覽與區段導覽不會被隱藏。**
+  `:has()` 的收斂錨點是 `[data-print="sheet"]`，而該節點只在 `exportScene !== null` 時掛載。
+  使用者在「尚無回合」的對戰頁按 Ctrl／Cmd + P 時，`[data-print="hide"]` 仍會隱藏標題區、
+  匯出入口、`RoundControls` 與舞台區，但 navbar 與區段導覽會留下來。
+  **不在本 change 處理的理由**：那個狀態下 app 內沒有任何列印入口（「列印 PDF」本身 disabled），
+  只有手動按快捷鍵才到得了；且印出來的是一張幾乎空白的紙，多一條 navbar 不改變其無用程度。
+  要修的話最小改法是讓 `PrintSheet` 無條件掛載（`scene` 改為可空），但那會讓 §6 已通過審查的
+  必填 props 契約鬆掉，**收益與風險不成比例**。
+- **F-4｜瀏覽器 I/O 樣板在 repo 內擺法分岔**（repo 級，非本 change 造成）：
+  M8 的 `components/matchmaker/downloadTextFile.ts` 在 `components/`，
+  M9 的 `lib/matchmaker/scene-canvas.ts` 在 `lib/`。兩者都是「Blob → `<a download>` → 清理」
+  的同類樣板卻分居兩層。本 change 的擺法有 `lib/matchmaker/round-storage.ts`、`storage.ts`
+  兩個同目錄瀏覽器 I/O 的**既有先例**，故 reviewer 判定可接受、不建議搬檔；
+  但 repo 層級該挑一種並寫進 `nextjs-pickball/CLAUDE.md`。
+- **F-5｜文案常數重複已達 5 份**：`TEAM_LABELS`（第一隊／第二隊）實測 5 份、
+  `FORMAT_LABEL`（單打／雙打）5～6 份。repo 有「刻意各自持有一份不抽共用模組」的既有裁決
+  （`HistoryRecordCard.tsx` 的註解），本 change 又加了兩份。
+  **不在本 change 收斂的理由**：收斂必然要動 M5／M7 的檔案（本 change 的「不動」清單），
+  且兩種 key 形狀不同（`Record<"teamA"|"teamB", string>` vs `readonly [string, string]`）。
+  **建議記為 tech debt**，於下一個會動到那些檔案的 change 一併處理。

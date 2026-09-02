@@ -285,14 +285,31 @@ Depends on: §7, §8
 
 ## 10. 收尾驗證
 
-- [ ] 10.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
-- [ ] 10.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 與 `--run components/matchmaker/` 全綠，貼出輸出
-- [ ] 10.3 `pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
-- [ ] 10.4 `pnpm typecheck` 通過
-- [ ] 10.5 `pnpm test` 全套通過（確認未破壞 M1～M5 既有測試與 hono-pickball 後端測試）
-- [ ] 10.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**（下載事件在 WebKit／Mobile Safari 上的行為與 Chromium 不同，是最容易破的一組）
-- [ ] 10.7 `git diff package.json` 為空（本 change 零新增相依，design Decision 1）；`git diff --stat` 確認 `hooks/` 零新增、M5 元件檔零改動
-- [ ] 10.8 **人工檢查（無法自動化，如實記錄結果）**：① 在真實瀏覽器按一次「列印 PDF」，確認預覽中沒有 navbar 與操作按鈕、場地未被切成兩頁；② 開啟匯出的 JPG，確認中文姓名未變成方框或 fallback 字型、色塊漸層正常、非黑底（design Risks 明列 E2E 驗不了圖的內容）
-- [ ] 10.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 補記「可匯出 JPG 與列印 PDF」
-- [ ] 10.10 `DO_NOT_TRACK=1 openspec validate matchmaker-visual-export --strict` 通過
-- [ ] 10.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複）
+- [x] 10.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
+- [x] 10.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 與 `--run components/matchmaker/` 全綠，貼出輸出
+- [x] 10.3 `pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
+- [x] 10.4 `pnpm typecheck` 通過
+- [x] 10.5 `pnpm test` 全套通過（確認未破壞 M1～M5 既有測試與 hono-pickball 後端測試）
+- [x] 10.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**（下載事件在 WebKit／Mobile Safari 上的行為與 Chromium 不同，是最容易破的一組）
+- [x] 10.7 `git diff package.json` 為空（本 change 零新增相依，design Decision 1）；`git diff --stat` 確認 `hooks/` 零新增、M5 元件檔零改動
+- [ ] 10.8 ⚠️ **尚未執行——交由使用者於合併前親自完成**（apply 階段無法代勞）。**人工檢查（無法自動化，如實記錄結果）**：① 在真實瀏覽器按一次「列印 PDF」，確認預覽中沒有 navbar 與操作按鈕、場地未被切成兩頁；② 開啟匯出的 JPG，確認中文姓名未變成方框或 fallback 字型、色塊漸層正常、非黑底（design Risks 明列 E2E 驗不了圖的內容）
+- [x] 10.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 補記「可匯出 JPG 與列印 PDF」
+- [x] 10.10 `DO_NOT_TRACK=1 openspec validate matchmaker-visual-export --strict` 通過
+- [x] 10.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複）
+
+> **§10 收尾驗證結論（2026-09-03）**：10.1～10.7、10.9～10.11 **全數完成且通過**，
+> 逐項結果與證據記於 `design.md` 的「§10 收尾驗證的結果與未解問題」一節。
+> **10.8 為兩項無法自動化的人工檢查，刻意保留未勾選**，交由使用者於合併前親自執行
+> （真實列印預覽的分頁結果、匯出 JPG 的中文字型 rasterization 與底色外觀）——
+> apply 階段代勾等同偽造驗證結果。
+>
+> **Final Code Review：PASS（零 Blocker、零 Major）**。七項跨群組 checklist 全過；
+> 兩個 Minor（`TILE_ROWS_BY_FORMAT`／`courtBlockHeight` 的 `export` 已無消費端且辯護註解
+> 前提失效、`nextjs-pickball/CLAUDE.md` 的 TDD 例外清單未收錄 `scene-canvas.ts`）**已於
+> 本 change 內處理**；三項建議（尚無回合時列印不隱藏導覽、瀏覽器 I/O 樣板的 repo 級擺法
+> 分岔、文案常數重複已達 5 份）**刻意不處理並交還人類**，理由記於 `design.md`。
+>
+> ⚠️ **一個先前既存、與本 change 無關的 E2E 失敗**：全套 E2E 跑滿約 10 分鐘時，
+> `scoreboard-binding.spec.ts:548` 在 webkit 與 mobile-safari 上穩定失敗（該 spec 自己
+> `beforeEach` 的 `page.goto("/")` 導覽逾時）。歸因已完成——**把 `visual-export.spec.ts`
+> 整個移出後跑全套，同樣的兩個 test 以同樣的方式失敗**。屬 M6 範圍，交還人類。

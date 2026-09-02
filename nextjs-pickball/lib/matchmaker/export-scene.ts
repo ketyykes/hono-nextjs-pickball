@@ -105,18 +105,10 @@ export const TILE_COLUMNS = 2;
 
 /**
  * 各對戰方式的球員列數：單打 1 列（兩格左右並排），雙打 2 列（上下各兩格）。
- *
- * ⚠️ BLOCKED（matchmaker-visual-export tasks §7 Major-2，第 1 次退回修正輪）：
- * 本應改為 `ExportCourt.blockHeight` 由本檔在 `buildExportCourt` 內填入，讓
- * scene-canvas.ts 不必反推對戰方式即可累加場地高度，本常數與 `courtBlockHeight`
- * 也應隨之改回 private。但 `ExportCourt` 一旦新增必填欄位 `blockHeight`，會讓
- * `components/matchmaker/ExportActions.test.tsx`（第 17 行手寫的 `ExportCourt` 字面量
- * fixture，未含該欄位）編譯失敗——而該檔明列於本輪「SHALL NOT 修改」清單，
- * 同時也明列於「既有測試 MUST 全數保持綠燈」清單，兩個約束在此互斥。故本輪維持
- * `export` 以保留 scene-canvas.ts 現行的 `resolveCourtFormat` 反推路徑，
- * 詳細證據與決策見交付報告 Major-2 一節。
+ * 僅供本檔的 courtBlockHeight 使用，不對外匯出——場地區塊高度已由
+ * `ExportCourt.blockHeight` 一併算好交給消費端，沒有人需要自行重算。
  */
-export const TILE_ROWS_BY_FORMAT: Record<MatchFormat, number> = {
+const TILE_ROWS_BY_FORMAT: Record<MatchFormat, number> = {
 	singles: 1,
 	doubles: 2,
 };
@@ -236,10 +228,10 @@ function buildExportCourt(match: RoundMatch, players: readonly Player[]): Export
  * 場地區塊高度：固定的表頭部分（場地編號＋狀態文字）加上該對戰方式的球員列數 ×
  * 每列高度。單打與雙打共用同一條公式，差異只在於 TILE_ROWS_BY_FORMAT 的列數——
  * SHALL NOT 為兩種對戰方式各寫一份公式（tasks 2.9）。
- * export：scene-canvas.ts 的 resolveCourtFormat 仍需由外部呼叫本函式（Major-2 因與
- * ExportActions.test.tsx 衝突而 BLOCKED，見本檔 TILE_ROWS_BY_FORMAT 上方註解）。
+ * 不對外匯出：唯一的外部消費端 scene-canvas.ts 已改為直接讀 `ExportCourt.blockHeight`，
+ * 「場地區塊高度只算一處」因此收斂在本檔內。
  */
-export function courtBlockHeight(format: MatchFormat): number {
+function courtBlockHeight(format: MatchFormat): number {
 	return COURT_HEADER_HEIGHT + TILE_ROWS_BY_FORMAT[format] * TILE_ROW_HEIGHT;
 }
 

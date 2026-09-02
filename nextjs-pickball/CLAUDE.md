@@ -77,7 +77,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
 `openspec/` 在 repo root，openspec CLI 一律從 repo root 執行；規格內引用本 workspace 的檔案路徑須帶 `nextjs-pickball/` 前綴。本 workspace 的 TDD 適用範圍與例外層（原 `openspec/config.yaml` 所載；該檔現在只放 `schema` 與 `context` 兩項設定，不含規則內文）：
 
 - `app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**` 下的行為邏輯模組採 TDD：先寫失敗測試 → 實作至綠 → refactor（三步規則與紅燈要求見 root CLAUDE.md）
-- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）
+- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）、`lib/matchmaker/scene-canvas.ts`（canvas 繪製與下載：所有決策都已在 `ExportScene` 內定死，本檔零分支、happy-dom 無 2D context，改以 `tests/e2e/specs/visual-export.spec.ts` 驗收，理由見該檔檔頭）
 - **純呈現型元件不強制單元 TDD**（以 Playwright E2E 驗收）；行為邏輯下放 `hooks/`、`lib/` 再對其做 TDD
 - 規格情境用 Given/When/Then 撰寫，行為邏輯情境須可直接對應到 Vitest test case
 
