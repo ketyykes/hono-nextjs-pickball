@@ -105,7 +105,7 @@
       跑單檔確認紅燈並貼出輸出
 - [x] 1.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/csv.ts` 的 `toCsv(rows)`：
       以 `﻿` 起頭、逗號分隔、`\r\n` 換行（Excel 相容），並匯出 BOM 具名常數
-- [ ] 1.3 RED: 於 `csv.test.ts` 補 it
+- [x] 1.3 RED: 於 `csv.test.ts` 補 it
       「含逗號、雙引號或換行的欄位以 RFC 4180 規則跳脫並可原樣讀回」：
       以 `王小明, Jr.`／`他說"讚"`／含 `\n` 的值序列化後斷言引號與跳脫，
       再以 `parseCsv` 讀回斷言逐字相同。確認紅燈
