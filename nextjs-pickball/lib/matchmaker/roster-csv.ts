@@ -9,6 +9,7 @@ import { addPlayer } from "./roster";
 import type { AddPlayerInput } from "./roster";
 import type { Gender, Player } from "./types";
 import { RATING_MIN, RATING_MAX } from "./rating-types";
+import { TRANSFER_MESSAGES } from "./transfer-types";
 
 /** CSV 的五個標題欄名稱（繁體中文），欄位對應依名稱而非位置。 */
 export const ROSTER_CSV_HEADERS = {
@@ -174,7 +175,7 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	if (missingHeaders.length > 0) {
 		return {
 			ok: false,
-			message: `CSV 標題列缺少必填欄位：${missingHeaders.join("、")}`,
+			message: TRANSFER_MESSAGES.missingRosterCsvHeaders(missingHeaders),
 		};
 	}
 

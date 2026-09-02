@@ -445,7 +445,15 @@ describe("backup", () => {
 		// 原本的 /請[^。]*[。]?/ 幾乎恆真（[。]? 是 optional、[^。]* 可為空，等價於
 		// 「字串裡有一個請字」），退化成 "JSON。請"、"請"、"參賽者。請" 之類的殘缺
 		// 訊息也會通過。改為四項可執行的斷言（M8 §3 Stage 2 review J2 裁決）：
-		const messages = Object.values(TRANSFER_MESSAGES);
+		//
+		// TRANSFER_MESSAGES.missingRosterCsvHeaders 是函式（依缺欄清單產生訊息），
+		// Object.values 取出的是函式本身而非字串，故先過濾出純字串成員，
+		// 再以代表性參數呼叫該函式、把產生的字串一併納入遍歷
+		// （Final Review M1 裁決：不納入就會逃過本 guard 的檢查）。
+		const messages = Object.values(TRANSFER_MESSAGES).filter(
+			(value): value is string => typeof value === "string",
+		);
+		messages.push(TRANSFER_MESSAGES.missingRosterCsvHeaders(["名稱", "性別"]));
 
 		expect(messages.length).toBeGreaterThan(0);
 

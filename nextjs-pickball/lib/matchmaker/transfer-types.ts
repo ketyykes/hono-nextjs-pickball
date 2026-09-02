@@ -45,4 +45,11 @@ export const TRANSFER_MESSAGES = {
 	// setItem 拋出配額相關例外（QuotaExceededError 等）。
 	quotaExceeded:
 		"寫入本機儲存空間時已超出瀏覽器的容量上限。這份資料因此未被儲存，但備份檔案本身沒有遺失。請先清除舊資料或減少匯入筆數後再試一次。",
+	// roster-csv.ts 的 parseRosterCsv 原本在此則訊息外自行拼字面值，逃過本表的集中管理
+	// 與 backup.test.ts 的遍歷 guard（M8 Final Review M1 裁決）。缺欄清單為動態內容，
+	// 故此則以函式形式帶入，而非固定字串；訊息仍固定寫成「＜發生了什麼＞。＜目前資料
+	// 狀態＞。請＜下一步＞。」三段式，與其餘四則同一語氣。
+	missingRosterCsvHeaders(missing: readonly string[]): string {
+		return `CSV 標題列缺少必填欄位：${missing.join("、")}。缺少的欄位無法對應到任何一行資料，因此整份 CSV 未被匯入。請於標題列補齊缺少的欄位名稱後重新匯入。`;
+	},
 } as const;
