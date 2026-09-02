@@ -5,12 +5,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
+import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 
 // JSON 完整備份區塊（M8 §8.4／§8.9）：涵蓋匯出（Blob + <a download>）與匯入
 // （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
-// 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker）。
+// 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker，「Blob → 下載」的樣板抽到
+// 共用函式 downloadTextFile，與 HistoryCsvSection 共用，見 Final Review m2）。
 // Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在元件層（design Decision 7），
 // lib/matchmaker/backup.ts 與 transfer-storage.ts 只回傳純資料或可判讀的結果物件。
 //
@@ -26,15 +28,7 @@ export function JsonBackupSection() {
 	function handleExport() {
 		const exportedAt = new Date().toISOString();
 		const backup = buildBackup(readSnapshot(), { exportedAt });
-		const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement("a");
-		anchor.href = url;
-		anchor.download = backupFileName(exportedAt);
-		document.body.appendChild(anchor);
-		anchor.click();
-		document.body.removeChild(anchor);
-		URL.revokeObjectURL(url);
+		downloadTextFile(JSON.stringify(backup, null, 2), backupFileName(exportedAt), "application/json");
 	}
 
 	function handleImportText(text: string) {
