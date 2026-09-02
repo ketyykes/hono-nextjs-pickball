@@ -56,9 +56,30 @@ const RATING_MAX = 8;
 /** Hex 色碼格式，與 types.ts 的 HexColorSchema 相同規則。 */
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
+/** 必填標題欄，顏色兩欄選填不在此列——缺漏才需整份拒絕（design「必填標題欄缺漏」）。 */
+const REQUIRED_HEADERS: readonly string[] = [
+	ROSTER_CSV_HEADERS.name,
+	ROSTER_CSV_HEADERS.gender,
+	ROSTER_CSV_HEADERS.rating,
+];
+
 export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const table = parseCsv(text);
 	const headerRow = table[0] ?? [];
+
+	// 必填標題欄檢查 MUST 在逐列解析之前執行：缺欄位時直接整份拒絕，
+	// 不進入逐列迴圈——否則每一列都會各自產生同一個「找不到欄位」的錯誤，
+	// 刷出上百則重複訊息（design.md 對應風險）。
+	const missingHeaders = REQUIRED_HEADERS.filter(
+		(header) => !headerRow.includes(header),
+	);
+	if (missingHeaders.length > 0) {
+		return {
+			ok: false,
+			message: `CSV 標題列缺少必填欄位：${missingHeaders.join("、")}`,
+		};
+	}
+
 	const dataRows = table.slice(1);
 
 	const nameIndex = findHeaderIndex(headerRow, ROSTER_CSV_HEADERS.name);
