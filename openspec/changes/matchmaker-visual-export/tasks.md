@@ -223,9 +223,32 @@ Depends on: §2, §3, §5
 
 Depends on: §6, §7
 
-- [ ] 8.1 RED: 於 `visual-export.spec.ts` 補三個 test：「點擊列印 PDF 會呼叫瀏覽器列印一次」（`addInitScript` 覆寫 `window.print` 為記錄呼叫的 stub）、「列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容」（`emulateMedia({ media: "print" })`）、「列印版的每個場地區塊設定為不跨頁切斷」（computed style 的 `break-inside` 為 `avoid`）。確認紅燈
-- [ ] 8.2 GREEN: 於 `page.tsx` 掛入 `PrintSheet`（同一份 scene）並把互動區塊包進 `data-print="hide"` 的包裝元素；於 `nextjs-pickball/app/globals.css` 新增 `@media print` 區塊：`body:has([data-print="sheet"]) > header` 與 `[data-print="hide"]` 隱藏、`[data-print="sheet"]` 顯示、`[data-print="court"]` 為 `break-inside: avoid`（design Decision 3）
-- [ ] 8.3 REFACTOR: 確認 `@media print` 規則**只**透過 `data-print` 屬性與 `body:has()` 生效，沒有洩漏到 matchmaker 以外的路由；確認**沒有修改 M5 的任何元件檔**（`git diff --stat` 機械確認 `components/matchmaker/MatchStage.tsx`／`CourtCard.tsx`／`RoundControls.tsx`／`RestingPanel.tsx` 皆未變動）；於 CSS 區塊上方以繁體中文註解說明 `body:has()` 的收斂理由與舊瀏覽器的降級後果（多印一條 navbar，資訊仍完整）
+- [x] 8.1 RED: 於 `visual-export.spec.ts` 補三個 test：「點擊列印 PDF 會呼叫瀏覽器列印一次」（`addInitScript` 覆寫 `window.print` 為記錄呼叫的 stub）、「列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容」（`emulateMedia({ media: "print" })`）、「列印版的每個場地區塊設定為不跨頁切斷」（computed style 的 `break-inside` 為 `avoid`）。確認紅燈
+- [x] 8.2 GREEN: 於 `page.tsx` 掛入 `PrintSheet`（同一份 scene）並把互動區塊包進 `data-print="hide"` 的包裝元素；於 `nextjs-pickball/app/globals.css` 新增 `@media print` 區塊：`body:has([data-print="sheet"]) > header` 與 `[data-print="hide"]` 隱藏、`[data-print="sheet"]` 顯示、`[data-print="court"]` 為 `break-inside: avoid`（design Decision 3）
+- [x] 8.3 REFACTOR: 確認 `@media print` 規則**只**透過 `data-print` 屬性與 `body:has()` 生效，沒有洩漏到 matchmaker 以外的路由；確認**沒有修改 M5 的任何元件檔**（`git diff --stat` 機械確認 `components/matchmaker/MatchStage.tsx`／`CourtCard.tsx`／`RoundControls.tsx`／`RestingPanel.tsx` 皆未變動）；於 CSS 區塊上方以繁體中文註解說明 `body:has()` 的收斂理由與舊瀏覽器的降級後果（多印一條 navbar，資訊仍完整）
+
+> **§8 審查結論（2026-09-03）**：Stage 1／2 合併由 opus 審。三個錨點 test 名稱逐字相符；
+> `@media print` 只透過 `data-print` 屬性與 `body:has()` 生效，reviewer 另在 `/`、`/quiz`、
+> `/tour`、`/scoreboard`、`/matchmaker/players`、`/matchmaker/history` 與「尚無回合」七種情境
+> 實測 computed `display`，確認**零外溢**；M5 四個元件檔零改動；無 `print:` utility class。
+> Stage 2 **REJECT 一次**——16 個 mutant 存活 8 個，扣除等價變異（`nav` 與 `> header` 的收斂在
+> 現況下無可觀察差異、4 個 `!important` 全移除仍綠因區塊寫在 layer 之外）與可接受代價
+> （純排版的字級與間距、`roundError` 需先製造失敗狀態）後**真缺口 3 個**。修正輪後 leader
+> 獨立複驗五個 mutant 皆轉紅。
+>
+> **leader 核准的一處偏離**：Implementer 另加一條 `@media print` **之外**的基礎規則
+> `[data-print="sheet"] { display: none; }`，以滿足 spec 的「列印版內容螢幕上 MUST 隱藏」。
+> design Decision 3 的 CSS 片段沒有這條，但少了它列印版會在螢幕上一直顯示。
+>
+> ⚠️ **方法學紀錄（跨群組適用）**：改完 `app/globals.css` 後**等 8 秒不足以保證 Turbopack
+> 重編譯完成**，會讓 CSS mutation 得到「存活」的**假陰性**。Stage 2 與 leader 都各踩過一次。
+> CSS mutation 一律等 20 秒並以第二次執行結果為準。
+>
+> **regression guard 標註**：8.1 的三條錨點 test 中，「列印媒體下隱藏…」與「場地區塊不跨頁
+> 切斷」兩條為真紅燈（元素未隱藏、`break-inside` 不是 `avoid`）；「點擊列印 PDF 會呼叫
+> 瀏覽器列印一次」在寫入當下即綠（§5 已完成 wiring、§7 已掛載元件），Implementer 已誠實
+> 標註為 regression guard，**未偽造紅燈**。修正輪新增的四條斷言均為先寫斷言、再以 mutation
+> 複驗其有效性。
 
 ## 9. 唯讀保證與無障礙 E2E
 
