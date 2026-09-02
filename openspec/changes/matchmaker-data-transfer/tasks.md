@@ -23,7 +23,7 @@
 > 讀出的，**M4 當時尚未合併**；本群組的工作就是逐項對照 worktree 內的**實際程式碼**，
 > 不一致時以程式碼為準並就地更新此表。
 
-- [ ] 0.1 確認 worktree 的 base 已含 M5（`matchmaker-match-stage-ui`），
+- [x] 0.1 確認 worktree 的 base 已含 M5（`matchmaker-match-stage-ui`），
       並確認 M3（`matchmaker-rating-engine`）與 M4（`matchmaker-round-lifecycle`）
       皆已在 `main`。
       **判定方式為程式碼存在性核對，SHALL NOT 用 `ls openspec/changes/archive | grep matchmaker` 判定**：
@@ -35,15 +35,15 @@
       `ls nextjs-pickball/lib/matchmaker/round-types.ts nextjs-pickball/lib/matchmaker/round-storage.ts`（M4）、
       `ls nextjs-pickball/lib/matchmaker/section-nav.ts nextjs-pickball/app/matchmaker/page.tsx`（M5）。
       **若任一未合併，停止 apply 並回報**（見 `execution-plan.md` 的 Escalation）
-- [ ] 0.2 `grep -rn "^export " nextjs-pickball/lib/matchmaker/round-types.ts
+- [x] 0.2 `grep -rn "^export " nextjs-pickball/lib/matchmaker/round-types.ts
       nextjs-pickball/lib/matchmaker/history.ts nextjs-pickball/lib/matchmaker/storage-keys.ts
       nextjs-pickball/lib/matchmaker/round-storage.ts`
       核對回合／歷史 schema、key 常數、`hasLocalStorage()` 與讀寫函式的實際匯出名稱
-- [ ] 0.3 確認 `Round` 的簽章欄位（預期 `seenSignatures`，三組字串陣列）
+- [x] 0.3 確認 `Round` 的簽章欄位（預期 `seenSignatures`，三組字串陣列）
       與其在 `RoundSchema` 內的巢狀位置
-- [ ] 0.4 確認 `MatchHistoryEntry` 的球員快照欄位（預期
+- [x] 0.4 確認 `MatchHistoryEntry` 的球員快照欄位（預期
       `teamA.players[].name`／`ratingBefore`／`ratingAfter`），CSV 匯出直接讀這些欄位
-- [ ] 0.5 列出**本 app 寫入 LocalStorage 的全部 key 常數**，兩道 grep 都要跑
+- [x] 0.5 列出**本 app 寫入 LocalStorage 的全部 key 常數**，兩道 grep 都要跑
       （第二道用來抓不是 `export const` 形式的宣告，例如包在物件或陣列裡的字面值）：
       `grep -rnE '^export const [A-Z_]+ = "(matchmaker|scoreboard):' nextjs-pickball/lib/`
       與 `grep -rnE '"(matchmaker|scoreboard):[^"]*"' nextjs-pickball/lib/`。
@@ -63,23 +63,36 @@
       命中的每一個 key 常數都 MUST 填入下表並成為 §7
       `CLEAR_ALL_KEYS` 的來源：spec 的「清除本機資料」承諾的是「本 app 寫入的全部 key」
       而非固定四筆，**漏列即為 spec 違反**（會留下整批孤兒分場計分槽）
-- [ ] 0.6 把 0.2～0.5 的核對結果填入下表——§2 之後的每一次派工都要附上此表：
+- [x] 0.6 把 0.2～0.5 的核對結果填入下表——§2 之後的每一次派工都要附上此表：
 
   | 需要的東西 | M4 delta 名稱（待核對） | 實際名稱 | 模組路徑 |
   |---|---|---|---|
-  | 回合 schema | `RoundSchema` | _核對後填_ | `lib/matchmaker/round-types.ts` |
-  | 歷史單筆 schema | `MatchHistoryEntrySchema` | _核對後填_ | `lib/matchmaker/history.ts` |
-  | 名單 key 常數 | `ROSTER_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
-  | 回合 key 常數 | `ROUND_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
-  | 歷史 key 常數 | `HISTORY_STORAGE_KEY` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
-  | LocalStorage 防護 | `hasLocalStorage()` | _核對後填_ | `lib/matchmaker/storage-keys.ts` |
-  | 回合／歷史讀寫 | `readRound`／`writeRound`／`readHistory`／`writeHistory` | _核對後填_ | `lib/matchmaker/round-storage.ts` |
-  | 簽章持久化欄位 | `Round.seenSignatures`（三組字串陣列） | _核對後填_ | `lib/matchmaker/round-types.ts` |
-  | 計分板獨立槽 key 常數 | `STORAGE_KEY` | _核對後填_ | `lib/scoreboard/storage.ts` |
-  | 計分板分槽 key 常數（M6 為硬前置，MUST 存在） | `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`） | _核對後填；找不到即 M6 未合併，停止 apply 並回報_ | `lib/scoreboard/match-slots.ts` |
-  | 其他 `matchmaker:`／`scoreboard:` key 常數 | （0.5 的 grep 若還有命中就逐一補列） | _核對後填_ | _核對後填_ |
+  | 回合 schema | `RoundSchema` | `RoundSchema`（相符）／`Round` 型別 | `lib/matchmaker/round-types.ts` |
+  | 歷史單筆 schema | `MatchHistoryEntrySchema` | `MatchHistoryEntrySchema`（相符；為 `z.discriminatedUnion("format", …)`，兩分支皆 `.strict()`）／`MatchHistoryEntry` 型別 | `lib/matchmaker/history.ts` |
+  | 名單 key 常數 | `ROSTER_STORAGE_KEY` | `ROSTER_STORAGE_KEY = "matchmaker:roster:v1"`（相符） | `lib/matchmaker/storage-keys.ts` |
+  | 回合 key 常數 | `ROUND_STORAGE_KEY` | `ROUND_STORAGE_KEY = "matchmaker:round:v1"`（相符） | `lib/matchmaker/storage-keys.ts` |
+  | 歷史 key 常數 | `HISTORY_STORAGE_KEY` | `HISTORY_STORAGE_KEY = "matchmaker:history:v1"`（相符） | `lib/matchmaker/storage-keys.ts` |
+  | LocalStorage 防護 | `hasLocalStorage()` | `hasLocalStorage()`（相符，已為 `export function`） | `lib/matchmaker/storage-keys.ts` |
+  | 回合／歷史讀寫 | `readRound`／`writeRound`／`readHistory`／`writeHistory` | 四者皆存在（另有 `clearRound`／`clearHistory`）。⚠️ `readHistory()` 回傳的是 `ReadHistoryResult = { entries, droppedCount }` 而非陣列；`writeRound`／`writeHistory` **靜默吞掉配額例外**，故 §7 的 `writeBackup` SHALL NOT 委派它們（無法回報配額失敗），須自行 `setItem` 並 try/catch | `lib/matchmaker/round-storage.ts` |
+  | 簽章持久化欄位 | `Round.seenSignatures`（三組字串陣列） | `Round.seenSignatures: { teammateKeys: string[]; opponentKeys: string[]; fullMatchKeys: string[] }`（相符，schema 為 `SeenSignaturesSchema`） | `lib/matchmaker/round-types.ts` |
+  | 計分板獨立槽 key 常數 | `STORAGE_KEY` | `STORAGE_KEY = "scoreboard:current:v1"`。⚠️ **宣告點是 `lib/scoreboard/storage-keys.ts`**，`storage.ts` 第 9 行只 `export { STORAGE_KEY }` re-export | `lib/scoreboard/storage-keys.ts` |
+  | 計分板分槽 key 常數（M6 為硬前置，MUST 存在） | `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`） | ✅ 存在：`MATCH_SLOTS_KEY = "scoreboard:matches:v1"`。⚠️ **宣告點是 `lib/scoreboard/storage-keys.ts`**，`match-slots.ts` 第 8 行只 `export { MATCH_SLOTS_KEY }` re-export。M6 已在 `main` | `lib/scoreboard/storage-keys.ts` |
+  | 其他 `matchmaker:`／`scoreboard:` key 常數 | （0.5 的 grep 若還有命中就逐一補列） | 無其他 LocalStorage key。唯一額外命中為 `components/scoreboard/OrientationHint.tsx:8` 的 `DISMISS_KEY = "scoreboard:hint-dismissed"`，該檔第 21／30 行用的是 **`sessionStorage`**，依 §0.5 明文 SHALL NOT 列入清除清單 | — |
 
-- [ ] 0.7 跑 `pnpm test` 確認 baseline 全綠，把結果與 commit hash 回填
+  補充（§5／§6 需要）：`PlayerSchema`／`Player`／`Gender` 在 `lib/matchmaker/types.ts`；
+  `addPlayer(roster, input, { id, now })`、`nextAutoGradient(roster)`、
+  `AddPlayerInput { name, gender, rating, colorFrom?, colorTo? }`、
+  `AddPlayerContext { id, now }` 在 `lib/matchmaker/roster.ts`；
+  `PALETTE_SIZE`／`defaultGradient`／`paletteIndexOf` 在 `lib/matchmaker/colors.ts`。
+  三個 matchmaker key 的容器格式為 `{ version: 1, players }`／`{ version: 1, round }`／
+  `{ version: 1, entries }`。
+
+  **CLEAR_ALL_KEYS 的最終來源（§7.2 據此實作，共 5 個 key）**：
+  `ROSTER_STORAGE_KEY`／`ROUND_STORAGE_KEY`／`HISTORY_STORAGE_KEY`
+  （`@/lib/matchmaker/storage-keys`）＋ `STORAGE_KEY`／`MATCH_SLOTS_KEY`
+  （`@/lib/scoreboard/storage-keys`，即兩者的實際宣告點）。
+
+- [x] 0.7 跑 `pnpm test` 確認 baseline 全綠，把結果與 commit hash 回填
       `environment.md` 的 Verification 三個欄位
 
 ## 1. CSV 底層序列化與解析（`lib/matchmaker/csv.ts`）
