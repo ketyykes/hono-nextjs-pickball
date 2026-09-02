@@ -8,15 +8,24 @@ export const UTF8_BOM = "﻿";
 /** 欄位分隔符。 */
 const DELIMITER = ",";
 
+/** 換行用的 CR、LF 字元；解析時分開判斷，序列化時合併使用。 */
+const CARRIAGE_RETURN = "\r";
+const LINE_FEED = "\n";
+
 /** 換行符（輸出一律用這組，Excel 相容）。 */
-const LINE_BREAK = "\r\n";
+const LINE_BREAK = CARRIAGE_RETURN + LINE_FEED;
 
 /** 跳脫用的引號字元。 */
 const QUOTE = '"';
 
 /** 判斷欄位值是否需要以引號包住：含分隔符、引號或任何換行皆須跳脫（RFC 4180）。 */
 function needsQuoting(field: string): boolean {
-	return field.includes(DELIMITER) || field.includes(QUOTE) || field.includes("\n") || field.includes("\r");
+	return (
+		field.includes(DELIMITER) ||
+		field.includes(QUOTE) ||
+		field.includes(LINE_FEED) ||
+		field.includes(CARRIAGE_RETURN)
+	);
 }
 
 /** 依 RFC 4180 規則跳脫單一欄位值：需要時以引號包住，並將內部引號轉為兩個引號。 */
@@ -76,10 +85,10 @@ export function parseCsv(text: string): string[][] {
 		} else if (char === DELIMITER) {
 			currentRow.push(currentField);
 			currentField = "";
-		} else if (char === "\r") {
-			// `\r\n` 由後續的 `\n` 分支結束該列；單獨的 `\r` 不在支援範圍內（見 design.md Non-Goals）。
+		} else if (char === CARRIAGE_RETURN) {
+			// `\r\n` 由後續的 LINE_FEED 分支結束該列；單獨的 CR 不在支援範圍內（見 design.md Non-Goals）。
 			continue;
-		} else if (char === "\n") {
+		} else if (char === LINE_FEED) {
 			currentRow.push(currentField);
 			rows.push(currentRow);
 			currentRow = [];
