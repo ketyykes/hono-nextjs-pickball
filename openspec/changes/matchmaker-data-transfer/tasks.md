@@ -437,7 +437,7 @@ Depends on: §2, §3, §4, §6, §7
       寫入兩個 test：「可從 matchmaker 區段導覽抵達資料頁並看到四個功能區塊」、
       「資料頁標示 CSV 匯出入不對稱且完整還原請用 JSON」。
       跑 `pnpm --filter ./nextjs-pickball test:e2e --grep "資料頁"` 確認紅燈並貼出輸出
-- [ ] 8.2 GREEN: 建立 `app/matchmaker/data/page.tsx` 與四個區塊元件骨架
+- [x] 8.2 GREEN: 建立 `app/matchmaker/data/page.tsx` 與四個區塊元件骨架
       （`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`、
       `ClearLocalDataSection`），含 9.3 不對稱說明文字與從 matchmaker 區段的導覽入口
 - [x] 8.2a **必 TDD**（`lib/**` 的行為邏輯，非例外層）：導覽入口的單一來源是
