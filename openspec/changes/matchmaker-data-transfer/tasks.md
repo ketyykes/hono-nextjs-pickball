@@ -234,7 +234,7 @@ Depends on: §0, §1
 - [x] 5.1 RED: 新增 `nextjs-pickball/lib/matchmaker/roster-csv.test.ts`，寫入 it
       「合法 CSV 解析出對應筆數且性別已正規化」：標題列 + 3 筆合法資料 →
       3 筆可新增、0 筆錯誤。確認紅燈
-- [ ] 5.2 GREEN: 實作 `parseRosterCsv(text)`：委派 `csv.ts` 的 `parseCsv`，
+- [x] 5.2 GREEN: 實作 `parseRosterCsv(text)`：委派 `csv.ts` 的 `parseCsv`，
       **依標題名稱**（非欄位位置）對應五個欄位，逐列產出可新增列
 - [ ] 5.3 RED: 補 it「性別欄接受中英文常見寫法並忽略大小寫與前後空白」：
       `男`／`female`／` M `／`不指定` → `male`／`female`／`male`／`other`。確認紅燈
