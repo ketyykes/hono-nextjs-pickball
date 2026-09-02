@@ -361,10 +361,17 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 
 	// M8 §8 修正輪（Stage 2 review Blocker B1，mutant M3）：writeBackup 回 ok:false
 	// （LocalStorage 寫入拋例外，如配額超出）的分支同樣零覆蓋。以
-	// window.localStorage.setItem 抽換成拋例外版本，模擬 writeBackup 內
+	// Storage.prototype.setItem 抽換成拋例外版本，模擬 writeBackup 內
 	// try/catch 捕捉到的邊界情境；此抽換只存在於目前的 page context（page.evaluate，
 	// 非 addInitScript），若元件誤觸發 location.reload() 會產生全新 document、
 	// 抽換自動失效，之後的 page.goto 用的是原生 setItem，不影響後續斷言的可靠性。
+	//
+	// ⚠️ 抽換點 MUST 是 `Storage.prototype.setItem`，SHALL NOT 寫成
+	// `window.localStorage.setItem = ...`（M8 §9.7 全瀏覽器實跑抓到）：`Storage` 定義了
+	// named property setter，Firefox／WebKit 會把對 localStorage 實例的屬性指派解讀為
+	// 「寫入一筆 key 為 setItem 的資料」，而不是遮蔽該方法——原生 setItem 依然生效，
+	// 匯入會意外成功、alert 永不出現，測試只在 Chromium 綠。
+	// 改抽換 prototype 才能在五個瀏覽器 project 一致生效。
 	test("LocalStorage 寫入失敗時 JSON 匯入不誤 reload 且顯示訊息", async ({ page }) => {
 		await clearMatchmakerStorage(page);
 		const existingPlayers = [
@@ -375,7 +382,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await page.goto(DATA_PAGE);
 
 		await page.evaluate(() => {
-			window.localStorage.setItem = () => {
+			Storage.prototype.setItem = () => {
 				throw new DOMException("模擬 LocalStorage 配額超出", "QuotaExceededError");
 			};
 		});
