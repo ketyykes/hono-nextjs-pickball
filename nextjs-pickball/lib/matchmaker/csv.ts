@@ -65,10 +65,9 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
 export function parseCsv(text: string): string[][] {
 	const withoutBom = text.startsWith(UTF8_BOM) ? text.slice(UTF8_BOM.length) : text;
 
-	if (withoutBom.length === 0) {
-		return [];
-	}
-
+	// 空字串（或只有 BOM）不額外提早 return——迴圈跑 0 次、currentField 與
+	// currentRow 維持初始空值，會被下方「檔尾幻影列」判斷式自然擋下並回傳 []，
+	// 兩者行為相同，保留提早 return 只會是永遠不會轉紅的 dead code。
 	const rows: string[][] = [];
 	let currentRow: string[] = [];
 	let currentField = "";
