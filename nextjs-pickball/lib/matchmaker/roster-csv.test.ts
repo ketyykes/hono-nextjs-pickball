@@ -197,4 +197,21 @@ describe("parseRosterCsv", () => {
 			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringMatching(/[一-龥]/) },
 		]);
 	});
+
+	it("缺少必填標題欄時回傳結構性錯誤並指出欄位名稱", () => {
+		// 標題列缺少「強度分數」。
+		const csv = [
+			"名稱,性別,顏色起點,顏色終點",
+			"甲,male,,",
+			"乙,female,,",
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.message).toContain(ROSTER_CSV_HEADERS.rating);
+	});
 });
