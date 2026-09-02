@@ -63,13 +63,23 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const rows: RosterCsvRow[] = [];
 	const errors: RosterCsvRowError[] = [];
 
-	dataRows.forEach((dataRow) => {
+	dataRows.forEach((dataRow, dataIndex) => {
+		const spreadsheetRow = dataIndex + 2;
 		const name = (dataRow[nameIndex] ?? "").trim();
 		const genderRaw = (dataRow[genderIndex] ?? "").trim().toLowerCase();
-		const gender = GENDER_LOOKUP[genderRaw] ?? "other";
+		const gender = GENDER_LOOKUP[genderRaw];
 		const rating = Number((dataRow[ratingIndex] ?? "").trim());
 		const colorFrom = (dataRow[colorFromIndex] ?? "").trim();
 		const colorTo = (dataRow[colorToIndex] ?? "").trim();
+
+		if (gender === undefined) {
+			errors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.gender,
+				reason: "性別無法辨識，請填入常見寫法（男／女／其他等）",
+			});
+			return;
+		}
 
 		const row: RosterCsvRow = { name, gender, rating };
 		if (colorFrom !== "" && colorTo !== "") {
