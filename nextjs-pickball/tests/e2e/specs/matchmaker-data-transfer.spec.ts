@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
@@ -363,5 +364,37 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.getByText("JSON寫入失敗既有員", { exact: true })).toBeVisible();
 		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
+
+	// M8 §8 修正輪（Stage 2 review Blocker B2）：JSON 匯出功能完全零覆蓋。
+	// 點擊「匯出 JSON」，以 waitForEvent("download") 攔截下載，驗證檔名格式與
+	// 內容的四個頂層欄位，且 players 與先前種入的名單一致。
+	test("匯出 JSON 產生內容正確的備份檔案", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		const existingPlayers = [buildPlayerFixture({ id: "p-json-export-1", name: "JSON匯出員" })];
+		await seedRoster(page, existingPlayers);
+
+		await page.goto(DATA_PAGE);
+
+		const [download] = await Promise.all([
+			page.waitForEvent("download"),
+			page.getByRole("button", { name: "匯出 JSON" }).click(),
+		]);
+
+		expect(download.suggestedFilename()).toMatch(/^matchmaker-backup-\d{4}-\d{2}-\d{2}\.json$/);
+
+		const downloadPath = await download.path();
+		expect(downloadPath).not.toBeNull();
+		const content = JSON.parse(readFileSync(downloadPath as string, "utf-8")) as {
+			version: unknown;
+			players: unknown;
+			currentRound: unknown;
+			history: unknown;
+		};
+		expect(content).toHaveProperty("version");
+		expect(content).toHaveProperty("players");
+		expect(content).toHaveProperty("currentRound");
+		expect(content).toHaveProperty("history");
+		expect(content.players).toEqual(existingPlayers);
 	});
 });
