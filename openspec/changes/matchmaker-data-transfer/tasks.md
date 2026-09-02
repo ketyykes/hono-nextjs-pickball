@@ -433,7 +433,7 @@ Depends on: §2, §3, §4, §6, §7
 > 的預覽表頭，請直接 `import` 這份常數，SHALL NOT 在本群組另抄一份欄位名稱字面值——
 > 兩處各自維護會在欄位改動時漂移。
 
-- [ ] 8.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，
+- [x] 8.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，
       寫入兩個 test：「可從 matchmaker 區段導覽抵達資料頁並看到四個功能區塊」、
       「資料頁標示 CSV 匯出入不對稱且完整還原請用 JSON」。
       跑 `pnpm --filter ./nextjs-pickball test:e2e --grep "資料頁"` 確認紅燈並貼出輸出
