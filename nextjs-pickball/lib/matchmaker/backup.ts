@@ -114,7 +114,7 @@ export function parseBackup(text: string): ParseBackupResult {
 	} catch {
 		// SHALL NOT 拋出例外中斷操作——拋例外會讓整頁白畫面，是最糟的失敗模式
 		// （design Risks／spec 第 11 節）。
-		return { ok: false, message: TRANSFER_MESSAGES.invalidJson };
+		return fail(TRANSFER_MESSAGES.invalidJson);
 	}
 
 	// 版本不符須有專屬訊息，不與「結構不合法」共用（design「3.6 的順序」節）：
@@ -122,14 +122,22 @@ export function parseBackup(text: string): ParseBackupResult {
 	// 會與其他結構問題混在同一份 issues 陣列裡，無法個別給出對應訊息。因此在此
 	// 單獨檢視 version 欄位，SHALL NOT 為此放寬 BackupSchema（那會破壞既有守衛）。
 	if (isPlainObject(json) && "version" in json && json.version !== 1) {
-		return { ok: false, message: TRANSFER_MESSAGES.unsupportedVersion };
+		return fail(TRANSFER_MESSAGES.unsupportedVersion);
 	}
 
 	const parsed = BackupSchema.safeParse(json);
-	if (parsed.success) {
-		return { ok: true, backup: parsed.data };
+	if (!parsed.success) {
+		return fail(TRANSFER_MESSAGES.invalidStructure);
 	}
-	return { ok: false, message: TRANSFER_MESSAGES.invalidStructure };
+	return { ok: true, backup: parsed.data };
+}
+
+/**
+ * 失敗結果的唯一組裝點（tasks 3.11）：語法／版本／結構三種失敗只是取用不同訊息，
+ * 不應各自在呼叫處重複拼一份 `{ ok: false, message }` 物件字面量。
+ */
+function fail(message: string): ParseBackupResult {
+	return { ok: false, message };
 }
 
 /** 縮小為可安全用 in 運算子存取屬性的物件型別（陣列／null 皆非本函式要處理的形狀）。 */
