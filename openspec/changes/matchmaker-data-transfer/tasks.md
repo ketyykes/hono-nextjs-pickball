@@ -261,6 +261,10 @@ Depends on: §0, §1
 ## 6. CSV 匯入的預覽與附加寫入（`roster-csv.ts`）
 Depends on: §5
 
+> §5 的 `parseRosterCsv` 會**直接跳過空白資料列**（不計入 `rows` 也不計入 `errors`，
+> 見 design Decision 13）。§6 的「可新增 N 人」與「有錯即 disabled」直接建立在此形狀上，
+> SHALL NOT 在 §6 另做一次空列過濾。
+
 - [ ] 6.1 RED: 於 `roster-csv.test.ts` 補 it「預覽回報可新增人數與問題列的列號與原因」：
       5 筆其中 2 筆有問題 → 可新增 3 人、2 筆問題列。確認紅燈
 - [ ] 6.2 GREEN: 讓 `parseRosterCsv` 的回傳形狀即為預覽所需（可新增列數 + 問題列清單），
