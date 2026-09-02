@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildBackup, backupFileName, parseBackup } from "./backup";
-import { BackupSchema } from "./transfer-types";
+import { BackupSchema, TRANSFER_MESSAGES } from "./transfer-types";
 import type { BackupSnapshot } from "./backup";
 import type { Player } from "./types";
 import type { Round } from "./round-types";
@@ -300,6 +300,21 @@ describe("backup", () => {
 		if (result && !result.ok) {
 			expect(result.message).toMatch(/JSON/);
 			expect(result.message).toMatch(/[一-鿿]/);
+		}
+	});
+
+	it("version 不是 1 時整份拒絕並說明版本不支援", () => {
+		const backup = buildBackup(makeSnapshot(), { exportedAt: "2026-08-23T01:02:03.000Z" });
+		// 結構完整，僅 version 改為系統不支援的 2。
+		const text = JSON.stringify({ ...backup, version: 2 });
+
+		const result = parseBackup(text);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			// 版本不符須有專屬訊息，不與「結構不合法」共用同一則（兩者的修正方式不同）。
+			expect(result.message).toBe(TRANSFER_MESSAGES.unsupportedVersion);
+			expect(result.message).not.toBe(TRANSFER_MESSAGES.invalidStructure);
 		}
 	});
 });
