@@ -7,17 +7,18 @@
 > 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
 > **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 狀態快照（最後更新 2026-08-30）
+## 狀態快照（最後更新 2026-09-02）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `5547e62`（feat：合併計分板綁定） |
+| `main` HEAD | `da9cfd2`（feat：合併對戰歷史頁，PRD 8.2） |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
 | M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
-| M7 | **進行中**（2026-08-31，第三棒因電腦睡眠中斷暫停）。tasks.md 勾選 **33/47（勾選數已過時，實際進度見下方）**。見下方「M7 中斷點」 |
-| M8～M9 | 未開始。**順序固定 M7 → M8 → M9**，理由見下方 |
+| M7 | **完成並已合併**（2026-09-02，`da9cfd2`）。47/47，coordinator 獨立驗證：`pnpm test` 57+4 檔/486+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、matchmaker-history E2E 55 passed、全量 E2E 389 passed/21 skipped 無迴歸。worktree（`pickball-worktrees/matchmaker-history-page`）與分支**尚未 teardown**，待使用者確認 |
+| M8 | **完成，合併中**（2026-09-02）。110/110（tasks.md 過程中從原估 94 擴為 110，含 Final Review 修正輪 §10 的 4 Major＋3 Minor）。跑了**兩棒 leader**（第一棒因脈絡將盡於 §5/§6 邊界乾淨停止；第二棒完成 §6～Final Review 後因帳號 session 額度觸頂中斷，但中斷前已 commit 完整 §10 收尾複驗證據）。coordinator 獨立驗證：`pnpm test` 62+4 檔/570+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、`openspec validate --strict` 通過、全量 E2E 462 passed/21 skipped（2 個 webkit/mobile-safari 逾時失敗，單獨重跑 2/2 全綠，判定為資源壓力假紅燈）。worktree 與分支**尚未 teardown**，待使用者確認 |
+| M9 | 未開始，**worktree 尚未建立** |
 
 ## 🔖 M7 中斷點（2026-08-31，第三棒因電腦睡眠中斷、coordinator 複驗後暫停）
 
