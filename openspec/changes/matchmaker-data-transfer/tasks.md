@@ -472,20 +472,20 @@ Depends on: §2, §3, §4, §6, §7
 
 ## 9. 收尾驗證（驗證項，非實作項）
 
-- [ ] 9.1 逐條核對 delta spec 的 38 個「驗收」錨點：以腳本抽出
+- [x] 9.1 逐條核對 delta spec 的 38 個「驗收」錨點：以腳本抽出
       `**驗收**：\`<path>\`，it／test 名稱「<name>」` 並與實際 `it(...)`／`test(...)`
       逐字比對（比照 M2 §13.1 的做法），**不靠目視**
-- [ ] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法統計
+- [x] 9.2 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法統計
       `### Requirement:` 與 `#### Scenario:`，**不使用 BSD `uniq`**
-- [ ] 9.3 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 全綠
-- [ ] 9.4 `pnpm lint` 0 errors（既有 3 個 warning 不計）
-- [ ] 9.5 `pnpm typecheck` 通過
-- [ ] 9.6 `pnpm test` 全套通過（確認未破壞 M1～M7 既有測試與後端測試）
-- [ ] 9.7 `pnpm test:e2e` 通過（本 change 新增的 8 個 E2E case 皆綠）；
+- [x] 9.3 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/` 全綠
+- [x] 9.4 `pnpm lint` 0 errors（既有 3 個 warning 不計）
+- [x] 9.5 `pnpm typecheck` 通過
+- [x] 9.6 `pnpm test` 全套通過（確認未破壞 M1～M7 既有測試與後端測試）
+- [x] 9.7 `pnpm test:e2e` 通過（本 change 新增的 8 個 E2E case 皆綠）；
       **後端測試在受限沙箱會噴 `listen EPERM`，那是 miniflare 需要開 localhost server
       被擋，不是設定錯誤**，放行後重跑即可
-- [ ] 9.8 確認 `git status` 中**沒有**任何 `openspec/specs/**`、`prd.md`、
+- [x] 9.8 確認 `git status` 中**沒有**任何 `openspec/specs/**`、`prd.md`、
       `lib/matchmaker/storage.ts`、`roster.ts`、`types.ts`、`colors.ts`、`hooks/**` 的改動
-- [ ] 9.9 `DO_NOT_TRACK=1 npx openspec validate matchmaker-data-transfer --strict` 通過
+- [x] 9.9 `DO_NOT_TRACK=1 npx openspec validate matchmaker-data-transfer --strict` 通過
 - [ ] 9.10 派發 Final Code Reviewer（見 `execution-plan.md`）對完整 commit 集合做跨任務審查，
       並把結論記入本檔
