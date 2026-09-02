@@ -13,8 +13,12 @@ import type { Gender, Player } from "./types";
 /** App 名稱，匯出標題與（未來的）列印稿共用，SHALL NOT 由各呼叫端各自寫死（prd.md 9.4）。 */
 export const EXPORT_APP_NAME = "匹克球對戰分配機";
 
-/** 對戰方式顯示文案，供標題組裝；沿用畫面既有用語（單打／雙打）。 */
-const FORMAT_LABELS: Record<MatchFormat, string> = {
+/**
+ * 對戰方式顯示文案，供標題組裝；沿用畫面既有用語（單打／雙打）。
+ * 與 `history-csv.ts`／`round.ts`／`RoundControls.tsx`／`HistoryRecordCard.tsx` 的同名對照表
+ * 逐字相同，刻意各自持有一份不抽共用模組（沿用 `HistoryRecordCard.tsx` 的既有裁決）。
+ */
+const FORMAT_LABEL: Record<MatchFormat, string> = {
 	singles: "單打",
 	doubles: "雙打",
 };
@@ -26,7 +30,11 @@ const ROUND_LABEL_SUFFIX = " 輪";
 /** 標題各段落之間的分隔符（全形空白，避免中文字緊貼難以辨讀）。 */
 const TITLE_SEPARATOR = "　";
 
-/** 隊伍顯示文案，供已完成場次的狀態文字標示勝方所屬隊伍。 */
+/**
+ * 隊伍顯示文案，供已完成場次的狀態文字標示勝方所屬隊伍。
+ * 與 `history-csv.ts`／`HistoryRecordCard.tsx` 的同名對照表逐字相同，刻意各自持有一份
+ * 不抽共用模組（沿用 `HistoryRecordCard.tsx` 的既有裁決）。
+ */
 const TEAM_LABELS: Record<"teamA" | "teamB", string> = {
 	teamA: "第一隊",
 	teamB: "第二隊",
@@ -34,6 +42,13 @@ const TEAM_LABELS: Record<"teamA" | "teamB", string> = {
 
 /** 已完成場次狀態文字中，比分兩數之間的分隔符。 */
 const SCORE_SEPARATOR = " : ";
+
+/**
+ * 已完成場次狀態文字中，比分與勝方之間的分隔符。與 `TITLE_SEPARATOR` 恰好同為全形空白，
+ * 但兩者是不同的排版決策（一個分隔標題段落、一個分隔狀態文字段落）：獨立持有常數，
+ * 避免日後改動標題分隔符時無意間連帶改掉狀態文字排版，且改動時沒有測試會示警。
+ */
+const STATUS_SEPARATOR = "　";
 
 /** 已完成場次狀態文字的「獲勝」後綴，例如「第一隊獲勝」。 */
 const WINNER_SUFFIX = "獲勝";
@@ -110,7 +125,7 @@ export interface ExportScene {
 /** 由回合編號與對戰方式組裝標題，同時含 App 名稱、回合編號與對戰方式三項資訊（prd.md 9.4）。 */
 function buildTitle(roundNumber: number, format: MatchFormat): string {
 	const roundLabel = `${ROUND_LABEL_PREFIX}${roundNumber}${ROUND_LABEL_SUFFIX}`;
-	return [EXPORT_APP_NAME, roundLabel, FORMAT_LABELS[format]].join(TITLE_SEPARATOR);
+	return [EXPORT_APP_NAME, roundLabel, FORMAT_LABEL[format]].join(TITLE_SEPARATOR);
 }
 
 /**
@@ -145,7 +160,7 @@ function resolvePlayer(playerId: string, players: readonly Player[]): Player {
 function buildStatusText(match: RoundMatch): string {
 	if (match.status === "completed" && match.scores !== null && match.winner !== null) {
 		const winnerLabel = TEAM_LABELS[match.winner];
-		return `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${TITLE_SEPARATOR}${winnerLabel}${WINNER_SUFFIX}`;
+		return `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${winnerLabel}${WINNER_SUFFIX}`;
 	}
 
 	return INCOMPLETE_STATUS_TEXT;
@@ -191,6 +206,11 @@ function courtBlockHeight(format: MatchFormat): number {
 /**
  * 畫布高度：標題區 + 場地數 × 該對戰方式的場地區塊高度 + 間距。
  * 場地數愈多、或對戰方式的球員列數愈多（雙打 2 列 > 單打 1 列），高度愈高。
+ *
+ * 這裡的 format 取自 `round.format`（單一值），而 `buildCourtTiles` 用的是各場 `match.format`——
+ * 兩者現行前提是一致的：`lib/matchmaker/round.ts` 保證同一回合每場 `format` 皆與回合相同。
+ * 若日後支援同回合混合對戰方式，本函式的高度預算需改由逐場 `courts` 加總推導，
+ * 不能再用單一 `round.format` 乘上場地數。
  */
 function computeCanvasHeight(courtCount: number, format: MatchFormat): number {
 	return (
