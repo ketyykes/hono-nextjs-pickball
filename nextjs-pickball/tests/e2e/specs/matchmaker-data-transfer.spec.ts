@@ -2,6 +2,9 @@ import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
+// M8 §8 修正輪（Stage 2 review B3）：歷史 CSV 標題列 MUST 直接比對 lib 層的單一真相來源，
+// SHALL NOT 在本檔另抄一份「日期,時間,對戰方式,…」字面值——常數改了測試也要一起改。
+import { HISTORY_CSV_HEADERS } from "@/lib/matchmaker/history-csv";
 
 // /matchmaker/data 資料工具頁的 E2E 驗收（M8 §8）。
 // §8.1 只涵蓋兩個入口驗收 test；§8.3 起補上 JSON／CSV 匯出入與清除本機資料的實際行為，
@@ -67,6 +70,18 @@ async function seedRoster(page: Page, players: unknown[]): Promise<void> {
 			window.localStorage.setItem(arg.key, arg.value);
 		},
 		{ key: ROSTER_STORAGE_KEY, value: JSON.stringify({ version: 1, players }) },
+	);
+}
+
+// 種入歷史紀錄：外層容器 MUST 是 { version: 1, entries: [...] }（round-storage.ts 的
+// writeHistory() 寫入形狀），沿用 seedRoster 同一個 page.evaluate 一次性寫入的理由
+// （本檔的 HistoryCsvSection 匯出測試不需要 reload，但仍統一走一次性寫入以維持一致慣例）。
+async function seedHistory(page: Page, entries: unknown[]): Promise<void> {
+	await page.evaluate(
+		(arg: { key: string; value: string }) => {
+			window.localStorage.setItem(arg.key, arg.value);
+		},
+		{ key: HISTORY_STORAGE_KEY, value: JSON.stringify({ version: 1, entries }) },
 	);
 }
 
@@ -396,5 +411,84 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		expect(content).toHaveProperty("currentRound");
 		expect(content).toHaveProperty("history");
 		expect(content.players).toEqual(existingPlayers);
+	});
+
+	// M8 §8 修正輪（Stage 2 review Blocker B3）：HistoryCsvSection（歷史賽果 CSV 匯出）
+	// 完全零覆蓋。此 describe 固定裝置時區為 Asia/Taipei（UTC+8），並選一個在 UTC 與
+	// Asia/Taipei 屬於不同曆日的 playedAt（世界協調時 18:30 → 台北時間已跨入隔日
+	// 02:30），用來驗證 Decision 12（時區必須注入本地時區，SHALL NOT 用 UTC）——
+	// 斷言方式刻意不直接比對某個字面值時區換算結果（測試機時區會造成假紅燈），
+	// 改為比對 CSV 的「日期」欄與 /matchmaker/history 頁面同一筆記錄顯示的日期是否相等：
+	// 兩者都在同一個 page context（同一個被固定為 Asia/Taipei 的裝置時區）內產生，
+	// 若 HistoryCsvSection 誤把時區改回 UTC，兩者就會不一致並使斷言失敗。
+	test.describe("歷史賽果 CSV 匯出（固定裝置時區驗證 Decision 12）", () => {
+		test.use({ timezoneId: "Asia/Taipei" });
+
+		test("匯出歷史賽果 CSV 內容正確且日期與歷史頁顯示一致", async ({ page }) => {
+			await clearMatchmakerStorage(page);
+
+			const matchId = "e2e-data-transfer-history-csv-1";
+			await seedHistory(page, [
+				buildHistoryEntryFixture({
+					matchId,
+					teamAPlayer: { id: "p-history-csv-a", name: "CSV匯出球員A" },
+					teamBPlayer: { id: "p-history-csv-b", name: "CSV匯出球員B" },
+				}),
+			]);
+			// buildHistoryEntryFixture 的 playedAt 固定為「現在」，本測試需要跨曆日的
+			// 固定時間，改以 page.evaluate 直接覆寫剛種入的那一筆 playedAt。
+			await page.evaluate(
+				(arg: { key: string; matchId: string; playedAt: string }) => {
+					const raw = window.localStorage.getItem(arg.key);
+					if (raw === null) return;
+					const parsed = JSON.parse(raw) as {
+						version: number;
+						entries: { matchId: string; playedAt: string }[];
+					};
+					for (const entry of parsed.entries) {
+						if (entry.matchId === arg.matchId) {
+							entry.playedAt = arg.playedAt;
+						}
+					}
+					window.localStorage.setItem(arg.key, JSON.stringify(parsed));
+				},
+				{ key: HISTORY_STORAGE_KEY, matchId, playedAt: "2000-01-01T18:30:00.000Z" },
+			);
+
+			await page.goto(DATA_PAGE);
+
+			const [download] = await Promise.all([
+				page.waitForEvent("download"),
+				page.getByRole("button", { name: "匯出 CSV" }).click(),
+			]);
+
+			expect(download.suggestedFilename()).toMatch(/^matchmaker-history-\d{4}-\d{2}-\d{2}\.csv$/);
+
+			const downloadPath = await download.path();
+			expect(downloadPath).not.toBeNull();
+			const rawContent = readFileSync(downloadPath as string, "utf-8");
+			expect(rawContent.charCodeAt(0)).toBe(0xfeff);
+			const content = rawContent.slice(1);
+
+			const lines = content.split("\r\n");
+			const headerFields = lines[0]?.split(",") ?? [];
+			expect(headerFields).toEqual([...HISTORY_CSV_HEADERS]);
+
+			const dataRow = lines[1] ?? "";
+			expect(dataRow).toContain("CSV匯出球員A");
+			expect(dataRow).toContain("CSV匯出球員B");
+
+			const dateColumnIndex = HISTORY_CSV_HEADERS.indexOf("日期");
+			const csvDate = dataRow.split(",")[dateColumnIndex];
+
+			await page.goto(HISTORY_PAGE);
+			await page.getByRole("radio", { name: "更早" }).click();
+			const record = page.getByTestId(`history-record-${matchId}`);
+			await expect(record).toBeVisible();
+			const displayedDateTime = await record.locator("time").innerText();
+			const displayedDate = displayedDateTime.slice(0, 10).replaceAll("/", "-");
+
+			expect(csvDate).toBe(displayedDate);
+		});
 	});
 });
