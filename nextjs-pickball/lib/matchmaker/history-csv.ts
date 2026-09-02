@@ -177,6 +177,17 @@ export interface HistoryToCsvOptions {
 }
 
 /**
+ * 依注入的 exportedAt 產生匯出檔名。比照 backup.ts 的 backupFileName——
+ * SHALL NOT 內部呼叫 new Date()，內部產生會使回傳值每次不同，測試只能寬鬆斷言
+ * 而失去驗證力。HistoryCsvSection.tsx 原本把這段邏輯內聯在元件裡，與 backup.ts
+ * 已建立且有測試的作法各做一套（Final Review M3 裁決），故下沉到本模組。
+ */
+export function historyCsvFileName(exportedAt: string): string {
+	const date = exportedAt.slice(0, 10);
+	return `matchmaker-history-${date}.csv`;
+}
+
+/**
  * 把歷史賽果轉為 CSV 文字。標題列固定在前；歷史為空時仍輸出只有標題列的 CSV
  * （spec「歷史為空時仍輸出標題列」）。序列化（BOM、跳脫、換行）一律委派 csv.ts 的
  * toCsv，本函式只負責欄位對應。

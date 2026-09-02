@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { MatchHistoryEntry } from "./history";
 import type { DoublesComposition } from "./allocation-types";
 import { parseCsv } from "./csv";
-import { historyToCsv } from "./history-csv";
+import { historyCsvFileName, historyToCsv } from "./history-csv";
 
 /** 9.3.1 要求的標題列，逐字比對，順序固定。 */
 const HEADER_LINE =
@@ -240,5 +240,12 @@ describe("history-csv", () => {
 
 		expect(csvText.length).toBeGreaterThan(0);
 		expect(lines).toEqual([HEADER_LINE]);
+	});
+
+	// HistoryCsvSection.tsx 原本把檔名衍生邏輯內聯（`matchmaker-history-${...}.csv`），
+	// 與 backup.ts 的 backupFileName 各做一套。比照 backupFileName 的既有測試樣板
+	// （Final Review M3）：注入固定的 exportedAt，SHALL NOT 由本函式內部呼叫 new Date()。
+	it("historyCsvFileName 依注入時間產生含日期的檔名", () => {
+		expect(historyCsvFileName("2026-08-23T01:02:03.000Z")).toBe("matchmaker-history-2026-08-23.csv");
 	});
 });
