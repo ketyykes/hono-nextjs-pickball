@@ -143,12 +143,21 @@ Depends on: §0
       > `backup.ts` 與還原前 byte-for-byte 相同（`diff` 確認）。
 - [x] 2.4 GREEN: 補齊空資料路徑：空陣列與 `null` 皆為合法輸入，不進入任何錯誤分支
       （2.2 的實作已滿足，無需額外程式碼改動；見上方 2.3 的 mutation 證據）
-- [ ] 2.5 RED: 補 it「簽章以字串陣列寫入備份，JSON 往返後內容不變」：以簽章為 `Set` 的快照
+- [x] 2.5 RED: 補 it「簽章以字串陣列寫入備份，JSON 往返後內容不變」：以簽章為 `Set` 的快照
       呼叫 `buildBackup`，斷言 `backup.currentRound` 的三組簽章欄位皆為字串陣列，且
       `JSON.parse(JSON.stringify(backup))` 後內容相等。確認紅燈
-- [ ] 2.6 GREEN: 在 `buildBackup` 內把簽章的 `Set` 轉為**排序後**的字串陣列並寫回
+      > regression guard：型別安全要求 `BackupSnapshot` 從 2.2 起就要能同時接受
+      > `ReadonlySet<string>` 與字串陣列（見公開介面約定），2.2 為滿足此型別限制
+      > 已一併實作 Set→排序字串陣列的正規化，本 it 寫入即綠燈。
+      > 已用 mutation 驗證偵測力：暫時把 `buildBackup` 內三個 `seenSignatures` 欄位改為
+      > `snapshot.currentRound.seenSignatures as any`（跳過正規化，直接原樣寫入 Set），
+      > 本 it 立即轉紅（`AssertionError: expected false to be true` on
+      > `Array.isArray(backup.currentRound?.seenSignatures.teammateKeys)`）；
+      > 還原後重跑轉綠，`backup.ts` 與還原前逐位元組相同（`diff` 確認）。
+- [x] 2.6 GREEN: 在 `buildBackup` 內把簽章的 `Set` 轉為**排序後**的字串陣列並寫回
       `currentRound` 的對應欄位（design Decision 11：**不另設頂層 `signatures` 欄位**；
       排序是為了讓相同內容產生相同備份，便於 round-trip 斷言與 diff）
+      （2.2 的 `toSortedSignatureKeys` 已滿足，無需額外程式碼改動；見上方 2.5 的 mutation 證據）
 - [ ] 2.7 RED: 補 it「backupFileName 依注入時間產生含日期的檔名」：
       `exportedAt = "2026-08-23T01:02:03.000Z"` → `matchmaker-backup-2026-08-23.json`。確認紅燈
 - [ ] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`

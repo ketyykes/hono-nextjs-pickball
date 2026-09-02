@@ -154,4 +154,28 @@ describe("backup", () => {
 		expect(backup.currentRound).toBeNull();
 		expect(backup.history).toEqual([]);
 	});
+
+	it("簽章以字串陣列寫入備份，JSON 往返後內容不變", () => {
+		const round = makeRound();
+		const snapshot: BackupSnapshot = {
+			...makeSnapshot(),
+			currentRound: {
+				...round,
+				seenSignatures: {
+					teammateKeys: new Set(["p2|p1"]),
+					opponentKeys: new Set(["p3|p4", "p1|p2"]),
+					fullMatchKeys: new Set<string>(),
+				},
+			},
+		};
+
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		expect(Array.isArray(backup.currentRound?.seenSignatures.teammateKeys)).toBe(true);
+		expect(Array.isArray(backup.currentRound?.seenSignatures.opponentKeys)).toBe(true);
+		expect(Array.isArray(backup.currentRound?.seenSignatures.fullMatchKeys)).toBe(true);
+
+		const roundTripped = JSON.parse(JSON.stringify(backup));
+		expect(roundTripped).toEqual(backup);
+	});
 });
