@@ -589,4 +589,23 @@ describe("applyRosterImport", () => {
 		expect(updatedRoster[1]).toEqual(secondExistingPlayer);
 		expect(updatedRoster.slice(2).map((player) => player.name)).toEqual(["甲", "乙", "丙"]);
 	});
+
+	it("同名參賽者各自獨立建立，不靜默合併", () => {
+		const csv = [HEADER_LINE, "王小明,male,5.5,,"].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const existingRoster: Player[] = [{ ...EXISTING_PLAYER, id: "existing-1", name: "王小明" }];
+		const updatedRoster = applyRosterImport(existingRoster, parsed, {
+			ids: ["imported-1"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		const wangs = updatedRoster.filter((player) => player.name === "王小明");
+		expect(wangs).toHaveLength(2);
+		expect(wangs[0].id).not.toBe(wangs[1].id);
+	});
 });
