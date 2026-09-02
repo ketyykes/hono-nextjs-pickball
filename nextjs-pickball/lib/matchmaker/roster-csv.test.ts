@@ -216,6 +216,100 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
+	 * Stage 2 review Major M2：唯一的結構性錯誤測試只拿掉「強度分數」，
+	 * 「名稱」「性別」是否同為必填欄從未被驗證過——若日後有人不慎把「名稱」
+	 * 移出必填清單，缺名稱欄的 CSV 會退化成「每一列都報一次名稱不可為空白」
+	 * （正是 5.10 早退設計要避免的刷屏），但測試不會轉紅。此處改為遍歷三個
+	 * 必填欄，逐一拿掉一欄並斷言整份拒絕、訊息指出正確欄位名稱。
+	 */
+	it("缺少任一必填標題欄時皆整份拒絕並指出該欄位名稱", () => {
+		const allHeaders = [
+			ROSTER_CSV_HEADERS.name,
+			ROSTER_CSV_HEADERS.gender,
+			ROSTER_CSV_HEADERS.rating,
+			ROSTER_CSV_HEADERS.colorFrom,
+			ROSTER_CSV_HEADERS.colorTo,
+		];
+		const requiredHeaders = [ROSTER_CSV_HEADERS.name, ROSTER_CSV_HEADERS.gender, ROSTER_CSV_HEADERS.rating];
+
+		requiredHeaders.forEach((missingHeader) => {
+			const remainingHeaders = allHeaders.filter((header) => header !== missingHeader);
+			const csv = [remainingHeaders.join(","), "甲,male,5.0,,"].join("\r\n");
+
+			const result = parseRosterCsv(csv);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) {
+				throw new Error("unreachable");
+			}
+			expect(result.message).toContain(missingHeader);
+		});
+	});
+
+	/**
+	 * Stage 2 review Major M2：把「顏色起點」誤加進必填清單會讓「只有三個必填欄、
+	 * 沒有顏色欄」的極簡 CSV 整份被拒——這條主流程從未被測過。此處補上正向測試，
+	 * 確認顏色兩欄確實是選填。
+	 */
+	it("只有三個必填標題欄、沒有顏色欄時仍可正常解析", () => {
+		const csv = [
+			[ROSTER_CSV_HEADERS.name, ROSTER_CSV_HEADERS.gender, ROSTER_CSV_HEADERS.rating].join(","),
+			"甲,male,5.0",
+			"乙,female,6.0",
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0 },
+			{ name: "乙", gender: "female", rating: 6.0 },
+		]);
+	});
+
+	/**
+	 * Stage 2 review Minor m3：資料列欄位數少於標題數時，缺席的欄位（非顯式空字串，
+	 * 而是陣列索引超界）MUST 視為空白，不可帶入任何非空預設值——否則會靜默偽造
+	 * 出使用者從未填寫的資料。用只有名稱一欄的資料列隔離出「性別」欄位缺席的情況。
+	 */
+	it("資料列欄位數少於標題數時，缺席的欄位視為空白而非其他預設值", () => {
+		const csv = [HEADER_LINE, "甲"].join("\r\n"); // 只有名稱欄，其餘四欄整個缺席
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([]);
+		expect(result.errors).toEqual([
+			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringContaining("性別") },
+			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("數字") },
+		]);
+	});
+
+	/**
+	 * Stage 2 review Minor m3（stage2 報告原文情境）：資料列只有三欄、尾端顏色兩欄
+	 * 整個缺席（非顯式空字串）時，MUST 視為未填色而正常匯入，不可報錯。
+	 */
+	it("資料列只有三欄、尾端顏色欄被截斷時仍可正常匯入", () => {
+		const csv = [HEADER_LINE, "甲,male,5.0"].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([{ name: "甲", gender: "male", rating: 5.0 }]);
+	});
+
+	/**
 	 * Stage 2 review Major M1：標題名稱前後若帶有多餘空白（使用者複製貼上／試算表
 	 * 匯出時常見），現行 `indexOf` 精確比對會全部找不到，回傳「三欄全缺」的
 	 * 結構性錯誤——但使用者眼中的標題列明明白白寫著這三個欄位，訊息謊報缺欄位。
