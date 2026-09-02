@@ -63,6 +63,86 @@ const REQUIRED_HEADERS: readonly string[] = [
 	ROSTER_CSV_HEADERS.rating,
 ];
 
+/**
+ * 單一欄位驗證的統一形狀：合法時帶正規化後的值，不合法時帶繁體中文原因。
+ * 五個欄位各自的驗證函式皆回傳這個形狀，讓呼叫端（collectField）用同一套
+ * 邏輯組裝 RosterCsvRowError，不必五段各寫各的錯誤組裝（task 5.13）。
+ */
+type FieldValidation<T> =
+	| { readonly valid: true; readonly value: T }
+	| { readonly valid: false; readonly reason: string };
+
+/** 名稱：trim 後不可為空白。 */
+function validateName(raw: string): FieldValidation<string> {
+	const value = raw.trim();
+	if (value === "") {
+		return { valid: false, reason: "名稱不可為空白" };
+	}
+	return { valid: true, value };
+}
+
+/** 性別：trim + toLowerCase 後查 GENDER_LOOKUP，查無對應值視為錯誤而非回退為 other。 */
+function validateGender(raw: string): FieldValidation<Gender> {
+	const normalized = raw.trim().toLowerCase();
+	const gender = GENDER_LOOKUP[normalized];
+	if (gender === undefined) {
+		return {
+			valid: false,
+			reason: "性別無法辨識，請填入常見寫法（男／女／其他等）",
+		};
+	}
+	return { valid: true, value: gender };
+}
+
+/** 強度分數：1.00～8.00 的數字；非數字與超出範圍是兩種不同的錯誤原因。 */
+function validateRating(raw: string): FieldValidation<number> {
+	const trimmed = raw.trim();
+	const value = Number(trimmed);
+	if (trimmed === "" || Number.isNaN(value)) {
+		return { valid: false, reason: "強度分數需為數字" };
+	}
+	if (value < RATING_MIN || value > RATING_MAX) {
+		return {
+			valid: false,
+			reason: `強度分數需介於 ${RATING_MIN}.00 至 ${RATING_MAX}.00 之間`,
+		};
+	}
+	return { valid: true, value };
+}
+
+/**
+ * 顏色欄（起點／終點共用）：選填，空字串視為「未提供」而非錯誤——
+ * 是否要因為「只給一端」而整組回退為未指定，由呼叫端依 design Decision 9 判斷，
+ * 本函式只負責「有填時格式是否合法」。
+ */
+function validateOptionalHexColor(raw: string, invalidReason: string): FieldValidation<string> {
+	const value = raw.trim();
+	if (value === "") {
+		return { valid: true, value: "" };
+	}
+	if (!HEX_COLOR_PATTERN.test(value)) {
+		return { valid: false, reason: invalidReason };
+	}
+	return { valid: true, value };
+}
+
+/**
+ * 依驗證結果組裝該列的錯誤（不合法時推入 rowErrors）並回傳正規化後的值；
+ * 五個欄位共用同一組裝邏輯，避免各自重複「合法取值、不合法推錯誤」的樣板。
+ */
+function collectField<T>(
+	rowErrors: RosterCsvRowError[],
+	row: number,
+	column: string,
+	validation: FieldValidation<T>,
+): T | undefined {
+	if (validation.valid) {
+		return validation.value;
+	}
+	rowErrors.push({ row, column, reason: validation.reason });
+	return undefined;
+}
+
 export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const table = parseCsv(text);
 	const headerRow = table[0] ?? [];
@@ -96,65 +176,49 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 		const spreadsheetRow = dataIndex + 2;
 		const rowErrors: RosterCsvRowError[] = [];
 
-		const name = (dataRow[nameIndex] ?? "").trim();
-		if (name === "") {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.name,
-				reason: "名稱不可為空白",
-			});
-		}
-
-		const genderRaw = (dataRow[genderIndex] ?? "").trim().toLowerCase();
-		const gender = GENDER_LOOKUP[genderRaw];
-		if (gender === undefined) {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.gender,
-				reason: "性別無法辨識，請填入常見寫法（男／女／其他等）",
-			});
-		}
-
-		const ratingRaw = (dataRow[ratingIndex] ?? "").trim();
-		const rating = Number(ratingRaw);
-		if (ratingRaw === "" || Number.isNaN(rating)) {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.rating,
-				reason: "強度分數需為數字",
-			});
-		} else if (rating < RATING_MIN || rating > RATING_MAX) {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.rating,
-				reason: `強度分數需介於 ${RATING_MIN}.00 至 ${RATING_MAX}.00 之間`,
-			});
-		}
-
-		const colorFrom = (dataRow[colorFromIndex] ?? "").trim();
-		const colorTo = (dataRow[colorToIndex] ?? "").trim();
-		if (colorFrom !== "" && !HEX_COLOR_PATTERN.test(colorFrom)) {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.colorFrom,
-				reason: "顏色起點格式錯誤，須為 #RRGGBB",
-			});
-		}
-		if (colorTo !== "" && !HEX_COLOR_PATTERN.test(colorTo)) {
-			rowErrors.push({
-				row: spreadsheetRow,
-				column: ROSTER_CSV_HEADERS.colorTo,
-				reason: "顏色終點格式錯誤，須為 #RRGGBB",
-			});
-		}
+		const name = collectField(
+			rowErrors,
+			spreadsheetRow,
+			ROSTER_CSV_HEADERS.name,
+			validateName(dataRow[nameIndex] ?? ""),
+		);
+		const gender = collectField(
+			rowErrors,
+			spreadsheetRow,
+			ROSTER_CSV_HEADERS.gender,
+			validateGender(dataRow[genderIndex] ?? ""),
+		);
+		const rating = collectField(
+			rowErrors,
+			spreadsheetRow,
+			ROSTER_CSV_HEADERS.rating,
+			validateRating(dataRow[ratingIndex] ?? ""),
+		);
+		const colorFrom = collectField(
+			rowErrors,
+			spreadsheetRow,
+			ROSTER_CSV_HEADERS.colorFrom,
+			validateOptionalHexColor(dataRow[colorFromIndex] ?? "", "顏色起點格式錯誤，須為 #RRGGBB"),
+		);
+		const colorTo = collectField(
+			rowErrors,
+			spreadsheetRow,
+			ROSTER_CSV_HEADERS.colorTo,
+			validateOptionalHexColor(dataRow[colorToIndex] ?? "", "顏色終點格式錯誤，須為 #RRGGBB"),
+		);
 
 		if (rowErrors.length > 0) {
 			errors.push(...rowErrors);
 			return;
 		}
 
-		// 走到這裡代表本列所有欄位皆合法，gender 必已在 GENDER_LOOKUP 中查得到。
-		const row: RosterCsvRow = { name, gender: gender as Gender, rating };
+		// 走到這裡代表本列所有欄位皆合法，collectField 必已回傳定義值
+		// （rowErrors 為空代表五個欄位皆未觸發 undefined 分支）。
+		const row: RosterCsvRow = {
+			name: name as string,
+			gender: gender as Gender,
+			rating: rating as number,
+		};
 		// 顏色兩端同進同出（design Decision 9）：只給一端時兩端皆不帶入，
 		// 交由 addPlayer 走自動配色，不在本模組另寫顏色判定。
 		if (colorFrom !== "" && colorTo !== "") {
