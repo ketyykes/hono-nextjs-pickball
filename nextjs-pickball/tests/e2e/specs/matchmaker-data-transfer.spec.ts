@@ -277,4 +277,91 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByRole("button", { name: "新增第一位參賽者" })).toBeVisible();
 		await expect(page.getByText("清除確認員", { exact: true })).toHaveCount(0);
 	});
+
+	// M8 §8 修正輪（Stage 2 review Blocker B1）：JSON 匯入失敗（parseBackup 回 ok:false）
+	// 完全零覆蓋，含「是否誤 reload」。餵入語法錯誤的 JSON，斷言錯誤訊息顯示、名單不變、
+	// 且沒有誤觸發 location.reload()——若誤 reload，component state（message）會被清空，
+	// 畫面上的 alert 會消失，故等待一段時間後再次確認 alert 仍可見即可證明沒有誤 reload。
+	// 用 `p[role="alert"]` 而非 `getByRole("alert")`：Next.js 的
+	// `#__next-route-announcer__` 本身也帶 role="alert"，直接用 role 選會撞成 strict
+	// mode violation（兩個符合的元素）。
+	test("匯入語法錯誤的 JSON 備份時顯示錯誤訊息且不寫入不誤 reload", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		const existingPlayers = [buildPlayerFixture({ id: "p-json-invalid-existing", name: "JSON錯誤既有員" })];
+		await seedRoster(page, existingPlayers);
+
+		await page.goto(DATA_PAGE);
+
+		await page.getByTestId("json-backup-import-input").setInputFiles({
+			name: "broken-backup.json",
+			mimeType: "application/json",
+			buffer: Buffer.from("{ 這不是合法的 JSON"),
+		});
+
+		const alert = page.locator('p[role="alert"]');
+		await expect(alert).toBeVisible();
+		await expect(alert.getByText("不是合法的 JSON 格式", { exact: false })).toBeVisible();
+
+		// 誤 reload 防護：等待一段時間後訊息仍留在畫面上。
+		await page.waitForTimeout(500);
+		await expect(alert).toBeVisible();
+
+		const storedRosterAfterFailedImport = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROSTER_STORAGE_KEY,
+		);
+		expect(storedRosterAfterFailedImport).toBe(JSON.stringify({ version: 1, players: existingPlayers }));
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("JSON錯誤既有員", { exact: true })).toBeVisible();
+		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
+
+	// M8 §8 修正輪（Stage 2 review Blocker B1，mutant M3）：writeBackup 回 ok:false
+	// （LocalStorage 寫入拋例外，如配額超出）的分支同樣零覆蓋。以
+	// window.localStorage.setItem 抽換成拋例外版本，模擬 writeBackup 內
+	// try/catch 捕捉到的邊界情境；此抽換只存在於目前的 page context（page.evaluate，
+	// 非 addInitScript），若元件誤觸發 location.reload() 會產生全新 document、
+	// 抽換自動失效，之後的 page.goto 用的是原生 setItem，不影響後續斷言的可靠性。
+	test("LocalStorage 寫入失敗時 JSON 匯入不誤 reload 且顯示訊息", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		const existingPlayers = [
+			buildPlayerFixture({ id: "p-json-writefail-existing", name: "JSON寫入失敗既有員" }),
+		];
+		await seedRoster(page, existingPlayers);
+
+		await page.goto(DATA_PAGE);
+
+		await page.evaluate(() => {
+			window.localStorage.setItem = () => {
+				throw new DOMException("模擬 LocalStorage 配額超出", "QuotaExceededError");
+			};
+		});
+
+		const backup = {
+			version: 1,
+			players: [buildPlayerFixture({ id: "p-writefail-import", name: "寫入失敗匯入員" })],
+			currentRound: null,
+			history: [],
+		};
+		await page.getByTestId("json-backup-import-input").setInputFiles({
+			name: "matchmaker-backup-writefail.json",
+			mimeType: "application/json",
+			buffer: Buffer.from(JSON.stringify(backup)),
+		});
+
+		const alert = page.locator('p[role="alert"]');
+		await expect(alert).toBeVisible();
+		await expect(alert.getByText("已超出瀏覽器的容量上限", { exact: false })).toBeVisible();
+
+		// 誤 reload 防護：等待一段時間後訊息仍留在畫面上。
+		await page.waitForTimeout(500);
+		await expect(alert).toBeVisible();
+
+		// 確認沒有誤 reload、既有名單未受影響——page.goto 會建立全新 document，
+		// 前面抽換的 setItem 自動失效，讀到的是真正的 LocalStorage 內容。
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("JSON寫入失敗既有員", { exact: true })).toBeVisible();
+		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
 });
