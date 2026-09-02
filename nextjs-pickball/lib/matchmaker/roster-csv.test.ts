@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseRosterCsv, ROSTER_CSV_HEADERS } from "./roster-csv";
+import { applyRosterImport, parseRosterCsv, ROSTER_CSV_HEADERS } from "./roster-csv";
+import type { Player } from "./types";
 
 /** 標題列文字，欄位順序依 ROSTER_CSV_HEADERS 的既定順序。 */
 const HEADER_LINE = [
@@ -521,5 +522,45 @@ describe("parseRosterCsv", () => {
 			{ row: 3, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringContaining("性別") },
 			{ row: 5, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("1.00") },
 		]);
+	});
+});
+
+/** applyRosterImport 測試共用的既有參賽者固定資料，欄位皆為任意但合法的值。 */
+const EXISTING_PLAYER: Player = {
+	id: "existing-1",
+	name: "既有球員",
+	gender: "male",
+	colorFrom: "#0E6B63",
+	colorTo: "#134E4A",
+	rating: 5.0,
+	restCount: 0,
+	gamesPlayed: 0,
+	isActive: true,
+	createdAt: "2025-01-01T00:00:00.000Z",
+};
+
+describe("applyRosterImport", () => {
+	it("任一列驗證失敗時整份不匯入，名單完全不變", () => {
+		// 4 筆中第 3 筆強度分數 12 超出範圍，其餘 3 筆皆合法。
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,,",
+			"乙,female,4.0,,",
+			"丙,male,12,,",
+			"丁,other,5.0,,",
+		].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const existingRoster: Player[] = [EXISTING_PLAYER];
+		const updatedRoster = applyRosterImport(existingRoster, parsed, {
+			ids: parsed.rows.map((_, index) => `imported-${index}`),
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		expect(updatedRoster).toEqual(existingRoster);
 	});
 });

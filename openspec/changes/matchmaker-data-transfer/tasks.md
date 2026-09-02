@@ -274,8 +274,9 @@ Depends on: §5
 - [x] 6.2 GREEN（同上，已於 6.1 前提前完成）: `parseRosterCsv` 的回傳形狀本身即為預覽所需
       （可新增列數 = `rows.length`、問題列清單 = `errors`），未另立第二種只為 UI 服務的
       回傳型別
-- [ ] 6.3 RED: 補 it「任一列驗證失敗時整份不匯入，名單完全不變」：
-      4 筆中第 3 筆 rating `12` → 回傳名單與原名單逐筆相等。確認紅燈
+- [x] 6.3 RED: 補 it「任一列驗證失敗時整份不匯入，名單完全不變」：
+      4 筆中第 3 筆 rating `12` → 回傳名單與原名單逐筆相等。**真紅燈**：
+      `TypeError: applyRosterImport is not a function`（函式尚未存在）
 - [ ] 6.4 GREEN: 實作 `applyRosterImport(roster, rows, { ids, now })`：
       有任一錯誤列時**直接回傳原名單**（不進入迴圈），
       `ids.length` 與 `rows.length` 不符時視為呼叫端錯誤並拋出可判讀訊息
