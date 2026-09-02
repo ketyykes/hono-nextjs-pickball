@@ -441,15 +441,25 @@ describe("backup", () => {
 	it("所有錯誤訊息為繁體中文且各自包含可採取的修正方式", () => {
 		// 遍歷整張表而非手抄清單——§7 之後會再往 TRANSFER_MESSAGES 追加訊息，
 		// 手抄清單會讓新訊息漏檢查也不會紅（design Decision 1）。
+		//
+		// 原本的 /請[^。]*[。]?/ 幾乎恆真（[。]? 是 optional、[^。]* 可為空，等價於
+		// 「字串裡有一個請字」），退化成 "JSON。請"、"請"、"參賽者。請" 之類的殘缺
+		// 訊息也會通過。改為四項可執行的斷言（M8 §3 Stage 2 review J2 裁決）：
 		const messages = Object.values(TRANSFER_MESSAGES);
 
 		expect(messages.length).toBeGreaterThan(0);
 
 		for (const message of messages) {
-			// 不含未翻譯的 zod 原始 issue 字串（§11：不得只顯示技術錯誤碼）。
+			const segments = message.split("。").filter(Boolean);
+
+			// (a) 三段式：「發生了什麼」「目前資料狀態」「下一步」至少三段。
+			expect(segments.length).toBeGreaterThanOrEqual(3);
+			// (b) 下一步指引在最後一段開頭，而非出現在字串中任意位置。
+			expect(segments[segments.length - 1]?.startsWith("請")).toBe(true);
+			// (c) 避免退化為單純的關鍵字堆砌。
+			expect(message.length).toBeGreaterThanOrEqual(30);
+			// (d) 不含未翻譯的 zod 原始 issue 字串（§11：不得只顯示技術錯誤碼）。
 			expect(message).not.toMatch(/Invalid input|Expected|Required/i);
-			// 含「請」字開頭的下一步指引。
-			expect(message).toMatch(/請[^。]*[。]?/);
 		}
 	});
 });
