@@ -202,6 +202,21 @@ async function seedRoster(page: Page, count: number): Promise<void> {
 	);
 }
 
+// 取得整份 LocalStorage 的快照。唯讀保證的 spec 文字是「MUST NOT 修改……或**任何**
+// LocalStorage 資料」，因此比對範圍必須是整份而非單一 key——只比對 matchmaker:round:v1
+// 的話，「寫別的 key」「刪掉某個 key」「新增全新 key」三種違規都會靜默通過。
+async function snapshotLocalStorage(page: Page): Promise<Record<string, string>> {
+	return page.evaluate(() => {
+		const snapshot: Record<string, string> = {};
+		for (let index = 0; index < window.localStorage.length; index++) {
+			const key = window.localStorage.key(index);
+			if (key === null) continue;
+			snapshot[key] = window.localStorage.getItem(key) ?? "";
+		}
+		return snapshot;
+	});
+}
+
 // §9 tasks 9.3：把「種名單 + 產生一輪」這段各 test 重複的前置動作收斂為單一 helper。
 // 回合格式來源為 M4 的 `matchmaker:round:v1`，改動請同步。
 // 能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態（球員名單本身沒有
@@ -461,33 +476,25 @@ test.describe("/matchmaker 匯出功能", () => {
 	test("匯出 JPG 後目前回合與本機資料保持不變", async ({ page }) => {
 		await gotoMatchmakerWithRound(page, 2);
 
-		const roundBeforeExport = await page.evaluate(
-			(key) => window.localStorage.getItem(key),
-			ROUND_STORAGE_KEY,
-		);
-		expect(roundBeforeExport).not.toBeNull();
+		// 比對**整份** LocalStorage 而非只挑 matchmaker:round:v1：spec 的文字是
+		// 「MUST NOT 修改參賽者名單、目前回合、歷史紀錄或**任何** LocalStorage 資料」，
+		// 只比對單一 key 會漏掉「寫別的 key」「刪掉某個 key」「新增全新 key」三種違規
+		// （審查實測：這三種在單 key 比對下全部綠燈）。
+		const storageBeforeExport = await snapshotLocalStorage(page);
+		// 前置條件：回合確實已存在，否則後面比對的是兩份空快照，測試會空洞通過。
+		expect(storageBeforeExport[ROUND_STORAGE_KEY]).toBeDefined();
 
-		const [download] = await Promise.all([
+		await Promise.all([
 			page.waitForEvent("download"),
 			page.getByRole("button", { name: "匯出 JPG" }).click(),
 		]);
-		void download;
 
-		const roundAfterExport = await page.evaluate(
-			(key) => window.localStorage.getItem(key),
-			ROUND_STORAGE_KEY,
-		);
-		expect(roundAfterExport).toBe(roundBeforeExport);
+		expect(await snapshotLocalStorage(page)).toEqual(storageBeforeExport);
 
-		// 重新整理後再確認一次（spec 的 AND）：這裡直接比對整份 matchmaker:round:v1
-		// 的原始內容，而非只挑幾個欄位——場地數、場次狀態與比分全部包在這份 JSON 裡，
-		// 內容逐位元組相同即代表這三者都未被改動。
+		// 重新整理後再確認一次（spec 的 AND）：場地數、場次狀態與比分全部包在
+		// matchmaker:round:v1 這份 JSON 裡，整份快照逐鍵逐值相同即代表三者都未被改動。
 		await page.reload();
-		const roundAfterReload = await page.evaluate(
-			(key) => window.localStorage.getItem(key),
-			ROUND_STORAGE_KEY,
-		);
-		expect(roundAfterReload).toBe(roundBeforeExport);
+		expect(await snapshotLocalStorage(page)).toEqual(storageBeforeExport);
 	});
 
 	// §9：匯出 MUST 完全在瀏覽器本機完成，不得將參賽者資料送往後端或第三方服務
@@ -504,26 +511,40 @@ test.describe("/matchmaker 匯出功能", () => {
 		// 那些不是「匯出動作發出的請求」，故等頁面完全靜止後才開始計數。
 		await page.waitForLoadState("networkidle");
 
-		// 只計 fetch／XHR：spec 的 THEN 明訂「未發出任何 fetch 或 XHR 請求」，排除
-		// WebSocket（HMR）等其他資源型別的雜訊，避免過濾範圍太窄而漏掉真正的違規，
-		// 也避免太寬而把無關噪音誤判為違規（leader 裁決 2）。
-		let requestCount = 0;
+		// 用 URL 黑名單而非 resourceType 白名單。spec 的 THEN 雖只列 fetch 與 XHR，
+		// 但 Requirement 正文是「SHALL NOT 將**任何**參賽者資料送往後端或第三方服務」，
+		// 且 design Decision 1 明言「這條 e2e 就是那個決策的自動化防線」。審查實測：
+		// 只認 fetch／xhr 的話，navigator.sendBeacon（resourceType 為 **ping**，POST，
+		// body 可夾帶全部姓名與比分）與 new Image().src（resourceType 為 image）
+		// 這兩種最常見的外洩手法可以直接繞過防線。
+		// 排除項只有 Next.js 的建置產物與 RSC payload——實測 networkidle 之後，
+		// 匯出路徑的 await document.fonts.ready 仍會補一筆
+		// /_next/static/media/*.woff2，那不是「匯出把資料送出去」。
+		const IGNORED_REQUEST_URL = /\/_next\/|[?&]_rsc=|^data:|^blob:/;
+		// 記錄違規清單而非計數：失敗訊息才能直接指出是哪一個 URL 把資料送了出去。
+		const offendingRequests: string[] = [];
 		page.on("request", (request) => {
-			const resourceType = request.resourceType();
-			if (resourceType === "fetch" || resourceType === "xhr") {
-				requestCount += 1;
-			}
+			if (request.resourceType() === "websocket") return;
+			const url = request.url();
+			if (IGNORED_REQUEST_URL.test(url)) return;
+			offendingRequests.push(`${request.resourceType()} ${request.method()} ${url}`);
 		});
 
-		const [download] = await Promise.all([
+		await Promise.all([
 			page.waitForEvent("download"),
 			page.getByRole("button", { name: "匯出 JPG" }).click(),
 		]);
-		void download;
 
 		await page.getByRole("button", { name: "列印 PDF" }).click();
 
-		expect(requestCount).toBe(0);
+		// 留一段沉澱時間再斷言：fire-and-forget 的外洩（例如在 setTimeout 或
+		// Promise 尾巴才送出）在點擊當下還沒發生，立即斷言會讓它逃掉。
+		await page.waitForTimeout(1000);
+
+		expect(
+			offendingRequests,
+			`匯出過程 MUST NOT 發出任何請求，實際發出：\n${offendingRequests.join("\n")}`,
+		).toEqual([]);
 	});
 
 	// §9：兩個匯出入口 MUST 具備可辨識的文字或 aria-label，且 MUST 可由鍵盤操作
