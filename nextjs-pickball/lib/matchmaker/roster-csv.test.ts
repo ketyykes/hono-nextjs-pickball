@@ -214,4 +214,50 @@ describe("parseRosterCsv", () => {
 		}
 		expect(result.message).toContain(ROSTER_CSV_HEADERS.rating);
 	});
+
+	it("只提供顏色起點或終點其中一端時整組改走自動配色", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,#FF0000,", // 只給起點
+			"乙,male,5.0,,#00FF00", // 只給終點
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0 },
+			{ name: "乙", gender: "male", rating: 5.0 },
+		]);
+	});
+
+	/**
+	 * 補充測試（非六條必要測試之一）：顏色欄的四種組合（只給起點／只給終點／
+	 * 兩端都給／兩端都空）皆需覆蓋，5.11 只驗證了前兩種，此處補上「兩端都給」
+	 * 與「兩端都空」，避免 addPlayer 一定會收到的 colorFrom／colorTo 賦值分支
+	 * 零覆蓋（Stage 2 mutation 教訓）。
+	 */
+	it("顏色兩端都提供時整組帶入、兩端都空白時維持未指定", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,#FF0000,#00FF00", // 兩端都給
+			"乙,male,5.0,,", // 兩端都空
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0, colorFrom: "#FF0000", colorTo: "#00FF00" },
+			{ name: "乙", gender: "male", rating: 5.0 },
+		]);
+	});
 });
