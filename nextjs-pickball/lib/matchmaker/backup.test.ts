@@ -287,4 +287,19 @@ describe("backup", () => {
 			expect(result.backup).toEqual(backup);
 		}
 	});
+
+	it("JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯", () => {
+		let result: ReturnType<typeof parseBackup> | undefined;
+
+		// SHALL NOT 拋出例外——拋例外會讓整頁白畫面，是最糟的失敗模式（design Risks）。
+		expect(() => {
+			result = parseBackup("{ 不是合法 JSON");
+		}).not.toThrow();
+
+		expect(result?.ok).toBe(false);
+		if (result && !result.ok) {
+			expect(result.message).toMatch(/JSON/);
+			expect(result.message).toMatch(/[一-鿿]/);
+		}
+	});
 });
