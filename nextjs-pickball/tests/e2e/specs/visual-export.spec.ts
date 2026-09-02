@@ -292,4 +292,91 @@ test.describe("/matchmaker 匯出功能", () => {
 			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
 		).toEqual([]);
 	});
+
+	// §8：列印流程與 print CSS（tasks 8.1）。
+
+	test("點擊列印 PDF 會呼叫瀏覽器列印一次", async ({ page }) => {
+		const consoleIssues = trackConsoleIssues(page);
+
+		// 覆寫 window.print 為記錄呼叫次數的 stub，MUST 在頁面任何 script 執行前注入。
+		// ExportActions.handlePrint 是在點擊當下才以 `printer ?? window.print?.bind(window)`
+		// 取得列印函式（見該檔），故此處覆寫對「點擊當下」仍然有效。
+		await page.addInitScript(() => {
+			const win = window as unknown as { __printCallCount: number };
+			win.__printCallCount = 0;
+			window.print = () => {
+				win.__printCallCount += 1;
+			};
+		});
+
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		await page.getByRole("button", { name: "列印 PDF" }).click();
+
+		const callCount = await page.evaluate(
+			() => (window as unknown as { __printCallCount: number }).__printCallCount,
+		);
+		expect(callCount).toBe(1);
+
+		expect(
+			consoleIssues,
+			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
+		).toEqual([]);
+	});
+
+	test("列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		await page.emulateMedia({ media: "print" });
+
+		// 全站導覽（app/layout.tsx 的 SiteNavbar，渲染出 body 直接子節點 <header>）。
+		await expect(page.locator("body > header")).toBeHidden();
+
+		// M7／M8 之後的區段導覽（裁決 3）：nav 本身與其四個分頁連結（對戰／參賽者／
+		// 歷史／資料）逐一斷言，而非只驗 nav 元素本身——nav 隱藏不代表連結本身
+		// 沒有各自被其他規則影響到可見性。
+		const sectionNav = page.locator('nav[aria-label="對戰分配區段導覽"]');
+		await expect(sectionNav).toBeHidden();
+		for (const label of ["對戰", "參賽者", "歷史", "資料"]) {
+			await expect(sectionNav.getByRole("link", { name: label, exact: true })).toBeHidden();
+		}
+
+		// 對戰頁的操作控制項（data-print="hide"）：頁面標題區、匯出入口、
+		// RoundControls 包裝、對戰舞台區。
+		await expect(page.getByRole("heading", { name: "對戰分配", exact: true })).toBeHidden();
+		await expect(page.getByRole("button", { name: "匯出 JPG" })).toBeHidden();
+		await expect(page.getByRole("button", { name: "列印 PDF" })).toBeHidden();
+		await expect(page.getByTestId("match-stage-region")).toBeHidden();
+
+		// 列印版內容為可見。
+		await expect(page.locator('[data-print="sheet"]')).toBeVisible();
+	});
+
+	test("列印版的每個場地區塊設定為不跨頁切斷", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		await page.emulateMedia({ media: "print" });
+
+		const breakInside = await page
+			.locator('[data-print="court"]')
+			.first()
+			.evaluate((element) => getComputedStyle(element).breakInside);
+		expect(breakInside).toBe("avoid");
+	});
+
+	// self-review checklist 額外驗收：@media print 的規則以 body:has([data-print="sheet"])
+	// 收斂，SHALL NOT 外溢到 matchmaker 以外的路由——在沒有 PrintSheet 的首頁驗證
+	// navbar 於列印媒體下仍可見。
+	test("非 matchmaker 路由的全站導覽不受列印樣式影響", async ({ page }) => {
+		await page.goto("/");
+		await page.emulateMedia({ media: "print" });
+
+		await expect(page.locator("body > header")).toBeVisible();
+	});
 });

@@ -6,6 +6,7 @@ import { EmptyStage } from "@/components/matchmaker/EmptyStage";
 import { ExportActions } from "@/components/matchmaker/ExportActions";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError } from "@/components/matchmaker/MatchStage";
+import { PrintSheet } from "@/components/matchmaker/PrintSheet";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
@@ -128,16 +129,24 @@ export default function MatchmakerPage() {
 
 	return (
 		<main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-			<div>
+			{/* §8：頁面標題區在列印時隱藏——PrintSheet 已自帶一個 <h1>{scene.title}</h1>，
+			    若不隱藏會讓紙本同頁出現兩個 <h1>（leader 裁決 1）。 */}
+			<div data-print="hide">
 				<h1 className="text-2xl font-bold">對戰分配</h1>
 				<p className="text-sm text-muted-foreground">安排場地、產生本輪對戰並記錄比分。</p>
 			</div>
 
-			<ExportActions scene={exportScene} fileName={exportFileName} exportJpg={downloadSceneAsJpeg} />
+			{/* §8：匯出入口是操作控制項，列印時應隱藏，改由紙本自己的列印版取代（裁決 5）。
+			    ExportActions 本身不接受 className／data 屬性，故以包裝 div 承載
+			    data-print="hide"，而非改動 ExportActions.tsx（不在本組可動檔案清單內）。 */}
+			<div data-print="hide">
+				<ExportActions scene={exportScene} fileName={exportFileName} exportJpg={downloadSceneAsJpeg} />
+			</div>
 
 			{roundError !== null && (
 				<div
 					role="alert"
+					data-print="hide"
 					className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
 				>
 					{roundError}
@@ -149,8 +158,13 @@ export default function MatchmakerPage() {
 			    是次要控制項，本 change 刻意不擴大範圍（leader 裁決）。RoundControls.tsx
 			    不在可動檔案清單內，改由本層以 CSS 選擇器精準只挑出「無 role 也無
 			    aria-label」的按鈕——這正好排除所有 radio（帶 role="radio"）與圖示按鈕
-			    （帶 aria-label），只命中「產生本輪對戰」「重設／再排」這兩顆。 */}
-			<div className="max-md:[&_button:not([role]):not([aria-label])]:min-h-11">
+			    （帶 aria-label），只命中「產生本輪對戰」「重設／再排」這兩顆。
+			    §8：這顆包裝 div 同時也是 RoundControls 的操作控制項容器，列印時隱藏
+			    （裁決 5）。 */}
+			<div
+				data-print="hide"
+				className="max-md:[&_button:not([role]):not([aria-label])]:min-h-11"
+			>
 				<RoundControls
 					settings={settings}
 					onSettingsChange={setSettings}
@@ -163,7 +177,9 @@ export default function MatchmakerPage() {
 				/>
 			</div>
 
-			<div data-testid="match-stage-region">
+			{/* §8：舞台區是螢幕版的對戰畫面（比分輸入等互動），列印時由下方的 PrintSheet
+			    取代，故隱藏（裁決 5）。 */}
+			<div data-testid="match-stage-region" data-print="hide">
 				{round === null ? (
 					<EmptyStage hasActivePlayers={hasActivePlayers} onGenerate={() => handleGenerate(settings)} />
 				) : (
@@ -177,6 +193,12 @@ export default function MatchmakerPage() {
 					/>
 				)}
 			</div>
+
+			{/* §8：列印版內容，與 JPG 匯出共用同一份 exportScene（design Decision 2）。
+			    螢幕上預設隱藏、列印時顯示，由 app/globals.css 的 @media print 區塊負責。
+			    exportScene 為 null（尚無回合）時 PrintSheet 的 scene prop 為必填，故此處
+			    不掛入。 */}
+			{exportScene !== null && <PrintSheet scene={exportScene} />}
 		</main>
 	);
 }
