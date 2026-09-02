@@ -92,6 +92,15 @@ function buildHistoryEntryFixture(options: HistoryEntryFixtureOptions) {
 	};
 }
 
+// 參賽者名單 CSV 匯入 fixture：欄位名稱對應 ROSTER_CSV_HEADERS
+// （lib/matchmaker/roster-csv.ts），逐字沿用「名稱／性別／強度分數／顏色起點／顏色終點」，
+// 不另抄一份不同拼法。顏色兩欄留空以測試自動配色路徑（非本測試重點，故不特別指定）。
+function buildRosterCsv(rows: readonly { name: string; gender: string; rating: string }[]): string {
+	const header = "名稱,性別,強度分數,顏色起點,顏色終點";
+	const lines = rows.map((row) => `${row.name},${row.gender},${row.rating},,`);
+	return [header, ...lines].join("\n");
+}
+
 test.describe("/matchmaker/data 資料工具頁", () => {
 	test("可從 matchmaker 區段導覽抵達資料頁並看到四個功能區塊", async ({ page }) => {
 		// 從 matchmaker 區段點擊導覽入口抵達，不是直接 goto——驗收的是「可從區段導覽抵達」
@@ -157,5 +166,59 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 
 		await page.goto(HISTORY_PAGE);
 		await expect(page.getByTestId(`history-record-${matchId}`)).toBeVisible();
+	});
+
+	// §8.5／8.6：參賽者名單 CSV 匯入的預覽、取消與確認
+	// （spec「於預覽取消時不寫入任何資料」／「確認預覽後名單新增匯入的參賽者」）。
+	test("在 CSV 匯入預覽按取消後名單維持不變", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await seedRoster(page, [buildPlayerFixture({ id: "p-csv-cancel-existing", name: "CSV取消既有員" })]);
+
+		await page.goto(DATA_PAGE);
+
+		const csv = buildRosterCsv([{ name: "CSV取消匯入員", gender: "男", rating: "3.50" }]);
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(csv),
+		});
+
+		await expect(page.getByText("可新增 1 人")).toBeVisible();
+		await page.getByRole("button", { name: "取消" }).click();
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("CSV取消既有員", { exact: true })).toBeVisible();
+		await expect(page.getByText("CSV取消匯入員", { exact: true })).toHaveCount(0);
+		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
+
+	test("確認 CSV 匯入預覽後名單新增匯入的參賽者", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await seedRoster(page, [buildPlayerFixture({ id: "p-csv-confirm-existing", name: "CSV確認既有員" })]);
+
+		await page.goto(DATA_PAGE);
+
+		const csv = buildRosterCsv([
+			{ name: "CSV確認匯入員一", gender: "男", rating: "3.50" },
+			{ name: "CSV確認匯入員二", gender: "女", rating: "4.20" },
+		]);
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(csv),
+		});
+
+		await expect(page.getByText("可新增 2 人")).toBeVisible();
+
+		await Promise.all([
+			page.waitForEvent("load"),
+			page.getByRole("button", { name: "確認匯入" }).click(),
+		]);
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("CSV確認既有員", { exact: true })).toBeVisible();
+		await expect(page.getByText("CSV確認匯入員一", { exact: true })).toBeVisible();
+		await expect(page.getByText("CSV確認匯入員二", { exact: true })).toBeVisible();
+		await expect(page.getByText("共 3 位參賽者")).toBeVisible();
 	});
 });

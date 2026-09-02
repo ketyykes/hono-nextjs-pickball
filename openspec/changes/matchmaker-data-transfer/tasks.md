@@ -456,7 +456,7 @@ Depends on: §2, §3, §4, §6, §7
       `exportedAt` MUST 直接來自 `new Date().toISOString()`，SHALL NOT 由使用者輸入
       或其他來源取得——`backupFileName` 對非 ISO 輸入不做防護（§2 Stage 2 Minor-4 裁決：
       不加執行期驗證，違反 Simplicity First 且會讓純函式多一條錯誤路徑）
-- [ ] 8.5 RED: 補兩個 test：「在 CSV 匯入預覽按取消後名單維持不變」、
+- [x] 8.5 RED: 補兩個 test：「在 CSV 匯入預覽按取消後名單維持不變」、
       「確認 CSV 匯入預覽後名單新增匯入的參賽者」。確認紅燈
 - [ ] 8.6 GREEN: 接上 `RosterCsvImportSection`：選檔 → `parseRosterCsv` → 顯示預覽
       （可新增人數 + 問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
