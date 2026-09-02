@@ -317,4 +317,25 @@ describe("backup", () => {
 			expect(result.message).not.toBe(TRANSFER_MESSAGES.invalidStructure);
 		}
 	});
+
+	it("單筆參賽者不合法時整份拒絕，不走逐筆降級", () => {
+		const snapshot = makeSnapshot({
+			players: [
+				makePlayer({ id: "p1", name: "Alice" }),
+				// rating 99 超出 1.00～8.00，僅這一筆不合法。
+				makePlayer({ id: "p2", name: "Bob", rating: 99 }),
+				makePlayer({ id: "p3", name: "Cathy" }),
+			],
+		});
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		const result = parseBackup(JSON.stringify(backup));
+
+		expect(result.ok).toBe(false);
+		// 失敗分支的型別本就不帶任何資料欄位，「不保留另外兩位」由型別強制——
+		// 此處只需確認整份被判定失敗，不需要（也無法）另外斷言「沒有 players 欄位」。
+		if (!result.ok) {
+			expect(result.message).toContain("參賽者");
+		}
+	});
 });
