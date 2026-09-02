@@ -464,7 +464,7 @@ Depends on: §2, §3, §4, §6, §7
 - [x] 8.7 RED: 補三個 test：「清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含
       計分進度」、「取消清除本機資料後名單維持不變」、「確認清除本機資料後參賽者頁回到
       空白狀態」。確認紅燈
-- [ ] 8.8 GREEN: 實作 `components/matchmaker/ClearLocalDataDialog.tsx`：
+- [x] 8.8 GREEN: 實作 `components/matchmaker/ClearLocalDataDialog.tsx`：
       比照既有 `ResetRosterDialog` 的 `AlertDialog` + `variant="destructive"` 模式，
       文案含三句（無法復原／建議先匯出 JSON／備份不含 `/scoreboard` 計分進度）
 - [ ] 8.9 REFACTOR: 四個區塊共用的「選檔 → 讀文字 → 顯示錯誤」樣板抽成單一元件或
