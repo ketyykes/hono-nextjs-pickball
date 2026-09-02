@@ -422,7 +422,10 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 			page.getByRole("button", { name: "匯出 JSON" }).click(),
 		]);
 
-		expect(download.suggestedFilename()).toMatch(/^matchmaker-backup-\d{4}-\d{2}-\d{2}\.json$/);
+		// 精確比對「今天」的日期，而非只驗證格式——只驗證格式時，exportedAt 若被誤改成
+		// 固定字面值（如 "2000-01-01T00:00:00.000Z"）仍能通過格式正確但日期錯誤的檔名。
+		const expectedDate = new Date().toISOString().slice(0, 10);
+		expect(download.suggestedFilename()).toBe(`matchmaker-backup-${expectedDate}.json`);
 
 		const downloadPath = await download.path();
 		expect(downloadPath).not.toBeNull();
