@@ -331,6 +331,22 @@ test.describe("/matchmaker 匯出功能", () => {
 		await page.goto("/matchmaker");
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 
+		// 先在**螢幕媒體**下確認這些元素都真的存在——Playwright 的 role 查詢會把
+		// display:none 的元素排除在無障礙樹外，切到 print 之後 getByRole 一律回 0 個，
+		// 屆時 toBeHidden() 對「元素根本不存在」同樣通過，只寫後者會讓「把整塊刪掉」
+		// 的實作也綠燈（Stage 2 Minor-4）。故存在性一律在切換媒體前確認。
+		const pageHeading = page.getByRole("heading", { name: "對戰分配", exact: true });
+		const exportJpgButton = page.getByRole("button", { name: "匯出 JPG" });
+		const printPdfButton = page.getByRole("button", { name: "列印 PDF" });
+		// 「產生本輪對戰」是 RoundControls 內的按鈕（Stage 2 Major-2）：原本四條斷言裡
+		// 「匯出 JPG」與「列印 PDF」同屬 ExportActions，等於 ExportActions 驗兩次、
+		// RoundControls 那層包裝一次都沒驗——拿掉它的 data-print="hide" 測試照樣全綠。
+		const generateButton = page.getByRole("button", { name: "產生本輪對戰" });
+		const stageRegion = page.getByTestId("match-stage-region");
+		for (const locator of [pageHeading, exportJpgButton, printPdfButton, generateButton, stageRegion]) {
+			await expect(locator).toHaveCount(1);
+		}
+
 		await page.emulateMedia({ media: "print" });
 
 		// 全站導覽（app/layout.tsx 的 SiteNavbar，渲染出 body 直接子節點 <header>）。
@@ -346,14 +362,33 @@ test.describe("/matchmaker 匯出功能", () => {
 		}
 
 		// 對戰頁的操作控制項（data-print="hide"）：頁面標題區、匯出入口、
-		// RoundControls 包裝、對戰舞台區。
-		await expect(page.getByRole("heading", { name: "對戰分配", exact: true })).toBeHidden();
-		await expect(page.getByRole("button", { name: "匯出 JPG" })).toBeHidden();
-		await expect(page.getByRole("button", { name: "列印 PDF" })).toBeHidden();
-		await expect(page.getByTestId("match-stage-region")).toBeHidden();
+		// RoundControls 包裝、對戰舞台區。存在性已於切換媒體前確認（見上方）。
+		// 以 CSS 選擇器（而非 role）判定可見性：role 查詢在 display:none 下回 0 個元素，
+		// toBeHidden() 會空洞通過，無法區分「被隱藏」與「不存在」。
+		// ⚠️ 選擇器**刻意不含** [data-print="hide"]：若把它寫進選擇器，一旦某塊的
+		// data-print="hide" 被拿掉，該選擇器就match 到 0 個元素，toBeHidden() 又會空洞
+		// 通過——正是這條斷言要擋的那個 mutant。改以「這個元素本身」定位，才真的在驗
+		// 「它有沒有被隱藏」。
+		// 用完全比對的 regex 挑出頁面標題那個 h1——PrintSheet 的 h1 是
+		// 「匹克球對戰分配機　第 1 輪　單打」，含有「對戰分配」四字，
+		// 用 hasText 部分比對會同時命中兩個而觸發 strict mode violation。
+		await expect(page.locator("main h1").filter({ hasText: /^對戰分配$/ })).toBeHidden();
+		await expect(page.locator("main button", { hasText: "匯出 JPG" })).toBeHidden();
+		await expect(page.locator("main button", { hasText: "列印 PDF" })).toBeHidden();
+		await expect(page.locator("main button", { hasText: "產生本輪對戰" })).toBeHidden();
+		await expect(stageRegion).toBeHidden();
 
 		// 列印版內容為可見。
 		await expect(page.locator('[data-print="sheet"]')).toBeVisible();
+
+		// 列印版的內容 MUST 來自與 JPG 相同的那一份 ExportScene（spec：PDF 以瀏覽器
+		// 列印流程輸出）。Stage 2 實測：把 scene 換成另外組出來的物件（例如改掉 title）
+		// 測試照樣全綠——同源這件事完全沒有驗收。這裡以列印版標題必須逐字等於
+		// buildExportScene 組出的標題來釘住：App 名稱常數、回合編號、對戰方式三者
+		// 任一被另一份來源覆寫都會轉紅。
+		await expect(page.locator('[data-print="sheet"] h1')).toHaveText(
+			"匹克球對戰分配機　第 1 輪　單打",
+		);
 	});
 
 	test("列印版的每個場地區塊設定為不跨頁切斷", async ({ page }) => {
@@ -363,11 +398,38 @@ test.describe("/matchmaker 匯出功能", () => {
 
 		await page.emulateMedia({ media: "print" });
 
-		const breakInside = await page
-			.locator('[data-print="court"]')
-			.first()
-			.evaluate((element) => getComputedStyle(element).breakInside);
-		expect(breakInside).toBe("avoid");
+		// 逐一驗**每個**場地區塊，而非只驗第一個（Stage 2 Minor-3）：規則若被寫成
+		// 只作用於首個區塊（例如誤用 :first-child），只驗第一個會完全看不出來。
+		const courts = page.locator('[data-print="court"]');
+		const courtCount = await courts.count();
+		expect(courtCount).toBeGreaterThan(0);
+		for (let index = 0; index < courtCount; index++) {
+			const breakInside = await courts
+				.nth(index)
+				.evaluate((element) => getComputedStyle(element).breakInside);
+			expect(breakInside).toBe("avoid");
+		}
+	});
+
+	// Stage 2 Major-1：spec 明訂「列印版內容 MUST 顯示（**螢幕上則 MUST 隱藏**）」，
+	// 但「螢幕上隱藏」的唯一防線是 globals.css 那條 @media print 之外的基礎規則
+	// `[data-print="sheet"] { display: none }`，而它被拿掉時**全套 E2E 都不會紅**。
+	// 這條就是那道防線。
+	test("列印版內容在螢幕媒體下隱藏，只有列印時才顯示", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const sheet = page.locator('[data-print="sheet"]');
+		// 先確認它確實掛在 DOM 上——否則「根本沒渲染」也會讓 toBeHidden() 通過。
+		// 用 CSS 選擇器而非 role 查詢：後者在 display:none 下回 0 個元素，count 驗不到。
+		await expect(sheet).toHaveCount(1);
+		await expect(sheet).toBeHidden();
+
+		// 同一個元素在列印媒體下 MUST 轉為可見，證明隱藏是媒體查詢造成的、
+		// 不是元件永遠不顯示。
+		await page.emulateMedia({ media: "print" });
+		await expect(sheet).toBeVisible();
 	});
 
 	// self-review checklist 額外驗收：@media print 的規則以 body:has([data-print="sheet"])

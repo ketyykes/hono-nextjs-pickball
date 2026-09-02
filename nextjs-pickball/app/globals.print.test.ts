@@ -16,6 +16,12 @@ import {
 	PRINT_SHEET_DATA_VALUE,
 } from "@/components/matchmaker/PrintSheet";
 
+// 路徑以 process.cwd() 為基準：vitest 的 root 就是本 workspace 目錄，
+// 不論從 repo root 跑 `pnpm test`（經 pnpm -r 進到各 workspace）或在本目錄直接跑
+// vitest，cwd 都是 nextjs-pickball/。
+// （`import.meta.url` 在本 repo 的 vitest 設定下不是 file: scheme，無法用來解析路徑，
+//   已實測 `The URL must be of scheme file`。）
+// 下方 readGlobalsCss() 會在檔案讀不到時直接拋錯，路徑一旦失效不會靜默通過。
 const GLOBALS_CSS_PATH = join(process.cwd(), "app", "globals.css");
 
 function readGlobalsCss(): string {
