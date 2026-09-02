@@ -177,6 +177,48 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
+	 * Stage 2 review Major M3：顏色 regex 原本只被「連 # 都沒有」的輸入守著
+	 * （合法樣本清一色大寫、非法樣本只有 `red`／`blue`），縮寫、過長、只收大寫
+	 * 等三種 regex 破壞方式全部零覆蓋。最要命的是「只收大寫」——`PlayerForm.tsx`
+	 * 的 `<input type="color">` 依 HTML 規範一律回傳小寫 hex，使用者從既有名單
+	 * 抄出來的顏色幾乎都是小寫，若 regex 被誤收緊只收大寫，整批小寫顏色會全部
+	 * 報錯而測試仍全綠。同時併入 Minor m2：`.trim()` 是 load-bearing 卻零覆蓋，
+	 * 此處以「前後帶空白」與「只有空白視為未填」兩案例一併驗證。
+	 */
+	it("顏色格式驗證涵蓋大小寫、長度邊界與前後空白", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,#FF0000,#00FF00", // 大寫，兩端合法
+			"乙,male,5.0,#abcdef,#012345", // 小寫，兩端合法
+			"丙,male,5.0, #FF0000 ,#00FF00", // 起點前後帶空白，trim 後合法
+			"丁,male,5.0,   ,#00FF00", // 起點只有空白，視為未填，非格式錯誤（同進同出→兩端皆不帶入）
+			"戊,male,5.0,#ABC,#00FF00", // 起點過短
+			"己,male,5.0,#ABCDEF0,#00FF00", // 起點過長
+			"庚,male,5.0,ABCDEF,#00FF00", // 起點缺少 #
+			"辛,male,5.0,#GGGGGG,#00FF00", // 起點含非 hex 字元
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0, colorFrom: "#FF0000", colorTo: "#00FF00" },
+			{ name: "乙", gender: "male", rating: 5.0, colorFrom: "#abcdef", colorTo: "#012345" },
+			{ name: "丙", gender: "male", rating: 5.0, colorFrom: "#FF0000", colorTo: "#00FF00" },
+			{ name: "丁", gender: "male", rating: 5.0 },
+		]);
+		expect(result.errors).toEqual([
+			{ row: 6, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
+			{ row: 7, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
+			{ row: 8, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
+			{ row: 9, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
+		]);
+	});
+
+	/**
 	 * 補充測試（非六條必要測試之一）：同一列可能同時觸發多個欄位錯誤，
 	 * 驗證所有錯誤皆會被回報而非只回報第一個就中止該列的驗證。
 	 */
