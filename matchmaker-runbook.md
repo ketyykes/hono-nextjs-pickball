@@ -17,8 +17,8 @@
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
 | M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
 | M7 | **完成並已合併**（2026-09-02，`da9cfd2`）。47/47，coordinator 獨立驗證：`pnpm test` 57+4 檔/486+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、matchmaker-history E2E 55 passed、全量 E2E 389 passed/21 skipped 無迴歸。worktree（`pickball-worktrees/matchmaker-history-page`）與分支**尚未 teardown**，待使用者確認 |
-| M8 | **完成，合併中**（2026-09-02）。110/110（tasks.md 過程中從原估 94 擴為 110，含 Final Review 修正輪 §10 的 4 Major＋3 Minor）。跑了**兩棒 leader**（第一棒因脈絡將盡於 §5/§6 邊界乾淨停止；第二棒完成 §6～Final Review 後因帳號 session 額度觸頂中斷，但中斷前已 commit 完整 §10 收尾複驗證據）。coordinator 獨立驗證：`pnpm test` 62+4 檔/570+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、`openspec validate --strict` 通過、全量 E2E 462 passed/21 skipped（2 個 webkit/mobile-safari 逾時失敗，單獨重跑 2/2 全綠，判定為資源壓力假紅燈）。worktree 與分支**尚未 teardown**，待使用者確認 |
-| M9 | 未開始，**worktree 尚未建立** |
+| M8 | **完成並已合併**（2026-09-02，`2b3fb8f`）。110/110（tasks.md 過程中從原估 94 擴為 110，含 Final Review 修正輪 §10 的 4 Major＋3 Minor）。跑了**兩棒 leader**（第一棒因脈絡將盡於 §5/§6 邊界乾淨停止；第二棒完成 §6～Final Review 後因帳號 session 額度觸頂中斷，但中斷前已 commit 完整 §10 收尾複驗證據）。coordinator 獨立驗證：合併前 `pnpm test` 62+4 檔/570+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、`openspec validate --strict` 通過、全量 E2E 462 passed/21 skipped（2 個 webkit/mobile-safari 逾時失敗，單獨重跑 2/2 全綠，判定為資源壓力假紅燈）；合併後複驗 `tsc` exit 0、`pnpm test` 62+4 檔/570+16 全綠，**無迴歸**。worktree（`pickball-worktrees/matchmaker-data-transfer`）與分支**尚未 teardown**，待使用者確認 |
+| M9 | **worktree 已開**（`change/matchmaker-visual-export`，base `2b3fb8f`），leader 尚未派出 |
 
 ## 🔖 M7 中斷點（2026-08-31，第三棒因電腦睡眠中斷、coordinator 複驗後暫停）
 
