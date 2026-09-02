@@ -215,6 +215,30 @@ describe("parseRosterCsv", () => {
 		expect(result.message).toContain(ROSTER_CSV_HEADERS.rating);
 	});
 
+	/**
+	 * Stage 2 review Major M1：標題名稱前後若帶有多餘空白（使用者複製貼上／試算表
+	 * 匯出時常見），現行 `indexOf` 精確比對會全部找不到，回傳「三欄全缺」的
+	 * 結構性錯誤——但使用者眼中的標題列明明白白寫著這三個欄位，訊息謊報缺欄位。
+	 * 五個儲存格值都已 trim，標題名稱理應一致處理。
+	 */
+	it("標題欄名稱前後有多餘空白時仍可正確辨識並解析", () => {
+		const csv = [
+			" 名稱 , 性別 , 強度分數 , 顏色起點 , 顏色終點 ",
+			"王小明,male,5.5,#FF0000,#00FF00",
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([
+			{ name: "王小明", gender: "male", rating: 5.5, colorFrom: "#FF0000", colorTo: "#00FF00" },
+		]);
+	});
+
 	it("只提供顏色起點或終點其中一端時整組改走自動配色", () => {
 		const csv = [
 			HEADER_LINE,
