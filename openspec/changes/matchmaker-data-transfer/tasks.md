@@ -316,6 +316,14 @@ Depends on: §5
 >   正規表達式斷言訊息內容（原本此 throw 分支零測試覆蓋）。mutation：拿掉整個 guard
 >   （`if (false)`）兩條皆轉紅；只留 `<` 方向、只留 `>` 方向、訊息內兩數字互換，皆能被
 >   對應方向或內容斷言轉紅。
+> - **B2＋M1～M4**：合併成一條「每一列的 id／createdAt／gender／rating／顏色／預設欄位
+>   皆正確寫入且互不污染」，3 筆（1 筆手動顏色＋2 筆自動配色）一次鎖住 id 依序對應、
+>   `context.now`→`createdAt`、gender／rating 透傳（rating 用 `4.567` 鎖住 round 委派）、
+>   手動顏色原樣帶入且不跨列污染（以 `colors.ts` 的 `paletteIndexOf` 斷言自動配色仍落在
+>   既有調色盤內）、新成員 `restCount`／`gamesPlayed`／`isActive` 初值。mutation：id
+>   共用第一個／位移一格／反轉，`now` 固定空字串，`gender` 強制覆寫，`rating` 強制覆寫或
+>   自行 `Math.floor`，顏色清空／只清終點／被第一列污染，reduce 後 `.map()` 強制
+>   `isActive:false`／`restCount:99`，逐一改動皆轉紅，且皆命中此條 it。
 
 ## 7. 快照的讀寫與清除（`transfer-storage.ts`）
 Depends on: §0, §3

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyRosterImport, parseRosterCsv, ROSTER_CSV_HEADERS } from "./roster-csv";
+import { paletteIndexOf } from "./colors";
 import type { Player } from "./types";
 
 /** 標題列文字，欄位順序依 ROSTER_CSV_HEADERS 的既定順序。 */
@@ -661,5 +662,55 @@ describe("applyRosterImport", () => {
 				now: "2026-01-01T00:00:00.000Z",
 			}),
 		).toThrow(/id 數量（3）.*可新增列數量（1）/);
+	});
+
+	/**
+	 * Stage 2 review Blocker B2（§3.6）＋Major M1／M2／M3／M4（§3.4／3.5／3.7／3.11／3.12）：
+	 * 合併成一條完整欄位斷言，一次鎖住 applyRosterImport 與 addPlayer 之間的介面契約——
+	 * id 依序對應（不共用、不錯位）、createdAt 來自 context.now、gender／rating 原樣透傳
+	 * （rating 委由 addPlayer round）、手動指定的顏色原樣帶入且不跨列污染、未指定顏色的
+	 * 列仍落在既有調色盤內、新成員的 restCount／gamesPlayed／isActive 初值正確。
+	 * 3 筆中第 1 筆手動指定顏色，第 2、3 筆走自動配色，避免任何欄位因巧合而被蓋過仍測不出來。
+	 */
+	it("每一列的 id／createdAt／gender／rating／顏色／預設欄位皆正確寫入且互不污染", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,4.567,#123456,#654321", // 手動指定顏色，rating 需被 addPlayer round
+			"乙,female,3.0,,", // 自動配色
+			"丙,other,2.0,,", // 自動配色
+		].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const updated = applyRosterImport([], parsed, {
+			ids: ["id-a", "id-b", "id-c"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		// id 依序對應各列，不共用同一 id 也不錯位（殺死 M19／M20／M21）。
+		expect(updated.map((player) => player.id)).toEqual(["id-a", "id-b", "id-c"]);
+		// createdAt 皆來自注入的 context.now（殺死 M22／M23）。
+		expect(updated.every((player) => player.createdAt === "2026-01-01T00:00:00.000Z")).toBe(true);
+		// gender 原樣透傳（殺死 M16）。
+		expect(updated.map((player) => player.gender)).toEqual(["male", "female", "other"]);
+		// rating 原樣透傳並委由 addPlayer round，非本模組自行處理（殺死 M17／M35）。
+		expect(updated[0].rating).toBe(4.57);
+		// 手動指定的顏色原樣帶入 addPlayer（殺死 M15／M32）。
+		expect(updated[0].colorFrom).toBe("#123456");
+		expect(updated[0].colorTo).toBe("#654321");
+		// 未指定顏色的列仍落在既有預設調色盤內、未被第一列的手動顏色跨列污染（殺死 M34）。
+		expect(paletteIndexOf(updated[1].colorFrom, updated[1].colorTo)).not.toBe(-1);
+		expect(paletteIndexOf(updated[2].colorFrom, updated[2].colorTo)).not.toBe(-1);
+		expect(updated[1].colorFrom).not.toBe(updated[0].colorFrom);
+		expect(updated[1].colorFrom).not.toBe(updated[2].colorFrom);
+		// 新成員的預設欄位初值皆委派 addPlayer 設定，本模組不覆寫（殺死 M30／M31）。
+		updated.forEach((player) => {
+			expect(player.restCount).toBe(0);
+			expect(player.gamesPlayed).toBe(0);
+			expect(player.isActive).toBe(true);
+		});
 	});
 });
