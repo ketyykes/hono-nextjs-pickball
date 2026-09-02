@@ -117,9 +117,22 @@ export function parseBackup(text: string): ParseBackupResult {
 		return { ok: false, message: TRANSFER_MESSAGES.invalidJson };
 	}
 
+	// 版本不符須有專屬訊息，不與「結構不合法」共用（design「3.6 的順序」節）：
+	// BackupSchema 的 version 為 z.literal(1)，若直接丟給 safeParse，「version 不是 1」
+	// 會與其他結構問題混在同一份 issues 陣列裡，無法個別給出對應訊息。因此在此
+	// 單獨檢視 version 欄位，SHALL NOT 為此放寬 BackupSchema（那會破壞既有守衛）。
+	if (isPlainObject(json) && "version" in json && json.version !== 1) {
+		return { ok: false, message: TRANSFER_MESSAGES.unsupportedVersion };
+	}
+
 	const parsed = BackupSchema.safeParse(json);
 	if (parsed.success) {
 		return { ok: true, backup: parsed.data };
 	}
 	return { ok: false, message: TRANSFER_MESSAGES.invalidStructure };
+}
+
+/** 縮小為可安全用 in 運算子存取屬性的物件型別（陣列／null 皆非本函式要處理的形狀）。 */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
