@@ -5,6 +5,10 @@ import type { Page } from "@playwright/test";
 // M8 §8 修正輪（Stage 2 review B3）：歷史 CSV 標題列 MUST 直接比對 lib 層的單一真相來源，
 // SHALL NOT 在本檔另抄一份「日期,時間,對戰方式,…」字面值——常數改了測試也要一起改。
 import { HISTORY_CSV_HEADERS } from "@/lib/matchmaker/history-csv";
+// Final Review m3：roster CSV 標題列原本在本檔另抄一份「名稱,性別,強度分數,…」字面值，
+// 與上面 HISTORY_CSV_HEADERS 的 import 慣例不一致——同一條 SHALL NOT 規則沒有一致套用。
+// 改為與歷史標題列同樣 import 單一真相來源。
+import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
 
 // /matchmaker/data 資料工具頁的 E2E 驗收（M8 §8）。
 // §8.1 只涵蓋兩個入口驗收 test；§8.3 起補上 JSON／CSV 匯出入與清除本機資料的實際行為，
@@ -118,7 +122,13 @@ function buildHistoryEntryFixture(options: HistoryEntryFixtureOptions) {
 // （lib/matchmaker/roster-csv.ts），逐字沿用「名稱／性別／強度分數／顏色起點／顏色終點」，
 // 不另抄一份不同拼法。顏色兩欄留空以測試自動配色路徑（非本測試重點，故不特別指定）。
 function buildRosterCsv(rows: readonly { name: string; gender: string; rating: string }[]): string {
-	const header = "名稱,性別,強度分數,顏色起點,顏色終點";
+	const header = [
+		ROSTER_CSV_HEADERS.name,
+		ROSTER_CSV_HEADERS.gender,
+		ROSTER_CSV_HEADERS.rating,
+		ROSTER_CSV_HEADERS.colorFrom,
+		ROSTER_CSV_HEADERS.colorTo,
+	].join(",");
 	const lines = rows.map((row) => `${row.name},${row.gender},${row.rating},,`);
 	return [header, ...lines].join("\n");
 }
