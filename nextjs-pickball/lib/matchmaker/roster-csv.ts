@@ -145,7 +145,10 @@ function collectField<T>(
 
 export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const table = parseCsv(text);
-	const headerRow = table[0] ?? [];
+	// 標題名稱與五個儲存格值一樣一律 trim：使用者複製貼上或試算表匯出時，標題欄
+	// 前後帶空白是常態，不 trim 會讓 indexOf 精確比對全部落空，回傳「整份缺欄位」
+	// 這種與畫面所見矛盾的訊息（Stage 2 review Major M1）。
+	const headerRow = (table[0] ?? []).map((header) => header.trim());
 
 	// 必填標題欄檢查 MUST 在逐列解析之前執行：缺欄位時直接整份拒絕，
 	// 不進入逐列迴圈——否則每一列都會各自產生同一個「找不到欄位」的錯誤，
