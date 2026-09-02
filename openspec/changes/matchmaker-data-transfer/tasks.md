@@ -461,7 +461,7 @@ Depends on: §2, §3, §4, §6, §7
 - [x] 8.6 GREEN: 接上 `RosterCsvImportSection`：選檔 → `parseRosterCsv` → 顯示預覽
       （可新增人數 + 問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
       確認後 `applyRosterImport` → 寫入 → reload
-- [ ] 8.7 RED: 補三個 test：「清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含
+- [x] 8.7 RED: 補三個 test：「清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含
       計分進度」、「取消清除本機資料後名單維持不變」、「確認清除本機資料後參賽者頁回到
       空白狀態」。確認紅燈
 - [ ] 8.8 GREEN: 實作 `components/matchmaker/ClearLocalDataDialog.tsx`：

@@ -227,4 +227,54 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("CSV確認匯入員二", { exact: true })).toBeVisible();
 		await expect(page.getByText("共 3 位參賽者")).toBeVisible();
 	});
+
+	// §8.7／8.8：清除本機資料的二次確認（spec「清除本機資料與其確認流程」）。
+	test("清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含計分進度", async ({ page }) => {
+		await page.goto(DATA_PAGE);
+
+		await page.getByRole("button", { name: "清除本機資料" }).click();
+		const alert = page.getByRole("alertdialog", { name: "清除本機資料" });
+		await expect(alert).toBeVisible();
+
+		await expect(alert.getByText("無法復原", { exact: false })).toBeVisible();
+		await expect(alert.getByText("建議先匯出 JSON 備份", { exact: false })).toBeVisible();
+		await expect(
+			alert.getByText("JSON 備份不包含 /scoreboard 進行中的逐球計分進度", { exact: false }),
+		).toBeVisible();
+	});
+
+	test("取消清除本機資料後名單維持不變", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await seedRoster(page, [buildPlayerFixture({ id: "p-clear-cancel", name: "清除取消員" })]);
+
+		await page.goto(DATA_PAGE);
+
+		await page.getByRole("button", { name: "清除本機資料" }).click();
+		const alert = page.getByRole("alertdialog", { name: "清除本機資料" });
+		await expect(alert).toBeVisible();
+		await alert.getByRole("button", { name: "取消" }).click();
+		await expect(alert).toBeHidden();
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("清除取消員", { exact: true })).toBeVisible();
+		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
+
+	test("確認清除本機資料後參賽者頁回到空白狀態", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await seedRoster(page, [buildPlayerFixture({ id: "p-clear-confirm", name: "清除確認員" })]);
+
+		await page.goto(DATA_PAGE);
+
+		await page.getByRole("button", { name: "清除本機資料" }).click();
+		const alert = page.getByRole("alertdialog", { name: "清除本機資料" });
+		await expect(alert).toBeVisible();
+		await alert.getByRole("button", { name: "確定清除" }).click();
+		await expect(alert).toBeHidden();
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("目前還沒有參賽者")).toBeVisible();
+		await expect(page.getByRole("button", { name: "新增第一位參賽者" })).toBeVisible();
+		await expect(page.getByText("清除確認員", { exact: true })).toHaveCount(0);
+	});
 });
