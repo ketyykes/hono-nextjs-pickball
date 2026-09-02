@@ -22,7 +22,10 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 // round 為 null 時 ExportActions 的兩顆按鈕皆為 disabled（見該元件 hasNoRound 判定），
 // 此時 fileName prop 不會被實際使用到；仍給一個型別合法的常數值，而非空字串或 undefined，
 // 避免這個「反正用不到」的角落被誤讀成尚未處理。
-const NO_ROUND_FILE_NAME_PLACEHOLDER = "matchmaker-round-export.jpg";
+// 值刻意取不含品牌前綴的中性字串（Minor-5）：舊值 "matchmaker-round-export.jpg" 手寫重複了
+// export-filename.ts 的前綴與副檔名字面值，日後那邊調整會靜默漂移而沒有測試示警
+// （這個值本來就用不到，不會有測試比對它）。中性字串讓「這是佔位不是真檔名」一望即知。
+const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 
 // 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點
 // （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，

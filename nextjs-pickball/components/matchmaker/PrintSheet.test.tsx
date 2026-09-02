@@ -30,6 +30,9 @@ function buildCourt(overrides: Partial<ExportCourt> = {}): ExportCourt {
 	return {
 		courtNumber: 1,
 		statusText: "未完成",
+		// blockHeight 是給 canvas 版累加 y 座標用的幾何欄位，列印版不使用；
+		// 這裡只為滿足 ExportCourt 型別而給一個合法值（單打的實際值，見 export-scene.ts）。
+		blockHeight: 144,
 		tiles: [
 			buildTile({ name: "王小明", teamIndex: 0, row: 0, column: 0 }),
 			buildTile({ name: "陳小華", teamIndex: 1, row: 0, column: 1 }),

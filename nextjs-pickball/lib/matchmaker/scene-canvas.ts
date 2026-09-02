@@ -16,13 +16,11 @@ import {
 	CANVAS_WIDTH,
 	COURT_BLOCK_SPACING,
 	COURT_HEADER_HEIGHT,
+	TILE_COLUMNS,
 	TILE_ROW_HEIGHT,
-	TILE_ROWS_BY_FORMAT,
 	TITLE_AREA_HEIGHT,
-	courtBlockHeight,
 } from "./export-scene";
 import type { ExportCourt, ExportScene, ExportTile } from "./export-scene";
-import type { MatchFormat } from "./allocation-types";
 
 // 位圖縮放倍率：canvas 的 CSS 尺寸與位圖尺寸分離，位圖取 2 倍讓文字在高解析螢幕與列印時
 // 不糊（design Decision 9）。
@@ -39,10 +37,6 @@ const EXPORT_JPEG_QUALITY = 0.92;
 // 每個球員格內縮的留白（logical px），讓相鄰格之間留出可辨識的間隙，避免色塊互相貼合。
 const TILE_INNER_PADDING = 8;
 
-// 場地區塊內，球員格固定切兩欄（單打／雙打皆是——teamIndex 0／1 各佔一欄，
-// 雙打同隊兩人再往下一列展開，見 stage-layout.ts buildCourtTiles 的既有版面規則）。
-const TILE_COLUMNS = 2;
-
 // 標題／場地表頭／狀態文字的預設文字色（在 ExportScene.background 白底上需可讀）；
 // 球員格文字色一律使用 ExportTile.textColor（由 pickTextColor 依漸層對比度算出），
 // 不套用本常數。
@@ -56,31 +50,6 @@ const TILE_NAME_FONT_SIZE = 22;
 
 // 場地表頭與畫布邊界之間的水平留白。
 const COURT_HEADER_HORIZONTAL_PADDING = 16;
-
-/**
- * 由 TILE_ROWS_BY_FORMAT 反推「球員格列數 → 對戰方式」的對照表，供由 ExportCourt.tiles
- * 反推該場地的 MatchFormat（ExportCourt 本身沒有 format 欄位，見 tasks §7 裁決 2）。
- * 純粹由既有常數（TILE_ROWS_BY_FORMAT）在模組載入時衍生一次，不重寫任何幾何公式。
- */
-const FORMAT_BY_ROW_COUNT = new Map<number, MatchFormat>(
-	(Object.entries(TILE_ROWS_BY_FORMAT) as [MatchFormat, number][]).map(([format, rows]) => [
-		rows,
-		format,
-	]),
-);
-
-/** 由一個場地區塊的球員格列數，反推其對戰方式，以便呼叫既有的 courtBlockHeight(format)。 */
-function resolveCourtFormat(court: ExportCourt): MatchFormat {
-	const rowCount = court.tiles.reduce((max, tile) => Math.max(max, tile.row), 0) + 1;
-	const format = FORMAT_BY_ROW_COUNT.get(rowCount);
-	if (format === undefined) {
-		// 理論上不可達：TILE_ROWS_BY_FORMAT 目前只有 1（單打）與 2（雙打）兩種列數，
-		// buildExportScene 的輸出必定落在其中之一。留下明確錯誤而非靜默用預設值，
-		// 資料損壞時才不會畫出錯誤高度的版面卻無跡可尋。
-		throw new Error(`無法由球員格列數 ${rowCount} 推導對戰方式`);
-	}
-	return format;
-}
 
 /** 取得目前頁面實際套用的字型堆疊（解析 CSS 變數後的結果），讓 canvas 文字與頁面視覺一致。 */
 function resolveBodyFontFamily(): string {
@@ -129,6 +98,9 @@ function drawTile(ctx: CanvasRenderingContext2D, tile: ExportTile, courtTilesTop
 	const rectHeight = TILE_ROW_HEIGHT - TILE_INNER_PADDING * 2;
 
 	// 水平漸層：由格子左緣到右緣，colorFrom → colorTo。
+	// 這是刻意的選擇而非疏漏：畫面版 tile-style.ts 用 135 度（對角）漸層，但 canvas 的
+	// createLinearGradient 是取兩個座標點而非角度，在球員格這種窄格內把對角漸層換算成
+	// 座標點的收益極低（design Risks 已接受手繪版與畫面版漸層方向可以不同）。
 	const gradient = ctx.createLinearGradient(rectX, rectY, rectX + rectWidth, rectY);
 	gradient.addColorStop(0, tile.colorFrom);
 	gradient.addColorStop(1, tile.colorTo);
@@ -139,19 +111,26 @@ function drawTile(ctx: CanvasRenderingContext2D, tile: ExportTile, courtTilesTop
 	ctx.font = `700 ${TILE_NAME_FONT_SIZE}px ${fontFamily}`;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
-	ctx.fillText(tile.name, rectX + rectWidth / 2, rectY + rectHeight / 2);
+	// 第四個參數 maxWidth：canvas 原生的「壓縮至不超過此寬度」語意，是畫面版
+	// PlayerTile.tsx 的 truncate + overflow-hidden 在手繪版的對應物。PlayerSchema
+	// 對姓名沒有長度上限，沒有這個參數，極長姓名會不換行、不裁切地衝出畫布並覆蓋鄰格
+	// （design Decision 3、matchmaker-visual-export tasks §7 Major-3）。
+	ctx.fillText(
+		tile.name,
+		rectX + rectWidth / 2,
+		rectY + rectHeight / 2,
+		rectWidth - TILE_INNER_PADDING * 2,
+	);
 }
 
-/** 畫出一個場地區塊（表頭 + 全部球員格），回傳其佔用高度供呼叫端累加下一個場地的起點。 */
-function drawCourt(ctx: CanvasRenderingContext2D, court: ExportCourt, courtY: number, fontFamily: string): number {
+/** 畫出一個場地區塊（表頭 + 全部球員格）。區塊高度由 court.blockHeight 提供，本檔不推導。 */
+function drawCourt(ctx: CanvasRenderingContext2D, court: ExportCourt, courtY: number, fontFamily: string): void {
 	drawCourtHeader(ctx, court, courtY, fontFamily);
 
 	const tilesTop = courtY + COURT_HEADER_HEIGHT;
 	for (const tile of court.tiles) {
 		drawTile(ctx, tile, tilesTop, fontFamily);
 	}
-
-	return courtBlockHeight(resolveCourtFormat(court));
 }
 
 /**
@@ -169,8 +148,10 @@ function drawScene(ctx: CanvasRenderingContext2D, scene: ExportScene): void {
 
 	let courtY = TITLE_AREA_HEIGHT + COURT_BLOCK_SPACING;
 	for (const court of scene.courts) {
-		const blockHeight = drawCourt(ctx, court, courtY, fontFamily);
-		courtY += blockHeight + COURT_BLOCK_SPACING;
+		drawCourt(ctx, court, courtY, fontFamily);
+		// 區塊高度直接取自 scene，不由 tiles 反推對戰方式再套公式——推導屬行為邏輯，
+		// 不該住在例外層，且反推在 tiles 為空時會靜默給出錯誤答案（§7 Stage 2 Major-2）。
+		courtY += court.blockHeight + COURT_BLOCK_SPACING;
 	}
 }
 

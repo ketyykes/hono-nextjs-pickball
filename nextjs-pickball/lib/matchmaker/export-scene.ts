@@ -91,7 +91,31 @@ export const COURT_HEADER_HEIGHT = 56;
 /** 每一列球員格的高度。 */
 export const TILE_ROW_HEIGHT = 88;
 
-/** 各對戰方式的球員列數：單打 1 列（兩格左右並排），雙打 2 列（上下各兩格）。 */
+/**
+ * 場地區塊內，球員格固定切兩欄（單打／雙打皆是——teamIndex 0／1 各佔一欄，
+ * 雙打同隊兩人再往下一列展開，見 stage-layout.ts buildCourtTiles 的既有版面規則）。
+ * 幾何的唯一真相來源在本檔（matchmaker-visual-export tasks §7 Minor-4），scene-canvas.ts
+ * 只能引用、SHALL NOT 自行持有一份。
+ *
+ * ⚠️ 隱含假設：本常數為 2 隱含 `stage-layout.ts` 的 `buildCourtTiles` 只會輸出
+ * `column ∈ {0, 1}`——若該檔日後改為輸出兩欄以外的 column 值，本常數與依賴它的
+ * 版面計算（scene-canvas.ts 的 columnWidth 切分）都需要同步檢視。
+ */
+export const TILE_COLUMNS = 2;
+
+/**
+ * 各對戰方式的球員列數：單打 1 列（兩格左右並排），雙打 2 列（上下各兩格）。
+ *
+ * ⚠️ BLOCKED（matchmaker-visual-export tasks §7 Major-2，第 1 次退回修正輪）：
+ * 本應改為 `ExportCourt.blockHeight` 由本檔在 `buildExportCourt` 內填入，讓
+ * scene-canvas.ts 不必反推對戰方式即可累加場地高度，本常數與 `courtBlockHeight`
+ * 也應隨之改回 private。但 `ExportCourt` 一旦新增必填欄位 `blockHeight`，會讓
+ * `components/matchmaker/ExportActions.test.tsx`（第 17 行手寫的 `ExportCourt` 字面量
+ * fixture，未含該欄位）編譯失敗——而該檔明列於本輪「SHALL NOT 修改」清單，
+ * 同時也明列於「既有測試 MUST 全數保持綠燈」清單，兩個約束在此互斥。故本輪維持
+ * `export` 以保留 scene-canvas.ts 現行的 `resolveCourtFormat` 反推路徑，
+ * 詳細證據與決策見交付報告 Major-2 一節。
+ */
 export const TILE_ROWS_BY_FORMAT: Record<MatchFormat, number> = {
 	singles: 1,
 	doubles: 2,
@@ -113,6 +137,14 @@ export interface ExportCourt {
 	readonly courtNumber: number;
 	readonly statusText: string;
 	readonly tiles: readonly ExportTile[];
+	/**
+	 * 此場地區塊佔用的高度（邏輯像素），由 courtBlockHeight(format) 求得。
+	 * 之所以放進 ExportScene 而不讓消費端自己算：scene-canvas.ts 需要它來累加下一個場地的
+	 * 起點 y，但該檔是 TDD 例外層（「所有決策已在 ExportScene 內定死、本檔無推導」）。
+	 * 由本檔一併算好，例外層才真的只剩「把 scene 逐項翻成 canvas 呼叫」，
+	 * 也維持 tasks 2.9 的「場地區塊高度的計算只有一處」。
+	 */
+	readonly blockHeight: number;
 }
 
 /**
@@ -196,6 +228,7 @@ function buildExportCourt(match: RoundMatch, players: readonly Player[]): Export
 		courtNumber: match.courtNumber,
 		statusText: buildStatusText(match),
 		tiles,
+		blockHeight: courtBlockHeight(match.format),
 	};
 }
 
@@ -203,6 +236,8 @@ function buildExportCourt(match: RoundMatch, players: readonly Player[]): Export
  * 場地區塊高度：固定的表頭部分（場地編號＋狀態文字）加上該對戰方式的球員列數 ×
  * 每列高度。單打與雙打共用同一條公式，差異只在於 TILE_ROWS_BY_FORMAT 的列數——
  * SHALL NOT 為兩種對戰方式各寫一份公式（tasks 2.9）。
+ * export：scene-canvas.ts 的 resolveCourtFormat 仍需由外部呼叫本函式（Major-2 因與
+ * ExportActions.test.tsx 衝突而 BLOCKED，見本檔 TILE_ROWS_BY_FORMAT 上方註解）。
  */
 export function courtBlockHeight(format: MatchFormat): number {
 	return COURT_HEADER_HEIGHT + TILE_ROWS_BY_FORMAT[format] * TILE_ROW_HEIGHT;

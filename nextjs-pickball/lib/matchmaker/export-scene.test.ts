@@ -488,6 +488,39 @@ describe("buildExportScene", () => {
 		expect(h2Doubles - h1Doubles).toBeGreaterThan(singlesStep);
 	});
 
+	it("每個場地區塊自帶 blockHeight，單打與雙打各為公式推導出的固定值", () => {
+		// blockHeight 存在的理由是讓 scene-canvas.ts 直接累加下一個場地的起點 y，
+		// 而不必由 tiles 反推對戰方式再套公式——推導屬行為邏輯，不該住在例外層
+		// （§7 Stage 2 Major-2）。這條把「本檔一併算好」這件事釘住：欄位漏填、
+		// 填成 0、或單打與雙打填成同值都會轉紅。
+		// 期望值＝COURT_HEADER_HEIGHT(56) + 該對戰方式的球員列數 × TILE_ROW_HEIGHT(88)：
+		// 單打 56 + 1×88 = 144；雙打 56 + 2×88 = 232。
+		const players: Player[] = [];
+		const singlesScene = buildExportScene(
+			makeRound({ format: "singles", matches: [makeRoundMatch({ format: "singles" })] }),
+			players,
+		);
+		const doublesScene = buildExportScene(
+			makeRound({
+				format: "doubles",
+				matches: [
+					makeRoundMatch({
+						format: "doubles",
+						teams: [
+							{ playerIds: ["p1", "p2"], rating: 7 },
+							{ playerIds: ["p3", "p4"], rating: 7 },
+						],
+					}),
+				],
+			}),
+			players,
+		);
+
+		expect(singlesScene.courts[0].blockHeight).toBe(144);
+		expect(doublesScene.courts[0].blockHeight).toBe(232);
+		expect(doublesScene.courts[0].blockHeight).toBeGreaterThan(singlesScene.courts[0].blockHeight);
+	});
+
 	it("畫布高度的組成為標題區、場地表頭、球員列與間距四項具名常數的固定公式", () => {
 		// 直接釘住依公式推導出的精確高度值，取代單純的「越多越高」單調性檢查——
 		// 讓 TITLE_AREA_HEIGHT／COURT_HEADER_HEIGHT／COURT_BLOCK_SPACING／TILE_ROW_HEIGHT

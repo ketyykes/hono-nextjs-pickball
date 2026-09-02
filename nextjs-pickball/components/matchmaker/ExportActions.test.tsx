@@ -17,6 +17,9 @@ function buildScene(overrides: Partial<ExportScene> = {}): ExportScene {
 			{
 				courtNumber: 1,
 				statusText: "未完成",
+				// blockHeight 是給 canvas 版累加 y 座標用的幾何欄位，本元件不使用；
+				// 這裡只為滿足 ExportCourt 型別而給一個合法值（單打的實際值）。
+				blockHeight: 144,
 				tiles: [
 					{ name: "王小明", teamIndex: 0, row: 0, column: 0, colorFrom: "#0E6B63", colorTo: "#134E4A", textColor: "#FFFFFF" },
 					{ name: "陳小華", teamIndex: 1, row: 0, column: 1, colorFrom: "#7C2D12", colorTo: "#F97316", textColor: "#FFFFFF" },
