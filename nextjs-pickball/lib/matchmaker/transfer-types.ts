@@ -23,8 +23,10 @@ export type Backup = z.infer<typeof BackupSchema>;
 // 驗得起來——若訊息散落在各個 return 裡，測試只能一則一則手抄，漏掉新加的那則
 // 不會紅。集中成常數表後，測試改為遍歷整張表，新增訊息卻忘了寫修正方式會立刻紅燈。
 // 每則訊息固定寫成「＜發生了什麼＞。＜目前資料狀態＞。請＜下一步＞。」三段式，
-// 與 PlayerForm 既有的錯誤訊息語氣一致。§7 會再往這張表追加兩則
-// （localStorage 不可用／寫入超出配額），本組只放本組用得到的三則。
+// 與 PlayerForm 既有的錯誤訊息語氣一致。以下 localStorageUnavailable／quotaExceeded
+// 兩則為 §7（transfer-storage.ts）追加，同樣受 backup.test.ts「所有錯誤訊息…」遍歷
+// 測試檢查：以「。」分段後至少 3 段、最後一段以「請」開頭、長度 ≥ 30 字、
+// 不含未翻譯的 zod issue 字串（M8 §3 Stage 2 review J2 裁決）。
 export const TRANSFER_MESSAGES = {
 	invalidJson:
 		"備份檔案的內容不是合法的 JSON 格式。檔案可能已損毀或遭手動修改，資料未被匯入。請確認檔案未損毀，或重新匯出一份備份後再試一次。",
@@ -36,4 +38,11 @@ export const TRANSFER_MESSAGES = {
 	// 反而會誤導使用者去檢查一份根本不存在的名單（M8 §3 Stage 2 review J4 裁決）。
 	invalidStructure:
 		"備份檔案的內容不符合預期的結構。檔案可能缺少備份必要的欄位、其中的參賽者／目前回合／歷史紀錄之一不合法，也可能這根本不是本系統匯出的備份檔，資料未被匯入。請確認匯入的是本系統匯出的備份檔，並確認參賽者等欄位是否完整（例如強度分數需介於 1.00 至 8.00 之間），必要時重新匯出一份備份後再試一次。",
+	// localStorage 存取本身拋出例外（SSR、私密模式等）。匯出不受此影響（讀不到資料時
+	// 匯出空備份），此則只在匯入的寫入路徑用到。
+	localStorageUnavailable:
+		"此瀏覽器目前無法使用 LocalStorage 儲存空間。可能處於私密瀏覽模式或瀏覽器限制寫入，資料未被匯入。請改用一般瀏覽模式，或更換瀏覽器後再試一次。",
+	// setItem 拋出配額相關例外（QuotaExceededError 等）。
+	quotaExceeded:
+		"寫入本機儲存空間時已超出瀏覽器的容量上限。這份資料因此未被儲存，但備份檔案本身沒有遺失。請先清除舊資料或減少匯入筆數後再試一次。",
 } as const;
