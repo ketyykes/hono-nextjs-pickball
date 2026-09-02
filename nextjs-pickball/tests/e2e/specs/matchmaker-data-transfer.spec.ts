@@ -194,7 +194,11 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 	// （spec「於預覽取消時不寫入任何資料」／「確認預覽後名單新增匯入的參賽者」）。
 	test("在 CSV 匯入預覽按取消後名單維持不變", async ({ page }) => {
 		await clearMatchmakerStorage(page);
-		await seedRoster(page, [buildPlayerFixture({ id: "p-csv-cancel-existing", name: "CSV取消既有員" })]);
+		// 保留種子物件本身（而非只記文字姓名），以便取消後能與 LocalStorage 逐字元比對
+		// （M8 §8 修正輪 Stage 1 review A2：只比姓名＋人數不足以證明性別／強度分數／
+		// 顏色等欄位未被誤動）。
+		const existingPlayers = [buildPlayerFixture({ id: "p-csv-cancel-existing", name: "CSV取消既有員" })];
+		await seedRoster(page, existingPlayers);
 
 		await page.goto(DATA_PAGE);
 
@@ -207,6 +211,19 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 
 		await expect(page.getByText("可新增 1 人")).toBeVisible();
 		await page.getByRole("button", { name: "取消" }).click();
+
+		// J2：取消後 UI MUST 真的重置為 idle——預覽面板（含「可新增 N 人」與問題列）
+		// 須整個收回，不能只是「沒有寫入」這個更弱的事實（handleCancel 若被誤改成
+		// no-op，UI 仍會停在 ready 狀態，本斷言可以抓到）。
+		await expect(page.getByTestId("roster-csv-preview")).toBeHidden();
+
+		// 逐字元比對整個 matchmaker:roster:v1：比只驗姓名＋人數更嚴格，
+		// 能同時守住既有參賽者的性別／強度分數／顏色等欄位未被誤動。
+		const storedRosterAfterCancel = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROSTER_STORAGE_KEY,
+		);
+		expect(storedRosterAfterCancel).toBe(JSON.stringify({ version: 1, players: existingPlayers }));
 
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.getByText("CSV取消既有員", { exact: true })).toBeVisible();
@@ -261,7 +278,8 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 
 	test("取消清除本機資料後名單維持不變", async ({ page }) => {
 		await clearMatchmakerStorage(page);
-		await seedRoster(page, [buildPlayerFixture({ id: "p-clear-cancel", name: "清除取消員" })]);
+		const existingPlayers = [buildPlayerFixture({ id: "p-clear-cancel", name: "清除取消員" })];
+		await seedRoster(page, existingPlayers);
 
 		await page.goto(DATA_PAGE);
 
@@ -270,6 +288,14 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(alert).toBeVisible();
 		await alert.getByRole("button", { name: "取消" }).click();
 		await expect(alert).toBeHidden();
+
+		// 逐字元比對整個 matchmaker:roster:v1（M8 §8 修正輪 Stage 1 review A2），
+		// 比只驗姓名＋人數更嚴格。
+		const storedRosterAfterCancel = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROSTER_STORAGE_KEY,
+		);
+		expect(storedRosterAfterCancel).toBe(JSON.stringify({ version: 1, players: existingPlayers }));
 
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.getByText("清除取消員", { exact: true })).toBeVisible();
