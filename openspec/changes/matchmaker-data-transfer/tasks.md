@@ -285,8 +285,12 @@ Depends on: §5
       與 task 6.4 附註「例如直接接受 ParseRosterCsvResult 的成功分支」一致。
       有任一錯誤列時**直接回傳原名單**（不進入迴圈），
       `ids.length` 與 `rows.length` 不符時視為呼叫端錯誤並拋出可判讀訊息
-- [ ] 6.5 RED: 補 it「匯入採附加模式，既有參賽者不被覆蓋且順序在前」。確認紅燈
-- [ ] 6.6 GREEN: 以 `reduce` 逐列呼叫既有 `roster.ts` 的 `addPlayer`，新成員附加於陣列尾端
+- [x] 6.5 RED→regression guard: 補 it「匯入採附加模式，既有參賽者不被覆蓋且順序在前」。
+      **寫下當下即綠燈**——6.4 的 `reduce` 實作已內建附加語意，非真紅燈；已以 mutation
+      驗證：將 `reduce` 初始累積值由 `[...roster]` 改為 `[]`（既有名單不再帶入）後轉紅
+      （`toHaveLength(5)` 收到 3），還原後轉綠
+- [x] 6.6 GREEN（同上，已於 6.4 提前完成）: `reduce` 逐列呼叫既有 `roster.ts` 的
+      `addPlayer`，新成員附加於陣列尾端
 - [ ] 6.7 RED: 補 it「同名參賽者各自獨立建立，不靜默合併」。確認紅燈
 - [ ] 6.8 GREEN: 確認流程中**沒有任何依 `name` 的比對或去重**，同名自然各自建立
 - [ ] 6.9 RED: 補 it「同一次匯入未提供顏色的多列取得互不相同的預設漸層」：

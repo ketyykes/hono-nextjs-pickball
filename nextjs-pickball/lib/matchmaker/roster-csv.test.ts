@@ -563,4 +563,30 @@ describe("applyRosterImport", () => {
 
 		expect(updatedRoster).toEqual(existingRoster);
 	});
+
+	it("匯入採附加模式，既有參賽者不被覆蓋且順序在前", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,,",
+			"乙,female,4.0,,",
+			"丙,other,6.0,,",
+		].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const secondExistingPlayer: Player = { ...EXISTING_PLAYER, id: "existing-2", name: "既有球員二" };
+		const existingRoster: Player[] = [EXISTING_PLAYER, secondExistingPlayer];
+		const updatedRoster = applyRosterImport(existingRoster, parsed, {
+			ids: ["imported-1", "imported-2", "imported-3"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		expect(updatedRoster).toHaveLength(5);
+		expect(updatedRoster[0]).toEqual(EXISTING_PLAYER);
+		expect(updatedRoster[1]).toEqual(secondExistingPlayer);
+		expect(updatedRoster.slice(2).map((player) => player.name)).toEqual(["甲", "乙", "丙"]);
+	});
 });
