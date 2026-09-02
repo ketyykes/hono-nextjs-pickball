@@ -80,4 +80,17 @@ describe("history-csv", () => {
 		expect(fields[9]).toBe("3.10、3.20、3.30、3.40");
 		expect(fields[10]).toBe("4.10、4.20、4.30、4.40");
 	});
+
+	// regression guard：寫入當下即為綠燈（4.4 的實作本就無條件輸出標題列，
+	// entries 為空時 map 結果自然是空陣列，不需要另外的空歷史分支）。已用「改壞
+	// historyToCsv、令空歷史回傳空字串」的方式驗證偵測力：mutation 後本測試轉紅
+	// （expected 0 to be greater than 0），還原後轉綠，證明本測試確實能攔住
+	// 「空歷史回傳空字串」這種退化（M8 §4.5／4.6 回報）。
+	it("歷史為空時仍輸出只有標題列的 CSV", () => {
+		const csvText = historyToCsv([]);
+		const lines = stripBom(csvText).split("\r\n");
+
+		expect(csvText.length).toBeGreaterThan(0);
+		expect(lines).toEqual([HEADER_LINE]);
+	});
 });
