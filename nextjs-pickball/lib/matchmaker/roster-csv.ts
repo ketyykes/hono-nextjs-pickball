@@ -44,7 +44,12 @@ const GENDER_LOOKUP: Record<string, Gender> = {
 	other: "other",
 };
 
-/** 依標題名稱找出各欄位在資料列中的索引；找不到則為 -1。 */
+/**
+ * 依標題名稱找出各欄位在資料列中的索引；找不到則為 -1。
+ * 標題列若有重複欄名（例如兩個「名稱」），`indexOf` 只會取第一個，第二欄的值
+ * 靜默丟棄——這是刻意的取捨（Stage 2 review Minor m4）：重複標題本身已是使用者
+ * 誤填，本模組不額外偵測，行為與「多一個未知欄位」一致（忽略而非報錯）。
+ */
 function findHeaderIndex(headerRow: readonly string[], headerName: string): number {
 	return headerRow.indexOf(headerName);
 }
@@ -94,7 +99,19 @@ function validateGender(raw: string): FieldValidation<Gender> {
 	return { valid: true, value: gender };
 }
 
-/** 強度分數：1.00～8.00 的數字；非數字與超出範圍是兩種不同的錯誤原因。 */
+/**
+ * 強度分數：1.00～8.00 的數字；非數字與超出範圍是兩種不同的錯誤原因。
+ *
+ * `.trim()` 不是為了讓 `Number()` 正確解析（`Number()` 本就忽略前後空白），
+ * 而是為了讓純空白輸入（如 `"   "`）命中下面的 `trimmed === ""` 分支、回報
+ * 「需為數字」，而非讓 `Number("   ")` 的值 0 落入下面的範圍檢查、誤報成
+ * 「需介於…之間」（Stage 2 review Minor m1）。
+ *
+ * 另外 `Number()` 的寬鬆語法會一併接受 `"0x5"`／`"+5"`／`"5."` 等非十進位或
+ * 非常規寫法（皆會被轉為落在合法範圍內的數字），與「強度分數需為數字」的
+ * 使用者心智模型有落差，但因結果仍落在合法範圍內故無實害，故不額外收緊
+ * （Simplicity First；Stage 2 review Minor m6）。
+ */
 function validateRating(raw: string): FieldValidation<number> {
 	const trimmed = raw.trim();
 	const value = Number(trimmed);
