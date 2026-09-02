@@ -339,3 +339,28 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
 
    **Nits（不阻擋）**：`DOUBLES_COMPOSITION_LABEL` 在 `CourtCard.tsx` 與 `HistoryRecordCard.tsx`
    各持有一份（4.9 已裁決不抽，理由見 tasks 4.9）；若日後第三處也需要同一份文案，屆時再抽。
+
+9. **§5.3 兩個 regression guard 的獨立 mutation 複驗：`PASS`，0 存活
+   （2026-09-02，由第四棒 leader 親自執行）**
+
+   **為何要做**：§5.1～5.3 由第三棒完成後未經兩階段審查即中斷。§5.3 的兩個 test 寫入當下即綠燈
+   （如實標註 regression guard），其偵測力**僅有 Implementer 自述**——而本 change 的既有教訓明訂
+   「Stage 2 mutation 自述不可採信，必須獨立驗證」。§6 的其餘八項都不覆蓋這兩個 test 的偵測力
+   （6.8 只打 `history-range.ts`），故補做此項。
+
+   **偏離說明**：execution-plan 指定審查應派 subagent。本次由 leader（opus）親跑，原因是
+   「派出 subagent 之後不可以結束回合」的硬規則與 E2E 的長執行時間相衝突，親跑可在同一回合內
+   完整落盤；審查標準未打折，每組皆貼出實際輸出並以 `git checkout --` 還原。
+
+   **3 組 mutation 全數轉紅（3/3 killed）**，於 `chromium` project 單獨執行：
+
+   | 代號 | 對 `HistoryView.tsx` 的變異 | 結果 |
+   |---|---|---|
+   | M1 | hydration 後回寫 `localStorage`，且**資料完全相同、只對調 `{ version, entries }` 的鍵序** | 「內容不變」**轉紅**（`expect(afterValue).toBe(rawValue)` 失敗）——證實該斷言是**逐字**比對，連不改變語意的最細微寫入都攔得住 |
+   | M2 | render 期間直讀 `localStorage`（`?? (typeof window !== "undefined" ? readHistory().entries : [])`），製造**真實**的 hydration mismatch | 「無 console error」**轉紅**（攔到 `[pageerror] Hydration failed because the server rendered text didn't match the client`）——證實 `trackConsoleIssues()` 確實涵蓋 hydration 警告，非僅 `console.error` |
+   | M3 | `entries` 恆為空陣列 | **兩個 test 皆轉紅**（`getByText("唯讀驗證員A1")` 與 `getByText("hydration顯示員A")` 皆 element(s) not found）——證實兩者都真的驗到「紀錄有被渲染出來」，不是空跑後只檢查 storage／console |
+
+   **結論**：§5.3 的自述屬實，**0 存活**。這是本 change 至今**唯一一組獨立複驗後未發現新缺口**的
+   （§1 抓到 1、§3 抓到 3、§4 抓到 14），成因推測是 §5.3 的兩個 test 本就是為「否定性保證」
+   （不寫入、無錯誤）而寫，斷言形狀是 `toBe(原字串)` 與 `toEqual([])` 這類**全稱斷言**，
+   天然不易出現「某個取值從未被走過」的零覆蓋形態——與前幾組的缺口成因正好互補。
