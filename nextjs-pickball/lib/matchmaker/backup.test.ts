@@ -300,6 +300,9 @@ describe("backup", () => {
 		if (result && !result.ok) {
 			expect(result.message).toMatch(/JSON/);
 			expect(result.message).toMatch(/[一-鿿]/);
+			// 失敗分支恰為 { ok, message } 兩個欄位，不多不少——這是可執行的斷言，
+			// 不是型別上「無法斷言」的事（M8 §3 Stage 2 review J3）。
+			expect(Object.keys(result).sort()).toEqual(["message", "ok"]);
 		}
 	});
 
@@ -315,6 +318,7 @@ describe("backup", () => {
 			// 版本不符須有專屬訊息，不與「結構不合法」共用同一則（兩者的修正方式不同）。
 			expect(result.message).toBe(TRANSFER_MESSAGES.unsupportedVersion);
 			expect(result.message).not.toBe(TRANSFER_MESSAGES.invalidStructure);
+			expect(Object.keys(result).sort()).toEqual(["message", "ok"]);
 		}
 	});
 
@@ -332,10 +336,12 @@ describe("backup", () => {
 		const result = parseBackup(JSON.stringify(backup));
 
 		expect(result.ok).toBe(false);
-		// 失敗分支的型別本就不帶任何資料欄位，「不保留另外兩位」由型別強制——
-		// 此處只需確認整份被判定失敗，不需要（也無法）另外斷言「沒有 players 欄位」。
 		if (!result.ok) {
 			expect(result.message).toContain("參賽者");
+			// 「不保留另外兩位」不只是型別上的推論，這裡直接斷言失敗結果恰為
+			// { ok, message } 兩個欄位、沒有夾帶任何 players／backup 相關欄位
+			// （M8 §3 Stage 2 review J3：此前的註解宣稱這件事「無法斷言」是錯的）。
+			expect(Object.keys(result).sort()).toEqual(["message", "ok"]);
 		}
 	});
 
