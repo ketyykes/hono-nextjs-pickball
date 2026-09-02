@@ -216,3 +216,63 @@
   }
 }
 
+/*
+  matchmaker 列印樣式（matchmaker-visual-export change §8，design Decision 3）。
+  規則集中於此、一律以 data-print 屬性選取，SHALL NOT 散落於各元件的 utility class——
+  列印要關掉的東西橫跨全站導覽（app/layout.tsx）與對戰頁控制項（app/matchmaker/page.tsx）
+  兩個不同擁有者，集中一處才追得動。
+
+  `[data-print="sheet"]` 這條基礎規則不在 @media print 內：PrintSheet（列印版內容）
+  在螢幕上 MUST 隱藏，只有列印時才 MUST 顯示，因此需要一條「平常關閉」的基礎規則，
+  交由下方 @media print 內的 `display: block !important` 於列印時覆寫。
+
+  @media print 內的兩條 `body:has([data-print="sheet"]) ...` 規則，把「隱藏全站
+  navbar／matchmaker 區段導覽」限縮在「本頁確實有掛列印版內容」的情況——用 :has()
+  收斂，避免這條 matchmaker 專屬的列印需求外溢到 matchmaker 以外的路由（例如 /
+  或 /quiz）的列印行為。:has() 支援：Chromium 105+／Safari 15.4+／Firefox 121+
+  （prd.md 12.2「現代瀏覽器」範圍內）。降級後果：不支援 :has() 的舊瀏覽器列印
+  matchmaker 頁面時會多印一條 navbar 與一條區段導覽 tab，是美觀問題而非功能失效，
+  對戰資訊（[data-print="sheet"] 內容）仍完整顯示。不為此加 JS 版 fallback
+  （在 beforeprint 事件動 class）：那會為了少數舊瀏覽器引入一個常駐事件監聽。
+*/
+[data-print="sheet"] {
+  display: none;
+}
+
+@media print {
+  body:has([data-print="sheet"]) > header {
+    display: none !important;
+  }
+  body:has([data-print="sheet"]) nav[aria-label="對戰分配區段導覽"] {
+    display: none !important;
+  }
+
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  [data-print="sheet"] {
+    display: block !important;
+  }
+  [data-print="sheet"] > h1 {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+  }
+
+  /* 每個場地區塊不可跨頁切斷（spec：SHALL NOT 讓同一個場地的球員被拆到兩頁），
+     並給予基本間距與縮排，讓紙本可讀（leader 裁決 4：只做「讓紙本可讀」所需的
+     最小排版，SHALL NOT 做頁首頁尾、頁碼、指定紙張大小）。 */
+  [data-print="court"] {
+    break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+  [data-print="court"] > h2 {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+  }
+  [data-print="court"] > div {
+    margin-left: 1rem;
+    margin-bottom: 0.25rem;
+  }
+}
+

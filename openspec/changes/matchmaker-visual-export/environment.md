@@ -19,8 +19,12 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
-- **Initial commit hash**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
+- **Baseline tests**: ✅ 全綠（2026-09-02 於本 worktree 實跑 `pnpm install` 後 `pnpm test`，exit 0）。
+  `nextjs-pickball`：Test Files 62 passed (62)、Tests 570 passed (570)；
+  `hono-pickball`：Test Files 4 passed (4)、Tests 16 passed (16)。
+  後端未出現 `listen EPERM 127.0.0.1`，不需放行重跑。
+  `pnpm install` 後 `git status --short` 為空——`pnpm-lock.yaml` 與 `package.json` 皆未變動。
+- **Initial commit hash**: `2b3fb8fa9a2bd972661a67c19f92028d438efab0`（`main` 上 M3～M8 全部已合併）
 - **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-visual-export`
 
 ## Teardown

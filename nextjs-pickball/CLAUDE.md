@@ -25,9 +25,15 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
 
 - `/` — 匹克球指南（Hero、TocBar、Part 01/02、Conclusion）
 - `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查
-- `/matchmaker` — 對戰頁（場次舞台：本輪設定、場地色塊網格、比分輸入與送出、休息名單），milestone M5 = matchmaker-match-stage-ui change。**全站 navbar 的 matchmaker 入口指向這裡**，SHALL NOT 同時掛第二條指向名單頁的連結
+- `/matchmaker` — 對戰頁（場次舞台：本輪設定、場地色塊網格、比分輸入與送出、休息名單），milestone M5 = matchmaker-match-stage-ui change。**全站 navbar 的 matchmaker 入口指向這裡**，SHALL NOT 同時掛第二條指向名單頁的連結。
+  本頁另提供**匯出 JPG 與列印 PDF**（milestone M9 = matchmaker-visual-export change）：兩者共用
+  `lib/matchmaker/export-scene.ts` 的同一份 `ExportScene`，JPG 走 `lib/matchmaker/scene-canvas.ts`
+  的 canvas 手繪（**零外部套件**），PDF 走瀏覽器列印流程（`window.print()` + `app/globals.css`
+  的 `@media print` 區塊 + `components/matchmaker/PrintSheet.tsx` 列印版）
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
-- 上述兩頁共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）
+- `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
+- 上述四頁共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
+  **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 
 matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單、回合、比分都存瀏覽器，不上傳後端）——引擎放前端是刻意決策，不是待搬的後端邏輯。
@@ -71,7 +77,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
 `openspec/` 在 repo root，openspec CLI 一律從 repo root 執行；規格內引用本 workspace 的檔案路徑須帶 `nextjs-pickball/` 前綴。本 workspace 的 TDD 適用範圍與例外層（原 `openspec/config.yaml` 所載；該檔現在只放 `schema` 與 `context` 兩項設定，不含規則內文）：
 
 - `app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**` 下的行為邏輯模組採 TDD：先寫失敗測試 → 實作至綠 → refactor（三步規則與紅燈要求見 root CLAUDE.md）
-- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）
+- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）、`lib/matchmaker/scene-canvas.ts`（canvas 繪製與下載：所有決策都已在 `ExportScene` 內定死，本檔零分支、happy-dom 無 2D context，改以 `tests/e2e/specs/visual-export.spec.ts` 驗收，理由見該檔檔頭）
 - **純呈現型元件不強制單元 TDD**（以 Playwright E2E 驗收）；行為邏輯下放 `hooks/`、`lib/` 再對其做 TDD
 - 規格情境用 Given/When/Then 撰寫，行為邏輯情境須可直接對應到 Vitest test case
 
