@@ -205,7 +205,7 @@ describe("transfer-storage", () => {
 	});
 
 	it("寫入超出配額時回報失敗並提供繁體中文的修正建議", () => {
-		vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+		const setItemSpy = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
 			throw new DOMException("超出配額", "QuotaExceededError");
 		});
 
@@ -214,5 +214,37 @@ describe("transfer-storage", () => {
 			ok: false,
 			message: TRANSFER_MESSAGES.quotaExceeded,
 		});
+
+		// 明確 mockRestore：實測發現 happy-dom 環境下對 window.localStorage 實例方法的
+		// spy，afterEach 的 vi.restoreAllMocks() 無法可靠還原（會殘留到下一條 it），
+		// 只還原 window 的 "localStorage" getter 本身不受影響。此處明確還原以避免污染
+		// 後續 it（見本輪新增的 readSnapshot／writeBackup happy-path it）。
+		setItemSpy.mockRestore();
+	});
+
+	it("readSnapshot 在 localStorage 可用時回傳名單／回合／歷史的真實內容", () => {
+		// M8 §7 兩階段審查 Blocker B2：readSnapshot 的 happy path（storage 可用時真正
+		// 讀出資料）先前完全零覆蓋，guard 條件反轉、拿掉任一來源函式、entries→history
+		// 欄位改名錯置皆不會被發現。本測試以真實 localStorage 內容（非 mock）逐欄位鎖住。
+		const player = makePlayer();
+		const round = makeRound();
+		const entryA = makeHistoryEntry();
+		const entryB = makeHistoryEntry({ matchId: "match-2" });
+
+		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [player] }));
+		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round }));
+		localStorage.setItem(
+			HISTORY_STORAGE_KEY,
+			JSON.stringify({ version: 1, entries: [entryA, entryB] }),
+		);
+
+		const snapshot = readSnapshot();
+
+		expect(snapshot.players).toEqual([player]);
+		expect(snapshot.currentRound).toEqual(round);
+		// 特別鎖住「entries → history」的欄位改名對應，且用兩筆非空資料排除
+		// 「巧合地都是空陣列」的情況。
+		expect(snapshot.history).toHaveLength(2);
+		expect(snapshot.history).toEqual([entryA, entryB]);
 	});
 });

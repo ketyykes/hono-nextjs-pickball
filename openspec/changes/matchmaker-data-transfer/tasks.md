@@ -393,6 +393,10 @@ Depends on: §0, §3
       新增 `vi.spyOn(window.localStorage, "setItem")` 監看，明確斷言 `setItem` 全程
       未被呼叫，讓「驗證失敗時沒有寫入路徑可走」從型別保證變成可觀察的斷言。
       it 名稱不變（spec 驗收錨點）
+- [x] 7.13 FIX（Blocker B2）: 新增 it「readSnapshot 在 localStorage 可用時回傳名單／
+      回合／歷史的真實內容」：以真實 localStorage 內容（非 mock）驗證三欄位對應來源
+      資料，history 用 2 筆非空資料鎖住 `entries → history` 欄位改名。
+      mutation 複驗：M13／M15／M16／M17／M18／M19 六組全數轉紅（見 impl-s7-fix.md）
 
 ## 8. 資料頁與元件（例外層，E2E 當 RED）
 Depends on: §2, §3, §4, §6, §7
