@@ -186,27 +186,27 @@ Depends on: §2
 > 不排序（保留 Set 插入序）。round-trip fixture 若用亂序簽章，期望值要寫**排序後**
 > 的結果，不能直接比對原始 LocalStorage 內容。
 
-- [ ] 3.1 RED: 於 `backup.test.ts` 補 it
+- [x] 3.1 RED: 於 `backup.test.ts` 補 it
       「buildBackup 的輸出經 JSON 往返後可被 parseBackup 還原為相同快照」。確認紅燈
-- [ ] 3.2 GREEN: 實作 `parseBackup(text)`：`JSON.parse` → `BackupSchema.safeParse`，
+- [x] 3.2 GREEN: 實作 `parseBackup(text)`：`JSON.parse` → `BackupSchema.safeParse`，
       成功回 `{ ok: true, backup }`。回傳型別 MUST 讓「未驗證的資料」在型別上無法傳給
       §7 的寫入函式（design Decision 1 的原子性由型別強制）
-- [ ] 3.3 RED: 補 it「JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯」。確認紅燈
-- [ ] 3.4 GREEN: 以 try/catch 接住 `JSON.parse`，回 `{ ok: false, message }`，
+- [x] 3.3 RED: 補 it「JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯」。確認紅燈
+- [x] 3.4 GREEN: 以 try/catch 接住 `JSON.parse`，回 `{ ok: false, message }`，
       訊息取自 `TRANSFER_MESSAGES`，SHALL NOT 在此處寫死字串
-- [ ] 3.5 RED: 補 it「version 不是 1 時整份拒絕並說明版本不支援」。確認紅燈
-- [ ] 3.6 GREEN: 在 `parseBackup` 內先辨識版本不符並回傳專屬訊息，
+- [x] 3.5 RED: 補 it「version 不是 1 時整份拒絕並說明版本不支援」。確認紅燈
+- [x] 3.6 GREEN: 在 `parseBackup` 內先辨識版本不符並回傳專屬訊息，
       不與「結構不合法」共用同一則（兩者的修正方式不同）
-- [ ] 3.7 RED: 補 it「單筆參賽者不合法時整份拒絕，不走逐筆降級」：3 位中 1 位
+- [x] 3.7 RED: 補 it「單筆參賽者不合法時整份拒絕，不走逐筆降級」：3 位中 1 位
       `rating: 99`，斷言 `ok` 為 `false` **且結果中不存在另外 2 位**。確認紅燈
-- [ ] 3.8 GREEN: 確認 `BackupSchema` 對 `players` 使用完整的 `PlayerSchema` 陣列驗證
+- [x] 3.8 GREEN: 確認 `BackupSchema` 對 `players` 使用完整的 `PlayerSchema` 陣列驗證
       （非 `z.unknown()` 兩段式），使單筆不合法即整份失敗（design Decision 4）
-- [ ] 3.9 RED: 補 it「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」：
+- [x] 3.9 RED: 補 it「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」：
       遍歷 `TRANSFER_MESSAGES` 的每一則，斷言① 不含未翻譯的 zod issue 字串
       （如 `Invalid input`、`Expected`）② 含「請」字開頭的下一步指引。確認紅燈
-- [ ] 3.10 GREEN: 補齊訊息表：每一則都寫成「＜發生了什麼＞。＜目前資料狀態＞。請＜下一步＞。」
+- [x] 3.10 GREEN: 補齊訊息表：每一則都寫成「＜發生了什麼＞。＜目前資料狀態＞。請＜下一步＞。」
       三段式，與 `PlayerForm` 既有訊息語氣一致
-- [ ] 3.11 REFACTOR: 確認 `parseBackup` 的失敗分支只有一處組裝結果物件，
+- [x] 3.11 REFACTOR: 確認 `parseBackup` 的失敗分支只有一處組裝結果物件，
       三種失敗（語法／版本／結構）只是取不同訊息，不各自寫一份 return
 
 ## 4. 歷史賽果的 CSV 匯出（`history-csv.ts`）
