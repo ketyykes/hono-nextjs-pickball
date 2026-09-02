@@ -2,7 +2,7 @@
 // 即是 `import { Buffer } from "node:buffer";`，本檔沿用而非依賴全域 Buffer。
 import { Buffer } from "node:buffer";
 import { test, expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 // 對戰頁（/matchmaker）匯出 JPG／列印 PDF 兩個入口的 E2E 驗收。
 // 對應 matchmaker-visual-export change tasks §7 的 test-plan：入口可見性、
@@ -202,6 +202,32 @@ async function seedRoster(page: Page, count: number): Promise<void> {
 	);
 }
 
+// §9 tasks 9.3：把「種名單 + 產生一輪」這段各 test 重複的前置動作收斂為單一 helper。
+// 回合格式來源為 M4 的 `matchmaker:round:v1`，改動請同步。
+// 能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態（球員名單本身沒有
+// 對應的 UI 建立流程）才種資料——「已有回合」一律靠點擊「產生本輪對戰」達成，
+// 不直接寫入 matchmaker:round:v1（沿用 M5 design Decision 10 既有裁決）。
+async function gotoMatchmakerWithRound(page: Page, count: number): Promise<void> {
+	await seedRoster(page, count);
+	await page.goto("/matchmaker");
+	await page.getByRole("button", { name: "產生本輪對戰" }).click();
+}
+
+// §9 tasks 9.1：以鍵盤 Tab 走訪，而非直接呼叫 locator.focus()——後者會繞過瀏覽器真實的
+// 鍵盤走訪順序，測不出「使用者只用鍵盤是否真的到得了這裡」（spec：MUST 可由鍵盤操作）。
+// 逐次按 Tab 後才檢查是否已聚焦（而非先檢查再按），因為起始焦點在 body，需要先移動一次
+// 才可能命中任何元素。
+async function tabUntilFocused(page: Page, locator: Locator, maxTabPresses = 50): Promise<void> {
+	for (let attempt = 0; attempt < maxTabPresses; attempt++) {
+		await page.keyboard.press("Tab");
+		const isFocused = await locator
+			.evaluate((element) => element === document.activeElement)
+			.catch(() => false);
+		if (isFocused) return;
+	}
+	throw new Error(`Tab 鍵在 ${maxTabPresses} 次內未能到達目標元素`);
+}
+
 test.describe("/matchmaker 匯出功能", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto("/");
@@ -216,9 +242,7 @@ test.describe("/matchmaker 匯出功能", () => {
 	test("對戰頁提供匯出 JPG 與列印 PDF 兩個入口", async ({ page }) => {
 		const consoleIssues = trackConsoleIssues(page);
 
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		await expect(page.getByRole("button", { name: "匯出 JPG" })).toBeVisible();
 		await expect(page.getByRole("button", { name: "列印 PDF" })).toBeVisible();
@@ -235,9 +259,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		// 讓本測試也能偵測到 scene-canvas.ts／page.tsx 若不慎在模組層級碰 window／document。
 		const consoleIssues = trackConsoleIssues(page);
 
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		const [download] = await Promise.all([
 			page.waitForEvent("download"),
@@ -309,9 +331,7 @@ test.describe("/matchmaker 匯出功能", () => {
 			};
 		});
 
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		await page.getByRole("button", { name: "列印 PDF" }).click();
 
@@ -327,9 +347,7 @@ test.describe("/matchmaker 匯出功能", () => {
 	});
 
 	test("列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容", async ({ page }) => {
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		// 先在**螢幕媒體**下確認這些元素都真的存在——Playwright 的 role 查詢會把
 		// display:none 的元素排除在無障礙樹外，切到 print 之後 getByRole 一律回 0 個，
@@ -392,9 +410,7 @@ test.describe("/matchmaker 匯出功能", () => {
 	});
 
 	test("列印版的每個場地區塊設定為不跨頁切斷", async ({ page }) => {
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		await page.emulateMedia({ media: "print" });
 
@@ -416,9 +432,7 @@ test.describe("/matchmaker 匯出功能", () => {
 	// `[data-print="sheet"] { display: none }`，而它被拿掉時**全套 E2E 都不會紅**。
 	// 這條就是那道防線。
 	test("列印版內容在螢幕媒體下隱藏，只有列印時才顯示", async ({ page }) => {
-		await seedRoster(page, 2);
-		await page.goto("/matchmaker");
-		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await gotoMatchmakerWithRound(page, 2);
 
 		const sheet = page.locator('[data-print="sheet"]');
 		// 先確認它確實掛在 DOM 上——否則「根本沒渲染」也會讓 toBeHidden() 通過。
@@ -440,5 +454,100 @@ test.describe("/matchmaker 匯出功能", () => {
 		await page.emulateMedia({ media: "print" });
 
 		await expect(page.locator("body > header")).toBeVisible();
+	});
+
+	// §9：匯出 SHALL 為唯讀操作——匯出流程 MUST NOT 改動目前回合或任何 LocalStorage 資料
+	// （spec「匯出為純前端唯讀操作」）。
+	test("匯出 JPG 後目前回合與本機資料保持不變", async ({ page }) => {
+		await gotoMatchmakerWithRound(page, 2);
+
+		const roundBeforeExport = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROUND_STORAGE_KEY,
+		);
+		expect(roundBeforeExport).not.toBeNull();
+
+		const [download] = await Promise.all([
+			page.waitForEvent("download"),
+			page.getByRole("button", { name: "匯出 JPG" }).click(),
+		]);
+		void download;
+
+		const roundAfterExport = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROUND_STORAGE_KEY,
+		);
+		expect(roundAfterExport).toBe(roundBeforeExport);
+
+		// 重新整理後再確認一次（spec 的 AND）：這裡直接比對整份 matchmaker:round:v1
+		// 的原始內容，而非只挑幾個欄位——場地數、場次狀態與比分全部包在這份 JSON 裡，
+		// 內容逐位元組相同即代表這三者都未被改動。
+		await page.reload();
+		const roundAfterReload = await page.evaluate(
+			(key) => window.localStorage.getItem(key),
+			ROUND_STORAGE_KEY,
+		);
+		expect(roundAfterReload).toBe(roundBeforeExport);
+	});
+
+	// §9：匯出 MUST 完全在瀏覽器本機完成，不得將參賽者資料送往後端或第三方服務
+	// （spec「匯出為純前端唯讀操作」；prd.md 12.4）。
+	test("匯出過程不發出任何網路請求", async ({ page }) => {
+		// 列印用 stub，避免真的呼叫瀏覽器原生列印對話框卡住測試（沿用既有列印測試的既有裁決）。
+		await page.addInitScript(() => {
+			window.print = () => {};
+		});
+
+		await gotoMatchmakerWithRound(page, 2);
+
+		// 頁面載入期間本身會有 RSC payload、字型、chunk 等請求（開發模式下還有 HMR），
+		// 那些不是「匯出動作發出的請求」，故等頁面完全靜止後才開始計數。
+		await page.waitForLoadState("networkidle");
+
+		// 只計 fetch／XHR：spec 的 THEN 明訂「未發出任何 fetch 或 XHR 請求」，排除
+		// WebSocket（HMR）等其他資源型別的雜訊，避免過濾範圍太窄而漏掉真正的違規，
+		// 也避免太寬而把無關噪音誤判為違規（leader 裁決 2）。
+		let requestCount = 0;
+		page.on("request", (request) => {
+			const resourceType = request.resourceType();
+			if (resourceType === "fetch" || resourceType === "xhr") {
+				requestCount += 1;
+			}
+		});
+
+		const [download] = await Promise.all([
+			page.waitForEvent("download"),
+			page.getByRole("button", { name: "匯出 JPG" }).click(),
+		]);
+		void download;
+
+		await page.getByRole("button", { name: "列印 PDF" }).click();
+
+		expect(requestCount).toBe(0);
+	});
+
+	// §9：兩個匯出入口 MUST 具備可辨識的文字或 aria-label，且 MUST 可由鍵盤操作
+	// （spec「匯出入口的可用性與無障礙」；prd.md 12.3、12.5）。
+	test("匯出入口具備可存取名稱且可由鍵盤操作", async ({ page }) => {
+		await gotoMatchmakerWithRound(page, 2);
+
+		// gotoMatchmakerWithRound 內點擊「產生本輪對戰」後，該按鈕仍保有 focus——Firefox
+		// 對「Tab 到文件最後一個可聚焦元素後再按 Tab」不會循環回文件開頭（Chromium／WebKit
+		// 會），若不清掉這個殘留 focus，往後 Tab 永遠到不了在 DOM 順序上更早的匯出入口
+		// （debug 實測：firefox 卡在最後一顆「送出比分」按鈕原地不動）。清空 focus 讓起點
+		// 回到中性狀態（document.activeElement 為 body），與「使用者剛載入頁面、尚未點擊
+		// 任何東西就開始按 Tab」的情境等價，三種桌面瀏覽器行為才會一致。
+		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+		const exportJpgButton = page.getByRole("button", { name: "匯出 JPG" });
+		const printPdfButton = page.getByRole("button", { name: "列印 PDF" });
+
+		await tabUntilFocused(page, exportJpgButton);
+		await expect(exportJpgButton).toBeFocused();
+		await expect(exportJpgButton).toHaveAccessibleName(/\S/);
+
+		await tabUntilFocused(page, printPdfButton);
+		await expect(printPdfButton).toBeFocused();
+		await expect(printPdfButton).toHaveAccessibleName(/\S/);
 	});
 });
