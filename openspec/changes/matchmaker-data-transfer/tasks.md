@@ -133,9 +133,16 @@ Depends on: §0
       巢狀 schema 一律 **import 自 §0 對照表記錄的模組**，SHALL NOT 重新宣告欄位；
       同檔匯出 `TRANSFER_MESSAGES` 訊息常數表（先放本任務用得到的）。
       並實作 `backup.ts` 的 `buildBackup(snapshot, { exportedAt })`
-- [ ] 2.3 RED: 補 it「空資料時仍產生合法備份而非拒絕匯出」：空名單／`currentRound: null`／
+- [x] 2.3 RED: 補 it「空資料時仍產生合法備份而非拒絕匯出」：空名單／`currentRound: null`／
       空歷史，斷言回傳合法備份且不拋例外。確認紅燈
-- [ ] 2.4 GREEN: 補齊空資料路徑：空陣列與 `null` 皆為合法輸入，不進入任何錯誤分支
+      > regression guard：2.2 的 buildBackup 對空陣列／null 本就無特殊分支，寫入即綠燈。
+      > 已用 mutation 驗證偵測力：暫時在 buildBackup 內加入
+      > `if (snapshot.players.length === 0) throw new Error(...)`，
+      > 本 it 立即轉紅（`AssertionError: expected [Function] to not throw an error but
+      > 'Error: MUTATION-TEST：空名單時故意拒絕匯出' was thrown`）；還原後重跑轉綠，
+      > `backup.ts` 與還原前 byte-for-byte 相同（`diff` 確認）。
+- [x] 2.4 GREEN: 補齊空資料路徑：空陣列與 `null` 皆為合法輸入，不進入任何錯誤分支
+      （2.2 的實作已滿足，無需額外程式碼改動；見上方 2.3 的 mutation 證據）
 - [ ] 2.5 RED: 補 it「簽章以字串陣列寫入備份，JSON 往返後內容不變」：以簽章為 `Set` 的快照
       呼叫 `buildBackup`，斷言 `backup.currentRound` 的三組簽章欄位皆為字串陣列，且
       `JSON.parse(JSON.stringify(backup))` 後內容相等。確認紅燈

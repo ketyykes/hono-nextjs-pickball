@@ -137,4 +137,21 @@ describe("backup", () => {
 			fullMatchKeys: [],
 		});
 	});
+
+	it("空資料時仍產生合法備份而非拒絕匯出", () => {
+		const snapshot = makeSnapshot({
+			players: [],
+			currentRound: null,
+			history: [],
+		});
+
+		expect(() => buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" })).not.toThrow();
+
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		expect(backup.version).toBe(1);
+		expect(backup.players).toEqual([]);
+		expect(backup.currentRound).toBeNull();
+		expect(backup.history).toEqual([]);
+	});
 });
