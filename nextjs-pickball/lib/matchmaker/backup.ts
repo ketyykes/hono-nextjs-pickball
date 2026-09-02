@@ -33,6 +33,18 @@ export interface BackupSnapshot {
 /**
  * 把 Set 或字串陣列正規化為排序後的字串陣列（design Decision 11：排序是為了讓相同
  * 內容產生相同備份，便於 round-trip 斷言與 diff）。
+ *
+ * 交棒給 §3：排序使 `buildBackup` 對**亂序輸入非恆等**——而 `round.ts` 的私有函式
+ * `toArrays()` 只做 `[...index.teammateKeys]`，保留 Set 插入序、不排序。因此從
+ * LocalStorage 讀出的 `Round.seenSignatures` 可能是亂序的，經 `buildBackup` 後會被
+ * 排序；§3 若要寫 round-trip 斷言，期望值須是**排序後**的結果，不能直接比對原始
+ * LocalStorage 內容（M8 §2 Stage 2 實測發現）。
+ *
+ * 刻意 SHALL NOT 去重：輸入若是記憶體表示法 Set，本就不含重複值；輸入若是已持久化
+ * 的字串陣列，理論上也不會有重複（`round.ts` 的 `toArrays` 只從 Set 產生）。但本函式
+ * 不對「輸入是否已去重」做任何假設或修正——多做一層去重只是把成本轉嫁到這個單純的
+ * 正規化函式，卻換不到任何額外能力，還可能掩蓋上游其實產生了重複值的錯誤（去重後
+ * 從備份檔看不出源頭壞了）。此決定由 `backup.test.ts` 的重複值測試釘住。
  */
 function toSortedSignatureKeys(keys: SignatureKeys): string[] {
 	return [...keys].sort();
@@ -41,10 +53,17 @@ function toSortedSignatureKeys(keys: SignatureKeys): string[] {
 /**
  * 由目前的本機資料快照產生一份完整備份物件（prd.md 9.2 的五項：version／players／
  * currentRound／history／重複配對簽章，簽章隨 currentRound 一併備份，見 design Decision 11）。
- * SHALL NOT 呼叫 new Date()——exportedAt 目前只用於 backupFileName，本函式用不到它，
- * 但仍保留參數形狀以對齊 spec 的 buildBackup(snapshot, context) 簽章。
+ * SHALL NOT 呼叫 new Date()。
+ *
+ * 刻意只做頂層淺拷貝：`players`／`history` 僅淺拷貝陣列本身，元素（以及
+ * `currentRound.matches`）與輸入 `snapshot` 共用參考。深拷貝在此無實質需求——輸出
+ * 隨即交給 `JSON.stringify`／schema 驗證，不會被就地修改；深拷貝只會讓這個純函式
+ * 多一層無人使用的成本。呼叫端 MUST 視傳入的 `snapshot` 為唯讀，不要在呼叫
+ * `buildBackup` 之後再修改其內容。
  */
 export function buildBackup(snapshot: BackupSnapshot, context: { exportedAt: string }): Backup {
+	// context／exportedAt 本函式用不到，但仍保留參數形狀以對齊 spec 的
+	// buildBackup(snapshot, context) 簽章（exportedAt 目前只給 backupFileName 用）。
 	void context;
 	return {
 		version: 1,

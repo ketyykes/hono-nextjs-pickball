@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildBackup, backupFileName } from "./backup";
+import { BackupSchema } from "./transfer-types";
 import type { BackupSnapshot } from "./backup";
 import type { Player } from "./types";
 import type { Round } from "./round-types";
@@ -136,6 +137,25 @@ describe("backup", () => {
 			opponentKeys: ["p1|p2", "p3|p4"],
 			fullMatchKeys: [],
 		});
+		// 目前回合的整體內容（roundNumber／createdAt／format／courtCount／targetScore／
+		// matches／restingPlayerIds）都必須與快照相等，不能只驗過簽章那一個子欄位。
+		expect(backup.currentRound).toEqual(snapshot.currentRound);
+		// 只做頂層淺拷貝：陣列本身是新的，但呼叫端 MUST 視 snapshot 為唯讀——
+		// 這裡鎖住「確實有拷貝」這件事，避免展開語法被誤刪成直接參考傳遞。
+		expect(backup.players).not.toBe(snapshot.players);
+		expect(backup.history).not.toBe(snapshot.history);
+		// 備份物件恰為 schema 宣告的四個欄位，不多不少——防止日後不小心多寫一個
+		// schema 未宣告的欄位（例如把 exportedAt 也塞進輸出），那種欄位不會被
+		// safeParse 偵測到（zod 物件預設 strip 多餘鍵而非 reject）。
+		expect(Object.keys(backup).sort()).toEqual(["currentRound", "history", "players", "version"]);
+		// 備份物件本身也必須通過自家的 BackupSchema，且驗證後的內容與輸出逐位元組
+		// 相等——只斷言 success 不夠：若 schema 少宣告了某個欄位，safeParse 仍會
+		// 回報成功，但驗證後的資料會悄悄少那個欄位。
+		const parsed = BackupSchema.safeParse(backup);
+		expect(parsed.success).toBe(true);
+		if (parsed.success) {
+			expect(parsed.data).toEqual(backup);
+		}
 	});
 
 	it("空資料時仍產生合法備份而非拒絕匯出", () => {
@@ -153,18 +173,28 @@ describe("backup", () => {
 		expect(backup.players).toEqual([]);
 		expect(backup.currentRound).toBeNull();
 		expect(backup.history).toEqual([]);
+		// currentRound 為 null 時仍須通過 BackupSchema——這是「空資料 SHALL NOT
+		// 拒絕匯出」承諾在 schema 層的對應保證：schema 若漏了 .nullable()，
+		// 使用者匯入自己剛匯出的空備份會被判為格式錯誤。
+		const parsed = BackupSchema.safeParse(backup);
+		expect(parsed.success).toBe(true);
+		if (parsed.success) {
+			expect(parsed.data).toEqual(backup);
+		}
 	});
 
 	it("簽章以字串陣列寫入備份，JSON 往返後內容不變", () => {
 		const round = makeRound();
+		// 三個欄位皆給非空且插入順序與字母序不同的內容，才驗得出「有沒有真的排序」——
+		// 若只餵本來就已排序的值，拿掉 .sort() 測試仍會全綠（M8 §2 Stage 2 實測發現）。
 		const snapshot: BackupSnapshot = {
 			...makeSnapshot(),
 			currentRound: {
 				...round,
 				seenSignatures: {
-					teammateKeys: new Set(["p2|p1"]),
+					teammateKeys: new Set(["p2|p1", "p1|p2"]),
 					opponentKeys: new Set(["p3|p4", "p1|p2"]),
-					fullMatchKeys: new Set<string>(),
+					fullMatchKeys: new Set(["z|y", "a|b"]),
 				},
 			},
 		};
@@ -174,9 +204,67 @@ describe("backup", () => {
 		expect(Array.isArray(backup.currentRound?.seenSignatures.teammateKeys)).toBe(true);
 		expect(Array.isArray(backup.currentRound?.seenSignatures.opponentKeys)).toBe(true);
 		expect(Array.isArray(backup.currentRound?.seenSignatures.fullMatchKeys)).toBe(true);
+		// 三個欄位各自都要驗到「排序後的確切內容」，不是只驗類型。
+		expect(backup.currentRound?.seenSignatures).toEqual({
+			teammateKeys: ["p1|p2", "p2|p1"],
+			opponentKeys: ["p1|p2", "p3|p4"],
+			fullMatchKeys: ["a|b", "z|y"],
+		});
 
 		const roundTripped = JSON.parse(JSON.stringify(backup));
 		expect(roundTripped).toEqual(backup);
+	});
+
+	it("簽章陣列輸入含重複值時原樣保留，buildBackup 不做去重", () => {
+		const round = makeRound();
+		const snapshot: BackupSnapshot = {
+			...makeSnapshot(),
+			currentRound: {
+				...round,
+				seenSignatures: {
+					teammateKeys: ["p1|p2", "p1|p2", "p3|p4"],
+					opponentKeys: [],
+					fullMatchKeys: [],
+				},
+			},
+		};
+
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		expect(backup.currentRound?.seenSignatures.teammateKeys).toEqual(["p1|p2", "p1|p2", "p3|p4"]);
+	});
+
+	it("BackupSchema 逐欄位鎖住合法型別，不因欄位放寬或遺漏而讓不合法資料通過", () => {
+		const validBackup = buildBackup(makeSnapshot(), { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		// version 必須恰為字面量 1，不可放寬為一般 number，也不可鎖死在其他字面量。
+		expect(BackupSchema.safeParse({ ...validBackup, version: 2 }).success).toBe(false);
+
+		// players 為必要欄位且逐筆驗證：整份缺少 players、或其中一筆格式不合法皆須拒絕。
+		const withoutPlayers: Record<string, unknown> = { ...validBackup };
+		delete withoutPlayers.players;
+		expect(BackupSchema.safeParse(withoutPlayers).success).toBe(false);
+		expect(
+			BackupSchema.safeParse({
+				...validBackup,
+				players: [{ ...validBackup.players[0], rating: "not-a-number" }],
+			}).success,
+		).toBe(false);
+
+		// currentRound 仍要求完整的 Round 結構，不可放寬為 z.unknown()。
+		expect(
+			BackupSchema.safeParse({
+				...validBackup,
+				currentRound: { ...validBackup.currentRound, roundNumber: "not-a-number" },
+			}).success,
+		).toBe(false);
+
+		// history 逐筆驗證：其中一筆缺少必要欄位須整份拒絕，不走逐筆降級。
+		const invalidHistoryEntry: Record<string, unknown> = { ...validBackup.history[0] };
+		delete invalidHistoryEntry.winner;
+		expect(
+			BackupSchema.safeParse({ ...validBackup, history: [invalidHistoryEntry] }).success,
+		).toBe(false);
 	});
 
 	it("backupFileName 依注入時間產生含日期的檔名", () => {
