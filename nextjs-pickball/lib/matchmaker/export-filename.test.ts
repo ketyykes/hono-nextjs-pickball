@@ -3,9 +3,15 @@ import { jpgExportFileName } from "./export-filename";
 
 describe("jpgExportFileName", () => {
 	it("JPG 檔名依回合編號與注入日期組成", () => {
+		// 第一組為 spec Scenario 明訂的輸入與期望值，逐字不可更動。
 		expect(
 			jpgExportFileName({ roundNumber: 3, exportedAt: "2026-08-23T01:02:03.000Z" }),
 		).toBe("matchmaker-round-3-2026-08-23.jpg");
+		// 第二組刻意換一個回合編號：只驗第一組時，把 roundNumber 寫死成 3 的實作也會通過，
+		// 本錨點測試自己就殺不掉那個 mutant（Stage 2 實測 Minor-3）。
+		expect(
+			jpgExportFileName({ roundNumber: 12, exportedAt: "2026-08-23T01:02:03.000Z" }),
+		).toBe("matchmaker-round-12-2026-08-23.jpg");
 	});
 
 	// 以下為補充測試（非 spec 錨點），用來把 §8 列出的各種 mutant 逐一釘死。

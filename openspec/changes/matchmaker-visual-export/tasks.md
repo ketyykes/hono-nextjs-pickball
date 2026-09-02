@@ -62,9 +62,23 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/export-filename.test.ts`，寫入 it「JPG 檔名依回合編號與注入日期組成」：`roundNumber` 為 3、`exportedAt` 為 `2026-08-23T01:02:03.000Z` → 回傳 `matchmaker-round-3-2026-08-23.jpg`。確認紅燈
-- [ ] 3.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/export-filename.ts` 的 `jpgExportFileName({ roundNumber, exportedAt })`：日期取 ISO 字串前 10 碼，**SHALL NOT 於函式內呼叫 `new Date()` 或 `Date.now()`**
-- [ ] 3.3 REFACTOR: 檔名前綴與副檔名抽為具名常數；於檔頭註解記錄兩件事——① 格式刻意與 M8 的 `matchmaker-backup-<日期>.json` 對齊但**不跨 change import**、② 取 ISO 前 10 碼等於用 UTC 日期，台灣當地時間 08:00 前匯出會得到前一天日期，這是已知取捨（design Decision 6）
+- [x] 3.1 RED: 新增 `nextjs-pickball/lib/matchmaker/export-filename.test.ts`，寫入 it「JPG 檔名依回合編號與注入日期組成」：`roundNumber` 為 3、`exportedAt` 為 `2026-08-23T01:02:03.000Z` → 回傳 `matchmaker-round-3-2026-08-23.jpg`。確認紅燈
+- [x] 3.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/export-filename.ts` 的 `jpgExportFileName({ roundNumber, exportedAt })`：日期取 ISO 字串前 10 碼，**SHALL NOT 於函式內呼叫 `new Date()` 或 `Date.now()`**
+- [x] 3.3 REFACTOR: 檔名前綴與副檔名抽為具名常數；於檔頭註解記錄兩件事——① 格式刻意與 M8 的 `matchmaker-backup-<日期>.json` 對齊但**不跨 change import**、② 取 ISO 前 10 碼等於用 UTC 日期，台灣當地時間 08:00 前匯出會得到前一天日期，這是已知取捨（design Decision 6）
+
+> **§3 審查結論（2026-09-02）**：Stage 1 **PASS**（錨點逐字相符、斷言為精確 `toBe`、
+> 函式本體零 `new Date()`／`Date.now()`、未跨 change import M8 的 `backupFileName`、
+> 3.3 的兩條檔頭註解皆到位）。Stage 2 **PASS**——獨立 mutation 23 個**全數 KILLED，存活率 0.0%**
+> （含本組最在意的兩種「偷用當下時間」變體），為本 change 目前唯一零存活的群組；leader 另獨立
+> 複驗前綴、副檔名、段落順序、連字號、日期切片、`roundNumber` 寫死六項皆確認轉紅。
+> 4 個 Minor 已於本組全數處理：介面後綴 `Params`→`Input`（對齊 `lib/` 既有九個同類介面）、
+> 檔頭註解由「兩個小函式」更正為「第三個採同一 idiom 的檔名函式」、錨點測試補第二組回合編號
+> 使其自身即可殺死「寫死 3」的 mutant、補記 `roundNumber` 的呼叫端前置條件。
+>
+> **regression guard 標註**：除 spec 錨點「JPG 檔名依回合編號與注入日期組成」外的 5 條 it
+> （不同 roundNumber、同日不同時刻、跨日、整體格式 regex、UTC 語意臨界值）**寫入當下即綠**，
+> 用途是把 mutation 盲點釘死，非 TDD 紅燈。3.1 的真紅燈為模組不存在（`Failed to resolve import`），
+> 已於 shell 實測。
 
 ## 4. 列印被擋判定（print-guard.ts）
 
