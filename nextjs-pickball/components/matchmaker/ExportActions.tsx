@@ -10,18 +10,22 @@ import type { ExportScene } from "@/lib/matchmaker/export-scene";
 // 下一步該做什麼，比照 RoundControls.tsx／EmptyStage.tsx 既有的「停用並說明原因」寫法）。
 const NO_ROUND_DESCRIPTION = "需先產生本輪對戰才能匯出。";
 
+// 欄位不加 readonly：components/matchmaker/ 既有十個 props 介面（RestingPanelProps、
+// CourtCardProps、RoundControlsProps 等）一律不在欄位上加，只在陣列元素型別用
+// readonly T[]。要改是跨檔案一次改齊的議題，不在單一新檔開分岔。
 export interface ExportActionsProps {
-	readonly scene: ExportScene | null;
-	readonly fileName: string;
-	/** JPG 匯出（繪製 → 編碼 → 下載）的注入點；實作於 §7 的 scene-canvas.ts，本元件不 import 它。 */
-	readonly exportJpg: (scene: ExportScene, fileName: string) => Promise<void>;
+	scene: ExportScene | null;
+	fileName: string;
+	/** JPG 匯出（繪製 → 編碼 → 下載）的注入點；實作於 scene-canvas.ts，本元件不 import 它。 */
+	exportJpg: (scene: ExportScene, fileName: string) => Promise<void>;
 	/** 列印函式的注入點；省略時元件層取 window.print（design Decision 4）。 */
-	readonly printer?: unknown;
+	printer?: unknown;
 }
 
 // 對戰頁的匯出入口（spec「對戰頁的匯出入口與可用狀態」）：兩顆按鈕、觸發匯出、被擋提示。
-// 資料與 callback 一律走 props，本元件不 import 任何 store（design Decision 9 的既有裁決
-// 延伸），也不做任何比分／勝方／姓名的字串組裝——那些全在 ExportScene 內完成（design Decision 2）。
+// 資料與注入點一律走 props，本元件不 import 任何 store（沿用 M5 對戰頁「store 只在 page 層」
+// 的既有分層），也不做任何比分／勝方／姓名的字串組裝——那些全在 ExportScene 內完成
+// （design Decision 2：ExportScene 是唯一的內容真相來源）。
 export function ExportActions({ scene, fileName, exportJpg, printer }: ExportActionsProps) {
 	// 列印被阻擋時的提示訊息；null 代表目前沒有提示，MUST 在每次點擊列印時重新判定
 	// （成功時清除前一次的錯誤訊息，spec：列印成功時 MUST NOT 顯示任何錯誤訊息）。
@@ -31,8 +35,16 @@ export function ExportActions({ scene, fileName, exportJpg, printer }: ExportAct
 
 	const hasNoRound = scene === null;
 
+	// 用 finally 而非 catch 是刻意的：spec 未為「JPG 匯出失敗」定義任何提示行為，
+	// 元件自行 catch 後 setError 一則自寫文案，正是 design Decision 4 明文否決的替代方案
+	// （「訊息文案與判定條件散落在元件裡」）。因此本元件只保證「失敗後按鈕恢復可用」，
+	// 讓 rejection 往外傳；若日後要為匯出失敗提供提示，接線點是注入 exportJpg 的
+	// 呼叫端（page.tsx）而非本元件。
+	//
+	// 早退用 hasNoRound 而非再寫一次 scene === null：兩者是同一個判斷，且 TypeScript 的
+	// aliased narrowing 會由 hasNoRound 收窄 scene，型別上等價。
 	async function handleExportJpg() {
-		if (scene === null) {
+		if (hasNoRound) {
 			return;
 		}
 		setIsExportingJpg(true);

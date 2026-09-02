@@ -50,6 +50,9 @@ describe("ExportActions", () => {
 		const printButton = screen.getByRole("button", { name: "列印 PDF" }) as HTMLButtonElement;
 		expect(exportButton.disabled).toBe(false);
 		expect(printButton.disabled).toBe(false);
+		// 反向對照：只驗「停用時有說明」的話，「說明文字恆顯示」的實作也會通過，
+		// 而那會在功能可用時誤導使用者（design Decision 5）。
+		expect(screen.queryByText(/需先產生本輪對戰/)).toBeNull();
 	});
 
 	it("點擊列印 PDF 會呼叫注入的列印函式一次", async () => {
@@ -183,8 +186,8 @@ describe("ExportActions", () => {
 		const user = userEvent.setup();
 		render(<ExportActions scene={null} fileName="round-1.jpg" exportJpg={exportJpg} printer={printer} />);
 
-		// disabled 的按鈕在 happy-dom 下點擊不會觸發 onClick，這裡用 { skipPointerEventsCheck: true }
-		// 之外的預設行為即可驗證；userEvent 對 disabled 元素點擊本就是 no-op。
+		// userEvent 對帶 disabled 屬性的元素點擊本就是 no-op，不需要任何額外選項；
+		// 這條驗的是「停用以屬性表達」真的擋住了行為，而不只是視覺變淡。
 		await user.click(screen.getByRole("button", { name: "匯出 JPG" }));
 		await user.click(screen.getByRole("button", { name: "列印 PDF" }));
 		expect(exportJpg).not.toHaveBeenCalled();

@@ -113,11 +113,37 @@ Depends on: §1
 
 Depends on: §2, §3, §4
 
-- [ ] 5.1 RED: 新增 `nextjs-pickball/components/matchmaker/ExportActions.test.tsx`，寫入兩個 it：「尚無目前回合時匯出 JPG 與列印 PDF 皆為 disabled 並顯示繁體中文說明」、「目前回合存在時匯出 JPG 與列印 PDF 皆可點擊」。確認紅燈（元件尚不存在，預期為模組解析失敗）
-- [ ] 5.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/ExportActions.tsx`：`"use client"`，props 為 `{ scene, fileName, printer? }`；`scene` 為 `null` 時兩顆按鈕帶 `disabled` 並顯示繁體中文說明（design Decision 5：**停用不隱藏**）。資料與 callback 一律走 props，SHALL NOT 在元件內 import 任何 store
-- [ ] 5.3 RED: 補三個 it：「點擊列印 PDF 會呼叫注入的列印函式一次」、「列印被阻擋時以 role alert 顯示繁體中文提示」（注入會拋錯的 printer）、「匯出進行中時匯出 JPG 入口暫時停用避免重複觸發」（以未 resolve 的 promise 模擬繪製中）。確認紅燈
-- [ ] 5.4 GREEN: 補齊：列印點擊委派 §4 的 `requestPrint(printer ?? window.print?.bind(window))`，`ok` 為 false 時把訊息渲染成 `role="alert"` 區塊；JPG 點擊期間以本地 state 讓該按鈕 `disabled`，結束後恢復
-- [ ] 5.5 REFACTOR: 確認元件內**沒有**任何比分／勝方／姓名的字串組裝（那些全在 `ExportScene` 內，design Decision 2）；兩顆按鈕的可存取名稱明確；`disabled` 以屬性表達而非只調視覺；訊息不含未轉譯的技術錯誤碼
+- [x] 5.1 RED: 新增 `nextjs-pickball/components/matchmaker/ExportActions.test.tsx`，寫入兩個 it：「尚無目前回合時匯出 JPG 與列印 PDF 皆為 disabled 並顯示繁體中文說明」、「目前回合存在時匯出 JPG 與列印 PDF 皆可點擊」。確認紅燈（元件尚不存在，預期為模組解析失敗）
+- [x] 5.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/ExportActions.tsx`：`"use client"`，props 為 `{ scene, fileName, printer? }`；`scene` 為 `null` 時兩顆按鈕帶 `disabled` 並顯示繁體中文說明（design Decision 5：**停用不隱藏**）。資料與 callback 一律走 props，SHALL NOT 在元件內 import 任何 store
+- [x] 5.3 RED: 補三個 it：「點擊列印 PDF 會呼叫注入的列印函式一次」、「列印被阻擋時以 role alert 顯示繁體中文提示」（注入會拋錯的 printer）、「匯出進行中時匯出 JPG 入口暫時停用避免重複觸發」（以未 resolve 的 promise 模擬繪製中）。確認紅燈
+- [x] 5.4 GREEN: 補齊：列印點擊委派 §4 的 `requestPrint(printer ?? window.print?.bind(window))`，`ok` 為 false 時把訊息渲染成 `role="alert"` 區塊；JPG 點擊期間以本地 state 讓該按鈕 `disabled`，結束後恢復
+- [x] 5.5 REFACTOR: 確認元件內**沒有**任何比分／勝方／姓名的字串組裝（那些全在 `ExportScene` 內，design Decision 2）；兩顆按鈕的可存取名稱明確；`disabled` 以屬性表達而非只調視覺；訊息不含未轉譯的技術錯誤碼
+
+> **§5 審查結論（2026-09-02）**：Stage 1 **PASS**（五條錨點逐字相符、斷言確實映射 WHEN／THEN、
+> 列印判定確實委派 `requestPrint`、零 store import、零內容字串組裝、無 scope creep、未動既有檔）。
+> Stage 2 **PASS**——獨立 mutation 30 個中 26 個 KILLED、1 個等價變異（移除 `handleExportJpg`
+> 的早退：原生 `disabled` 在 happy-dom 已擋下所有 click dispatch，且移除後 `tsc` 直接報 TS2345，
+> 連合法產品狀態都不是）、1 個純樣式變異，**真盲點 2 個、存活率 6.9%**（對照 §2 首輪 47.3%）。
+> leader 另獨立複驗隱藏而非停用、`role` 改 `status`、成功時不清除訊息、JPG 點擊時不設 disabled、
+> 匯出期間連列印也停用五項皆確認轉紅。
+>
+> 6 個 Minor 已於本組全數處理：F-1 把「用 `finally` 而非 `catch`」寫成明示裁決（spec 未定義
+> JPG 匯出失敗的提示行為，元件自寫文案正是 Decision 4 否決的替代方案，故只保證按鈕恢復可用、
+> 讓 rejection 往外傳，並註明日後要提示的接線點在呼叫端）；F-2 補「有回合時不顯示說明文字」的
+> 反向對照斷言，複驗確認原先存活的「說明文字恆顯示」mutant 轉紅；F-3 拿掉 props 欄位的
+> `readonly`（`components/matchmaker/` 既有十個 props 介面無一使用，跨檔案統一屬另一個議題）；
+> F-4 早退改用 `hasNoRound` 收窄，去除重複的 `scene === null`；F-5 更正誤引的 Decision 編號；
+> F-6 更正提到 `skipPointerEventsCheck` 但實際未使用的過時註解。
+>
+> **regression guard 標註**：額外補充的 6 條 it 中，「一開始未點擊任何按鈕時畫面上沒有
+> role alert 元素」與「兩顆按鈕的可存取名稱皆非空且可由 role 查得」兩條**寫入當下即綠**；
+> 其餘四條為有效的 mutation-killing 測試。5.1 與 5.3 的真紅燈已於 shell 實測
+> （5.1 為模組不存在，leader 另以移走元件檔複驗得到
+> `Failed to resolve import "./ExportActions"`）。
+>
+> **交棒給 §7 的約束**：`ExportActions` 的 `exportJpg` 為必填注入點，§7 的 `page.tsx`
+> MUST 傳入 `scene-canvas.ts` 匯出的下載函式；`page.tsx` 內 **SHALL NOT** 出現任何
+> `<a download>` 或 canvas 呼叫（leader 裁決，見 design.md 末節）。
 
 ## 6. 列印版元件（PrintSheet.tsx）
 
