@@ -8,6 +8,7 @@ import { parseCsv } from "./csv";
 import { addPlayer } from "./roster";
 import type { AddPlayerInput } from "./roster";
 import type { Gender, Player } from "./types";
+import { RATING_MIN, RATING_MAX } from "./rating-types";
 
 /** CSV 的五個標題欄名稱（繁體中文），欄位對應依名稱而非位置。 */
 export const ROSTER_CSV_HEADERS = {
@@ -54,10 +55,6 @@ const GENDER_LOOKUP: Record<string, Gender> = {
 function findHeaderIndex(headerRow: readonly string[], headerName: string): number {
 	return headerRow.indexOf(headerName);
 }
-
-/** rating 的合法範圍（含端點），對應 types.ts 的 PlayerSchema.rating。 */
-const RATING_MIN = 1;
-const RATING_MAX = 8;
 
 /** Hex 色碼格式，與 types.ts 的 HexColorSchema 相同規則。 */
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
