@@ -29,15 +29,34 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/export-scene.test.ts`，寫入三個 it：「匯出標題含 App 名稱、回合編號與對戰方式」、「每個場地含場地編號與該場全部球員格」、「匯出場景以不透明白色為底色」。跑單檔確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/export-scene.ts` 的 `buildExportScene(input)` 骨架：回傳 `{ background, width, height, title, courts }`；`courts` 依回合的場次依序產生，每個 court 帶 `courtNumber` 與 tiles，tiles 的隊伍與 row／column 取自 §1.4 記錄的 `stage-layout.ts` 簽章。App 名稱以本檔的具名常數提供，SHALL NOT 由呼叫端各自傳入字面量
-- [ ] 2.3 RED: 補兩個 it：「已完成場次顯示最終比分與勝方」（`scores` 為 11 比 7、`winner` 為第一隊，斷言狀態文字同時含 11、7 與勝方隊伍）、「未完成場次顯示未完成狀態而非空白比分」（`scores` 為 `null` 時狀態文字非空且不含數字）。確認紅燈
-- [ ] 2.4 GREEN: 補齊場次狀態文字的兩條分支；「未完成」與「勝方」文案抽為本檔的具名常數，SHALL NOT 散在字串模板裡
-- [ ] 2.5 RED: 補兩個 it：「球員格帶該員雙色漸層與 pickTextColor 前景色」（斷言前景色等於直接呼叫 `pickTextColor(colorFrom, colorTo)` 的回傳值，**不硬寫顏色字串**）、「名單中找不到該球員時以替代文字呈現且不拋錯」。確認紅燈
-- [ ] 2.6 GREEN: 補齊球員解析：以 id 於名單查找，找到則帶姓名與該員 `colorFrom`／`colorTo`／前景色；找不到則以具名常數的替代文字與中性色呈現該格，其餘格照常輸出（design Decision 8）
-- [ ] 2.7 RED: 補兩個 it：「畫布高度依場地數與對戰方式遞增」（3 個場地 > 1 個場地；同為 1 個場地時雙打 > 單打）、「組裝匯出內容不修改輸入的回合與名單」（以 `structuredClone` 前後深層比對）。確認紅燈
-- [ ] 2.8 GREEN: 補齊尺寸推導：`height` 由標題區高度 + 場地數 × 該對戰方式的場地區塊高度 + 間距推導；所有尺寸與間距為本檔的具名常數，SHALL NOT 出現裸數字
-- [ ] 2.9 REFACTOR: 確認本檔為純函式——零 `window`／`document`／`Blob`／`canvas` 引用、零 `new Date()`；`ExportScene` 為可序列化純資料（無函式、無 class 實例）；場地區塊高度的計算只有一處，單打與雙打共用同一條公式而非各寫一份
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/export-scene.test.ts`，寫入三個 it：「匯出標題含 App 名稱、回合編號與對戰方式」、「每個場地含場地編號與該場全部球員格」、「匯出場景以不透明白色為底色」。跑單檔確認紅燈並貼出輸出
+- [x] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/export-scene.ts` 的 `buildExportScene(input)` 骨架：回傳 `{ background, width, height, title, courts }`；`courts` 依回合的場次依序產生，每個 court 帶 `courtNumber` 與 tiles，tiles 的隊伍與 row／column 取自 §1.4 記錄的 `stage-layout.ts` 簽章。App 名稱以本檔的具名常數提供，SHALL NOT 由呼叫端各自傳入字面量
+- [x] 2.3 RED: 補兩個 it：「已完成場次顯示最終比分與勝方」（`scores` 為 11 比 7、`winner` 為第一隊，斷言狀態文字同時含 11、7 與勝方隊伍）、「未完成場次顯示未完成狀態而非空白比分」（`scores` 為 `null` 時狀態文字非空且不含數字）。確認紅燈
+- [x] 2.4 GREEN: 補齊場次狀態文字的兩條分支；「未完成」與「勝方」文案抽為本檔的具名常數，SHALL NOT 散在字串模板裡
+- [x] 2.5 RED: 補兩個 it：「球員格帶該員雙色漸層與 pickTextColor 前景色」（斷言前景色等於直接呼叫 `pickTextColor(colorFrom, colorTo)` 的回傳值，**不硬寫顏色字串**）、「名單中找不到該球員時以替代文字呈現且不拋錯」。確認紅燈
+- [x] 2.6 GREEN: 補齊球員解析：以 id 於名單查找，找到則帶姓名與該員 `colorFrom`／`colorTo`／前景色；找不到則以具名常數的替代文字與中性色呈現該格，其餘格照常輸出（design Decision 8）
+- [x] 2.7 RED: 補兩個 it：「畫布高度依場地數與對戰方式遞增」（3 個場地 > 1 個場地；同為 1 個場地時雙打 > 單打）、「組裝匯出內容不修改輸入的回合與名單」（以 `structuredClone` 前後深層比對）。確認紅燈
+- [x] 2.8 GREEN: 補齊尺寸推導：`height` 由標題區高度 + 場地數 × 該對戰方式的場地區塊高度 + 間距推導；所有尺寸與間距為本檔的具名常數，SHALL NOT 出現裸數字
+- [x] 2.9 REFACTOR: 確認本檔為純函式——零 `window`／`document`／`Blob`／`canvas` 引用、零 `new Date()`；`ExportScene` 為可序列化純資料（無函式、無 class 實例）；場地區塊高度的計算只有一處，單打與雙打共用同一條公式而非各寫一份
+
+> **§2 審查結論（2026-09-02）**：Stage 1 **PASS**（9 條驗收錨點逐字相符、9.4 七項內容一項不缺、
+> 無 scope creep、未修改既有檔）。Stage 2 **REJECT 一次**——獨立 mutation 55 個存活 26 個
+> （存活率 47.3%），8 個 Major（1 個為真實程式碼缺陷：`TITLE_SEPARATOR` 被跨語意借去組狀態文字；
+> 其餘 7 個為測試盲點）＋7 個 Minor。修正輪後 31 個指定 mutant **全數 KILLED**，leader 另獨立
+> 複驗 6 個確認轉紅，**Stage 2 判定通過**。
+>
+> **regression guard 標註**（寫入當下即綠，產品碼本來就正確，非偽造紅燈）：
+> ① 「scoring 狀態與 pending 同樣視為未完成，不另立第三種文案」
+> ② 「狀態為 completed 但比分或勝方缺漏時退回未完成文字而非拋錯」
+> ③ 「狀態非 completed 時即使意外帶有比分與勝方仍顯示未完成，status 是唯一判斷依據」
+> 三者皆為修正輪為殺 mutant 而補的分支保護，`buildStatusText` 的實作在補測試前即已正確。
+>
+> **前瞻風險（留待 §7 決定，本組刻意不處理）**：幾何常數（`CANVAS_WIDTH`／`TITLE_AREA_HEIGHT`／
+> `COURT_BLOCK_SPACING`／`COURT_HEADER_HEIGHT`／`TILE_ROW_HEIGHT`／`courtBlockHeight`）目前皆為
+> module-private，且 `ExportCourt` 未帶 y 座標。§7 的 `scene-canvas.ts` 若要把場地畫在正確位置，
+> 必須取得這些幾何——屆時 MUST 由本檔匯出或於 `ExportCourt` 增設純資料欄位，
+> **SHALL NOT 在 `scene-canvas.ts` 重寫一份**（那會違反 task 2.9 的「場地區塊高度的計算只有一處」
+> 與 design Decision 2 的「唯一內容真相來源」）。
 
 ## 3. 檔名組成（export-filename.ts）
 
