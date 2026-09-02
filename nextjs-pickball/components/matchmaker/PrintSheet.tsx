@@ -14,17 +14,19 @@ export const PRINT_COURT_DATA_VALUE = "court";
 
 /**
  * 隊伍顯示文案：色彩不得作為唯一資訊來源（prd.md 12.5）。與 export-scene.ts（TEAM_LABELS）、
- * history-csv.ts、HistoryRecordCard.tsx 的同名對照表逐字相同，刻意各自持有一份不抽共用模組
- * （沿用 HistoryRecordCard.tsx 的既有裁決：抽出需連動修改本 change 範圍外的檔案，
- * 風險與收益不成比例）。
+ * history-csv.ts、HistoryRecordCard.tsx、CourtCard.tsx 的同名對照表逐字相同，刻意各自持有
+ * 一份不抽共用模組（沿用 HistoryRecordCard.tsx 的既有裁決：抽出需連動修改本 change 範圍外的
+ * 檔案，風險與收益不成比例）。
  */
 const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
 
 /**
  * 顏色小標記（色點）的邊長，刻意極小——列印版以文字為主，色彩僅為輔助小標記，
  * SHALL NOT 做大面積漸層背景（design Decision 3；prd.md 12.5 色彩不可為唯一資訊來源）。
+ * export 是為了讓測試能直接釘住這個常數本身（而非只驗行為），擋住「小色點退化成
+ * 大面積背景」這種 Stage 2 抓到的存活 mutant（例如把此值改成 "100%"）。
  */
-const COLOR_DOT_SIZE = "0.5rem";
+export const COLOR_DOT_SIZE = "0.5rem";
 
 export interface PrintSheetProps {
 	scene: ExportScene;
@@ -99,6 +101,10 @@ function PrintCourt({ court }: { court: ExportCourt }) {
  * 版面刻意做成文字為主（design Decision 3）：場地標題、隊伍、姓名、比分皆為文字，
  * 顏色只以小色點呈現——紙本目的是貼公告板找場地，油墨與瀏覽器背景圖列印限制皆不利於
  * 大面積色塊，且色彩不得作為唯一資訊來源（prd.md 12.5），姓名與隊伍文字才是可靠依據。
+ *
+ * 本元件刻意保留 `<h1>`：列印時 `app/matchmaker/page.tsx` 的頁面標題會被 `data-print="hide"`
+ * 隱藏（§7／§8 職責），紙本上只會有這一個第一級標題，階層 h1→h2→h3 維持完整
+ * （leader 對「兩個 `<h1>`」交棒事項的裁決：處置 A）。
  */
 export function PrintSheet({ scene }: PrintSheetProps) {
 	return (
