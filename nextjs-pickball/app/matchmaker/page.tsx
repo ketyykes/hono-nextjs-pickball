@@ -1,18 +1,28 @@
 // app/matchmaker/page.tsx
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { EmptyStage } from "@/components/matchmaker/EmptyStage";
+import { ExportActions } from "@/components/matchmaker/ExportActions";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError } from "@/components/matchmaker/MatchStage";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
+import { buildExportScene } from "@/lib/matchmaker/export-scene";
+import type { ExportScene } from "@/lib/matchmaker/export-scene";
+import { jpgExportFileName } from "@/lib/matchmaker/export-filename";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import { collectFinishedSubmissions, toSubmitScoreInput } from "@/lib/matchmaker/scoreboard-binding";
+import { downloadSceneAsJpeg } from "@/lib/matchmaker/scene-canvas";
 import { readMatchSlots, clearMatchSlots } from "@/lib/scoreboard/match-slots";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
+
+// round 為 null 時 ExportActions 的兩顆按鈕皆為 disabled（見該元件 hasNoRound 判定），
+// 此時 fileName prop 不會被實際使用到；仍給一個型別合法的常數值，而非空字串或 undefined，
+// 避免這個「反正用不到」的角落被誤讀成尚未處理。
+const NO_ROUND_FILE_NAME_PLACEHOLDER = "matchmaker-round-export.jpg";
 
 // 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點
 // （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
@@ -89,12 +99,38 @@ export default function MatchmakerPage() {
 		setSubmitError(result.ok ? null : { matchId, message: result.message });
 	}
 
+	// buildExportScene 的唯一呼叫點（design Decision 2）：JPG 與（未來的）列印稿共用
+	// 同一份內容真相來源，不各自組裝。round／players 變動時才重算。
+	const exportScene: ExportScene | null = useMemo(
+		() => (round === null ? null : buildExportScene(round, players)),
+		[round, players],
+	);
+
+	// 傳給 ExportActions 的 fileName prop。exportedAt 取 round.createdAt（本輪產生的時間）
+	// 而非 new Date()，有兩個理由（leader 於 §7 的裁決，覆寫「點擊當下取時間」的原始指示）：
+	// ① 在 render 期間呼叫 new Date() 會讓 render 變成不純函式，同一份 props 在不同時刻
+	//    render 出不同結果，是 SSR／hydration 不一致的典型成因；
+	// ② 檔名日期的用途是「排序與辨識」（design Decision 6），而「這一輪是哪天排的」比
+	//    「我哪一刻按下匯出」更貼近使用者辨識檔案的心智模型——跨午夜才匯出時，
+	//    round.createdAt 給的是這一輪實際發生的日期，反而比點擊時間正確。
+	// 由於 exportedAt 不再依賴當下時間，fileName 完全由 round 決定，useMemo 依 round
+	// 重算即可，也不再需要在點擊當下重組檔名的包裝函式。
+	const exportFileName = useMemo(
+		() =>
+			round === null
+				? NO_ROUND_FILE_NAME_PLACEHOLDER
+				: jpgExportFileName({ roundNumber: round.roundNumber, exportedAt: round.createdAt }),
+		[round],
+	);
+
 	return (
 		<main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
 			<div>
 				<h1 className="text-2xl font-bold">對戰分配</h1>
 				<p className="text-sm text-muted-foreground">安排場地、產生本輪對戰並記錄比分。</p>
 			</div>
+
+			<ExportActions scene={exportScene} fileName={exportFileName} exportJpg={downloadSceneAsJpeg} />
 
 			{roundError !== null && (
 				<div

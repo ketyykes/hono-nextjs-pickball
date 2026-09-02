@@ -71,23 +71,28 @@ const PLACEHOLDER_CREATED_AT = "1970-01-01T00:00:00.000Z";
 /** 匯出畫布底色：不透明白色。JPEG 無 alpha 通道，透明底在部分瀏覽器會編碼成黑色（design Decision 9）。 */
 const EXPORT_BACKGROUND_COLOR = "#FFFFFF";
 
-/** 匯出畫布寬度（邏輯像素，未乘 2 倍縮放；縮放由 scene-canvas.ts 處理，見 design Decision 9）。 */
-const CANVAS_WIDTH = 800;
+/**
+ * 匯出畫布寬度（邏輯像素，未乘 2 倍縮放；縮放由 scene-canvas.ts 處理，見 design Decision 9）。
+ * 對 scene-canvas.ts 而言是唯一內容真相來源需要匯出的幾何常數之一（matchmaker-visual-export
+ * tasks §7 裁決 2）：本檔負責「場地區塊高度／畫布高度只算一次」，scene-canvas.ts 只能引用、
+ * SHALL NOT 自行重算。
+ */
+export const CANVAS_WIDTH = 800;
 
 /** 標題區高度。 */
-const TITLE_AREA_HEIGHT = 96;
+export const TITLE_AREA_HEIGHT = 96;
 
 /** 場地區塊之間與頭尾的間距；courtCount 個場地共有 courtCount + 1 段間距。 */
-const COURT_BLOCK_SPACING = 24;
+export const COURT_BLOCK_SPACING = 24;
 
 /** 每個場地區塊固定部分的高度（場地編號列 + 狀態文字列），與對戰方式無關。 */
-const COURT_HEADER_HEIGHT = 56;
+export const COURT_HEADER_HEIGHT = 56;
 
 /** 每一列球員格的高度。 */
-const TILE_ROW_HEIGHT = 88;
+export const TILE_ROW_HEIGHT = 88;
 
 /** 各對戰方式的球員列數：單打 1 列（兩格左右並排），雙打 2 列（上下各兩格）。 */
-const TILE_ROWS_BY_FORMAT: Record<MatchFormat, number> = {
+export const TILE_ROWS_BY_FORMAT: Record<MatchFormat, number> = {
 	singles: 1,
 	doubles: 2,
 };
@@ -199,7 +204,7 @@ function buildExportCourt(match: RoundMatch, players: readonly Player[]): Export
  * 每列高度。單打與雙打共用同一條公式，差異只在於 TILE_ROWS_BY_FORMAT 的列數——
  * SHALL NOT 為兩種對戰方式各寫一份公式（tasks 2.9）。
  */
-function courtBlockHeight(format: MatchFormat): number {
+export function courtBlockHeight(format: MatchFormat): number {
 	return COURT_HEADER_HEIGHT + TILE_ROWS_BY_FORMAT[format] * TILE_ROW_HEIGHT;
 }
 
