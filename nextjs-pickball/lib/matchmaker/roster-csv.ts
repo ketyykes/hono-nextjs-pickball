@@ -49,6 +49,13 @@ function findHeaderIndex(headerRow: readonly string[], headerName: string): numb
 	return headerRow.indexOf(headerName);
 }
 
+/** rating 的合法範圍（含端點），對應 types.ts 的 PlayerSchema.rating。 */
+const RATING_MIN = 1;
+const RATING_MAX = 8;
+
+/** Hex 色碼格式，與 types.ts 的 HexColorSchema 相同規則。 */
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
 export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const table = parseCsv(text);
 	const headerRow = table[0] ?? [];
@@ -64,24 +71,71 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const errors: RosterCsvRowError[] = [];
 
 	dataRows.forEach((dataRow, dataIndex) => {
+		// 試算表行號：標題列固定為第 1 列，第一筆資料（dataIndex 0）為第 2 列。
 		const spreadsheetRow = dataIndex + 2;
+		const rowErrors: RosterCsvRowError[] = [];
+
 		const name = (dataRow[nameIndex] ?? "").trim();
+		if (name === "") {
+			rowErrors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.name,
+				reason: "名稱不可為空白",
+			});
+		}
+
 		const genderRaw = (dataRow[genderIndex] ?? "").trim().toLowerCase();
 		const gender = GENDER_LOOKUP[genderRaw];
-		const rating = Number((dataRow[ratingIndex] ?? "").trim());
-		const colorFrom = (dataRow[colorFromIndex] ?? "").trim();
-		const colorTo = (dataRow[colorToIndex] ?? "").trim();
-
 		if (gender === undefined) {
-			errors.push({
+			rowErrors.push({
 				row: spreadsheetRow,
 				column: ROSTER_CSV_HEADERS.gender,
 				reason: "性別無法辨識，請填入常見寫法（男／女／其他等）",
 			});
+		}
+
+		const ratingRaw = (dataRow[ratingIndex] ?? "").trim();
+		const rating = Number(ratingRaw);
+		if (ratingRaw === "" || Number.isNaN(rating)) {
+			rowErrors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.rating,
+				reason: "強度分數需為數字",
+			});
+		} else if (rating < RATING_MIN || rating > RATING_MAX) {
+			rowErrors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.rating,
+				reason: `強度分數需介於 ${RATING_MIN}.00 至 ${RATING_MAX}.00 之間`,
+			});
+		}
+
+		const colorFrom = (dataRow[colorFromIndex] ?? "").trim();
+		const colorTo = (dataRow[colorToIndex] ?? "").trim();
+		if (colorFrom !== "" && !HEX_COLOR_PATTERN.test(colorFrom)) {
+			rowErrors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.colorFrom,
+				reason: "顏色起點格式錯誤，須為 #RRGGBB",
+			});
+		}
+		if (colorTo !== "" && !HEX_COLOR_PATTERN.test(colorTo)) {
+			rowErrors.push({
+				row: spreadsheetRow,
+				column: ROSTER_CSV_HEADERS.colorTo,
+				reason: "顏色終點格式錯誤，須為 #RRGGBB",
+			});
+		}
+
+		if (rowErrors.length > 0) {
+			errors.push(...rowErrors);
 			return;
 		}
 
-		const row: RosterCsvRow = { name, gender, rating };
+		// 走到這裡代表本列所有欄位皆合法，gender 必已在 GENDER_LOOKUP 中查得到。
+		const row: RosterCsvRow = { name, gender: gender as Gender, rating };
+		// 顏色兩端同進同出（design Decision 9）：只給一端時兩端皆不帶入，
+		// 交由 addPlayer 走自動配色，不在本模組另寫顏色判定。
 		if (colorFrom !== "" && colorTo !== "") {
 			row.colorFrom = colorFrom;
 			row.colorTo = colorTo;
