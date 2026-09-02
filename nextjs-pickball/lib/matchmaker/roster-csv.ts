@@ -174,6 +174,20 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	dataRows.forEach((dataRow, dataIndex) => {
 		// 試算表行號：標題列固定為第 1 列，第一筆資料（dataIndex 0）為第 2 列。
 		const spreadsheetRow = dataIndex + 2;
+
+		// 空白資料列（Google Sheets／Excel 框選範圍匯出時夾帶的常態）直接跳過，
+		// 不計入 rows 也不計入 errors（design.md Decision 13）：若計為錯誤，
+		// §6「任一列有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入。
+		// 判定方式為「五個已對應到的欄位 trim 後皆為空字串」，涵蓋 parseCsv 的兩種
+		// 空白列形狀——純空行（`[""]`）與 Sheets 風格全空列（`,,,,`，欄位數正確但全空）。
+		// dataIndex 不受跳過影響，後續列的 spreadsheetRow 依然是 `資料索引 + 2`，不會漂移。
+		const isBlankRow = [nameIndex, genderIndex, ratingIndex, colorFromIndex, colorToIndex].every(
+			(index) => (dataRow[index] ?? "").trim() === "",
+		);
+		if (isBlankRow) {
+			return;
+		}
+
 		const rowErrors: RosterCsvRowError[] = [];
 
 		const name = collectField(
