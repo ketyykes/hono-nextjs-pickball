@@ -124,9 +124,15 @@ export function parseBackup(text: string): ParseBackupResult {
 	//
 	// 這裡刻意要求 typeof json.version === "number"：「版本不支援」這則訊息只該在
 	// 我們真的讀到一個不受支援的版本號時出現。若 version 的型別本身就不對
-	// （null／布林／字串等），那是結構問題，不是版本問題——把使用者導向「請改用
-	// 符合目前版本的備份檔案」是錯誤的下一步（M8 §3 Stage 2 review m2 裁決）。
-	if (isPlainObject(json) && "version" in json && typeof json.version === "number" && json.version !== 1) {
+	// （null／布林／字串等，包含完全缺少 version 鍵時 json.version 為 undefined），
+	// 那是結構問題，不是版本問題——把使用者導向「請改用符合目前版本的備份檔案」是
+	// 錯誤的下一步（M8 §3 Stage 2 review m2 裁決）。
+	//
+	// 刻意 SHALL NOT 另外寫 "version" in json：json 經 isPlainObject 縮小為
+	// Record<string, unknown> 後，存取不存在的鍵本就安全地回傳 undefined，
+	// 而 typeof undefined === "number" 恆為 false——"in" 判斷對本函式的任何輸入
+	// 都不會改變結果，是恆等突變（equivalent mutant），寫了也是死碼。
+	if (isPlainObject(json) && typeof json.version === "number" && json.version !== 1) {
 		return fail(TRANSFER_MESSAGES.unsupportedVersion);
 	}
 
