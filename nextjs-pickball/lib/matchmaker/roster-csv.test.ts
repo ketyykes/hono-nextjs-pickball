@@ -97,4 +97,37 @@ describe("parseRosterCsv", () => {
 			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringMatching(/[一-龥]/) },
 		]);
 	});
+
+	it("每筆錯誤指出試算表列號、欄位與繁體中文原因", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,,", // 第 2 列，合法
+			" ,female,5.0,,", // 第 3 列，名稱空白
+			"丙,other,5.0,,", // 第 4 列，合法
+			"丁,male,9,,", // 第 5 列，強度分數超出範圍
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0 },
+			{ name: "丙", gender: "other", rating: 5.0 },
+		]);
+		expect(result.errors).toEqual([
+			{
+				row: 3,
+				column: ROSTER_CSV_HEADERS.name,
+				reason: expect.stringMatching(/[一-龥]/),
+			},
+			{
+				row: 5,
+				column: ROSTER_CSV_HEADERS.rating,
+				reason: expect.stringMatching(/[一-龥]/),
+			},
+		]);
+	});
 });
