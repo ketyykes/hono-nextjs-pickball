@@ -63,3 +63,14 @@ export function buildBackup(snapshot: BackupSnapshot, context: { exportedAt: str
 		history: [...snapshot.history],
 	};
 }
+
+/**
+ * 依注入的 exportedAt 產生匯出檔名。SHALL NOT 內部呼叫 new Date()——內部產生會使
+ * 回傳值每次不同，測試只能寬鬆斷言而失去驗證力（沿用 player-roster 的同一原則）。
+ * exportedAt 一律來自 new Date().toISOString()（固定輸出 UTC，`YYYY-MM-DDTHH:mm:ss.sssZ`），
+ * 故直接切字串前 10 碼取得日期，不繞道 Date 物件重新格式化。
+ */
+export function backupFileName(exportedAt: string): string {
+	const date = exportedAt.slice(0, 10);
+	return `matchmaker-backup-${date}.json`;
+}

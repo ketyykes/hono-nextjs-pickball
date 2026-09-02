@@ -160,7 +160,7 @@ Depends on: §0
       （2.2 的 `toSortedSignatureKeys` 已滿足，無需額外程式碼改動；見上方 2.5 的 mutation 證據）
 - [x] 2.7 RED: 補 it「backupFileName 依注入時間產生含日期的檔名」：
       `exportedAt = "2026-08-23T01:02:03.000Z"` → `matchmaker-backup-2026-08-23.json`。確認紅燈
-- [ ] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`
+- [x] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`
 - [ ] 2.9 REFACTOR: 確認 `transfer-types.ts` 內**沒有任何函式**（純 schema 與常數），
       且 `buildBackup` 未重複實作任何既有模組已提供的轉換
 
