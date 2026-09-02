@@ -161,14 +161,30 @@ Depends on: §0
 - [x] 2.7 RED: 補 it「backupFileName 依注入時間產生含日期的檔名」：
       `exportedAt = "2026-08-23T01:02:03.000Z"` → `matchmaker-backup-2026-08-23.json`。確認紅燈
 - [x] 2.8 GREEN: 實作 `backupFileName(exportedAt)`；SHALL NOT 內部呼叫 `new Date()`
-- [x] 2.9 REFACTOR（skipped，無壞味道）: 已用
+- [x] 2.9 REFACTOR（skipped，無壞味道；Stage 2 第 1 輪修正後更新措辭）: 已用
       `grep -nE "function|=>" nextjs-pickball/lib/matchmaker/transfer-types.ts`
       確認無命中——`transfer-types.ts` 僅含 `BackupSchema`／`Backup` 兩個匯出，無任何函式。
-      `buildBackup` 的 Set→排序字串陣列正規化（`toSortedSignatureKeys`）為本 capability
-      新邏輯，未與既有模組（`round-types.ts`／`history.ts`／`types.ts`）的任何轉換重複。
+      `buildBackup` 的 Set→排序字串陣列正規化（`toSortedSignatureKeys`）**與 `round.ts`
+      的私有函式 `toArrays()` 語意相近但刻意不同**：`toArrays()` 只做
+      `[...index.teammateKeys]`，保留 Set 插入序、不排序；本檔的
+      `toSortedSignatureKeys` 額外排序（design Decision 11：讓相同內容產生相同備份，
+      便於 round-trip 斷言與 diff）。兩者不合併抽共用——語意刻意不同（一個要保序、
+      一個要排序），且 `round.ts` 為唯讀檔案（不在本 change 的檔案邊界內）。
+      （原措辭誤稱「未與既有模組的任何轉換重複」，未查 `round.ts`；M8 §2 Stage 2
+      Code-Quality Review 第 1 輪修正回合已更正，見 `backup.ts` 的
+      `toSortedSignatureKeys` 註解與 `backup.test.ts` 的重複值測試。）
 
 ## 3. 備份匯入的驗證與錯誤訊息（`backup.ts`）
 Depends on: §2
+
+> **交棒記錄（M8 §2 Stage 2 實測，第 1 輪修正回合）**：
+> ① round-trip 斷言 MUST 用 `toEqual`，SHALL NOT 比較 JSON 字串——
+> `MatchHistoryEntrySchema` 為 `discriminatedUnion`，zod 重建物件後 `format` 鍵序
+> 與輸入不同，`JSON.stringify(parsed) === JSON.stringify(backup)` 會是 `false`，
+> 但 `toEqual` 為 PASS，字串比較會產生假紅燈。
+> ② `buildBackup` 會把重複配對簽章**排序**，而 `round.ts` 的私有函式 `toArrays()`
+> 不排序（保留 Set 插入序）。round-trip fixture 若用亂序簽章，期望值要寫**排序後**
+> 的結果，不能直接比對原始 LocalStorage 內容。
 
 - [ ] 3.1 RED: 於 `backup.test.ts` 補 it
       「buildBackup 的輸出經 JSON 往返後可被 parseBackup 還原為相同快照」。確認紅燈
@@ -323,6 +339,9 @@ Depends on: §2, §3, §4, §6, §7
 - [ ] 8.4 GREEN: 接上 `JsonBackupSection` 的匯出（Blob + `<a download>`）與匯入
       （`File.text()` → `parseBackup` → `writeBackup` → `location.reload()`），
       失敗時只顯示訊息**不寫入**
+      `exportedAt` MUST 直接來自 `new Date().toISOString()`，SHALL NOT 由使用者輸入
+      或其他來源取得——`backupFileName` 對非 ISO 輸入不做防護（§2 Stage 2 Minor-4 裁決：
+      不加執行期驗證，違反 Simplicity First 且會讓純函式多一條錯誤路徑）
 - [ ] 8.5 RED: 補兩個 test：「在 CSV 匯入預覽按取消後名單維持不變」、
       「確認 CSV 匯入預覽後名單新增匯入的參賽者」。確認紅燈
 - [ ] 8.6 GREEN: 接上 `RosterCsvImportSection`：選檔 → `parseRosterCsv` → 顯示預覽
