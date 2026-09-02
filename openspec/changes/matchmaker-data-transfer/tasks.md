@@ -440,7 +440,7 @@ Depends on: §2, §3, §4, §6, §7
 - [ ] 8.2 GREEN: 建立 `app/matchmaker/data/page.tsx` 與四個區塊元件骨架
       （`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`、
       `ClearLocalDataSection`），含 9.3 不對稱說明文字與從 matchmaker 區段的導覽入口
-- [ ] 8.2a **必 TDD**（`lib/**` 的行為邏輯，非例外層）：導覽入口的單一來源是
+- [x] 8.2a **必 TDD**（`lib/**` 的行為邏輯，非例外層）：導覽入口的單一來源是
       `nextjs-pickball/lib/matchmaker/section-nav.ts`——在 `MATCHMAKER_SECTION_HREFS`
       （第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）各加一筆資料頁路徑
       （標籤「資料」）。`lib/matchmaker/section-nav.test.ts` 第 31～36 行的 `toEqual`
