@@ -625,6 +625,11 @@ describe("applyRosterImport", () => {
 
 		const gradientKeys = updatedRoster.map((player) => `${player.colorFrom}/${player.colorTo}`);
 		expect(new Set(gradientKeys).size).toBe(gradientKeys.length);
+		// Stage 2 review Minor m4：spec 的 THEN 子句除了「兩兩相異」還要求「皆來自既有
+		// 預設調色盤」，此處補上顯式斷言（原本只靠建構方式保證，未被鎖住）。
+		updatedRoster.forEach((player) => {
+			expect(paletteIndexOf(player.colorFrom, player.colorTo)).not.toBe(-1);
+		});
 	});
 
 	/**
@@ -712,5 +717,69 @@ describe("applyRosterImport", () => {
 			expect(player.gamesPlayed).toBe(0);
 			expect(player.isActive).toBe(true);
 		});
+	});
+
+	/** Stage 2 review Minor m1（§3.9）：成功匯入後，原 roster 參數本身不被就地修改。 */
+	it("成功匯入後原 roster 陣列本身不被就地修改", () => {
+		const csv = [HEADER_LINE, "甲,male,5.0,,"].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const existingRoster: Player[] = [EXISTING_PLAYER];
+		applyRosterImport(existingRoster, parsed, {
+			ids: ["imported-1"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		expect(existingRoster).toHaveLength(1);
+		expect(existingRoster[0]).toEqual(EXISTING_PLAYER);
+	});
+
+	/**
+	 * Stage 2 review Minor m2（§3.8）：CSV 合法但無可新增資料（只有標題列，無資料列）
+	 * 屬合法邊界，MUST 正常回傳與原名單相等的結果，不可拋錯。
+	 */
+	it("CSV 合法但無可新增資料時正常回傳與原名單相等的結果", () => {
+		const parsed = parseRosterCsv(HEADER_LINE); // 只有標題列，無任何資料列
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+		expect(parsed.rows).toEqual([]);
+
+		const existingRoster: Player[] = [EXISTING_PLAYER];
+		const updated = applyRosterImport(existingRoster, parsed, {
+			ids: [],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		expect(updated).toEqual(existingRoster);
+	});
+
+	/**
+	 * Stage 2 review Minor m3（§3.1）：錯誤路徑（`parsed.errors` 非空）回傳的是原名單的
+	 * 複本而非同一參考——regression guard，鎖住現行「即使沒有變動也回傳新參考」的選擇，
+	 * 避免未來被靜默改成別名語意。
+	 */
+	it("驗證失敗時回傳的是原名單的複本而非同一參考", () => {
+		const csv = [HEADER_LINE, "甲,male,12,,"].join("\r\n"); // rating 12 超出範圍
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+		expect(parsed.errors.length).toBeGreaterThan(0);
+
+		const existingRoster: Player[] = [EXISTING_PLAYER];
+		const updated = applyRosterImport(existingRoster, parsed, {
+			ids: ["imported-1"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		expect(updated).toEqual(existingRoster);
+		expect(updated).not.toBe(existingRoster);
 	});
 });

@@ -324,6 +324,17 @@ Depends on: §5
 >   共用第一個／位移一格／反轉，`now` 固定空字串，`gender` 強制覆寫，`rating` 強制覆寫或
 >   自行 `Math.floor`，顏色清空／只清終點／被第一列污染，reduce 後 `.map()` 強制
 >   `isActive:false`／`restCount:99`，逐一改動皆轉紅，且皆命中此條 it。
+> - **m1**：補「成功匯入後原 roster 陣列本身不被就地修改」，mutation（reduce 後對輸入
+>   `roster` 額外 `.push()`）轉紅。
+> - **m2**：補「CSV 合法但無可新增資料時正常回傳與原名單相等的結果」（`rows: []` 邊界），
+>   mutation（`rows.length === 0` 時額外 throw）轉紅。
+> - **m3**：補「驗證失敗時回傳的是原名單的複本而非同一參考」（`not.toBe` regression
+>   guard，鎖住現行「即使無變動也回傳新參考」的選擇），mutation（改回傳 `roster as
+>   Player[]`）轉紅。
+> - **m4**（Stage 1 Minor）：既有 it「同一次匯入未提供顏色的多列取得互不相同的預設漸層」
+>   補上 `paletteIndexOf` 斷言（spec THEN 子句「皆來自既有預設調色盤」，原本只驗證兩兩
+>   相異）。it 名稱不變，僅擴充斷言。mutation：讓自動配色改回傳互異但不在調色盤內的顏色，
+>   轉紅。
 
 ## 7. 快照的讀寫與清除（`transfer-storage.ts`）
 Depends on: §0, §3
