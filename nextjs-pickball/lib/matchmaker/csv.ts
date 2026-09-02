@@ -40,6 +40,11 @@ function escapeField(field: string): string {
 /**
  * 把二維陣列轉為 CSV 文字，以 UTF-8 BOM 起頭、逗號分隔、`\r\n` 換行（Excel 相容）。
  * 對空 `rows` 回傳只有 BOM 的字串，不拋錯——空歷史仍需輸出可用的 CSV（見 spec）。
+ *
+ * 刻意不在最後一列後面補一個 `LINE_BREAK`：Excel／Google Sheets 開啟「無尾端換行」與
+ * 「有尾端換行」的 CSV 結果相同，但若本函式輸出尾端換行，`parseCsv` 讀回時就會多解析出
+ * 一列空列（即下方 Stage 2 review 抓到的幻影空列問題）——保持「不輸出」可以讓
+ * `parseCsv(toCsv(rows))` 這條 round-trip 不必額外處理自己製造出來的邊界。
  */
 export function toCsv(rows: readonly (readonly string[])[]): string {
 	const lines = rows.map((row) => row.map(escapeField).join(DELIMITER));
@@ -49,6 +54,13 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
 /**
  * 把 CSV 文字解析回二維陣列。以引號狀態機處理：引號內的分隔符與換行不視為分隔，
  * 連續兩個引號還原為一個引號內容。開頭的 BOM 會被去除，`\n` 與 `\r\n` 皆可作為換行。
+ *
+ * 設計取捨（刻意維持寬鬆、不拋錯）：若引號未閉合，狀態機會把後續所有內容
+ * （含換行與分隔符）併入同一欄位，直到字串結束，並不會產生第二列。
+ * 這是有意的取捨——要偵測「引號未閉合」就必須把回傳型別從 `string[][]`
+ * 改成可攜帶錯誤的型別，牽動所有呼叫端；而下游（§5／§6）本來就會核對
+ * 「欄位數是否等於標題數」，未閉合引號造成的列數／欄位數異常會被那一層攔下，
+ * 不需要本模組額外報錯。
  */
 export function parseCsv(text: string): string[][] {
 	const withoutBom = text.startsWith(UTF8_BOM) ? text.slice(UTF8_BOM.length) : text;
@@ -86,7 +98,9 @@ export function parseCsv(text: string): string[][] {
 			currentRow.push(currentField);
 			currentField = "";
 		} else if (char === CARRIAGE_RETURN) {
-			// `\r\n` 由後續的 LINE_FEED 分支結束該列；單獨的 CR 不在支援範圍內（見 design.md Non-Goals）。
+			// `\r\n` 由後續的 LINE_FEED 分支結束該列；單獨的 CR 不在支援範圍內（見 design.md Non-Goals），
+			// 引號外的單獨 CR 會被靜默丟棄（不進 currentField）——若欄位值本身含 CR，
+			// 呼叫端須透過 toCsv 跳脫（needsQuoting 已涵蓋 CR），CR 才會被引號保護、原樣讀回。
 			continue;
 		} else if (char === LINE_FEED) {
 			currentRow.push(currentField);
@@ -98,8 +112,14 @@ export function parseCsv(text: string): string[][] {
 		}
 	}
 
-	currentRow.push(currentField);
-	rows.push(currentRow);
+	// 迴圈結束時若剛好停在列邊界（上一個字元是換行，已經把該列 push 過），
+	// currentField 與 currentRow 皆會是空的初始狀態——此時不可再推入一列，
+	// 否則以換行結尾的檔案（Google Sheets／Excel 另存的常態）會多吐出幻影空列 [""]。
+	// 檔案「中間」的空列語意不同、必須保留，本條件只作用在字串結尾，不影響中間空列。
+	if (currentField !== "" || currentRow.length !== 0) {
+		currentRow.push(currentField);
+		rows.push(currentRow);
+	}
 
 	return rows;
 }
