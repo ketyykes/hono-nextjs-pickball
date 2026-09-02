@@ -88,7 +88,7 @@ export function RosterCsvImportSection() {
 					<div className="flex flex-col gap-2 text-sm" data-testid="roster-csv-preview">
 						<p>可新增 {preview.result.rows.length} 人</p>
 						{preview.result.errors.length > 0 && (
-							<ul className="list-disc pl-5 text-destructive">
+							<ul className="list-disc pl-5 text-destructive" data-testid="roster-csv-errors">
 								{preview.result.errors.map((error) => (
 									<li key={`${error.row}-${error.column}`}>
 										第 {error.row} 列．{error.column}：{error.reason}

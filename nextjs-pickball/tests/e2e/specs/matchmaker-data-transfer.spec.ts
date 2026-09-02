@@ -510,4 +510,35 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(alert.getByText("強度分數", { exact: false })).toBeVisible();
 		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
 	});
+
+	// M8 §8 修正輪（Stage 2 review Major J1 + Minor N1，合併一條）：含錯誤列的預覽畫面
+	// 從未被渲染過。CSV 混 3 列合法＋1 列強度分數超出範圍，斷言「可新增 3 人」、
+	// 錯誤列表含正確的試算表列號（第 5 列：標題列第 1 列＋4 筆資料）、欄位名稱與
+	// 繁體中文原因，並且（N1）「確認匯入」按鈕在此狀態為 disabled。
+	test("CSV 匯入預覽同時顯示可新增人數與錯誤列且確認匯入按鈕 disabled", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await page.goto(DATA_PAGE);
+
+		const csv = buildRosterCsv([
+			{ name: "混合員一", gender: "男", rating: "3.50" },
+			{ name: "混合員二", gender: "女", rating: "4.20" },
+			{ name: "混合員三", gender: "其他", rating: "5.00" },
+			{ name: "混合員四", gender: "男", rating: "9.00" }, // 強度分數超出範圍（>8.00）
+		]);
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster-mixed.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(csv),
+		});
+
+		await expect(page.getByText("可新增 3 人")).toBeVisible();
+
+		const errorList = page.getByTestId("roster-csv-errors");
+		await expect(errorList).toBeVisible();
+		await expect(errorList).toContainText("第 5 列");
+		await expect(errorList).toContainText("強度分數");
+		await expect(errorList).toContainText("需介於 1.00 至 8.00 之間");
+
+		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
+	});
 });
