@@ -130,4 +130,71 @@ describe("parseRosterCsv", () => {
 			},
 		]);
 	});
+
+	/**
+	 * 補充測試（非六條必要測試之一）：強度分數「非數字」與「超出範圍（低於下限）」
+	 * 是兩種不同的錯誤原因，5.7 只覆蓋了「超出範圍（高於上限）」，此處補上另兩種，
+	 * 避免 rating 分支的其餘兩條路徑零覆蓋（Stage 2 mutation 教訓）。
+	 */
+	it("強度分數非數字或低於下限時記為該列錯誤", () => {
+		const csv = [HEADER_LINE, "甲,male,abc,,", "乙,male,0.5,,"].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([]);
+		expect(result.errors).toEqual([
+			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 3, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
+		]);
+	});
+
+	/**
+	 * 補充測試（非六條必要測試之一）：顏色格式錯誤是 self-review checklist 明列的
+	 * 錯誤原因之一，此處分別驗證「起點格式錯」與「終點格式錯」兩個欄位皆會被攔下。
+	 */
+	it("顏色格式不正確時記為該列錯誤", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,red,#00FF00",
+			"乙,male,5.0,#FF0000,blue",
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([]);
+		expect(result.errors).toEqual([
+			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 3, column: ROSTER_CSV_HEADERS.colorTo, reason: expect.stringMatching(/[一-龥]/) },
+		]);
+	});
+
+	/**
+	 * 補充測試（非六條必要測試之一）：同一列可能同時觸發多個欄位錯誤，
+	 * 驗證所有錯誤皆會被回報而非只回報第一個就中止該列的驗證。
+	 */
+	it("單一列同時觸發多個欄位錯誤時全部回報", () => {
+		const csv = [HEADER_LINE, " ,貓,abc,red,"].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([]);
+		expect(result.errors).toEqual([
+			{ row: 2, column: ROSTER_CSV_HEADERS.name, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringMatching(/[一-龥]/) },
+		]);
+	});
 });
