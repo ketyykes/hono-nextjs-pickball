@@ -16,40 +16,40 @@
 
 ## 1. 區間切點計算（`nextjs-pickball/lib/matchmaker/history-range.ts` — 行為邏輯，必 TDD）
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-range.test.ts`，寫入 it「一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日」——以 `now = new Date(2026, 7, 15)`（2026-08-15 週六）呼叫 `computeRangeCutoffs(now)`，斷言 `c0`／`c1`／`c2`／`c3` 依序等於 `new Date(2026, 7, 15)`、`new Date(2026, 7, 10)`、`new Date(2026, 7, 1)`、`new Date(2026, 6, 1)` 的時間戳。跑單檔看到紅燈並貼出輸出（**真紅燈**：模組尚不存在，import 解析失敗）
-- [ ] 1.2 GREEN: 建立 `history-range.ts`，實作 `computeRangeCutoffs(now: Date): RangeCutoffs`，回傳四個當地時區 00:00 的時間戳。此步**先各自獨立計算**四個切點（今天、本週一、當月 1 日、上月 1 日），尚不套用 `min()`——`min()` 由 1.4 依 1.3 的紅燈驅動加入。重跑至綠
-- [ ] 1.3 RED: 補兩個 it：「跨月週時當月切點取本週一而非當月 1 日」（`now = new Date(2026, 7, 1)`，2026-08-01 週六、本週一為 7/27，斷言 `c1` 與 `c2` 皆為 `new Date(2026, 6, 27)`、`c3` 為 `new Date(2026, 6, 1)`）與「四個切點單調不遞增」（對月初、月中、週一、週日、跨年五組 `now` 逐一斷言 `c3 <= c2 <= c1 <= c0`）。看到紅燈（**真紅燈**：1.2 未套 `min()` 時 `c2 = 8/1 > c1 = 7/27`）
-- [ ] 1.4 GREEN: 依 design Decision 1 逐層套用 `min()`：`c1 = min(本週一, c0)`、`c2 = min(當月 1 日, c1)`、`c3 = min(上月 1 日, c2)`。重跑 1.1／1.3 三個 it 全綠
-- [ ] 1.5 RED: 補 it「週起始為週一，週日的本週一為六天前」——`now = new Date(2026, 7, 16)`（週日），斷言 `c1` 為 `new Date(2026, 7, 10)` 而非 `new Date(2026, 7, 17)`。看到紅燈（若 1.2 已用 `(getDay() + 6) % 7` 正確處理，此項會直接綠燈——**如實標註為 regression guard**，不得偽造紅燈）
-- [ ] 1.6 GREEN: 以 `(now.getDay() + 6) % 7` 推算本週一的天數偏移（週一為 0、週日為 6），確保週日歸入前一週。重跑至綠
-- [ ] 1.7 RED: 補兩個 it：「切點為當地時區 00:00 而非 UTC 00:00」（`now` 為當地 2026-08-15 23:30，斷言 `new Date(c0)` 的 `getHours()`／`getMinutes()`／`getSeconds()`／`getMilliseconds()` 皆為 0，且 `c0 === new Date(2026, 7, 15).getTime()`）與「一月時上月切點落在去年 12 月 1 日」（`now = new Date(2027, 0, 5)`，斷言 `c3 === new Date(2026, 11, 1).getTime()`）。看到紅燈（若 1.2 已用 `new Date(y, m, d)` 本地建構且以 `m - 1` 取上月，兩項可能直接綠燈——**如實標註為 regression guard**）
-- [ ] 1.8 GREEN: 確認四個切點一律以 `new Date(y, m, d)` 本地建構（**不得**使用 `Date.UTC` 或 `getUTC*`），上月以 `new Date(y, m - 1, 1)` 取得並倚賴月份 `-1` 的跨年正規化（design Decision 2）。重跑至綠
-- [ ] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）
-- [ ] 1.10 GREEN: 確認 `history-range.ts` 全檔沒有任何 `new Date()`（無參數）、`Date.now()` 或其他系統時鐘取用；「現在」一律由參數注入。重跑至綠
-- [ ] 1.11 REFACTOR: 把「取某年月日的當地 00:00」抽成模組內具名 helper（例如 `startOfLocalDay`），使四個切點共用同一條正規化路徑；`RangeCutoffs` 型別與 `HISTORY_RANGES` 常數以 `as const` 匯出。確認無重複的日期建構邏輯，無壞味道則註記 skipped
+- [x] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-range.test.ts`，寫入 it「一般情形下四個切點依序為今天、本週一、當月 1 日與上月 1 日」——以 `now = new Date(2026, 7, 15)`（2026-08-15 週六）呼叫 `computeRangeCutoffs(now)`，斷言 `c0`／`c1`／`c2`／`c3` 依序等於 `new Date(2026, 7, 15)`、`new Date(2026, 7, 10)`、`new Date(2026, 7, 1)`、`new Date(2026, 6, 1)` 的時間戳。跑單檔看到紅燈並貼出輸出（**真紅燈**：模組尚不存在，import 解析失敗）
+- [x] 1.2 GREEN: 建立 `history-range.ts`，實作 `computeRangeCutoffs(now: Date): RangeCutoffs`，回傳四個當地時區 00:00 的時間戳。此步**先各自獨立計算**四個切點（今天、本週一、當月 1 日、上月 1 日），尚不套用 `min()`——`min()` 由 1.4 依 1.3 的紅燈驅動加入。重跑至綠
+- [x] 1.3 RED: 補兩個 it：「跨月週時當月切點取本週一而非當月 1 日」（`now = new Date(2026, 7, 1)`，2026-08-01 週六、本週一為 7/27，斷言 `c1` 與 `c2` 皆為 `new Date(2026, 6, 27)`、`c3` 為 `new Date(2026, 6, 1)`）與「四個切點單調不遞增」（對月初、月中、週一、週日、跨年五組 `now` 逐一斷言 `c3 <= c2 <= c1 <= c0`）。看到紅燈（**真紅燈**：1.2 未套 `min()` 時 `c2 = 8/1 > c1 = 7/27`）
+- [x] 1.4 GREEN: 依 design Decision 1 逐層套用 `min()`：`c1 = min(本週一, c0)`、`c2 = min(當月 1 日, c1)`、`c3 = min(上月 1 日, c2)`。重跑 1.1／1.3 三個 it 全綠
+- [x] 1.5 RED: 補 it「週起始為週一，週日的本週一為六天前」——`now = new Date(2026, 7, 16)`（週日），斷言 `c1` 為 `new Date(2026, 7, 10)` 而非 `new Date(2026, 7, 17)`。看到紅燈（若 1.2 已用 `(getDay() + 6) % 7` 正確處理，此項會直接綠燈——**如實標註為 regression guard**，不得偽造紅燈）**真紅燈**：1.2/1.4 使用的 `getDay() - 1` 對週日（getDay()=0）算出 offset=-1，日期反而往後推一天，得 8/17 而非預期的 8/10
+- [x] 1.6 GREEN: 以 `(now.getDay() + 6) % 7` 推算本週一的天數偏移（週一為 0、週日為 6），確保週日歸入前一週。重跑至綠
+- [x] 1.7 RED: 補兩個 it：「切點為當地時區 00:00 而非 UTC 00:00」（`now` 為當地 2026-08-15 23:30，斷言 `new Date(c0)` 的 `getHours()`／`getMinutes()`／`getSeconds()`／`getMilliseconds()` 皆為 0，且 `c0 === new Date(2026, 7, 15).getTime()`）與「一月時上月切點落在去年 12 月 1 日」（`now = new Date(2027, 0, 5)`，斷言 `c3 === new Date(2026, 11, 1).getTime()`）。看到紅燈（若 1.2 已用 `new Date(y, m, d)` 本地建構且以 `m - 1` 取上月，兩項可能直接綠燈——**如實標註為 regression guard**）**regression guard**：1.2 起就一律用 `new Date(y, m, d)` 本地建構、上月用 `m - 1`，兩個 it 加入時直接綠燈
+- [x] 1.8 GREEN: 確認四個切點一律以 `new Date(y, m, d)` 本地建構（**不得**使用 `Date.UTC` 或 `getUTC*`），上月以 `new Date(y, m - 1, 1)` 取得並倚賴月份 `-1` 的跨年正規化（design Decision 2）。重跑至綠
+- [x] 1.9 RED: 補 it「切點依注入的 now 計算，與系統時鐘無關」——以 `vi.useFakeTimers()` + `vi.setSystemTime(new Date(2030, 2, 3))` 把系統時間推到 2030，仍傳入 `now = new Date(2026, 7, 15)`，斷言結果與 1.1 完全相同；測試結束 `vi.useRealTimers()`。看到紅燈（若 1.2 從未取用系統時鐘則為 regression guard，**如實標註**）**regression guard**：`computeRangeCutoffs` 自 1.2 起就只用參數 `now`，從未取用系統時鐘，加入時直接綠燈
+- [x] 1.10 GREEN: 確認 `history-range.ts` 全檔沒有任何 `new Date()`（無參數）、`Date.now()` 或其他系統時鐘取用；「現在」一律由參數注入。重跑至綠
+- [x] 1.11 REFACTOR: 把「取某年月日的當地 00:00」抽成模組內具名 helper（例如 `startOfLocalDay`），使四個切點共用同一條正規化路徑；`RangeCutoffs` 型別與 `HISTORY_RANGES` 常數以 `as const` 匯出。確認無重複的日期建構邏輯，無壞味道則註記 skipped
 
 ## 2. 區間歸屬（`history-range.ts`）
 
 Depends on: §1
 
-- [ ] 2.1 RED: 補兩個 it：「任一時間點恰好落入五個區間中的一個」（`now = 2026-08-15`，取一組含 `new Date(1970, 0, 1)` 與 `new Date(2100, 0, 1)` 兩個極端值、橫跨五個區間的時間點，對每點以五個區間範圍逐一判定，斷言恰有一個成立且與 `rangeOfTime` 回傳值一致）與「時間點恰為切點時歸入較新的區間」（`t` 為 `c0`／`c1`／`c2`／`c3` 時依序得 `"today"`／`"thisWeek"`／`"thisMonth"`／`"lastMonth"`，`c3 - 1` 得 `"earlier"`）。看到紅燈（**真紅燈**：`rangeOfTime` 尚不存在）
-- [ ] 2.2 GREEN: 實作 `rangeOfTime(time, now): HistoryRange`，依 design Decision 8 採由新到遠的單向 `if / else if` 掃描（`>= c0` → today、`>= c1` → thisWeek、`>= c2` → thisMonth、`>= c3` → lastMonth、否則 earlier），最後一個分支**無條件回傳**，不得有 `undefined` 或 `throw` 路徑。重跑至綠
-- [ ] 2.3 RED: 補 it「晚於現在的時間點仍歸入今日而非落空」——`now` 為 2026-08-15 20:00、`t` 為 2026-08-15 23:59，斷言回傳 `"today"` 且不拋出例外。看到紅燈（若 2.2 未替今日設上界則為 regression guard，**如實標註**；若 2.2 誤照 PRD 表格寫成 `t <= now` 的上界則為真紅燈）
-- [ ] 2.4 GREEN: 確認今日的上界為 `+∞`（實作上即「不設上界」），SHALL NOT 以「現在」為上界（design Decision 3）。重跑至綠
-- [ ] 2.5 RED: 補 it「跨月週時沒有任何時間點落入本月」——`now = new Date(2026, 7, 1)`，對 7/1～8/1 逐日取樣，斷言 7/27～7/31 皆回傳 `"thisWeek"`、7/1～7/26 皆回傳 `"lastMonth"`、整段無任何一點回傳 `"thisMonth"`。看到紅燈（若 §1 的 `min()` 已正確 clamp 則為 regression guard，**如實標註**）
-- [ ] 2.6 GREEN: 確認空區間是 `c2 === c1` 的自然結果，SHALL NOT 為此加任何特例分支。重跑至綠
-- [ ] 2.7 REFACTOR: 以 `HISTORY_RANGES` 常數與切點序列驅動比較，消除五段結構重複的 `if`；確認回傳型別為 `HistoryRange` 而非 `string`。無壞味道則註記 skipped
+- [x] 2.1 RED: 補兩個 it：「任一時間點恰好落入五個區間中的一個」（`now = 2026-08-15`，取一組含 `new Date(1970, 0, 1)` 與 `new Date(2100, 0, 1)` 兩個極端值、橫跨五個區間的時間點，對每點以五個區間範圍逐一判定，斷言恰有一個成立且與 `rangeOfTime` 回傳值一致）與「時間點恰為切點時歸入較新的區間」（`t` 為 `c0`／`c1`／`c2`／`c3` 時依序得 `"today"`／`"thisWeek"`／`"thisMonth"`／`"lastMonth"`，`c3 - 1` 得 `"earlier"`）。看到紅燈（**真紅燈**：`rangeOfTime` 尚不存在）**真紅燈**：`TypeError: rangeOfTime is not a function`，2 個 it 失敗
+- [x] 2.2 GREEN: 實作 `rangeOfTime(time, now): HistoryRange`，依 design Decision 8 採由新到遠的單向 `if / else if` 掃描（`>= c0` → today、`>= c1` → thisWeek、`>= c2` → thisMonth、`>= c3` → lastMonth、否則 earlier），最後一個分支**無條件回傳**，不得有 `undefined` 或 `throw` 路徑。重跑至綠
+- [x] 2.3 RED: 補 it「晚於現在的時間點仍歸入今日而非落空」——`now` 為 2026-08-15 20:00、`t` 為 2026-08-15 23:59，斷言回傳 `"today"` 且不拋出例外。看到紅燈（若 2.2 未替今日設上界則為 regression guard，**如實標註**；若 2.2 誤照 PRD 表格寫成 `t <= now` 的上界則為真紅燈）**regression guard**：2.2 的 `today` 分支本就只判斷 `>= c0`、無上界，加入時直接綠燈
+- [x] 2.4 GREEN: 確認今日的上界為 `+∞`（實作上即「不設上界」），SHALL NOT 以「現在」為上界（design Decision 3）。重跑至綠
+- [x] 2.5 RED: 補 it「跨月週時沒有任何時間點落入本月」——`now = new Date(2026, 7, 1)`，對 7/1～8/1 逐日取樣，斷言 7/27～7/31 皆回傳 `"thisWeek"`、7/1～7/26 皆回傳 `"lastMonth"`、整段無任何一點回傳 `"thisMonth"`。看到紅燈（若 §1 的 `min()` 已正確 clamp 則為 regression guard，**如實標註**）**regression guard**：§1 的 `min()` 已正確 clamp（此 now 下 `c2 === c1`），加入時直接綠燈
+- [x] 2.6 GREEN: 確認空區間是 `c2 === c1` 的自然結果，SHALL NOT 為此加任何特例分支。重跑至綠
+- [x] 2.7 REFACTOR: 以 `HISTORY_RANGES` 常數與切點序列驅動比較，消除五段結構重複的 `if`；確認回傳型別為 `HistoryRange` 而非 `string`。無壞味道則註記 skipped——改以 `[c0, c1, c2, c3]` 與 `HISTORY_RANGES` 索引對應的 for 迴圈掃描，命中即回傳 `HISTORY_RANGES[i]`，迴圈跑完（未命中）落到迴圈外無條件回傳 `HISTORY_RANGES[4]`；未用 `find()`，保住 Decision 8「無 undefined／throw 路徑」的保證。`tsc --noEmit` 通過（若 `HISTORY_RANGES[i]` 型別寬化為 `string`，因函式宣告回傳型別為 `HistoryRange`，`tsc` 會直接報型別不符，故通過即確認回傳型別正確）
 
 ## 3. 篩選與排序（`history-range.ts`）
 
 Depends on: §2
 
-- [ ] 3.1 **（非實作項）複核 M4 的紀錄 schema**：讀 worktree 內 `main` 已合併的 M4 程式碼——`lib/matchmaker/history.ts` 的 `MatchHistoryEntry`／`MatchHistoryEntrySchema`、`lib/matchmaker/round-storage.ts` 的 `readHistory()`、`lib/matchmaker/storage-keys.ts` 的 key 常數——確認對戰時間欄位確為 `playedAt`（ISO 8601）且 reader 匯出名稱一致，把實際結果回填 design.md `## Open Questions` 第 1、2 點。**只讀程式碼，不讀其他 change 的計畫檔**；若與 design.md 的欄位表不符，以程式碼為準且**不得**改動 M4 的型別；`readHistory()` 回報的 `droppedCount` 只記錄不實作（超出本 change 的 spec 範圍）
-- [ ] 3.2 RED: 補 it「篩選結果依對戰時間由新到舊排序」——同一區間內三筆紀錄以時間亂序傳入 `filterHistoryByRange(records, "today", now)`，斷言回傳順序為對戰時間遞減。看到紅燈（**真紅燈**：函式尚不存在）
-- [ ] 3.3 GREEN: 實作 `filterHistoryByRange(entries, range, now)`：以模組內單一 `recordTime(entry)` 取出 `playedAt` 並轉為時間戳（design Decision 4），`filter` 出 `rangeOfTime(...) === range` 者後依時間遞減排序。重跑至綠
-- [ ] 3.4 RED: 補 it「篩選不修改輸入的紀錄陣列」——傳入亂序紀錄後，斷言輸入陣列的長度、元素順序與各紀錄內容皆與呼叫前相同（以 `structuredClone` 前後比對），且回傳值與輸入不是同一參照。看到紅燈（**真紅燈**：3.3 若直接 `records.sort()` 會原地改動輸入）
-- [ ] 3.5 GREEN: 排序前先 `slice()` 複製，確保純函式語意。重跑至綠
-- [ ] 3.6 REFACTOR: 確認對戰時間的取值只出現在 `recordTime()` 一處、模組對外只匯出 `HISTORY_RANGES`／`HistoryRange`／`RangeCutoffs`／`computeRangeCutoffs`／`rangeOfTime`／`filterHistoryByRange`；為 `recordTime()` 補 JSDoc 說明它是「M4 欄位命名的唯一對齊點」。無壞味道則註記 skipped
+- [x] 3.1 **（非實作項）複核 M4 的紀錄 schema**：讀 worktree 內 `main` 已合併的 M4 程式碼——`lib/matchmaker/history.ts` 的 `MatchHistoryEntry`／`MatchHistoryEntrySchema`、`lib/matchmaker/round-storage.ts` 的 `readHistory()`、`lib/matchmaker/storage-keys.ts` 的 key 常數——確認對戰時間欄位確為 `playedAt`（ISO 8601）且 reader 匯出名稱一致，把實際結果回填 design.md `## Open Questions` 第 1、2 點。**只讀程式碼，不讀其他 change 的計畫檔**；若與 design.md 的欄位表不符，以程式碼為準且**不得**改動 M4 的型別；`readHistory()` 回報的 `droppedCount` 只記錄不實作（超出本 change 的 spec 範圍）——**複核結果：程式碼與 design.md 欄位表完全一致，無出入，已回填 Open Questions 第 1、2 點**
+- [x] 3.2 RED: 補 it「篩選結果依對戰時間由新到舊排序」——同一區間內三筆紀錄以時間亂序傳入 `filterHistoryByRange(records, "today", now)`，斷言回傳順序為對戰時間遞減。看到紅燈（**真紅燈**：函式尚不存在）**真紅燈**：`TypeError: filterHistoryByRange is not a function`，1 個 it 失敗、11 個既有 it 仍綠
+- [x] 3.3 GREEN: 實作 `filterHistoryByRange(entries, range, now)`：以模組內單一 `recordTime(entry)` 取出 `playedAt` 並轉為時間戳（design Decision 4），`filter` 出 `rangeOfTime(...) === range` 者後依時間遞減排序。重跑至綠——最小實作刻意寫成 `entries.sort(...).filter(...)`（直接對輸入參照排序），供 3.4 產生真紅燈
+- [x] 3.4 RED: 補 it「篩選不修改輸入的紀錄陣列」——傳入亂序紀錄後，斷言輸入陣列的長度、元素順序與各紀錄內容皆與呼叫前相同（以 `structuredClone` 前後比對），且回傳值與輸入不是同一參照。看到紅燈（**真紅燈**：3.3 若直接 `records.sort()` 會原地改動輸入）**真紅燈**：`AssertionError`，輸入陣列的元素順序在呼叫後被原地改動，1 個 it 失敗、12 個既有 it 仍綠
+- [x] 3.5 GREEN: 排序前先 `slice()` 複製，確保純函式語意。重跑至綠——13 個 it 全綠
+- [x] 3.6 REFACTOR: 確認對戰時間的取值只出現在 `recordTime()` 一處、模組對外只匯出 `HISTORY_RANGES`／`HistoryRange`／`RangeCutoffs`／`computeRangeCutoffs`／`rangeOfTime`／`filterHistoryByRange`；為 `recordTime()` 補 JSDoc 說明它是「M4 欄位命名的唯一對齊點」。無壞味道則註記 skipped——已補 JSDoc，匯出清單與取值集中點皆符合要求，無其他壞味道
 
 ## 4. 歷史頁與紀錄呈現（例外層 — 入口與純呈現，以 E2E 驗收）
 
@@ -58,15 +58,15 @@ Depends on: §3
 > 本節的檔案（`app/**/page.tsx` 與純呈現元件）依 `nextjs-pickball/CLAUDE.md` 屬 **TDD 例外層**，
 > 不寫單元測試；RED 一律以 Playwright E2E 承擔，仍維持「先看到紅燈再實作」的順序。
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，每個 test 前清空 `matchmaker:history:v1`；寫入 test「直接開啟 /matchmaker/history 可載入歷史頁」與「沒有任何歷史紀錄時顯示引導空狀態」。執行 E2E 看到紅燈並貼出輸出（**真紅燈**：路由不存在，回應 404）
-- [ ] 4.2 GREEN: 建立 `app/matchmaker/history/page.tsx`（入口，組合下述元件）、`components/matchmaker/HistoryView.tsx`（`"use client"`，於 hydration 的 `useEffect` 內取一次 `new Date()` 與 `readHistory()` 的結果存進 state；**不得**改用 `useRoundStore`，見 design Decision 5、7）、`components/matchmaker/EmptyHistory.tsx`（引導型空狀態，繁體中文並說明「完成對戰後才會有紀錄」）。重跑至綠
-- [ ] 4.3 RED: 補兩個 test：「開啟歷史頁預設顯示今日區間」（seed 今日與更早各一筆，斷言今日篩選為選中狀態且列表只含今日那筆）與「切換區間後只顯示該區間的紀錄」（seed 今日與上月各一筆，切到上月後只出現上月那筆）。看到紅燈
-- [ ] 4.4 GREEN: 建立 `components/matchmaker/HistoryRangeFilter.tsx`，提供今日／本週／本月／上月／更早五個篩選，初次開啟預設選中今日；選取狀態只存在元件 state，**不寫入 LocalStorage**。重跑至綠
-- [ ] 4.5 RED: 補三個 test：「雙打紀錄顯示 8.2 全部欄位含雙打組成標示」、「單打紀錄不顯示雙打組成標示」、「每位球員同時顯示賽前與賽後分數」（賽前 4.20、賽後 4.35 兩值同時出現）。看到紅燈
-- [ ] 4.6 GREEN: 建立 `components/matchmaker/HistoryRecordCard.tsx`，呈現 `prd.md` 8.2 全部欄位；雙打組成標示只在雙打時渲染；勝方以文字或圖示標示而非僅靠顏色（`prd.md` 12.5）；分數一律照 M4 寫入值原樣顯示，不重算。重跑至綠
-- [ ] 4.7 RED: 補 test「跨月週時本月顯示空狀態而非錯誤」——以假時鐘把時間固定在 2026-08-01 並 seed 7/27～7/31 的紀錄，斷言本月顯示友善空狀態且畫面無錯誤字樣、本週如常列出該批紀錄。看到紅燈（**不得**改用「依當下日期動態算出資料」的寫法繞過假時鐘，見 design Risks）
-- [ ] 4.8 GREEN: 讓每個區間各自擁有空狀態文案，並確保「本月為空」走的是正常空狀態路徑而非錯誤路徑。重跑至綠
-- [ ] 4.9 REFACTOR: 把 E2E 的 seed 邏輯抽成單一 helper（一處組裝紀錄 fixture），確認五個 test 不各自重複拼 JSON；元件皆標 `"use client"` 且與 `components/matchmaker/` 既有命名風格一致。無壞味道則註記 skipped
+- [x] 4.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，每個 test 前清空 `matchmaker:history:v1`；寫入 test「直接開啟 /matchmaker/history 可載入歷史頁」與「沒有任何歷史紀錄時顯示引導空狀態」。執行 E2E 看到紅燈並貼出輸出（**真紅燈**：路由不存在，Next.js 回應預設 404 頁，`heading「對戰歷史」`／五個 `radio`／引導文案「完成對戰後才會有紀錄」皆 `element(s) not found`，2 個 test 失敗）
+- [x] 4.2 GREEN: 建立 `app/matchmaker/history/page.tsx`（入口，組合下述元件）、`components/matchmaker/HistoryView.tsx`（`"use client"`，於 hydration 的 `useEffect` 內取一次 `new Date()` 與 `readHistory()` 的結果存進 state；**不得**改用 `useRoundStore`，見 design Decision 5、7）、`components/matchmaker/EmptyHistory.tsx`（引導型空狀態，繁體中文並說明「完成對戰後才會有紀錄」）。重跑至綠——2 個 test 皆綠（首次冷啟編譯耗時較長屬環境正常現象，非行為缺陷，重跑確認穩定綠）
+- [x] 4.3 RED: 補兩個 test：「開啟歷史頁預設顯示今日區間」（seed 今日與更早各一筆，斷言今日篩選為選中狀態且列表只含今日那筆）與「切換區間後只顯示該區間的紀錄」（seed 今日與上月各一筆，切到上月後只出現上月那筆）。看到紅燈——**真紅燈**：`getByRole("radio", { name: "今日", checked: true })` 找不到元素（HistoryView 的區間控制項尚無選中狀態）；`getByText("今日對戰員C")` 找不到元素（尚無任何紀錄列表渲染），2 個 test 失敗，既有 2 個 test 仍綠
+- [x] 4.4 GREEN: 建立 `components/matchmaker/HistoryRangeFilter.tsx`，提供今日／本週／本月／上月／更早五個篩選，初次開啟預設選中今日；選取狀態只存在元件 state，**不寫入 LocalStorage**。重跑至綠——4 個 test 全綠。同步在 `HistoryView` 加上以 `filterHistoryByRange` 篩選後的最小紀錄列表（暫以球員姓名文字呈現，4.6 會替換為 `HistoryRecordCard`）
+- [x] 4.5 RED: 補三個 test：「雙打紀錄顯示 8.2 全部欄位含雙打組成標示」、「單打紀錄不顯示雙打組成標示」、「每位球員同時顯示賽前與賽後分數」（賽前 4.20、賽後 4.35 兩值同時出現）。看到紅燈——**真紅燈**：`getByTestId("history-record-<matchId>")` 全數找不到元素（`HistoryRecordCard` 尚不存在，目前列表只以球員姓名純文字呈現），3 個 test 失敗、既有 4 個 test 仍綠
+- [x] 4.6 GREEN: 建立 `components/matchmaker/HistoryRecordCard.tsx`，呈現 `prd.md` 8.2 全部欄位；雙打組成標示只在雙打時渲染；勝方以文字或圖示標示而非僅靠顏色（`prd.md` 12.5）；分數一律照 M4 寫入值原樣顯示，不重算。重跑至綠——7 個 test 全綠，`HistoryView` 改用 `HistoryRecordCard` 取代 4.4 的最小列表
+- [x] 4.7 RED: 補 test「跨月週時本月顯示空狀態而非錯誤」——以假時鐘把時間固定在 2026-08-01 並 seed 7/27～7/31 的紀錄，斷言本月顯示友善空狀態且畫面無錯誤字樣、本週如常列出該批紀錄。看到紅燈（**不得**改用「依當下日期動態算出資料」的寫法繞過假時鐘，見 design Risks）——**真紅燈**：`getByTestId("empty-history-range")` 找不到元素；目前邏輯只判斷「整份歷史是否為空」，切到本月後 `filteredEntries` 為空但 `entries.length > 0`，falls through 到卡片列表分支渲染出 0 張卡片、畫面留白且無任何提示文字，1 個 test 失敗、既有 7 個 test 仍綠
+- [x] 4.8 GREEN: 讓每個區間各自擁有空狀態文案，並確保「本月為空」走的是正常空狀態路徑而非錯誤路徑。重跑至綠——8 個 test 全綠。`EmptyHistory` 改為 `range: HistoryRange | null` 判斷兩種空狀態：`null` 為引導型（整份歷史皆空）、指定區間為該區間各自的友善文案；`HistoryView` 依「整份是否為空」→「篩選後是否為空」兩層 ternary 分流，本月為空與其他區間為空走同一條正常路徑
+- [x] 4.9 REFACTOR: 把 E2E 的 seed 邏輯抽成單一 helper（一處組裝紀錄 fixture），確認五個 test 不各自重複拼 JSON；元件皆標 `"use client"` 且與 `components/matchmaker/` 既有命名風格一致。無壞味道則註記 skipped——新增 `player()`／`buildEntry()` 兩個組裝函式，六個需種資料的 test 皆改呼叫 `buildEntry()`（format 依隊伍人數自動推導），不再各自拼 JSON 物件字面量；重跑 8 個 test 全綠。`HistoryView`／`EmptyHistory`／`HistoryRangeFilter`／`HistoryRecordCard` 皆已標 `"use client"`，命名與既有 `CourtCard`／`PlayerTile`／`EmptyStage` 風格一致。另評估「`DOUBLES_COMPOSITION_LABEL` 是否抽成 `CourtCard.tsx` 與 `HistoryRecordCard.tsx` 共用模組」——判定**不抽**：僅 4 個項目的穩定對照表，抽出需連動修改範圍外的 `CourtCard.tsx`，與 Rule 3「不得改動 CourtCard 任何行為」的風險不成比例，維持兩檔各自持有一份
 
 ## 5. 導覽入口（必 TDD）與唯讀保證（例外層）
 
@@ -76,20 +76,20 @@ Depends on: §4
 > **MUST 走 TDD 三步**（先看到單元測試紅燈再實作），不是例外層的 `<Link>` 新增；
 > 唯讀保證那部分（§5.3～5.5）仍屬例外層，以 E2E 承擔。
 
-- [ ] 5.1 RED: 於 `matchmaker-history.spec.ts` 補 test「可由對戰頁的連結進入歷史頁」——自 matchmaker 區段點擊歷史紀錄連結，斷言網址為 `/matchmaker/history` 且歷史頁內容出現。看到紅燈（**真紅燈**：連結尚不存在）。RED MUST 同時包含 `lib/matchmaker/section-nav.test.ts` 第 31～36 行 `toEqual` 斷言的單元紅燈（把預期清單改成含 `/matchmaker/history` 的三筆後先跑出紅燈）
-- [ ] 5.2 GREEN: 在 `lib/matchmaker/section-nav.ts` 的 `MATCHMAKER_SECTION_HREFS` 與 `MATCHMAKER_SECTION_LABELS` 各加一筆 `/matchmaker/history`（標籤「歷史」），並同步更新第 23～24 行關於巢狀路由的註解（design Decision 6）。渲染層 `components/matchmaker/MatchmakerTabs.tsx` 只 map 清單，不需改動。**SHALL NOT** 改動 `site-navbar`、不改 M5 既有連結的行為、不順手重排連結順序或抽共用元件。重跑至綠
-- [ ] 5.3 RED: 補兩個 test：「瀏覽與切換區間後 matchmaker:history:v1 內容不變」（記下開頁前的原始字串 → 依序切換五個區間 → 再讀出的字串逐字相同）與「紀錄於 hydration 後顯示且無 console error」（監聽 `console` 事件，斷言載入過程無任何 error，含 hydration mismatch 警告）。看到紅燈（若 4.2 已正確採 hydration 模式且從未寫入，兩項可能直接綠燈——**如實標註為 regression guard**）
-- [ ] 5.4 GREEN: 確認 `HistoryView.tsx` 只呼叫 `readHistory()`（回傳為 `ReadHistoryResult`，即 `{ entries, droppedCount }` **物件而非陣列**），全檔沒有任何 `localStorage.setItem`／`removeItem`、沒有 `writeHistory()`／`writeRound()`，也沒有 import `useRoundStore`；render 期間不取用 `new Date()`／`Date.now()`／`localStorage`。重跑至綠。**注意**：`main` 上的 `readHistory()` 在 `droppedCount > 0` 時會呼叫 `writeHistory()` 回寫清理後的歷史（`lib/matchmaker/round-storage.ts` 第 142～147 行），因此唯讀保證的範圍是「`HistoryView` 自身不寫入」，§5.3 的 seed MUST 全數使用合法紀錄，以免踩到 M4 的回寫路徑而讓「內容不變」失守
-- [ ] 5.5 REFACTOR: 確認 `/matchmaker/history` 不相依任何前一畫面留下的記憶體狀態（直接開啟與由連結進入的行為一致）；檢查新增的連結文案與既有導覽的文案風格一致。無壞味道則註記 skipped
+- [x] 5.1 RED: 於 `matchmaker-history.spec.ts` 補 test「可由對戰頁的連結進入歷史頁」——自 matchmaker 區段點擊歷史紀錄連結，斷言網址為 `/matchmaker/history` 且歷史頁內容出現。看到紅燈（**真紅燈**：連結尚不存在）。RED MUST 同時包含 `lib/matchmaker/section-nav.test.ts` 第 31～36 行 `toEqual` 斷言的單元紅燈（把預期清單改成含 `/matchmaker/history` 的三筆後先跑出紅燈）——**真紅燈（兩處）**：`section-nav.test.ts` 的 `toEqual` 斷言改為三筆後失敗（實際仍只有對戰／參賽者兩筆）；E2E「可由對戰頁的連結進入歷史頁」找不到歷史連結。commit `6bf402a`
+- [x] 5.2 GREEN: 在 `lib/matchmaker/section-nav.ts` 的 `MATCHMAKER_SECTION_HREFS` 與 `MATCHMAKER_SECTION_LABELS` 各加一筆 `/matchmaker/history`（標籤「歷史」），並同步更新第 23～24 行關於巢狀路由的註解（design Decision 6）。渲染層 `components/matchmaker/MatchmakerTabs.tsx` 只 map 清單，不需改動。**SHALL NOT** 改動 `site-navbar`、不改 M5 既有連結的行為、不順手重排連結順序或抽共用元件。重跑至綠——commit `7e9bcd0`。實際行號因 M6 合併而位移（兩個常數在第 16／18～24 行、註解在第 26～27 行，見 Open Questions 第 5 點），依實際位置修改；「歷史」插在 `players` 之後，既有兩筆順序未動，`MatchmakerTabs.tsx` 與 `site-navbar` 皆未改動
+- [x] 5.3 RED: 補兩個 test：「瀏覽與切換區間後 matchmaker:history:v1 內容不變」（記下開頁前的原始字串 → 依序切換五個區間 → 再讀出的字串逐字相同）與「紀錄於 hydration 後顯示且無 console error」（監聽 `console` 事件，斷言載入過程無任何 error，含 hydration mismatch 警告）。看到紅燈（若 4.2 已正確採 hydration 模式且從未寫入，兩項可能直接綠燈——**如實標註為 regression guard**）——**regression guard，非傳統紅燈**：4.2 起 `HistoryView` 即採 hydration 模式且僅呼叫 `readHistory()`，兩個 test 寫入當下直接綠燈。依規則不偽造紅燈，改以 3 組 mutation 驗證偵測力（回寫、附加重複紀錄、追加字元／`console.error`、`entries` 恆空、render 期間直讀 `localStorage` 製造真實 hydration mismatch），確認皆轉紅後還原。commit `29aabaf`
+- [x] 5.4 GREEN: 確認 `HistoryView.tsx` 只呼叫 `readHistory()`（回傳為 `ReadHistoryResult`，即 `{ entries, droppedCount }` **物件而非陣列**），全檔沒有任何 `localStorage.setItem`／`removeItem`、沒有 `writeHistory()`／`writeRound()`，也沒有 import `useRoundStore`；render 期間不取用 `new Date()`／`Date.now()`／`localStorage`。重跑至綠。**注意**：`main` 上的 `readHistory()` 在 `droppedCount > 0` 時會呼叫 `writeHistory()` 回寫清理後的歷史（`lib/matchmaker/round-storage.ts` 第 142～147 行），因此唯讀保證的範圍是「`HistoryView` 自身不寫入」，§5.3 的 seed MUST 全數使用合法紀錄，以免踩到 M4 的回寫路徑而讓「內容不變」失守——**逐項機械查核通過**（剝除註解後計數，避免被註解字面命中誤導）：`readHistory()` 以 `const { entries } = readHistory()` 物件解構取用（非當陣列用）；`localStorage`／`setItem`／`removeItem`／`writeHistory`／`writeRound`／`useRoundStore` 在剝除註解後**皆 0 命中**（原始檔的 3 處 `localStorage`、1 處 `setItem`／`removeItem`、1 處 `useRoundStore` 全在第 14／28／36 行的註解內）；全檔唯一的 `new Date()` 在第 39 行、位於第 37～40 行的 `useEffect` 內，render 期間不取用時鐘。E2E 重跑 **55 passed**（11 test × 5 browser project）
+- [x] 5.5 REFACTOR: 確認 `/matchmaker/history` 不相依任何前一畫面留下的記憶體狀態（直接開啟與由連結進入的行為一致）；檢查新增的連結文案與既有導覽的文案風格一致。無壞味道則註記 skipped——**記憶體狀態獨立性成立**：`page.tsx` 為 server component、不標 `"use client"`；四個元件與 `page.tsx` 對 `useContext`／`createContext`／`Provider`／`useRoundStore`／`useRosterStore` 皆 0 命中（僅 2 處註解字面命中）；`app/matchmaker/layout.tsx` 只渲染 `MatchmakerTabs` 與 `children`，無任何 provider。行為一致性由 E2E 兩個 test 對照驗證（「直接開啟 /matchmaker/history 可載入歷史頁」與「可由對戰頁的連結進入歷史頁」，5 個 project 全綠）。**文案風格一致**：對戰／參賽者／歷史皆為 2～3 字名詞、無後綴。**唯一改動**：`app/matchmaker/layout.tsx` 第 5～7 行的註解因 §5.2 新增分頁而失真（原寫「兩頁共用同一份區段導覽」），更新為三頁——屬清理自身造成的過期註解，**未改動任何行為**，`MatchmakerTabs.tsx` 與 `site-navbar` 皆未動
 
 ## 6. 收尾驗證
 
-- [ ] 6.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**；貼出「共 N 個錨點、N 個對上」的輸出
-- [ ] 6.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/history-range.test.ts` 全綠，貼出輸出
-- [ ] 6.3 `pnpm --filter ./nextjs-pickball test:e2e --grep "matchmaker-history"` 於五個 browser project 全綠，貼出輸出
-- [ ] 6.4 `pnpm lint`（repo root）：0 errors；記錄既有 warning 以證明無新增
-- [ ] 6.5 `pnpm typecheck`（repo root）通過
-- [ ] 6.6 `pnpm test`（repo root）全套通過，確認未破壞 M1～M5 既有測試與 `hono-pickball` 後端測試
-- [ ] 6.7 `DO_NOT_TRACK=1 openspec validate matchmaker-history-page --strict` 通過
-- [ ] 6.8 **mutation 驗證**（本 change 有數個 RED 屬 regression guard，紅燈無法自然出現，測試有效性改由 mutation 承擔）。逐項改壞後跑 `history-range.test.ts` 確認變紅再還原，至少涵蓋：① `c2` 的 `min()` 拿掉 ② 本週一偏移改為 `now.getDay() - 1` ③ `startOfLocalDay` 改用 `Date.UTC` ④ `rangeOfTime` 的今日分支加上 `t <= now` 上界 ⑤ `filterHistoryByRange` 拿掉 `slice()`。逐項貼出紅燈輸出
-- [ ] 6.9 `pnpm build` 通過，並確認 `/matchmaker/history` 被識別為靜態預渲染（與 hydration 模式一致：首次輸出為空狀態，client effect 後才填入紀錄）
+- [x] 6.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**；貼出「共 N 個錨點、N 個對上」的輸出——**共 24 個錨點、24 個對上**。腳本以正規式 `- \*\*驗收\*\*：`([^`]+)`，(it|test) 名稱「([^」]+)」` 抽取，再對來源檔逐字計 `it("<name>"`／`test("<name>"` 出現次數，每個皆恰為 1。抽取完整性另以 `grep -c '^- \*\*驗收\*\*'` 交叉驗證亦為 24（另有 1 行含「驗收」二字為第 179 行散文，非錨點）。兩個來源檔皆存在（`history-range.test.ts` 13 個、`matchmaker-history.spec.ts` 11 個）
+- [x] 6.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/history-range.test.ts` 全綠，貼出輸出——**Test Files 1 passed (1)／Tests 14 passed (14)**，Duration 405ms
+- [x] 6.3 `pnpm --filter ./nextjs-pickball test:e2e --grep "matchmaker-history"` 於五個 browser project 全綠，貼出輸出——**55 passed (55.6s)**，即 11 個 test × 5 個 project（chromium／firefox／webkit／mobile-chrome／mobile-safari）。以 `--workers=1` 執行；跑前跑後皆確認 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 為空
+- [x] 6.4 `pnpm lint`（repo root）：0 errors；記錄既有 warning 以證明無新增——**exit 0，3 problems (0 errors, 3 warnings)**。三個 warning 皆為既有：`hooks/useQuiz.ts:33`（`_correctIndex`）、`hooks/useRosterStore.ts:112`（`_arg`）、`hooks/useScoreboardStore.ts:45`（`_arg`）。以 `git diff --name-only 85889ca..HEAD` 確認三檔**皆未被本 change 改動**，故無新增 warning
+- [x] 6.5 `pnpm typecheck`（repo root）通過——`pnpm -r exec tsc --noEmit` **exit 0**，無輸出
+- [x] 6.6 `pnpm test`（repo root）全套通過，確認未破壞 M1～M5 既有測試與 `hono-pickball` 後端測試——**前端 57 檔／486 tests 全綠，後端 4 檔／16 tests 全綠**。對照 Step 0 baseline（前端 56 檔／472 tests、後端 4 檔／16 tests）：檔數 +1（新增 `history-range.test.ts`）、測試數 +14（恰為該檔的 14 個 it），**既有測試 0 破壞**；`section-nav.test.ts` 只改斷言內容、測試數未變
+- [x] 6.7 `DO_NOT_TRACK=1 openspec validate matchmaker-history-page --strict` 通過——`Change 'matchmaker-history-page' is valid`，exit 0
+- [x] 6.8 **mutation 驗證**（本 change 有數個 RED 屬 regression guard，紅燈無法自然出現，測試有效性改由 mutation 承擔）。逐項改壞後跑 `history-range.test.ts` 確認變紅再還原，至少涵蓋：① `c2` 的 `min()` 拿掉 ② 本週一偏移改為 `now.getDay() - 1` ③ `startOfLocalDay` 改用 `Date.UTC` ④ `rangeOfTime` 的今日分支加上 `t <= now` 上界 ⑤ `filterHistoryByRange` 拿掉 `slice()`。逐項貼出紅燈輸出——**五組全數轉紅（5/5 killed），每組皆以 `git checkout --` 還原並確認工作區乾淨**：<br>① `const c2 = Math.min(firstOfMonth, c1)` → `= firstOfMonth`：**2 failed**（「跨月週時當月切點取本週一而非當月 1 日」`expected 1785513600000 to be 1785081600000`、「四個切點單調不遞增」`expected 1785513600000 to be less than or equal to 1785081600000`）<br>② `(now.getDay() + 6) % 7` → `now.getDay() - 1`：**1 failed**（「週起始為週一，週日的本週一為六天前」`expected 1786809600000 to be 1786291200000`）<br>③ `new Date(year, month, day).getTime()` → `Date.UTC(year, month, day)`：**7 failed**（含「切點為當地時區 00:00 而非 UTC 00:00」`expected 8 to be +0`，以及一般情形／跨月週／週日／跨年上月／系統時鐘無關／區間篩選共六項）<br>④ 迴圈條件改為 `time >= cutoffs[i] && (i !== 0 || time <= now.getTime())`：**2 failed**（「晚於現在的時間點仍歸入今日而非落空」與「任一時間點恰好落入五個區間中的一個」皆 `expected 'thisWeek' to be 'today'`）<br>⑤ 拿掉 `.slice()`：**1 failed**（「篩選不修改輸入的紀錄陣列」`AssertionError: expected [ …(3) ] to deeply equal [ …(3) ]`）。**註**：⑤ coordinator 已於 §3 Stage 2 實測確認轉紅（design Open Questions 第 7 點），本次仍實跑複驗，結果一致
+- [x] 6.9 `pnpm build` 通過，並確認 `/matchmaker/history` 被識別為靜態預渲染（與 hydration 模式一致：首次輸出為空狀態，client effect 後才填入紀錄）——**兩個 workspace 皆 Done**（後端 `tsc --noEmit && wrangler deploy --dry-run` 通過，前端 Next.js 16.2.9 Turbopack 編譯成功、9/9 靜態頁產生）。Route 表列出 **`├ ○ /matchmaker/history`**，`○ (Static) prerendered as static content`。另實地檢查預渲染產物 `.next/server/app/matchmaker/history.html`：含引導空狀態文案「完成對戰後才會有紀錄」1 次、**`history-record-` testid 0 次**（無任何紀錄卡片）、標題「對戰歷史」與五個區間標籤各 1 次——確認首次輸出即為空狀態殼層，與 design Decision 7 的 hydration 模式一致

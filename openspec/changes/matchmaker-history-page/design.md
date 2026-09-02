@@ -153,6 +153,214 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
 ## Open Questions
 
 1. **M4 的 `MatchHistoryEntry` 與 `readHistory()` 落地後是否與其 delta spec 一致？** 本文件的欄位表抄自 M4 的 delta spec（撰寫時 M4 尚未實作）。apply 的 §3.1 MUST 以 `main` 上的實際程式碼複核；若有出入，改動範圍限於 `recordTime()` 一處（Decision 4），並在此節回填實際名稱。
+
+   **已確認（apply 3.1 實地複核，2026-08-30）**：`lib/matchmaker/history.ts` 與 `lib/matchmaker/round-storage.ts` 的實際程式碼與本文件上方欄位表**完全一致**，逐項比對無出入：`matchId`（`z.string()`）、`courtNumber`（`z.number().int().positive()`）、`playedAt`（`z.iso.datetime()`，ISO 8601 字串）、`format`（`"singles" | "doubles"` discriminated union，兩分支皆 `.strict()`，`doublesComposition` 單打不帶、雙打必帶）、`teamA`／`teamB`（各含 `players[]` 與 `rating`）、`players[].id`／`name`／`ratingBefore`／`ratingAfter`、`scoreA`／`scoreB`（非負整數）、`winner`（`"teamA" | "teamB"`）。型別與 schema 匯出名稱為 `MatchHistoryEntry`／`MatchHistoryEntrySchema`，與本文件記載一致。reader 為 `lib/matchmaker/round-storage.ts` 匯出的 `readHistory()`，回傳形狀為 `ReadHistoryResult { entries: MatchHistoryEntry[]; droppedCount: number }`（合法紀錄陣列在 `.entries` 欄位，非直接回傳陣列——`recordTime()` 與 `filterHistoryByRange` 的呼叫端需注意這一層）。key 常數 `HISTORY_STORAGE_KEY` 由 `lib/matchmaker/storage-keys.ts` 單一來源匯出，與本文件記載一致。**無需調整 `recordTime()` 之外的任何取值方式，M4 型別未被改動。**
 2. **`readHistory()` 回報的 `droppedCount > 0` 時，歷史頁要不要顯示「有 N 筆資料損毀已略過」？** M4 的 delta spec 已明訂 reader「丟棄筆數大於 0 時 SHALL 對外回報，SHALL NOT 靜默處理」，因此該值確定存在。**M4 合併後實地核對 `main` 補充**：`readHistory()` 除了回傳 `droppedCount` 與 `console.warn` 之外，**還會回寫**清理後的歷史（`lib/matchmaker/round-storage.ts` 第 142～147 行在 `droppedCount > 0` 時呼叫 `writeHistory(entries)`），屬「自我修復寫入」——這不是本頁發起的寫入，但代表載入損毀資料時 `matchmaker:history:v1` 的內容確實會變（見 Decision 5 與 tasks §5.4）。本 change **刻意不承諾**顯示行為，理由有二：① 本 change 的範圍是區間篩選與 8.2 呈現，損壞提示屬另一條使用者可見的行為，該有自己的 requirement 與驗收；② `useRoundStore`（M4）與對戰畫面（M5）也是 reader 的消費端，提示該放在哪一層是跨 milestone 的決定，不該由本 change 單方面定案。apply 時若發現此缺口，MUST 記錄於此節並回報，SHALL NOT 順手實作（會產生沒有 spec 覆蓋的行為）。
+
+   **apply 3.1 複核補充（2026-08-30）**：本次複核確認 `droppedCount` 的行為與上述記載一致，`filterHistoryByRange` 與 `recordTime()` 皆不消費 `droppedCount`，僅使用 `readHistory().entries`；沿用上述「不顯示」決議，不順手實作。
 3. ~~**M5 在 `main` 上提供的 matchmaker 導覽是獨立元件還是對戰頁內的連結區？**~~ **已確認（M5 合併後實地核對 `main`）：是獨立元件，但入口連結的落點不在元件。** `components/matchmaker/MatchmakerTabs.tsx` 掛在 `app/matchmaker/layout.tsx` 第 14 行，對戰頁與參賽者頁共用；`app/matchmaker/page.tsx` 內**沒有**任何 `<Link>`。`MatchmakerTabs` 只 `tabs.map()` 渲染，分頁清單與文案的單一來源是純函式模組 `lib/matchmaker/section-nav.ts`——`MATCHMAKER_SECTION_HREFS`（第 13 行）與 `MATCHMAKER_SECTION_LABELS`（第 15～21 行）。因此 §5 要改的是 `section-nav.ts` 這兩處各加一筆 `/matchmaker/history`，`MatchmakerTabs.tsx` 不必動。連帶兩點 MUST 注意：① `section-nav.ts` 屬 `lib/**`，是**必 TDD** 的行為邏輯，不是 Decision 6 原本設想的例外層 `<Link>` 新增；② `lib/matchmaker/section-nav.test.ts` 第 31～36 行的 regression guard 以 `toEqual` 逐字釘住「分頁清單依序為對戰與參賽者兩筆」，新增分頁必使其轉紅（這是真紅燈），MUST 一併更新該斷言。active 判定用 `===` 精確比對，`/matchmaker/history` 加入後判定仍正確，僅第 23～24 行「目前 app/matchmaker/ 下沒有巢狀路由」的註解需同步。
 4. ~~**雙打組成標示的中文文案是否已由 M5 定案？**~~（男雙／女雙／混雙／一般雙打）**已確認（M5 合併後實地核對 `main`）：M5 有這份對應表，但不是共用模組**——它寫死在 `components/matchmaker/CourtCard.tsx` 第 20～23 行（`mixed: "混雙"`／`mens: "男雙"`／`womens: "女雙"`／`general: "一般雙打"`）。M7 的 `HistoryRecordCard` 需要同一份文案，因此「沿用還是另寫一份」變成「要不要把 `CourtCard` 內的對應表抽成共用模組」——這正是 §4 REFACTOR 要判斷的具體情境。文案本身 MUST 與上述四個字串逐字相同，SHALL NOT 自創別的說法。
+5. **apply 中斷點手記（2026-08-30，第一棒 leader 因 session 即將中斷而停止）**
+
+   **進度：24／47 勾選（§1 11／11、§2 7／7、§3 6／6 全數完成；§4 起未開工）。**
+   分支 `change/matchmaker-history-page`，中斷時 HEAD 為 `ba4eb5c`，`git status --porcelain` **乾淨**，
+   無殘留 dev server process（`lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 皆空）。
+
+   **Step 0 baseline**（已回填 environment.md）：`Initial commit hash` = `85889ca`，
+   `pnpm test` 前端 56 檔 472 tests、後端 4 檔 16 tests 全綠。
+
+   **已完成群組的審查結論（皆已過兩階段審查，0 Blocking）**：
+   - §1 區間切點計算：Stage 1 `PASS`；Stage 2 `PASS_WITH_NITS`（獨立跑 **44 組 mutation**，
+     抓到 1 個 Implementer 未發現的真缺口——`getFullYear` 改成 `getUTCFullYear` 時**零覆蓋**，
+     因既有取樣日期全在 8 月與 1/5，兩種讀法年份相同。已補跨年邊界斷言，commit `05f3a79`）。
+   - §2 區間歸屬：Stage 1 `PASS`；Stage 2 `PASS`（獨立跑 **45 組 mutation，0 存活**）。
+     Stage 2 另修正註解中的懸空群組編號（commit `2d1e1f2`）。
+   - §3 篩選與排序：**Stage 1 `PASS`／Stage 2 `PASS_WITH_NITS`，0 Blocking——兩階段皆已完成**
+     （由 coordinator 於 2026-08-30 親自執行，見下方第 6、7 點）。Stage 2 獨立跑 20 組 mutation，
+     抓到 **3 個 Implementer 自測 12 組未發現的真缺口**，已補斷言（commit `aadf0df`）。
+
+   **⚠️ 續跑的第一件事：§4.1**（§1～§3 皆已完成兩階段審查，**不需重跑任何審查**）。
+
+   **接續點：§4.1**（新增 `tests/e2e/specs/matchmaker-history.spec.ts` 的兩個 E2E test，
+   真紅燈為路由不存在的 404）。§4 起進入例外層（`app/**/page.tsx` 與純呈現元件），
+   RED 一律由 Playwright E2E 承擔。依 execution-plan 的 Roles，§4／§5 的 Implementer
+   **MUST 用 `sonnet` 起跳**（本專案常設覆寫：Implementer 一律 sonnet，不用 plan 預設的 haiku）。
+
+   **§4 開工前就該知道的事**（避免重查）：
+   - E2E seed 的 LocalStorage 值必須是 **`{"version":1,"entries":[...]}`** 這個外層容器形狀，
+     不是裸陣列——`writeHistory()` 寫的是 `{ version: 1, entries }`（`round-storage.ts`），
+     外層 version 不符會被 reader 判為結構層級損壞而清空整份。
+   - `readHistory()` 回傳 **`{ entries, droppedCount }` 物件而非陣列**（見上方第 1 點）。
+   - §4.7 的跨月週情境 MUST 用 Playwright 假時鐘固定在 2026-08-01，
+     SHALL NOT 用「依當下日期動態算資料」繞過（design Risks 明令）。
+   - E2E **必須帶 `--workers=1`**（root `CLAUDE.md`：預設併發下本機不穩定）；
+     跑之前先 `lsof -i :3005 -i :8787` 與 `ps aux | grep -E "wrangler|workerd|next"` 清殘留，
+     **跑完立刻清掉自己起的 process**。
+
+   **§5 開工前的補充（本棒實地核對 `main`，修正 Decision 6 與上方第 3 點的行號）**：
+   M6 合併後 `lib/matchmaker/section-nav.ts` 已新增 `MATCHMAKER_ROUTE = "/matchmaker"`（第 14 行），
+   使兩個常數的行號位移——`MATCHMAKER_SECTION_HREFS` 現在在**第 16 行**（且由 `MATCHMAKER_ROUTE`
+   組成：`[MATCHMAKER_ROUTE, \`${MATCHMAKER_ROUTE}/players\`]`）、`MATCHMAKER_SECTION_LABELS`
+   在**第 18～24 行**、「目前 app/matchmaker/ 下沒有巢狀路由」的註解在**第 26～27 行**（非第 23～24 行）。
+   兩個常數**皆未 export**（模組私有），`matchmakerSectionTabs()` 才是唯一對外入口。
+   `section-nav.test.ts` 的 regression guard it 名稱為「分頁清單依序為對戰與參賽者兩筆」，
+   位於第 31～36 行，新增分頁後該名稱本身也需一併更新（例如改為「…對戰、參賽者與歷史三筆」）。
+   分頁順序依 runbook 既定約定為 **對戰／參賽者／歷史／資料**，「歷史」插在 `players` 之後。
+
+   **未解的裁決或阻塞：無。** 本次中斷純因 session 即將結束，非技術阻塞。
+   Open Questions 第 1、2 點已於 §3.1 完成實地複核並回填；第 3、4 點在 M5 合併後已結案。
+
+6. **§3「篩選與排序」Stage 1（Spec Reviewer）判定：`PASS`（2026-08-30，由 coordinator 親自執行）**
+
+   **偏離說明**：依 execution-plan，Stage 1 應派 `sonnet` 的 Spec Reviewer subagent。本次由
+   coordinator（opus）親自執行，原因是使用者即將關機，派背景 subagent 會產生無人接收回報的
+   孤兒 agent（M6 第九棒的失敗模式）。審查內容與標準未打折，全部為機械查核並留下可複驗的證據。
+
+   **審查範圍**：`2d1e1f2..ba4eb5c`（8 個 commit），對應 tasks 3.1～3.6。
+
+   **① 驗收錨點逐字比對：2/2 命中。** delta spec 的兩個 Scenario 各要求一個 it 名稱，
+   實測 `grep -c 'it("<名稱>"'` 皆為 **1**：
+   - 「篩選結果依對戰時間由新到舊排序」（`history-range.test.ts:189`）
+   - 「篩選不修改輸入的紀錄陣列」（`:207`）
+
+   **② 紅燈宣稱機械複驗：2/2 皆為真紅燈**（`git show <commit>^:<path>`，非採信自述）：
+   - **3.2**（RED commit `bfab871`）：父版本的 `history-range.ts` 內 `filterHistoryByRange`
+     出現次數為 **0**——函式根本不存在，紅燈形式為 `TypeError`，成立。
+   - **3.4**（RED commit `c29c096`）：父版本的實作**逐字**為
+     `return entries.sort(...).filter(...)`——直接對輸入參照排序、無 `slice()`，
+     必然原地改動呼叫端陣列，紅燈成立。tasks.md 3.3 自述「刻意寫成原地排序供 3.4 產生真紅燈」屬實。
+
+   **③ Requirement 的五條 SHALL NOT 逐條查核，全部有把關**：
+   | SHALL NOT | 查核方式與結果 |
+   |---|---|
+   | 不得在多處各自讀取 `playedAt` | `grep -n playedAt` 全檔僅 2 處命中，其中 `:96` 是註解、`:100` 在 `recordTime()` 內。**單一取值點成立** |
+   | 不得自行定義歷史紀錄型別 | `:5` `import type { MatchHistoryEntry } from "./history"`，取用 M4 型別，未自訂 |
+   | 不得修改輸入的 `records` 陣列 | 由 it「篩選不修改輸入的紀錄陣列」把關，且簽章收為 `readonly MatchHistoryEntry[]`，**編譯期另加一道護欄**（強於 task 要求） |
+   | 不得讀寫 LocalStorage | `grep localStorage` 全檔 **0 命中** |
+   | 不得取用系統時鐘 | 無參數的 `new Date()` 與 `Date.now()` 全檔 **0 命中**（三處字面命中皆在註解內）。`:100` 的 `new Date(entry.playedAt)` 帶引數，是解析 ISO 字串而非讀時鐘，不違反 |
+
+   **④ 3.6 REFACTOR 的匯出清單宣稱屬實**：實測 `grep '^export'` 恰為 6 項且與 task 逐字相符——
+   `RangeCutoffs`／`HISTORY_RANGES`／`HistoryRange`／`computeRangeCutoffs`／`rangeOfTime`／
+   `filterHistoryByRange`，無多餘匯出。
+
+   **⑤ 無 scope creep**：§3 只新增 2 個 it（即上述兩個錨點），`ba4eb5c` 補的是**既有 it 內的斷言**
+   而非新 it；未新增任何 spec 未要求的行為分支、storage key 或匯出。
+
+   **⑥ 交件驗證**：`pnpm --filter ./nextjs-pickball test --run lib/matchmaker/history-range.test.ts`
+   → **13 passed**（§1 七個＋§2 四個＋§3 兩個）。
+
+   **移交 Stage 2 的兩項**（Stage 1 依分工不審，明文移交）：
+   1. **`ba4eb5c` 補的斷言是否真的堵住那個缺口，MUST 由 Stage 2 獨立以 mutation 複核**——
+      Implementer 自述「拿掉 `filter` 第一次跑存活」，補斷言後轉紅，但此為**自述**，未經獨立驗證。
+   2. **循「分支或欄位零覆蓋」方向擴大盤點**（本專案最常見的缺口形態）。具體建議至少涵蓋：
+      `recordTime` 改回傳固定值、`filter` 的比較改為 `!==`、排序改為遞增、`slice()` 拿掉、
+      `rangeOfTime` 的引數順序對調。
+   → **兩項皆已由下方第 7 點的 Stage 2 結案。**
+
+7. **§3「篩選與排序」Stage 2（Code-Quality Reviewer）判定：`PASS_WITH_NITS`，0 Blocking
+   （2026-08-30，由 coordinator 親自執行）**
+
+   **偏離說明**：同第 6 點——execution-plan 指定 `opus` subagent，因使用者即將關機、
+   派背景 agent 會產生孤兒，改由 coordinator（opus）親跑。變異腳本留在 scratchpad，
+   可完整複驗；每組變異皆以 `git checkout --` 還原並在收尾確認工作區乾淨。
+
+   **獨立跑 20 組 mutation，未採信 Implementer 自述（其自測 12 組、宣稱補完後無存活）。**
+
+   **第一輪 14 組：全數轉紅、0 存活。** 涵蓋 `recordTime` 的三種壞法（固定值／NaN／正負號反轉）、
+   `filter` 的三種（`!==`／恆真／恆假）、comparator 的三種（方向反轉／恆 0／只比單邊）、
+   `rangeOfTime` 引數的兩種，以及整段刪除三種（拿掉 `slice()`／`filter()`／`sort()`）。
+   **其中「拿掉 `filter()`」轉紅，即獨立證實了 Stage 1 移交第 1 項**——`ba4eb5c` 補的斷言
+   確實有偵測力，Implementer 該項自述屬實。
+
+   **第二輪 6 組（針對「參數／分支零覆蓋」設計）：3 組存活，全部是真缺口。**
+   | 代號 | 變異 | 為何會存活 |
+   |---|---|---|
+   | **F1（最嚴重）** | `range` 參數被完全忽略、`=== range` 寫死成 `=== "today"` | 既有兩個 it **只用過 `"today"` 一個值**，函式最核心的契約「依指定區間篩選」對其餘四個區間**零保護** |
+   | F2 | `.slice()` → `.slice(0, 3)` | **截斷可冒充篩選**——fixture 剛好讓被截掉的那筆也正是該被濾掉的那筆 |
+   | F3 | `.slice()` → `.slice(0, -1)` | 同上，丟掉末筆恰好無害 |
+
+   **F1 正是本專案反覆出現的形態的極端版**：不是斷言太弱，是**參數的值域從未被走過**。
+   §1 的 `getUTCFullYear` 零覆蓋（取樣日期年份剛好相同）、§6（M6）的「多筆同時符合零覆蓋」
+   都是同一類——**取樣讓某條路徑從未被執行**。
+
+   **修正**（commit `aadf0df`，只動測試、未動生產程式碼）：新增 it
+   「依傳入的區間篩選，且不因截斷而遺漏區間內的紀錄」——以「同一組輸入分別查 `today` 與
+   `lastMonth` 兩個區間」堵住 F1，以「五筆輸入中今日佔四筆、上月那筆刻意置中」堵住 F2／F3。
+   寫下當下即綠，**如實標註 regression guard**。
+   **複驗**：補完後 F1／F2／F3 同批重跑**全數轉紅**，20/20 mutation 皆 killed。
+
+   **既有兩個 it 的名稱與斷言未更動**（仍是 spec 驗收錨點）。
+
+   **交件驗證**：前端 **57 檔／486 tests 全綠**、`pnpm -r exec tsc --noEmit` **exit 0**、
+   工作區乾淨、變更範圍僅 `history-range.test.ts` 一檔。
+
+   **Nits（不阻擋，供 §4 起參考）**：
+   1. `filterHistoryByRange` 對**空陣列**與**對戰時間相同的兩筆（排序穩定性）**皆無測試。
+      前者行為顯然（回傳空陣列），後者 `Array.prototype.sort` 在 V8 已保證穩定，
+      判定不值得為此增加 fixture 複雜度，故不補——**但 §4 的 E2E 若要呈現「今日無紀錄」的
+      空狀態，該情境屆時仍須覆蓋**。
+   2. `recordTime()` 對 `playedAt` 為非法 ISO 字串時回傳 `NaN`，會讓該筆靜默落入
+      `rangeOfTime` 的最後一個分支（`earlier`）而非被丟棄。M4 的 reader 已在讀取時
+      `safeParse` 過一輪，實務上到不了這裡；**若日後 §4 直接吃未經 reader 的資料則需重審**。
+
+8. **§4「歷史頁與紀錄呈現」兩階段審查結論（2026-09-02 由第四棒 leader 回填；審查本身由第三棒
+   於 2026-08-31 完成，結論原僅存在於 commit `d412607` 的 message，未落盤本節）**
+
+   **審查範圍**：`ba4eb5c..d412607`（§4.1～4.9，含 8 個 E2E test 與四個新元件）。
+
+   **Stage 1（Spec Reviewer）判定：`PASS`，0 Blocking。**
+   ⚠️ **誠實標註**：Stage 1 的**逐條查核明細未留下可複驗的落盤紀錄**，第三棒中斷時只保留了
+   「PASS、0 Blocking」這個結論；本節不重建當時的查核細節，以免把推論寫成證據。
+   驗收錨點的逐字比對改由 §6.1 以腳本重跑一次，作為 Stage 1 該項的補強證據。
+
+   **Stage 2（Code-Quality Reviewer）判定：`PASS_WITH_NITS`，0 Blocking。**
+   獨立跑 **30 組 mutation，抓到 14 組存活**——未採信 Implementer 自述（其自測 8 次、僅 1 組存活）。
+   存活成因高度集中在同一形態：**某欄位在八個 test 裡只餵過一種值，單一取值的欄位等於零保護**。
+
+   | 存活的變異 | 為何會存活 | 修正 |
+   |---|---|---|
+   | `courtNumber`／`scoreA`／`winner`／`doublesComposition` 各自寫死成唯一用過的值 | 八個 test 只餵過一種值，寫死後仍全綠 | 補第二筆雙打紀錄（場地 5、比分 8:11、第二隊獲勝、男雙）與單打紀錄的場地 2，補足相異值 |
+   | 女雙／一般雙打／男雙三個文案改錯 | 三個文案從未被渲染過，改錯亦不轉紅 | 補三筆雙打紀錄逐字覆蓋四個文案 |
+   | `EmptyHistory` 忽略 `range` 參數 | 區間空狀態只走過「本月」一條 | 在跨月週 test 逐一覆蓋今日／上月／更早，在切換區間 test 覆蓋本週 |
+   | `aria-checked` 恆為 `true` | 選取狀態只驗過「今日為選中」，無未選中斷言 | 補未選中的斷言 |
+   | 對戰時間改用 `getUTC*` | 只驗過 `<time datetime>`，人眼可讀的文字無斷言 | 補當地時區的文字斷言 |
+   | 兩隊標籤與成員對應錯置、「現在」在每次 render 重取 | 兩者皆無斷言（後者即 design Decision 7 的保證） | 一併補上斷言 |
+
+   **這與 §1 的 `getUTCFullYear` 零覆蓋、§3 的 F1（`range` 參數值域從未走過）是同一形態**：
+   不是斷言太弱，而是**取樣讓某條路徑／某個取值從未被執行**。本 change 至今每一組都是
+   「Implementer 自測極少存活、Stage 2 獨立測出大量存活」，§4 為 8 次/1 存活 vs 30 組/14 存活。
+
+   **修正**（commit `d412607`）：只動 E2E 測試檔補值域覆蓋與文案斷言，**生產程式碼的行為未改動**；
+   另修正 `HistoryRecordCard` 內已過期的註解（4.9 已裁決不抽共用模組，原註解仍寫「留給 4.9 判斷」，
+   且引用了 archive 後會消失的 tasks.md 內部盤點編號）。
+
+   **交件驗證**：`d412607` 版 `matchmaker-history.spec.ts` 為 **8 個 E2E test**，
+   五個 browser project 全綠；工作區乾淨。§5 完成後同檔為 11 個 test，於 §6.3 重跑全數複驗。
+
+   **Nits（不阻擋）**：`DOUBLES_COMPOSITION_LABEL` 在 `CourtCard.tsx` 與 `HistoryRecordCard.tsx`
+   各持有一份（4.9 已裁決不抽，理由見 tasks 4.9）；若日後第三處也需要同一份文案，屆時再抽。
+
+9. **§5.3 兩個 regression guard 的獨立 mutation 複驗：`PASS`，0 存活
+   （2026-09-02，由第四棒 leader 親自執行）**
+
+   **為何要做**：§5.1～5.3 由第三棒完成後未經兩階段審查即中斷。§5.3 的兩個 test 寫入當下即綠燈
+   （如實標註 regression guard），其偵測力**僅有 Implementer 自述**——而本 change 的既有教訓明訂
+   「Stage 2 mutation 自述不可採信，必須獨立驗證」。§6 的其餘八項都不覆蓋這兩個 test 的偵測力
+   （6.8 只打 `history-range.ts`），故補做此項。
+
+   **偏離說明**：execution-plan 指定審查應派 subagent。本次由 leader（opus）親跑，原因是
+   「派出 subagent 之後不可以結束回合」的硬規則與 E2E 的長執行時間相衝突，親跑可在同一回合內
+   完整落盤；審查標準未打折，每組皆貼出實際輸出並以 `git checkout --` 還原。
+
+   **3 組 mutation 全數轉紅（3/3 killed）**，於 `chromium` project 單獨執行：
+
+   | 代號 | 對 `HistoryView.tsx` 的變異 | 結果 |
+   |---|---|---|
+   | M1 | hydration 後回寫 `localStorage`，且**資料完全相同、只對調 `{ version, entries }` 的鍵序** | 「內容不變」**轉紅**（`expect(afterValue).toBe(rawValue)` 失敗）——證實該斷言是**逐字**比對，連不改變語意的最細微寫入都攔得住 |
+   | M2 | render 期間直讀 `localStorage`（`?? (typeof window !== "undefined" ? readHistory().entries : [])`），製造**真實**的 hydration mismatch | 「無 console error」**轉紅**（攔到 `[pageerror] Hydration failed because the server rendered text didn't match the client`）——證實 `trackConsoleIssues()` 確實涵蓋 hydration 警告，非僅 `console.error` |
+   | M3 | `entries` 恆為空陣列 | **兩個 test 皆轉紅**（`getByText("唯讀驗證員A1")` 與 `getByText("hydration顯示員A")` 皆 element(s) not found）——證實兩者都真的驗到「紀錄有被渲染出來」，不是空跑後只檢查 storage／console |
+
+   **結論**：§5.3 的自述屬實，**0 存活**。這是本 change 至今**唯一一組獨立複驗後未發現新缺口**的
+   （§1 抓到 1、§3 抓到 3、§4 抓到 14），成因推測是 §5.3 的兩個 test 本就是為「否定性保證」
+   （不寫入、無錯誤）而寫，斷言形狀是 `toBe(原字串)` 與 `toEqual([])` 這類**全稱斷言**，
+   天然不易出現「某個取值從未被走過」的零覆蓋形態——與前幾組的缺口成因正好互補。
