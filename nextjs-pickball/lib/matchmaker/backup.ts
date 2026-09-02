@@ -3,7 +3,7 @@
 import type { Player } from "./types";
 import type { Round } from "./round-types";
 import type { MatchHistoryEntry } from "./history";
-import type { Backup } from "./transfer-types";
+import { BackupSchema, type Backup } from "./transfer-types";
 
 /**
  * 重複配對簽章的鍵集合：可能是記憶體表示法 ReadonlySet<string>（allocation-types.ts
@@ -92,4 +92,26 @@ export function buildBackup(snapshot: BackupSnapshot, context: { exportedAt: str
 export function backupFileName(exportedAt: string): string {
 	const date = exportedAt.slice(0, 10);
 	return `matchmaker-backup-${date}.json`;
+}
+
+/**
+ * parseBackup 的結果型別。失敗分支刻意 SHALL NOT 帶任何部分資料欄位——只有成功分支
+ * 拿得到 Backup，§7 之後的寫入函式只接受 Backup 型別，型別上就無法讓未驗證的資料
+ * 流到寫入層（design Decision 1「原子性由型別強制」）。
+ */
+export type ParseBackupResult =
+	| { readonly ok: true; readonly backup: Backup }
+	| { readonly ok: false; readonly message: string };
+
+/**
+ * 解析並驗證匯入的備份檔內容（design Decision 1／4：先全部驗證、再一次寫入；
+ * 單筆參賽者不合法即整份拒絕，不走逐筆降級）。
+ */
+export function parseBackup(text: string): ParseBackupResult {
+	const json: unknown = JSON.parse(text);
+	const parsed = BackupSchema.safeParse(json);
+	if (parsed.success) {
+		return { ok: true, backup: parsed.data };
+	}
+	return { ok: false, message: "備份格式不合法" };
 }
