@@ -29,6 +29,15 @@ const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
 const MULTI_VALUE_SEPARATOR = "、";
 
 /**
+ * 比分欄（scoreA／scoreB）的分隔符。SHALL NOT 用半形冒號 `:`——`11:7` 符合 Excel／
+ * Google Sheets 的 `h:mm` 時間樣式，匯入時會被自動轉型成時間值（顯示成 `11:07`），
+ * 且轉型後原始文字不可逆（Stage 2 review J4）。也 SHALL NOT 用 `-` 或 `/`，
+ * 那兩者會被誤判為日期（例如 11 月 7 日）。全形冒號不是任何 locale 的時間或日期
+ * 分隔符，試算表會當成純文字，也符合繁體中文排版慣例。
+ */
+const SCORE_SEPARATOR = "：";
+
+/**
  * 賽前／賽後分數欄的小數位數，沿用 rating 既有的顯示精度（見 HistoryRecordCard.tsx
  * 的 `ratingBefore.toFixed(2)`／`ratingAfter.toFixed(2)`）——CSV 與畫面顯示的小數位數
  * 需一致，避免使用者比對時誤以為兩處數字不同。
@@ -127,7 +136,10 @@ const HISTORY_CSV_COLUMNS: ReadonlyArray<{
 		getValue: ({ entry }) =>
 			entry.teamB.players.map((player) => player.name).join(MULTI_VALUE_SEPARATOR),
 	},
-	{ header: "比分", getValue: ({ entry }) => `${entry.scoreA}:${entry.scoreB}` },
+	{
+		header: "比分",
+		getValue: ({ entry }) => `${entry.scoreA}${SCORE_SEPARATOR}${entry.scoreB}`,
+	},
 	{
 		header: "勝方",
 		getValue: ({ entry }) => (entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]),
