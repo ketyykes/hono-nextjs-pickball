@@ -80,6 +80,9 @@ describe("history-csv", () => {
 		expect(fields[1]).toBe("00:30:00");
 		expect(fields[5]).toBe("王大明、陳小美");
 		expect(fields[6]).toBe("林志豪、張美麗");
+		// 比分欄使用全形冒號，避免 Excel／Google Sheets 把 `11:9` 誤判為時間樣式而自動轉型
+		// （Stage 2 review J4）。
+		expect(fields[7]).toBe("11：9");
 		expect(fields[9]).toBe("3.10、3.20、3.30、3.40");
 		expect(fields[10]).toBe("4.10、4.20、4.30、4.40");
 	});
