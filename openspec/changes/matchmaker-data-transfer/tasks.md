@@ -212,9 +212,9 @@ Depends on: §2
 ## 4. 歷史賽果的 CSV 匯出（`history-csv.ts`）
 Depends on: §0, §1
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-csv.test.ts`，寫入 it
+- [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/history-csv.test.ts`，寫入 it
       「標題列涵蓋 9.3.1 的 11 個欄位且順序固定」：去除 BOM 後比對第一列。確認紅燈
-- [ ] 4.2 GREEN: 實作 `history-csv.ts`：匯出標題列常數與轉換函式，內部委派 `csv.ts` 的 `toCsv`
+- [x] 4.2 GREEN: 實作 `history-csv.ts`：匯出標題列常數與轉換函式，內部委派 `csv.ts` 的 `toCsv`
 - [ ] 4.3 RED: 補 it「雙打歷史輸出日期時間、雙方球員與各員賽前賽後分數」：
       以一筆雙打歷史斷言日期／時間由對戰時間拆出、雙方球員串接、賽前與賽後分數對應到各員。確認紅燈
 - [ ] 4.4 GREEN: 實作單筆歷史 → CSV 列的欄位對應（欄位名稱以 §0 對照表為準）
