@@ -3,7 +3,7 @@
 import type { Player } from "./types";
 import type { Round } from "./round-types";
 import type { MatchHistoryEntry } from "./history";
-import { BackupSchema, type Backup } from "./transfer-types";
+import { BackupSchema, TRANSFER_MESSAGES, type Backup } from "./transfer-types";
 
 /**
  * 重複配對簽章的鍵集合：可能是記憶體表示法 ReadonlySet<string>（allocation-types.ts
@@ -108,10 +108,18 @@ export type ParseBackupResult =
  * 單筆參賽者不合法即整份拒絕，不走逐筆降級）。
  */
 export function parseBackup(text: string): ParseBackupResult {
-	const json: unknown = JSON.parse(text);
+	let json: unknown;
+	try {
+		json = JSON.parse(text);
+	} catch {
+		// SHALL NOT 拋出例外中斷操作——拋例外會讓整頁白畫面，是最糟的失敗模式
+		// （design Risks／spec 第 11 節）。
+		return { ok: false, message: TRANSFER_MESSAGES.invalidJson };
+	}
+
 	const parsed = BackupSchema.safeParse(json);
 	if (parsed.success) {
 		return { ok: true, backup: parsed.data };
 	}
-	return { ok: false, message: "備份格式不合法" };
+	return { ok: false, message: TRANSFER_MESSAGES.invalidStructure };
 }
