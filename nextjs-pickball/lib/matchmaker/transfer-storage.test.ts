@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { CLEAR_ALL_KEYS, clearAllLocalData, readSnapshot, writeBackup } from "./transfer-storage";
+import { CLEAR_ALL_KEYS, clearAllLocalData, readSnapshot, writeBackup, writeRosterPlayers } from "./transfer-storage";
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
 // 取 scoreboard 實際匯出的 key 而非硬編碼字面值——比照 storage.test.ts 既有慣例
 // （見 player-roster delta 的「單一來源」條款：日後 scoreboard 改 key 名，硬編碼的測試
@@ -335,5 +335,49 @@ describe("transfer-storage", () => {
 
 		// 明確 mockRestore（見前述「寫入超出配額」it 的說明）。
 		setItemSpy.mockRestore();
+	});
+
+	// Final Review M2：RosterCsvImportSection.tsx 原本用 storage.ts 的 writeRoster()
+	// 寫入 CSV 匯入結果，但該函式靜默吞掉例外且回傳 void，元件卻無條件 location.reload()——
+	// 配額滿／localStorage 不可用時使用者看不到任何錯誤訊息。writeRosterPlayers 比照
+	// writeBackup，自行 setItem + try/catch 並回傳同一個 WriteBackupResult 形狀，
+	// 讓呼叫端可以檢查 .ok 後才決定是否 reload。以下三則測試比照 writeBackup 既有測試樣板。
+	describe("writeRosterPlayers", () => {
+		it("localStorage 不可用時回傳可判讀的失敗訊息且不拋出例外", () => {
+			vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+				throw new Error("localStorage 不可用（例如私密模式）");
+			});
+
+			expect(() => writeRosterPlayers([makePlayer()])).not.toThrow();
+			expect(writeRosterPlayers([makePlayer()])).toEqual({
+				ok: false,
+				message: TRANSFER_MESSAGES.localStorageUnavailable,
+			});
+		});
+
+		it("寫入超出配額時回傳失敗並提供繁體中文的修正建議", () => {
+			const setItemSpy = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+				throw new DOMException("超出配額", "QuotaExceededError");
+			});
+
+			expect(() => writeRosterPlayers([makePlayer()])).not.toThrow();
+			expect(writeRosterPlayers([makePlayer()])).toEqual({
+				ok: false,
+				message: TRANSFER_MESSAGES.quotaExceeded,
+			});
+
+			// 明確 mockRestore（見前述「寫入超出配額」it 的說明：afterEach 的
+			// restoreAllMocks 對 window.localStorage 實例方法不可靠）。
+			setItemSpy.mockRestore();
+		});
+
+		it("成功寫入後可用既有 readRoster 讀回相同名單（round-trip）", () => {
+			const players = [makePlayer(), makePlayer({ id: "p2", name: "Bob" })];
+
+			const result = writeRosterPlayers(players);
+
+			expect(result).toEqual({ ok: true });
+			expect(readRoster().players).toEqual(players);
+		});
 	});
 });

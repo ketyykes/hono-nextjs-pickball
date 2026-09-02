@@ -16,6 +16,7 @@ import { readRound, readHistory } from "./round-storage";
 import { TRANSFER_MESSAGES } from "./transfer-types";
 import type { Backup } from "./transfer-types";
 import type { BackupSnapshot } from "./backup";
+import type { Player } from "./types";
 
 /**
  * 「清除本機資料」涵蓋的全部 LocalStorage key（design Decision 2／5；tasks §0.6 對照表，
@@ -90,6 +91,29 @@ export function writeBackup(backup: Backup): WriteBackupResult {
 		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: backup.players }));
 		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round: backup.currentRound }));
 		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: backup.history }));
+		return { ok: true };
+	} catch {
+		return { ok: false, message: TRANSFER_MESSAGES.quotaExceeded };
+	}
+}
+
+/**
+ * 將名單寫入 localStorage 並回報結果（Final Review M2）。
+ *
+ * RosterCsvImportSection.tsx 原本用 storage.ts 的 writeRoster() 寫入 CSV 匯入結果，
+ * 但該函式的文件註解已明寫「若 localStorage 不可用或寫入失敗則靜默忽略」且回傳
+ * void，元件卻無條件呼叫 location.reload()——配額已滿或 localStorage 不可用時，
+ * 使用者會看到名單沒有變化且沒有任何錯誤訊息。SHALL NOT 修改 storage.ts
+ * （proposal 的「不動」清單），故在本檔另立一個會回報失敗的版本：比照 writeBackup，
+ * 自行 setItem 並 try/catch，回傳同一個 WriteBackupResult 形狀，讓呼叫端可以
+ * 檢查 `.ok` 後才決定是否 reload。
+ */
+export function writeRosterPlayers(players: readonly Player[]): WriteBackupResult {
+	if (!hasLocalStorage()) {
+		return { ok: false, message: TRANSFER_MESSAGES.localStorageUnavailable };
+	}
+	try {
+		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players }));
 		return { ok: true };
 	} catch {
 		return { ok: false, message: TRANSFER_MESSAGES.quotaExceeded };
