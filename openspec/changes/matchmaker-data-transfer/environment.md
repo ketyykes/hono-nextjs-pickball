@@ -35,11 +35,9 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
-  （對應 `tasks.md` §0.7；回填格式為 `PASS`／`FAIL` 加一行結果摘要，
-  例如 `PASS — hono-pickball 4 檔 16 tests、nextjs-pickball 39 檔 270 tests 全綠`）
-- **Initial commit hash**: 尚未執行——由 apply Step 0 建立 worktree 時執行並回填
-  （`git rev-parse HEAD` 於 worktree 內取得）
+- **Baseline tests**: `PASS` — hono-pickball 4 檔 16 tests、nextjs-pickball 57 檔 486 tests 全綠
+  （2026-09-02 於 worktree 內執行 `pnpm test`，exit code 0；後端未出現 `listen EPERM`）
+- **Initial commit hash**: `da9cfd2`（`git rev-parse HEAD`，即 `main` 上含 M3～M7 的 base commit）
 - **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-data-transfer`
 
 ## Teardown

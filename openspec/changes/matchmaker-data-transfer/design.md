@@ -296,6 +296,56 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
 「沒有回合時簽章會遺失嗎」——不會。M4 明訂重複比對基準**只取上一輪**且保存在目前回合內，
 沒有目前回合就沒有基準（首輪基準為空）。因此不存在「簽章有值但回合為 `null`」的狀態。
 
+### Decision 12：CSV 的日期／時間以本地時區輸出，時區由呼叫端注入
+
+`history-csv.ts` 的「日期」「時間」兩欄改為換算成本地時區，不再直接切割 `playedAt`
+的 UTC ISO 字串。`historyToCsv` 新增 `options.timeZone`（IANA 名稱，例如
+`"Asia/Taipei"`），預設取 `Intl.DateTimeFormat().resolvedOptions().timeZone`
+（執行裝置的本地時區）。
+
+**為什麼不用 UTC**：`components/matchmaker/HistoryRecordCard.tsx` 的 `formatPlayedAt`
+用本地時區 getter 顯示畫面上的日期時間；若 CSV 直接切割 UTC 字串，同一筆資料在畫面與
+匯出檔會相差數小時（實測 `Asia/Taipei` 相差 8 小時），且時間落在本地午夜前後時
+連日期都會跨日不一致。使用者匯出與檢視 App 是在同一台裝置、同一個時區，兩處數字
+必須一致，否則使用者會判定「匯出功能壞了」（Stage 2 review B1）。
+
+**為什麼要注入而非直接讀執行環境時區**：`historyToCsv` 是純函式，測試需要能以
+固定值斷言確切的日期／時間輸出，不能依賴跑測試機器的預設時區——注入時區讓測試
+明確指定 `timeZone: "Asia/Taipei"`，並涵蓋「UTC 與台北跨日」的邊界案例。
+
+**已知取捨**：同一份備份在不同時區的裝置上匯出，CSV 的日期時間會不同——這是刻意的，
+因為 CSV 是給「這台裝置的使用者」看的報表，不是跨裝置交換格式；`courtNumber`／
+`matchId` 等其餘欄位不受時區影響，仍可作為跨裝置比對的依據。
+
+**賽前／賽後分數欄的球員順序約定**：第 10（賽前分數）／11（賽後分數）欄把兩隊球員
+合併為單一欄，順序固定為「先第一隊全員、再第二隊全員」，與第 6（第一隊球員）／
+7（第二隊球員）欄的球員順序一致（Stage 2 review m1；程式碼對應註解見
+`history-csv.ts` 的 `HISTORY_CSV_COLUMNS`）。
+
+### Decision 13：CSV 匯入的空白資料列直接跳過，不計為錯誤列
+
+`roster-csv.ts` 的 `parseRosterCsv` 對空白資料列（五個已對應到的欄位 trim 後皆為空
+字串）直接跳過，不計入 `rows`（可新增列）也不計入 `errors`（問題列）。
+
+**為什麼**：使用者在 Google Sheets／Excel 框選範圍另存 CSV 時，範圍內夾帶空白列是
+常態；`parseCsv` 對此有兩種產物——純空行（回傳單一空欄位 `[""]`）與 Sheets 風格的
+全空列（欄位數正確但每格皆空，即 `,,,,`）。若把空白列當成「有問題的資料」計入
+`errors`，會讓 §6 規定的「任一列有錯即整份不匯入」把最常見的真實輸入誤傷成
+「檔案看起來沒問題、匯入卻整份被拒」的無聲失敗——§8 的問題列清單會顯示「第 N 列
+性別無法辨識」，但使用者在試算表第 N 列看到的是一片空白，訊息與畫面完全對不上，
+更不會聯想到「刪掉空列」這個修法（Stage 2 review Blocker B1）。
+
+**判定方式**：在逐列迴圈開頭，對該列已對應到的五個欄位（名稱、性別、強度分數、
+顏色起點、顏色終點）個別取值、trim 後檢查是否皆為空字串；皆空則視為空白列，
+直接跳過該次迭代，不產生任何 `rows` 或 `errors` 項目。因迴圈本身的索引不受
+提前結束該次迭代影響，後續列的試算表行號（`資料索引 + 2`）不會因為前面的
+列被跳過而漂移。
+
+**已知取捨**：「整列只有空白但使用者其實想填」的情況會被靜默略過，而非提示——
+這是可接受的，因為使用者在匯入預覽看到的「可新增 N 人」會比預期少，那本身就是
+一種提示；若要進一步提示「偵測到 N 列空白已略過」，屬 §6／§8 的預覽介面可自行
+決定是否疊加，不影響本函式的回傳形狀。
+
 ## Risks / Trade-offs
 
 - **[M4 合併前又調整了 schema 名稱]** → Context 的對照表是依 M4 現行 delta 讀出的，
@@ -361,3 +411,76 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
   獨立槽與分槽兩者。
 - **是否提供拖放（drag & drop）選檔？** 本段只做 `<input type="file">`。
   拖放屬純互動加值，不影響任何 requirement，留待後續。
+
+---
+
+## Apply 續跑狀態（2026-09-02，第一棒 leader 因脈絡將盡於群組邊界乾淨停止）
+
+> 本節是**跨 session 的接續點**，不是設計內容。§6 開工前務必整段讀完。
+> 停止時機刻意選在「§5 完全收官、§6 尚未派工」的乾淨邊界，**沒有任何 subagent 在飛行中**，
+> 工作樹乾淨、無殘留 process、無臨時探測檔。
+
+### 接續點
+
+**下一步：§6（CSV 匯入的預覽與附加寫入，`roster-csv.ts` 的 `applyRosterImport`）的 Implementer 派工。**
+
+### 已完成（52 / 94 tasks，全部已在 `change/matchmaker-data-transfer` 上 commit）
+
+| 群組 | 範圍 | 狀態 |
+|---|---|---|
+| §0（0.1～0.7） | 與 M4／M6 的介面對齊、baseline | 完成。對照表在 tasks.md §0.6 |
+| §1（1.1～1.5） | `csv.ts`／`csv.test.ts` | 完成。Stage 1 APPROVED；Stage 2 退回 1 次（38 組 mutation／18 存活，含檔尾換行幻影列 Blocker），修正後由**獨立**複審員 APPROVED |
+| §2（2.1～2.9） | `transfer-types.ts`／`backup.ts` 的 `buildBackup`／`backupFileName` | 完成。Stage 1 APPROVED；Stage 2 退回 1 次（50 組／25 存活），修正後 leader 獨立抽驗 T1／T7／B12／B24 皆轉紅 |
+| §3（3.1～3.11） | `parseBackup`／`TRANSFER_MESSAGES` | 完成。Stage 1 APPROVED；Stage 2 退回 1 次（50 組／11 存活，2 Blocker），修正後 leader 獨立抽驗 M06／M13／M50／M31 皆轉紅 |
+| §4（4.1～4.7） | `history-csv.ts` | 完成。Stage 1 APPROVED；Stage 2 退回 1 次（59 組／22 存活，**2 個真實產品缺陷**），修正後 leader 獨立抽驗 B1／J4／M19／M47／M08 皆轉紅 |
+| §5（5.1～5.13） | `roster-csv.ts` 的 `parseRosterCsv` | 完成。Stage 1 APPROVED；Stage 2 退回 1 次（58 組／10 存活，1 Blocker），修正後 leader 獨立抽驗 B1／M1／M3／M4 皆轉紅 |
+
+### 未開工
+
+§6（6.1～6.11）、§7（7.1～7.11）、§8（8.1～8.9 含 8.2a）、§9（9.1～9.10）。
+
+### 開工前必看事項
+
+1. **本次 apply 過程中新增了兩條 design Decision，§6 以後必須遵守**：
+   - **Decision 12**：CSV 的日期／時間以**本地時區**輸出，時區由呼叫端注入
+     （`historyToCsv(entries, { timeZone })`）。§8 呼叫時 SHALL NOT 傳 UTC。
+   - **Decision 13**：CSV 匯入的**空白資料列直接跳過**，不計入 `rows` 也不計入 `errors`。
+     §6 的「可新增 N 人」與「有錯即 disabled」直接建立在此形狀上，
+     **SHALL NOT 在 §6 另做一次空列過濾**。
+2. **`TRANSFER_MESSAGES` 的遍歷斷言已被強化**（§3 Stage 2 J2 裁決）：§7 追加的兩則訊息
+   （localStorage 不可用、寫入超出配額）MUST 滿足——以「。」分段後**至少 3 段**、
+   **最後一段以「請」開頭**、**長度 ≥ 30 字**、不含未翻譯的 zod issue 字串。
+   否則 `backup.test.ts` 的「所有錯誤訊息…」那條會轉紅。
+3. **`ParseBackupResult` 失敗分支只有 `message`，沒有機器可讀的 `code`**（§3 Stage 2 m4）。
+   §8 若需對三種失敗做不同 UI 處理，SHALL NOT 用字串比對訊息內容判別類別，
+   要先回頭確認是否補 `code`。
+4. **§7.2 的 `CLEAR_ALL_KEYS` 共 5 個 key**，且 `STORAGE_KEY` 與 `MATCH_SLOTS_KEY` 的
+   **實際宣告點是 `lib/scoreboard/storage-keys.ts`**（`storage.ts`／`match-slots.ts` 只是 re-export）。
+   `scoreboard:hint-dismissed` 用的是 **sessionStorage**，依 §0.5 明文 SHALL NOT 列入。
+5. **§7 的 `writeBackup` SHALL NOT 委派 `round-storage.ts` 的 `writeRound`／`writeHistory`**——
+   那兩個函式**靜默吞掉配額例外**，無法滿足「寫入超出配額時回報失敗」。須自行 `setItem` 並 try/catch。
+6. **§8.2a 的分頁最終順序為「對戰／參賽者／歷史／資料」**。`section-nav.test.ts` 的
+   regression guard 目前釘死三筆（對戰／參賽者／歷史），先改測試看紅燈再改 `section-nav.ts`。
+7. **每一組都要跑滿兩階段審查**。前五組的 Stage 2 獨立 mutation 存活率為
+   47%／50%／22%／37%／17%，**每一組都退回過一次**，其中 §1／§4／§5 抓到的是真實缺陷而非只是測試缺口。
+   **Implementer 自述一律不可採信**，leader MUST 自行抽驗數組 mutation。
+8. **紅燈宣稱一律用 `git show <commit>^:<path>` 機械複驗**。實測踩過兩次坑：
+   grep `backupFileName` 命中的其實是註解、grep `try|catch` 命中的其實是 `MatchHistoryEntry`
+   裡的 `try` 三個字母——**要看實際命中行，不要只看 `grep -c` 的數字**。
+9. **派 subagent 後不可結束回合**：本 session 採「subagent 把報告寫進 scratchpad 的
+   `*.md`、最後一行放 `IMPL-COMPLETE`／`REVIEW-COMPLETE` 哨兵，leader 用前景 `until` 迴圈
+   輪詢該檔案」的模式在同一回合內等結果。前景 `sleep` 迴圈可用（已實測）。
+10. **§8／§9 要跑 E2E 與 preview**：跑之前與跑之後 MUST 查 `lsof -i :3005 -i :8787` 與
+    `ps aux | grep -E "wrangler|workerd|next"`，發現殘留全數 kill；E2E 帶 `--workers=1`；
+    且 MUST 在同一回合內等到結果、落盤、清掉自己起的 process 才結束。
+
+### 停止時的驗證快照（實跑）
+
+- `pnpm test`：hono-pickball 4 檔 16 tests、nextjs-pickball **61 檔 545 tests** 全綠
+- `pnpm -r exec tsc --noEmit`：exit 0，無輸出
+- `pnpm lint`：**0 errors**、3 warnings（皆為既有，位於 `hooks/useRosterStore.ts`、
+  `hooks/useScoreboardStore.ts`，非本 change 產生）
+- `git status`：乾淨
+- 越界檢查：`git diff --name-only da9cfd2..HEAD` 中**沒有**
+  `openspec/specs/**`、`prd.md`、`lib/matchmaker/storage.ts`／`roster.ts`／`types.ts`／`colors.ts`、`hooks/**`
+- 尚未跑過 E2E（§8 尚未開工，新的 E2E spec 還不存在）

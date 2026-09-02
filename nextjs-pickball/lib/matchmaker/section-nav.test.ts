@@ -28,11 +28,12 @@ describe("matchmakerSectionTabs", () => {
 
 	// regression guard：釘住 label／href／順序，避免分頁互換或多混入一筆
 	// 仍被既有斷言（只挑 active 欄位）放過。
-	it("分頁清單依序為對戰、參賽者與歷史三筆", () => {
+	it("分頁清單依序為對戰、參賽者、歷史與資料四筆", () => {
 		expect(matchmakerSectionTabs("/matchmaker")).toEqual([
 			{ label: "對戰", href: "/matchmaker", active: true },
 			{ label: "參賽者", href: "/matchmaker/players", active: false },
 			{ label: "歷史", href: "/matchmaker/history", active: false },
+			{ label: "資料", href: "/matchmaker/data", active: false },
 		]);
 	});
 });

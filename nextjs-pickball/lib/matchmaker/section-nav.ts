@@ -17,6 +17,7 @@ const MATCHMAKER_SECTION_HREFS = [
 	MATCHMAKER_ROUTE,
 	`${MATCHMAKER_ROUTE}/players`,
 	`${MATCHMAKER_ROUTE}/history`,
+	`${MATCHMAKER_ROUTE}/data`,
 ] as const;
 
 const MATCHMAKER_SECTION_LABELS: Record<
@@ -26,6 +27,7 @@ const MATCHMAKER_SECTION_LABELS: Record<
 	"/matchmaker": "對戰",
 	"/matchmaker/players": "參賽者",
 	"/matchmaker/history": "歷史",
+	"/matchmaker/data": "資料",
 };
 
 // 精確比對（===）是刻意的：app/matchmaker/ 下已有巢狀路由（例如 /matchmaker/history），
