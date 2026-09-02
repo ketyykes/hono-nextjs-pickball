@@ -84,9 +84,30 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/print-guard.test.ts`，寫入三個 it：「列印函式拋錯時判定為被阻擋並回傳繁體中文訊息」、「環境未提供列印函式時判定為被阻擋」（`undefined` 與非函式值兩種輸入）、「列印成功時回報 ok 且不帶訊息」（並斷言該假函式恰被呼叫一次）。確認紅燈
-- [ ] 4.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/print-guard.ts` 的 `requestPrint(printer)`：回傳 `{ ok: true }` 或 `{ ok: false, message }`；列印函式由呼叫端注入，**SHALL NOT 在本檔讀取 `window`**（design Decision 4）
-- [ ] 4.3 REFACTOR: 被擋訊息抽為具名常數並確認同時給兩條退路（開啟彈出視窗權限、改用瀏覽器選單列印 Ctrl／Cmd + P）；「拋錯」與「非函式」兩條路徑**回傳同一則訊息**而非各寫一份；於檔頭註解記錄 `afterprint` 事件為何不能用來判定（使用者按取消也會觸發）
+- [x] 4.1 RED: 新增 `nextjs-pickball/lib/matchmaker/print-guard.test.ts`，寫入三個 it：「列印函式拋錯時判定為被阻擋並回傳繁體中文訊息」、「環境未提供列印函式時判定為被阻擋」（`undefined` 與非函式值兩種輸入）、「列印成功時回報 ok 且不帶訊息」（並斷言該假函式恰被呼叫一次）。確認紅燈
+- [x] 4.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/print-guard.ts` 的 `requestPrint(printer)`：回傳 `{ ok: true }` 或 `{ ok: false, message }`；列印函式由呼叫端注入，**SHALL NOT 在本檔讀取 `window`**（design Decision 4）
+- [x] 4.3 REFACTOR: 被擋訊息抽為具名常數並確認同時給兩條退路（開啟彈出視窗權限、改用瀏覽器選單列印 Ctrl／Cmd + P）；「拋錯」與「非函式」兩條路徑**回傳同一則訊息**而非各寫一份；於檔頭註解記錄 `afterprint` 事件為何不能用來判定（使用者按取消也會觸發）
+
+> **§4 審查結論（2026-09-02）**：Stage 1 **PASS**（三條錨點逐字相符、兩種失敗形態共用同一則
+> 訊息、模組內零 `window` 讀取、`afterprint` 註解到位、無 scope creep）。Stage 2 **PASS**——
+> 獨立 mutation 21 個中 16 個 KILLED、2 個判定為**等價變異**（移除 `typeof` 早退：非函式值仍在
+> `printer()` 拋 `TypeError` 並被同一個 `catch` 接住，可觀察行為完全一致；拆掉 discriminated union：
+> 型別擦除後無執行期差異），真盲點 3 個（存活率 15.8%，同一根因：訊息內容只被兩個 substring
+> 斷言覆蓋），**無任何存活者是真實產品缺陷**。leader 另獨立複驗永遠回 ok:true／永遠回 ok:false／
+> catch 回 ok:true／成功分支多帶 message／移除 `printer()` 呼叫／兩條路徑不同訊息六項皆確認轉紅。
+>
+> 5 個 Minor 已於本組全數處理：F1 補兩條訊息內容 guard（逐字等於常數＋繁中指引句型），
+> 複驗確認原先存活的「整句簡體但保留彈出視窗」與「退化成關鍵字堆砌」兩個 mutant 皆轉紅；
+> F2 `PrintOutcome` 改名 `RequestPrintResult`（codebase 其餘 17 個結果型別一律 `<動詞+受詞>Result`，
+> 且 `transfer-storage.ts` 的 `WriteBackupResult` 與它逐字元同形）；F3 檔頭補記 async printer 的
+> rejection 不被同步 `catch` 接住之已知限制與不處理理由；F4 `it.each` 的 `%p` 實測不會被代換，
+> 改為 `[標籤, 值]` 配對＋`%s`（沿用 `history-csv.test.ts` 慣例）並補齊陣列與布林值兩種輸入；
+> F5 收窄用的 throw 訊息改繁體中文。
+>
+> **regression guard 標註**：除三條 spec 錨點外的其餘 it（兩條路徑訊息相同、兩條退路、
+> 訊息逐字等於常數、繁中指引句型、不含技術錯誤碼、六種非函式輸入的值域覆蓋）**寫入當下即綠**，
+> 用途是把 mutation 盲點釘死，非 TDD 紅燈。4.1 的真紅燈為模組不存在
+> （`Failed to resolve import`），已於 shell 實測。
 
 ## 5. 匯出入口元件（ExportActions.tsx）
 
