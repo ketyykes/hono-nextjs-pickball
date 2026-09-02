@@ -260,4 +260,31 @@ describe("parseRosterCsv", () => {
 			{ name: "乙", gender: "male", rating: 5.0 },
 		]);
 	});
+
+	/**
+	 * 自我複查要求的驗證：欄位對應依標題名稱而非位置，此處刻意打亂標題欄順序
+	 * （顏色兩欄與強度分數對調），確認仍能正確對應——若實作改回依欄位位置
+	 * 對應，本測試會轉紅。
+	 */
+	it("標題欄順序被打亂仍能依標題名稱正確對應", () => {
+		const shuffledHeader = [
+			ROSTER_CSV_HEADERS.colorTo,
+			ROSTER_CSV_HEADERS.name,
+			ROSTER_CSV_HEADERS.colorFrom,
+			ROSTER_CSV_HEADERS.rating,
+			ROSTER_CSV_HEADERS.gender,
+		].join(",");
+		const csv = [shuffledHeader, "#00FF00,王小明,#FF0000,5.5,male"].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.errors).toEqual([]);
+		expect(result.rows).toEqual([
+			{ name: "王小明", gender: "male", rating: 5.5, colorFrom: "#FF0000", colorTo: "#00FF00" },
+		]);
+	});
 });
