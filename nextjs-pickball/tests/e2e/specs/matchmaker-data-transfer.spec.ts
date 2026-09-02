@@ -587,4 +587,54 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 
 		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
 	});
+
+	// Final Review M2：CSV 匯入原本用會靜默吞例外的 writeRoster() 寫入，配額滿／
+	// localStorage 不可用時無訊息且照常 reload。比照既有「LocalStorage 寫入失敗時
+	// JSON 匯入不誤 reload 且顯示訊息」的寫法：以 Storage.prototype.setItem 抽換成
+	// 拋出例外版本，確認 CSV 匯入確認後顯示訊息、不誤 reload、既有名單不受影響。
+	//
+	// ⚠️ 抽換點 MUST 是 `Storage.prototype.setItem`，SHALL NOT 寫成
+	// `window.localStorage.setItem = ...`（見上方 JSON 匯入寫入失敗測試的說明：
+	// Firefox／WebKit 會把對 localStorage 實例的屬性指派解讀為「寫入一筆 key 為
+	// setItem 的資料」而非遮蔽該方法，原生 setItem 依然生效）。
+	test("LocalStorage 寫入失敗時 CSV 匯入確認後不誤 reload 且顯示訊息", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		const existingPlayers = [
+			buildPlayerFixture({ id: "p-csv-writefail-existing", name: "CSV寫入失敗既有員" }),
+		];
+		await seedRoster(page, existingPlayers);
+
+		await page.goto(DATA_PAGE);
+
+		const csv = buildRosterCsv([{ name: "CSV寫入失敗匯入員", gender: "男", rating: "3.50" }]);
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster-writefail.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(csv),
+		});
+		await expect(page.getByText("可新增 1 人")).toBeVisible();
+
+		await page.evaluate(() => {
+			Storage.prototype.setItem = () => {
+				throw new DOMException("模擬 LocalStorage 配額超出", "QuotaExceededError");
+			};
+		});
+
+		await page.getByRole("button", { name: "確認匯入" }).click();
+
+		const alert = page.locator('p[role="alert"]');
+		await expect(alert).toBeVisible();
+		await expect(alert.getByText("已超出瀏覽器的容量上限", { exact: false })).toBeVisible();
+
+		// 誤 reload 防護：等待一段時間後訊息仍留在畫面上。
+		await page.waitForTimeout(500);
+		await expect(alert).toBeVisible();
+
+		// 確認沒有誤 reload、既有名單未受影響——page.goto 會建立全新 document，
+		// 前面抽換的 setItem 自動失效，讀到的是真正的 LocalStorage 內容。
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.getByText("CSV寫入失敗既有員", { exact: true })).toBeVisible();
+		await expect(page.getByText("CSV寫入失敗匯入員", { exact: true })).toHaveCount(0);
+		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
+	});
 });
