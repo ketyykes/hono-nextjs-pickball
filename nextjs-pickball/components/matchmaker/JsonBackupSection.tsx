@@ -1,16 +1,17 @@
 // components/matchmaker/JsonBackupSection.tsx
 "use client";
 
-import { useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 
-// JSON 完整備份區塊（M8 §8.4）：涵蓋匯出（Blob + <a download>）與匯入
-// （File.text() → parseBackup → writeBackup → location.reload()）。
-// Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在本層（design Decision 7），
+// JSON 完整備份區塊（M8 §8.4／§8.9）：涵蓋匯出（Blob + <a download>）與匯入
+// （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
+// 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker）。
+// Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在元件層（design Decision 7），
 // lib/matchmaker/backup.ts 與 transfer-storage.ts 只回傳純資料或可判讀的結果物件。
 //
 // exportedAt MUST 直接來自 new Date().toISOString()（spec「JSON 完整備份的匯出內容」），
@@ -20,7 +21,6 @@ import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 // review m4 的交棒記錄）：語法／版本／結構三種失敗一律原樣顯示 message，不做分類、
 // 不用字串比對 message 內容判斷類別。
 export function JsonBackupSection() {
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [message, setMessage] = useState<string | null>(null);
 
 	function handleExport() {
@@ -37,13 +37,7 @@ export function JsonBackupSection() {
 		URL.revokeObjectURL(url);
 	}
 
-	async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-		const file = event.target.files?.[0];
-		// 允許重複選同一個檔案也能再次觸發 onChange。
-		event.target.value = "";
-		if (!file) return;
-
-		const text = await file.text();
+	function handleImportText(text: string) {
 		const parsed = parseBackup(text);
 		if (!parsed.ok) {
 			setMessage(parsed.message);
@@ -71,17 +65,12 @@ export function JsonBackupSection() {
 			</CardHeader>
 			<CardContent className="flex flex-wrap items-start gap-2">
 				<Button onClick={handleExport}>匯出 JSON</Button>
-				<input
-					ref={fileInputRef}
-					type="file"
+				<FileTextPicker
+					label="選擇備份檔…"
 					accept="application/json"
-					className="hidden"
-					data-testid="json-backup-import-input"
-					onChange={handleFileChange}
+					testId="json-backup-import-input"
+					onFileText={handleImportText}
 				/>
-				<Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-					選擇備份檔…
-				</Button>
 				{message !== null && (
 					<p role="alert" className="w-full text-sm text-destructive">
 						{message}

@@ -467,7 +467,7 @@ Depends on: §2, §3, §4, §6, §7
 - [x] 8.8 GREEN: 實作 `components/matchmaker/ClearLocalDataDialog.tsx`：
       比照既有 `ResetRosterDialog` 的 `AlertDialog` + `variant="destructive"` 模式，
       文案含三句（無法復原／建議先匯出 JSON／備份不含 `/scoreboard` 計分進度）
-- [ ] 8.9 REFACTOR: 四個區塊共用的「選檔 → 讀文字 → 顯示錯誤」樣板抽成單一元件或
+- [x] 8.9 REFACTOR: 四個區塊共用的「選檔 → 讀文字 → 顯示錯誤」樣板抽成單一元件或
       小型 helper；確認 `lib/` 的純函式沒有為了配合 UI 而被改動
 
 ## 9. 收尾驗證（驗證項，非實作項）

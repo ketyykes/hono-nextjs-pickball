@@ -1,10 +1,10 @@
 // components/matchmaker/RosterCsvImportSection.tsx
 "use client";
 
-import { useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
 import { readRoster, writeRoster } from "@/lib/matchmaker/storage";
@@ -16,22 +16,17 @@ type PreviewState =
 	| { readonly status: "structuralError"; readonly message: string }
 	| { readonly status: "ready"; readonly result: Extract<ParseRosterCsvResult, { ok: true }> };
 
-// 參賽者名單 CSV 匯入區塊（M8 §8.6）：選檔 → parseRosterCsv → 顯示預覽
+// 參賽者名單 CSV 匯入區塊（M8 §8.6／§8.9）：選檔 → parseRosterCsv → 顯示預覽
 // （可新增人數＋問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
 // 確認後 applyRosterImport → 寫入 → reload。
-// File.text() 等瀏覽器 I/O 只出現在本層（design Decision 7）；parseRosterCsv／
-// applyRosterImport 皆為純函式，不在此另外實作任何驗證或空列過濾邏輯
-// （Decision 13：parseRosterCsv 已跳過空白列，本層不再過濾一次）。
+// 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker；File.text() 等瀏覽器 I/O
+// 只出現在元件層（design Decision 7）；parseRosterCsv／applyRosterImport 皆為
+// 純函式，不在此另外實作任何驗證或空列過濾邏輯（Decision 13：parseRosterCsv
+// 已跳過空白列，本層不再過濾一次）。
 export function RosterCsvImportSection() {
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
 
-	async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-		const file = event.target.files?.[0];
-		event.target.value = "";
-		if (!file) return;
-
-		const text = await file.text();
+	function handleFileText(text: string) {
 		const parsed = parseRosterCsv(text);
 		if (!parsed.ok) {
 			setPreview({ status: "structuralError", message: parsed.message });
@@ -67,17 +62,12 @@ export function RosterCsvImportSection() {
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				<div className="flex flex-wrap gap-2">
-					<input
-						ref={fileInputRef}
-						type="file"
+					<FileTextPicker
+						label="選擇 CSV 檔…"
 						accept=".csv,text/csv"
-						className="hidden"
-						data-testid="roster-csv-import-input"
-						onChange={handleFileChange}
+						testId="roster-csv-import-input"
+						onFileText={handleFileText}
 					/>
-					<Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-						選擇 CSV 檔…
-					</Button>
 					<Button disabled={!canConfirm} onClick={handleConfirm}>
 						確認匯入
 					</Button>
