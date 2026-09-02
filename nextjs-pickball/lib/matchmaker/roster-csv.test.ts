@@ -262,6 +262,38 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
+	 * Stage 2 review Blocker B1：檔案中間的空白資料列（Google Sheets／Excel 框選範圍
+	 * 匯出的常態）MUST 直接跳過，不計入 rows 也不計入 errors——若計為錯誤，§6「任一列
+	 * 有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入（design Decision 13）。
+	 * 同時餵 `parseCsv` 下兩種不同形狀的空白列：純空行（單一空欄位）與 Sheets 風格的
+	 * `,,,,`（欄位數正確但全空），並確認空白列之後的合法／錯誤列列號不因跳過而漂移。
+	 */
+	it("檔案中間的空白資料列會被跳過，不計入可新增列或錯誤列，且不影響後續列號", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,,", // 第 2 列，合法
+			"", // 第 3 列，純空行（parseCsv 產出 [""]）
+			",,,,", // 第 4 列，Sheets 風格全空列（欄位數正確但全空）
+			"乙,female,4.0,,", // 第 5 列，合法——驗證列號未因空白列被跳過而漂移
+			"丙,male,9,,", // 第 6 列，強度分數超出範圍——驗證錯誤列列號亦未漂移
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([
+			{ name: "甲", gender: "male", rating: 5.0 },
+			{ name: "乙", gender: "female", rating: 4.0 },
+		]);
+		expect(result.errors).toEqual([
+			{ row: 6, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("1.00") },
+		]);
+	});
+
+	/**
 	 * 自我複查要求的驗證：欄位對應依標題名稱而非位置，此處刻意打亂標題欄順序
 	 * （顏色兩欄與強度分數對調），確認仍能正確對應——若實作改回依欄位位置
 	 * 對應，本測試會轉紅。
