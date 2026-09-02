@@ -254,9 +254,34 @@ Depends on: §6, §7
 
 Depends on: §7, §8
 
-- [ ] 9.1 RED: 於 `visual-export.spec.ts` 補三個 test：「匯出 JPG 後目前回合與本機資料保持不變」（匯出前後比對 `matchmaker:round:v1`，並重新整理後再確認一次）、「匯出過程不發出任何網路請求」（頁面載入完成後才開始計數 `request` 事件）、「匯出入口具備可存取名稱且可由鍵盤操作」。確認紅燈
-- [ ] 9.2 GREEN: 補齊缺口：匯出路徑不得寫入任何 LocalStorage、不得呼叫任何 store 的 setter、不得發出任何請求；兩個入口補上可存取名稱與可見 focus 樣式。⚠️ 這三條**很可能加入即綠**（§2 已保證純函式、§7 的下載走本機 Blob）——若如此，MUST 在本項後方誠實標註為 **regression guard**，SHALL NOT 用「改斷言看紅再改回」偽造紅燈
-- [ ] 9.3 REFACTOR: 把 E2E 的「種名單 + 產生一輪」前置動作收斂為單一 helper 並註明「回合格式來源為 M4 的 `matchmaker:round:v1`，改動請同步」；能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態才種資料
+- [x] 9.1 RED: 於 `visual-export.spec.ts` 補三個 test：「匯出 JPG 後目前回合與本機資料保持不變」（匯出前後比對 `matchmaker:round:v1`，並重新整理後再確認一次）、「匯出過程不發出任何網路請求」（頁面載入完成後才開始計數 `request` 事件）、「匯出入口具備可存取名稱且可由鍵盤操作」。確認紅燈
+- [x] 9.2 GREEN: 補齊缺口：匯出路徑不得寫入任何 LocalStorage、不得呼叫任何 store 的 setter、不得發出任何請求；兩個入口補上可存取名稱與可見 focus 樣式。⚠️ 這三條**很可能加入即綠**（§2 已保證純函式、§7 的下載走本機 Blob）——若如此，MUST 在本項後方誠實標註為 **regression guard**，SHALL NOT 用「改斷言看紅再改回」偽造紅燈
+- [x] 9.3 REFACTOR: 把 E2E 的「種名單 + 產生一輪」前置動作收斂為單一 helper 並註明「回合格式來源為 M4 的 `matchmaker:round:v1`，改動請同步」；能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態才種資料
+
+> **§9 審查結論（2026-09-03）**：Stage 1／2 合併由 opus 審。三個錨點 test 名稱逐位元組相符；
+> 確實用 Tab 走訪（非直接 `.focus()`）；9.3 的 helper 收斂徹底（9 個呼叫點全走 helper）、
+> 必備兩句註解到位、未動任何既有斷言；零產品程式碼改動、零新增相依。
+> Stage 2 **REJECT 一次**——審查以 14 個違規情境實測三條 guard 的有效性，抓出兩個真缺口
+> （唯讀 guard 只守一把 key、網路 guard 的 resourceType 白名單可被 `sendBeacon` 與追蹤像素
+> 繞過）。修正輪後 leader 獨立複驗六個先前逃得掉的情境**全部轉紅**。
+>
+> **regression guard 標註（9.2 的誠實標註）**：本組三條 test **全部寫入當下即綠**，
+> 已如實標註，**未偽造紅燈**。它們本來就綠是因為匯出路徑本來就正確：`export-scene.ts`
+> 是純函式、`scene-canvas.ts` 只做本機 canvas 與 `<a download>`、`ExportActions.tsx`
+> 零 store import、兩顆按鈕是原生 `<button>` 且有文字內容。9.2 的「補上可存取名稱與可見
+> focus 樣式」**不需要改實作**——審查已查證 `components/ui/button.tsx` 確有
+> `focus-visible:border-ring`／`ring-ring/50`／`ring-[3px]`。
+>
+> **已接受的範圍界定（非缺陷）**：網路 guard 的計數起點為 `networkidle`，**頁面載入期**
+> 發出的請求不在涵蓋範圍——spec Scenario 的 GIVEN 明寫「已產生一輪對戰**且頁面載入完成**」，
+> test 名稱也是「**匯出過程**」。
+>
+> **Firefox 的行為差異（測試環境正規化，非實作缺陷）**：Firefox 對「Tab 到文件最後一個
+> 可聚焦元素後再按 Tab」不會循環回頁首（會先進入瀏覽器 chrome），而 helper 點完
+> 「產生本輪對戰」後該按鈕仍保有 focus，導致往後 Tab 到不了 DOM 順序上更早的匯出入口。
+> 於該 test 內先 `blur()` 重置起點。審查已複現並判定為工具限制而非真實無障礙問題
+> （真實使用者可經由瀏覽器 chrome 繞回頁首），且判別力未受損——把按鈕改成
+> `<div onClick>` 或加 `tabIndex={-1}` 仍會轉紅。
 
 ## 10. 收尾驗證
 
