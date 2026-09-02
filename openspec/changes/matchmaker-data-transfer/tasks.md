@@ -345,14 +345,14 @@ Depends on: §0, §3
 > `backup.test.ts` 的「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」一律遍歷整張表，
 > 新訊息不符合這四項會直接紅燈。
 
-- [ ] 7.1 RED: 新增 `nextjs-pickball/lib/matchmaker/transfer-storage.test.ts`，寫入 it
+- [x] 7.1 RED: 新增 `nextjs-pickball/lib/matchmaker/transfer-storage.test.ts`，寫入 it
       「clearAllLocalData 移除本 app 寫入的全部 LocalStorage key」：以 §0.5／0.6 對照表列出的
       **全部** key 常數（由來源模組 import，SHALL NOT 在測試內抄字面值）組成 `expectedKeys`，
       逐一寫入內容後呼叫，斷言① 每個 key 皆為 `null` ②
       `new Set(CLEAR_ALL_KEYS)` 與 `new Set(expectedKeys)` 相等。
       **SHALL NOT 斷言固定筆數**（如 `toHaveLength(4)`）——寫死筆數會讓日後新增資料域
       卻漏列的情況維持綠燈。確認紅燈
-- [ ] 7.2 GREEN: 實作 `transfer-storage.ts` 的 `CLEAR_ALL_KEYS`（**import**
+- [x] 7.2 GREEN: 實作 `transfer-storage.ts` 的 `CLEAR_ALL_KEYS`（**import**
       `storage-keys.ts` 的三個 matchmaker key 常數，以及 §0.5 grep 出的
       `lib/scoreboard/` 全部 key 常數——`storage.ts` 的 `STORAGE_KEY`，以及分槽模組
       `lib/scoreboard/match-slots.ts` 的 `MATCH_SLOTS_KEY`（`scoreboard:matches:v1`）；
@@ -363,22 +363,22 @@ Depends on: §0, §3
       import 得到的常數，補不出還不存在的模組）。因此 **M6 MUST 先於本 change 合併**。
       **SHALL NOT 編輯 `lib/matchmaker/storage.ts` 或 `storage-keys.ts`**（design Decision 2），
       也 SHALL NOT 編輯 `lib/scoreboard/**`（只 import）
-- [ ] 7.3 RED: 補 it「clearAllLocalData 不呼叫 clear，列舉範圍外的 key 完全不受影響」：
+- [x] 7.3 RED: 補 it「clearAllLocalData 不呼叫 clear，列舉範圍外的 key 完全不受影響」：
       另寫一個不在清單的 key，斷言其內容逐字不變。確認紅燈
-- [ ] 7.4 GREEN: 確認實作為逐一 `removeItem`，且原始碼中不存在 `localStorage.clear()`
-- [ ] 7.5 RED: 補 it「匯入驗證失敗時三個 key 的內容完全不變」：既有三 key 有內容，
+- [x] 7.4 GREEN: 確認實作為逐一 `removeItem`，且原始碼中不存在 `localStorage.clear()`
+- [x] 7.5 RED: 補 it「匯入驗證失敗時三個 key 的內容完全不變」：既有三 key 有內容，
       以不合法備份走匯入流程，斷言三者的字串與匯入前逐字相同。確認紅燈
-- [ ] 7.6 GREEN: 實作 `writeBackup(backup)`：參數型別只接受 §3 驗證通過的 `Backup`，
+- [x] 7.6 GREEN: 實作 `writeBackup(backup)`：參數型別只接受 §3 驗證通過的 `Backup`，
       驗證與寫入在型別上就無法對調順序
-- [ ] 7.7 RED: 補 it「localStorage 不可用時讀寫皆不拋出例外並回報可判讀結果」：
+- [x] 7.7 RED: 補 it「localStorage 不可用時讀寫皆不拋出例外並回報可判讀結果」：
       以 `vi.spyOn(window, "localStorage", "get")` 讓存取拋例外。確認紅燈
-- [ ] 7.8 GREEN: 讀寫入口皆先呼叫 `storage-keys.ts` **匯出的** `hasLocalStorage()`；
+- [x] 7.8 GREEN: 讀寫入口皆先呼叫 `storage-keys.ts` **匯出的** `hasLocalStorage()`；
       讀取回空快照、寫入回失敗結果並附 `TRANSFER_MESSAGES` 的訊息
-- [ ] 7.9 RED: 補 it「寫入超出配額時回報失敗並提供繁體中文的修正建議」：
+- [x] 7.9 RED: 補 it「寫入超出配額時回報失敗並提供繁體中文的修正建議」：
       讓 `setItem` 拋 quota 例外。確認紅燈
-- [ ] 7.10 GREEN: 以 try/catch 接住 `setItem`，回傳失敗結果與專屬訊息
+- [x] 7.10 GREEN: 以 try/catch 接住 `setItem`，回傳失敗結果與專屬訊息
       （「請先清除舊資料或減少匯入筆數」）
-- [ ] 7.11 REFACTOR: 確認 `hasLocalStorage` 的判斷**沒有在本檔重寫**一份；
+- [x] 7.11 REFACTOR: 確認 `hasLocalStorage` 的判斷**沒有在本檔重寫**一份；
       `CLEAR_ALL_KEYS` 內每一個 key 的來源皆為 import 而非字面值，且其成員與 §0.6
       對照表列出的全部 key 常數逐一對得上（有落差就是漏列，回到 7.2 補齊）
 
