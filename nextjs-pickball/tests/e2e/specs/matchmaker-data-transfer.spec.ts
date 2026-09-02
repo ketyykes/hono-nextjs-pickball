@@ -74,7 +74,9 @@ function buildHistoryEntryFixture(options: HistoryEntryFixtureOptions) {
 	return {
 		matchId: options.matchId,
 		courtNumber: 1,
-		playedAt: "2026-01-01T01:00:00.000Z",
+		// 歷史頁預設顯示「今日」區間（matchmaker-history.spec.ts 的既有行為），
+		// 故 playedAt 必須是測試執行當下的「現在」，不可寫死絕對日期。
+		playedAt: new Date().toISOString(),
 		format: "singles" as const,
 		teamA: {
 			players: [{ ...options.teamAPlayer, ratingBefore: 3.5, ratingAfter: 3.6 }],

@@ -450,7 +450,7 @@ Depends on: §2, §3, §4, §6, §7
       漏做的話會拖到 §9.6「`pnpm test` 全套通過」才爆，且那不是 TDD 紅燈而是既有測試被破壞。
       **M7 也會改同兩處**，合併時保留雙方分頁（順序：對戰／參賽者／歷史／資料）
 - [x] 8.3 RED: 補 test「匯入合法 JSON 備份後參賽者與歷史一併還原」。確認紅燈
-- [ ] 8.4 GREEN: 接上 `JsonBackupSection` 的匯出（Blob + `<a download>`）與匯入
+- [x] 8.4 GREEN: 接上 `JsonBackupSection` 的匯出（Blob + `<a download>`）與匯入
       （`File.text()` → `parseBackup` → `writeBackup` → `location.reload()`），
       失敗時只顯示訊息**不寫入**
       `exportedAt` MUST 直接來自 `new Date().toISOString()`，SHALL NOT 由使用者輸入
