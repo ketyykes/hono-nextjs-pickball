@@ -338,4 +338,19 @@ describe("backup", () => {
 			expect(result.message).toContain("參賽者");
 		}
 	});
+
+	it("所有錯誤訊息為繁體中文且各自包含可採取的修正方式", () => {
+		// 遍歷整張表而非手抄清單——§7 之後會再往 TRANSFER_MESSAGES 追加訊息，
+		// 手抄清單會讓新訊息漏檢查也不會紅（design Decision 1）。
+		const messages = Object.values(TRANSFER_MESSAGES);
+
+		expect(messages.length).toBeGreaterThan(0);
+
+		for (const message of messages) {
+			// 不含未翻譯的 zod 原始 issue 字串（§11：不得只顯示技術錯誤碼）。
+			expect(message).not.toMatch(/Invalid input|Expected|Required/i);
+			// 含「請」字開頭的下一步指引。
+			expect(message).toMatch(/請[^。]*[。]?/);
+		}
+	});
 });
