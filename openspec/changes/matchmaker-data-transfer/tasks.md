@@ -265,10 +265,15 @@ Depends on: §5
 > 見 design Decision 13）。§6 的「可新增 N 人」與「有錯即 disabled」直接建立在此形狀上，
 > SHALL NOT 在 §6 另做一次空列過濾。
 
-- [ ] 6.1 RED: 於 `roster-csv.test.ts` 補 it「預覽回報可新增人數與問題列的列號與原因」：
-      5 筆其中 2 筆有問題 → 可新增 3 人、2 筆問題列。確認紅燈
-- [ ] 6.2 GREEN: 讓 `parseRosterCsv` 的回傳形狀即為預覽所需（可新增列數 + 問題列清單），
-      SHALL NOT 另做一個只為 UI 服務的第二種回傳型別
+- [x] 6.1 RED→regression guard: 於 `roster-csv.test.ts` 補 it「預覽回報可新增人數與問題列的列號與原因」：
+      5 筆其中 2 筆有問題 → 可新增 3 人、2 筆問題列。**寫下當下即綠燈**——`parseRosterCsv`
+      的既有回傳形狀（`rows`／`errors`）已完整滿足此預覽需求，非真紅燈；已以 mutation
+      驗證：將 `roster-csv.ts` 逐列迴圈內 `if (rowErrors.length > 0)` 改為
+      `if (rowErrors.length > 100)`（使錯誤列不再被攔下）後轉紅（9 個 it 失敗，
+      含本條），還原後轉綠
+- [x] 6.2 GREEN（同上，已於 6.1 前提前完成）: `parseRosterCsv` 的回傳形狀本身即為預覽所需
+      （可新增列數 = `rows.length`、問題列清單 = `errors`），未另立第二種只為 UI 服務的
+      回傳型別
 - [ ] 6.3 RED: 補 it「任一列驗證失敗時整份不匯入，名單完全不變」：
       4 筆中第 3 筆 rating `12` → 回傳名單與原名單逐筆相等。確認紅燈
 - [ ] 6.4 GREEN: 實作 `applyRosterImport(roster, rows, { ids, now })`：

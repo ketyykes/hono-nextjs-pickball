@@ -494,4 +494,32 @@ describe("parseRosterCsv", () => {
 			{ name: "王小明", gender: "male", rating: 5.5, colorFrom: "#FF0000", colorTo: "#00FF00" },
 		]);
 	});
+
+	/**
+	 * §6 task 6.1：預覽所需的資訊即 `parseRosterCsv` 的回傳形狀本身——可新增人數為
+	 * `rows.length`，問題列（含列號與原因）即 `errors`，SHALL NOT 為 UI 另立第二種
+	 * 回傳型別（task 6.2）。5 筆資料中第 2 筆性別無法辨識、第 4 筆強度分數超出範圍。
+	 */
+	it("預覽回報可新增人數與問題列的列號與原因", () => {
+		const csv = [
+			HEADER_LINE,
+			"甲,male,5.0,,", // 第 2 列，合法
+			"乙,貓,5.0,,", // 第 3 列，性別無法辨識
+			"丙,female,5.0,,", // 第 4 列，合法
+			"丁,male,9,,", // 第 5 列，強度分數超出範圍
+			"戊,other,5.0,,", // 第 6 列，合法
+		].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toHaveLength(3);
+		expect(result.errors).toEqual([
+			{ row: 3, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringContaining("性別") },
+			{ row: 5, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("1.00") },
+		]);
+	});
 });
