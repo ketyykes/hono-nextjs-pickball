@@ -339,6 +339,99 @@ describe("backup", () => {
 		}
 	});
 
+	it("version 型別非數字時歸類為結構不合法，數字但不支援時仍歸類為版本不支援", () => {
+		const backup = buildBackup(makeSnapshot(), { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		// version 型別本身就不對（null／布林／字串）時，這是結構問題而非版本問題——
+		// 「版本不支援」的訊息只該在我們真的讀到一個不受支援的版本號時出現
+		// （M8 §3 Stage 2 review m2 裁決）。
+		const structurallyInvalidVersions: unknown[] = [null, true, "1"];
+		for (const version of structurallyInvalidVersions) {
+			const result = parseBackup(JSON.stringify({ ...backup, version }));
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.message).toBe(TRANSFER_MESSAGES.invalidStructure);
+			}
+		}
+
+		// version 型別正確（number）但數值不是 1 時，仍應歸類為版本不支援。
+		const unsupportedNumericVersions = [2, 0];
+		for (const version of unsupportedNumericVersions) {
+			const result = parseBackup(JSON.stringify({ ...backup, version }));
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.message).toBe(TRANSFER_MESSAGES.unsupportedVersion);
+			}
+		}
+	});
+
+	it("備份缺少 version 欄位時歸類為結構不合法", () => {
+		// 完全沒有 version 鍵時，前置的版本檢查不該誤判為某個特定版本——
+		// 應直接落入結構不合法（M8 §3 Stage 2 review J1）。
+		const text = JSON.stringify({ players: [], currentRound: null, history: [] });
+
+		const result = parseBackup(text);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.message).toBe(TRANSFER_MESSAGES.invalidStructure);
+		}
+	});
+
+	it("parseBackup 對非物件的合法 JSON 一律回傳失敗結果而不拋出例外", () => {
+		// 涵蓋「JSON 語法合法但內容不是物件」的各種形狀——這條路徑此前從未被餵過
+		// （M8 §3 Stage 2 review Blocker B1）。
+		const inputs = ["", "null", "[]", "123", '"x"', "true", "{}"];
+
+		for (const input of inputs) {
+			let result: ReturnType<typeof parseBackup> | undefined;
+
+			expect(() => {
+				result = parseBackup(input);
+			}).not.toThrow();
+
+			expect(result?.ok).toBe(false);
+			if (result && !result.ok) {
+				expect(Object.values(TRANSFER_MESSAGES)).toContain(result.message);
+			}
+		}
+	});
+
+	it("parseBackup 回傳 zod 正規化後的資料，會剝除多餘欄位並套用欄位預設值", () => {
+		// 手改過的 JSON 文字：頂層與 players[0] 皆帶不明欄位，且 players[0] 刻意缺
+		// restCount／gamesPlayed——驗證成功分支回傳的是 parsed.data（經 zod 正規化），
+		// 不是把原始 json 直接轉型回傳（M8 §3 Stage 2 review Blocker B2）。
+		const text = JSON.stringify({
+			version: 1,
+			extraTopLevelField: "不明頂層欄位",
+			players: [
+				{
+					id: "p1",
+					name: "Alice",
+					gender: "female",
+					colorFrom: "#ff0000",
+					colorTo: "#00ff00",
+					rating: 5,
+					isActive: true,
+					createdAt: "2026-08-16T00:00:00.000Z",
+					extraPlayerField: "不明球員欄位",
+				},
+			],
+			currentRound: null,
+			history: [],
+		});
+
+		const result = parseBackup(text);
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(Object.keys(result.backup).sort()).toEqual(["currentRound", "history", "players", "version"]);
+			expect(Object.keys(result.backup.players[0]).sort()).not.toContain("extraPlayerField");
+			expect(result.backup.players[0].restCount).toBe(0);
+			expect(result.backup.players[0].gamesPlayed).toBe(0);
+		}
+	});
+
 	it("所有錯誤訊息為繁體中文且各自包含可採取的修正方式", () => {
 		// 遍歷整張表而非手抄清單——§7 之後會再往 TRANSFER_MESSAGES 追加訊息，
 		// 手抄清單會讓新訊息漏檢查也不會紅（design Decision 1）。
