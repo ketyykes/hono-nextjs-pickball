@@ -422,3 +422,52 @@ satori／canvas）。本 change 結束時此事實 MUST 不變。
   「對戰／參賽者／歷史／資料」**（歷史為 M7、資料為 M8 新增）。Decision 3 的規則隱藏的是
   **整個 `nav`**，因此四個分頁全數涵蓋，M7／M8 的新分頁不需要額外規則；§8 的 E2E 驗收
   MUST 實際確認這四個分頁在列印媒體下都不可見。
+
+---
+
+## Leader 裁決：`ExportActions` 的 JPG 匯出注入點（apply §5 開工前，2026-09-02）
+
+**問題**：tasks 5.2 把 props 列為 `{ scene, fileName, printer? }`，但 5.4 要求「JPG 點擊期間以
+本地 state 讓該按鈕 `disabled`」、test-plan 的「匯出進行中時匯出 JPG 入口暫時停用」要求
+「以**未 resolve 的 promise** 模擬繪製中」。這三份文件都沒說那個 promise 從哪來——props 清單
+裡沒有任何非同步的東西。§5 若不決定，就會出現「測試需要一個注入點，但介面沒有」的死結。
+
+**裁決**：`ExportActions` 的 props 為
+
+```ts
+interface ExportActionsProps {
+	readonly scene: ExportScene | null;
+	readonly fileName: string;
+	/** JPG 匯出（繪製 → 編碼 → 下載）的注入點；實作於 §7 的 scene-canvas.ts。 */
+	readonly exportJpg: (scene: ExportScene, fileName: string) => Promise<void>;
+	/** 列印函式的注入點；省略時元件層取 window.print（design Decision 4）。 */
+	readonly printer?: unknown;
+}
+```
+
+`exportJpg` 為**必填**且由呼叫端（§7 的 `page.tsx`）注入，§7 於 `scene-canvas.ts` 匯出
+`downloadSceneAsJpeg(scene, fileName): Promise<void>`——**canvas 繪製、`toBlob`、
+`URL.createObjectURL`、`<a download>`、`revokeObjectURL` 全部留在該檔**。
+
+**理由**：
+1. **分層不破口**。Stage 2 的分層檢查是「canvas 與 `<a download>` 只出現在 `scene-canvas.ts`
+   與 `ExportActions.tsx`」。若改由 `page.tsx` 組裝下載，`<a download>` 會跑進**例外層的頁面**，
+   那是三個檔案都碰瀏覽器 I/O，比集中在一個例外層更差。
+2. **§5 不必等 §7**。必填注入點讓 §5 的 integration test 直接傳 `vi.fn()` 或未 resolve 的
+   promise，不需要 `scene-canvas.ts` 先存在，也不需要在元件內寫一個「暫時的預設值」再於 §7 改掉。
+3. **與 `printer` 對稱**。兩者都是**注入的相依**而非事件回呼，因此**刻意不用 `onXxx` 命名**
+   （Final Review checklist 的「props 一律 `onXxx`」指的是事件回呼；`printer` 本身即為
+   design Decision 4 明訂的非 `onXxx` 注入點）。Final Review 請以本裁決為準，
+   **SHALL NOT 因為它們不叫 `onXxx` 而判為不一致**。
+4. **沿用 M8 既有慣例**。M8 已把「Blob → 建立暫時 `<a download>` → 觸發 → 清理」抽為
+   `components/matchmaker/downloadTextFile.ts`（其檔頭註解明寫「屬瀏覽器 I/O，
+   design Decision 7，本檔不含任何網域邏輯」）。本 change 的差別是輸入已經是 `Blob`
+   而非字串，且與 canvas 繪製同屬一條不可分割的非同步流程，故**不 import
+   `downloadTextFile`**（會為了共用而把 `Blob→字串→Blob` 繞一圈），改在 `scene-canvas.ts`
+   內完成同一件事並於檔頭註明此重複為刻意。
+
+**對後續群組的約束**：
+- §5 **SHALL NOT** import `scene-canvas.ts`（該檔此時尚不存在），也 SHALL NOT 自行呼叫
+  `document.createElement("canvas")`。
+- §7 的 `page.tsx` 掛載時傳入 `exportJpg={downloadSceneAsJpeg}`，**SHALL NOT** 在
+  `page.tsx` 內組任何 `<a download>`。
