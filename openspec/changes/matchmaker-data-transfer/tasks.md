@@ -305,8 +305,10 @@ Depends on: §5
       三者轉為同一漸層（`gradientKeys` 的 Set size 由 3 降為 1）後轉紅，還原後轉綠
 - [x] 6.10 GREEN（同上，已於 6.4 提前完成）: 確認 `reduce` 的累積值是**成長中的名單**
       （每次 `addPlayer` 都看到前一列的結果），而非固定的匯入前名單（design Decision 9）
-- [ ] 6.11 REFACTOR: 確認本模組**完全沒有**自行組裝 `Player` 物件的程式碼，
-      rating 的 round 與顏色判定全部落在 `addPlayer` 內
+- [x] 6.11 REFACTOR: skipped——確認本模組**完全沒有**自行組裝 `Player` 物件的程式碼：
+      `grep -n "Player\b" roster-csv.ts` 顯示 `Player` 僅作為型別標註（`readonly Player[]`／
+      `Player[]`），唯一產生 `Player` 值的呼叫點是 `addPlayer`，rating 的 round 與顏色
+      自動配色皆落在 `addPlayer` 內，無壞味道
 
 ## 7. 快照的讀寫與清除（`transfer-storage.ts`）
 Depends on: §0, §3
