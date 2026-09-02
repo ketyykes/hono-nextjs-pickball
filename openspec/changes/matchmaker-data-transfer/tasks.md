@@ -397,6 +397,10 @@ Depends on: §0, §3
       回合／歷史的真實內容」：以真實 localStorage 內容（非 mock）驗證三欄位對應來源
       資料，history 用 2 筆非空資料鎖住 `entries → history` 欄位改名。
       mutation 複驗：M13／M15／M16／M17／M18／M19 六組全數轉紅（見 impl-s7-fix.md）
+- [x] 7.14 FIX（Blocker B3）: 新增 it「writeBackup 成功寫入後可用既有讀取函式還原
+      名單／回合／歷史（round-trip）」：呼叫 `writeBackup` 後以既有 `readRoster`／
+      `readRound`／`readHistory` 讀回比對，同時鎖住寫入端容器格式與讀取端 schema。
+      mutation 複驗：M21～M27 七組全數轉紅（見 impl-s7-fix.md）
 
 ## 8. 資料頁與元件（例外層，E2E 當 RED）
 Depends on: §2, §3, §4, §6, §7

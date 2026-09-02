@@ -9,6 +9,8 @@ import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
 import { TRANSFER_MESSAGES } from "./transfer-types";
 import type { Backup } from "./transfer-types";
 import { parseBackup } from "./backup";
+import { readRoster } from "./storage";
+import { readRound, readHistory } from "./round-storage";
 import type { Player } from "./types";
 import type { Round } from "./round-types";
 import type { MatchHistoryEntry, HistoryTeam } from "./history";
@@ -246,5 +248,20 @@ describe("transfer-storage", () => {
 		// 「巧合地都是空陣列」的情況。
 		expect(snapshot.history).toHaveLength(2);
 		expect(snapshot.history).toEqual([entryA, entryB]);
+	});
+
+	it("writeBackup 成功寫入後可用既有讀取函式還原名單／回合／歷史（round-trip）", () => {
+		// M8 §7 兩階段審查 Blocker B3：writeBackup 的 happy path 先前完全零覆蓋，
+		// 移除任一 setItem、容器 version／欄位名改壞皆不會被發現（寫入端與
+		// readRoster／readRound／readHistory 的讀取端 schema 是否對齊，只有透過
+		// round-trip 才能同時鎖住兩端）。
+		const backup = makeBackup();
+
+		const result = writeBackup(backup);
+
+		expect(result).toEqual({ ok: true });
+		expect(readRoster().players).toEqual(backup.players);
+		expect(readRound()).toEqual(backup.currentRound);
+		expect(readHistory().entries).toEqual(backup.history);
 	});
 });
