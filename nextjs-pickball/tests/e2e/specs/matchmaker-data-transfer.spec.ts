@@ -54,8 +54,14 @@ function buildPlayerFixture(options: PlayerFixtureOptions) {
 		createdAt: "2026-01-01T00:00:00.000Z",
 	};
 }
-function seedRoster(page: Page, players: unknown[]) {
-	return page.addInitScript(
+// 刻意用 page.evaluate（一次性寫入）而非 page.addInitScript：本檔多個 test 會在
+// 匯入確認後呼叫 location.reload()，addInitScript 的腳本會在每次 reload／導覽時
+// 重新執行，把 reload 前才剛寫入的名單覆蓋回種子值——這與
+// matchmaker-history.spec.ts「瀏覽與切換區間後…內容不變」test 選擇不用
+// addInitScript 的理由相同（見該檔開頭的既有慣例說明）。呼叫端須確保 page
+// 已導覽至同源頁面（clearMatchmakerStorage 已 goto("/")）。
+async function seedRoster(page: Page, players: unknown[]): Promise<void> {
+	await page.evaluate(
 		(arg: { key: string; value: string }) => {
 			window.localStorage.setItem(arg.key, arg.value);
 		},
