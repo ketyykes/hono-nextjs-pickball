@@ -17,13 +17,13 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的 Open Questions 從假設
 > 變成事實，避免 §2 之後整批建立在錯的介面上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M5（`matchmaker-match-stage-ui`）已合併**：`nextjs-pickball/app/matchmaker/page.tsx` 存在且 `/matchmaker` 不是 404。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M5（見 proposal 的「執行相依」）
-- [ ] 1.3 讀 `nextjs-pickball/app/matchmaker/page.tsx`，記錄它如何取得「目前回合」與「參賽者名單」（變數名、型別、是否留在 page 層）。與 design Open Questions 第 1 條逐項比對，**差異一律補記進 design.md 的 Open Questions**，不要默默改實作去遷就；若資料未留在 page 層，MUST 依 execution-plan 的升級條件回報人類，SHALL NOT 為了拿資料去改 M5 的元件介面
-- [ ] 1.4 讀 `nextjs-pickball/lib/matchmaker/stage-layout.ts`，記錄實際函式名與回傳欄位（哪一格屬哪一隊、row／column 的欄位名）。§2 的 `export-scene.ts` 依實際簽章取用，SHALL NOT 在本 change 重新推導一次單打／雙打的排列規則（design Decision 2）
-- [ ] 1.5 讀 M4 的 `nextjs-pickball/lib/matchmaker/round-types.ts`，記錄 `Round` 與 `RoundMatch` 的實際欄位名（`roundNumber`／`format`／`courtNumber`／`teams`／`status`／`scores`／`winner`），確認與 design 假設一致
-- [ ] 1.6 確認對戰頁標題目前使用的 App 名稱字串（design Open Questions 第 3 條）。與本 change 要匯出的 App 名稱**對齊為同一個字串**；對齊方式是改本 change 的常數，**不**去改 M5 的畫面文案
-- [ ] 1.7 確認 `nextjs-pickball/package.json` 目前無任何影像或 PDF 相關相依（本 change 結束時此事實 MUST 不變，Final Review 會以 `git diff package.json` 機械確認）
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上 **M5（`matchmaker-match-stage-ui`）已合併**：`nextjs-pickball/app/matchmaker/page.tsx` 存在且 `/matchmaker` 不是 404。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M5（見 proposal 的「執行相依」）
+- [x] 1.3 讀 `nextjs-pickball/app/matchmaker/page.tsx`，記錄它如何取得「目前回合」與「參賽者名單」（變數名、型別、是否留在 page 層）。與 design Open Questions 第 1 條逐項比對，**差異一律補記進 design.md 的 Open Questions**，不要默默改實作去遷就；若資料未留在 page 層，MUST 依 execution-plan 的升級條件回報人類，SHALL NOT 為了拿資料去改 M5 的元件介面
+- [x] 1.4 讀 `nextjs-pickball/lib/matchmaker/stage-layout.ts`，記錄實際函式名與回傳欄位（哪一格屬哪一隊、row／column 的欄位名）。§2 的 `export-scene.ts` 依實際簽章取用，SHALL NOT 在本 change 重新推導一次單打／雙打的排列規則（design Decision 2）
+- [x] 1.5 讀 M4 的 `nextjs-pickball/lib/matchmaker/round-types.ts`，記錄 `Round` 與 `RoundMatch` 的實際欄位名（`roundNumber`／`format`／`courtNumber`／`teams`／`status`／`scores`／`winner`），確認與 design 假設一致
+- [x] 1.6 確認對戰頁標題目前使用的 App 名稱字串（design Open Questions 第 3 條）。與本 change 要匯出的 App 名稱**對齊為同一個字串**；對齊方式是改本 change 的常數，**不**去改 M5 的畫面文案
+- [x] 1.7 確認 `nextjs-pickball/package.json` 目前無任何影像或 PDF 相關相依（本 change 結束時此事實 MUST 不變，Final Review 會以 `git diff package.json` 機械確認）
 
 ## 2. 匯出內容組裝（export-scene.ts）
 

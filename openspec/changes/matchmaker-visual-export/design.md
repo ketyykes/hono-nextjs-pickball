@@ -330,3 +330,95 @@ M4 的回合只存 id，使用者可在回合進行中刪除參賽者。三個�
    9.4 的 JPG 也未列強度分數。暫定 JPG 顯示（版面容得下、現場有辨識價值）、列印版不顯示
    （紙本以找場地為主）。此差異**不寫進 spec**（spec 只約束必含項目），因此日後調整不需要
    改規格。
+
+---
+
+## §1 前置確認的實測結果（apply Step 0，2026-09-02）
+
+以下為 tasks.md §1.2～§1.7 在本 worktree（base `main @ 2b3fb8f`，含 M3～M8）逐項實讀的結果。
+**與上方 Open Questions 的差異一律記在這裡，不去改實作遷就假設，也不去改 M5 的檔案。**
+
+### 1.2 M5 已合併（PASS）
+
+`nextjs-pickball/app/matchmaker/page.tsx` 存在（143 行），`app/matchmaker/layout.tsx` 提供區段
+外框。無須停止。
+
+### 1.3 `page.tsx` 的資料取得（Open Question 1：**核心假設命中，行號與解構清單有偏差**）
+
+實際為第 21～25 行：
+
+```ts
+const { players, updatePlayer } = useRosterStore();
+const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore } = useRoundStore({
+	players,
+	updatePlayer,
+});
+```
+
+- **命中**：`round: Round | null` 與 `players: Player[]` 皆**留在 page 層**，可直接作為
+  §7 頁面組裝的輸入，不需要動 M5 的元件介面，因此**不觸發** execution-plan 的升級條件。
+- **偏差 A**：Open Question 1 記為「第 18～22 行」，實際為 21～25 行；`useRoundStore` 的解構
+  多出 `setTargetScore`（M6 場邊計分銜接加入）。純屬行號漂移，不影響設計。
+- **偏差 B**：Open Question 1 記掛載位置為「第 48～94 行的 `<main>`」，實際 `<main>` 為
+  **第 92～141 行**；其內依序為標題區、`roundError` 的 `role="alert"`、包住 `RoundControls`
+  的 `div`（帶 `max-md:[&_button...]` 觸控尺寸 class）、以及 `data-testid="match-stage-region"`
+  的舞台區。§7／§8 的掛載與 `data-print="hide"` 包裝一律在此 `<main>` 內追加。
+- **偏差 C（§8 需注意）**：page.tsx 已存在 M6 引入的 `readMatchSlots`／`matchSlots` 與一個
+  以 `round` 為依賴的回填 `useEffect`。本 change **只追加節點、不改動該 effect**。
+
+### 1.4 `stage-layout.ts` 的實際簽章（Open Question 2：**完全命中**）
+
+```ts
+export function buildCourtTiles(match: CourtTileSource): CourtTile[]
+export interface CourtTileSource { readonly format: MatchFormat; readonly teams: readonly [CourtTileTeamSource, CourtTileTeamSource]; }
+export interface CourtTileTeamSource { readonly players: readonly Player[]; }
+export interface CourtTile { readonly player: Player; readonly teamIndex: 0 | 1; readonly row: number; readonly column: number; }
+```
+
+版面語意經原始碼確認：**單打** teamA→(row 0, column 0)、teamB→(row 0, column 1)；
+**雙打** teamA→(row 0, column 0/1)、teamB→(row 1, column 0/1)。`export-scene.ts` MUST 直接
+呼叫本函式取得 row／column／teamIndex，**SHALL NOT 重新推導**。輸入為 `CourtTileSource`
+（`teams[].players` 為已解析的 `Player`），故 Decision 8 的「佔位 Player」約束成立且必要。
+
+### 1.5 M4 回合型別（**命中**）
+
+`lib/matchmaker/round-types.ts` 確認：`Round` 有 `roundNumber`／`createdAt`／`format`／
+`courtCount`／`targetScore`／`matches`／`restingPlayerIds`／`seenSignatures`；
+`RoundMatch` 有 `id`／`courtNumber`／`format`／`doublesComposition?`／`teams`／`status`／
+`scores`（`{ teamA, teamB } | null`）／`winner`（`"teamA" | "teamB" | null`）／`completedAt`／
+`playerRatings`。**補記**：`RoundTeam` 的形狀為 `{ playerIds: string[]; rating: number }`——
+只有 id，沒有 `players`，證實 `export-scene.ts` 必須自行把 `playerIds` 解析為 `Player[]`
+才餵得進 `buildCourtTiles`。`MatchStatus` 為三值 `pending | scoring | completed`：本 change
+把「非 completed」一律視為未完成，**SHALL NOT 為 `scoring` 另立第三種狀態文案**（proposal
+的「不在本次範圍」已明訂不改動任何狀態語意）。
+
+### 1.6 App 名稱（Open Question 3：**維持原裁決，不與畫面對齊**）
+
+實測三個現存字串各不相同：
+- 對戰頁 `<h1>` = 「對戰分配」（`page.tsx` 第 95 行）
+- 全站 metadata `title` = 「匹克球新手完全入門：規則與球拍選購一次搞懂」（`app/layout.tsx`）
+- 區段導覽 `aria-label` = 「對戰分配區段導覽」
+
+三者皆非 App 名稱。因此**沿用 Open Question 3 的既有裁決**：`export-scene.ts` 的具名常數
+採 **「匹克球對戰分配機」**（`prd.md` 標題）。tasks 1.6 的「對齊為同一個字串」在此**無對齊
+對象**——現存畫面沒有任何一處寫著 App 名稱，硬套 `<h1>` 的「對戰分配」會違反 `prd.md` 9.4
+「App 名稱」的文義。**SHALL NOT 修改 M5 的畫面文案**，這一點兩份文件一致。
+
+### 1.7 相依現況（PASS）
+
+`nextjs-pickball/package.json` 的 `dependencies` 為 `@opennextjs/cloudflare`、
+`@radix-ui/react-label`、`@radix-ui/react-slot`、`class-variance-authority`、`clsx`、
+`lucide-react`、`motion`、`next`、`radix-ui`、`react`、`react-dom`、`tailwind-merge`、`zod`；
+**無任何影像或 PDF 相關套件**（無 html-to-image／dom-to-image／html2canvas／jsPDF／pdf-lib／
+satori／canvas）。本 change 結束時此事實 MUST 不變。
+
+### 1.x 額外實測：§8 print CSS 的兩個前提（皆成立）
+
+- `<header>` 由 `components/layout/SiteNavbar.tsx` 提供，且是 `<body>` 的**直接子節點**
+  （`app/layout.tsx` 內 `<body><SiteNavbar />…</body>`），故 Decision 3 的
+  `body:has([data-print="sheet"]) > header` 選擇器成立。
+- 區段導覽 `nav[aria-label="對戰分配區段導覽"]` 存在於 `components/matchmaker/MatchmakerTabs.tsx`，
+  由 `app/matchmaker/layout.tsx` 掛載。**`lib/matchmaker/section-nav.ts` 目前為四筆分頁
+  「對戰／參賽者／歷史／資料」**（歷史為 M7、資料為 M8 新增）。Decision 3 的規則隱藏的是
+  **整個 `nav`**，因此四個分頁全數涵蓋，M7／M8 的新分頁不需要額外規則；§8 的 E2E 驗收
+  MUST 實際確認這四個分頁在列印媒體下都不可見。
