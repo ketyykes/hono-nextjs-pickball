@@ -100,7 +100,7 @@
 > 刻意排在最前面且**不依賴 §0**：本模組只認識字串與二維陣列，完全不 import 任何網域型別，
 > 因此 M4 是否已合併都不影響它。
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/csv.test.ts`，寫入 it
+- [x] 1.1 RED: 新增 `nextjs-pickball/lib/matchmaker/csv.test.ts`，寫入 it
       「CSV 文字以 UTF-8 BOM 開頭」：對任意二維陣列呼叫 `toCsv`，斷言首字元為 `﻿`。
       跑單檔確認紅燈並貼出輸出
 - [ ] 1.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/csv.ts` 的 `toCsv(rows)`：
