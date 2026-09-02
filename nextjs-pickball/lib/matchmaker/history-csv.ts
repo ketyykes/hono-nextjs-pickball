@@ -29,15 +29,51 @@ const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
 const MULTI_VALUE_SEPARATOR = "、";
 
 /**
- * 由 playedAt（UTC ISO 字串，例如 "2026-08-23T01:02:03.000Z"）直接切出日期與時間文字。
- * 刻意不建立 Date 物件走本地時區 getter（HistoryRecordCard.tsx 的畫面顯示才需要本地時區）
- * ——CSV 匯出是純函式，輸出不該因執行環境的時區而改變。
+ * 賽前／賽後分數欄的小數位數，沿用 rating 既有的顯示精度（見 HistoryRecordCard.tsx
+ * 的 `ratingBefore.toFixed(2)`／`ratingAfter.toFixed(2)`）——CSV 與畫面顯示的小數位數
+ * 需一致，避免使用者比對時誤以為兩處數字不同。
  */
-function splitPlayedAt(playedAt: string): { date: string; time: string } {
-	const [datePart, rawTimePart] = playedAt.split("T");
-	const withoutZone = (rawTimePart ?? "").replace(/Z$/, "");
-	const [time] = withoutZone.split(".");
-	return { date: datePart ?? "", time: time ?? "" };
+const RATING_DECIMAL_PLACES = 2;
+
+/**
+ * 建立換算 playedAt（UTC 瞬間）用的 Intl 格式化器。時區由呼叫端注入（見 historyToCsv
+ * 的 options.timeZone），而非讀執行環境的預設時區——使用者匯出與檢視 App 是在同一台
+ * 裝置、同一個時區，CSV 與畫面（HistoryRecordCard.tsx）的數字必須一致；注入時區也讓
+ * 測試能以固定值斷言，不必依賴跑測試的機器時區（design.md Decision 12）。
+ *
+ * 用 `formatToParts` 而非 `Date` 的 `getHours()` 等 getter，是因為那些 getter 一律讀
+ * 「執行行程」的本地時區、無法注入指定時區；`hourCycle: "h23"` 確保 00:00 一律輸出
+ * `00`，不會出現部分 locale 對午夜的 `24` 表示法。
+ */
+function createPlayedAtFormatter(timeZone: string): Intl.DateTimeFormat {
+	return new Intl.DateTimeFormat("en-US", {
+		timeZone,
+		hourCycle: "h23",
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
+/**
+ * 由 playedAt 換算出指定時區的日期與時間文字。每列只呼叫一次（呼叫端負責傳入
+ * 共用的 formatter，且只在 historyToCsv 的 row 迴圈內建立一次 context），
+ * 避免同一筆 playedAt 被重複格式化兩次。
+ */
+function formatPlayedAt(
+	playedAt: string,
+	formatter: Intl.DateTimeFormat,
+): { date: string; time: string } {
+	const parts = formatter.formatToParts(new Date(playedAt));
+	const get = (type: Intl.DateTimeFormatPartTypes): string =>
+		parts.find((part) => part.type === type)?.value ?? "";
+	return {
+		date: `${get("year")}-${get("month")}-${get("day")}`,
+		time: `${get("hour")}:${get("minute")}:${get("second")}`,
+	};
 }
 
 /**
@@ -53,51 +89,63 @@ function doublesCompositionLabel(entry: MatchHistoryEntry): string {
 }
 
 /**
+ * 單一列組裝時共用的上下文：playedAtParts 在 historyToCsv 的 row 迴圈內每列只算一次，
+ * 「日期」「時間」兩欄共用同一份結果，不必各自重算（m4：原本每列會被格式化兩次）。
+ */
+interface HistoryRowContext {
+	entry: MatchHistoryEntry;
+	playedAtParts: { date: string; time: string };
+}
+
+/**
  * 11 個欄位的單一定義來源（task 4.7）：標題列與資料列都從這份陣列衍生，
  * 避免兩處各自維護順序而漂移。陣列順序即 9.3.1 要求的欄位順序。
  *
  * 球員姓名與賽前／賽後分數一律取自歷史紀錄本身的快照欄位（players[].name／
  * ratingBefore／ratingAfter），SHALL NOT 以 id 回查目前名單——歷史被設計成自足快照，
  * 正是為了讓球員被刪除或改名後仍能完整呈現（design.md「與 M4 的介面對齊」）。
+ *
+ * 賽前／賽後分數欄的球員順序為「先第一隊全員、再第二隊全員」，與第 6／7 欄的球員順序
+ * 一致，此約定同時記錄於 design.md Decision 12。
  */
 const HISTORY_CSV_COLUMNS: ReadonlyArray<{
 	header: string;
-	getValue: (entry: MatchHistoryEntry) => string;
+	getValue: (context: HistoryRowContext) => string;
 }> = [
-	{ header: "日期", getValue: (entry) => splitPlayedAt(entry.playedAt).date },
-	{ header: "時間", getValue: (entry) => splitPlayedAt(entry.playedAt).time },
-	{ header: "對戰方式", getValue: (entry) => FORMAT_LABEL[entry.format] },
-	{ header: "雙打組成", getValue: doublesCompositionLabel },
-	{ header: "場地", getValue: (entry) => String(entry.courtNumber) },
+	{ header: "日期", getValue: ({ playedAtParts }) => playedAtParts.date },
+	{ header: "時間", getValue: ({ playedAtParts }) => playedAtParts.time },
+	{ header: "對戰方式", getValue: ({ entry }) => FORMAT_LABEL[entry.format] },
+	{ header: "雙打組成", getValue: ({ entry }) => doublesCompositionLabel(entry) },
+	{ header: "場地", getValue: ({ entry }) => String(entry.courtNumber) },
 	{
 		header: "第一隊球員",
-		getValue: (entry) =>
+		getValue: ({ entry }) =>
 			entry.teamA.players.map((player) => player.name).join(MULTI_VALUE_SEPARATOR),
 	},
 	{
 		header: "第二隊球員",
-		getValue: (entry) =>
+		getValue: ({ entry }) =>
 			entry.teamB.players.map((player) => player.name).join(MULTI_VALUE_SEPARATOR),
 	},
-	{ header: "比分", getValue: (entry) => `${entry.scoreA}:${entry.scoreB}` },
+	{ header: "比分", getValue: ({ entry }) => `${entry.scoreA}:${entry.scoreB}` },
 	{
 		header: "勝方",
-		getValue: (entry) => (entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]),
+		getValue: ({ entry }) => (entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]),
 	},
 	{
 		// 賽前／賽後分數的球員順序 MUST 與「第一隊球員」「第二隊球員」欄一致
 		// （先 teamA 全員、後 teamB 全員），欄位對應錯位是最容易發生也最難目視發現的錯。
 		header: "賽前分數",
-		getValue: (entry) =>
+		getValue: ({ entry }) =>
 			[...entry.teamA.players, ...entry.teamB.players]
-				.map((player) => player.ratingBefore.toFixed(2))
+				.map((player) => player.ratingBefore.toFixed(RATING_DECIMAL_PLACES))
 				.join(MULTI_VALUE_SEPARATOR),
 	},
 	{
 		header: "賽後分數",
-		getValue: (entry) =>
+		getValue: ({ entry }) =>
 			[...entry.teamA.players, ...entry.teamB.players]
-				.map((player) => player.ratingAfter.toFixed(2))
+				.map((player) => player.ratingAfter.toFixed(RATING_DECIMAL_PLACES))
 				.join(MULTI_VALUE_SEPARATOR),
 	},
 ];
@@ -107,15 +155,35 @@ export const HISTORY_CSV_HEADERS: readonly string[] = HISTORY_CSV_COLUMNS.map(
 	(column) => column.header,
 );
 
+export interface HistoryToCsvOptions {
+	/**
+	 * 日期／時間欄換算用的時區（IANA 名稱，例如 "Asia/Taipei"）。預設取
+	 * `Intl.DateTimeFormat().resolvedOptions().timeZone`（執行裝置的本地時區），
+	 * 與 HistoryRecordCard.tsx 的畫面顯示對齊（design.md Decision 12）。
+	 */
+	timeZone?: string;
+}
+
 /**
  * 把歷史賽果轉為 CSV 文字。標題列固定在前；歷史為空時仍輸出只有標題列的 CSV
  * （spec「歷史為空時仍輸出標題列」）。序列化（BOM、跳脫、換行）一律委派 csv.ts 的
  * toCsv，本函式只負責欄位對應。
  */
-export function historyToCsv(entries: readonly MatchHistoryEntry[]): string {
+export function historyToCsv(
+	entries: readonly MatchHistoryEntry[],
+	options?: HistoryToCsvOptions,
+): string {
+	const timeZone = options?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const formatter = createPlayedAtFormatter(timeZone);
 	const rows: string[][] = [
 		[...HISTORY_CSV_HEADERS],
-		...entries.map((entry) => HISTORY_CSV_COLUMNS.map((column) => column.getValue(entry))),
+		...entries.map((entry) => {
+			const context: HistoryRowContext = {
+				entry,
+				playedAtParts: formatPlayedAt(entry.playedAt, formatter),
+			};
+			return HISTORY_CSV_COLUMNS.map((column) => column.getValue(context));
+		}),
 	];
 	return toCsv(rows);
 }
