@@ -471,3 +471,81 @@ interface ExportActionsProps {
   `document.createElement("canvas")`。
 - §7 的 `page.tsx` 掛載時傳入 `exportJpg={downloadSceneAsJpeg}`，**SHALL NOT** 在
   `page.tsx` 內組任何 `<a download>`。
+
+---
+
+## §10 收尾驗證的結果與未解問題（apply 收官，2026-09-03）
+
+### ⚠️ 已知問題：`scoreboard-binding.spec.ts` 有兩個**先前既存**的 E2E 失敗（非本 change 造成）
+
+**現象**：`pnpm --filter ./nextjs-pickball test:e2e --workers=1`（全套、五個 browser project、
+約 10 分鐘）時，下列兩個 test **穩定失敗**（連跑兩次結果完全相同，非 flaky）：
+
+```
+[webkit]        › tests/e2e/specs/scoreboard-binding.spec.ts:548 › 已完成場次不顯示進入計分板入口
+[mobile-safari] › tests/e2e/specs/scoreboard-binding.spec.ts:548 › 已完成場次不顯示進入計分板入口
+```
+
+失敗點在該 spec **自己的 `beforeEach`** 第 375 行 `await page.goto("/")`（導覽逾時），
+**不是**測試本體的斷言不符。
+
+**已完成的歸因（結論：與本 change 無關）**：
+
+| 驗證方式 | 結果 |
+|---|---|
+| 單獨跑該 test（webkit，連跑 3 次） | ✅ 3/3 通過 |
+| 單獨跑 `scoreboard-binding.spec.ts` 整檔（webkit + mobile-safari） | ✅ 36/36 通過 |
+| `scoreboard-binding` + `visual-export` 兩檔一起（webkit + mobile-safari） | ✅ 56/56 通過 |
+| **把 `visual-export.spec.ts` 整個移出後跑全套** | ❌ **同樣的兩個 test 以同樣的方式失敗**（462 passed / 2 failed / 21 skipped） |
+
+最後一列是決定性證據：**本 change 的 spec 完全不存在時，失敗依舊一模一樣**，
+因此這是 `main` 上既有的問題，成因是全套跑滿 10 分鐘後 dev server 的資源／時序狀況，
+與 M9 的任何改動無關。
+
+**未解，交還人類決定**：這兩條要修（例如提高該 spec 的 navigation timeout、或改用
+`page.context().clearCookies()` 之類不需導覽的清理方式）屬於 **M6 `scoreboard-binding`
+capability 的範圍，不在本 change 內**。SHALL NOT 由 M9 順手改別的 capability 的測試檔。
+建議另開一個 change 處理，或在 `README.md` 的部署前檢查清單註明此已知狀況。
+
+### 10.8 人工檢查項（無法自動化，**尚未執行**）
+
+tasks 10.8 明列兩項只能由人親手做的檢查，apply 階段**無法代勞**，交由使用者於合併前執行：
+
+1. **在真實瀏覽器按一次「列印 PDF」**，確認列印預覽中沒有全站 navbar、沒有區段導覽的四個
+   分頁、沒有操作按鈕，且場地區塊未被切成兩頁。
+   （自動化已涵蓋的部分：`emulateMedia({ media: "print" })` 下的 computed style 與
+   `break-inside: avoid`；**無法涵蓋**的是真實列印引擎的實際分頁結果。）
+2. **開啟匯出的 JPG**，確認中文姓名沒有變成方框或 fallback 字型、色塊漸層正常、**非黑底**。
+   （自動化已涵蓋的部分：JPEG 位元組標記、位圖尺寸恰為邏輯尺寸的 2 倍、四角像素 RGB 皆
+   > 240 的白底檢查；**無法涵蓋**的是字型 rasterization 的實際外觀——design Risks 已明訂
+   **不做像素快照比對**，因為五個 browser project 的字型 rasterization 不同。）
+
+### 其餘收尾項目的結果
+
+- **10.1**：以腳本自 spec 抽出 **27 條**「驗收」錨點，逐條確認檔案存在且 `it`／`test` 名稱
+  **逐字命中**——27/27 全過（不靠目視）。
+- **10.2**：`lib/matchmaker/` 28 檔 339 測試、`components/matchmaker/` 5 檔 54 測試，全綠。
+- **10.3**：`pnpm lint` 0 error，3 個 warning 全部是既有的（`hooks/useRosterStore.ts`、
+  `hooks/useScoreboardStore.ts` 的 `_arg`），**本 change 零新增 warning**。
+- **10.4**：`pnpm typecheck`（`pnpm -r exec tsc --noEmit`）exit 0。
+- **10.5**：`pnpm test` 全套——前端 68 檔 638 測試、後端 4 檔 16 測試，全綠。
+  （baseline 為前端 570、後端 16；本 change 淨增 68 條前端測試。）
+- **10.6**：見上方「已知問題」。本 change 自己的 `visual-export.spec.ts` 為
+  **10 test × 5 project = 50/50 全綠**；`matchmaker-history.spec.ts`、
+  `matchmaker-data-transfer.spec.ts` 全數原樣通過。
+- **10.7**：`git diff main -- **/package.json`、`pnpm-lock.yaml` **皆為空**（零新增相依）；
+  `hooks/` 零改動；M5 的 `MatchStage.tsx`／`CourtCard.tsx`／`RoundControls.tsx`／
+  `RestingPanel.tsx` 零改動；`hono-pickball/` 零改動。本 change 相對 merge-base 的改動
+  **恰為 18 個檔案**，全部落在 `nextjs-pickball/**` 與
+  `openspec/changes/matchmaker-visual-export/**`。
+- **10.10**：`DO_NOT_TRACK=1 openspec validate matchmaker-visual-export --strict` 通過。
+- **10.11**：以 root `CLAUDE.md` 指定的 python 計數法（**未使用 BSD `uniq`**）檢查
+  delta spec，7 個 Requirement、26 個 Scenario，**無重複條目**。
+
+### 本 change 的硬前提複驗（開工前提出、收尾再確認一次）
+
+`lib/matchmaker/section-nav.ts` 為四筆分頁「對戰／參賽者／歷史／資料」，
+其中「歷史」為 M7、「資料」為 M8 所加。§8 的 `@media print` 隱藏的是**整條 `nav`**，
+E2E「列印媒體下隱藏全站導覽與操作控制項並顯示列印版內容」已**逐一斷言這四個分頁連結
+在列印媒體下皆不可見**，五個 browser project 全數通過——
+**M7／M8 新增的分頁確認不會被印進紙本**。
