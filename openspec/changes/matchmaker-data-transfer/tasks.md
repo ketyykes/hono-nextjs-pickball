@@ -336,6 +336,11 @@ Depends on: §2, §3, §4, §6, §7
 > 拼湊判斷邏輯（那與「訊息集中在常數表」的初衷相違，訊息措辭日後一改就會連動壞掉 UI 判斷）。
 > Blob／`<a download>`／`FileReader` 等瀏覽器 I/O **只出現在本層**（design Decision 7）。
 
+> **交棒記錄（M8 §4 Stage 2 review m3）**：`history-csv.ts` 已 `export` 了
+> `HISTORY_CSV_HEADERS`（9.3.1 的 11 個欄位標題，順序固定）。§8 若需要顯示 CSV 匯出
+> 的預覽表頭，請直接 `import` 這份常數，SHALL NOT 在本群組另抄一份欄位名稱字面值——
+> 兩處各自維護會在欄位改動時漂移。
+
 - [ ] 8.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，
       寫入兩個 test：「可從 matchmaker 區段導覽抵達資料頁並看到四個功能區塊」、
       「資料頁標示 CSV 匯出入不對稱且完整還原請用 JSON」。

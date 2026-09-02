@@ -296,6 +296,32 @@ E2E 的 `page.waitForEvent("download")` 才是真的驗到檔案落地。
 「沒有回合時簽章會遺失嗎」——不會。M4 明訂重複比對基準**只取上一輪**且保存在目前回合內，
 沒有目前回合就沒有基準（首輪基準為空）。因此不存在「簽章有值但回合為 `null`」的狀態。
 
+### Decision 12：CSV 的日期／時間以本地時區輸出，時區由呼叫端注入
+
+`history-csv.ts` 的「日期」「時間」兩欄改為換算成本地時區，不再直接切割 `playedAt`
+的 UTC ISO 字串。`historyToCsv` 新增 `options.timeZone`（IANA 名稱，例如
+`"Asia/Taipei"`），預設取 `Intl.DateTimeFormat().resolvedOptions().timeZone`
+（執行裝置的本地時區）。
+
+**為什麼不用 UTC**：`components/matchmaker/HistoryRecordCard.tsx` 的 `formatPlayedAt`
+用本地時區 getter 顯示畫面上的日期時間；若 CSV 直接切割 UTC 字串，同一筆資料在畫面與
+匯出檔會相差數小時（實測 `Asia/Taipei` 相差 8 小時），且時間落在本地午夜前後時
+連日期都會跨日不一致。使用者匯出與檢視 App 是在同一台裝置、同一個時區，兩處數字
+必須一致，否則使用者會判定「匯出功能壞了」（Stage 2 review B1）。
+
+**為什麼要注入而非直接讀執行環境時區**：`historyToCsv` 是純函式，測試需要能以
+固定值斷言確切的日期／時間輸出，不能依賴跑測試機器的預設時區——注入時區讓測試
+明確指定 `timeZone: "Asia/Taipei"`，並涵蓋「UTC 與台北跨日」的邊界案例。
+
+**已知取捨**：同一份備份在不同時區的裝置上匯出，CSV 的日期時間會不同——這是刻意的，
+因為 CSV 是給「這台裝置的使用者」看的報表，不是跨裝置交換格式；`courtNumber`／
+`matchId` 等其餘欄位不受時區影響，仍可作為跨裝置比對的依據。
+
+**賽前／賽後分數欄的球員順序約定**：第 10（賽前分數）／11（賽後分數）欄把兩隊球員
+合併為單一欄，順序固定為「先第一隊全員、再第二隊全員」，與第 6（第一隊球員）／
+7（第二隊球員）欄的球員順序一致（Stage 2 review m1；程式碼對應註解見
+`history-csv.ts` 的 `HISTORY_CSV_COLUMNS`）。
+
 ## Risks / Trade-offs
 
 - **[M4 合併前又調整了 schema 名稱]** → Context 的對照表是依 M4 現行 delta 讀出的，
