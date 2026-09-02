@@ -69,12 +69,15 @@ describe("history-csv", () => {
 	});
 
 	it("雙打歷史輸出日期時間、雙方球員與各員賽前賽後分數", () => {
-		const csvText = historyToCsv([makeDoublesEntry()]);
+		// UTC 16:30 對台北是隔天 00:30——刻意跨日，證明日期／時間確實換算為呼叫端
+		// 指定的時區，而非直接切割 UTC 字串（Stage 2 review B1／design.md Decision 12）。
+		const entry = { ...makeDoublesEntry(), playedAt: "2026-08-23T16:30:00.000Z" };
+		const csvText = historyToCsv([entry], { timeZone: "Asia/Taipei" });
 		const [, dataLine] = stripBom(csvText).split("\r\n");
 		const fields = dataLine?.split(",") ?? [];
 
-		expect(fields[0]).toBe("2026-08-23");
-		expect(fields[1]).toBe("13:45:06");
+		expect(fields[0]).toBe("2026-08-24");
+		expect(fields[1]).toBe("00:30:00");
 		expect(fields[5]).toBe("王大明、陳小美");
 		expect(fields[6]).toBe("林志豪、張美麗");
 		expect(fields[9]).toBe("3.10、3.20、3.30、3.40");
