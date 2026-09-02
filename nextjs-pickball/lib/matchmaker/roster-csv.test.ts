@@ -94,7 +94,7 @@ describe("parseRosterCsv", () => {
 		}
 		expect(result.rows).toEqual([]);
 		expect(result.errors).toEqual([
-			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringContaining("性別") },
 		]);
 	});
 
@@ -121,23 +121,36 @@ describe("parseRosterCsv", () => {
 			{
 				row: 3,
 				column: ROSTER_CSV_HEADERS.name,
-				reason: expect.stringMatching(/[一-龥]/),
+				reason: expect.stringContaining("名稱"),
 			},
 			{
 				row: 5,
 				column: ROSTER_CSV_HEADERS.rating,
-				reason: expect.stringMatching(/[一-龥]/),
+				reason: expect.stringMatching(/1\.00 至 8\.00/),
 			},
 		]);
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：強度分數「非數字」與「超出範圍（低於下限）」
-	 * 是兩種不同的錯誤原因，5.7 只覆蓋了「超出範圍（高於上限）」，此處補上另兩種，
-	 * 避免 rating 分支的其餘兩條路徑零覆蓋（Stage 2 mutation 教訓）。
+	 * 補充測試（非六條必要測試之一）：強度分數的四種錯誤路徑——非數字（`abc`）、
+	 * 顯式空字串、只有空白（`"   "`）皆屬「需為數字」，超出下限則屬「需介於…」，
+	 * 5.7 只覆蓋了「超出範圍（高於上限）」，此處補齊另外三種，避免 rating 分支
+	 * 零覆蓋（Stage 2 mutation 教訓）。
+	 *
+	 * Stage 2 review Major M4／Minor N4／V5：原本所有 reason 斷言都只檢查
+	 * 「含中文字」，等於沒斷言——把「顏色終點」的錯誤原因寫死成「顏色起點」都能
+	 * 存活。此處改為斷言辨識性關鍵字：非數字類含「數字」，範圍類含「1.00」與
+	 * 「8.00」，藉此同時區分兩種錯誤原因、也讓「空字串」「純空白」兩種輸入各自
+	 * 命中正確分支（V5：移除 `trimmed === ""` 判定；N4：移除 rating 的 `.trim()`）。
 	 */
 	it("強度分數非數字或低於下限時記為該列錯誤", () => {
-		const csv = [HEADER_LINE, "甲,male,abc,,", "乙,male,0.5,,"].join("\r\n");
+		const csv = [
+			HEADER_LINE,
+			"甲,male,abc,,", // 非數字
+			"乙,male,,,", // 顯式空字串
+			"丙,male,   ,,", // 只有空白
+			"丁,male,0.5,,", // 低於下限
+		].join("\r\n");
 
 		const result = parseRosterCsv(csv);
 
@@ -147,8 +160,10 @@ describe("parseRosterCsv", () => {
 		}
 		expect(result.rows).toEqual([]);
 		expect(result.errors).toEqual([
-			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
-			{ row: 3, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("數字") },
+			{ row: 3, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("數字") },
+			{ row: 4, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("數字") },
+			{ row: 5, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/1\.00 至 8\.00/) },
 		]);
 	});
 
@@ -171,8 +186,8 @@ describe("parseRosterCsv", () => {
 		}
 		expect(result.rows).toEqual([]);
 		expect(result.errors).toEqual([
-			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringMatching(/[一-龥]/) },
-			{ row: 3, column: ROSTER_CSV_HEADERS.colorTo, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
+			{ row: 3, column: ROSTER_CSV_HEADERS.colorTo, reason: expect.stringContaining("顏色終點") },
 		]);
 	});
 
@@ -233,10 +248,10 @@ describe("parseRosterCsv", () => {
 		}
 		expect(result.rows).toEqual([]);
 		expect(result.errors).toEqual([
-			{ row: 2, column: ROSTER_CSV_HEADERS.name, reason: expect.stringMatching(/[一-龥]/) },
-			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringMatching(/[一-龥]/) },
-			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringMatching(/[一-龥]/) },
-			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringMatching(/[一-龥]/) },
+			{ row: 2, column: ROSTER_CSV_HEADERS.name, reason: expect.stringContaining("名稱") },
+			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringContaining("性別") },
+			{ row: 2, column: ROSTER_CSV_HEADERS.rating, reason: expect.stringContaining("數字") },
+			{ row: 2, column: ROSTER_CSV_HEADERS.colorFrom, reason: expect.stringContaining("顏色起點") },
 		]);
 	});
 
