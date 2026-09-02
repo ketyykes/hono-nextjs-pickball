@@ -297,11 +297,14 @@ Depends on: §5
       後轉紅（`toHaveLength(2)` 收到 1），還原後轉綠
 - [x] 6.8 GREEN（同上，已於 6.4 提前完成）: 確認流程中**沒有任何依 `name` 的比對或去重**，
       同名自然各自建立
-- [ ] 6.9 RED: 補 it「同一次匯入未提供顏色的多列取得互不相同的預設漸層」：
-      匯入 3 筆皆未提供顏色 → 三者的 `colorFrom`／`colorTo` 組合兩兩相異。確認紅燈
-- [ ] 6.10 GREEN: 確認 `reduce` 的累積值是**成長中的名單**（每次 `addPlayer` 都看到前一列的結果），
-      而非固定的匯入前名單——後者會讓每一列的 `nextAutoGradient` 回傳同一個 index
-      （design Decision 9）
+- [x] 6.9 RED→regression guard: 補 it「同一次匯入未提供顏色的多列取得互不相同的預設漸層」：
+      匯入 3 筆皆未提供顏色 → 三者的 `colorFrom`／`colorTo` 組合兩兩相異。**寫下當下即綠燈**
+      ——6.4 的 `reduce` 本就以成長中的名單逐列呼叫 `addPlayer`，非真紅燈；已以 mutation
+      驗證：把 `addPlayer` 的第一參數由 `accumulatedRoster`（成長中名單）改為固定的
+      `roster`（匯入前名單），使 `nextAutoGradient` 每列都基於同一份名單計算，
+      三者轉為同一漸層（`gradientKeys` 的 Set size 由 3 降為 1）後轉紅，還原後轉綠
+- [x] 6.10 GREEN（同上，已於 6.4 提前完成）: 確認 `reduce` 的累積值是**成長中的名單**
+      （每次 `addPlayer` 都看到前一列的結果），而非固定的匯入前名單（design Decision 9）
 - [ ] 6.11 REFACTOR: 確認本模組**完全沒有**自行組裝 `Player` 物件的程式碼，
       rating 的 round 與顏色判定全部落在 `addPlayer` 內
 

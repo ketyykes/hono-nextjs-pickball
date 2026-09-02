@@ -608,4 +608,21 @@ describe("applyRosterImport", () => {
 		expect(wangs).toHaveLength(2);
 		expect(wangs[0].id).not.toBe(wangs[1].id);
 	});
+
+	it("同一次匯入未提供顏色的多列取得互不相同的預設漸層", () => {
+		const csv = [HEADER_LINE, "甲,male,5.0,,", "乙,female,5.0,,", "丙,other,5.0,,"].join("\r\n");
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		const updatedRoster = applyRosterImport([], parsed, {
+			ids: ["imported-1", "imported-2", "imported-3"],
+			now: "2026-01-01T00:00:00.000Z",
+		});
+
+		const gradientKeys = updatedRoster.map((player) => `${player.colorFrom}/${player.colorTo}`);
+		expect(new Set(gradientKeys).size).toBe(gradientKeys.length);
+	});
 });
