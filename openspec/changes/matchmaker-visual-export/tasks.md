@@ -149,9 +149,39 @@ Depends on: §2, §3, §4
 
 Depends on: §2
 
-- [ ] 6.1 RED: 新增 `nextjs-pickball/components/matchmaker/PrintSheet.test.tsx`，寫入 it「列印版顯示回合標題與每個場地的球員與比分」：以含 2 個場地的 scene 渲染，斷言查得回合標題、兩個場地編號、全部球員姓名與各場的比分或未完成狀態。確認紅燈
-- [ ] 6.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/PrintSheet.tsx`：以 `data-print="sheet"` 為根節點、每個場地為 `data-print="court"`；內容全部取自 props 的 `scene`，SHALL NOT 自行從回合重組（design Decision 2）。螢幕上預設隱藏，列印時由 §8 的 CSS 顯示
-- [ ] 6.3 REFACTOR: 確認列印版為**文字為主**的版面（場地標題、隊伍、姓名、比分），顏色僅作為輔助小標記而非大面積背景（design Decision 3：瀏覽器預設不印背景圖，且 `prd.md` 12.5 要求色彩不是唯一資訊來源）；`data-print` 屬性值抽為具名常數，與 §8 的 CSS 選擇器同源
+- [x] 6.1 RED: 新增 `nextjs-pickball/components/matchmaker/PrintSheet.test.tsx`，寫入 it「列印版顯示回合標題與每個場地的球員與比分」：以含 2 個場地的 scene 渲染，斷言查得回合標題、兩個場地編號、全部球員姓名與各場的比分或未完成狀態。確認紅燈
+- [x] 6.2 GREEN: 實作 `nextjs-pickball/components/matchmaker/PrintSheet.tsx`：以 `data-print="sheet"` 為根節點、每個場地為 `data-print="court"`；內容全部取自 props 的 `scene`，SHALL NOT 自行從回合重組（design Decision 2）。螢幕上預設隱藏，列印時由 §8 的 CSS 顯示
+- [x] 6.3 REFACTOR: 確認列印版為**文字為主**的版面（場地標題、隊伍、姓名、比分），顏色僅作為輔助小標記而非大面積背景（design Decision 3：瀏覽器預設不印背景圖，且 `prd.md` 12.5 要求色彩不是唯一資訊來源）；`data-print` 屬性值抽為具名常數，與 §8 的 CSS 選擇器同源
+
+> **§6 審查結論（2026-09-02）**：Stage 1 **PASS**（錨點逐字相符、內容全部取自 `ExportScene`、
+> `data-print` 兩個屬性正確、版面文字為主且無 `linear-gradient`、無 scope creep、未動既有檔）。
+> Stage 2 **REJECT 一次**——獨立 mutation 43 個存活 17 個（扣除 2 個 React `key` 等價變異後
+> 真盲點 15 個、存活率 36.6%），3 個 Major 全部落在規格核心（`TEAM_LABELS` 隊伍文字零覆蓋、
+> `courtNumber` 可被 `index + 1` 冒充、色點四變異含 `COLOR_DOT_SIZE` 改 `"100%"` 退化成
+> design Decision 3 明文否決的大面積背景）。修正輪後 28 個指定 mutant **全數 KILLED**，
+> leader 另獨立複驗八項確認轉紅，**Stage 2 判定通過**。
+>
+> ⚠️ **leader 在本組的獨立複驗另抓到一個 Implementer 宣稱 12/12 KILLED 但實際存活的 mutant**：
+> 把 `PRINT_SHEET_DATA_VALUE` 從 `"sheet"` 改成 `"xsheet"` 時測試全綠——原測試以常數本身組
+> 查詢字串，是同義反覆。已補「data-print 的兩個屬性值逐字為 sheet 與 court」釘住字面量。
+>
+> **regression guard 標註**：除 spec 錨點「列印版顯示回合標題與每個場地的球員與比分」外，
+> 其餘 12 條 it **全部寫入當下即綠**（產品碼在補測試前即正確），用途是把 mutation 盲點釘死，
+> 非 TDD 紅燈。6.1 的真紅燈為模組不存在（leader 以移走元件檔複驗得到
+> `Failed to resolve import "./PrintSheet"`）。
+>
+> **交棒給 §7／§8 的三項約束（leader 裁決）**：
+> ① **標題階層採處置 A**：`PrintSheet` 保留 `<h1>`，因此 §7／§8 MUST 為
+>    `app/matchmaker/page.tsx` 第 94～97 行的標題區（`<h1>對戰分配</h1>` 與其說明段落）
+>    加上 `data-print="hide"`，否則列印時同頁會有兩個 `<h1>`，且紙本會多印一個無用標題。
+>    design Decision 3 列出的選擇器**只涵蓋 `> header` 與區段導覽 `nav`**，不含頁內標題。
+> ② **`data-print` 的 CSS 側對稱防線**：TS 側已由 `PrintSheet.test.tsx` 釘住字面量，
+>    但 `globals.css` 側若被改成別的字串，兩側漂移一樣會讓列印樣式靜默失效且無測試會紅。
+>    §8 MUST 補一條對稱防線（讀 `app/globals.css` 斷言逐字含 `[data-print="sheet"]` 與
+>    `[data-print="court"]`，或以 E2E 的 computed style 驗證）。
+> ③ **`PrintSheet.tsx` 完全沒有 `className`**（是 `components/matchmaker/` 中唯一零 Tailwind
+>    class 的元件），列印版的**全部版面都押在 §8**。§8 收工前 MUST 確認它至少涵蓋標題、
+>    場地、隊伍的間距與斷頁，否則紙本會是無格式的長條文字。
 
 ## 7. JPG 產生、下載與頁面組裝
 
