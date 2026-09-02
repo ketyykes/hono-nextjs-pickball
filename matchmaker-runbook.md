@@ -7,18 +7,35 @@
 > 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
 > **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 狀態快照（最後更新 2026-09-02）
+## 🎉 七個 change 全數 apply 完成並合併（2026-09-03）
+
+**matchmaker M3～M9 全部完成，`main` HEAD 為 `9fdffe3`。**
+接下來的 verify／archive 階段**另行等待使用者指示，不要自行執行**（見檔尾「其他注意」）。
+三個 worktree（M7／M8／M9）**皆尚未 teardown**，待使用者確認後執行。
+
+## 狀態快照（最後更新 2026-09-03）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `da9cfd2`（feat：合併對戰歷史頁，PRD 8.2） |
+| `main` HEAD | `9fdffe3`（feat：合併對戰視覺化匯出，JPG／列印 PDF） |
 | M3 | **完成並已合併**。20/20，Final Review PASS。worktree 與分支已 teardown |
 | M4 | **完成並已合併**。62/62，Final Review PASS_WITH_NITS、0 Blocker。跑了**兩位 leader** |
 | M5 | **完成並已合併**。66/66，16 個 commit。跑了**兩位 leader**。worktree 與分支已 teardown |
 | M6 | **完成並已合併**（2026-08-30）。91/91，Final Review PASS。跑了**十位 leader**（含一起雙 leader 撞 worktree 的事故，已訂正）。worktree 與分支已 teardown |
 | M7 | **完成並已合併**（2026-09-02，`da9cfd2`）。47/47，coordinator 獨立驗證：`pnpm test` 57+4 檔/486+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、matchmaker-history E2E 55 passed、全量 E2E 389 passed/21 skipped 無迴歸。worktree（`pickball-worktrees/matchmaker-history-page`）與分支**尚未 teardown**，待使用者確認 |
 | M8 | **完成並已合併**（2026-09-02，`2b3fb8f`）。110/110（tasks.md 過程中從原估 94 擴為 110，含 Final Review 修正輪 §10 的 4 Major＋3 Minor）。跑了**兩棒 leader**（第一棒因脈絡將盡於 §5/§6 邊界乾淨停止；第二棒完成 §6～Final Review 後因帳號 session 額度觸頂中斷，但中斷前已 commit 完整 §10 收尾複驗證據）。coordinator 獨立驗證：合併前 `pnpm test` 62+4 檔/570+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、`openspec validate --strict` 通過、全量 E2E 462 passed/21 skipped（2 個 webkit/mobile-safari 逾時失敗，單獨重跑 2/2 全綠，判定為資源壓力假紅燈）；合併後複驗 `tsc` exit 0、`pnpm test` 62+4 檔/570+16 全綠，**無迴歸**。worktree（`pickball-worktrees/matchmaker-data-transfer`）與分支**尚未 teardown**，待使用者確認 |
-| M9 | **worktree 已開**（`change/matchmaker-visual-export`，base `2b3fb8f`），leader 尚未派出 |
+| M9 | **完成並已合併**（2026-09-03）。49/50（10.8 為兩項需人眼判斷的手動檢查，故意不代勞，留給使用者：①實際按一次「列印 PDF」看預覽分頁 ②開啟匯出的 JPG 看中文字型與底色）。跑了**一棒 leader**，Final Code Review PASS（0 Blocker、0 Major）。coordinator 獨立驗證：`pnpm test` 68+4 檔/638+16 全綠、`tsc` exit 0、`lint` 0 error/3 既存 warning、`openspec validate --strict` 通過、`pnpm-lock.yaml`／`package.json` 零變動、全量 E2E **514 passed/21 skipped/0 failed**（13.0 分鐘，含先前的 scoreboard-binding 偶發逾時測試這次也綠）；合併後複驗 `tsc` exit 0、`pnpm test` 68+4 檔/638+16 全綠，**無迴歸**。worktree（`pickball-worktrees/matchmaker-visual-export`）與分支**尚未 teardown**，待使用者確認 |
+
+### ⚠️ 2026-09-03 新增教訓：`next-server` 殭屍 process 會讓 `lsof` 誤判「乾淨」
+
+M9 合併前的全量 E2E 連續失敗四次（webServer 120 秒逾時／`EADDRINUSE :::3005`），根因是一個從很早以前
+就卡住、狂燒 **157% CPU** 的殭屍 `next-server` process 一直霸占 `:3005`。**多次 `lsof -i :3005` 檢查
+都回報乾淨**（可能是系統當下資源壓力太大，`lsof` 本身列舉時發生競態漏抓），直到改用
+`ps aux | grep next-server` 才抓到它。**教訓：查殘留 process 除了 `lsof -i :port`，MUST 同時
+用 `ps aux | grep -E "next-server|wrangler|workerd|playwright"` 交叉核對，尤其在連續多次
+E2E 失敗、且失敗訊息在「webServer 逾時」與「port 已被占用」之間搖擺時，優先懷疑殭屍
+process 而非程式碼問題。** 清掉殭屍＋順手清空 `.next` 快取後，同一套測試立刻在 1.3 分鐘內
+（scoped）／13 分鐘內（全量 514 test）全綠，證明先前的失敗與 M9 程式碼無關。
 
 ## 🔖 M7 中斷點（2026-08-31，第三棒因電腦睡眠中斷、coordinator 複驗後暫停）
 
