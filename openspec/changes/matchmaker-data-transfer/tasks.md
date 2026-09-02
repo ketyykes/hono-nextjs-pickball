@@ -277,7 +277,12 @@ Depends on: §5
 - [x] 6.3 RED: 補 it「任一列驗證失敗時整份不匯入，名單完全不變」：
       4 筆中第 3 筆 rating `12` → 回傳名單與原名單逐筆相等。**真紅燈**：
       `TypeError: applyRosterImport is not a function`（函式尚未存在）
-- [ ] 6.4 GREEN: 實作 `applyRosterImport(roster, rows, { ids, now })`：
+- [x] 6.4 GREEN: 實作 `applyRosterImport(roster, parsed, { ids, now })`——**偏離**：
+      design.md 字面簽章寫 `applyRosterImport(roster, rows, { ids, now })`，但任一列失敗
+      需整份不匯入（task 6.3）必須讀到 `errors`，若第二參數只收合法列（`RosterCsvRow[]`）
+      將無從得知有錯誤列存在；改為第二參數直接收 `parseRosterCsv` 的成功分支
+      `Extract<ParseRosterCsvResult, { ok: true }>`（含 `rows`／`errors`），不另立新型別，
+      與 task 6.4 附註「例如直接接受 ParseRosterCsvResult 的成功分支」一致。
       有任一錯誤列時**直接回傳原名單**（不進入迴圈），
       `ids.length` 與 `rows.length` 不符時視為呼叫端錯誤並拋出可判讀訊息
 - [ ] 6.5 RED: 補 it「匯入採附加模式，既有參賽者不被覆蓋且順序在前」。確認紅燈

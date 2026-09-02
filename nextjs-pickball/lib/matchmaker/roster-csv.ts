@@ -5,8 +5,9 @@
 // addPlayer 處理（design.md Decision 9）；本模組只負責「篩出可餵給 addPlayer 的輸入」。
 
 import { parseCsv } from "./csv";
+import { addPlayer } from "./roster";
 import type { AddPlayerInput } from "./roster";
-import type { Gender } from "./types";
+import type { Gender, Player } from "./types";
 
 /** CSV 的五個標題欄名稱（繁體中文），欄位對應依名稱而非位置。 */
 export const ROSTER_CSV_HEADERS = {
@@ -263,4 +264,52 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	});
 
 	return { ok: true, rows, errors };
+}
+
+/** applyRosterImport 所需的注入值：id 陣列與統一的建立時間，皆由呼叫端（未來的 useRosterStore）提供。 */
+export interface ApplyRosterImportContext {
+	/** 依序對應 parsed.rows 每一列的 id，長度須與 parsed.rows 相等（design Decision 9）。 */
+	readonly ids: readonly string[];
+	readonly now: string;
+}
+
+/**
+ * 將 CSV 解析結果套用到既有名單，寫入採**附加**模式（design Decision 9；prd.md 9.3.2）。
+ *
+ * 第二個參數直接複用 `parseRosterCsv` 的成功回傳形狀（`{ rows, errors }`），
+ * SHALL NOT 為此函式另立第二種只服務本函式的型別（task 6.2／6.4）。
+ *
+ * 任一列驗證失敗（`parsed.errors` 非空）時直接回傳原名單，不進入逐列迴圈——
+ * 「整份不匯入」不是「跳過失敗列後匯入其餘合法列」。
+ *
+ * 逐列以 `reduce` 呼叫 `roster.ts` 的 `addPlayer`，且**累積值為成長中的名單**
+ * （每次呼叫都看到前一列寫入後的結果）：rating 的兩位小數 round、顏色兩端同進同出
+ * 判定、自動配色的「最小未使用 palette index」皆委派 `addPlayer` 處理，本函式
+ * SHALL NOT 自行組裝 `Player` 物件。也因為是逐列疊加而非固定名單，同一次匯入內
+ * 多列未提供顏色時會各自取得互不相同的預設漸層（design Decision 9）。
+ *
+ * `id`／`now` 由呼叫端注入（design Decision 4／9），本函式不呼叫
+ * `crypto.randomUUID()` 或 `new Date()`。`context.ids.length` 與 `parsed.rows.length`
+ * 不符視為呼叫端錯誤，直接 throw 可判讀的訊息。
+ */
+export function applyRosterImport(
+	roster: readonly Player[],
+	parsed: Extract<ParseRosterCsvResult, { ok: true }>,
+	context: ApplyRosterImportContext,
+): Player[] {
+	if (parsed.errors.length > 0) {
+		return [...roster];
+	}
+
+	if (context.ids.length !== parsed.rows.length) {
+		throw new Error(
+			`applyRosterImport：id 數量（${context.ids.length}）與可新增列數量（${parsed.rows.length}）不符`,
+		);
+	}
+
+	return parsed.rows.reduce<Player[]>(
+		(accumulatedRoster, row, index) =>
+			addPlayer(accumulatedRoster, row, { id: context.ids[index], now: context.now }),
+		[...roster],
+	);
 }
