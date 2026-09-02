@@ -187,9 +187,37 @@ Depends on: §2
 
 Depends on: §2, §3, §5
 
-- [ ] 7.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/visual-export.spec.ts`，寫入兩個 test：「對戰頁提供匯出 JPG 與列印 PDF 兩個入口」、「匯出 JPG 會下載檔名含回合編號與日期的 JPEG 檔案」（`waitForEvent("download")`、檔名符合 `/^matchmaker-round-\d+-\d{4}-\d{2}-\d{2}\.jpg$/`、讀檔前三位元組為 `FF D8 FF` 且大小 > 0）。種入名單與產生回合的方式沿用 M5 `match-stage.spec.ts` 的既有 helper。確認紅燈
-- [ ] 7.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/scene-canvas.ts`（**例外層**：`createElement("canvas")` → `createLinearGradient` → `fillText` → `toBlob("image/jpeg", 0.92)`，2 倍位圖縮放，繪製前 `await document.fonts.ready`，見 design Decision 9），並於 `nextjs-pickball/app/matchmaker/page.tsx` 掛入 `ExportActions`：以 §2 的 `buildExportScene` 組出 scene、以 §3 的 `jpgExportFileName` 組出檔名，下載以 `Blob` + `<a download>` 完成後 `revokeObjectURL`
-- [ ] 7.3 REFACTOR: 於 `scene-canvas.ts` 檔頭註解說明**它為何是例外層**（所有決策已在 `ExportScene` 內定死，本檔無分支、happy-dom 無 2D context，故以 E2E 驗收）；確認 `buildExportScene` 的呼叫點只有 `page.tsx` 一處（`grep` 機械確認）；縮放倍率與 JPEG 品質為具名常數，並註明為何不用 `devicePixelRatio`（同一輸入需產生同一輸出）
+- [x] 7.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/visual-export.spec.ts`，寫入兩個 test：「對戰頁提供匯出 JPG 與列印 PDF 兩個入口」、「匯出 JPG 會下載檔名含回合編號與日期的 JPEG 檔案」（`waitForEvent("download")`、檔名符合 `/^matchmaker-round-\d+-\d{4}-\d{2}-\d{2}\.jpg$/`、讀檔前三位元組為 `FF D8 FF` 且大小 > 0）。種入名單與產生回合的方式沿用 M5 `match-stage.spec.ts` 的既有 helper。確認紅燈
+- [x] 7.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/scene-canvas.ts`（**例外層**：`createElement("canvas")` → `createLinearGradient` → `fillText` → `toBlob("image/jpeg", 0.92)`，2 倍位圖縮放，繪製前 `await document.fonts.ready`，見 design Decision 9），並於 `nextjs-pickball/app/matchmaker/page.tsx` 掛入 `ExportActions`：以 §2 的 `buildExportScene` 組出 scene、以 §3 的 `jpgExportFileName` 組出檔名，下載以 `Blob` + `<a download>` 完成後 `revokeObjectURL`
+- [x] 7.3 REFACTOR: 於 `scene-canvas.ts` 檔頭註解說明**它為何是例外層**（所有決策已在 `ExportScene` 內定死，本檔無分支、happy-dom 無 2D context，故以 E2E 驗收）；確認 `buildExportScene` 的呼叫點只有 `page.tsx` 一處（`grep` 機械確認）；縮放倍率與 JPEG 品質為具名常數，並註明為何不用 `devicePixelRatio`（同一輸入需產生同一輸出）
+
+> **§7 審查結論（2026-09-02）**：Stage 1 **PASS**（兩條錨點逐字相符、下載四項驗收全到位且
+> 確實讀了檔案內容、E2E helper 沿用 M5 慣例、零外部套件、繪製順序正確、`buildExportScene`
+> 產品呼叫點只有 `page.tsx` 一處、`export-scene.ts` 只加 `export` 關鍵字、`page.tsx` 純追加）。
+> Stage 2 **REJECT 一次**——獨立 mutation 17 個存活 11 個，三個 Major 皆為實質缺口。
+> 修正輪後複驗：拿掉底色 fillRect（產出全黑 JPEG）與位圖倍率改 1 兩個 mutant 皆確認轉紅。
+>
+> **leader 在本組的兩處覆寫**：
+> ① 檔名的 `exportedAt` 取 `round.createdAt` 而非 `new Date()`——原方案在 render 期間呼叫
+>    `new Date()` 會讓 render 變成不純函式（SSR／hydration 不一致的典型成因），且為了
+>    「點擊當下取時間」而加的包裝函式會讓 `fileName` prop 變成傳了卻被丟棄的死參數。
+>    spec 只要求「日期由呼叫端注入」，`round.createdAt` 完全滿足，語意上「這一輪是哪天排的」
+>    也比「我哪一刻按下匯出」更貼近檔名用於排序與辨識的用途（design Decision 6）。
+> ② Major-2 的檔案清單衝突：leader 原先同時把 `ExportActions.test.tsx` 列為「不可修改」與
+>    「必須維持綠燈」，而新增必填欄位必然要改其 fixture，Implementer 正確回報 `BLOCKED`。
+>    leader 放行修改三個 fixture 檔（**只補欄位、不動任何既有斷言**）後完成。
+>
+> **已知未殺的 mutant（可接受的例外層代價，已評估）**：`courtY` 不累加。E2E 的種子資料只會
+> 產出單一場地，累加與否無可觀察差異；殺它需要多場地的種子資料與更多下載驗證，
+> 成本高於收益。design Risks 已明訂「E2E 驗不了圖的內容對不對」且「不做像素快照比對」。
+>
+> **regression guard 標註**：§7 全為例外層（`scene-canvas.ts` 與 `page.tsx`），
+> 依 `nextjs-pickball/CLAUDE.md` 的分層規範不強制單元 TDD，以 E2E 驗收。
+> 7.1 的紅燈為真（按鈕不存在、下載事件逾時），修正輪新增的尺寸與四角像素斷言則是
+> **先寫斷言、再以 mutation 複驗其有效性**，不是 regression guard。
+>
+> **交棒給 §8 的補充**：`ExportCourt` 已新增 `blockHeight` 欄位，`PrintSheet.test.tsx` 與
+> `ExportActions.test.tsx` 的 fixture 已同步補上（列印版與入口元件都不使用該欄位）。
 
 ## 8. 列印流程與 print CSS
 
