@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBackup, backupFileName } from "./backup";
+import { buildBackup, backupFileName, parseBackup } from "./backup";
 import { BackupSchema } from "./transfer-types";
 import type { BackupSnapshot } from "./backup";
 import type { Player } from "./types";
@@ -269,5 +269,22 @@ describe("backup", () => {
 
 	it("backupFileName 依注入時間產生含日期的檔名", () => {
 		expect(backupFileName("2026-08-23T01:02:03.000Z")).toBe("matchmaker-backup-2026-08-23.json");
+	});
+
+	it("buildBackup 的輸出經 JSON 往返後可被 parseBackup 還原為相同快照", () => {
+		const snapshot = makeSnapshot();
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		// 往返走真正的 JSON 字串化／解析，不直接餵物件——parseBackup 的輸入契約是
+		// 檔案內容字串，round-trip 要模擬使用者真正會走的路徑。
+		const result = parseBackup(JSON.stringify(backup));
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			// MUST 用 toEqual，SHALL NOT 比較 JSON 字串：MatchHistoryEntrySchema 是
+			// discriminatedUnion，zod 重建物件後鍵序與輸入不同，字串比較會產生假紅燈
+			// （M8 §2 Stage 2 交棒記錄）。
+			expect(result.backup).toEqual(backup);
+		}
 	});
 });
