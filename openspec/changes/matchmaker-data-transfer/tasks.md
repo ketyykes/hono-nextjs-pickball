@@ -401,6 +401,19 @@ Depends on: §0, §3
       名單／回合／歷史（round-trip）」：呼叫 `writeBackup` 後以既有 `readRoster`／
       `readRound`／`readHistory` 讀回比對，同時鎖住寫入端容器格式與讀取端 schema。
       mutation 複驗：M21～M27 七組全數轉紅（見 impl-s7-fix.md）
+- [x] 7.15 FIX（Major M1）: 新增 it「clearAllLocalData 對單一 key 的 removeItem
+      拋例外時仍不拋出且其餘 key 正常清除」：mock 單一 key 的 `removeItem` 拋例外，
+      斷言不拋出、其餘 key 仍被清除。mutation 複驗：M9 轉紅
+- [x] 7.16 FIX（Minor m1）: 新增 regression guard it「writeBackup 於第二個 setItem
+      撞到配額時第一個已寫入的資料不會被回滾（design.md 已記錄的取捨，非缺陷）」，
+      it 上方以繁體中文註解引用 design.md「Risks / Trade-offs」的對應條目，避免日後
+      被誤判為缺陷而擅自加回滾（SHALL NOT 修改 `writeBackup` 的原子性行為）
+- [x] 7.17 FIX（Minor m2）: 新增 it「clearAllLocalData 在 localStorage 不可用時不
+      拋出例外」，補上 no-op 分支的覆蓋
+- [x] 7.18 驗證: 對 Stage 2 列為存活的 14 組 mutation（M9、M13、M15～M19、M21～M27）
+      逐一重新實測，確認現在全數被對應 it 殺死；並對 `writeBackup` 函式體整個換成
+      `return { ok: true };` 做 B1 專項複驗，確認 round-trip it 與配額 regression guard
+      it 轉紅。全部驗證後還原檔案，`git status` 乾淨。證據完整記錄於 impl-s7-fix.md
 
 ## 8. 資料頁與元件（例外層，E2E 當 RED）
 Depends on: §2, §3, §4, §6, §7

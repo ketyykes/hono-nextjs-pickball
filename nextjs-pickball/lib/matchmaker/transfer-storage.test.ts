@@ -264,4 +264,76 @@ describe("transfer-storage", () => {
 		expect(readRound()).toEqual(backup.currentRound);
 		expect(readHistory().entries).toEqual(backup.history);
 	});
+
+	it("clearAllLocalData 對單一 key 的 removeItem 拋例外時仍不拋出且其餘 key 正常清除", () => {
+		// M8 §7 兩階段審查 Major M1：逐 key 的 try/catch 先前零覆蓋，拿掉這層防護
+		// 仍全綠。本測試讓其中一個 key（ROUND_STORAGE_KEY）的 removeItem 拋例外，
+		// 驗證例外被靜默吞掉、不中斷迴圈，其餘 key 依然被正確清除。
+		for (const key of CLEAR_ALL_KEYS) {
+			localStorage.setItem(key, "有內容");
+		}
+
+		const originalRemoveItem = window.localStorage.removeItem.bind(window.localStorage);
+		const removeItemSpy = vi.spyOn(window.localStorage, "removeItem").mockImplementation((key: string) => {
+			if (key === ROUND_STORAGE_KEY) {
+				throw new Error("模擬 removeItem 拋出例外");
+			}
+			originalRemoveItem(key);
+		});
+
+		expect(() => clearAllLocalData()).not.toThrow();
+
+		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+		// ROUND_STORAGE_KEY 因例外被吞掉而未被移除——證明例外沒有中斷整個迴圈，
+		// 其餘 key 仍正確清除。
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe("有內容");
+
+		// 明確 mockRestore（見上方「寫入超出配額」it 的說明：afterEach 的
+		// restoreAllMocks 對 window.localStorage 實例方法不可靠）。
+		removeItemSpy.mockRestore();
+	});
+
+	it("clearAllLocalData 在 localStorage 不可用時不拋出例外", () => {
+		// M8 §7 兩階段審查 Minor m2：localStorage 不可用時的 no-op 分支先前零覆蓋。
+		vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+			throw new Error("localStorage 不可用（例如私密模式）");
+		});
+
+		expect(() => clearAllLocalData()).not.toThrow();
+	});
+
+	// M8 §7 兩階段審查 Minor m1：design.md「Risks / Trade-offs」明文記錄「三個 key
+	// 的寫入不是真正的原子操作」——第二次 setItem 撞到配額時，第一次已成功寫入的
+	// 資料不會被回滾（回滾本身也是寫入，同樣可能失敗）。這是已知且已記錄的取捨，
+	// SHALL NOT 因此修改 writeBackup 加回滾機制；本測試把這個行為轉成明確標註意圖
+	// 的 regression guard，避免日後被誤判為缺陷而擅自「修正」。
+	it("writeBackup 於第二個 setItem 撞到配額時第一個已寫入的資料不會被回滾（design.md 已記錄的取捨，非缺陷）", () => {
+		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [] }));
+		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round: null }));
+
+		const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+		let callCount = 0;
+		const setItemSpy = vi.spyOn(window.localStorage, "setItem").mockImplementation((key: string, value: string) => {
+			callCount++;
+			if (callCount === 2) {
+				throw new DOMException("超出配額", "QuotaExceededError");
+			}
+			originalSetItem(key, value);
+		});
+
+		const backup = makeBackup();
+		const result = writeBackup(backup);
+
+		expect(result).toEqual({ ok: false, message: TRANSFER_MESSAGES.quotaExceeded });
+		// roster（第一次 setItem）已被覆寫成匯入的新資料。
+		expect(readRoster().players).toEqual(backup.players);
+		// round（第二次 setItem 撞到配額）維持呼叫前的舊值，未被寫入新資料。
+		expect(readRound()).toBeNull();
+
+		// 明確 mockRestore（見前述「寫入超出配額」it 的說明）。
+		setItemSpy.mockRestore();
+	});
 });
