@@ -82,4 +82,19 @@ describe("parseRosterCsv", () => {
 		expect(result.errors).toEqual([]);
 		expect(result.rows.map((row) => row.gender)).toEqual(cases.map((c) => c.expected));
 	});
+
+	it("無法對應的性別記為該列錯誤而非靜默歸為 other", () => {
+		const csv = [HEADER_LINE, "小貓,貓,5.0,,"].join("\r\n");
+
+		const result = parseRosterCsv(csv);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) {
+			throw new Error("unreachable");
+		}
+		expect(result.rows).toEqual([]);
+		expect(result.errors).toEqual([
+			{ row: 2, column: ROSTER_CSV_HEADERS.gender, reason: expect.stringMatching(/[一-龥]/) },
+		]);
+	});
 });
