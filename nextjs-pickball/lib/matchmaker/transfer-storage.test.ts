@@ -166,7 +166,14 @@ describe("transfer-storage", () => {
 		const roundBefore = localStorage.getItem(ROUND_STORAGE_KEY);
 		const historyBefore = localStorage.getItem(HISTORY_STORAGE_KEY);
 
+		// 監看 setItem 從此刻起是否被呼叫過——讓「驗證失敗時沒有寫入路徑可走」這件事
+		// 從「型別系統保證但測試沒觀察到」變成可被斷言觀察到的事實（M8 §7 兩階段
+		// 審查 Blocker B1：原本 `if (parsed.ok)` 恆為 false，`writeBackup` 從未被
+		// 呼叫，卻沒有任何斷言明確指出這件事）。
+		const setItemSpy = vi.spyOn(window.localStorage, "setItem");
+
 		const parsed = parseBackup("{ 不是合法 JSON");
+		// 明確斷言驗證失敗——這個分支不再是「靜默略過」，而是本測試的核心錨點。
 		expect(parsed.ok).toBe(false);
 		// 型別上就無法對驗證失敗的結果呼叫 writeBackup（design Decision 1「原子性由
 		// 型別強制」）：parsed.ok 為 false 時 parsed 沒有 backup 欄位，下面這段
@@ -175,6 +182,8 @@ describe("transfer-storage", () => {
 			writeBackup(parsed.backup);
 		}
 
+		// 明確斷言「沒有寫入路徑可走」：整段流程中 setItem 一次都沒被呼叫過。
+		expect(setItemSpy).not.toHaveBeenCalled();
 		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBe(rosterBefore);
 		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe(roundBefore);
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBe(historyBefore);

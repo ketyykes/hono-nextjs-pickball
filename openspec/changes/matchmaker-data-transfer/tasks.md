@@ -382,6 +382,18 @@ Depends on: §0, §3
       `CLEAR_ALL_KEYS` 內每一個 key 的來源皆為 import 而非字面值，且其成員與 §0.6
       對照表列出的全部 key 常數逐一對得上（有落差就是漏列，回到 7.2 補齊）
 
+> **修正輪（兩階段審查 CHANGES REQUESTED 後）**：Stage 1 與 Stage 2 review 皆獨立指出
+> it「匯入驗證失敗時三個 key 的內容完全不變」是空測試（`writeBackup` 從未被呼叫），
+> 且 `readSnapshot`／`writeBackup` 的 happy path 完全零覆蓋（Stage 2 以 13 組 mutation
+> 具體證實：M13、M15～M19、M21～M27 全部 SURVIVED）。以下任務為修正輪，**不改動
+> `transfer-storage.ts` 的行為**（僅補測試），逐條附 mutation 紅燈證據於
+> `impl-s7-fix.md`。
+
+- [x] 7.12 FIX（Blocker B1）: 修正 it「匯入驗證失敗時三個 key 的內容完全不變」——
+      新增 `vi.spyOn(window.localStorage, "setItem")` 監看，明確斷言 `setItem` 全程
+      未被呼叫，讓「驗證失敗時沒有寫入路徑可走」從型別保證變成可觀察的斷言。
+      it 名稱不變（spec 驗收錨點）
+
 ## 8. 資料頁與元件（例外層，E2E 當 RED）
 Depends on: §2, §3, §4, §6, §7
 
