@@ -302,3 +302,40 @@ M5 在 `main` 上實際提供的導覽形狀已確認（見 Open Questions 3）�
    2. `recordTime()` 對 `playedAt` 為非法 ISO 字串時回傳 `NaN`，會讓該筆靜默落入
       `rangeOfTime` 的最後一個分支（`earlier`）而非被丟棄。M4 的 reader 已在讀取時
       `safeParse` 過一輪，實務上到不了這裡；**若日後 §4 直接吃未經 reader 的資料則需重審**。
+
+8. **§4「歷史頁與紀錄呈現」兩階段審查結論（2026-09-02 由第四棒 leader 回填；審查本身由第三棒
+   於 2026-08-31 完成，結論原僅存在於 commit `d412607` 的 message，未落盤本節）**
+
+   **審查範圍**：`ba4eb5c..d412607`（§4.1～4.9，含 8 個 E2E test 與四個新元件）。
+
+   **Stage 1（Spec Reviewer）判定：`PASS`，0 Blocking。**
+   ⚠️ **誠實標註**：Stage 1 的**逐條查核明細未留下可複驗的落盤紀錄**，第三棒中斷時只保留了
+   「PASS、0 Blocking」這個結論；本節不重建當時的查核細節，以免把推論寫成證據。
+   驗收錨點的逐字比對改由 §6.1 以腳本重跑一次，作為 Stage 1 該項的補強證據。
+
+   **Stage 2（Code-Quality Reviewer）判定：`PASS_WITH_NITS`，0 Blocking。**
+   獨立跑 **30 組 mutation，抓到 14 組存活**——未採信 Implementer 自述（其自測 8 次、僅 1 組存活）。
+   存活成因高度集中在同一形態：**某欄位在八個 test 裡只餵過一種值，單一取值的欄位等於零保護**。
+
+   | 存活的變異 | 為何會存活 | 修正 |
+   |---|---|---|
+   | `courtNumber`／`scoreA`／`winner`／`doublesComposition` 各自寫死成唯一用過的值 | 八個 test 只餵過一種值，寫死後仍全綠 | 補第二筆雙打紀錄（場地 5、比分 8:11、第二隊獲勝、男雙）與單打紀錄的場地 2，補足相異值 |
+   | 女雙／一般雙打／男雙三個文案改錯 | 三個文案從未被渲染過，改錯亦不轉紅 | 補三筆雙打紀錄逐字覆蓋四個文案 |
+   | `EmptyHistory` 忽略 `range` 參數 | 區間空狀態只走過「本月」一條 | 在跨月週 test 逐一覆蓋今日／上月／更早，在切換區間 test 覆蓋本週 |
+   | `aria-checked` 恆為 `true` | 選取狀態只驗過「今日為選中」，無未選中斷言 | 補未選中的斷言 |
+   | 對戰時間改用 `getUTC*` | 只驗過 `<time datetime>`，人眼可讀的文字無斷言 | 補當地時區的文字斷言 |
+   | 兩隊標籤與成員對應錯置、「現在」在每次 render 重取 | 兩者皆無斷言（後者即 design Decision 7 的保證） | 一併補上斷言 |
+
+   **這與 §1 的 `getUTCFullYear` 零覆蓋、§3 的 F1（`range` 參數值域從未走過）是同一形態**：
+   不是斷言太弱，而是**取樣讓某條路徑／某個取值從未被執行**。本 change 至今每一組都是
+   「Implementer 自測極少存活、Stage 2 獨立測出大量存活」，§4 為 8 次/1 存活 vs 30 組/14 存活。
+
+   **修正**（commit `d412607`）：只動 E2E 測試檔補值域覆蓋與文案斷言，**生產程式碼的行為未改動**；
+   另修正 `HistoryRecordCard` 內已過期的註解（4.9 已裁決不抽共用模組，原註解仍寫「留給 4.9 判斷」，
+   且引用了 archive 後會消失的 tasks.md 內部盤點編號）。
+
+   **交件驗證**：`d412607` 版 `matchmaker-history.spec.ts` 為 **8 個 E2E test**，
+   五個 browser project 全綠；工作區乾淨。§5 完成後同檔為 11 個 test，於 §6.3 重跑全數複驗。
+
+   **Nits（不阻擋）**：`DOUBLES_COMPOSITION_LABEL` 在 `CourtCard.tsx` 與 `HistoryRecordCard.tsx`
+   各持有一份（4.9 已裁決不抽，理由見 tasks 4.9）；若日後第三處也需要同一份文案，屆時再抽。
