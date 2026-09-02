@@ -32,4 +32,18 @@ describe("csv", () => {
 		expect(parsed[0]?.[1]).toBe(nameWithQuote);
 		expect(parsed[0]?.[2]).toBe(nameWithNewline);
 	});
+
+	it("parseCsv 對檔尾換行不產生幻影空列，且保留檔案中間的空列", () => {
+		// 使用者從 Google Sheets／Excel 另存的 CSV 檔案幾乎都以換行結尾，
+		// 若無條件把「迴圈結束後累積的欄位」推成最後一列，會多吐出一列 [""]，
+		// 讓下游（§5／§6）依列號回報的錯誤指向試算表上不存在的那一列。
+		expect(parseCsv("a,b\nc,d\n")).toEqual([
+			["a", "b"],
+			["c", "d"],
+		]);
+		expect(parseCsv("a,b\r\n")).toEqual([["a", "b"]]);
+		expect(parseCsv("\n")).toEqual([[""]]);
+		// 檔案「中間」的空列語意不同，必須保留，不可被本次修正一併過濾掉。
+		expect(parseCsv("a,b\n\nc,d")).toEqual([["a", "b"], [""], ["c", "d"]]);
+	});
 });
