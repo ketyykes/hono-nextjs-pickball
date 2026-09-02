@@ -222,8 +222,11 @@ Depends on: §0, §1
       （寫入當下即綠燈，已改標為 regression guard 並以 mutation 驗證，見 impl-s4.md）
 - [x] 4.6 GREEN: 補齊空歷史路徑：仍輸出標題列（含 BOM），SHALL NOT 回傳空字串
       （4.4 的實作已無條件涵蓋此路徑，本項為確認，無需額外程式改動）
-- [ ] 4.7 REFACTOR: 確認欄位順序**只有一處來源**（標題列常數與資料列的組裝共用同一份
+- [x] 4.7 REFACTOR: 確認欄位順序**只有一處來源**（標題列常數與資料列的組裝共用同一份
       欄位定義），避免兩處各自維護順序而漂移
+      （4.4 實作時已一次到位：HISTORY_CSV_COLUMNS 為單一來源，HISTORY_CSV_HEADERS 由其
+      `.map((column) => column.header)` 衍生、資料列由其 `.map((column) => column.getValue(entry))`
+      衍生，故本項為驗證，無需額外重構；grep 自證見 impl-s4.md）
 
 ## 5. 參賽者 CSV 的解析與逐列驗證（`roster-csv.ts`）
 Depends on: §0, §1
