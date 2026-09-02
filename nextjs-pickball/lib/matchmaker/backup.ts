@@ -135,12 +135,22 @@ export function parseBackup(text: string): ParseBackupResult {
 /**
  * 失敗結果的唯一組裝點（tasks 3.11）：語法／版本／結構三種失敗只是取用不同訊息，
  * 不應各自在呼叫處重複拼一份 `{ ok: false, message }` 物件字面量。
+ *
+ * 回傳型別刻意窄化為 `Extract<ParseBackupResult, { ok: false }>`（而非整個
+ * `ParseBackupResult` union）：若宣告成整個 union，把本函式誤改回
+ * `{ ok: true, ... }` 只會是執行期錯誤，型別檢查看不出來；窄化後同樣的誤改會
+ * 直接編譯失敗（M8 §3 Stage 2 review M21／m3 裁決）。
  */
-function fail(message: string): ParseBackupResult {
+function fail(message: string): Extract<ParseBackupResult, { ok: false }> {
 	return { ok: false, message };
 }
 
-/** 縮小為可安全用 in 運算子存取屬性的物件型別（陣列／null 皆非本函式要處理的形狀）。 */
+/**
+ * 縮小為可安全用 in 運算子存取屬性的物件型別（陣列／null 皆非本函式要處理的形狀）。
+ * `!Array.isArray(value)` 這條排除陣列的判斷主要是表達型別意圖（JSON 陣列本來就不會
+ * 有自有的 `version` 屬性，"version" in [] 恆為 false）——即使拿掉也不影響行為，
+ * 保留是為了讓型別縮小後的 `Record<string, unknown>` 語意誠實對應「純物件」。
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
