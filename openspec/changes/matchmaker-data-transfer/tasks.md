@@ -114,6 +114,13 @@
 - [x] 1.5 REFACTOR: 分隔符、引號、換行、BOM 抽為具名常數；序列化與解析共用同一組常數，
       不各自寫死字面值
 
+      > Stage 2 code-quality review 第 1 輪退回（CHANGES_REQUESTED，38 組 mutation、18 組存活）：
+      > 修正 Blocker B1（parseCsv 對檔尾換行產生幻影空列，先紅燈後修正）；補強 B2（parseCsv
+      > 主流路徑、toCsv 完整輸出、非引號欄位等零覆蓋路徑）；補 Major M1／M2（未閉合引號寬鬆
+      > 處理、單獨 CR round-trip）與 Minor（空輸入、連續引號、非引號欄位吃引號）的 regression
+      > guard；並把 M21 對應的空輸入提早 return 判定為 B1 修正後的 dead code（等價 mutant），
+      > 直接移除而非硬湊測試。複驗後 18 組存活 mutation 全數轉紅，最終 mutation 存活數 0。
+
 ## 2. 備份 schema、訊息常數與匯出（`transfer-types.ts`、`backup.ts`）
 Depends on: §0
 
