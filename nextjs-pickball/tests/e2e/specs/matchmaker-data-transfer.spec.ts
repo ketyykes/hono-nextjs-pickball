@@ -491,4 +491,23 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 			expect(csvDate).toBe(displayedDate);
 		});
 	});
+
+	// M8 §8 修正輪（Stage 2 review Blocker B4）：parseRosterCsv 回 ok:false
+	// （缺必填標題欄）的分支在元件層完全零覆蓋。餵入只有「名稱,性別」兩欄的 CSV
+	// （缺「強度分數」），斷言結構性錯誤訊息顯示且含缺少的欄位名稱、確認匯入按鈕維持 disabled。
+	test("CSV 標題列缺少必填欄位時顯示結構性錯誤且確認匯入按鈕維持 disabled", async ({ page }) => {
+		await clearMatchmakerStorage(page);
+		await page.goto(DATA_PAGE);
+
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster-missing-header.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from("名稱,性別\n結構錯誤員,男"),
+		});
+
+		const alert = page.locator('p[role="alert"]');
+		await expect(alert).toBeVisible();
+		await expect(alert.getByText("強度分數", { exact: false })).toBeVisible();
+		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
+	});
 });
