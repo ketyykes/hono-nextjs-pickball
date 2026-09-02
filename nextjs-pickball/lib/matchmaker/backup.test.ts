@@ -450,9 +450,12 @@ describe("backup", () => {
 		// Object.values 取出的是函式本身而非字串，故先過濾出純字串成員，
 		// 再以代表性參數呼叫該函式、把產生的字串一併納入遍歷
 		// （Final Review M1 裁決：不納入就會逃過本 guard 的檢查）。
-		const messages = Object.values(TRANSFER_MESSAGES).filter(
-			(value): value is string => typeof value === "string",
-		);
+		const messages: string[] = [];
+		for (const value of Object.values(TRANSFER_MESSAGES)) {
+			if (typeof value === "string") {
+				messages.push(value);
+			}
+		}
 		messages.push(TRANSFER_MESSAGES.missingRosterCsvHeaders(["名稱", "性別"]));
 
 		expect(messages.length).toBeGreaterThan(0);
