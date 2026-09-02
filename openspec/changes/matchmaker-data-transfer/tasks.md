@@ -124,7 +124,7 @@
 ## 2. 備份 schema、訊息常數與匯出（`transfer-types.ts`、`backup.ts`）
 Depends on: §0
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/backup.test.ts`，寫入 it
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/backup.test.ts`，寫入 it
       「buildBackup 產生的備份含版本號、參賽者、目前回合、歷史與重複配對簽章」：
       以 2 位參賽者／1 回合／3 筆歷史／2 組簽章的快照斷言五個區塊。確認紅燈
 - [ ] 2.2 GREEN: 建立 `nextjs-pickball/lib/matchmaker/transfer-types.ts`：
