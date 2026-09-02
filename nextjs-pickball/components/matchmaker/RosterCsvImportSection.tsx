@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
-import { readRoster, writeRoster } from "@/lib/matchmaker/storage";
+import { readRoster } from "@/lib/matchmaker/storage";
+import { writeRosterPlayers } from "@/lib/matchmaker/transfer-storage";
 
 // 匯入分兩階段：選檔後先解析出預覽（可新增人數＋問題列），使用者確認後才寫入
 // （spec「參賽者 CSV 匯入的預覽、附加寫入與整份原子性」）。取消／關閉預覽不寫入任何資料。
@@ -18,13 +19,20 @@ type PreviewState =
 
 // 參賽者名單 CSV 匯入區塊（M8 §8.6／§8.9）：選檔 → parseRosterCsv → 顯示預覽
 // （可新增人數＋問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
-// 確認後 applyRosterImport → 寫入 → reload。
+// 確認後 applyRosterImport → 寫入 → 檢查寫入結果後才 reload。
 // 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker；File.text() 等瀏覽器 I/O
 // 只出現在元件層（design Decision 7）；parseRosterCsv／applyRosterImport 皆為
 // 純函式，不在此另外實作任何驗證或空列過濾邏輯（Decision 13：parseRosterCsv
 // 已跳過空白列，本層不再過濾一次）。
+//
+// 寫入改用 transfer-storage.ts 的 writeRosterPlayers（而非 storage.ts 的
+// writeRoster）：後者靜默吞掉例外且回傳 void，配額滿／localStorage 不可用時
+// 會讓使用者看到名單沒變、卻沒有任何錯誤訊息。writeRosterPlayers 回傳可判讀的
+// WriteBackupResult，失敗時顯示訊息且不 reload（比照 JsonBackupSection 既有作法，
+// Final Review M2）。
 export function RosterCsvImportSection() {
 	const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+	const [message, setMessage] = useState<string | null>(null);
 
 	function handleFileText(text: string) {
 		const parsed = parseRosterCsv(text);
@@ -46,7 +54,15 @@ export function RosterCsvImportSection() {
 		const ids = preview.result.rows.map(() => crypto.randomUUID());
 		const now = new Date().toISOString();
 		const updatedRoster = applyRosterImport(players, preview.result, { ids, now });
-		writeRoster(updatedRoster);
+
+		const written = writeRosterPlayers(updatedRoster);
+		if (!written.ok) {
+			// 寫入失敗（LocalStorage 不可用／配額超出）只顯示訊息，不 reload
+			// （spec「匯入匯出的錯誤處理與 LocalStorage 邊界」）。
+			setMessage(written.message);
+			return;
+		}
+
 		location.reload();
 	}
 
@@ -81,6 +97,12 @@ export function RosterCsvImportSection() {
 				{preview.status === "structuralError" && (
 					<p role="alert" className="text-sm text-destructive">
 						{preview.message}
+					</p>
+				)}
+
+				{message !== null && (
+					<p role="alert" className="text-sm text-destructive">
+						{message}
 					</p>
 				)}
 
