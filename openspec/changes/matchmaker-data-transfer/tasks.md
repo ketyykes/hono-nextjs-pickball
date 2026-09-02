@@ -487,5 +487,51 @@ Depends on: §2, §3, §4, §6, §7
 - [x] 9.8 確認 `git status` 中**沒有**任何 `openspec/specs/**`、`prd.md`、
       `lib/matchmaker/storage.ts`、`roster.ts`、`types.ts`、`colors.ts`、`hooks/**` 的改動
 - [x] 9.9 `DO_NOT_TRACK=1 npx openspec validate matchmaker-data-transfer --strict` 通過
-- [ ] 9.10 派發 Final Code Reviewer（見 `execution-plan.md`）對完整 commit 集合做跨任務審查，
-      並把結論記入本檔
+- [x] 9.10 派發 Final Code Reviewer（見 `execution-plan.md`）對完整 commit 集合做跨任務審查，
+      並把結論記入本檔——結論為 CHANGES REQUESTED（4 Major + 3 Minor，詳見 §10）
+
+## 10. Final Review 修正輪（9.10 的結論處置）
+
+> Final Code Reviewer 判定 CHANGES REQUESTED，共 4 個 Major（M1～M4）＋ 3 個 Minor
+> （m2／m3／m9）需修正；其餘 Minor（m1／m4／m5／m6／m7／m8）與 Info 項由 leader 裁決
+> 不動。以下逐項記錄修正內容與證據。
+
+- [x] 10.1 **M4**：`lib/matchmaker/roster-csv.ts` 改為 `import { RATING_MIN, RATING_MAX }
+      from "./rating-types"`，刪除本地重複宣告（`rating-types.ts` 已 export 且全
+      codebase 皆 import 它）。無需 TDD（純刪重複宣告，行為不變，既有測試全綠即為證據）
+- [x] 10.2 **M1**（**必 TDD**）：`parseRosterCsv` 唯一的 `ok:false` 訊息原本自行拼字面值，
+      逃過 `TRANSFER_MESSAGES` 集中管理與 `backup.test.ts` 的遍歷 guard。先在
+      `backup.test.ts` 寫入引用尚不存在的 `TRANSFER_MESSAGES.missingRosterCsvHeaders`
+      確認紅燈（`TypeError: ... is not a function`），再於 `transfer-types.ts` 新增
+      該函式（依缺欄清單產生三段式訊息），`roster-csv.ts` 改呼叫它。guard 測試同步
+      過濾出字串成員後，以代表性參數呼叫該函式把結果併入遍歷
+- [x] 10.3 **M3**（**必 TDD**）：`HistoryCsvSection.tsx` 原本內聯匯出檔名衍生邏輯，
+      與 `backup.ts` 為相同問題建立且有測試的 `backupFileName` 各做一套。先在
+      `history-csv.test.ts` 寫入引用尚不存在的 `historyCsvFileName` 確認紅燈，
+      再於 `history-csv.ts` 新增該函式（比照 `backupFileName`，SHALL NOT 呼叫
+      `new Date()`），元件改為注入 `new Date().toISOString()`
+- [x] 10.4 **M2**（**必 TDD＋必補 E2E**）：CSV 匯入路徑原本用會靜默吞例外的
+      `storage.ts` `writeRoster()` 寫入，配額滿／localStorage 不可用時無訊息且照常
+      reload。SHALL NOT 修改 `storage.ts`。先在 `transfer-storage.test.ts` 寫三則
+      引用尚不存在的 `writeRosterPlayers` 確認紅燈，再新增該函式（比照 `writeBackup`
+      自行 `setItem` + try/catch，回傳同一個 `WriteBackupResult` 形狀）。
+      `RosterCsvImportSection.tsx` 改為檢查 `.ok` 後才 reload，失敗時以 `role="alert"`
+      顯示訊息。補一條 E2E test「LocalStorage 寫入失敗時 CSV 匯入確認後不誤 reload
+      且顯示訊息」（比照既有 JSON 匯入版本，抽換點為 `Storage.prototype.setItem`），
+      五個瀏覽器 project 全綠
+- [x] 10.5 **m2**：抽出 `components/matchmaker/downloadTextFile.ts` 共用
+      Blob + `<a download>` 下載樣板，`JsonBackupSection`／`HistoryCsvSection` 改用它
+- [x] 10.6 **m9**：移除 `HistoryCsvSection.tsx` 重算並顯式傳入
+      `Intl.DateTimeFormat().resolvedOptions().timeZone` 的冗餘——`historyToCsv`
+      本身已內建同樣的預設值，元件改為省略 `options` 交由該預設值決定
+- [x] 10.7 **m3**：`tests/e2e/specs/matchmaker-data-transfer.spec.ts` 的 roster CSV
+      標題列原本硬抄字面值，改為 `import { ROSTER_CSV_HEADERS } from
+      "@/lib/matchmaker/roster-csv"` 組出標題列，與同檔對 `HISTORY_CSV_HEADERS`
+      的既有 import 慣例一致
+- [x] 10.8 專項複驗：把 `writeRosterPlayers` 改壞為永遠回 `{ ok: true }`，
+      對應 E2E 轉紅（`element(s) not found` for `p[role="alert"]`），還原後轉綠；
+      把 `missingRosterCsvHeaders` 最後一段的「請」拿掉，`backup.test.ts` 的遍歷
+      guard 轉紅（`expected false to be true`），還原後轉綠
+- [x] 10.9 收尾複驗：`pnpm --filter ./nextjs-pickball test --run` 全綠、`pnpm test`
+      全套全綠、`pnpm -r exec tsc --noEmit` exit 0、`pnpm --filter ./nextjs-pickball
+      lint` 0 errors、`CI=1 pnpm test:e2e` 五個瀏覽器 project 全綠
