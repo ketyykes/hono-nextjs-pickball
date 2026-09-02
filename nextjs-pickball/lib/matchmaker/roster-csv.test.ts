@@ -625,4 +625,41 @@ describe("applyRosterImport", () => {
 		const gradientKeys = updatedRoster.map((player) => `${player.colorFrom}/${player.colorTo}`);
 		expect(new Set(gradientKeys).size).toBe(gradientKeys.length);
 	});
+
+	/**
+	 * Stage 2 review Blocker B1（§3.2）：`context.ids.length !== parsed.rows.length` 的
+	 * throw 合約（tasks 6.4 明文要求）原本零測試覆蓋。此處補兩個方向：ids 太少（此測試）
+	 * 與 ids 太多（下一條測試），並斷言錯誤訊息內容包含可辨識的關鍵字與正確數字。
+	 */
+	it("ids 數量少於可新增列數量時拋出可判讀錯誤", () => {
+		const csv = [HEADER_LINE, "甲,male,5.0,,", "乙,female,4.0,,"].join("\r\n"); // 2 筆可新增列
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		expect(() =>
+			applyRosterImport([], parsed, {
+				ids: ["only-one"], // 只給 1 個 id，少於 2 筆可新增列
+				now: "2026-01-01T00:00:00.000Z",
+			}),
+		).toThrow(/id 數量（1）.*可新增列數量（2）/);
+	});
+
+	it("ids 數量多於可新增列數量時拋出可判讀錯誤", () => {
+		const csv = [HEADER_LINE, "甲,male,5.0,,"].join("\r\n"); // 1 筆可新增列
+		const parsed = parseRosterCsv(csv);
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) {
+			throw new Error("unreachable");
+		}
+
+		expect(() =>
+			applyRosterImport([], parsed, {
+				ids: ["a", "b", "c"], // 給 3 個 id，多於 1 筆可新增列
+				now: "2026-01-01T00:00:00.000Z",
+			}),
+		).toThrow(/id 數量（3）.*可新增列數量（1）/);
+	});
 });

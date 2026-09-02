@@ -310,6 +310,13 @@ Depends on: §5
       `Player[]`），唯一產生 `Player` 值的呼叫點是 `addPlayer`，rating 的 round 與顏色
       自動配色皆落在 `addPlayer` 內，無壞味道
 
+> **修正輪（§6 Stage 2 review CHANGES REQUESTED）**：以下皆為「行為早已正確、寫下即綠」
+> 的 regression guard，逐條以 mutation 驗證（改壞看紅、還原看綠），**無一條偽造紅燈**：
+> - **B1**：補「ids 數量少於／多於可新增列數量時拋出可判讀錯誤」兩條 it，`toThrow` 帶
+>   正規表達式斷言訊息內容（原本此 throw 分支零測試覆蓋）。mutation：拿掉整個 guard
+>   （`if (false)`）兩條皆轉紅；只留 `<` 方向、只留 `>` 方向、訊息內兩數字互換，皆能被
+>   對應方向或內容斷言轉紅。
+
 ## 7. 快照的讀寫與清除（`transfer-storage.ts`）
 Depends on: §0, §3
 
