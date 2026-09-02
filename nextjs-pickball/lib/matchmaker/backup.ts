@@ -121,7 +121,12 @@ export function parseBackup(text: string): ParseBackupResult {
 	// BackupSchema 的 version 為 z.literal(1)，若直接丟給 safeParse，「version 不是 1」
 	// 會與其他結構問題混在同一份 issues 陣列裡，無法個別給出對應訊息。因此在此
 	// 單獨檢視 version 欄位，SHALL NOT 為此放寬 BackupSchema（那會破壞既有守衛）。
-	if (isPlainObject(json) && "version" in json && json.version !== 1) {
+	//
+	// 這裡刻意要求 typeof json.version === "number"：「版本不支援」這則訊息只該在
+	// 我們真的讀到一個不受支援的版本號時出現。若 version 的型別本身就不對
+	// （null／布林／字串等），那是結構問題，不是版本問題——把使用者導向「請改用
+	// 符合目前版本的備份檔案」是錯誤的下一步（M8 §3 Stage 2 review m2 裁決）。
+	if (isPlainObject(json) && "version" in json && typeof json.version === "number" && json.version !== 1) {
 		return fail(TRANSFER_MESSAGES.unsupportedVersion);
 	}
 
