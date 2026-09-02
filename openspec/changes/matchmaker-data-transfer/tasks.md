@@ -275,6 +275,12 @@ Depends on: §5
 ## 7. 快照的讀寫與清除（`transfer-storage.ts`）
 Depends on: §0, §3
 
+> **交棒記錄（M8 §3 Stage 2 review J2 裁決）**：本組追加到 `TRANSFER_MESSAGES` 的兩則
+> 訊息（localStorage 不可用／寫入超出配額）MUST 同樣滿足 §3 的遍歷斷言：以「。」分段後
+> 至少 3 段、最後一段以「請」開頭、長度 ≥ 30 字、不含未翻譯的 zod issue 字串。
+> `backup.test.ts` 的「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」一律遍歷整張表，
+> 新訊息不符合這四項會直接紅燈。
+
 - [ ] 7.1 RED: 新增 `nextjs-pickball/lib/matchmaker/transfer-storage.test.ts`，寫入 it
       「clearAllLocalData 移除本 app 寫入的全部 LocalStorage key」：以 §0.5／0.6 對照表列出的
       **全部** key 常數（由來源模組 import，SHALL NOT 在測試內抄字面值）組成 `expectedKeys`，
@@ -317,6 +323,12 @@ Depends on: §2, §3, §4, §6, §7
 
 > 依 `nextjs-pickball/CLAUDE.md`，`app/**/page.tsx` 與純呈現元件為 TDD 例外層。
 > 本群組不寫單元測試，改以 Playwright E2E 當紅燈：路由或區塊不存在時測試必紅。
+
+> **交棒記錄（M8 §3 Stage 2 review m4）**：`ParseBackupResult` 失敗分支只有 `message`
+> （無機器可讀的 `code`）。§8 若需對三種失敗（語法／版本／結構，未來還會加上 localStorage
+> 不可用／寫入超出配額）做不同 UI 處理，SHALL NOT 用字串比對訊息內容判別類別——
+> 請回頭與 leader 確認是否要補 `code` 欄位，不要在本群組自行用 `message === TRANSFER_MESSAGES.xxx`
+> 拼湊判斷邏輯（那與「訊息集中在常數表」的初衷相違，訊息措辭日後一改就會連動壞掉 UI 判斷）。
 > Blob／`<a download>`／`FileReader` 等瀏覽器 I/O **只出現在本層**（design Decision 7）。
 
 - [ ] 8.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，
