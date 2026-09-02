@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBackup } from "./backup";
+import { buildBackup, backupFileName } from "./backup";
 import type { BackupSnapshot } from "./backup";
 import type { Player } from "./types";
 import type { Round } from "./round-types";
@@ -177,5 +177,9 @@ describe("backup", () => {
 
 		const roundTripped = JSON.parse(JSON.stringify(backup));
 		expect(roundTripped).toEqual(backup);
+	});
+
+	it("backupFileName 依注入時間產生含日期的檔名", () => {
+		expect(backupFileName("2026-08-23T01:02:03.000Z")).toBe("matchmaker-backup-2026-08-23.json");
 	});
 });
