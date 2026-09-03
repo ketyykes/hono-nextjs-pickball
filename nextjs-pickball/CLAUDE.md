@@ -70,6 +70,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）
+  - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔
 
 ### TDD（spec-driven）

@@ -66,6 +66,11 @@ pnpm test:e2e                                    # 5. Playwright E2E（會自動
 pnpm --filter ./nextjs-pickball preview          # 6. workerd runtime 整合驗證
 ```
 
+> ⚠️ 第 5 步的 Playwright 設定會重用既有 dev server（`reuseExistingServer`）。若 dev server
+> 已連續運行很久（隔夜以上），陳舊的 dev chunk 快取可能噴 `ChunkLoadError` 造成假失敗
+> （2026-09-03 於 webkit 實測，隔離重跑即過）。跑本清單前請先重啟 dev server，
+> 或先停掉它讓 Playwright 自行帶起乾淨的前後端。
+
 7. 確認部署順序：先 hono-pickball，後 nextjs-pickball
 
 ## 各 workspace 細節
