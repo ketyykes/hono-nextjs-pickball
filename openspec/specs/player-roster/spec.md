@@ -7,6 +7,7 @@
 與 `/scoreboard`（單場 side-out 計分板）是兩個不同的東西：兩者的 LocalStorage 資料互不干涉，本 capability 的重置範圍以列舉的 key 清單實作，不影響 `scoreboard:current:v1`。
 
 ## Requirements
+
 ### Requirement: 參賽者資料模型
 
 系統 SHALL 以 zod schema 定義參賽者，欄位與規格對應 `prd.md` 4.1：
@@ -24,7 +25,7 @@
 | `isActive` | boolean | `true` 為出場中，`false` 為暫停出場 |
 | `createdAt` | string | ISO 8601，由呼叫端提供 |
 
-`restCount` 與 `gamesPlayed` MUST 存在於 schema 並初始化為 0，但本 capability SHALL NOT 寫入其累加邏輯 —— 累加分別屬於分配演算法與評分更新。先納入是為了避免後續階段對 `matchmaker:roster:v1` 做破壞性遷移（見 design Decision 2）。
+`restCount` 與 `gamesPlayed` MUST 存在於 schema 並初始化為 0，但本 capability SHALL NOT 寫入其累加邏輯 —— **兩者的累加皆屬於 `round-lifecycle`**：`restCount` 於「產生新一輪」時對上一輪休息名單的成員累加（`prd.md` 5.3 的「本輪結束」即產生新一輪的那一刻），`gamesPlayed` 於「比分送出並完成該場」時對該場出賽者累加。分配演算法與評分計算皆為純函式，MUST NOT 修改任何 `Player` 物件——`match-allocation` 的「候選排序與出場名單決策」已明訂「本 capability SHALL NOT 修改任何 `Player` 物件，包含 `restCount` 的累加」，本條先前寫的「累加分別屬於分配演算法與評分更新」與該規格互相矛盾，於此更正。先納入欄位是為了避免後續階段對 `matchmaker:roster:v1` 做破壞性遷移（見 design Decision 2）。
 
 `rating` 超出 1.00～8.00 或 Hex 色碼格式不合法時 MUST 驗證失敗，SHALL NOT 靜默夾值或改寫。
 
@@ -267,9 +268,17 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 使用者確認後，系統 SHALL 清除本機所有屬於重置範圍的資料並回到空白初始狀態；使用者取消時 SHALL NOT 改變任何資料。
 
-重置範圍 MUST 以**列舉的 key 清單**實作，SHALL NOT 使用 `matchmaker:` 前綴掃描 —— 前綴掃描會誤刪未來加入且不該被重置的使用者偏好，而列舉清單強制在新增資料域時主動決定它是否屬於重置範圍（見 design Decision 6）。本次清單僅含 `matchmaker:roster:v1`。
+重置範圍 MUST 以**列舉的 key 清單**實作，SHALL NOT 使用 `matchmaker:` 前綴掃描 —— 前綴掃描會誤刪未來加入且不該被重置的使用者偏好，而列舉清單強制在新增資料域時主動決定它是否屬於重置範圍（見 design Decision 6）。前綴掃描在本次變更後另有一個更硬的理由不可用：重置範圍已跨出 `matchmaker:` 前綴（見下）。
 
-實作位於 `nextjs-pickball/lib/matchmaker/storage.ts` 與 `nextjs-pickball/components/matchmaker/ResetRosterDialog.tsx`。
+目前的清單為四個 key：`matchmaker:roster:v1`（參賽者名單）、`matchmaker:round:v1`（目前回合）、`matchmaker:history:v1`（歷史賽果）與 `scoreboard:matches:v1`（對戰場次的計分板分槽），對應 `prd.md` 4.1.5 與第 10 節要求清除的「全部參賽者、目前回合與歷史賽果」。回合與歷史屬於重置範圍是產品明文決策，SHALL NOT 只清名單而讓上一場活動的回合與賽果殘留 —— 使用者按下重置的語意是「重新開始一場活動」，殘留的回合會在下一次產生對戰時被當成上一輪納入重複比對基準，而那些人可能已經不在名單裡。
+
+`scoreboard:matches:v1` 於本次變更納入清單：該 key 的每個條目都以某個對戰場次的 id 為索引，回合被清掉後那些條目即成孤兒——使用者從舊分頁或書籤回到 `/scoreboard?match=<舊 id>` 會看到一個仍可計分、但分數永遠回填不到任何地方的計分板，且孤兒條目會無界累積在 LocalStorage 中（見 `round-lifecycle` capability 的「重排本輪或重置名單時清除對應計分板進度」Requirement）。
+
+四個 key 的名稱 MUST 取自同一個來源模組，SHALL NOT 在本檔重複寫死字串 —— key 名稱多一處來源就多一處漏改，而漏改的失敗模式是**沉默的**：重置看起來成功了，殘留的資料要到下一輪產生對戰時才顯現。`scoreboard:matches:v1` 的字面值 MUST 取自 `nextjs-pickball/lib/scoreboard/` 的分槽 key 具名匯出（`match-slots.ts` 的 `MATCH_SLOTS_KEY`，見本 change 的 `scoreboard` delta），由 matchmaker 側的 key 清單模組 import 後併入，SHALL NOT 在 matchmaker 側再寫一次字串——同一個 key 出現兩份字面值時，改版（`:v2`）只會改到其中一份。
+
+`scoreboard:current:v1` **不**在重置範圍內：獨立計分板的進度與分配機的活動無關，一併清掉會讓使用者正在進行的個人比賽無故歸零。重置範圍涵蓋分槽 key 而不涵蓋獨立槽，正是「一場一槽」與「全站唯一一場」兩種語意的分界所在。
+
+實作位於 `nextjs-pickball/lib/matchmaker/storage.ts`、`nextjs-pickball/lib/matchmaker/storage-keys.ts` 與 `nextjs-pickball/components/matchmaker/ResetRosterDialog.tsx`。
 
 #### Scenario: 確認重置後名單清空
 
@@ -287,12 +296,11 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 #### Scenario: 重置只清除列舉範圍內的 key
 
-- **GIVEN** LocalStorage 同時存在 `matchmaker:roster:v1` 與 `scoreboard:current:v1`
+- **GIVEN** LocalStorage 同時存在 `matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`、`scoreboard:matches:v1` 與 `scoreboard:current:v1`
 - **WHEN** 呼叫 `resetMatchmakerData()`
-- **THEN** `matchmaker:roster:v1` 被移除，`scoreboard:current:v1` **不受影響**
-- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「重置只移除列舉的 key，不影響 scoreboard 資料」
-
----
+- **THEN** 三個 `matchmaker:` key 與 `scoreboard:matches:v1` 皆被移除
+- **AND** `scoreboard:current:v1` **不受影響**
+- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「重置只移除列舉的四個 key，不影響獨立計分板資料」
 
 ### Requirement: LocalStorage 持久化與逐筆降級
 

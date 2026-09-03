@@ -88,8 +88,6 @@
 - **THEN** 場地 1 顯示 5-2、場地 2 顯示 3-1，兩者互不覆蓋；再次進入場地 1 時顯示 5-2
 - **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts`，test 名稱「多場地同時計分時各場進度互不覆蓋」
 
-## MODIFIED Requirements
-
 ### Requirement: 目標分數選擇器
 
 對戰頁 SHALL 提供目標分數選擇器，選項 MUST 為 11、15、21 三者，預設 MUST 為 11
@@ -153,3 +151,23 @@ MUST 於其模組補一個具名匯出再由本 capability 取用，SHALL NOT �
 - **WHEN** 以 Tab 進入目標分數群組後按下方向鍵右鍵
 - **THEN** 選取移到 15（移動即選取），且群組內僅選中項的 `tabIndex` 為 0
 - **驗收**：`nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，test 名稱「目標分數 radiogroup 支援方向鍵導覽與 roving tabindex」
+
+## RENAMED Requirements
+
+- FROM: `### Requirement: 目標分數選擇器`
+- TO: `### Requirement: 目標分數選擇器（M5 版，已由本 change 整條換版取代）`
+
+## REMOVED Requirements
+
+### Requirement: 目標分數選擇器（M5 版，已由本 change 整條換版取代）
+
+**Reason**: 鎖定規則由 M5 版的「目前回合存在時一律鎖定」整條換版為「本輪已開始計分才鎖定」
+（放寬理由見本 change design 與上方 ADDED 版本的內文），M5 版的 Scenario「目前回合存在時鎖定」
+隨之作廢。本 delta 原以 MODIFIED 表達，但 openspec CLI（1.9.0，1.12.0 亦同）的 archive
+套用防呆不允許 MODIFIED 區塊丟棄既有 Scenario，validator 又將同名 requirement 同時出現於
+ADDED 與 REMOVED 判為 ERROR——兩檢查對「整條換版」互相矛盾，四種區塊沒有任何一種能直接
+表達此意圖。2026-09-03 archive 時因此改以 RENAMED（暫改為本標題）→ REMOVED（本條）→
+ADDED（上方新版）三段式等價表達；套用順序恰為 RENAMED、REMOVED、ADDED，先改名再刪除、
+最後放入新版，全程通過 `validate --strict`。上方 ADDED 版內容與原 MODIFIED 區塊逐字相同，
+最終主 spec 狀態不變。此為表達格式調整，非語意變更；括號內的暫用標題只存在於本 delta，
+從未出現在任何主 spec。
