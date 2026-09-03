@@ -292,7 +292,7 @@ Depends on: §7, §8
 - [x] 10.5 `pnpm test` 全套通過（確認未破壞 M1～M5 既有測試與 hono-pickball 後端測試）
 - [x] 10.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**（下載事件在 WebKit／Mobile Safari 上的行為與 Chromium 不同，是最容易破的一組）
 - [x] 10.7 `git diff package.json` 為空（本 change 零新增相依，design Decision 1）；`git diff --stat` 確認 `hooks/` 零新增、M5 元件檔零改動
-- [ ] 10.8 ⚠️ **尚未執行——交由使用者於合併前親自完成**（apply 階段無法代勞）。**人工檢查（無法自動化，如實記錄結果）**：① 在真實瀏覽器按一次「列印 PDF」，確認預覽中沒有 navbar 與操作按鈕、場地未被切成兩頁；② 開啟匯出的 JPG，確認中文姓名未變成方框或 fallback 字型、色塊漸層正常、非黑底（design Risks 明列 E2E 驗不了圖的內容）
+- [x] 10.8 **人工檢查（無法自動化，如實記錄結果）**：① 在真實瀏覽器按一次「列印 PDF」，確認預覽中沒有 navbar 與操作按鈕、場地未被切成兩頁；② 開啟匯出的 JPG，確認中文姓名未變成方框或 fallback 字型、色塊漸層正常、非黑底（design Risks 明列 E2E 驗不了圖的內容）。**結果（2026-09-03，使用者親自於 Chrome 實測，合併後於 main 補驗）**：① 通過——列印預覽無 navbar 與操作按鈕、右上角顯示 1 頁、場地未跨頁（純文字版面與姓名前色點被「背景圖形」濾掉皆為 design Decision 3 預期內）；② 通過——JPG 的中文標題「匹克球對戰分配機　第 57 輪　單打」與球員姓名（含注音符號字元）皆正常渲染、兩隊色塊漸層正常、白底非黑底
 - [x] 10.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 補記「可匯出 JPG 與列印 PDF」
 - [x] 10.10 `DO_NOT_TRACK=1 openspec validate matchmaker-visual-export --strict` 通過
 - [x] 10.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複）
