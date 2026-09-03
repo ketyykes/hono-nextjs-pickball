@@ -7,11 +7,24 @@
 > 一律以那兩節為準。** 特別注意：舊段落多處寫「M6～M9 四個平行」，
 > **那是已被推翻的計畫**，現行決定是嚴格序列 M6 → M7 → M8 → M9。
 
-## 🎉 七個 change 全數 apply 完成並合併（2026-09-03）
+## 🏁 全流程結束：verify 與 archive 皆已完成（2026-09-03）
 
-**matchmaker M3～M9 全部完成，`main` HEAD 為 `9fdffe3`。**
-接下來的 verify／archive 階段**另行等待使用者指示，不要自行執行**（見檔尾「其他注意」）。
-三個 worktree（M7／M8／M9）**皆尚未 teardown**，待使用者確認後執行。
+**matchmaker M3～M9 全部 apply、verify、archive 完畢。** 摘要：
+
+- **verify**（/opsx:verify，全七個 change）：445/446 task（唯一未勾的 M9 10.8 隨後由使用者
+  親自完成兩項人眼檢查並補勾）、296/296 scenario 可追溯、validate --strict 全過。
+  verify 產出的 2 WARNING（E2E reload 快照賽跑、陳舊 dev server 假失敗）與
+  3 SUGGESTION（F-3 不修、F-4 慣例入 CLAUDE.md、F-5 收斂 labels.ts）皆已處置，
+  詳見 commits `8e541e0`～`5ee5d22`。
+- **archive**（依 M3→M9 順序）：六個新 capability 建立、四個既有 capability 更新，
+  `validate --all --strict` 16 項全過、主 spec 零重複條目（commit `bd11746`）。
+  ⚠️ M6 的 match-stage delta 在 archive 前由 MODIFIED 改寫為 RENAMED→REMOVED→ADDED
+  三段式（openspec CLI 無法直接表達「整條換版丟棄 scenario」，詳見該 delta 的 REMOVED
+  Reason），主 spec 終態與原 MODIFIED 內容逐字相同。
+- **prd.md 已歸檔**至 `docs/prd.md`（依 2026-08-23 拍板：不刪除、頁首加註）。
+
+**唯一剩餘事項：三個 worktree（M7／M8／M9）尚未 teardown，待使用者確認後執行**
+（指令見各 change archive 後的 `environment.md`，分支為 `change/matchmaker-{history-page,data-transfer,visual-export}`）。
 
 ## 狀態快照（最後更新 2026-09-03）
 
@@ -525,6 +538,9 @@ execution-plan 的偏離 ⑤ 未解問題或阻塞。
 M1～M9 的對照表寫在每個 change 的 `proposal.md` 開頭，刪不刪 prd 都查得到。
 
 **此動作在全部 change 完成後才執行**，現在不要動 `prd.md`（它仍是進行中 change 的需求來源）。
+
+> ✅ **已執行（2026-09-03）**：七個 change archive 完畢後，`prd.md` 已以 `git mv` 移至
+> `docs/prd.md` 並於頁首加註，root `CLAUDE.md` 的結構樹與文件分工說明同步更新。
 
 ## ~~⛔ 停止點~~（已解除，使用者 2026-08-24 指示續跑 M6～M9）
 

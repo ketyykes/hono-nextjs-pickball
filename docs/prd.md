@@ -1,5 +1,12 @@
 # 匹克球對戰分配機 App
 
+> ⚠️ 本檔為歷史紀錄（2026-09-03 自 repo root 歸檔至 `docs/`，使用者 2026-08-23 拍板：不刪除、
+> 歸檔保留）。對戰分配機 M1～M9 已全數實作完成並 archive，正式規格見 `openspec/specs/` 的
+> match-allocation、player-roster、match-rating、round-lifecycle、match-stage、match-history、
+> data-transfer、visual-export 等 capability——**行為以該處為準**。本檔保留是因為 change 文件
+> 與 commit 訊息大量引用「prd.md 5.1」「PRD 6.4」這類章節編號，供追溯之用。
+> 頁首「尚未實作」等狀態描述為當時原文，刻意保留未改。
+
 ## 產品需求文件（PRD）
 
 **文件版本：** v2.0

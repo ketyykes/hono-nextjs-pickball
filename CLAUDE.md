@@ -9,11 +9,11 @@ hono-nextjs-pickball/     ← repo 與 root package 名稱
 ├─ nextjs-pickball/   ← 前端：Next.js 16 + React 19，經 OpenNext 部署為 Cloudflare Worker
 ├─ hono-pickball/     ← 後端：Hono API on Cloudflare Workers，所有後端邏輯都放這裡
 ├─ openspec/          ← OpenSpec 規格與變更；schemas/ 為 GENERATED 檔案（見「OpenSpec 慣例」）
-├─ prd.md             ← 「對戰分配機」PRD：matchmaker 系列 change 的需求來源。
-│                       commit / tasks 中的 4.2、5.1～5.6 等數字編號指本檔章節；
+├─ docs/              ← 設計文件歷史紀錄（superpowers/、prd.md）；已被 openspec 取代者於頁首標註。
+│                       prd.md 為「對戰分配機」PRD（M1～M9 已完成並 archive，2026-09-03 歸檔至此）：
+│                       commit / tasks 中的 4.2、5.1～5.6 等數字編號指該檔章節；
 │                       M 編號（M1 等）則指 milestone 或 tasks 內的修正項次，
-│                       定義在 openspec change 文件，不在本檔
-├─ docs/              ← 設計文件歷史紀錄（superpowers/）；已被 openspec 取代者於頁首標註
+│                       定義在 openspec change 文件，不在該檔
 ├─ README.md          ← 含「部署前手動檢查清單」——本專案無 CI，這是唯一部署關卡
 ├─ .claude/           ← settings.json（hooks，見下）、agents/（四個 project subagent 定義）、
 │                       agent-memory/（各 agent 長期記憶，**唯一來源**；workspace 內若長出
@@ -24,9 +24,8 @@ hono-nextjs-pickball/     ← repo 與 root package 名稱
 └─ skills-lock.json   ← 外部 skill 的版本鎖定（root 單一份）
 ```
 
-> 三層文件分工：`openspec/specs/` 是**正式規格**；`prd.md` 是 matchmaker 的需求來源；
-> `docs/superpowers/` 是歷史紀錄。任何行為變更以 openspec change 為準，
-> 不要在 `docs/` 下新增平行規格。
+> 文件分工：`openspec/specs/` 是**正式規格**；`docs/`（superpowers/ 與歸檔後的 prd.md）
+> 是歷史紀錄。任何行為變更以 openspec change 為準，不要在 `docs/` 下新增平行規格。
 
 ## 不可省略的規則
 
