@@ -4,6 +4,7 @@
 // ExportScene 為可序列化純資料（無函式、無 class 實例）。
 
 import { pickTextColor } from "./colors";
+import { FORMAT_LABEL, TEAM_LABELS_BY_KEY } from "./labels";
 import { buildCourtTiles } from "./stage-layout";
 import type { CourtTileTeamSource } from "./stage-layout";
 import type { MatchFormat } from "./allocation-types";
@@ -13,32 +14,12 @@ import type { Gender, Player } from "./types";
 /** App 名稱，匯出標題與（未來的）列印稿共用，SHALL NOT 由各呼叫端各自寫死（prd.md 9.4）。 */
 export const EXPORT_APP_NAME = "匹克球對戰分配機";
 
-/**
- * 對戰方式顯示文案，供標題組裝；沿用畫面既有用語（單打／雙打）。
- * 與 `history-csv.ts`／`round.ts`／`RoundControls.tsx`／`HistoryRecordCard.tsx` 的同名對照表
- * 逐字相同，刻意各自持有一份不抽共用模組（沿用 `HistoryRecordCard.tsx` 的既有裁決）。
- */
-const FORMAT_LABEL: Record<MatchFormat, string> = {
-	singles: "單打",
-	doubles: "雙打",
-};
-
 /** 回合編號標題片段的前後綴，例如「第 3 輪」。 */
 const ROUND_LABEL_PREFIX = "第 ";
 const ROUND_LABEL_SUFFIX = " 輪";
 
 /** 標題各段落之間的分隔符（全形空白，避免中文字緊貼難以辨讀）。 */
 const TITLE_SEPARATOR = "　";
-
-/**
- * 隊伍顯示文案，供已完成場次的狀態文字標示勝方所屬隊伍。
- * 與 `history-csv.ts`／`HistoryRecordCard.tsx` 的同名對照表逐字相同，刻意各自持有一份
- * 不抽共用模組（沿用 `HistoryRecordCard.tsx` 的既有裁決）。
- */
-const TEAM_LABELS: Record<"teamA" | "teamB", string> = {
-	teamA: "第一隊",
-	teamB: "第二隊",
-};
 
 /** 已完成場次狀態文字中，比分兩數之間的分隔符。 */
 const SCORE_SEPARATOR = " : ";
@@ -188,7 +169,7 @@ function resolvePlayer(playerId: string, players: readonly Player[]): Player {
  */
 function buildStatusText(match: RoundMatch): string {
 	if (match.status === "completed" && match.scores !== null && match.winner !== null) {
-		const winnerLabel = TEAM_LABELS[match.winner];
+		const winnerLabel = TEAM_LABELS_BY_KEY[match.winner];
 		return `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${winnerLabel}${WINNER_SUFFIX}`;
 	}
 

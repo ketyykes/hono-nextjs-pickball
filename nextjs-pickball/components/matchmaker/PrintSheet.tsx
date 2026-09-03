@@ -1,6 +1,7 @@
 // components/matchmaker/PrintSheet.tsx
 "use client";
 
+import { TEAM_LABELS } from "@/lib/matchmaker/labels";
 import type { ExportCourt, ExportScene, ExportTile } from "@/lib/matchmaker/export-scene";
 
 /**
@@ -11,14 +12,6 @@ import type { ExportCourt, ExportScene, ExportTile } from "@/lib/matchmaker/expo
  */
 export const PRINT_SHEET_DATA_VALUE = "sheet";
 export const PRINT_COURT_DATA_VALUE = "court";
-
-/**
- * 隊伍顯示文案：色彩不得作為唯一資訊來源（prd.md 12.5）。與 export-scene.ts（TEAM_LABELS）、
- * history-csv.ts、HistoryRecordCard.tsx、CourtCard.tsx 的同名對照表逐字相同，刻意各自持有
- * 一份不抽共用模組（沿用 HistoryRecordCard.tsx 的既有裁決：抽出需連動修改本 change 範圍外的
- * 檔案，風險與收益不成比例）。
- */
-const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
 
 /**
  * 顏色小標記（色點）的邊長，刻意極小——列印版以文字為主，色彩僅為輔助小標記，

@@ -10,6 +10,7 @@ import { buildSignatureIndex } from "./duplication";
 import { roundRating } from "./rating-math";
 import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
+import { FORMAT_LABEL } from "./labels";
 import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "./allocation-types";
 import type { MatchHistoryEntry } from "./history";
 import type { RatingChange, RatingPlayerInput, RatingUpdateResult } from "./rating-types";
@@ -28,8 +29,6 @@ export const ROUND_FAILURE_CODE = {
 } as const;
 
 export type RoundFailureCode = (typeof ROUND_FAILURE_CODE)[keyof typeof ROUND_FAILURE_CODE];
-
-const FORMAT_LABEL: Record<MatchFormat, string> = { singles: "單打", doubles: "雙打" };
 
 // 「全員暫停」與「名單為空」的修正方式完全不同（前者要恢復出場、後者要新增參賽者），
 // 訊息 MUST 不同，否則使用者會對著滿滿一頁參賽者被告知「請先新增參賽者」（spec 明文）。

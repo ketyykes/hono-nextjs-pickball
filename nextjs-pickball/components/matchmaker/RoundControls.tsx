@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { courtCountBounds, changeCourtCount } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import { PLAYERS_PER_MATCH } from "@/lib/matchmaker/allocation-types";
+import { FORMAT_LABEL } from "@/lib/matchmaker/labels";
 import type { MatchFormat } from "@/lib/matchmaker/allocation-types";
 import { TARGET_SCORE_OPTIONS } from "@/lib/matchmaker/round-types";
 import type { Round, RoundTargetScore } from "@/lib/matchmaker/round-types";
@@ -17,12 +18,6 @@ import { isTargetScoreLocked } from "@/lib/matchmaker/scoreboard-binding";
 // matchmaker 與 scoreboard 的目標分數選擇器共用同一份 WAI-ARIA radio group 方向鍵索引計算。
 import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
-
-// 對戰方式的顯示文字，亦作為人數不足說明的措辭來源，避免兩處各自寫一份中文。
-const FORMAT_LABEL: Record<MatchFormat, string> = {
-	singles: "單打",
-	doubles: "雙打",
-};
 
 // 選項清單由 FORMAT_LABEL 的 key 推導，不另列一次 singles／doubles——MatchFormat 若擴值，
 // Record<MatchFormat, string> 會在 FORMAT_LABEL 缺項時編譯錯誤，兩處因此不會各自漂移。

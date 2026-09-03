@@ -7,25 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { buildCourtTiles } from "@/lib/matchmaker/stage-layout";
+import { DOUBLES_COMPOSITION_LABEL, TEAM_LABELS } from "@/lib/matchmaker/labels";
 import type { CourtTileSource } from "@/lib/matchmaker/stage-layout";
-import type { DoublesComposition } from "@/lib/matchmaker/allocation-types";
 import type { Player } from "@/lib/matchmaker/types";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
 import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "@/lib/matchmaker/scoreboard-binding";
 import type { ScoreboardState } from "@/lib/scoreboard/types";
 import { PlayerTile } from "./PlayerTile";
 import { ScoreEntry } from "./ScoreEntry";
-
-// 隊伍文字標籤：色彩不得作為唯一資訊來源，場地與隊伍 MUST 有可讀文字（prd.md 12.5）。
-const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
-
-// 雙打組成的事後顯示標示，純顯示用途，不參與選人或配對決策（prd.md 7.3）。
-const DOUBLES_COMPOSITION_LABEL: Record<DoublesComposition, string> = {
-	mixed: "混雙",
-	mens: "男雙",
-	womens: "女雙",
-	general: "一般雙打",
-};
 
 export interface CourtCardProps {
 	match: RoundMatch;

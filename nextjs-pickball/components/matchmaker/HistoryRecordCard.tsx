@@ -4,26 +4,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { DOUBLES_COMPOSITION_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@/lib/matchmaker/labels";
 import type { HistoryTeam, MatchHistoryEntry } from "@/lib/matchmaker/history";
-
-// 隊伍文字標籤：色彩不得作為唯一資訊來源（prd.md 12.5），與 CourtCard.tsx 既有寫法相同。
-const TEAM_LABELS: readonly [string, string] = ["第一隊", "第二隊"];
-
-// 對戰方式的顯示文字。
-const FORMAT_LABEL: Record<MatchHistoryEntry["format"], string> = {
-	singles: "單打",
-	doubles: "雙打",
-};
-
-// 雙打組成的中文標示，MUST 與 CourtCard.tsx 各自持有的同名對照表逐字相同
-// （design Open Question 4 的結案裁決）。刻意不抽成共用模組：僅 4 個項目的穩定對照表，
-// 抽出需連動修改本 change 範圍外的 CourtCard.tsx，風險與收益不成比例。
-const DOUBLES_COMPOSITION_LABEL = {
-	mixed: "混雙",
-	mens: "男雙",
-	womens: "女雙",
-	general: "一般雙打",
-} as const;
 
 export interface HistoryRecordCardProps {
 	entry: MatchHistoryEntry;

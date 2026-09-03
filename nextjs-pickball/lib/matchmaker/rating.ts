@@ -4,6 +4,7 @@
 import { RATING_D, RATING_K_BASE, K_DECAY_GAMES, RATING_MIN, RATING_MAX } from "./rating-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
 import { roundRating } from "./rating-math";
+import { FORMAT_LABEL } from "./labels";
 import type { RatingChange, RatingPlayerInput, RatingUpdateInput, RatingUpdateResult, Side } from "./rating-types";
 import type { MatchFormat } from "./allocation-types";
 
@@ -59,12 +60,6 @@ function applyDelta(player: RatingPlayerInput, s: number, e: number): RatingChan
 	};
 }
 
-// 對戰方式的中文標籤。
-const FORMAT_LABELS = {
-	singles: "單打",
-	doubles: "雙打",
-} as const satisfies Record<MatchFormat, string>;
-
 // 生成驗證錯誤訊息。人數、rating、gamesPlayed 三條訊息共用此句型，集中維護全形標點與固定句尾對齊 allocation.ts 格式；
 // 重複 id 那條刻意繞過此 helper，因為它的對象不是使用者調整輸入，而是 M4 上游接線錯誤的警報，
 // 句型改為「請檢查輸入」而非「請調整後再試」才能正確傳達語意。
@@ -82,7 +77,7 @@ function assertValidInput(format: MatchFormat, teams: readonly [Side, Side], pla
 		// 分子分母對不上，隊伍平均就被悄悄算錯——不會拋錯、也不會出現 NaN，錯得無聲無息。
 		if (team.length !== playersPerTeam) {
 			throw createValidationError(
-				`對戰方式為「${FORMAT_LABELS[format]}」時，隊伍人數需為 ${playersPerTeam} 人`,
+				`對戰方式為「${FORMAT_LABEL[format]}」時，隊伍人數需為 ${playersPerTeam} 人`,
 				`${team.length} 人`
 			);
 		}
