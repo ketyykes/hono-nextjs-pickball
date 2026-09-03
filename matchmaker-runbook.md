@@ -23,8 +23,11 @@
   Reason），主 spec 終態與原 MODIFIED 內容逐字相同。
 - **prd.md 已歸檔**至 `docs/prd.md`（依 2026-08-23 拍板：不刪除、頁首加註）。
 
-**唯一剩餘事項：三個 worktree（M7／M8／M9）尚未 teardown，待使用者確認後執行**
-（指令見各 change archive 後的 `environment.md`，分支為 `change/matchmaker-{history-page,data-transfer,visual-export}`）。
+**worktree teardown 亦已完成（2026-09-03，使用者確認後執行）**：三個 worktree
+（M7／M8／M9）與 `change/matchmaker-{history-page,data-transfer,visual-export}` 三條分支
+皆已移除。data-transfer 分支因末端多一個 docs commit（`b3b3bfc`）需 `-D` 強刪，刪前已
+逐檔比對確認其內容（tasks.md／design.md）與 main 歸檔版逐字相同，零內容損失。
+**本 runbook 已無任何待辦事項。**
 
 ## 狀態快照（最後更新 2026-09-03）
 
