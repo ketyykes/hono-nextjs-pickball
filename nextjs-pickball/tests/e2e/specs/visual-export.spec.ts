@@ -476,6 +476,16 @@ test.describe("/matchmaker 匯出功能", () => {
 	test("匯出 JPG 後目前回合與本機資料保持不變", async ({ page }) => {
 		await gotoMatchmakerWithRound(page, 2);
 
+		// 預置與 round-storage.ts writeHistory() 逐字相同序列化的空歷史：下方 reload 後
+		// useRoundStore 的 hydrate 一旦看到既有回合就會 dispatch，write effect 隨即以空歷史
+		// 回寫 matchmaker:history:v1（首次載入時回合尚不存在、hydrate 不 dispatch，該 key
+		// 因此原本不存在）。不預置的話，reload 後的快照就與這次回寫賽跑——全量並行執行時
+		// 實測會 flake（2026-09-03，chromium 與 mobile-chrome 同時失敗、隔離重跑全綠）。
+		await page.evaluate(
+			([key, value]) => window.localStorage.setItem(key, value),
+			[HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: [] })],
+		);
+
 		// 比對**整份** LocalStorage 而非只挑 matchmaker:round:v1：spec 的文字是
 		// 「MUST NOT 修改參賽者名單、目前回合、歷史紀錄或**任何** LocalStorage 資料」，
 		// 只比對單一 key 會漏掉「寫別的 key」「刪掉某個 key」「新增全新 key」三種違規
