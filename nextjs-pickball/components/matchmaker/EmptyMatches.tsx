@@ -16,7 +16,7 @@ export function EmptyMatches() {
 	return (
 		<div
 			data-testid="empty-matches"
-			className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border px-6 py-16 text-center"
+			className="flex flex-1 flex-col items-center gap-4 rounded-lg border border-dashed border-border px-6 py-16 text-center"
 		>
 			<div className="space-y-1">
 				<p className="text-lg font-semibold">{EMPTY_MATCHES_TITLE}</p>

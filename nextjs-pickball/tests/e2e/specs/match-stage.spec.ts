@@ -519,6 +519,9 @@ test.describe("/matchmaker 對戰頁", () => {
 
 		await expect(page.getByTestId("empty-matches")).toBeVisible();
 		await expect(page.getByTestId("empty-matches")).toContainText("本輪目前沒有任何場次");
+		// 說明句同樣要斷言：spec 要求「SHALL NOT 只顯示技術訊息或留白」，只鎖標題的話
+		// 說明句被清空仍會全綠（Stage 2 mutation 實測存活），等於這段文案沒有守衛。
+		await expect(page.getByTestId("empty-matches")).toContainText("候選人數不足以組成任何一場比賽");
 		await expect(page.getByTestId("match-stage-courts")).toHaveCount(0);
 		const joinLink = page.getByRole("link", { name: "前往參賽者名單" });
 		await expect(joinLink).toBeVisible();
