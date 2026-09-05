@@ -529,6 +529,45 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page).toHaveURL(/\/matchmaker\/players$/);
 	});
 
+	// 版面 regression guard（Stage 2 mutation 實測補上）：把 EmptyMatches 根節點的
+	// `flex-1` 拿掉，上面兩條 test 仍全綠——但說明卡片會縮成內容寬（1280 視窗下量得
+	// 554px 而非 680px），休息名單跟著左移 126px，整列右緣與同頁其他區塊對不齊。
+	// 改以「說明卡片與場地網格同寬」「休息名單左緣不因場次有無而位移」兩條相對關係
+	// 鎖住，不寫死像素值，日後調整容器寬度或間距都不需要跟著改這條測試。
+	test("桌面斷點本輪無場次時說明卡片佔滿場地欄寬度", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		const courts = await page.getByTestId("match-stage-courts").boundingBox();
+		const restingWithCourts = await page.getByTestId("match-stage-resting").boundingBox();
+
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await nav.getByRole("link", { name: "參賽者", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
+		await page.getByRole("button", { name: "設為暫停" }).first().click();
+		await page
+			.getByRole("navigation", { name: "對戰分配區段導覽" })
+			.getByRole("link", { name: "對戰", exact: true })
+			.click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await page.getByRole("button", { name: "重設／再排" }).click();
+		await expect(page.getByTestId("empty-matches")).toBeVisible();
+
+		const empty = await page.getByTestId("empty-matches").boundingBox();
+		const resting = await page.getByTestId("match-stage-resting").boundingBox();
+		expect(courts).not.toBeNull();
+		expect(restingWithCourts).not.toBeNull();
+		expect(empty).not.toBeNull();
+		expect(resting).not.toBeNull();
+		if (courts === null || restingWithCourts === null || empty === null || resting === null) return;
+
+		expect(empty.width).toBeCloseTo(courts.width, 0);
+		expect(resting.x).toBeCloseTo(restingWithCourts.x, 0);
+	});
+
 	test("回合存在且有場次時不顯示本輪場次為空的說明", async ({ page }) => {
 		await seedRoster(page, 2);
 		await page.goto("/matchmaker");
