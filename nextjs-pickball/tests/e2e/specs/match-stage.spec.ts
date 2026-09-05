@@ -576,4 +576,82 @@ test.describe("/matchmaker 對戰頁", () => {
 
 		await expect(page.getByTestId("empty-matches")).toHaveCount(0);
 	});
+
+	// M10（matchmaker-stage-gaps）§4：regression guard，不對應任何新的或被修改的 spec
+	// 驗收錨點（見 design Decision 3）——resetIncompleteMatches 與其 UI wiring 已由
+	// lib/matchmaker/round.test.ts 與 components/matchmaker/RoundControls.test.tsx
+	// 覆蓋且正確，本測試只新增一層「真實瀏覽器 + 真實 LocalStorage」的端到端證據。
+	test("重設／再排後已完成場次保留、未完成場次重新分配且休息名單排除已比賽者", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await seedRoster(page, 6);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "增加場地數" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		// 限定範圍取第一場地：兩個場地皆有同名的比分欄位與送出鈕，直接對整頁呼叫
+		// getByLabel 會觸發 Playwright strict-mode 多重命中錯誤（沿用既有 test 的作法）。
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(2);
+		const firstCourt = courtGrids.nth(0);
+
+		await firstCourt.getByLabel("第一隊比分").fill("11");
+		await firstCourt.getByLabel("第二隊比分").fill("7");
+		await firstCourt.getByRole("button", { name: "送出比分" }).click();
+		await expect(firstCourt.getByRole("button", { name: "送出比分" })).toBeDisabled();
+
+		type StoredMatch = {
+			id: string;
+			courtNumber: number;
+			status: string;
+			scores: { teamA: number; teamB: number } | null;
+			winner: string | null;
+			completedAt: string | null;
+			teams: [{ playerIds: string[] }, { playerIds: string[] }];
+		};
+		type StoredRound = {
+			round: { matches: StoredMatch[]; restingPlayerIds: string[] } | null;
+		};
+
+		const beforeRaw = await page.evaluate((key) => window.localStorage.getItem(key), ROUND_STORAGE_KEY);
+		expect(beforeRaw).not.toBeNull();
+		const before = JSON.parse(beforeRaw ?? "{}") as StoredRound;
+		expect(before.round).not.toBeNull();
+		if (before.round === null) return;
+
+		const completedBefore = before.round.matches.find((m) => m.status === "completed");
+		const pendingBefore = before.round.matches.find((m) => m.status !== "completed");
+		expect(completedBefore).toBeDefined();
+		expect(pendingBefore).toBeDefined();
+		if (completedBefore === undefined || pendingBefore === undefined) return;
+		expect(before.round.restingPlayerIds).toHaveLength(2);
+
+		await page.getByRole("button", { name: "重設／再排" }).click();
+
+		const afterRaw = await page.evaluate((key) => window.localStorage.getItem(key), ROUND_STORAGE_KEY);
+		expect(afterRaw).not.toBeNull();
+		const after = JSON.parse(afterRaw ?? "{}") as StoredRound;
+		expect(after.round).not.toBeNull();
+		if (after.round === null) return;
+
+		expect(after.round.matches).toHaveLength(2);
+		const completedAfter = after.round.matches.find((m) => m.id === completedBefore.id);
+		expect(completedAfter).toBeDefined();
+		if (completedAfter === undefined) return;
+		expect(completedAfter.scores).toEqual(completedBefore.scores);
+		expect(completedAfter.winner).toBe(completedBefore.winner);
+		expect(completedAfter.courtNumber).toBe(completedBefore.courtNumber);
+		expect(completedAfter.completedAt).toBe(completedBefore.completedAt);
+
+		const otherMatchAfter = after.round.matches.find((m) => m.id !== completedBefore.id);
+		expect(otherMatchAfter).toBeDefined();
+		if (otherMatchAfter === undefined) return;
+		expect(otherMatchAfter.id).not.toBe(pendingBefore.id);
+
+		// 休息名單排除已比賽者：完成場次那兩位球員 SHALL NOT 出現在重排後的休息名單。
+		const completedPlayerIds = completedBefore.teams.flatMap((team) => team.playerIds);
+		expect(after.round.restingPlayerIds).toHaveLength(2);
+		for (const playerId of completedPlayerIds) {
+			expect(after.round.restingPlayerIds).not.toContain(playerId);
+		}
+	});
 });
