@@ -59,6 +59,14 @@ function isoCrossMonthWeek(day: number, hour = 10): string {
 	return new Date(2026, 6, day, hour, 0, 0).toISOString();
 }
 
+// Next.js 的 route announcer（`__next-route-announcer__`）本身即帶 role="alert"，
+// 但恆為空字串內容，且並非 aria-hidden，會被 getByRole("alert") 一併命中，
+// 讓「有幾個 alert」與「alert 文字是什麼」兩種斷言都失真——本頁新增的損毀提示
+// 必須排除這個固定 id 才能鎖定實際渲染出來的提示本身。
+function historyCorruptionAlert(page: Page) {
+	return page.locator('[role="alert"]:not(#__next-route-announcer__)');
+}
+
 // 種入一批歷史紀錄：外層容器 MUST 是 { version: 1, entries: [...] }（round-storage.ts
 // 的 writeHistory() 寫入形狀），裸陣列會被 readHistory() 判為結構層級損壞而整份清空。
 // 以 page.addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀得到
@@ -470,6 +478,45 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 			HISTORY_STORAGE_KEY,
 		);
 		expect(afterValue).toBe(rawValue);
+	});
+
+	test("有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示", async ({ page }) => {
+		const validEntry = buildEntry({
+			matchId: "e2e-history-valid-1",
+			playedAt: isoToday(9),
+			teamA: [player("p-valid-a", "損毀提示合法員A")],
+			teamB: [player("p-valid-b", "損毀提示合法員B")],
+		});
+		// 刻意缺必要欄位（teamB）製造一筆不合法紀錄：外層容器 version 仍合法，
+		// 只有這一筆個別紀錄不合法，readHistory() 會逐筆丟棄並回報 droppedCount。
+		const corruptEntry = { matchId: "e2e-history-corrupt-1", playedAt: isoToday(9) };
+		await seedHistory(page, [validEntry, corruptEntry]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const alert = historyCorruptionAlert(page);
+		await expect(alert).toBeVisible();
+		await expect(alert).toContainText("1");
+		await expect(alert).toContainText("損毀");
+		await expect(alert).toContainText("歷史紀錄");
+		// 合法那筆紀錄不受影響，正常顯示。
+		await expect(page.getByText("損毀提示合法員A")).toBeVisible();
+	});
+
+	test("沒有損毀歷史紀錄時不顯示損毀提示", async ({ page }) => {
+		await seedHistory(page, [
+			buildEntry({
+				matchId: "e2e-history-nodrop-1",
+				playedAt: isoToday(9),
+				teamA: [player("p-nodrop-a", "無損毀員A")],
+				teamB: [player("p-nodrop-b", "無損毀員B")],
+			}),
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		await expect(page.getByText("無損毀員A")).toBeVisible();
+		await expect(historyCorruptionAlert(page)).toHaveCount(0);
 	});
 
 	test("紀錄於 hydration 後顯示且無 console error", async ({ page }) => {
