@@ -497,16 +497,24 @@ test.describe("/matchmaker 對戰頁", () => {
 	// 是已由程式碼證實可達的狀態（resetIncompleteMatches 候選池計算不過濾
 	// isActive，見 design Decision 4）——重現方式為「產生本輪對戰後，把其中一位
 	// 對戰中的球員設為暫停出場，再點重設／再排」，候選池即不足以組出任何一場。
+	//
+	// 頁面切換一律用區段導覽的 <Link> 點擊（client-side 軟導覽），SHALL NOT 用
+	// page.goto()：seedRoster 以 addInitScript 種入，其腳本會在每次「真正的瀏覽器
+	// 導覽」（含 page.goto）重新執行、把名單重設回全員出場，蓋掉本測試靠 UI 操作
+	// 做出的「設為暫停」變更；client-side 路由切換不建立新 document，不會觸發它。
 	test("回合存在但本輪無場次時顯示說明文字與前往參賽者名單入口", async ({ page }) => {
 		await seedRoster(page, 2);
 		await page.goto("/matchmaker");
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
 
-		await page.goto("/matchmaker/players");
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await nav.getByRole("link", { name: "參賽者", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
 		await page.getByRole("button", { name: "設為暫停" }).first().click();
 
-		await page.goto("/matchmaker");
+		await page.getByRole("navigation", { name: "對戰分配區段導覽" }).getByRole("link", { name: "對戰", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
 		await page.getByRole("button", { name: "重設／再排" }).click();
 
 		await expect(page.getByTestId("empty-matches")).toBeVisible();
