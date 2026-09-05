@@ -624,6 +624,10 @@ test.describe("/matchmaker 對戰頁", () => {
 		expect(pendingBefore).toBeDefined();
 		if (completedBefore === undefined || pendingBefore === undefined) return;
 		expect(before.round.restingPlayerIds).toHaveLength(2);
+		// 先把重排前的狀態錨定到本測試實際輸入的比分：下方 scores／winner 是「重排後 === 重排前」
+		// 的相對比對，若兩邊都是 null 一樣會綠，錨定後那組比對才真的代表「值被保留下來」。
+		expect(completedBefore.scores).toEqual({ teamA: 11, teamB: 7 });
+		expect(completedBefore.winner).toBe("teamA");
 
 		await page.getByRole("button", { name: "重設／再排" }).click();
 
@@ -646,12 +650,26 @@ test.describe("/matchmaker 對戰頁", () => {
 		expect(otherMatchAfter).toBeDefined();
 		if (otherMatchAfter === undefined) return;
 		expect(otherMatchAfter.id).not.toBe(pendingBefore.id);
+		// 新場次 MUST 避開保留場次已佔用的場地編號，否則畫面會出現兩張同時寫著「1 號場」的
+		// 卡片（Stage 2 mutation 實測：拿掉 takeFreeCourtNumbers 的避讓後其餘斷言全綠存活）。
+		expect(otherMatchAfter.courtNumber).not.toBe(completedAfter.courtNumber);
 
 		// 休息名單排除已比賽者：完成場次那兩位球員 SHALL NOT 出現在重排後的休息名單。
 		const completedPlayerIds = completedBefore.teams.flatMap((team) => team.playerIds);
+		// 先鎖住筆數再進迴圈：completedPlayerIds 若為空陣列，下面的 for 一次都不會執行，
+		// 「排除已比賽者」這條守衛會靜默失效而測試照樣全綠（單打一場恰為兩人）。
+		expect(completedPlayerIds).toHaveLength(2);
 		expect(after.round.restingPlayerIds).toHaveLength(2);
 		for (const playerId of completedPlayerIds) {
 			expect(after.round.restingPlayerIds).not.toContain(playerId);
+		}
+
+		// 休息名單與場上球員互斥：同一個人不可能同時在比賽又在休息。這是不變量而非演算法
+		// 細節（候選排序規則調整不會使它轉紅），Stage 2 mutation 實測補上——把 restingPlayerIds
+		// 誤接成新場次的球員時，上面「筆數為 2」與「不含已比賽者」兩組斷言全數無感而測試照樣全綠。
+		const playingAfterIds = after.round.matches.flatMap((m) => m.teams.flatMap((team) => team.playerIds));
+		for (const playerId of after.round.restingPlayerIds) {
+			expect(playingAfterIds).not.toContain(playerId);
 		}
 	});
 });
