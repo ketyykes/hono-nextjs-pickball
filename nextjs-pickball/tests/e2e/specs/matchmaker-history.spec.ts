@@ -487,16 +487,20 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 			teamA: [player("p-valid-a", "損毀提示合法員A")],
 			teamB: [player("p-valid-b", "損毀提示合法員B")],
 		});
-		// 刻意缺必要欄位（teamB）製造一筆不合法紀錄：外層容器 version 仍合法，
-		// 只有這一筆個別紀錄不合法，readHistory() 會逐筆丟棄並回報 droppedCount。
-		const corruptEntry = { matchId: "e2e-history-corrupt-1", playedAt: isoToday(9) };
-		await seedHistory(page, [validEntry, corruptEntry]);
+		// 刻意缺必要欄位（teamB）製造不合法紀錄：外層容器 version 仍合法，
+		// 只有這些個別紀錄不合法，readHistory() 會逐筆丟棄並回報 droppedCount。
+		const corruptEntry = (n: number) => ({ matchId: `e2e-history-corrupt-${n}`, playedAt: isoToday(9) });
+		await seedHistory(page, [validEntry, corruptEntry(1), corruptEntry(2)]);
 
 		await page.goto(HISTORY_PAGE);
 
 		const alert = historyCorruptionAlert(page);
 		await expect(alert).toBeVisible();
-		await expect(alert).toContainText("1");
+		// 損毀筆數刻意種 2 筆（而非 1 筆），並在本 test 末尾再以另一個筆數重讀一次：
+		// 只種 1 筆時，把 {hydrated.droppedCount} 插值寫死成常數 1 照樣全綠
+		// （Stage 2 mutation 實測確認此退化會存活），兩個相異取值才擋得住寫死——
+		// 沿用本檔「8.2 全部欄位」那個 test 的相異值慣例（單一取值等於零保護）。
+		await expect(alert).toContainText("2");
 		await expect(alert).toContainText("損毀");
 		await expect(alert).toContainText("歷史紀錄");
 		// spec Scenario 1 的 THEN 除了損毀筆數，還要求「說明其餘紀錄不受影響」；
@@ -505,6 +509,13 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(alert).toContainText("不受影響");
 		// 合法那筆紀錄不受影響，正常顯示。
 		await expect(page.getByText("損毀提示合法員A")).toBeVisible();
+
+		// 換一個損毀筆數重讀：addInitScript 可重複註冊且依註冊順序執行，後註冊的這份
+		// 會覆寫前一份寫入的值（連帶蓋掉 readHistory() 在 droppedCount > 0 時回寫的
+		// 清理後結果），reload 後即為 3 筆損毀——畫面顯示的數字 MUST 隨資料改變。
+		await seedHistory(page, [validEntry, corruptEntry(1), corruptEntry(2), corruptEntry(3)]);
+		await page.reload();
+		await expect(historyCorruptionAlert(page)).toContainText("3");
 	});
 
 	test("沒有損毀歷史紀錄時不顯示損毀提示", async ({ page }) => {
