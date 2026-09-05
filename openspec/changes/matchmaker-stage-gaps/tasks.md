@@ -22,9 +22,9 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 新增兩個 test：「回合存在但本輪無場次時顯示說明文字與前往參賽者名單入口」（種 2 位參賽者 → 產生本輪對戰 → 於參賽者頁把其中一位設為暫停出場 → 回對戰頁點擊「重設／再排」→ 斷言 `getByTestId("empty-matches")` 可見、`getByTestId("match-stage-courts")` 筆數為 0、`getByRole("link", { name: "前往參賽者名單" })` 可見）、「回合存在且有場次時不顯示本輪場次為空的說明」（種 2 位參賽者 → 產生本輪對戰 → 斷言 `getByTestId("empty-matches")` 筆數為 0）。跑單檔確認兩者紅燈並貼出輸出（預期為 `empty-matches` 測不到元素）
-- [ ] 2.2 GREEN: 新增 `nextjs-pickball/components/matchmaker/EmptyMatches.tsx`（`"use client"`，無 props，`data-testid="empty-matches"`，繁體中文標題＋說明＋`前往參賽者名單` 連結，版面沿用 `EmptyStage.tsx` 的既有形狀：虛線邊框卡片、標題＋說明＋一個入口）；修改 `nextjs-pickball/components/matchmaker/MatchStage.tsx`，把原本無條件的 `round.matches.map(...)` 改為 `round.matches.length === 0` 時渲染 `EmptyMatches`、否則渲染原有場地網格（`data-testid="match-stage-courts"` 只在有場次時存在）。`RestingPanel`（休息名單側欄）維持一律渲染，不受此條件影響
-- [ ] 2.3 REFACTOR: 確認 `EmptyMatches.tsx` 零 props、標題／說明文案為具名常數（比照 `EmptyStage.tsx` 的 `NO_PLAYERS_TITLE` 等既有寫法）；確認 `MatchStage.tsx` 的條件判斷只有這一處新增分支，沒有把任何原本屬於 `lib/` 的邏輯搬進元件；註解說明為什麼此狀態與「空白球場狀態」不同（design Decision 1）
+- [x] 2.1 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 新增兩個 test：「回合存在但本輪無場次時顯示說明文字與前往參賽者名單入口」（種 2 位參賽者 → 產生本輪對戰 → 於參賽者頁把其中一位設為暫停出場 → 回對戰頁點擊「重設／再排」→ 斷言 `getByTestId("empty-matches")` 可見、`getByTestId("match-stage-courts")` 筆數為 0、`getByRole("link", { name: "前往參賽者名單" })` 可見）、「回合存在且有場次時不顯示本輪場次為空的說明」（種 2 位參賽者 → 產生本輪對戰 → 斷言 `getByTestId("empty-matches")` 筆數為 0）。跑單檔確認兩者紅燈並貼出輸出（預期為 `empty-matches` 測不到元素）
+- [x] 2.2 GREEN: 新增 `nextjs-pickball/components/matchmaker/EmptyMatches.tsx`（`"use client"`，無 props，`data-testid="empty-matches"`，繁體中文標題＋說明＋`前往參賽者名單` 連結，版面沿用 `EmptyStage.tsx` 的既有形狀：虛線邊框卡片、標題＋說明＋一個入口）；修改 `nextjs-pickball/components/matchmaker/MatchStage.tsx`，把原本無條件的 `round.matches.map(...)` 改為 `round.matches.length === 0` 時渲染 `EmptyMatches`、否則渲染原有場地網格（`data-testid="match-stage-courts"` 只在有場次時存在）。`RestingPanel`（休息名單側欄）維持一律渲染，不受此條件影響
+- [x] 2.3 REFACTOR: 確認 `EmptyMatches.tsx` 零 props、標題／說明文案為具名常數（比照 `EmptyStage.tsx` 的 `NO_PLAYERS_TITLE` 等既有寫法）；確認 `MatchStage.tsx` 的條件判斷只有這一處新增分支，沒有把任何原本屬於 `lib/` 的邏輯搬進元件；註解說明為什麼此狀態與「空白球場狀態」不同（design Decision 1）
 
 ## 3. 損毀歷史紀錄的可見提示
 
