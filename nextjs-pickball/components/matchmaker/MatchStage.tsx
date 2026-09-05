@@ -2,6 +2,7 @@
 "use client";
 
 import { CourtCard } from "./CourtCard";
+import { EmptyMatches } from "./EmptyMatches";
 import { RestingPanel } from "./RestingPanel";
 import type { Player } from "@/lib/matchmaker/types";
 import type { Round } from "@/lib/matchmaker/round-types";
@@ -52,24 +53,33 @@ export function MatchStage({
 		.map((id) => players.find((player) => player.id === id))
 		.filter((player): player is Player => player !== undefined);
 
+	// round.matches 為空但 round 本身非 null，是「回合已存在、但這一輪排不出任何
+	// 一場」的狀態（與 round 為 null 的「空白球場狀態」不同，見 EmptyMatches 檔頭
+	// 註解／design Decision 1）：改渲染 EmptyMatches 而非空的場地網格，
+	// data-testid="match-stage-courts" 只在有場次時存在。RestingPanel 不受此
+	// 條件影響，一律渲染——即使本輪排不出任何場次，休息名單對主持人仍是有效資訊。
 	return (
 		<div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-			<div
-				data-testid="match-stage-courts"
-				className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 max-md:[&_input]:min-h-11 max-md:[&_button]:min-h-11"
-			>
-				{round.matches.map((match) => (
-					<CourtCard
-						key={match.id}
-						match={match}
-						players={players}
-						round={round}
-						matchSlot={matchSlots[match.id] ?? null}
-						onSubmitScore={onSubmitScore}
-						submitError={submitError?.matchId === match.id ? submitError.message : null}
-					/>
-				))}
-			</div>
+			{round.matches.length === 0 ? (
+				<EmptyMatches />
+			) : (
+				<div
+					data-testid="match-stage-courts"
+					className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 max-md:[&_input]:min-h-11 max-md:[&_button]:min-h-11"
+				>
+					{round.matches.map((match) => (
+						<CourtCard
+							key={match.id}
+							match={match}
+							players={players}
+							round={round}
+							matchSlot={matchSlots[match.id] ?? null}
+							onSubmitScore={onSubmitScore}
+							submitError={submitError?.matchId === match.id ? submitError.message : null}
+						/>
+					))}
+				</div>
+			)}
 			<aside data-testid="match-stage-resting" className="flex flex-col gap-2 lg:w-72 lg:shrink-0">
 				<h2 className="text-sm font-semibold">休息名單</h2>
 				<RestingPanel resting={resting} hasActivePlayers={hasActivePlayers} />
