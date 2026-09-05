@@ -15,11 +15,18 @@ import { HistoryRecordCard } from "./HistoryRecordCard";
 interface HydratedHistory {
 	now: Date;
 	entries: MatchHistoryEntry[];
+	droppedCount: number;
 }
 
 // 用 useReducer 而非 useState 存放 hydration 結果：ESLint 的 react-hooks/set-state-in-effect
 // 規則會擋下「在 effect 內同步呼叫 useState setter」，但不適用於 useReducer 的 dispatch
 // （沿用 hooks/useRosterStore.ts、app/matchmaker/page.tsx 的既有寫法）。
+//
+// droppedCount 的潛在陷阱（M10 §3，已實測排除）：readHistory() 在 droppedCount > 0 時會把
+// 清理後的歷史回寫 localStorage（round-storage.ts），第二次呼叫會讀到 droppedCount: 0；
+// 若 React StrictMode 讓 hydration 的 useEffect 跑兩次，第二次 dispatch 理論上會把已偵測到
+// 的損毀筆數蓋回 0。實測（於 `pnpm dev` 下以 Node 端 console listener 計數）此 effect
+// 只執行一次，並未雙跑，故不需要為此加防禦式合併邏輯——以實測為準，不寫用不到的分支。
 function hydratedHistoryReducer(_current: HydratedHistory | null, next: HydratedHistory): HydratedHistory {
 	return next;
 }
@@ -35,8 +42,8 @@ export function HistoryView() {
 	// hydration 的 useEffect 內取一次 new Date() 與 readHistory() 的結果（design Decision 7）：
 	// 首次伺服器輸出固定為空狀態，避免 render 期間取用系統時鐘或 localStorage。
 	useEffect(() => {
-		const { entries } = readHistory();
-		setHydrated({ now: new Date(), entries });
+		const { entries, droppedCount } = readHistory();
+		setHydrated({ now: new Date(), entries, droppedCount });
 	}, []);
 
 	const entries = hydrated?.entries ?? [];
@@ -46,6 +53,21 @@ export function HistoryView() {
 
 	return (
 		<div className="flex flex-col gap-4">
+			{/* droppedCount > 0：讀取歷史紀錄時有損壞筆數被逐筆丟棄，SHALL NOT 靜默處理。
+			    樣式 class 與文案比照 app/matchmaker/players/page.tsx 既有的損毀提示區塊
+			    （design Decision 2）：兩者分屬 player-roster／match-history 兩個不同
+			    capability，各自持有一份、不抽共用元件——抽象需要跨 capability 改動或
+			    新建第三個檔案，在只有兩個消費端且文案主詞本就不同（「參賽者資料」vs
+			    「歷史紀錄」）的情況下是提前抽象，故維持各自一份（記為 tech debt）。 */}
+			{hydrated !== null && hydrated.droppedCount > 0 && (
+				<div
+					role="alert"
+					className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+				>
+					有 {hydrated.droppedCount} 筆損毀的歷史紀錄已略過，其餘歷史紀錄不受影響。
+				</div>
+			)}
+
 			<HistoryRangeFilter value={selectedRange} onChange={setSelectedRange} />
 
 			{entries.length === 0 ? (
