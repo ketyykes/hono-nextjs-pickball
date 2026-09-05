@@ -518,8 +518,12 @@ test.describe("/matchmaker 對戰頁", () => {
 		await page.getByRole("button", { name: "重設／再排" }).click();
 
 		await expect(page.getByTestId("empty-matches")).toBeVisible();
+		await expect(page.getByTestId("empty-matches")).toContainText("本輪目前沒有任何場次");
 		await expect(page.getByTestId("match-stage-courts")).toHaveCount(0);
-		await expect(page.getByRole("link", { name: "前往參賽者名單" })).toBeVisible();
+		const joinLink = page.getByRole("link", { name: "前往參賽者名單" });
+		await expect(joinLink).toBeVisible();
+		await joinLink.click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
 	});
 
 	test("回合存在且有場次時不顯示本輪場次為空的說明", async ({ page }) => {
