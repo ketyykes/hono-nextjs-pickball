@@ -53,11 +53,19 @@ Depends on: §1
 
 Depends on: §2, §3, §4
 
-- [ ] 5.1 逐條核對 delta spec（`specs/match-stage/spec.md`、`specs/match-history/spec.md`）的每個「驗收」錨點：檔案路徑存在、`test` 名稱逐字相符；另核對 §4 的 test 名稱與 test-plan.md「重設／再排的端到端覆蓋」表格逐字相符（§4 無 delta spec 錨點可對，改對 test-plan.md）。**不靠目視**，以腳本抽取比對
-- [ ] 5.2 `pnpm test` 全套通過（`-r`，前端 Vitest ＋ 後端 workerd runtime；確認未破壞既有測試，含 hono-pickball 後端測試——本 change 完全不觸碰後端，理論上零影響）
-- [ ] 5.3 `pnpm -r exec tsc --noEmit` 通過
-- [ ] 5.4 `pnpm --filter ./nextjs-pickball lint` 通過（0 errors；既有 warning 不得新增）
+- [x] 5.1 逐條核對 delta spec（`specs/match-stage/spec.md`、`specs/match-history/spec.md`）的每個「驗收」錨點：檔案路徑存在、`test` 名稱逐字相符；另核對 §4 的 test 名稱與 test-plan.md「重設／再排的端到端覆蓋」表格逐字相符（§4 無 delta spec 錨點可對，改對 test-plan.md）。**不靠目視**，以腳本抽取比對
+      → 以 python 腳本用 `re.findall(r'^\s*test\("([^"]+)"', ...)` 抽出兩份測試檔的所有 test 名稱集合，逐一比對 4 個 delta spec 錨點＋ 1 個 test-plan.md §4 名稱，**5 項全數 MATCH**（詳見回報內文的腳本輸出）。
+- [x] 5.2 `pnpm test` 全套通過（`-r`，前端 Vitest ＋ 後端 workerd runtime；確認未破壞既有測試，含 hono-pickball 後端測試——本 change 完全不觸碰後端，理論上零影響）
+      → 前端 68 test files / 638 tests passed；後端 4 test files / 16 tests passed。與 apply Step 0 baseline 完全一致，無新增／無破壞。
+- [x] 5.3 `pnpm -r exec tsc --noEmit` 通過
+      → 兩個 workspace 皆無輸出、exit 0。
+- [x] 5.4 `pnpm --filter ./nextjs-pickball lint` 通過（0 errors；既有 warning 不得新增）
+      → `0 errors, 3 warnings`，3 個 warning 皆為既有已知項目（`hooks/useQuiz.ts`、`hooks/useRosterStore.ts`、`hooks/useScoreboardStore.ts`），未新增。
 - [ ] 5.5 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過，**五個 browser project 皆跑**；`match-stage.spec.ts`、`matchmaker-history.spec.ts` 既有 test 全數原樣通過，其餘既有 E2E spec（`player-roster.spec.ts`、`scoreboard-binding.spec.ts`、`matchmaker-data-transfer.spec.ts`、`visual-export.spec.ts` 等）不受影響
-- [ ] 5.6 `git diff main -- **/package.json` 與 `git diff main -- pnpm-lock.yaml` 皆為空（零新增相依）；`git diff main --stat -- nextjs-pickball/hooks/` 與 `git diff main --stat -- nextjs-pickball/lib/matchmaker/` 皆為空（零新增 hook、零修改底層邏輯）；`DO_NOT_TRACK=1 openspec validate matchmaker-stage-gaps --strict` 通過
-- [ ] 5.7 以 root `CLAUDE.md` 指定的 python 計數法（**不使用 BSD `uniq`**）檢查 `openspec/specs/match-stage/spec.md` 與 `openspec/specs/match-history/spec.md` 是否有重複的 Requirement／Scenario 標題
-- [ ] 5.8 記錄「本 change 唯一容許變動的既有測試」清單：**應為「無」**——本 change 只新增測試，不修改任何既有 `it`／`test` 的斷言或名稱；收尾時逐一核對 `git diff main -- nextjs-pickball/tests/e2e/specs/match-stage.spec.ts nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 只有新增的區塊、既有 test 的內容逐字不變，其餘既有測試轉紅一律視為迴歸
+      → **未通過（回報 coordinator 裁示，非自行判定）**：542 passed／2 failed／21 skipped（10.5 分鐘）。失敗為 `scoreboard-binding.spec.ts:384`「計分中的場次顯示計分中標示與當前比分」，在 `[webkit]` 與 `[mobile-safari]` 兩個 project 上皆於 `beforeEach` 的 `page.goto("/")` 逾時 30000ms（並非 `KNOWN_DEV_ONLY_NOISE` 的 `ChunkLoadError` 樣式）。本 change 完全未觸碰 `scoreboard-binding.spec.ts` 或計分板相關程式碼。事後將該筆測試單獨於 `[webkit]`＋`[mobile-safari]` 重跑（`-g` 篩選），**兩者皆一次通過**，兩者皆一次通過。**coordinator 後續於完全乾淨的環境（零殘留 process、零佔用 port、已刪 `test-results/`／`playwright-report/`）重跑全套一次，結果逐字重現：同樣 542 passed／2 failed／21 skipped，同樣是 `scoreboard-binding.spec.ts:384` 在 `[webkit]` 與 `[mobile-safari]` 逾時於 `page.goto("/")`**——因此**不是**首跑當下的高負載巧合，而是全套脈絡下可重現的順序相依現象。同一支 spec 單獨在該兩個 project 重跑則 36/36 全過（該條僅耗時 1.2s，對比全套時逾時 30s）。另機械確認本 change 的三個產品檔（`EmptyMatches.tsx`／`MatchStage.tsx`／`HistoryView.tsx`）僅被 `app/matchmaker/page.tsx` 與 `app/matchmaker/history/page.tsx` import，而失敗處導覽的 `/` 路由（`app/page.tsx`）只 import `components/guide/**` 與 `components/ui/separator`，與本 change 零關聯，結構上不可能由本 change 造成。依規範本組**無權自行認定為雜訊**並勾選通過，此項維持未勾選，待 coordinator 裁示（建議：在 `main` 上跑一次同樣的全套 E2E，確認此為既有現象而非本 change 迴歸）。`match-stage.spec.ts`、`matchmaker-history.spec.ts`（含本 change 新增的 5 條 test）在全部五個 project 上皆全數通過。21 skipped 為既有 `api-health.spec.ts`（僅 chromium 跑，其餘 project 依既有設定 skip）與 `navbar-rwd.spec.ts`（僅 desktop viewport 跑，mobile project skip），與本 change 無關、非新增。
+- [x] 5.6 `git diff main -- **/package.json` 與 `git diff main -- pnpm-lock.yaml` 皆為空（零新增相依）；`git diff main --stat -- nextjs-pickball/hooks/` 與 `git diff main --stat -- nextjs-pickball/lib/matchmaker/` 皆為空（零新增 hook、零修改底層邏輯）；`DO_NOT_TRACK=1 openspec validate matchmaker-stage-gaps --strict` 通過
+      → 四項 diff 皆為空；`openspec validate --strict` 輸出 `Change 'matchmaker-stage-gaps' is valid`；另確認 `git diff main -- openspec/specs/` 為空（主 spec 未被本 change 修改）。
+- [x] 5.7 以 root `CLAUDE.md` 指定的 python 計數法（**不使用 BSD `uniq`**）檢查 `openspec/specs/match-stage/spec.md` 與 `openspec/specs/match-history/spec.md` 是否有重複的 Requirement／Scenario 標題
+      → 兩份主 spec 皆輸出「無重複」。
+- [x] 5.8 記錄「本 change 唯一容許變動的既有測試」清單：**應為「無」**——本 change 只新增測試，不修改任何既有 `it`／`test` 的斷言或名稱；收尾時逐一核對 `git diff main -- nextjs-pickball/tests/e2e/specs/match-stage.spec.ts nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 只有新增的區塊、既有 test 的內容逐字不變，其餘既有測試轉紅一律視為迴歸
+      → **本 change 唯一容許變動的既有測試清單：無。** 以 `git diff main | grep -E '^-[^-]'`（排除 `--- ` 檔頭行）核對兩份測試檔的完整 diff，exit status 1（無匹配），即整份 diff 不含任何刪除行，全部為新增區塊。
