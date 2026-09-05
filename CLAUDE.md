@@ -9,7 +9,7 @@ hono-nextjs-pickball/     ← repo 與 root package 名稱
 ├─ nextjs-pickball/   ← 前端：Next.js 16 + React 19，經 OpenNext 部署為 Cloudflare Worker
 ├─ hono-pickball/     ← 後端：Hono API on Cloudflare Workers，所有後端邏輯都放這裡
 ├─ openspec/          ← OpenSpec 規格與變更；schemas/ 為 GENERATED 檔案（見「OpenSpec 慣例」）
-├─ docs/              ← 設計文件歷史紀錄（superpowers/、prd.md）；已被 openspec 取代者於頁首標註。
+├─ docs/              ← 設計文件歷史紀錄（superpowers/、prd.md、matchmaker-runbook-m3-m9.md）；已被 openspec 取代者於頁首標註。
 │                       prd.md 為「對戰分配機」PRD（M1～M9 已完成並 archive，2026-09-03 歸檔至此）：
 │                       commit / tasks 中的 4.2、5.1～5.6 等數字編號指該檔章節；
 │                       M 編號（M1 等）則指 milestone 或 tasks 內的修正項次，

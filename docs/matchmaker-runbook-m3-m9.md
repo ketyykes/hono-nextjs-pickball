@@ -1,5 +1,9 @@
 # Matchmaker M3～M9 apply 執行手冊（runbook）
 
+> 📌 **歷史紀錄（2026-09-03 歸檔）。** 原檔名 `matchmaker-runbook.md`，位於 repo root；
+> M3～M9 七個 change 已全部 apply／verify／archive 完畢，本檔零待辦，依 prd.md 的「歸檔不刪除」慣例搬至 `docs/`。
+> 現行手冊是 repo root 的 `matchmaker-runbook-m10-m15.md`；本檔的教訓與派工經驗已濃縮進該檔。
+
 > 給下一個接手的 coordinator agent。目標：把 openspec 的 7 個 matchmaker change
 > 依相依順序全部跑完 `/opsx:apply` 並逐一合併回本機 `main`。
 >
