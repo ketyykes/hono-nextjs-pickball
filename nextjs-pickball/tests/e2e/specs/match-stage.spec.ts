@@ -492,4 +492,34 @@ test.describe("/matchmaker 對戰頁", () => {
 		const unnamed = items.filter((item) => item.name === "");
 		expect(unnamed).toEqual([]);
 	});
+
+	// M10（matchmaker-stage-gaps）：round.matches 為空但 round 本身非 null 的狀態，
+	// 是已由程式碼證實可達的狀態（resetIncompleteMatches 候選池計算不過濾
+	// isActive，見 design Decision 4）——重現方式為「產生本輪對戰後，把其中一位
+	// 對戰中的球員設為暫停出場，再點重設／再排」，候選池即不足以組出任何一場。
+	test("回合存在但本輪無場次時顯示說明文字與前往參賽者名單入口", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		await page.goto("/matchmaker/players");
+		await page.getByRole("button", { name: "設為暫停" }).first().click();
+
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "重設／再排" }).click();
+
+		await expect(page.getByTestId("empty-matches")).toBeVisible();
+		await expect(page.getByTestId("match-stage-courts")).toHaveCount(0);
+		await expect(page.getByRole("link", { name: "前往參賽者名單" })).toBeVisible();
+	});
+
+	test("回合存在且有場次時不顯示本輪場次為空的說明", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		await expect(page.getByTestId("empty-matches")).toHaveCount(0);
+	});
 });
