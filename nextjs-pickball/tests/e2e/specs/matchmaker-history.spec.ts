@@ -499,6 +499,10 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(alert).toContainText("1");
 		await expect(alert).toContainText("損毀");
 		await expect(alert).toContainText("歷史紀錄");
+		// spec Scenario 1 的 THEN 除了損毀筆數，還要求「說明其餘紀錄不受影響」；
+		// 前三條斷言擋不住把後半句拿掉的退化（例如只剩「有 N 筆損毀的歷史紀錄已略過。」），
+		// 這裡直接鎖字面量文字，不引用 HistoryView.tsx 的字串（避免恆真同義反覆）。
+		await expect(alert).toContainText("不受影響");
 		// 合法那筆紀錄不受影響，正常顯示。
 		await expect(page.getByText("損毀提示合法員A")).toBeVisible();
 	});
