@@ -30,9 +30,9 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 3.1 RED: 於 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 新增兩個 test：「有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示」（以 `page.addInitScript` 種入 `matchmaker:history:v1` 含一筆合法紀錄與一筆缺必要欄位的不合法紀錄 → 開啟 `/matchmaker/history` → 斷言 `getByRole("alert")` 可見且文字含損毀筆數與「歷史紀錄」，合法紀錄的球員姓名仍可見）、「沒有損毀歷史紀錄時不顯示損毀提示」（種入僅含合法紀錄 → 斷言 `getByRole("alert")` 筆數為 0）。跑單檔確認兩者紅燈並貼出輸出
-- [ ] 3.2 GREEN: 修改 `nextjs-pickball/components/matchmaker/HistoryView.tsx`：hydration 的 `useEffect` 內同時取用 `readHistory()` 回傳的 `entries` 與 `droppedCount`（目前只取前者），存進既有的 `HydratedHistory` reducer state；`droppedCount > 0` 時於內容最上方（`<HistoryRangeFilter>` 之前）渲染 `role="alert"` 提示，樣式 class 與文案比照 `nextjs-pickball/app/matchmaker/players/page.tsx` 第 67～75 行既有區塊（「有 {droppedCount} 筆損毀的歷史紀錄已略過，其餘歷史紀錄不受影響。」），**不修改** `app/matchmaker/players/page.tsx`、**不抽共用元件**（design Decision 2）
-- [ ] 3.3 REFACTOR: 確認提示區塊只在 `hydrated !== null && hydrated.droppedCount > 0` 時渲染（避免 SSR／CSR 不一致的 hydration mismatch，比照既有 `entries` 的取用方式）；確認 `HistoryView.tsx` 仍未 import `useRoundStore`；於新增區塊旁以繁體中文註解說明「各自持有一份、不抽共用元件」的理由（design Decision 2），避免日後被誤判為疏漏而順手抽象
+- [x] 3.1 RED: 於 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 新增兩個 test：「有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示」（以 `page.addInitScript` 種入 `matchmaker:history:v1` 含一筆合法紀錄與一筆缺必要欄位的不合法紀錄 → 開啟 `/matchmaker/history` → 斷言 `getByRole("alert")` 可見且文字含損毀筆數與「歷史紀錄」，合法紀錄的球員姓名仍可見）、「沒有損毀歷史紀錄時不顯示損毀提示」（種入僅含合法紀錄 → 斷言 `getByRole("alert")` 筆數為 0）。跑單檔確認兩者紅燈並貼出輸出
+- [x] 3.2 GREEN: 修改 `nextjs-pickball/components/matchmaker/HistoryView.tsx`：hydration 的 `useEffect` 內同時取用 `readHistory()` 回傳的 `entries` 與 `droppedCount`（目前只取前者），存進既有的 `HydratedHistory` reducer state；`droppedCount > 0` 時於內容最上方（`<HistoryRangeFilter>` 之前）渲染 `role="alert"` 提示，樣式 class 與文案比照 `nextjs-pickball/app/matchmaker/players/page.tsx` 第 67～75 行既有區塊（「有 {droppedCount} 筆損毀的歷史紀錄已略過，其餘歷史紀錄不受影響。」），**不修改** `app/matchmaker/players/page.tsx`、**不抽共用元件**（design Decision 2）
+- [x] 3.3 REFACTOR: 確認提示區塊只在 `hydrated !== null && hydrated.droppedCount > 0` 時渲染（避免 SSR／CSR 不一致的 hydration mismatch，比照既有 `entries` 的取用方式）；確認 `HistoryView.tsx` 仍未 import `useRoundStore`；於新增區塊旁以繁體中文註解說明「各自持有一份、不抽共用元件」的理由（design Decision 2），避免日後被誤判為疏漏而順手抽象
 
 ## 4. 重設／再排的端到端覆蓋（無對應 spec 異動）
 
