@@ -12,11 +12,11 @@
 > 追蹤結果核對一次，避免 §2 之後的工作建立在過期或錯誤的假設上。**本 change 為 M10～M15
 > 這一批的第一棒，無前一棒需確認合併**（見 environment.md／design.md Open Questions 第 1 條）。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上已含 `3fa2d22`（`git log --oneline -1` 或等效檢查）。本 change 無前一棒需合併，此項核對僅確認開分支前提成立，不需額外動作
-- [ ] 1.3 讀 `nextjs-pickball/lib/matchmaker/round.ts` 的 `resetIncompleteMatches` 與 `nextjs-pickball/lib/matchmaker/candidates.ts` 的 `selectPlaying`，核對 design Context／Decision 1、4 所述的「候選池計算不過濾 `isActive`、`isActive` 的過濾發生在 `selectPlaying`」是否與 `main` 上實際程式碼一致。**不一致則停止並回報**，SHALL NOT 依本文件假設開工——本 change 的 spec 可達性論證與 §2、§4 的 E2E 重現步驟皆建立在這個追蹤結果上
-- [ ] 1.4 讀 `nextjs-pickball/hooks/useRoundStore.ts`（`droppedCount` 附近，約第 90 行）、`nextjs-pickball/lib/matchmaker/round-storage.ts` 的 `readHistory()`，與 `nextjs-pickball/app/matchmaker/players/page.tsx` 第 67～75 行既有的損毀提示區塊，記錄 `droppedCount` 的實際回傳形狀與既有提示樣式 class／文案，供 §3 GREEN 直接比照
-- [ ] 1.5 讀 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 的 `seedRoster`／`trackConsoleIssues`／`tabUntilFocused` 與 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry`／`player` 等既有 helper，核對簽章與既有用法，供 §2～§4 直接沿用、SHALL NOT 重寫一份
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上已含 `3fa2d22`（`git log --oneline -1` 或等效檢查）。本 change 無前一棒需合併，此項核對僅確認開分支前提成立，不需額外動作
+- [x] 1.3 讀 `nextjs-pickball/lib/matchmaker/round.ts` 的 `resetIncompleteMatches` 與 `nextjs-pickball/lib/matchmaker/candidates.ts` 的 `selectPlaying`，核對 design Context／Decision 1、4 所述的「候選池計算不過濾 `isActive`、`isActive` 的過濾發生在 `selectPlaying`」是否與 `main` 上實際程式碼一致。**不一致則停止並回報**，SHALL NOT 依本文件假設開工——本 change 的 spec 可達性論證與 §2、§4 的 E2E 重現步驟皆建立在這個追蹤結果上
+- [x] 1.4 讀 `nextjs-pickball/hooks/useRoundStore.ts`（`droppedCount` 附近，約第 90 行）、`nextjs-pickball/lib/matchmaker/round-storage.ts` 的 `readHistory()`，與 `nextjs-pickball/app/matchmaker/players/page.tsx` 第 67～75 行既有的損毀提示區塊，記錄 `droppedCount` 的實際回傳形狀與既有提示樣式 class／文案，供 §3 GREEN 直接比照
+- [x] 1.5 讀 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 的 `seedRoster`／`trackConsoleIssues`／`tabUntilFocused` 與 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry`／`player` 等既有 helper，核對簽章與既有用法，供 §2～§4 直接沿用、SHALL NOT 重寫一份
 
 ## 2. 本輪場次為空時的畫面說明
 

@@ -79,4 +79,21 @@
 
 1. **本 change 是否需要在 apply §0 對齊「前一棒也可能改到的 MODIFIED 對象」？——不需要，此問題不適用。** 本 change 是 M10～M15 這一批的第一棒，相依對象固定為 `main @ 3fa2d22`（M9 已合併），批次內沒有更早的 change 需要對齊；且本 change 的兩份 delta spec（`match-stage`、`match-history`）皆只使用 ADDED Requirement，**不含任何 MODIFIED**，因此也不存在「MODIFIED 區塊需要以合併後的 main 重新對齊」的情境。apply §0 仍須依 tasks.md §1 的既有慣例，核對本文件與 spec 引用的每個既有函式簽章、常數與檔案路徑在 `main` 上的實際狀態（`resetIncompleteMatches`、`selectPlaying`、`readHistory`、`useRoundStore` 的 `droppedCount` 欄位、`app/matchmaker/players/page.tsx` 的提示樣式），但這是一般性的「先核對再動工」紀律，不是本條所指的批次內 MODIFIED 對齊問題。
 2. **`EmptyMatches.tsx` 是否需要接受任何 props？** 暫定不需要——判斷「是否要渲染」的條件（`round.matches.length === 0`）留在 `MatchStage.tsx`，元件本身是純靜態內容（標題、說明、一個固定連結），不需要任何輸入。若 apply 階段發現需要依情境調整文案（例如未來想區分「重排導致」與「其他成因導致」的空場次），屆時再回頭補 props，本文件不預先設計用不到的擴充點（`working-principles`「No abstractions for single-use code」）。
-3. **`droppedCount` 提示放置於 `HistoryRangeFilter` 之上或之下？** 暫定比照 `player-roster` 的既有慣例，放在頁面內容最上方（`HistoryView.tsx` 回傳的最外層 `<div>` 內、`<HistoryRangeFilter>` 之前）——損毀提示是「整份資料層級」的訊息，不屬於任何一個區間篩選結果，理應在篩選控制項之前先被看到。此為呈現順序的小決定，不寫進 spec（spec 只約束「MUST 顯示」，不約束版面順序），apply 階段若有更好的版面理由可自行微調，不需要回頭改 spec。
+3. **[已於 apply §1 核對，2026-09-06]** 本節其餘條目所引用的既有程式碼在 `main` 上的實際狀態，
+   逐項核對結果如下，**全數與本文件一致，無差異**：
+   - `lib/matchmaker/round.ts` 的 `resetIncompleteMatches`：`occupiedPlayerIds` 只由 `keptMatches`
+     推出，候選池 `players.filter((p) => !occupiedPlayerIds.has(p.id))` **不過濾 `isActive`**；
+     該函式內既有註解亦明載「候選池不足時 `allocateRound` 回傳空 `matches`，本函式不判定失敗」。
+   - `lib/matchmaker/candidates.ts` 的 `selectPlaying`：第 51 行 `players.filter((p) => p.isActive)`，
+     `isActive` 過濾確實發生在此處（Decision 4 的重現路徑成立）。
+   - `lib/matchmaker/round-storage.ts`：`ReadHistoryResult` 為 `{ entries, droppedCount }`；
+     `hooks/useRoundStore.ts` 的 `UseRoundStoreResult.droppedCount` 亦存在（僅供對照，本 change 不用它）。
+   - `app/matchmaker/players/page.tsx` 既有損毀提示：`role="alert"` ＋
+     `className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"`，
+     文案「有 {droppedCount} 筆資料損毀已略過，其餘參賽者資料不受影響。如遺失重要參賽者，請重新新增。」
+   - E2E helper 簽章：`match-stage.spec.ts` 的 `seedRoster(page, count)`、`trackConsoleIssues(page)`、
+     `tabUntilFocused(page, locator, maxPresses?)`；`matchmaker-history.spec.ts` 的
+     `seedHistory(page, entries)`、`buildEntry(options)`、`player(id, name, ratingBefore?, ratingAfter?)`。
+   - `PlayerCard.tsx` 的出場切換按鈕文字為「設為暫停」／「恢復出場」（Decision 4 的點擊目標）。
+
+4. **`droppedCount` 提示放置於 `HistoryRangeFilter` 之上或之下？** 暫定比照 `player-roster` 的既有慣例，放在頁面內容最上方（`HistoryView.tsx` 回傳的最外層 `<div>` 內、`<HistoryRangeFilter>` 之前）——損毀提示是「整份資料層級」的訊息，不屬於任何一個區間篩選結果，理應在篩選控制項之前先被看到。此為呈現順序的小決定，不寫進 spec（spec 只約束「MUST 顯示」，不約束版面順序），apply 階段若有更好的版面理由可自行微調，不需要回頭改 spec。

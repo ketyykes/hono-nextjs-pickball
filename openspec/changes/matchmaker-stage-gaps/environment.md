@@ -35,10 +35,16 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0 實測回填。
-- **Initial commit hash**: 待 apply Step 0 實測回填（開分支當下 `main` HEAD 已知為
-  `3fa2d224a0b5700f910656de07b03fe23b93f007`，但 Step 0 仍須於該分支上實際
-  `git rev-parse HEAD` 回填本欄，SHALL NOT 憑本文件記載的值代填）。
+- **Baseline tests**: apply Step 0（2026-09-06）實測 `pnpm test` 全綠——
+  `nextjs-pickball`：68 test files / 638 tests passed；`hono-pickball`：4 test files / 16 tests
+  passed（workerd runtime，未出現 `listen EPERM`）。`pnpm install` 後 `git status --porcelain`
+  為空、`pnpm-lock.yaml` 零變動。
+- **Initial commit hash**: `3da4ce944e4b8c855686f41cb3c736341ff2027c`（於
+  `change/matchmaker-stage-gaps` 上實測 `git rev-parse HEAD`）。與上方 propose 階段記載的
+  `3fa2d22` 不同是預期內的：`main` 在 propose 之後多了三個**純文件** commit
+  （`80143fa` 目錄索引、`70099ad` M10～M15 執行手冊、`3da4ce9` 六個 change 提案），
+  皆不含任何 `nextjs-pickball/**` 程式碼異動；`git merge-base --is-ancestor 3fa2d22 main`
+  已實測通過，開分支前提（`main` 含 `3fa2d22`）成立。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`
   （主 repo；本批不用 worktree，schema Step 0 的 cwd 檢查以此路徑為準）
 
