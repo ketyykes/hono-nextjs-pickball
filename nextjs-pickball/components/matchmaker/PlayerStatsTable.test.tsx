@@ -156,4 +156,50 @@ describe("PlayerStatsTable", () => {
 		expect(cellTexts[7]).toBe("尚無紀錄");
 		expect(cellTexts[8]).toBe("尚無紀錄");
 	});
+
+	it("球員欄的色塊內容為姓名本身", () => {
+		const stat = buildStat({ id: "p1", name: "王小明" });
+		render(<PlayerStatsTable stats={[stat]} />);
+
+		// 色塊內顯示的必須是姓名，不是 id 或其他欄位——spec「統計頁的路由與呈現」的球員欄
+		// 定義為「色塊＋姓名」，只斷言背景／前景色會讓「色塊內容換成 id」的變異存活。
+		const badge = screen.getByTestId(`player-stat-badge-${stat.id}`);
+		expect(badge.textContent).toBe("王小明");
+	});
+
+	it("強度淨變化為零時不補正號", () => {
+		const stat = buildStat({ ratingDelta: 0 });
+		render(<PlayerStatsTable stats={[stat]} />);
+
+		const row = screen.getByTestId(`player-stat-row-${stat.id}`);
+		const cellTexts = within(row)
+			.getAllByRole("cell")
+			.map((cell) => cell.textContent);
+
+		// 「正值補 +、0 不補」是元件內具名的顯示決策（spec 未規範此邊界），
+		// 以斷言鎖住，避免日後改成 delta >= 0 而無人察覺。
+		expect(cellTexts[6]).toBe("0.00");
+	});
+
+	it("勝率以四捨五入取整數百分比呈現", () => {
+		// 兩個值同時涵蓋三種取整方式的差異：2/3（三場兩勝，spec 舉過的實際值）四捨五入為
+		// 67%、無條件捨去為 66%；1/3（三場一勝）四捨五入為 33%、無條件進位為 34%。
+		const roundsUp = buildStat({ id: "p1", gamesPlayed: 3, wins: 2, losses: 1, winRate: 2 / 3 });
+		const roundsDown = buildStat({ id: "p2", gamesPlayed: 3, wins: 1, losses: 2, winRate: 1 / 3 });
+		render(<PlayerStatsTable stats={[roundsUp, roundsDown]} />);
+
+		const winRateOf = (id: string) =>
+			within(screen.getByTestId(`player-stat-row-${id}`)).getAllByRole("cell")[5].textContent;
+
+		expect(winRateOf("p1")).toBe("67%");
+		expect(winRateOf("p2")).toBe("33%");
+	});
+
+	it("表格具備可存取名稱", () => {
+		render(<PlayerStatsTable stats={[buildStat()]} />);
+
+		// 九欄表格對螢幕閱讀器而言需要一個名稱才能在「表格清單」中被辨識；
+		// 標題列本身不構成表格的可存取名稱。
+		expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
+	});
 });

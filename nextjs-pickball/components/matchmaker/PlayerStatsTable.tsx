@@ -25,6 +25,10 @@ export interface PlayerStatsTableProps {
 // 不進 labels.ts（design Decision 2；§4→§5 交棒事項 1：null 的顯示決策留在本檔）。
 const NO_FREQUENT_NAME_PLACEHOLDER = "尚無紀錄";
 
+// 表格的可存取名稱：標題列不構成 <table> 的可存取名稱，缺少名稱時螢幕閱讀器的表格清單
+// 只會讀到「表格」。與佔位符號同樣是單一消費端的純顯示字串，故留在本檔不進 labels.ts。
+const TABLE_ACCESSIBLE_NAME = "球員排行榜";
+
 // 漸層角度沿用 lib/matchmaker/tile-style.ts 既有寫法，同一顏色來源在不同呈現位置
 // 採一致角度；本元件不重用 playerTileStyle 本身——該函式簽名要求完整 Player
 // （含 gender／rating 等排行榜色塊不需要的欄位），且它的 completed 參數在排行榜
@@ -40,7 +44,7 @@ function formatRatingDelta(delta: number): string {
 
 export function PlayerStatsTable({ stats }: PlayerStatsTableProps) {
 	return (
-		<Table>
+		<Table aria-label={TABLE_ACCESSIBLE_NAME}>
 			<TableHeader>
 				<TableRow>
 					<TableHead>名次</TableHead>
