@@ -67,9 +67,15 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 					import lib/matchmaker/ 的單向相依）。 */}
 					{state.teamPlayers !== null && (
 						<span className="mx-1 inline-flex items-center gap-1 align-middle">
-							{state.teamPlayers[team].map((badge) => (
+							{state.teamPlayers[team].map((badge, index) => (
 								<span
-									key={badge.name}
+									// key 取 index 而非 badge.name：PlayerBadge 沒有 id 欄位，而 name 不保證
+									// 唯一——同名球員（PlayerSchema 對 name 無唯一性約束），或雙打某隊兩人
+									// 都已離開名單時（兩筆的 name 皆為固定替代文字「已離開名單」，見
+									// lib/matchmaker/scoreboard-binding.ts 的 MISSING_PLAYER_NAME），
+									// 同層就會出現重複 key。本清單是純靜態渲染（長度固定 1～2，不新增、
+									// 不刪除、不排序），index 與該筆資料的對應恆定，是此處安全的鍵。
+									key={index}
 									title={badge.name}
 									className="max-w-24 truncate rounded-full px-2 py-0.5 text-[0.6rem] normal-case tracking-normal"
 									style={{
