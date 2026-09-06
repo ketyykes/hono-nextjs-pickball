@@ -79,4 +79,45 @@ describe("computePlayerStats", () => {
 		const gone = result.find((stat) => stat.id === "p-gone");
 		expect(gone).toBeDefined();
 	});
+
+	it("出場數、勝場與敗場依歷史紀錄正確加總", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		const history = [
+			makeEntry({
+				matchId: "m1",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				winner: "teamA",
+			}),
+			makeEntry({
+				matchId: "m2",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				winner: "teamA",
+			}),
+			makeEntry({
+				matchId: "m3",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				winner: "teamA",
+			}),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.gamesPlayed).toBe(3);
+		expect(alice?.wins).toBe(2);
+		expect(alice?.losses).toBe(1);
+		expect(alice?.winRate).toBeCloseTo(2 / 3);
+	});
+
+	it("出場數為零時勝率為零而非 NaN", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" })];
+
+		const result = computePlayerStats([], players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.winRate).toBe(0);
+	});
 });
