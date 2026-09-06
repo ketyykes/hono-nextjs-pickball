@@ -23,6 +23,12 @@ const PLACEHOLDER_COLOR_TO = "#4B5563";
  * SHALL NOT 跳過該筆，跳過會讓雙打面板變成一人一格（見 spec）。foreground 一律由
  * pickTextColor 依 colorFrom／colorTo 算好存入，scoreboard 端只讀不算，藉此維持
  * lib/scoreboard/ 不 import lib/matchmaker/ 的單向相依（design Decision 1）。
+ *
+ * ⚠️ 與 components/matchmaker/CourtCard.tsx、lib/matchmaker/round.ts 內同名的
+ * `resolveTeamPlayers`（兩者皆「查無此人就跳過」）行為相反，這是 design Decision 3
+ * 明文接受的不一致：對戰頁色塊的 row／column 是離散格位，缺一格比多一格佔位更貼近
+ * 版面推導的資料形狀；計分板面板沒有這層版面約束，少一筆反而會讓雙打看起來像單打。
+ * 複製那兩個函式的假設到這裡會直接違反 spec，反之亦然。
  */
 function resolvePlayerBadges(
 	playerIds: readonly string[],
@@ -42,10 +48,15 @@ function resolvePlayerBadges(
 }
 
 /**
- * 把該場的兩隊 playerIds 解析為 teamPlayers：第一隊 ↔ us、第二隊 ↔ them，
+ * 把該場的兩隊 playerIds 組成 teamPlayers：第一隊 ↔ us、第二隊 ↔ them，
  * 與 mapTeamScores 的隊伍對應同構，SHALL NOT 在兩處各自寫一份。
+ *
+ * 命名刻意不叫 `resolveTeamPlayers`：`round.ts` 與 `CourtCard.tsx` 已各有一個同名私有
+ * 函式，其契約是 `(playerIds, players) => Player[]`（且查無此人就跳過）；本函式吃的是
+ * 整個 `match`、產出的是 us／them 兩側的 PlayerBadge 結構，與那個契約不同，沿用同名會讓
+ * 讀者把「跳過」的假設一併帶進來。`build` 前綴同 buildMatchSlotSeed／buildCourtTiles。
  */
-function resolveTeamPlayers(match: RoundMatch, players: readonly Player[]): TeamPlayers {
+function buildTeamPlayers(match: RoundMatch, players: readonly Player[]): TeamPlayers {
 	const [teamA, teamB] = match.teams;
 	return {
 		us: resolvePlayerBadges(teamA.playerIds, players),
@@ -73,7 +84,7 @@ export function buildMatchSlotSeed(
 		...createInitialState({
 			mode: round.format,
 			targetScore: round.targetScore,
-			teamPlayers: resolveTeamPlayers(match, players),
+			teamPlayers: buildTeamPlayers(match, players),
 		}),
 		// matchId 只在這裡決定一次：createInitialState 的 matchId 型別為 string | null，
 		// 在此覆寫同時完成型別窄化，故不再重複傳進 overrides——兩處寫同一件事會分歧。

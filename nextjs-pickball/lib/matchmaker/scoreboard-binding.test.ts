@@ -261,6 +261,14 @@ describe("scoreboard-binding", () => {
 		expect(badge?.colorTo).toBe("#E5E5E5");
 		// 不硬寫顏色字串：直接呼叫 pickTextColor 比對，確保未來公式調整時本斷言自動跟進。
 		expect(badge?.foreground).toBe(pickTextColor("#F5F5F5", "#E5E5E5"));
+
+		// Stage 2 補：them 側的色碼原本沒有任何斷言比對（只比對過姓名），實測
+		// 「只讓 them 的 colorFrom 被固定字串覆寫」的竄改會全綠存活。兩隊套用同一個
+		// 解析函式、無隊伍別分支，但缺了斷言就等於缺了偵測力，故 them 側同樣釘住三欄。
+		const opponentBadge = seed.teamPlayers?.them[0];
+		expect(opponentBadge?.colorFrom).toBe("#DC2626");
+		expect(opponentBadge?.colorTo).toBe("#7F1D1D");
+		expect(opponentBadge?.foreground).toBe(pickTextColor("#DC2626", "#7F1D1D"));
 	});
 
 	it("名單中找不到該球員時球員顯示資訊以替代文字呈現且不拋錯", () => {
