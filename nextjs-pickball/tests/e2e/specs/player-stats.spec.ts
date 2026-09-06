@@ -182,6 +182,12 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 
 		await page.goto(STATS_PAGE);
 
+		// 頁面標題區（tasks 6.3：標題與說明文字為繁體中文且不與其他 matchmaker 頁面
+		// 重複措辭）。沿用 matchmaker-history.spec.ts 對 h1 的既有斷言慣例——沒有這兩條
+		// 時，把整個標題區刪掉本檔照樣全綠（Stage 2 mutation 實測確認此退化會存活）。
+		await expect(page.getByRole("heading", { name: "球員統計" })).toBeVisible();
+		await expect(page.getByText("依區間排名每位球員的表現與強度消長。")).toBeVisible();
+
 		const table = page.getByRole("table", { name: STATS_TABLE_NAME });
 		await expect(table).toBeVisible();
 
@@ -266,6 +272,37 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 		await page.getByRole("radio", { name: "今日" }).click();
 		await expect(focusRow.getByRole("cell").nth(CELL_INDEX_GAMES_PLAYED)).toHaveText("2");
 		await expect(page.getByTestId("player-stat-row-p-range-lastmonth")).toHaveCount(0);
+	});
+
+	// 非錨點補強：鎖住空狀態判定用的是「未篩選的 history」而非「篩選後的 filteredHistory」。
+	// 兩者只在「整份歷史有資料、但目前區間內沒有」時才分岔，上面三條錨點 test 的每個
+	// 斷言時點都落在「目前區間有資料」，因此把 history.length 換成 filteredHistory.length
+	// 照樣全綠（Stage 2 mutation 實測確認此退化會存活）。
+	//
+	// 引導型空狀態的語意是「從沒打過」（EmptyHistory 的 range === null 分支文案），
+	// 空區間顯示它會謊稱使用者從未有過任何紀錄——這正是本條要擋下的退化。
+	test("切換到沒有紀錄的區間時不顯示引導型空狀態", async ({ page }) => {
+		await seedHistory(page, [
+			buildEntry({
+				matchId: "e2e-stats-emptyrange-1",
+				playedAt: isoToday(10),
+				teamA: [player("p-emptyrange-a", "空區間今日員甲")],
+				teamB: [player("p-emptyrange-b", "空區間今日員乙")],
+			}),
+		]);
+
+		await page.goto(STATS_PAGE);
+		await expect(page.getByTestId("player-stat-row-p-emptyrange-a")).toBeVisible();
+
+		// 唯一一筆紀錄落在今日，上月因此必為空區間。
+		await page.getByRole("radio", { name: "上月" }).click();
+
+		// 區間篩選 MUST 留在畫面上，使用者才切得回有紀錄的區間——換成
+		// filteredHistory.length 會連同篩選器一起被空狀態分支取代。
+		await expect(page.getByRole("radiogroup", { name: "歷史區間" })).toBeVisible();
+		await expect(page.getByTestId("empty-history")).toHaveCount(0);
+		// 正向對照：今日那筆確實已被排除，不是「篩選根本沒生效」而讓上面兩條矇混通過。
+		await expect(page.getByTestId("player-stat-row-p-emptyrange-a")).toHaveCount(0);
 	});
 
 	// 非錨點補強：鎖住 computePlayerStats 的第二引數確實接上 useRosterStore 的名單。
