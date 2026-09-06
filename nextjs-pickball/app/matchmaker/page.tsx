@@ -5,7 +5,7 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { EmptyStage } from "@/components/matchmaker/EmptyStage";
 import { ExportActions } from "@/components/matchmaker/ExportActions";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
-import type { MatchStageSubmitError } from "@/components/matchmaker/MatchStage";
+import type { MatchStageSubmitError, MatchStageSwapError } from "@/components/matchmaker/MatchStage";
 import { PrintSheet } from "@/components/matchmaker/PrintSheet";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
 import { useRosterStore } from "@/hooks/useRosterStore";
@@ -33,7 +33,7 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
 	const { players, updatePlayer } = useRosterStore();
-	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore } = useRoundStore({
+	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, swapMatchPlayer } = useRoundStore({
 		players,
 		updatePlayer,
 	});
@@ -41,6 +41,7 @@ export default function MatchmakerPage() {
 	const [settings, setSettings] = useState<RoundSettings>(() => createRoundSettings());
 	const [roundError, setRoundError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null);
+	const [swapError, setSwapError] = useState<MatchStageSwapError | null>(null);
 	// 用 useReducer 而非 useState 存放 matchSlots：ESLint 的 react-hooks/set-state-in-effect
 	// 規則會擋下「在 effect 內同步呼叫 useState setter」，但不適用於 useReducer 的
 	// dispatch（與 hooks/useScoreboardStore.ts 的 bindingStatus 既有寫法一致）。
@@ -101,6 +102,14 @@ export default function MatchmakerPage() {
 	function handleSubmitScore(matchId: string, rawScoreA: string, rawScoreB: string) {
 		const result = submitScore(matchId, rawScoreA, rawScoreB);
 		setSubmitError(result.ok ? null : { matchId, message: result.message });
+	}
+
+	// swapMatchPlayer 一次互動只呼叫一次（useRoundStore 的已知限制，見該檔註解）：
+	// 本函式是 CourtCard 換人操作的唯一呼叫點。swapError 與 submitError 為各自獨立的
+	// state，互不清除對方（design 換人風險第 1 條）。
+	function handleSwapPlayer(matchId: string, outPlayerId: string, inPlayerId: string) {
+		const result = swapMatchPlayer(matchId, outPlayerId, inPlayerId);
+		setSwapError(result.ok ? null : { matchId, message: result.message });
 	}
 
 	// buildExportScene 的唯一呼叫點（design Decision 2）：JPG 與（未來的）列印稿共用
@@ -190,6 +199,8 @@ export default function MatchmakerPage() {
 						matchSlots={matchSlots}
 						onSubmitScore={handleSubmitScore}
 						submitError={submitError}
+						onSwapPlayer={handleSwapPlayer}
+						swapError={swapError}
 					/>
 				)}
 			</div>
