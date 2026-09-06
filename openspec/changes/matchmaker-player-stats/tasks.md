@@ -157,6 +157,51 @@ Depends on: §4
 - [x] 5.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/labels.ts` 新增具名常數 `PLAYER_NOT_ON_ROSTER_LABEL = "已不在名單"`（純新增，不改動既有四個匯出）。實作 `nextjs-pickball/components/matchmaker/PlayerStatsTable.tsx`：`"use client"`，props 為 `{ stats: readonly PlayerStat[] }`，使用 `components/ui/table.tsx` 的 `Table`／`TableHeader`／`TableBody`／`TableRow`／`TableCell` 渲染九欄（名次、球員、強度、出場、勝－負、勝率、淨變化、常搭檔、常對手）；球員欄以 `colorFrom`／`colorTo` 內嵌 `linear-gradient` 背景與 `pickTextColor` 前景色呈現色塊，`onRoster===false` 時姓名旁加上 `PLAYER_NOT_ON_ROSTER_LABEL`；`mostFrequentPartner`／`mostFrequentOpponent` 為 `null` 時顯示本檔內具名的佔位符號（單一用途，不進 `labels.ts`）。標題列儲存格用 `TableHead`（非文字列出的 `TableCell`），理由見交件回報「偏離」欄
 - [x] 5.3 REFACTOR: 確認欄位順序與 spec 逐字相符；確認 `PLAYER_NOT_ON_ROSTER_LABEL` 只有這一個消費端且沒有第二份「已不在名單」字面量散在元件內；確認名次為傳入陣列的索引 + 1（`computePlayerStats` 已排序，元件不重新排序）；確認元件不 import 任何 store。逐項機械核對通過，無需改動程式碼
 
+> **§5 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。紅燈複驗屬實（`b181ef2^` 無此元件）；錨點 it
+>   名稱逐字相符；`PlayerStat` **13 個欄位逐一盤點確認全數有消費端、零 dead data**（Decision 6）。
+>   Stage 1 另裁決兩件事：① **「勝－負」vs「勝負」為 delta spec 內部矛盾**——Scenario 的九個詞
+>   全都是欄位全名的子字串（「強度」⊂「目前強度」等），唯獨「勝負」⊄「勝－負」，破折號是 prose
+>   敘述便利寫法而非 UI 文案規定；實作採「勝負」正確，leader 已於 `6ff2247` 更正 spec／design／
+>   proposal 三處（詳見 design.md Open Questions 第 1-b 條）。② **「已不在名單」不加全形括號可接受**
+>   ——spec 只要求「可讀的文字標示」、未規定標點形式，不構成「為了測試好寫而改動產品輸出」。
+> - Stage 2（品質）：`APPROVED`。獨立跑 **36 個變異體，補斷言前 4 個存活**：
+>   ① **球員欄從未斷言「顯示的是姓名」**（色塊內容換成 `stat.id` 竟全綠）——屬規格欄位無斷言覆蓋的
+>   實質缺口；② `formatRatingDelta` 的 `delta > 0` 放寬為 `>=`（0 也補正號）；③ 勝率的
+>   `Math.round` 換成 `floor`／`ceil`；④ `pickTextColor` 兩引數對調。
+>   Stage 2 依授權於 `977a6fc` 補 4 個 it 殺掉前三項，並**補上表格的可存取名稱**
+>   （`aria-label="球員排行榜"`，先寫測試看到真紅燈再實作）。
+>   **剩餘 1 個存活變異判定為 equivalent mutant**：`colors.ts` 的 `pickTextColor` 內部是
+>   `Math.min(contrastRatio(colorFrom, fg), contrastRatio(colorTo, fg))`，`Math.min` 對兩引數
+>   對稱，`pickTextColor(a,b) === pickTextColor(b,a)` 恆成立，**任何測試都不可能殺掉它**。
+> - Stage 2 對三項判斷題的結論：① **不共用 `tile-style.ts` 的 `playerTileStyle` 成立**——該函式
+>   簽名要求完整 `Player`（含 `gender`／`rating` 等），且 `completed` 參數在排行榜無意義；且
+>   `components/matchmaker/PlayerCard.tsx:39` **既有先例本來就內嵌漸層字串**，三處角度與格式零漂移，
+>   並已有 mutation 護欄。放寬 `playerTileStyle` 參數屬後續重構 change，不在 M11 範圍。
+>   ② 數值格式化與全 repo 一致（`toFixed(2)` 見 `PlayerTile`／`PlayerCard`／`PlayerForm`／
+>   `HistoryRecordCard`，`history-csv.ts` 更有 `RATING_DECIMAL_PLACES = 2` 的具名先例）。
+>   ③ `data-testid` 命名 `<語意>-${id}` 與既有 `resting-player-${id}`／`player-tile-${id}`／
+>   `history-record-${matchId}-score` 同型，且 §6 的 E2E 本來就需要。
+> - 無障礙：色塊 `<span>` 承載姓名文字且**沒有**被標 `aria-hidden`（有別於 `RestingPanel` 的純裝飾
+>   色點刻意標了 `aria-hidden`），處理正確。`pickTextColor` **不保證 WCAG AA**（`colors.ts` 檔頭
+>   JSDoc 明寫「即使兩者最小對比皆低於 4.5:1，仍取較高者、不阻擋」）——那是 M1 的既定全域取捨，
+>   非本 change 新增的缺陷。
+>
+> **§5 → §6 交棒（Stage 2 指定，MUST 遵守）**
+> 1. `<Table>` 現在帶 `aria-label="球員排行榜"`。E2E 定位表格用
+>    `page.getByRole("table", { name: "球員排行榜" })` 最穩，**勿假設表格無名稱**。
+> 2. 可用的 `data-testid`：`player-stat-row-${stat.id}`、`player-stat-badge-${stat.id}`。
+>    元件實際渲染的九個標題為「名次／球員／**目前強度**／**出場數**／**勝負**／勝率／
+>    **強度淨變化**／**最常搭檔**／**最常對手**」——Scenario 要比對的
+>    `強度`／`出場`／`淨變化`／`常搭檔`／`常對手` 皆為其子字串，可直接用 `toContainText`。
+> 3. **`PlayerStatsTable` 的 props 只有 `stats`**，元件不吃 `history`／`players`、不做 null 防護、
+>    也**不處理空狀態**（`stats` 為空時只渲染標題列）。spec 要求「完全沒有紀錄時顯示 `EmptyHistory`
+>    而非空表格」，**這個分流責任完全在 §6 的 `page.tsx`**，不要期待元件內有 fallback。
+> 4. Decision 7 的 390px 不溢出由 `table.tsx` 內建 `overflow-x-auto` 提供；§6 的頁面外層若加了
+>    自己的 padding／grid，MUST 確認沒有把捲動容器撐破——元件端已零斷點 CSS、零 `min-width`。
+> 5. **窄螢幕隱藏欄位一事，§6 SHALL NOT 自行處理**——那牽動 Decision 6／7 與 Open Question 3，
+>    屬人類決策，遇到問題回報 `BLOCKED`。
+
 ## 6. 統計頁掛載：路由、區間整合、空狀態（app/matchmaker/stats/page.tsx）
 
 Depends on: §5
@@ -196,7 +241,7 @@ Depends on: §6, §7
 - [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」
 - [ ] 9.10 `DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
 - [ ] 9.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
-- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 3 個
+- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 12 個
       不在 delta spec 驗收錨點內的 `it`（皆對應 spec prose 的 MUST 子句或 design Decision，
       經 §4 Stage 1／Stage 2 判定為正當而非測試膨脹）。archive 前 MUST 把它們補登進
       `test-plan.md`，避免日後稽核誤判為未經規劃的測試膨脹：
@@ -205,3 +250,14 @@ Depends on: §6, §7
       ② 「最常搭檔次數平手時取姓名 UTF-16 code unit 較前者」（對應 Decision 5 的 tie-break）
       ③ 「最常搭檔的顯示姓名取該對象 playedAt 最近一次的姓名快照」（對應 Decision 4 的 MUST，
       §4 Stage 2 發現該條 MUST 原本零覆蓋）
+      —— 以上三個在 `lib/matchmaker/player-stats.test.ts`。
+      §5 的 `components/matchmaker/PlayerStatsTable.test.tsx` 另有九個：
+      ④ 「表格標題列依序顯示九個欄位名稱」（對應 spec 的九欄順序 MUST 與 Decision 6 的零 dead data）
+      ⑤ 「名次為傳入陣列的索引加一，不重新排序也不使用索引本身」（對應 5.3 與 §4→§5 交棒事項 2）
+      ⑥ 「各欄位如實顯示球員統計資料」（對應九欄的欄位對應正確性）
+      ⑦ 「強度淨變化為負值時顯示負號，不強制補上正號」（呈現層決策的護欄）
+      ⑧ 「最常搭檔與最常對手為 null 時顯示佔位符號而非空字串」（對應 Decision 2 的 null→文案分工）
+      ⑨ 「球員欄的色塊內容為姓名本身」（§5 Stage 2 發現：球員欄原本從未斷言顯示的是姓名）
+      ⑩ 「強度淨變化為零時不補正號」（`formatRatingDelta` 的具名顯示決策原本無護欄）
+      ⑪ 「勝率以四捨五入取整數百分比呈現」（同上）
+      ⑫ 「表格具備可存取名稱」（§5 Stage 2 補的 a11y 行為，spec「色彩非唯一資訊來源」的延伸）
