@@ -135,15 +135,25 @@ export function CourtCard({
 	// disabled 要解釋自己），否則顯示「換人」；aria-label 一律含球員姓名，使可存取名稱
 	// 在雙打四格之間互不相同（spec「場地區塊的換人操作」）。組字模板集中於此，
 	// 球員格迴圈內只呼叫本函式，不重複拼接。
+	//
+	// 停用時把原因併入可存取名稱：aria-label 會蓋掉觸發器的內部文字，若只把「無可換之人」
+	// 放在可見文字，讀屏使用者聽到的只有「替 X 換人，已停用」而聽不到原因——可見與可聽到
+	// 的資訊必須一致，disabled 才算真的解釋了自己（prd.md 12.3）。
 	function renderSwapTrigger(outPlayer: Player) {
 		const noCandidate = swapCandidates.length === 0;
+		const triggerLabel = `替 ${outPlayer.name} ${SWAP_PLAYER_LABEL}`;
 		return (
 			<Select
 				value=""
 				onValueChange={(inPlayerId) => handleSwapSelect(outPlayer.id, inPlayerId)}
 				disabled={noCandidate}
 			>
-				<SelectTrigger className="w-full" aria-label={`替 ${outPlayer.name} ${SWAP_PLAYER_LABEL}`}>
+				<SelectTrigger
+					className="w-full"
+					aria-label={
+						noCandidate ? `${triggerLabel}（${SWAP_PLAYER_NO_CANDIDATE_LABEL}）` : triggerLabel
+					}
+				>
 					<SelectValue placeholder={noCandidate ? SWAP_PLAYER_NO_CANDIDATE_LABEL : SWAP_PLAYER_LABEL} />
 				</SelectTrigger>
 				<SelectContent position="popper">

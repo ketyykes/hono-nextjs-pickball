@@ -643,6 +643,14 @@ describe("CourtCard", () => {
 			expect((trigger as HTMLButtonElement).disabled).toBe(true);
 			expect(trigger.textContent).toContain("無可換之人");
 		}
+
+		// 停用原因也 MUST 進入可存取名稱：aria-label 會蓋掉觸發器的內部文字，只驗
+		// textContent 的話，讀屏使用者實際聽不到「無可換之人」這件事測不出來。
+		// 順帶釘住兩格的可存取名稱在停用狀態下仍互不相同。
+		expect(triggers.map((trigger) => trigger.getAttribute("aria-label"))).toEqual([
+			"替 王小明 換人（無可換之人）",
+			"替 陳小華 換人（無可換之人）",
+		]);
 	});
 
 	it("換人被拒絕時顯示帶 role alert 的繁體中文錯誤訊息", () => {
