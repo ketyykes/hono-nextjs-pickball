@@ -206,9 +206,23 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`，寫入三個 test：「完全沒有歷史紀錄時顯示引導型空狀態」、「直接開啟 /matchmaker/stats 可載入排行榜表格」、「切換區間後排行榜只反映該區間的歷史紀錄」（種資料方式比照 `matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry` 慣例，各自在本檔複製一份 fixture helper）。跑該檔確認紅燈（路由不存在／404）並貼出輸出
-- [ ] 6.2 GREEN: 實作 `nextjs-pickball/app/matchmaker/stats/page.tsx`：`"use client"`，持有 `const { players, updatePlayer } = useRosterStore();` 與 `const { history } = useRoundStore({ players, updatePlayer });`（design Decision 1，比照 `app/matchmaker/page.tsx` 既有形態，不新增 hook、不新增 View 元件）；以 `useState<HistoryRange>("today")` 持有目前區間；呼叫 `filterHistoryByRange(history, selectedRange, new Date())` 取得篩選後歷史，交給 `computePlayerStats(filteredHistory, players)`；`history.length === 0` 時渲染 `EmptyHistory range={null}`，否則渲染 `HistoryRangeFilter` 與 `PlayerStatsTable`
-- [ ] 6.3 REFACTOR: 確認 `page.tsx` 不含任何統計計算或區間篩選邏輯（全數委派既有函式），只做 store 接線與條件渲染；確認頁面標題與說明文字為繁體中文且不與其他 matchmaker 頁面重複措辭
+- [x] 6.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`，寫入三個 test：「完全沒有歷史紀錄時顯示引導型空狀態」、「直接開啟 /matchmaker/stats 可載入排行榜表格」、「切換區間後排行榜只反映該區間的歷史紀錄」（種資料方式比照 `matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry` 慣例，各自在本檔複製一份 fixture helper）。跑該檔確認紅燈（路由不存在／404）並貼出輸出。另補 2 個非錨點 test 覆蓋 mutation 缺口（見交件回報「偏離」欄），三個錨點 test 名稱逐字未變
+- [x] 6.2 GREEN: 實作 `nextjs-pickball/app/matchmaker/stats/page.tsx`：`"use client"`，持有 `const { players, updatePlayer } = useRosterStore();` 與 `const { history } = useRoundStore({ players, updatePlayer });`（design Decision 1，比照 `app/matchmaker/page.tsx` 既有形態，不新增 hook、不新增 View 元件）；以 `useState<HistoryRange>("today")` 持有目前區間；呼叫 `filterHistoryByRange(history, selectedRange, new Date())` 取得篩選後歷史，交給 `computePlayerStats(filteredHistory, players)`；`history.length === 0` 時渲染 `EmptyHistory range={null}`，否則渲染 `HistoryRangeFilter` 與 `PlayerStatsTable`
+- [x] 6.3 REFACTOR: 確認 `page.tsx` 不含任何統計計算或區間篩選邏輯（全數委派既有函式），只做 store 接線與條件渲染；確認頁面標題與說明文字為繁體中文且不與其他 matchmaker 頁面重複措辭。逐項機械核對通過，無需改動程式碼
+
+> **§6 實作紀錄（2026-09-06）**
+> - 紅燈：`4c8863d` 當下 `/matchmaker/stats` 路由不存在，五條 test 全數 `element(s) not found`（chromium）。
+> - 綠燈：`01ef639` 後 **25/25 通過（五個 browser project 全跑）**。
+> - Mutation：自跑 **11 個變異體，全數轉紅、零存活**（含指示清單的 7 條，另加
+>   「`HistoryRangeFilter` 移出條件式」「`computePlayerStats` 第二引數換空陣列」
+>   「`new Date()` 換 `new Date(0)`」「`value={selectedRange}` 寫死 `"today"`」四條）。
+> - 非錨點補強 test 兩條：「名單內球員取名單姓名與目前強度，已離開名單者標示且取歷史最後一筆」
+>   （鎖住 `computePlayerStats` 第二引數確實接上 `useRosterStore`）、「統計頁載入後無 console error」
+>   （本頁在 render 期間呼叫 `new Date()`，此條為「不會 hydration mismatch」的實證）。
+> - 交棒事項 1～5 全數遵守：表格一律以 `getByRole("table", { name: "球員排行榜" })` 定位；
+>   九個欄位子字串直接 `toContainText`；空狀態分流寫在 `page.tsx`（元件端無 fallback）；
+>   頁面外層沿用其他 matchmaker 頁既有的 `max-w-5xl … px-4 py-8`，未加任何會撐破
+>   `table.tsx` 捲動容器的水平內距或 grid；窄螢幕隱藏欄位未自行處理。
 
 ## 7. match-stage：第五個分頁「統計」納入區段導覽
 
