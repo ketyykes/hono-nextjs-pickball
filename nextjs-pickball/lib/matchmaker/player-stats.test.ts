@@ -137,6 +137,9 @@ describe("computePlayerStats", () => {
 
 		const alice = result.find((stat) => stat.id === "p1");
 		expect(alice?.winRate).toBe(0);
+		// spec「強度淨變化的計算」明載「出場數為 0 時淨變化 MUST 為 0」，但 Scenario 只列了
+		// golden path；這條 MUST 子句沒有其他測試守住，故在同一個「零出場」情境內一併斷言。
+		expect(alice?.ratingDelta).toBe(0);
 	});
 
 	it("名單內球員的目前強度取自名單目前的 rating", () => {
@@ -160,18 +163,20 @@ describe("computePlayerStats", () => {
 	it("已離開名單的球員取歷史最近一筆的 ratingAfter 並標示已不在名單", () => {
 		// 陣列順序刻意把「較晚」那筆放在前面：若實作誤用「陣列迭代順序取最後一筆」
 		// 會得到較早那筆的 4，只有真的依 playedAt 比較才會得到較晚那筆的 7。
+		// Bob 放在 teamB 且兩筆的 ratingAfter 不同：少了對他的斷言，實作只掃 teamA
+		// 也會全綠（teamB 的球員仍會經另一條聯集路徑被收進結果，只是強度落回 0）。
 		const history = [
 			makeEntry({
 				matchId: "m-later",
 				playedAt: "2026-08-20T00:00:00.000Z",
 				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p-gone", name: "Gone", ratingAfter: 7 })] }),
-				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob", ratingAfter: 9 })] }),
 			}),
 			makeEntry({
 				matchId: "m-earlier",
 				playedAt: "2026-08-10T00:00:00.000Z",
 				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p-gone", name: "Gone", ratingAfter: 4 })] }),
-				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob", ratingAfter: 2 })] }),
 			}),
 		];
 
@@ -180,24 +185,33 @@ describe("computePlayerStats", () => {
 		const gone = result.find((stat) => stat.id === "p-gone");
 		expect(gone?.currentRating).toBe(7);
 		expect(gone?.onRoster).toBe(false);
+		const bob = result.find((stat) => stat.id === "p2");
+		expect(bob?.currentRating).toBe(9);
+		expect(bob?.onRoster).toBe(false);
 	});
 
 	it("強度淨變化為所有出場紀錄賽前賽後分數差的加總", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		// Bob 全程在 teamB，且兩筆的分數差刻意與 Alice 不同：少了對他的斷言，
+		// 累加迴圈只掃 teamA 也會全綠。
 		const history = [
 			makeEntry({
 				matchId: "m1",
 				teamA: makeTeam({
 					players: [makeHistoryPlayer({ id: "p1", name: "Alice", ratingBefore: 5, ratingAfter: 5.12 })],
 				}),
-				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p2", name: "Bob", ratingBefore: 5, ratingAfter: 4.9 })],
+				}),
 			}),
 			makeEntry({
 				matchId: "m2",
 				teamA: makeTeam({
 					players: [makeHistoryPlayer({ id: "p1", name: "Alice", ratingBefore: 5.12, ratingAfter: 5.07 })],
 				}),
-				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p2", name: "Bob", ratingBefore: 4.9, ratingAfter: 4.94 })],
+				}),
 			}),
 		];
 
@@ -205,6 +219,8 @@ describe("computePlayerStats", () => {
 
 		const alice = result.find((stat) => stat.id === "p1");
 		expect(alice?.ratingDelta).toBeCloseTo(0.07);
+		const bob = result.find((stat) => stat.id === "p2");
+		expect(bob?.ratingDelta).toBeCloseTo(-0.06);
 	});
 
 	it("計算過程不修改輸入的歷史與名單", () => {
