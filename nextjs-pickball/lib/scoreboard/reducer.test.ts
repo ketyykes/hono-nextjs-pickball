@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { scoreboardReducer, createInitialState } from "./reducer";
-import type { ScoreboardState } from "./types";
+import type { ScoreboardState, TeamPlayers } from "./types";
 
 describe("createInitialState", () => {
 	it("預設為雙打、我方先發、0-0-2 起手", () => {
@@ -225,6 +225,23 @@ describe("scoreboardReducer — UNDO", () => {
 		const resetState = scoreboardReducer(undone, { type: "RESET" });
 		expect(resetState.courtNumber).toBe(3);
 	});
+
+	it("UNDO 與 RESET 後保留 teamPlayers，不退回 null", () => {
+		const teamPlayers: TeamPlayers = {
+			us: [{ name: "小明", colorFrom: "#000000", colorTo: "#111111", foreground: "#ffffff" }],
+			them: [{ name: "小華", colorFrom: "#222222", colorTo: "#333333", foreground: "#ffffff" }],
+		};
+		let state = createInitialState({ teamPlayers });
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: "us" });
+
+		const undone = scoreboardReducer(state, { type: "UNDO" });
+		// teamPlayers 與 matchId／courtNumber 的失效路徑同構：UNDO 以「重建初始 state 後
+		// replay」實作，若未帶入 teamPlayers 會在使用者按下 Undo 的瞬間靜默清掉球員姓名色塊
+		expect(undone.teamPlayers).toEqual(teamPlayers);
+
+		const resetState = scoreboardReducer(undone, { type: "RESET" });
+		expect(resetState.teamPlayers).toEqual(teamPlayers);
+	});
 });
 
 describe("scoreboardReducer — RESET", () => {
@@ -261,6 +278,22 @@ describe("scoreboardReducer — HYDRATE", () => {
 		const next = scoreboardReducer(createInitialState(), { type: "HYDRATE", state: persisted });
 		// hydrate 是重整後唯一的還原路徑，此處掉了 matchId 等同每次重整都靜默脫離綁定
 		expect(next.matchId).toBe("m1");
+		expect(next.scores).toEqual({ us: 3, them: 2 });
+	});
+
+	it("HYDRATE 原樣保留帶入的 teamPlayers", () => {
+		const teamPlayers: TeamPlayers = {
+			us: [{ name: "小明", colorFrom: "#000000", colorTo: "#111111", foreground: "#ffffff" }],
+			them: [{ name: "小華", colorFrom: "#222222", colorTo: "#333333", foreground: "#ffffff" }],
+		};
+		const persisted: ScoreboardState = {
+			...createInitialState({ teamPlayers }),
+			scores: { us: 3, them: 2 },
+			status: "playing",
+		};
+		const next = scoreboardReducer(createInitialState(), { type: "HYDRATE", state: persisted });
+		// hydrate 是重整後唯一的還原路徑，此處掉了 teamPlayers 等同每次重整都靜默清空球員顯示
+		expect(next.teamPlayers).toEqual(teamPlayers);
 		expect(next.scores).toEqual({ us: 3, them: 2 });
 	});
 });

@@ -114,6 +114,25 @@ describe("storage", () => {
 		expect(loaded?.history).toHaveLength(1);
 	});
 
+	// Stage 2 補充測試：design Migration Plan 的 Rollback 一節要求「回退後多出的新欄位
+	// 會被舊版 schema 剝除而非拒絕」須以測試實測、不得只憑推論。此處以一個 schema 未定義的
+	// 欄位模擬「舊版程式讀到新版資料」的情形（回退後 teamPlayers 對舊 schema 而言即為未知欄位）。
+	// 註：zod 物件預設即會剝除未知欄位，本 it 為 regression guard 而非 TDD 紅燈。
+	it("含未知欄位的資料被剝除該欄位而非判為損壞", () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const state = createInitialState();
+		localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, unknownFutureField: 42 }));
+
+		const loaded = readScoreboard();
+
+		expect(loaded).toEqual(state);
+		expect(loaded).not.toHaveProperty("unknownFutureField");
+		// 未知欄位不得使既有資料被清除，否則回退版本會把使用者進行中的比賽歸零
+		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+		expect(warnSpy).not.toHaveBeenCalled();
+		warnSpy.mockRestore();
+	});
+
 	it("matchId 為空字串時視為獨立計分板", () => {
 		// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉
 		// isStandaloneMatchId() 的空字串分支在既有測試下不會轉紅——`/scoreboard?match=`

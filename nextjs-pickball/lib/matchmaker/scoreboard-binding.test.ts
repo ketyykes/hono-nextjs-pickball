@@ -15,6 +15,7 @@ import { createInitialState } from "../scoreboard/reducer";
 import { submitScore } from "./round";
 import { resetMatchmakerData } from "./storage";
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
+import { pickTextColor } from "./colors";
 import type { Player } from "./types";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
@@ -66,8 +67,17 @@ describe("scoreboard-binding", () => {
 		// targetScore 同理取 15 而非預設的 11。
 		const round = makeRound({ targetScore: 15, format: "doubles" });
 		const match = makeMatch({ id: "match-1", format: "singles", status: "pending" });
+		// M12：buildMatchSlotSeed 新增必填的 players 第三參數，match 預設的 teams
+		// 已帶 playerIds（p1~p4），故必須提供對應名單，否則以下整體比對會因
+		// teamPlayers 從「未提供」變成「查無此人」而失真。
+		const players: Player[] = [
+			makePlayer({ id: "p1" }),
+			makePlayer({ id: "p2" }),
+			makePlayer({ id: "p3" }),
+			makePlayer({ id: "p4" }),
+		];
 
-		const seed = buildMatchSlotSeed(round, match);
+		const seed = buildMatchSlotSeed(round, match, players);
 
 		expect(seed.targetScore).toBe(15);
 		expect(seed.mode).toBe("doubles");
@@ -77,12 +87,16 @@ describe("scoreboard-binding", () => {
 		// 整體比對：除上述三個來源欄位外，其餘（firstServer 的預設值、servingTeam、
 		// serverNumber、空 history、courtNumber…）一律等同 createInitialState。逐欄斷言
 		// 漏掉的欄位被 seed 偷偷覆寫時不會紅，整體比對才擋得住。
+		// teamPlayers 改採 seed.teamPlayers 自身代入：本測試的偵測目標是「其餘欄位」，
+		// teamPlayers 的正確性由本檔新增的三個 it 專職把關，此處自我代入以避免
+		// 這道既有的整體比對因新增必填欄位而失去意義。
 		expect(seed).toEqual(
 			createInitialState({
 				mode: "doubles",
 				targetScore: 15,
 				matchId: "match-1",
 				courtNumber: match.courtNumber,
+				teamPlayers: seed.teamPlayers,
 			}),
 		);
 	});
@@ -92,7 +106,7 @@ describe("scoreboard-binding", () => {
 		const round = makeRound();
 		const match = makeMatch({ id: "match-1", courtNumber: 3 });
 
-		const seed = buildMatchSlotSeed(round, match);
+		const seed = buildMatchSlotSeed(round, match, []);
 
 		expect(seed.courtNumber).toBe(3);
 	});
@@ -104,8 +118,8 @@ describe("scoreboard-binding", () => {
 		const second = makeMatch({ id: "match-2", courtNumber: 4 });
 		const round = makeRound({ matches: [first, second] });
 
-		expect(buildMatchSlotSeed(round, second).courtNumber).toBe(4);
-		expect(buildMatchSlotSeed(round, first).courtNumber).toBe(1);
+		expect(buildMatchSlotSeed(round, second, []).courtNumber).toBe(4);
+		expect(buildMatchSlotSeed(round, first, []).courtNumber).toBe(1);
 	});
 
 	it("已有進度的場次再次進入時保留既有進度不覆蓋", () => {
@@ -127,7 +141,7 @@ describe("scoreboard-binding", () => {
 
 		const round = makeRound({ targetScore: 11, format: "singles" });
 		const match = makeMatch({ id: "match-1", format: "singles" });
-		const seed = buildMatchSlotSeed(round, match);
+		const seed = buildMatchSlotSeed(round, match, []);
 
 		const result = ensureMatchSlot(seed);
 
@@ -147,7 +161,7 @@ describe("scoreboard-binding", () => {
 	it("尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed", () => {
 		const round = makeRound({ targetScore: 21, format: "singles" });
 		const match = makeMatch({ id: "match-2", format: "singles" });
-		const seed = buildMatchSlotSeed(round, match);
+		const seed = buildMatchSlotSeed(round, match, []);
 
 		const result = ensureMatchSlot(seed);
 
@@ -163,7 +177,7 @@ describe("scoreboard-binding", () => {
 	// 且不 throw，否則 §8 的入口在 server render 期間會直接炸掉。寫法比照
 	// lib/scoreboard/match-slots.test.ts 的同性質 SSR 情境。
 	it("SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed", () => {
-		const seed = buildMatchSlotSeed(makeRound(), makeMatch({ id: "match-3" }));
+		const seed = buildMatchSlotSeed(makeRound(), makeMatch({ id: "match-3" }), []);
 
 		vi.stubGlobal("window", undefined);
 		try {
@@ -176,6 +190,117 @@ describe("scoreboard-binding", () => {
 
 		// guard 生效 → 寫入在碰 localStorage 之前就 return，槽內仍無該場條目
 		expect(readMatchSlot("match-3")).toBeNull();
+	});
+
+	// M12：三個新 it 共用的名單資料。姓名互不相同、每位球員的 colorFrom／colorTo
+	// 互不相同且兩者相異（tasks.md 第 9 節的測試資料前置要求）——資料對稱會讓隊伍對調、
+	// 姓名誤取 id、色碼對調等竄改變成偵測不到的等價變異。p1／p2 刻意取極淺色，
+	// 使 pickTextColor 選出深色前景，與「前景色寫死 #FFFFFF」的竄改區隔開。
+	function makeDistinctPlayers(): Player[] {
+		return [
+			makePlayer({ id: "p1", name: "陳小美", colorFrom: "#F5F5F5", colorTo: "#E5E5E5" }),
+			makePlayer({ id: "p2", name: "林小華", colorFrom: "#2563EB", colorTo: "#1E3A8A" }),
+			makePlayer({ id: "p3", name: "王小明", colorFrom: "#DC2626", colorTo: "#7F1D1D" }),
+			makePlayer({ id: "p4", name: "張小強", colorFrom: "#059669", colorTo: "#064E3B" }),
+		];
+	}
+
+	it("seed 依對戰方式帶入對應人數的球員顯示資訊：單打 1 人、雙打 2 人", () => {
+		const players = makeDistinctPlayers();
+
+		const singlesRound = makeRound({ format: "singles" });
+		const singlesMatch = makeMatch({
+			id: "match-singles",
+			format: "singles",
+			teams: [
+				{ playerIds: ["p1"], rating: 1000 },
+				{ playerIds: ["p3"], rating: 1000 },
+			],
+		});
+		const singlesSeed = buildMatchSlotSeed(singlesRound, singlesMatch, players);
+
+		expect(singlesSeed.teamPlayers?.us).toHaveLength(1);
+		expect(singlesSeed.teamPlayers?.them).toHaveLength(1);
+		expect(singlesSeed.teamPlayers?.us.map((badge) => badge.name)).toEqual(["陳小美"]);
+		expect(singlesSeed.teamPlayers?.them.map((badge) => badge.name)).toEqual(["王小明"]);
+
+		const doublesRound = makeRound({ format: "doubles" });
+		const doublesMatch = makeMatch({
+			id: "match-doubles",
+			format: "doubles",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 1000 },
+				{ playerIds: ["p3", "p4"], rating: 1000 },
+			],
+		});
+		const doublesSeed = buildMatchSlotSeed(doublesRound, doublesMatch, players);
+
+		expect(doublesSeed.teamPlayers?.us).toHaveLength(2);
+		expect(doublesSeed.teamPlayers?.them).toHaveLength(2);
+		expect(doublesSeed.teamPlayers?.us.map((badge) => badge.name)).toEqual(["陳小美", "林小華"]);
+		expect(doublesSeed.teamPlayers?.them.map((badge) => badge.name)).toEqual(["王小明", "張小強"]);
+	});
+
+	it("球員顯示資訊的前景色等於 pickTextColor 的回傳值", () => {
+		const players = makeDistinctPlayers();
+		const round = makeRound({ format: "doubles" });
+		const match = makeMatch({
+			id: "match-1",
+			format: "doubles",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 1000 },
+				{ playerIds: ["p3", "p4"], rating: 1000 },
+			],
+		});
+
+		const seed = buildMatchSlotSeed(round, match, players);
+
+		const badge = seed.teamPlayers?.us[0];
+		// 色碼本身也一併釘住：M3（colorFrom／colorTo 對調）若只靠 foreground 判斷可能存活。
+		expect(badge?.colorFrom).toBe("#F5F5F5");
+		expect(badge?.colorTo).toBe("#E5E5E5");
+		// 不硬寫顏色字串：直接呼叫 pickTextColor 比對，確保未來公式調整時本斷言自動跟進。
+		expect(badge?.foreground).toBe(pickTextColor("#F5F5F5", "#E5E5E5"));
+
+		// Stage 2 補：them 側的色碼原本沒有任何斷言比對（只比對過姓名），實測
+		// 「只讓 them 的 colorFrom 被固定字串覆寫」的竄改會全綠存活。兩隊套用同一個
+		// 解析函式、無隊伍別分支，但缺了斷言就等於缺了偵測力，故 them 側同樣釘住三欄。
+		const opponentBadge = seed.teamPlayers?.them[0];
+		expect(opponentBadge?.colorFrom).toBe("#DC2626");
+		expect(opponentBadge?.colorTo).toBe("#7F1D1D");
+		expect(opponentBadge?.foreground).toBe(pickTextColor("#DC2626", "#7F1D1D"));
+	});
+
+	it("名單中找不到該球員時球員顯示資訊以替代文字呈現且不拋錯", () => {
+		// p2 從名單移除，但仍出現在 match.teams 的 playerIds 中（M4 的回合只存 id，
+		// 使用者可在回合中刪人——見 spec「隊伍球員顯示資訊」）。
+		const players = makeDistinctPlayers().filter((player) => player.id !== "p2");
+		const round = makeRound({ format: "doubles" });
+		const match = makeMatch({
+			id: "match-1",
+			format: "doubles",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 1000 },
+				{ playerIds: ["p3", "p4"], rating: 1000 },
+			],
+		});
+
+		let seed: ReturnType<typeof buildMatchSlotSeed> | undefined;
+		expect(() => {
+			seed = buildMatchSlotSeed(round, match, players);
+		}).not.toThrow();
+
+		// 該隊人數不變（2 筆），不因查無此人而少一筆。
+		expect(seed?.teamPlayers?.us).toHaveLength(2);
+		expect(seed?.teamPlayers?.us[0].name).toBe("陳小美");
+		expect(seed?.teamPlayers?.us[1]).toEqual({
+			name: "已離開名單",
+			colorFrom: "#9CA3AF",
+			colorTo: "#4B5563",
+			foreground: pickTextColor("#9CA3AF", "#4B5563"),
+		});
+		// 另一隊照常輸出，不受該隊查無此人影響。
+		expect(seed?.teamPlayers?.them.map((badge) => badge.name)).toEqual(["王小明", "張小強"]);
 	});
 
 	it("第一隊對應 us、第二隊對應 them，來回轉換不顛倒", () => {

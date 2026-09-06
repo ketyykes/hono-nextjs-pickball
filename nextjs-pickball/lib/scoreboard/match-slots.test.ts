@@ -73,6 +73,49 @@ describe("match-slots", () => {
 		warnSpy.mockRestore();
 	});
 
+	it("舊版資料缺 teamPlayers 時補為 null 且不清除該筆", () => {
+		// 本次變更前寫入的合法舊資料不含 teamPlayers 欄位
+		const legacyState: Record<string, unknown> = { ...createInitialState() };
+		delete legacyState.teamPlayers;
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify({ m1: legacyState }));
+
+		const { slots, droppedCount } = readMatchSlots();
+
+		expect(Object.keys(slots)).toEqual(["m1"]);
+		expect(slots.m1?.teamPlayers).toBeNull();
+		expect(droppedCount).toBe(0);
+	});
+
+	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 TeamPlayersSchema 的
+	// .min(1).max(2) 零覆蓋——放寬為 .min(0).max(9) 時全套測試皆不轉紅。design Decision 6
+	// 明文要求把「單打 1 人、雙打 2 人」這條值域寫進 zod，本 it 釘住該邊界，
+	// 寫法比照上方「courtNumber 不合法的分槽條目被逐筆丟棄，合法者保留」。
+	it("teamPlayers 每隊人數超出 1～2 的分槽條目被逐筆丟棄，1 人與 2 人皆保留", () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const badge = {
+			name: "小明",
+			colorFrom: "#000000",
+			colorTo: "#111111",
+			foreground: "#ffffff",
+		};
+		const base = createInitialState();
+		const rawSlots: Record<string, unknown> = {
+			emptyUs: { ...base, teamPlayers: { us: [], them: [badge] } },
+			threeThem: { ...base, teamPlayers: { us: [badge], them: [badge, badge, badge] } },
+			singles: { ...base, teamPlayers: { us: [badge], them: [badge] } },
+			doubles: { ...base, teamPlayers: { us: [badge, badge], them: [badge, badge] } },
+		};
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify(rawSlots));
+
+		const { slots, droppedCount } = readMatchSlots();
+
+		expect(Object.keys(slots)).toEqual(["singles", "doubles"]);
+		expect(slots.singles?.teamPlayers?.us).toHaveLength(1);
+		expect(slots.doubles?.teamPlayers?.them).toHaveLength(2);
+		expect(droppedCount).toBe(2);
+		warnSpy.mockRestore();
+	});
+
 	it("單筆損壞只丟該筆並回報 droppedCount，其餘場次保留", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const m2State = createInitialState();

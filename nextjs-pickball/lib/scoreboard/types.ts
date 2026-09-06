@@ -18,6 +18,23 @@ export const ScoreEventSchema = z.object({
 	winner: TeamSchema,
 });
 
+// 球員姓名色塊：色碼欄位刻意維持 z.string()、不加 hex regex 驗證——
+// lib/scoreboard/ 不依賴 lib/matchmaker/ 的任何 schema（單向相依），
+// 格式正確性由寫入端（buildMatchSlotSeed，唯一生產者）負責（design Decision 6）。
+export const PlayerBadgeSchema = z.object({
+	name: z.string(),
+	colorFrom: z.string(),
+	colorTo: z.string(),
+	foreground: z.string(),
+});
+
+// us／them 兩個 key 沿用 scoreboard-binding 既有的 ScoreboardTeamScores 命名慣例；
+// 單打每隊 1 筆、雙打每隊 2 筆，故長度界於 1～2（design Decision 6）。
+export const TeamPlayersSchema = z.object({
+	us: z.array(PlayerBadgeSchema).min(1).max(2),
+	them: z.array(PlayerBadgeSchema).min(1).max(2),
+});
+
 export const ScoreboardStateSchema = z.object({
 	mode: ModeSchema,
 	scores: z.object({
@@ -39,6 +56,10 @@ export const ScoreboardStateSchema = z.object({
 	// 場地標示（如「場地 3」）的資料來源：與 matchId 同構的向後相容理由——
 	// .default(null) 使本欄位加入前寫入的資料被補為 null，而非判為損壞。
 	courtNumber: z.number().int().positive().nullable().default(null),
+	// 球員姓名色塊：與 matchId／courtNumber 同構的向後相容理由——
+	// .default(null) 使本欄位加入前寫入的資料被補為 null（維持我方／對方純文字呈現），
+	// 而非判為損壞。
+	teamPlayers: TeamPlayersSchema.nullable().default(null),
 });
 
 export type Mode = z.infer<typeof ModeSchema>;
@@ -49,6 +70,8 @@ export type ServeSide = z.infer<typeof ServeSideSchema>;
 export type ScoreEvent = z.infer<typeof ScoreEventSchema>;
 export type ScoreboardState = z.infer<typeof ScoreboardStateSchema>;
 export type TargetScore = z.infer<typeof TargetScoreSchema>;
+export type PlayerBadge = z.infer<typeof PlayerBadgeSchema>;
+export type TeamPlayers = z.infer<typeof TeamPlayersSchema>;
 
 // 賽前設定：status === "setup" 期間可調整、且在 UNDO replay 與 RESET 後必須被保留的欄位。
 // 收斂為單一型別，使新增設定值時只需改這裡與 settingsOf()，不必巡視每個 createInitialState 呼叫點。
@@ -58,6 +81,7 @@ export interface MatchSettings {
 	targetScore: TargetScore;
 	matchId: string | null;
 	courtNumber: number | null;
+	teamPlayers: TeamPlayers | null;
 }
 
 // Action 為純記憶體型別，不會落 localStorage，無需 zod 驗證

@@ -1,10 +1,68 @@
 import { createInitialState } from "../scoreboard/reducer";
 import { readMatchSlot, writeMatchSlot, clearMatchSlots } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
-import type { ScoreboardState } from "../scoreboard/types";
+import type { PlayerBadge, ScoreboardState, TeamPlayers } from "../scoreboard/types";
 import type { Round, RoundMatch } from "./round-types";
 import type { SubmitScoreInput } from "./round";
+import { pickTextColor } from "./colors";
 import type { Player } from "./types";
+
+// 名單中找不到該球員時的替代文字（design Decision 3：呈現替代文字，不跳過、不拋錯）。
+// 與 export-scene.ts「名單中找不到球員時以替代文字呈現」的既有判斷同構，但兩個
+// capability 各自獨立實作、不跨檔 import——export-scene.ts 的常數為 module-private，
+// 這裡重新宣告同一組字面量（沿用其措辭與色碼慣例，見 spec「隊伍球員顯示資訊」）。
+const MISSING_PLAYER_NAME = "已離開名單";
+
+// 替代文字球員的中性色（灰階），與真實球員的漸層調色盤區隔，一眼可辨識該格是佔位。
+const PLACEHOLDER_COLOR_FROM = "#9CA3AF";
+const PLACEHOLDER_COLOR_TO = "#4B5563";
+
+/**
+ * 把單一隊伍的 playerIds 解析為球員顯示資訊陣列（design Decision 1／3）：查得到時取該員
+ * name／colorFrom／colorTo，查不到時（該員已被移除）以固定替代文字與中性色呈現——
+ * SHALL NOT 跳過該筆，跳過會讓雙打面板變成一人一格（見 spec）。foreground 一律由
+ * pickTextColor 依 colorFrom／colorTo 算好存入，scoreboard 端只讀不算，藉此維持
+ * lib/scoreboard/ 不 import lib/matchmaker/ 的單向相依（design Decision 1）。
+ *
+ * ⚠️ 與 components/matchmaker/CourtCard.tsx、lib/matchmaker/round.ts 內同名的
+ * `resolveTeamPlayers`（兩者皆「查無此人就跳過」）行為相反，這是 design Decision 3
+ * 明文接受的不一致：對戰頁色塊的 row／column 是離散格位，缺一格比多一格佔位更貼近
+ * 版面推導的資料形狀；計分板面板沒有這層版面約束，少一筆反而會讓雙打看起來像單打。
+ * 複製那兩個函式的假設到這裡會直接違反 spec，反之亦然。
+ */
+function resolvePlayerBadges(
+	playerIds: readonly string[],
+	players: readonly Player[],
+): PlayerBadge[] {
+	return playerIds.map((playerId) => {
+		const player = players.find((candidate) => candidate.id === playerId);
+		const colorFrom = player?.colorFrom ?? PLACEHOLDER_COLOR_FROM;
+		const colorTo = player?.colorTo ?? PLACEHOLDER_COLOR_TO;
+		return {
+			name: player?.name ?? MISSING_PLAYER_NAME,
+			colorFrom,
+			colorTo,
+			foreground: pickTextColor(colorFrom, colorTo),
+		};
+	});
+}
+
+/**
+ * 把該場的兩隊 playerIds 組成 teamPlayers：第一隊 ↔ us、第二隊 ↔ them，
+ * 與 mapTeamScores 的隊伍對應同構，SHALL NOT 在兩處各自寫一份。
+ *
+ * 命名刻意不叫 `resolveTeamPlayers`：`round.ts` 與 `CourtCard.tsx` 已各有一個同名私有
+ * 函式，其契約是 `(playerIds, players) => Player[]`（且查無此人就跳過）；本函式吃的是
+ * 整個 `match`、產出的是 us／them 兩側的 PlayerBadge 結構，與那個契約不同，沿用同名會讓
+ * 讀者把「跳過」的假設一併帶進來。`build` 前綴同 buildMatchSlotSeed／buildCourtTiles。
+ */
+function buildTeamPlayers(match: RoundMatch, players: readonly Player[]): TeamPlayers {
+	const [teamA, teamB] = match.teams;
+	return {
+		us: resolvePlayerBadges(teamA.playerIds, players),
+		them: resolvePlayerBadges(teamB.playerIds, players),
+	};
+}
 
 /**
  * 建立場地區塊「進入計分板」入口所需的 seed：帶入該輪的目標分數與對戰方式，
@@ -12,15 +70,21 @@ import type { Player } from "./types";
  *
  * courtNumber 取自 match.courtNumber（唯一決定處）：計分板 SHALL NOT 反查
  * matchmaker:round:v1 來取得場地標示，seed 建立當下就是它唯一的資料來源。
+ *
+ * players 為必填（design Decision 4）：唯一的生產呼叫點（CourtCard.tsx）本來就已經
+ * 持有 players prop，沒有合法情境需要省略——optional 只會讓「忘記傳」從編譯期錯誤
+ * 退化成執行期的靜默降級。round 僅保存球員 id，姓名與雙色漸層須由此參數解析。
  */
 export function buildMatchSlotSeed(
 	round: Round,
 	match: RoundMatch,
+	players: readonly Player[],
 ): ScoreboardState & { matchId: string } {
 	return {
 		...createInitialState({
 			mode: round.format,
 			targetScore: round.targetScore,
+			teamPlayers: buildTeamPlayers(match, players),
 		}),
 		// matchId 只在這裡決定一次：createInitialState 的 matchId 型別為 string | null，
 		// 在此覆寫同時完成型別窄化，故不再重複傳進 overrides——兩處寫同一件事會分歧。

@@ -22,8 +22,12 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0 實測回填
-- **Initial commit hash**: 待 apply Step 0 實測回填
+- **Baseline tests**: 全綠。`pnpm test`（2026-09-06 實測）：`nextjs-pickball` 70 test files／
+  664 tests 全數通過；`hono-pickball` 4 test files／16 tests 全數通過（未出現 EPERM，
+  workerd 正常啟動）。`pnpm install` 後 `git status --porcelain` 為空，
+  `pnpm-lock.yaml`／`package.json` 零變動。
+- **Initial commit hash**: `b7541af`（`main` 與本分支的共同起點；`git log --oneline main..HEAD`
+  在 apply 開工前為空）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`
   （主 repo；本批不用 worktree，schema Step 0 的 cwd 檢查以此路徑為準）
 

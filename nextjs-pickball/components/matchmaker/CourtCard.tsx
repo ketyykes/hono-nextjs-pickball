@@ -70,7 +70,7 @@ export function CourtCard({ match, players, round, matchSlot, onSubmitScore, sub
 	// Next.js Link 會先呼叫這裡傳入的 onClick，再執行自身的導航邏輯，故本函式同步
 	// 完成 ensureMatchSlot（寫入 localStorage）之後，Link 才會開始換頁。
 	function handleEnterScoreboard() {
-		ensureMatchSlot(buildMatchSlotSeed(round, match));
+		ensureMatchSlot(buildMatchSlotSeed(round, match, players));
 	}
 
 	const tileSource: CourtTileSource = {
