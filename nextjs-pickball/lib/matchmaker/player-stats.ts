@@ -34,7 +34,7 @@ export interface PlayerStat {
 const OFF_ROSTER_COLOR_FROM = "#9CA3AF";
 const OFF_ROSTER_COLOR_TO = "#6B7280";
 
-/** 尚未套用 §3／§4 邏輯前的可變累加狀態，累加完成後才轉成對外的 PlayerStat。 */
+/** 尚未套用 §4 邏輯前的可變累加狀態，累加完成後才轉成對外的 PlayerStat。 */
 interface MutableStat {
 	id: string;
 	name: string;
@@ -45,20 +45,67 @@ interface MutableStat {
 	gamesPlayed: number;
 	wins: number;
 	losses: number;
+	ratingDelta: number;
+}
+
+/**
+ * 從一組帶有 `playedAt` 的候選中，取出 `playedAt` 最晚者所對應的值。比較採
+ * ISO 8601 字串字典序（design Decision 4），SHALL NOT 用 `new Date()` 解析。
+ * 完整掃描全部候選而非只看陣列最後一個元素，結果因此不依賴呼叫端傳入的排列
+ * 順序——供本檔目前強度計算與 §4 的最常搭檔／最常對手姓名解析共用同一份邏輯。
+ */
+function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; value: T }[]): T | undefined {
+	let latest: { playedAt: string; value: T } | undefined;
+	for (const candidate of candidates) {
+		if (!latest || candidate.playedAt > latest.playedAt) {
+			latest = candidate;
+		}
+	}
+	return latest?.value;
+}
+
+/**
+ * 已離開名單球員的目前強度：其在 `history` 中依 `playedAt` 最近一筆的
+ * `ratingAfter`（spec「目前強度與已離開名單球員的標示」）。名單內球員的目前強度
+ * 一律直接取自 `players` 的 `rating`，不經過本函式。
+ */
+function latestRatingAfterByPlayer(history: readonly MatchHistoryEntry[]): Map<string, number> {
+	const candidatesByPlayer = new Map<string, { playedAt: string; value: number }[]>();
+
+	for (const entry of history) {
+		for (const team of [entry.teamA, entry.teamB]) {
+			for (const historyPlayer of team.players) {
+				const candidates = candidatesByPlayer.get(historyPlayer.id) ?? [];
+				candidates.push({ playedAt: entry.playedAt, value: historyPlayer.ratingAfter });
+				candidatesByPlayer.set(historyPlayer.id, candidates);
+			}
+		}
+	}
+
+	const result = new Map<string, number>();
+	for (const [id, candidates] of candidatesByPlayer) {
+		const latest = pickValueAtLatestPlayedAt(candidates);
+		if (latest !== undefined) {
+			result.set(id, latest);
+		}
+	}
+	return result;
 }
 
 /**
  * 建立「目前名單」與「歷史紀錄中出現過的球員」的聯集初始項目，以 id 為鍵
  * （spec：SHALL NOT 以姓名為鍵）。名單內球員的姓名、色塊、目前強度取自 `players`；
- * 只出現在歷史的球員先以其快照姓名暫代、色塊為上方的中性灰、目前強度暫定為 0——
- * §3.2 會改用該球員在歷史中最近一筆的 ratingAfter。整段聯集只在這裡建構一次，
- * 供後續累加沿用，不在 §3／§4 重新掃描 history／players（tasks 2.7）。
+ * 只出現在歷史的球員以其快照姓名暫代、色塊為上方的中性灰，目前強度取
+ * `latestRatingAfterByPlayer` 算出的最近一筆 `ratingAfter`，並標示 `onRoster: false`。
+ * 整段聯集只在這裡建構一次，供後續累加沿用，不在 §4 重新掃描 history／players
+ * （tasks 2.7）。
  */
 function buildRosterUnion(
 	history: readonly MatchHistoryEntry[],
 	players: readonly Player[],
 ): Map<string, MutableStat> {
 	const union = new Map<string, MutableStat>();
+	const offRosterCurrentRatings = latestRatingAfterByPlayer(history);
 
 	for (const player of players) {
 		union.set(player.id, {
@@ -71,6 +118,7 @@ function buildRosterUnion(
 			gamesPlayed: 0,
 			wins: 0,
 			losses: 0,
+			ratingDelta: 0,
 		});
 	}
 
@@ -86,10 +134,11 @@ function buildRosterUnion(
 					colorFrom: OFF_ROSTER_COLOR_FROM,
 					colorTo: OFF_ROSTER_COLOR_TO,
 					onRoster: false,
-					currentRating: 0,
+					currentRating: offRosterCurrentRatings.get(historyPlayer.id) ?? 0,
 					gamesPlayed: 0,
 					wins: 0,
 					losses: 0,
+					ratingDelta: 0,
 				});
 			}
 		}
