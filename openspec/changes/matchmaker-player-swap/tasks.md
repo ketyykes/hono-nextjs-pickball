@@ -17,11 +17,11 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的 Context／Open Questions
 > 從撰寫當下的 `main` 快照變成 apply 當下的事實，避免 §2 之後整批建立在過期資訊上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M12（`matchmaker-scoreboard-team-labels`）已合併**：於 `openspec/changes/archive/` 或 `git log --oneline main` 找到對應的合併紀錄。**找不到則立即停止並回報**，SHALL NOT 在本 change 內臆測 M12 的實際內容或逕自繼續（見 proposal 的「執行相依」）
-- [ ] 1.3 讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`、`MatchStage.tsx`、`nextjs-pickball/app/matchmaker/page.tsx` 的目前內容，記錄 `CourtCardProps`／`MatchStageProps` 的實際欄位、`inProgress`／`matchSlot` 的計算方式，以及 page.tsx 如何持有 `useRoundStore` 的回傳值。與 design.md Context 段與 Open Questions 第 1、4 條逐項比對，**差異一律補記進 design.md**，不要默默改實作去遷就舊記載
-- [ ] 1.4 讀 `nextjs-pickball/lib/matchmaker/round.ts` 既有的 `setTargetScore`／`resetIncompleteMatches`／`submitScore` 三個函式簽章與失敗代碼命名模式、私有函式 `resolveTeamPlayers`；讀 `nextjs-pickball/lib/matchmaker/pairing.ts` 的 `labelDoublesComposition` 匯出簽章與 `nextjs-pickball/lib/matchmaker/rating-math.ts` 的 `roundRating` 簽章。確認與 design.md Context 記載一致，§2 依實際簽章取用，SHALL NOT 另寫一套判定或計算邏輯
-- [ ] 1.5 讀 `nextjs-pickball/lib/matchmaker/labels.ts` 目前收錄的常數與 `nextjs-pickball/components/ui/select.tsx`（Radix `Select` 的 shadcn 包裝）的既有用法（`PlayerForm.tsx` 的性別選單），確認可直接沿用同一組件與擺放慣例
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上 **M12（`matchmaker-scoreboard-team-labels`）已合併**：於 `openspec/changes/archive/` 或 `git log --oneline main` 找到對應的合併紀錄。**找不到則立即停止並回報**，SHALL NOT 在本 change 內臆測 M12 的實際內容或逕自繼續（見 proposal 的「執行相依」）
+- [x] 1.3 讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`、`MatchStage.tsx`、`nextjs-pickball/app/matchmaker/page.tsx` 的目前內容，記錄 `CourtCardProps`／`MatchStageProps` 的實際欄位、`inProgress`／`matchSlot` 的計算方式，以及 page.tsx 如何持有 `useRoundStore` 的回傳值。與 design.md Context 段與 Open Questions 第 1、4 條逐項比對，**差異一律補記進 design.md**，不要默默改實作去遷就舊記載
+- [x] 1.4 讀 `nextjs-pickball/lib/matchmaker/round.ts` 既有的 `setTargetScore`／`resetIncompleteMatches`／`submitScore` 三個函式簽章與失敗代碼命名模式、私有函式 `resolveTeamPlayers`；讀 `nextjs-pickball/lib/matchmaker/pairing.ts` 的 `labelDoublesComposition` 匯出簽章與 `nextjs-pickball/lib/matchmaker/rating-math.ts` 的 `roundRating` 簽章。確認與 design.md Context 記載一致，§2 依實際簽章取用，SHALL NOT 另寫一套判定或計算邏輯
+- [x] 1.5 讀 `nextjs-pickball/lib/matchmaker/labels.ts` 目前收錄的常數與 `nextjs-pickball/components/ui/select.tsx`（Radix `Select` 的 shadcn 包裝）的既有用法（`PlayerForm.tsx` 的性別選單），確認可直接沿用同一組件與擺放慣例
 
 ## 2. 臨時換人純函式（round-lifecycle）
 

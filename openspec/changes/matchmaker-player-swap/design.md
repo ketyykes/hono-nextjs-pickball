@@ -310,3 +310,62 @@ from "./round"`，若 `round.ts` 也 import `scoreboard-binding.ts`，兩檔互�
    內容（只確認其存在與部分結構），apply 的 §0 或對應群組的 RED 階段 MUST 實讀該檔既有
    `buildProps` 與 `makePlayer`／`makeRound` 系列 fixture 的簽章後再決定是否新增或調整，
    SHALL NOT 假設現有 fixture 已滿足需求。
+
+## Apply §1 對齊紀錄（2026-09-06，合併 M10／M11／M12 後的 `main`）
+
+tasks.md §1 要求把上方 Context 與 Open Questions 從 propose 當下的快照（`3fa2d22`）更新為
+apply 當下的事實。以下為實讀 `b69a418`（含 M12 合併 commit `ea71e08`）後的逐項核對結果。
+
+**Open Question 1 → 已解決（`CourtCard.tsx`／`MatchStage.tsx` 對齊完成）**
+
+- `CourtCardProps` 實際欄位為 `match`／`players`／`round`／`matchSlot`／`onSubmitScore`／
+  `submitError` 六個，與 design 撰寫時的假設**完全一致**。M12 只動了
+  `handleEnterScoreboard` 內一行（`buildMatchSlotSeed(round, match, players)` 補上第三參數
+  `players`），**未新增或移除任何 prop**，色塊呈現邏輯與私有的 `resolveTeamPlayers` 零改動。
+- `inProgress = matchSlot !== null`（`CourtCard.tsx:65`）仍存在且語意未變，Decision 4 的
+  「重用同一個變數」可照原計畫執行。
+- `MatchStageProps` 實際欄位為 `round`／`players`／`hasActivePlayers`／`matchSlots`／
+  `onSubmitScore`／`submitError`，`MatchStageSubmitError`（`{ matchId; message }`）已存在，
+  tasks §5.1 的 `MatchStageSwapError` 可逐字比照。
+- `app/matchmaker/page.tsx` 以
+  `const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore } =
+  useRoundStore({ players, updatePlayer })` 持有 store，並已有
+  `const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null)` 與
+  `handleSubmitScore` 的既有寫法，tasks §5.2 可逐字比照。
+- `round.ts` 的既有失敗碼家族實測為四組：`SET_TARGET_SCORE_FAILURE_CODE`、
+  `RESET_INCOMPLETE_MATCHES_FAILURE_CODE`、`VALIDATE_SCORE_FAILURE_CODE`、
+  `SUBMIT_SCORE_FAILURE_CODE`（另有未以函式名命名的舊 `ROUND_FAILURE_CODE`，即 tasks §2.6
+  所稱的 M3 教訓）。`roundRating` 已於檔頭 import（`round.ts:10`），私有
+  `resolveTeamPlayers`（`round.ts:742`）對解析不到的 id 一貫略過而不拋錯。
+  `labelDoublesComposition` 目前**尚未**被 `round.ts` import，§2 需新增
+  `import { labelDoublesComposition } from "./pairing"`。
+- `pairing.ts` 的 `labelDoublesComposition(fourPlayers: readonly [Player, Player, Player, Player])`
+  與 `rating-math.ts` 的 `roundRating(value: number): number` 兩個簽章皆與 Context 記載相符，
+  無需修改 `match-allocation` 的任何檔案。
+- `labels.ts` 目前收錄 `TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／
+  `DOUBLES_COMPOSITION_LABEL`／`PLAYER_NOT_ON_ROSTER_LABEL`（最後一項為 M11 新增），
+  全數為靜態顯示詞彙，Decision 7 的界線在合併後依然成立。
+- `components/ui/select.tsx` 匯出 `Select`／`SelectTrigger`／`SelectValue`／`SelectContent`／
+  `SelectItem` 等，`PlayerForm.tsx:200-211` 的性別選單即以
+  `<SelectTrigger id=… aria-label="性別">` 的形態使用，§4 可沿用同一組件與 `aria-label`
+  擺放慣例。
+
+**Open Question 4 → 已解決（fixture 只需補欄位）**
+
+`CourtCard.test.tsx` 既有 fixture 為 `buildPlayer`／`buildMatch`／`buildRound`／`buildProps`
+四個（非 propose 階段猜測的 `makePlayer`／`makeRound`）。`buildRound` 已含
+`restingPlayerIds: []` 欄位，`buildProps` 已含 `round`／`matchSlot` 預設值。§4 只需在
+`buildProps` 追加 `onSwapPlayer: vi.fn()` 與 `swapError: null` 兩個預設欄位即可，**既有 14 個
+it 的斷言本體逐字不動**，符合 tasks.md「本 change 唯一容許變動的既有測試」段落的既定裁決。
+
+**新增 Open Question 5 → 已解決（M12 的 `teamPlayers` 快照不需要換人更新路徑）**
+
+M12 在 `lib/matchmaker/scoreboard-binding.ts` 讓 `buildMatchSlotSeed(round, match, players)`
+把兩隊球員姓名與隊色寫成 `teamPlayers`，該值是**建立計分板槽當下的快照**，M12 刻意未提供
+任何事後更新路徑。換人是否需要同步更新它？**不需要**，且本 change 不新增該路徑：
+`ensureMatchSlot(buildMatchSlotSeed(...))` 只在使用者點擊「進入計分板」時執行，因此
+「槽已存在」與「換人被允許」在本 change 的規格下是互斥的兩個狀態——`match-stage` 的
+「場地區塊的換人操作」Requirement 明訂計分板槽存在（`matchSlot !== null`）時 SHALL NOT
+顯示換人操作。換人只可能發生在尚未建立槽的場次，之後使用者再點擊入口時 seed 才被建立，
+屆時讀到的必然是換人後的 `round`／`players`，快照天然正確。此判定與 Decision 4 的
+「UI 層以 `inProgress` 額外收斂」是同一條規則的兩個後果，不需要新的機制。
