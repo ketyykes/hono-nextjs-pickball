@@ -188,9 +188,28 @@ function winRateOf(wins: number, gamesPlayed: number): number {
 }
 
 /**
+ * 依歷史紀錄逐筆加總每位球員的強度淨變化（Σ(ratingAfter − ratingBefore)），
+ * 出場數為 0 者不會進入這個迴圈、維持 `MutableStat` 初始的 0（spec）。與
+ * `tallyGamesAndResults` 分開累加：兩者語意獨立，淨變化不受勝負影響。
+ */
+function tallyRatingDelta(stats: ReadonlyMap<string, MutableStat>, history: readonly MatchHistoryEntry[]): void {
+	for (const entry of history) {
+		for (const team of [entry.teamA, entry.teamB]) {
+			for (const historyPlayer of team.players) {
+				const stat = stats.get(historyPlayer.id);
+				if (!stat) {
+					continue;
+				}
+				stat.ratingDelta += historyPlayer.ratingAfter - historyPlayer.ratingBefore;
+			}
+		}
+	}
+}
+
+/**
  * 計算每位球員的統計，範圍為「目前名單」與「歷史紀錄中出現過的球員」的聯集。
- * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。`ratingDelta`／
- * `mostFrequentPartner`／`mostFrequentOpponent` 為 §3／§4 補齊前的暫定值。
+ * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。`mostFrequentPartner`／
+ * `mostFrequentOpponent` 為 §4 補齊前的暫定值。
  */
 export function computePlayerStats(
 	history: readonly MatchHistoryEntry[],
@@ -198,6 +217,7 @@ export function computePlayerStats(
 ): PlayerStat[] {
 	const union = buildRosterUnion(history, players);
 	tallyGamesAndResults(union, history);
+	tallyRatingDelta(union, history);
 
 	return Array.from(union.values()).map((stat) => ({
 		id: stat.id,
@@ -210,7 +230,7 @@ export function computePlayerStats(
 		wins: stat.wins,
 		losses: stat.losses,
 		winRate: winRateOf(stat.wins, stat.gamesPlayed),
-		ratingDelta: 0,
+		ratingDelta: stat.ratingDelta,
 		mostFrequentPartner: null,
 		mostFrequentOpponent: null,
 	}));
