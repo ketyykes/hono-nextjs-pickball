@@ -38,6 +38,28 @@ Depends on: §1
 - [x] 2.6 GREEN／確認: 已確認為 regression guard，原實作未修改輸入——`grep -n "push\|\.sort(\|\[.*\] ="` 對 `player-stats.ts` 全檔無命中，2.7 的 mutation 測試另行複驗
 - [x] 2.7 REFACTOR: 確認球員聯集的建構只有一處（不在後續 §3／§4 重新掃描一次 `history`／`players`）；確認本檔零 `window`／`document`／`localStorage`／`new Date()`／`fetch`；`PlayerStat` 為可序列化純資料（無函式、無 class 實例）
 
+> **§2 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。5 個 it 名稱與 delta spec 驗收錨點逐字相符；
+>   2.1／2.3 的紅燈宣稱以 `git show <commit>^:<path>` 複驗屬實；2.5／2.6 的 regression guard
+>   標註屬實。
+> - Stage 2（品質）：`APPROVED`。獨立跑 17 個變異，**修正前有 8 個存活**——Implementer 自述的
+>   「3 次 mutation、零存活」屬取樣過窄（非造假）。Stage 2 依授權在 `5eb37f2` 內補斷言，
+>   殺掉其中 6 個（`onRoster` 兩分支、名單／歷史兩處姓名來源、名單色塊來源與 `colorFrom`／
+>   `colorTo` 對調、聯集去重路徑），並把測試 fixture 的 `as MatchHistoryEntry` 改為既有
+>   codebase 樣板 `Partial<Omit<Extract<MatchHistoryEntry, { format: "singles" }>, "format">>`
+>   （原斷言會放行「單打 fixture 帶 doublesComposition」這種非法組合）。未動任何產品程式碼。
+> - **剩餘 2 個存活變異**：① 中性灰的確切色碼——Decision 3 只要求常數存在且有註解、不指定色值，
+>   斷言色碼會變成 change-detector test，視覺驗收落在 §5.1；② 名單分支 `currentRating` 取自
+>   `players.rating`——屬 §3 的既定範圍，**§3.1 的 it「名單內球員的目前強度取自名單目前的
+>   rating」MUST 真的殺掉這個變異**（見 §3 前的交棒註記）。
+>
+> **§2 → §3 交棒（Stage 2 指定，MUST 執行）**
+> 1. §3.1 的 RED MUST 在「名單分支 `currentRating: player.rating` 改成 `0`」這個變異下轉紅，
+>    否則代表該 it 的斷言不足。
+> 2. `player-stats.ts` 的 `MutableStat` 與 `buildRosterUnion` JSDoc 目前含「§3.2 會改用…」
+>    「§3／§4 補齊」等指向未完成章節的臨時說明，§3／§4 落地後 MUST 一併更新，
+>    否則會留下與實作不符的過期註解。
+
 ## 3. 統計計算核心 B：目前強度、已不在名單、強度淨變化（player-stats.ts）
 
 Depends on: §2
