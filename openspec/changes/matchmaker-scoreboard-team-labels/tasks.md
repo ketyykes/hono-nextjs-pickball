@@ -155,16 +155,48 @@ Depends on: §2, §3
 
 ## 5. 收尾驗證
 
-- [ ] 5.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
-- [ ] 5.2 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/` 與 `--run lib/matchmaker/scoreboard-binding.test.ts` 全綠，貼出輸出
-- [ ] 5.3 `pnpm lint` 通過（0 errors；既有 warning 不得新增）
-- [ ] 5.4 `pnpm -r exec tsc --noEmit` 通過
-- [ ] 5.5 `pnpm test` 全套通過（確認未破壞既有 matchmaker／scoreboard 前端測試與 `hono-pickball` 後端測試）
-- [ ] 5.6 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過；`scoreboard.spec.ts`、`scoreboard-binding.spec.ts`、`match-stage.spec.ts` 既有 test **原樣**通過
-- [ ] 5.7 `git diff package.json` 與 `git diff pnpm-lock.yaml` 皆為空（本 change 零新增相依）；`git diff --stat` 確認 `hooks/` 零新增、`components/matchmaker/CourtCard.tsx` 除 `buildMatchSlotSeed` 呼叫處補參數外零其他改動
-- [ ] 5.8 `DO_NOT_TRACK=1 openspec validate matchmaker-scoreboard-team-labels --strict` 通過
-- [ ] 5.9 delta spec 重複標題檢查：對 `openspec/changes/matchmaker-scoreboard-team-labels/specs/scoreboard/spec.md` 與 `.../specs/match-stage/spec.md` 各跑一次 root `CLAUDE.md` 指定的 python 計數法（**不使用 BSD `uniq`**），確認 `### Requirement:` 與 `#### Scenario:` 皆無重複
-- [ ] 5.10 同步 `nextjs-pickball/CLAUDE.md`：確認架構總覽對 `/matchmaker` 與 `/scoreboard` 的既有描述是否需要補記「計分板顯示綁定場次的球員姓名與隊色」，若已有等價敘述則不重複補寫
+- [x] 5.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
+- [x] 5.2 `pnpm --filter ./nextjs-pickball test --run lib/scoreboard/` 與 `--run lib/matchmaker/scoreboard-binding.test.ts` 全綠，貼出輸出
+- [x] 5.3 `pnpm lint` 通過（0 errors；既有 warning 不得新增）
+- [x] 5.4 `pnpm -r exec tsc --noEmit` 通過
+- [x] 5.5 `pnpm test` 全套通過（確認未破壞既有 matchmaker／scoreboard 前端測試與 `hono-pickball` 後端測試）
+- [x] 5.6 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過；`scoreboard.spec.ts`、`scoreboard-binding.spec.ts`、`match-stage.spec.ts` 既有 test **原樣**通過
+- [x] 5.7 `git diff package.json` 與 `git diff pnpm-lock.yaml` 皆為空（本 change 零新增相依）；`git diff --stat` 確認 `hooks/` 零新增、`components/matchmaker/CourtCard.tsx` 除 `buildMatchSlotSeed` 呼叫處補參數外零其他改動
+- [x] 5.8 `DO_NOT_TRACK=1 openspec validate matchmaker-scoreboard-team-labels --strict` 通過
+- [x] 5.9 delta spec 重複標題檢查：對 `openspec/changes/matchmaker-scoreboard-team-labels/specs/scoreboard/spec.md` 與 `.../specs/match-stage/spec.md` 各跑一次 root `CLAUDE.md` 指定的 python 計數法（**不使用 BSD `uniq`**），確認 `### Requirement:` 與 `#### Scenario:` 皆無重複
+- [x] 5.10 同步 `nextjs-pickball/CLAUDE.md`：確認架構總覽對 `/matchmaker` 與 `/scoreboard` 的既有描述是否需要補記「計分板顯示綁定場次的球員姓名與隊色」，若已有等價敘述則不重複補寫
+
+> **§5 收尾驗證結論（2026-09-06）**：十項**全數 PASS**，無 BLOCKED。
+> - **5.1** delta spec 錨點機械核對：兩份 delta spec 共 **23 條「驗收」錨點**逐條以腳本比對
+>   （檔案存在＋`it`／`test` 名稱逐字命中，含全形標點），全數 OK，未靠目視。
+> - **5.2** `lib/scoreboard/` 與 `lib/matchmaker/scoreboard-binding.test.ts` 全綠。
+> - **5.3** `pnpm lint` 0 errors；warning 仍為既有 3 個（`hooks/useQuiz.ts`、
+>   `useRosterStore.ts`、`useScoreboardStore.ts` 的未使用變數），**零新增**。
+> - **5.4** `pnpm -r exec tsc --noEmit` 通過。
+> - **5.5** `pnpm test` 全套通過；前端由 baseline 的 70 files／664 tests 增為 **672 tests**
+>   （本 change 新增 8 條 unit test），後端維持 4 files／16 tests，未出現 EPERM。
+> - **5.6** `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套
+>   **599 passed / 21 skipped / 0 failed，耗時 21.6 分鐘，exit code 0**。
+>   **無任何 timeout 或失敗，不需單獨重跑任何 spec**；`scoreboard.spec.ts`、
+>   `scoreboard-binding.spec.ts`、`match-stage.spec.ts` 既有 test 原樣通過。
+>   機器負載：跑前 `53.55 / 54.08 / 117.88`，跑後 `4.77 / 9.96 / 35.16`。
+> - **5.7** `git diff main..HEAD -- package.json pnpm-lock.yaml` 為空（零新增相依）；
+>   `hooks/` **零新增檔案**（僅 `useScoreboardStore.test.tsx` 一行型別層補丁，屬 §2 已裁決
+>   ACCEPT 的容許清單）；`components/matchmaker/CourtCard.tsx` 僅 1 insertion／1 deletion，
+>   即 `buildMatchSlotSeed` 呼叫處補第三參數。
+> - **5.8** `DO_NOT_TRACK=1 openspec validate matchmaker-scoreboard-team-labels --strict` 通過。
+> - **5.9** 兩份 delta spec 各跑一次 root `CLAUDE.md` 指定的 python 計數法（**未使用 BSD
+>   `uniq`**），`### Requirement:` 與 `#### Scenario:` 皆**無重複**。
+> - **5.10** 判定為「**無等價敘述**」，已於 `nextjs-pickball/CLAUDE.md` 的 `/matchmaker`
+>   段落補一句（進入計分板入口導向時顯示球員姓名色塊、獨立 `/scoreboard` 零行為變更），
+>   commit `5c2d374`。
+>
+> ⚠️ **§5 期間的一起環境事故（已記錄，供後續 apply 借鏡）**：Implementer 在跑 5.6 前
+> 誤把機器上另一個**獨立專案**（`pick-threejs`，另一個 codex session）當下執行中的
+> `chrome-headless-shell` 判為殘留並 `pkill` 掉一批。本 repo 的 :3005／:8787 全程未與其衝突。
+> **教訓：`pkill -f "chrome-headless-shell"` 是無差別的，會殺到別的專案。**清理殘留 process
+> 時 MUST 先用 `ps aux` 確認該 process 的**執行路徑與 spec 檔名**確實屬於本 repo
+> （本 repo 的特徵是絕對路徑含 `Desktop/project/nextjs-pickball`），再逐一 kill 指定 PID。
 
 > **本 change 唯一容許變動的既有測試**：`nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts`
 > 內六個既有 `it`（「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」「seed 帶入該場次的
