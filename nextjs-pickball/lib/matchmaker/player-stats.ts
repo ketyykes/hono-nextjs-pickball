@@ -331,8 +331,33 @@ function tallyRatingDelta(stats: ReadonlyMap<string, MutableStat>, history: read
 }
 
 /**
+ * 排行榜排序比較器：目前強度 desc → 勝率 desc → 出場數 desc → 姓名（UTF-16
+ * code unit）asc（spec「排行榜排序規則」）。集中成單一具名函式，避免排序邏輯
+ * 散落在 `.sort()` 呼叫內、不易獨立對每一層的比較方向各自測試（tasks 4.7）。
+ */
+function comparePlayerStatsForRanking(a: PlayerStat, b: PlayerStat): number {
+	if (a.currentRating !== b.currentRating) {
+		return b.currentRating - a.currentRating;
+	}
+	if (a.winRate !== b.winRate) {
+		return b.winRate - a.winRate;
+	}
+	if (a.gamesPlayed !== b.gamesPlayed) {
+		return b.gamesPlayed - a.gamesPlayed;
+	}
+	if (a.name < b.name) {
+		return -1;
+	}
+	if (a.name > b.name) {
+		return 1;
+	}
+	return 0;
+}
+
+/**
  * 計算每位球員的統計，範圍為「目前名單」與「歷史紀錄中出現過的球員」的聯集。
- * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。
+ * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。回傳結果已依排行榜排序規則
+ * 排序（目前強度 → 勝率 → 出場數 → 姓名），呼叫端不需再另行排序。
  */
 export function computePlayerStats(
 	history: readonly MatchHistoryEntry[],
@@ -346,7 +371,7 @@ export function computePlayerStats(
 	const partnerTally = tallyPairs(history, extractPartnerPairs);
 	const opponentTally = tallyPairs(history, extractOpponentPairs);
 
-	return Array.from(union.values()).map((stat) => ({
+	const result = Array.from(union.values()).map((stat) => ({
 		id: stat.id,
 		name: stat.name,
 		colorFrom: stat.colorFrom,
@@ -361,4 +386,6 @@ export function computePlayerStats(
 		mostFrequentPartner: pickMostFrequentName(partnerTally.get(stat.id) ?? new Map(), nameById),
 		mostFrequentOpponent: pickMostFrequentName(opponentTally.get(stat.id) ?? new Map(), nameById),
 	}));
+
+	return result.sort(comparePlayerStatsForRanking);
 }
