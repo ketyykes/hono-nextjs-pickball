@@ -40,8 +40,13 @@ function makeTeam(overrides: Partial<HistoryTeam> = {}): HistoryTeam {
 	};
 }
 
+// overrides 的型別排除 format，避免呼叫端誤把單打分支覆寫成雙打（或反之）卻讓
+// discriminated union 的分支判斷失準——沿用 history.test.ts／transfer-storage.test.ts
+// 的既有樣板；有了這層收窄就不需要 `as MatchHistoryEntry` 斷言去壓掉型別錯誤。
+type SinglesOverrides = Partial<Omit<Extract<MatchHistoryEntry, { format: "singles" }>, "format">>;
+
 /** 建立一筆合法的單打測試用歷史紀錄，可透過 overrides 覆寫特定欄位。 */
-function makeEntry(overrides: Partial<MatchHistoryEntry> = {}): MatchHistoryEntry {
+function makeEntry(overrides: SinglesOverrides = {}): MatchHistoryEntry {
 	return {
 		format: "singles",
 		matchId: "match-1",
@@ -53,18 +58,24 @@ function makeEntry(overrides: Partial<MatchHistoryEntry> = {}): MatchHistoryEntr
 		scoreB: 5,
 		winner: "teamA",
 		...overrides,
-	} as MatchHistoryEntry;
+	};
 }
 
 describe("computePlayerStats", () => {
 	it("名單成員即使無出場紀錄仍列入統計結果", () => {
-		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		const players = [makePlayer({ id: "p1", name: "Alice", colorFrom: "#111111", colorTo: "#222222" })];
 
 		const result = computePlayerStats([], players);
 
 		const alice = result.find((stat) => stat.id === "p1");
 		expect(alice).toBeDefined();
 		expect(alice?.gamesPlayed).toBe(0);
+		// 「列入統計結果」不只是出現在陣列裡：這一筆必須真的是她——姓名與色塊取自名單
+		// （tasks 2.2），且被標成名單成員，否則呈現層會把她誤標成「已不在名單」。
+		expect(alice?.onRoster).toBe(true);
+		expect(alice?.name).toBe("Alice");
+		expect(alice?.colorFrom).toBe("#111111");
+		expect(alice?.colorTo).toBe("#222222");
 	});
 
 	it("已離開名單但曾出現於歷史的球員仍列入統計結果", () => {
@@ -78,6 +89,10 @@ describe("computePlayerStats", () => {
 
 		const gone = result.find((stat) => stat.id === "p-gone");
 		expect(gone).toBeDefined();
+		// 這位球員只存在於歷史快照，姓名必須取自快照且 onRoster 為 false——
+		// 少了這兩項斷言，把歷史分支寫成 onRoster: true 或姓名寫死都不會被測出來。
+		expect(gone?.onRoster).toBe(false);
+		expect(gone?.name).toBe("Gone");
 	});
 
 	it("出場數、勝場與敗場依歷史紀錄正確加總", () => {
@@ -110,6 +125,9 @@ describe("computePlayerStats", () => {
 		expect(alice?.wins).toBe(2);
 		expect(alice?.losses).toBe(1);
 		expect(alice?.winRate).toBeCloseTo(2 / 3);
+		// Alice 同時存在於名單與歷史：聯集必須以 id 去重、名單那筆勝出，
+		// 否則歷史分支會把她覆寫成「已不在名單」而只有這裡看得出來。
+		expect(alice?.onRoster).toBe(true);
 	});
 
 	it("出場數為零時勝率為零而非 NaN", () => {
