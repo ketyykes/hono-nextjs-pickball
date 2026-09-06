@@ -79,4 +79,27 @@
 
 1. **本 change 是否需要在 apply §0 對齊「前一棒也可能改到的 MODIFIED 對象」？——不需要，此問題不適用。** 本 change 是 M10～M15 這一批的第一棒，相依對象固定為 `main @ 3fa2d22`（M9 已合併），批次內沒有更早的 change 需要對齊；且本 change 的兩份 delta spec（`match-stage`、`match-history`）皆只使用 ADDED Requirement，**不含任何 MODIFIED**，因此也不存在「MODIFIED 區塊需要以合併後的 main 重新對齊」的情境。apply §0 仍須依 tasks.md §1 的既有慣例，核對本文件與 spec 引用的每個既有函式簽章、常數與檔案路徑在 `main` 上的實際狀態（`resetIncompleteMatches`、`selectPlaying`、`readHistory`、`useRoundStore` 的 `droppedCount` 欄位、`app/matchmaker/players/page.tsx` 的提示樣式），但這是一般性的「先核對再動工」紀律，不是本條所指的批次內 MODIFIED 對齊問題。
 2. **`EmptyMatches.tsx` 是否需要接受任何 props？** 暫定不需要——判斷「是否要渲染」的條件（`round.matches.length === 0`）留在 `MatchStage.tsx`，元件本身是純靜態內容（標題、說明、一個固定連結），不需要任何輸入。若 apply 階段發現需要依情境調整文案（例如未來想區分「重排導致」與「其他成因導致」的空場次），屆時再回頭補 props，本文件不預先設計用不到的擴充點（`working-principles`「No abstractions for single-use code」）。
-3. **`droppedCount` 提示放置於 `HistoryRangeFilter` 之上或之下？** 暫定比照 `player-roster` 的既有慣例，放在頁面內容最上方（`HistoryView.tsx` 回傳的最外層 `<div>` 內、`<HistoryRangeFilter>` 之前）——損毀提示是「整份資料層級」的訊息，不屬於任何一個區間篩選結果，理應在篩選控制項之前先被看到。此為呈現順序的小決定，不寫進 spec（spec 只約束「MUST 顯示」，不約束版面順序），apply 階段若有更好的版面理由可自行微調，不需要回頭改 spec。
+3. **[已於 apply §1 核對，2026-09-06]** 本節其餘條目所引用的既有程式碼在 `main` 上的實際狀態，
+   逐項核對結果如下，**全數與本文件一致，無差異**：
+   - `lib/matchmaker/round.ts` 的 `resetIncompleteMatches`：`occupiedPlayerIds` 只由 `keptMatches`
+     推出，候選池 `players.filter((p) => !occupiedPlayerIds.has(p.id))` **不過濾 `isActive`**；
+     該函式內既有註解亦明載「候選池不足時 `allocateRound` 回傳空 `matches`，本函式不判定失敗」。
+   - `lib/matchmaker/candidates.ts` 的 `selectPlaying`：第 51 行 `players.filter((p) => p.isActive)`，
+     `isActive` 過濾確實發生在此處（Decision 4 的重現路徑成立）。
+   - `lib/matchmaker/round-storage.ts`：`ReadHistoryResult` 為 `{ entries, droppedCount }`；
+     `hooks/useRoundStore.ts` 的 `UseRoundStoreResult.droppedCount` 亦存在（僅供對照，本 change 不用它）。
+   - `app/matchmaker/players/page.tsx` 既有損毀提示：`role="alert"` ＋
+     `className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"`，
+     文案「有 {droppedCount} 筆資料損毀已略過，其餘參賽者資料不受影響。如遺失重要參賽者，請重新新增。」
+   - E2E helper 簽章：`match-stage.spec.ts` 的 `seedRoster(page, count)`、`trackConsoleIssues(page)`、
+     `tabUntilFocused(page, locator, maxPresses?)`；`matchmaker-history.spec.ts` 的
+     `seedHistory(page, entries)`、`buildEntry(options)`、`player(id, name, ratingBefore?, ratingAfter?)`。
+   - `PlayerCard.tsx` 的出場切換按鈕文字為「設為暫停」／「恢復出場」（Decision 4 的點擊目標）。
+
+4. **`droppedCount` 提示放置於 `HistoryRangeFilter` 之上或之下？** 暫定比照 `player-roster` 的既有慣例，放在頁面內容最上方（`HistoryView.tsx` 回傳的最外層 `<div>` 內、`<HistoryRangeFilter>` 之前）——損毀提示是「整份資料層級」的訊息，不屬於任何一個區間篩選結果，理應在篩選控制項之前先被看到。此為呈現順序的小決定，不寫進 spec（spec 只約束「MUST 顯示」，不約束版面順序），apply 階段若有更好的版面理由可自行微調，不需要回頭改 spec。
+
+5. **[Stage 2 Review 實測記錄，2026-09-06] `readHistory()` 的回寫副作用使損毀提示實質上「最多只被看到一次」——判定為不違反本組 spec、且不屬本 change 範圍，記於此供日後 milestone 參考。** `readHistory()` 在 `droppedCount > 0` 時會呼叫 `writeHistory(entries)` 回寫清理後的歷史（`lib/matchmaker/round-storage.ts`），因此有兩個可觀察的後果：①使用者**第二次**開啟歷史頁時 `droppedCount` 已是 0，提示不再出現；②若使用者先造訪 `/matchmaker`（該頁的 `useRoundStore` 同樣呼叫 `readHistory()`），損毀資料會在抵達歷史頁**之前**就被清掉，提示可能一次都不會被看到。**判定一：不違反本組 spec。** Scenario 1 的 WHEN 是條件式的「開啟歷史頁時 `readHistory()` 回傳的 `droppedCount` 大於 0」——第二次開啟時該條件本就不成立，而此時不顯示提示正是同一 Requirement 明文要求的「`droppedCount` 為 0 時 SHALL NOT 顯示任何損毀提示」；spec 從未要求提示跨 session 持續存在。**判定二：不屬本 change 範圍。** 要改變這個時序必須修改 `readHistory()` 的回寫時機，而 Context 明文「本 change 不改動 `lib/matchmaker/**` 的任何一行」，proposal Non-goals 亦有「不新增任何機制讓使用者『修復』或『找回』損毀的歷史紀錄」。若日後認定「提示至少要被看到一次」是產品需求，應是持久化層的獨立 change（例如把「已清理資料」與「已告知使用者」兩件事分開記錄），不應在本 change 內夾帶。
+
+6. **[Stage 2 Review 實測記錄，2026-09-06] hydration 的 `useEffect` 在 `pnpm dev` 下確認只執行一次，未觸發 React StrictMode 雙跑——`hydratedHistoryReducer` 維持 `return next`、不加防禦式合併邏輯是正確的。** 承上條：若該 effect 雙跑，第二次 `readHistory()` 會讀到已被回寫清理的資料而得到 `droppedCount: 0`，把第一次已偵測到的筆數蓋回 0。Reviewer 以獨立探針實測（在 effect 內暫時加一行 `console.warn`，借既有 test「紀錄於 hydration 後顯示且無 console error」的 console 收集器把收集到的訊息全數印出）確認該 warn 只出現一次；E2E test「有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示」全綠亦為同一結論的旁證——若雙跑，該 test 必然紅燈。結論與 `HistoryView.tsx` 檔內註解一致，不寫用不到的分支。
+
+7. **[Stage 2 Review 觀察記錄，2026-09-06] 重排後可能把「剛剛才下場休息的同一批人」繼續留在休息名單，而讓剛比完的人再度上場——屬既有且已核可的設計，不是本 change 引入，記於此供日後 milestone 判斷。** §4 的 E2E 實測（6 人 2 場地、第一場地送出比分後重排）顯示：重排後上場的仍是原本 pending 場次的那兩位，原本休息的兩位繼續休息。成因是 `restCount`／`gamesPlayed` 依 `round-lifecycle` 的 design Decision 1 **只在「產生新一輪」時結算**，重排當下四位候選的這兩個欄位皆為 0，分配優先序（累計休息次數）因此無從分辨先後。這與 §4 測試斷言的「休息名單筆數仍為 2 且排除已比賽者」並不衝突——已比賽的那兩位確實被排除在休息名單外（他們仍在保留的完成場次上）。本 change 不處理：修正它必須改動 `lib/matchmaker/**` 的結算時機，違反 Context 的「零修改 `lib/matchmaker/**`」與 proposal Non-goals 的「不改分配演算法」。附註：§4 Stage 2 曾以 mutation「`restingPlayerIds` 直接沿用重排前的值」測試，實測與正確輸出**逐項相同**而無法被任何斷言殺掉——那不是測試缺口，而是此情境下兩者本就等價的直接後果。

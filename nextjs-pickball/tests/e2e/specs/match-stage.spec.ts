@@ -492,4 +492,184 @@ test.describe("/matchmaker 對戰頁", () => {
 		const unnamed = items.filter((item) => item.name === "");
 		expect(unnamed).toEqual([]);
 	});
+
+	// M10（matchmaker-stage-gaps）：round.matches 為空但 round 本身非 null 的狀態，
+	// 是已由程式碼證實可達的狀態（resetIncompleteMatches 候選池計算不過濾
+	// isActive，見 design Decision 4）——重現方式為「產生本輪對戰後，把其中一位
+	// 對戰中的球員設為暫停出場，再點重設／再排」，候選池即不足以組出任何一場。
+	//
+	// 頁面切換一律用區段導覽的 <Link> 點擊（client-side 軟導覽），SHALL NOT 用
+	// page.goto()：seedRoster 以 addInitScript 種入，其腳本會在每次「真正的瀏覽器
+	// 導覽」（含 page.goto）重新執行、把名單重設回全員出場，蓋掉本測試靠 UI 操作
+	// 做出的「設為暫停」變更；client-side 路由切換不建立新 document，不會觸發它。
+	test("回合存在但本輪無場次時顯示說明文字與前往參賽者名單入口", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await nav.getByRole("link", { name: "參賽者", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
+		await page.getByRole("button", { name: "設為暫停" }).first().click();
+
+		await page.getByRole("navigation", { name: "對戰分配區段導覽" }).getByRole("link", { name: "對戰", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await page.getByRole("button", { name: "重設／再排" }).click();
+
+		await expect(page.getByTestId("empty-matches")).toBeVisible();
+		await expect(page.getByTestId("empty-matches")).toContainText("本輪目前沒有任何場次");
+		// 說明句同樣要斷言：spec 要求「SHALL NOT 只顯示技術訊息或留白」，只鎖標題的話
+		// 說明句被清空仍會全綠（Stage 2 mutation 實測存活），等於這段文案沒有守衛。
+		await expect(page.getByTestId("empty-matches")).toContainText("候選人數不足以組成任何一場比賽");
+		await expect(page.getByTestId("match-stage-courts")).toHaveCount(0);
+		const joinLink = page.getByRole("link", { name: "前往參賽者名單" });
+		await expect(joinLink).toBeVisible();
+		await joinLink.click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
+	});
+
+	// 版面 regression guard（Stage 2 mutation 實測補上）：把 EmptyMatches 根節點的
+	// `flex-1` 拿掉，上面兩條 test 仍全綠——但說明卡片會縮成內容寬（1280 視窗下量得
+	// 554px 而非 680px），休息名單跟著左移 126px，整列右緣與同頁其他區塊對不齊。
+	// 改以「說明卡片與場地網格同寬」「休息名單左緣不因場次有無而位移」兩條相對關係
+	// 鎖住，不寫死像素值，日後調整容器寬度或間距都不需要跟著改這條測試。
+	test("桌面斷點本輪無場次時說明卡片佔滿場地欄寬度", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		const courts = await page.getByTestId("match-stage-courts").boundingBox();
+		const restingWithCourts = await page.getByTestId("match-stage-resting").boundingBox();
+
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await nav.getByRole("link", { name: "參賽者", exact: true }).click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
+		await page.getByRole("button", { name: "設為暫停" }).first().click();
+		await page
+			.getByRole("navigation", { name: "對戰分配區段導覽" })
+			.getByRole("link", { name: "對戰", exact: true })
+			.click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await page.getByRole("button", { name: "重設／再排" }).click();
+		await expect(page.getByTestId("empty-matches")).toBeVisible();
+
+		const empty = await page.getByTestId("empty-matches").boundingBox();
+		const resting = await page.getByTestId("match-stage-resting").boundingBox();
+		expect(courts).not.toBeNull();
+		expect(restingWithCourts).not.toBeNull();
+		expect(empty).not.toBeNull();
+		expect(resting).not.toBeNull();
+		if (courts === null || restingWithCourts === null || empty === null || resting === null) return;
+
+		expect(empty.width).toBeCloseTo(courts.width, 0);
+		expect(resting.x).toBeCloseTo(restingWithCourts.x, 0);
+	});
+
+	test("回合存在且有場次時不顯示本輪場次為空的說明", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId("match-stage-courts")).toBeVisible();
+
+		await expect(page.getByTestId("empty-matches")).toHaveCount(0);
+	});
+
+	// M10（matchmaker-stage-gaps）§4：regression guard，不對應任何新的或被修改的 spec
+	// 驗收錨點（見 design Decision 3）——resetIncompleteMatches 與其 UI wiring 已由
+	// lib/matchmaker/round.test.ts 與 components/matchmaker/RoundControls.test.tsx
+	// 覆蓋且正確，本測試只新增一層「真實瀏覽器 + 真實 LocalStorage」的端到端證據。
+	test("重設／再排後已完成場次保留、未完成場次重新分配且休息名單排除已比賽者", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await seedRoster(page, 6);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "增加場地數" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		// 限定範圍取第一場地：兩個場地皆有同名的比分欄位與送出鈕，直接對整頁呼叫
+		// getByLabel 會觸發 Playwright strict-mode 多重命中錯誤（沿用既有 test 的作法）。
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(2);
+		const firstCourt = courtGrids.nth(0);
+
+		await firstCourt.getByLabel("第一隊比分").fill("11");
+		await firstCourt.getByLabel("第二隊比分").fill("7");
+		await firstCourt.getByRole("button", { name: "送出比分" }).click();
+		await expect(firstCourt.getByRole("button", { name: "送出比分" })).toBeDisabled();
+
+		type StoredMatch = {
+			id: string;
+			courtNumber: number;
+			status: string;
+			scores: { teamA: number; teamB: number } | null;
+			winner: string | null;
+			completedAt: string | null;
+			teams: [{ playerIds: string[] }, { playerIds: string[] }];
+		};
+		type StoredRound = {
+			round: { matches: StoredMatch[]; restingPlayerIds: string[] } | null;
+		};
+
+		const beforeRaw = await page.evaluate((key) => window.localStorage.getItem(key), ROUND_STORAGE_KEY);
+		expect(beforeRaw).not.toBeNull();
+		const before = JSON.parse(beforeRaw ?? "{}") as StoredRound;
+		expect(before.round).not.toBeNull();
+		if (before.round === null) return;
+
+		const completedBefore = before.round.matches.find((m) => m.status === "completed");
+		const pendingBefore = before.round.matches.find((m) => m.status !== "completed");
+		expect(completedBefore).toBeDefined();
+		expect(pendingBefore).toBeDefined();
+		if (completedBefore === undefined || pendingBefore === undefined) return;
+		expect(before.round.restingPlayerIds).toHaveLength(2);
+		// 先把重排前的狀態錨定到本測試實際輸入的比分：下方 scores／winner 是「重排後 === 重排前」
+		// 的相對比對，若兩邊都是 null 一樣會綠，錨定後那組比對才真的代表「值被保留下來」。
+		expect(completedBefore.scores).toEqual({ teamA: 11, teamB: 7 });
+		expect(completedBefore.winner).toBe("teamA");
+
+		await page.getByRole("button", { name: "重設／再排" }).click();
+
+		const afterRaw = await page.evaluate((key) => window.localStorage.getItem(key), ROUND_STORAGE_KEY);
+		expect(afterRaw).not.toBeNull();
+		const after = JSON.parse(afterRaw ?? "{}") as StoredRound;
+		expect(after.round).not.toBeNull();
+		if (after.round === null) return;
+
+		expect(after.round.matches).toHaveLength(2);
+		const completedAfter = after.round.matches.find((m) => m.id === completedBefore.id);
+		expect(completedAfter).toBeDefined();
+		if (completedAfter === undefined) return;
+		expect(completedAfter.scores).toEqual(completedBefore.scores);
+		expect(completedAfter.winner).toBe(completedBefore.winner);
+		expect(completedAfter.courtNumber).toBe(completedBefore.courtNumber);
+		expect(completedAfter.completedAt).toBe(completedBefore.completedAt);
+
+		const otherMatchAfter = after.round.matches.find((m) => m.id !== completedBefore.id);
+		expect(otherMatchAfter).toBeDefined();
+		if (otherMatchAfter === undefined) return;
+		expect(otherMatchAfter.id).not.toBe(pendingBefore.id);
+		// 新場次 MUST 避開保留場次已佔用的場地編號，否則畫面會出現兩張同時寫著「1 號場」的
+		// 卡片（Stage 2 mutation 實測：拿掉 takeFreeCourtNumbers 的避讓後其餘斷言全綠存活）。
+		expect(otherMatchAfter.courtNumber).not.toBe(completedAfter.courtNumber);
+
+		// 休息名單排除已比賽者：完成場次那兩位球員 SHALL NOT 出現在重排後的休息名單。
+		const completedPlayerIds = completedBefore.teams.flatMap((team) => team.playerIds);
+		// 先鎖住筆數再進迴圈：completedPlayerIds 若為空陣列，下面的 for 一次都不會執行，
+		// 「排除已比賽者」這條守衛會靜默失效而測試照樣全綠（單打一場恰為兩人）。
+		expect(completedPlayerIds).toHaveLength(2);
+		expect(after.round.restingPlayerIds).toHaveLength(2);
+		for (const playerId of completedPlayerIds) {
+			expect(after.round.restingPlayerIds).not.toContain(playerId);
+		}
+
+		// 休息名單與場上球員互斥：同一個人不可能同時在比賽又在休息。這是不變量而非演算法
+		// 細節（候選排序規則調整不會使它轉紅），Stage 2 mutation 實測補上——把 restingPlayerIds
+		// 誤接成新場次的球員時，上面「筆數為 2」與「不含已比賽者」兩組斷言全數無感而測試照樣全綠。
+		const playingAfterIds = after.round.matches.flatMap((m) => m.teams.flatMap((team) => team.playerIds));
+		for (const playerId of after.round.restingPlayerIds) {
+			expect(playingAfterIds).not.toContain(playerId);
+		}
+	});
 });

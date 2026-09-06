@@ -59,6 +59,14 @@ function isoCrossMonthWeek(day: number, hour = 10): string {
 	return new Date(2026, 6, day, hour, 0, 0).toISOString();
 }
 
+// Next.js 的 route announcer（`__next-route-announcer__`）本身即帶 role="alert"，
+// 但恆為空字串內容，且並非 aria-hidden，會被 getByRole("alert") 一併命中，
+// 讓「有幾個 alert」與「alert 文字是什麼」兩種斷言都失真——本頁新增的損毀提示
+// 必須排除這個固定 id 才能鎖定實際渲染出來的提示本身。
+function historyCorruptionAlert(page: Page) {
+	return page.locator('[role="alert"]:not(#__next-route-announcer__)');
+}
+
 // 種入一批歷史紀錄：外層容器 MUST 是 { version: 1, entries: [...] }（round-storage.ts
 // 的 writeHistory() 寫入形狀），裸陣列會被 readHistory() 判為結構層級損壞而整份清空。
 // 以 page.addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀得到
@@ -470,6 +478,60 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 			HISTORY_STORAGE_KEY,
 		);
 		expect(afterValue).toBe(rawValue);
+	});
+
+	test("有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示", async ({ page }) => {
+		const validEntry = buildEntry({
+			matchId: "e2e-history-valid-1",
+			playedAt: isoToday(9),
+			teamA: [player("p-valid-a", "損毀提示合法員A")],
+			teamB: [player("p-valid-b", "損毀提示合法員B")],
+		});
+		// 刻意缺必要欄位（teamB）製造不合法紀錄：外層容器 version 仍合法，
+		// 只有這些個別紀錄不合法，readHistory() 會逐筆丟棄並回報 droppedCount。
+		const corruptEntry = (n: number) => ({ matchId: `e2e-history-corrupt-${n}`, playedAt: isoToday(9) });
+		await seedHistory(page, [validEntry, corruptEntry(1), corruptEntry(2)]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const alert = historyCorruptionAlert(page);
+		await expect(alert).toBeVisible();
+		// 損毀筆數刻意種 2 筆（而非 1 筆），並在本 test 末尾再以另一個筆數重讀一次：
+		// 只種 1 筆時，把 {hydrated.droppedCount} 插值寫死成常數 1 照樣全綠
+		// （Stage 2 mutation 實測確認此退化會存活），兩個相異取值才擋得住寫死——
+		// 沿用本檔「8.2 全部欄位」那個 test 的相異值慣例（單一取值等於零保護）。
+		await expect(alert).toContainText("2");
+		await expect(alert).toContainText("損毀");
+		await expect(alert).toContainText("歷史紀錄");
+		// spec Scenario 1 的 THEN 除了損毀筆數，還要求「說明其餘紀錄不受影響」；
+		// 前三條斷言擋不住把後半句拿掉的退化（例如只剩「有 N 筆損毀的歷史紀錄已略過。」），
+		// 這裡直接鎖字面量文字，不引用 HistoryView.tsx 的字串（避免恆真同義反覆）。
+		await expect(alert).toContainText("不受影響");
+		// 合法那筆紀錄不受影響，正常顯示。
+		await expect(page.getByText("損毀提示合法員A")).toBeVisible();
+
+		// 換一個損毀筆數重讀：addInitScript 可重複註冊且依註冊順序執行，後註冊的這份
+		// 會覆寫前一份寫入的值（連帶蓋掉 readHistory() 在 droppedCount > 0 時回寫的
+		// 清理後結果），reload 後即為 3 筆損毀——畫面顯示的數字 MUST 隨資料改變。
+		await seedHistory(page, [validEntry, corruptEntry(1), corruptEntry(2), corruptEntry(3)]);
+		await page.reload();
+		await expect(historyCorruptionAlert(page)).toContainText("3");
+	});
+
+	test("沒有損毀歷史紀錄時不顯示損毀提示", async ({ page }) => {
+		await seedHistory(page, [
+			buildEntry({
+				matchId: "e2e-history-nodrop-1",
+				playedAt: isoToday(9),
+				teamA: [player("p-nodrop-a", "無損毀員A")],
+				teamB: [player("p-nodrop-b", "無損毀員B")],
+			}),
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		await expect(page.getByText("無損毀員A")).toBeVisible();
+		await expect(historyCorruptionAlert(page)).toHaveCount(0);
 	});
 
 	test("紀錄於 hydration 後顯示且無 console error", async ({ page }) => {
