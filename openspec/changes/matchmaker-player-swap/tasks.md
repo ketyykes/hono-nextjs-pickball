@@ -39,8 +39,8 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED: 於 `nextjs-pickball/hooks/useRoundStore.test.tsx` 補兩個 it：「swapMatchPlayer 成功時套用新回合、失敗時 round 參考不變」「尚無目前回合時呼叫 swapMatchPlayer 回傳失敗且不 dispatch」。確認紅燈
-- [ ] 3.2 GREEN: 於 `nextjs-pickball/hooks/useRoundStore.ts` 新增 `swapMatchPlayer(matchId, outPlayerId, inPlayerId)` 動作，形態比照既有 `resetIncompleteMatches`／`setTargetScore`（呼叫純函式 → 判 `ok` → dispatch；`state.round === null` 時直接回傳失敗結果，不呼叫純函式，比照 `setTargetScore`／`submitScore` 既有的型別安全防線寫法）；`UseRoundStoreResult` 新增對應欄位並更新其 JSDoc
+- [x] 3.1 RED: 於 `nextjs-pickball/hooks/useRoundStore.test.tsx` 補兩個 it：「swapMatchPlayer 成功時套用新回合、失敗時 round 參考不變」「尚無目前回合時呼叫 swapMatchPlayer 回傳失敗且不 dispatch」。確認紅燈
+- [x] 3.2 GREEN: 於 `nextjs-pickball/hooks/useRoundStore.ts` 新增 `swapMatchPlayer(matchId, outPlayerId, inPlayerId)` 動作，形態比照既有 `resetIncompleteMatches`／`setTargetScore`（呼叫純函式 → 判 `ok` → dispatch；`state.round === null` 時直接回傳失敗結果，不呼叫純函式，比照 `setTargetScore`／`submitScore` 既有的型別安全防線寫法）；`UseRoundStoreResult` 新增對應欄位並更新其 JSDoc
 
 ## 4. CourtCard 換人操作（match-stage）
 
