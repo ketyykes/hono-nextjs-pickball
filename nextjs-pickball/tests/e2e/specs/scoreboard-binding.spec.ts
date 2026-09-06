@@ -365,8 +365,11 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 	// 每位測試球員配不同的漸層色，而非全員共用同一組色碼：若「由對戰頁進入時面板顯示
 	// 球員姓名」test 只驗證色碼存在於畫面上某處，全員同色會讓「元件是否真的把每位球員
 	// 自己的 colorFrom／colorTo 接到對應色塊」這件事測不出來。
+	// 第一組刻意採「深色漸層」（pickTextColor 回傳淺色前景），其餘三組為淺色漸層（回傳
+	// 深色前景）：四組若全部落在同一側，四位球員的預期 foreground 會是同一個值，
+	// 「color 寫死成該值」的變異就殺不掉（Stage 2 mutation 補洞）。
 	const PLAYER_COLOR_PALETTE = [
-		{ colorFrom: "#4f46e5", colorTo: "#818cf8" },
+		{ colorFrom: "#0E6B63", colorTo: "#134E4A" },
 		{ colorFrom: "#16a34a", colorTo: "#4ade80" },
 		{ colorFrom: "#dc2626", colorTo: "#f87171" },
 		{ colorFrom: "#d97706", colorTo: "#fbbf24" },
@@ -787,5 +790,17 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 			testPlayers.map((player) => themPanel.getByText(player.name, { exact: true }).count()),
 		);
 		expect(themNameCounts.filter((count) => count > 0)).toHaveLength(2);
+
+		// 顯示位置的結構斷言（spec「顯示位置 MUST 為 TeamPanel.tsx 既有的名稱行，
+		// SHALL NOT 新增獨立的列或區塊」、design Decision 5）：頁面為 h-dvh + overflow-hidden
+		// 鎖高，多一列會壓縮分數面板的高度預算，且溢出的失敗模式是靜默裁切而非出現捲軸——
+		// 零捲動測試因此不保證抓得到。改以「色塊最近的祖先 div 同時含有『我方』與『分制』
+		// 兩段既有文字」直接驗證色塊確實落在名稱行內；把色塊搬到名稱行之外自成一列時，
+		// 該祖先 div 只會有球員姓名，本斷言即轉紅（Stage 2 mutation 補洞）。
+		const badgeRowText = await page
+			.getByText(testPlayers[0].name, { exact: true })
+			.evaluate((el) => el.closest("div")?.textContent ?? "");
+		expect(badgeRowText).toContain("我方");
+		expect(badgeRowText).toContain("分制");
 	});
 });
