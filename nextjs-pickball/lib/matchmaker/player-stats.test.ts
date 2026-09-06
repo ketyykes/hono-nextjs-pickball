@@ -182,6 +182,31 @@ describe("computePlayerStats", () => {
 		expect(gone?.onRoster).toBe(false);
 	});
 
+	it("強度淨變化為所有出場紀錄賽前賽後分數差的加總", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		const history = [
+			makeEntry({
+				matchId: "m1",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "Alice", ratingBefore: 5, ratingAfter: 5.12 })],
+				}),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+			makeEntry({
+				matchId: "m2",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "Alice", ratingBefore: 5.12, ratingAfter: 5.07 })],
+				}),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.ratingDelta).toBeCloseTo(0.07);
+	});
+
 	it("計算過程不修改輸入的歷史與名單", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice" })];
 		const history = [
