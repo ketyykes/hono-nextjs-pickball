@@ -389,6 +389,30 @@ it 的斷言本體逐字不動**，符合 tasks.md「本 change 唯一容許變�
    **相同的可存取名稱**。§6 E2E 的 fixture MUST 避免同名球員，否則 locator 會有歧義。
    根治需把 id 帶進可存取名稱（會讓文案不通順），留給日後真的出現同名情境時再處理。
 
+**apply §5 Stage 2 的三項結構性發現（記錄，非缺陷）**
+
+1. **`swapMatchPlayer` 的五個失敗碼在目前 UI 上全部不可達**。`CourtCard` 自身的守衛已把每一種
+   前置條件擋在前面：`matchId` 取自正在渲染的 `match.id`；`canSwap = !completed && !inProgress`
+   使非 pending 場次根本不渲染換人操作；換出者取自該球員格自己；候選人取自
+   `round.restingPlayerIds` 且已 `.filter(isActive)`。因此 `swapError` 的顯示接線是**純防禦性
+   程式碼**，E2E 無法以正常操作觸達。`match-stage` 的「換人被拒絕時顯示繁體中文錯誤訊息」
+   Scenario 由 §4 的 integration 測試（直接以 prop 傳入 `swapError`）驗收，這是正確且唯一
+   可行的驗收層級；**§6 SHALL NOT 嘗試用 E2E 觸發換人失敗訊息**——寫了只會得到一個永遠走不到
+   的分支，或一個造假的 seeding。已知覆蓋缺口：`MatchStage`／`page.tsx` 的 `swapError` 定位
+   接線（變異 P1／P3／P7／Q1／Q3）目前無任何自動化防線，且因不可達而無法補 E2E；風險已因
+   不可達而大幅降低，記錄於此供後續 change 參考。
+2. **兩個同形型別不提供編譯期保護**。`MatchStageSwapError` 與 `MatchStageSubmitError` 結構
+   完全相同，TypeScript 為結構型別系統，故 `submitError={swapError}` 這種誤傳**編譯完全合法**
+   （變異 Q3 實測 tsc exit 0）。維持兩個型別分離的價值是**文件性／語意性**的，不是編譯期強制
+   的——先前假設「不合併能換到型別安全」並不成立。若日後真要編譯期保護，唯一手段是 branded
+   type（各加一個 `readonly kind` 判別欄位）。本 change 不做（既有 codebase 的四組
+   `*_FAILURE_CODE` 同樣是各自獨立而非共用泛用列舉，方向一致）。
+3. **`components/matchmaker/CourtCard.test.tsx` 在全套並行執行下有低頻不穩定**（Stage 2 實測
+   9 次全套執行中出現 1 次，失敗的是「每個色塊顯示姓名、性別與強度分數」與「雙打場次顯示
+   男雙女雙混雙或一般雙打的組成標示」兩個**既有** it）。經單檔重跑 20/20 綠、變異下全套再跑
+   4 次全綠、基準全套跑 5 次全綠交叉確認，判定為 flake 而非真實防線。**非本 change 引入、
+   也非本 change 修復範圍**，記錄於此避免後續群組把它誤讀成真紅燈。
+
 **新增 Open Question 5 → 已解決（M12 的 `teamPlayers` 快照不需要換人更新路徑）**
 
 M12 在 `lib/matchmaker/scoreboard-binding.ts` 讓 `buildMatchSlotSeed(round, match, players)`

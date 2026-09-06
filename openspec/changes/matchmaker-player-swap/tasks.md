@@ -54,15 +54,29 @@ Depends on: §2, §3
 
 Depends on: §4
 
-- [ ] 5.1 GREEN（例外層，不強制紅燈，以 §6 E2E 驗收）：`MatchStage.tsx` 新增 `onSwapPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => void` 與 `swapError: MatchStageSwapError | null` 兩個 props（`MatchStageSwapError` 型別比照既有的 `MatchStageSubmitError`：`{ matchId: string; message: string }`），下傳給每個 `CourtCard`（`swapError` 依 `matchId` 比對後轉為該卡片的 `string | null`，比照既有 `submitError` 的下傳方式）
-- [ ] 5.2 GREEN（例外層，不強制紅燈，以 §6 E2E 驗收）：`app/matchmaker/page.tsx` 新增 `handleSwapPlayer(matchId, outPlayerId, inPlayerId)`：呼叫 `useRoundStore` 回傳的 `swapMatchPlayer`，失敗時以 `{ matchId, message: result.message }` 更新一個新的 `swapError` state（比照既有 `submitError` 的 `useState` 寫法），成功時清除該 state；掛入 `MatchStage` 的 `onSwapPlayer`／`swapError` props
+- [x] 5.1 GREEN（例外層，不強制紅燈，以 §6 E2E 驗收）：`MatchStage.tsx` 新增 `onSwapPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => void` 與 `swapError: MatchStageSwapError | null` 兩個 props（`MatchStageSwapError` 型別比照既有的 `MatchStageSubmitError`：`{ matchId: string; message: string }`），下傳給每個 `CourtCard`（`swapError` 依 `matchId` 比對後轉為該卡片的 `string | null`，比照既有 `submitError` 的下傳方式）
+- [x] 5.2 GREEN（例外層，不強制紅燈，以 §6 E2E 驗收）：`app/matchmaker/page.tsx` 新增 `handleSwapPlayer(matchId, outPlayerId, inPlayerId)`：呼叫 `useRoundStore` 回傳的 `swapMatchPlayer`，失敗時以 `{ matchId, message: result.message }` 更新一個新的 `swapError` state（比照既有 `submitError` 的 `useState` 寫法），成功時清除該 state；掛入 `MatchStage` 的 `onSwapPlayer`／`swapError` props
 
 ## 6. E2E：換人操作的可存取性
+
+> **Leader 裁決（apply §5 Stage 2 之後）**：§5 的 mutation 缺口盤點顯示 P5（`handleSwapPlayer`
+> 不呼叫 store）與 P6（`onSwapPlayer` 傳 no-op）這類「換人整條線路完全失效」的接線錯誤，
+> 在全套 694 個單元測試與 `tsc` 皆為綠燈的情況下**完全不會被發現**——§4 的 integration 測試只
+> 驗到 `CourtCard` 正確委派回呼，回呼之後的路徑無人守衛。因此除 6.1（spec 驗收錨點，逐字
+> 不可改）外，額外新增 **6.3**：一條換人成功路徑的 E2E。這是 leader 授權的**新增驗收**，
+> 不改變任何 spec MUST、不影響 6.1 的錨點比對，理由記於 design.md「apply §5 Stage 2 的三項
+> 結構性發現」。
+>
+> **§6 SHALL NOT 嘗試用 E2E 觸發換人失敗訊息**：五個失敗碼在目前 UI 上全部不可達（見
+> design.md 同節第 1 點），該 Scenario 由 §4 的 integration 測試以 prop 直接傳入 `swapError`
+> 驗收，那是正確且唯一可行的層級。
 
 Depends on: §4, §5
 
 - [ ] 6.1 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人操作具備可存取名稱且可由鍵盤操作，並能區分不同球員」——種入名單並產生一輪雙打對戰（沿用既有 helper），以 Tab 依序走訪該場地區塊的四個換人操作，斷言各自可取得 focus 且四者的可存取名稱互不相同（各含所屬球員姓名）。確認紅燈或如實標註為 regression guard（unit／integration 測試無法驗證真實 Tab 順序與可存取名稱的跨元素唯一性，此測試很可能是本 change 第一次真正驗證這件事）
 - [ ] 6.2 GREEN: 若 §4／§5 的既有實作已能通過，確認並貼出綠燈輸出；若可存取名稱組字方式不足以在真實 DOM 下彼此區分（例如被瀏覽器正規化空白字元），於 `CourtCard.tsx` 調整 `aria-label` 組字方式至通過
+
+- [ ] 6.3 RED（leader 授權新增，非原 tasks 項目）: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人成功後場地色塊與休息名單同步更新」——種入名單並產生一輪含休息球員的對戰，於某場地卡片選取一位候選人，斷言該球員格換成換入者、換出者出現在休息名單、且頁面無任何 `role="alert"`。此條專為封住 §5 盤點出的 P5／P6／Q2 三條無防線變異（換人線路完全失效或引數對調時，全套單元測試與 tsc 皆不會轉紅）
 
 ## 7. 收尾驗證
 
