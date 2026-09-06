@@ -139,6 +139,49 @@ describe("computePlayerStats", () => {
 		expect(alice?.winRate).toBe(0);
 	});
 
+	it("名單內球員的目前強度取自名單目前的 rating", () => {
+		// rating（6）刻意與該球員任一歷史 ratingAfter（3）、預設 ratingBefore（5）
+		// 都不同，避免巧合相等讓斷言失去區辨力。
+		const players = [makePlayer({ id: "p1", name: "Alice", rating: 6 })];
+		const history = [
+			makeEntry({
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice", ratingAfter: 3 })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.currentRating).toBe(6);
+		expect(alice?.onRoster).toBe(true);
+	});
+
+	it("已離開名單的球員取歷史最近一筆的 ratingAfter 並標示已不在名單", () => {
+		// 陣列順序刻意把「較晚」那筆放在前面：若實作誤用「陣列迭代順序取最後一筆」
+		// 會得到較早那筆的 4，只有真的依 playedAt 比較才會得到較晚那筆的 7。
+		const history = [
+			makeEntry({
+				matchId: "m-later",
+				playedAt: "2026-08-20T00:00:00.000Z",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p-gone", name: "Gone", ratingAfter: 7 })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+			makeEntry({
+				matchId: "m-earlier",
+				playedAt: "2026-08-10T00:00:00.000Z",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p-gone", name: "Gone", ratingAfter: 4 })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const gone = result.find((stat) => stat.id === "p-gone");
+		expect(gone?.currentRating).toBe(7);
+		expect(gone?.onRoster).toBe(false);
+	});
+
 	it("計算過程不修改輸入的歷史與名單", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice" })];
 		const history = [
