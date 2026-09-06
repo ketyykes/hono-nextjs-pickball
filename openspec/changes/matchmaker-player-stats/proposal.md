@@ -40,7 +40,7 @@ M10 已知缺口修補（stage-gaps） → 【M11 球員統計與排行榜頁（
   （已被刪除）仍列入結果，目前強度改取其在傳入歷史中最近一筆的 `ratingAfter`，並標示為
   已不在名單。
 - 新增元件 `nextjs-pickball/components/matchmaker/PlayerStatsTable.tsx`：純呈現的排行榜表格，
-  接收已計算好的統計陣列為 props，欄位為名次、球員（色塊＋姓名）、強度、出場、勝－負、勝率、
+  接收已計算好的統計陣列為 props，欄位為名次、球員（色塊＋姓名）、強度、出場、勝負、勝率、
   淨變化、常搭檔、常對手。
 - 新增頁面 `nextjs-pickball/app/matchmaker/stats/page.tsx`：`"use client"`，比照
   `app/matchmaker/page.tsx` 的既有形態直接持有 `useRosterStore()` 與

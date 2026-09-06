@@ -177,7 +177,7 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
 
 `computePlayerStats` 同時輸出 `mostFrequentPartner` 與 `mostFrequentOpponent`
 兩個欄位，`PlayerStatsTable.tsx` 的欄位 MUST 兩者都顯示（常搭檔、常對手各一欄，
-共九欄：名次、球員、強度、出場、勝－負、勝率、淨變化、常搭檔、常對手）。
+共九欄：名次、球員、強度、出場、勝負、勝率、淨變化、常搭檔、常對手）。
 
 **理由**：M9 Final Review 的既有 checklist 明文要求「`ExportScene` 的欄位全數有消費端，
 零 dead data」；若 `mostFrequentOpponent` 只被計算卻從不顯示，就是同一種問題在本 change
@@ -292,6 +292,21 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
    `change/matchmaker-player-stats` 分支上執行（見 environment.md 的 Verification）。
    execution-plan 與本檔中所有「worktree 絕對路徑」一律改讀為
    `/Users/m2_24gb/Desktop/project/nextjs-pickball`。
+
+1-b. **【apply §5 裁決，2026-09-06】delta spec 內部字面矛盾：「勝－負」vs「勝負」**
+
+   `specs/player-stats/spec.md` 的 Requirement prose 原本把第五欄寫成「**勝－負**」，但同一份
+   spec 的 Scenario「直接開啟 /matchmaker/stats 顯示排行榜表格」要求 §6 的 E2E 能在標題列比對到
+   「**勝負**」這個連續子字串——帶破折號的標題不含「勝負」，兩者不可能同時滿足。
+
+   對照可知 Scenario 的九個詞**全部都是欄位全名的子字串**（「強度」⊂「目前強度」、「出場」⊂
+   「出場數」、「淨變化」⊂「強度淨變化」、「常搭檔」⊂「最常搭檔」），唯獨「勝負」⊄「勝－負」
+   ——破折號是 prose 敘述時的便利寫法，不是 UI 文案規定。
+
+   **裁決**（§5 Stage 1 Reviewer 判定，leader 採納）：Scenario 是可執行、可機械驗證的契約，
+   prose 是自然語言描述；實作採「勝負」是正確的。已把 `specs/player-stats/spec.md`、本檔
+   Decision 6、`proposal.md` 三處的「勝－負」一併更正為「勝負」，避免 archive 時把這個自相矛盾
+   同步進主 spec。`tasks.md` 的 5.2 保留原始指派文字作為歷史紀錄，不回頭改寫。
 
 2. **Elo 走勢圖是否值得做成獨立 change？** 本 change 的 Non-Goals 已排除圖表；若使用者
    日後認為排行榜的「淨變化」不足以呈現趨勢，需另外評估圖表庫選型（是否比照 M9 的
