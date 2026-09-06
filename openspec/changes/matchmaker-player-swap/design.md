@@ -358,6 +358,37 @@ apply 當下的事實。以下為實讀 `b69a418`（含 M12 合併 commit `ea71e
 `buildProps` 追加 `onSwapPlayer: vi.fn()` 與 `swapError: null` 兩個預設欄位即可，**既有 14 個
 it 的斷言本體逐字不動**，符合 tasks.md「本 change 唯一容許變動的既有測試」段落的既定裁決。
 
+**Open Question 2 → 已解決（apply §4 Stage 2 裁定：維持每格顯示）**
+
+裁定者為 §4 的 Stage 2 Code-Quality Reviewer（design 明文把此決定權留給該階段）。結論是
+**維持「無可換之人」在雙打四格各自顯示**，但附帶一項**必要的實作修正**：
+
+原實作把「無可換之人」只放在 `SelectValue` 的 placeholder，而觸發器帶有 `aria-label`——
+`aria-label` 會**覆蓋**元素的內部文字，因此讀屏使用者實際只會聽到「替 X 換人，已停用」，
+永遠聽不到停用原因。也就是說 `prd.md` 12.3 的「disabled 要解釋自己」對讀屏使用者**並未
+成立**，而「每格獨立解釋自己」正是本 change 選擇每格顯示（而非場地層級顯示一次）的唯一
+理由——前提不成立，裁定就無從支撐。修正方式為停用時把原因併入 `aria-label`
+（`替 X 換人（無可換之人）`），使可見與可聽到的資訊一致（commit `ad86744`）。
+
+修正後維持每格顯示的理由：① 無障礙前提成立後，逐格 Tab 的使用者不會漏掉原因；
+② 零額外 DOM——原因文字放在 `Select` 既有的 placeholder 槽，改為場地層級反而要新增說明
+區塊並在該區塊與四個觸發器之間建立一條新的狀態耦合；③ 重複只出現在候選清單為空的邊界
+狀態（此時四個觸發器皆為 disabled 的低對比樣式），正常狀態下四格顯示的是「換人」這個
+標準控制項標籤，本就會重複、不算雜訊。spec 的 MUST 兩案皆滿足，故以無障礙穩健度裁量。
+
+**§4 交接給 §5／§6 的兩項已知風險（不阻擋 §4，但後續群組 MUST 注意）**
+
+1. **同一場地卡片可能同時出現兩個 `role="alert"`**：`swapError` 的 alert 由 `CourtCard`
+   直接渲染於卡片頂部，`submitError` 的 alert 在 `ScoreEntry` 內，兩者分屬獨立的錯誤來源。
+   Stage 2 以臨時探針實測確認：兩者同時非 `null` 時 `getByRole("alert")`（單數）**會 throw**。
+   既有測試不受影響（`buildProps` 讓兩條 alert 測試各自只設一個錯誤），但 §5／§6 若要在
+   場地卡片上查 alert，MUST 改用 `getAllByRole` 或 `within(場地卡片)` ＋ 文字過濾。
+   **SHALL NOT 為此把兩個 alert 合併成一個**——那會遺失資訊，並逼 `CourtCard` 持有
+   「哪個錯誤優先」這種它不該做的判斷。
+2. **`Player.name` 不保證唯一**：換人操作的可存取名稱以球員姓名組成，兩位同名球員會產生
+   **相同的可存取名稱**。§6 E2E 的 fixture MUST 避免同名球員，否則 locator 會有歧義。
+   根治需把 id 帶進可存取名稱（會讓文案不通順），留給日後真的出現同名情境時再處理。
+
 **新增 Open Question 5 → 已解決（M12 的 `teamPlayers` 快照不需要換人更新路徑）**
 
 M12 在 `lib/matchmaker/scoreboard-binding.ts` 讓 `buildMatchSlotSeed(round, match, players)`
