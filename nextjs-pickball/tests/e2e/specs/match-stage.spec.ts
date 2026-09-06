@@ -140,6 +140,31 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page.getByTestId("match-stage-region")).toBeVisible();
 	});
 
+	// M11（matchmaker-player-stats）：第五個分頁「統計」是否真的接上路由，而不只是
+	// 分頁清單多一筆資料。一併驗「對戰」在統計頁沒有 aria-current——/matchmaker/stats
+	// 以 /matchmaker 為前綴，active 判定若退化成前綴比對，兩個分頁會同時亮起。
+	test("可由對戰頁的區段導覽點擊進入統計頁", async ({ page }) => {
+		await page.goto("/matchmaker");
+		const nav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		const statsTab = nav.getByRole("link", { name: "統計", exact: true });
+		await expect(statsTab).toBeVisible();
+		await expect(statsTab).not.toHaveAttribute("aria-current");
+
+		await statsTab.click();
+		await expect(page).toHaveURL(/\/matchmaker\/stats$/);
+		// 真的渲染出統計頁，而非僅網址列變了
+		await expect(page.getByRole("heading", { name: "球員統計" })).toBeVisible();
+
+		const statsNav = page.getByRole("navigation", { name: "對戰分配區段導覽" });
+		await expect(statsNav.getByRole("link", { name: "統計", exact: true })).toHaveAttribute(
+			"aria-current",
+			"page",
+		);
+		await expect(statsNav.getByRole("link", { name: "對戰", exact: true })).not.toHaveAttribute(
+			"aria-current",
+		);
+	});
+
 	test("從首頁點擊 Navbar 的對戰分配連結進入對戰頁", async ({ page }) => {
 		await page.goto("/");
 		await page.getByRole("link", { name: "對戰分配", exact: true }).click();
