@@ -217,6 +217,19 @@ describe("match-slots", () => {
 	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現這兩個 catch 分支的
 	// console.warn 拿掉後全綠。寫入超出配額是 design Risks 明列的失效模式，
 	// 寫法比照 storage.test.ts 的「writeScoreboard localStorage 拋例外時不 throw，僅 warn」。
+	it("舊版資料缺 teamPlayers 時補為 null 且不清除該筆", () => {
+		// 本次變更前寫入的合法舊資料不含 teamPlayers 欄位
+		const legacyState: Record<string, unknown> = { ...createInitialState() };
+		delete legacyState.teamPlayers;
+		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify({ m1: legacyState }));
+
+		const { slots, droppedCount } = readMatchSlots();
+
+		expect(Object.keys(slots)).toEqual(["m1"]);
+		expect(slots.m1?.teamPlayers).toBeNull();
+		expect(droppedCount).toBe(0);
+	});
+
 	it("寫入與批次清除遇 localStorage 拋例外時不 throw，僅 warn", () => {
 		writeMatchSlot({ ...createInitialState(), matchId: "m1" });
 
