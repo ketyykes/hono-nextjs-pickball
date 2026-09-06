@@ -120,4 +120,21 @@ describe("computePlayerStats", () => {
 		const alice = result.find((stat) => stat.id === "p1");
 		expect(alice?.winRate).toBe(0);
 	});
+
+	it("計算過程不修改輸入的歷史與名單", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		const history = [
+			makeEntry({
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+		];
+		const playersSnapshot = structuredClone(players);
+		const historySnapshot = structuredClone(history);
+
+		computePlayerStats(history, players);
+
+		expect(players).toStrictEqual(playersSnapshot);
+		expect(history).toStrictEqual(historySnapshot);
+	});
 });

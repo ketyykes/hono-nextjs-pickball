@@ -34,8 +34,8 @@ Depends on: §1
 - [x] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/player-stats.ts` 的 `computePlayerStats(history, players)` 骨架：以 `HistoryPlayer.id`／`Player.id` 為鍵，建立「目前名單」與「歷史紀錄中出現過的球員」的聯集，每位球員回傳 `PlayerStat`（`id`／`name`／`colorFrom`／`colorTo`／`onRoster`／`currentRating`／`gamesPlayed`／`wins`／`losses`／`winRate`／`ratingDelta`／`mostFrequentPartner`／`mostFrequentOpponent`，本階段除 `id`／`name`／`onRoster` 外可先給合理預設值）。名單內球員 `onRoster: true`、姓名與色塊取自 `players`；只出現在歷史的球員本階段先給暫定值（§3 補齊）
 - [x] 2.3 RED: 補兩個 it：「出場數、勝場與敗場依歷史紀錄正確加總」、「出場數為零時勝率為零而非 NaN」。確認紅燈
 - [x] 2.4 GREEN: 實作出場數（該球員出現的紀錄筆數）、勝場／敗場（依各筆 `winner` 與該球員所屬隊伍判定）、勝率（`wins/gamesPlayed`，`gamesPlayed===0` 時為 `0`）
-- [ ] 2.5 RED: 補一個 it：「計算過程不修改輸入的歷史與名單」（以 `structuredClone` 前後深層比對）。跑單檔——若目前實作已無原地操作，本項可能一寫入即綠，**如實標註為 regression guard**，SHALL NOT 為了製造紅燈而刻意讓 2.2／2.4 的實作先寫錯
-- [ ] 2.6 GREEN／確認: 若 2.5 為紅燈則修正為不修改輸入（`.slice()`／展開複製而非原地 push／sort）；若為 regression guard 則在本項註明「已確認為 regression guard，原實作未修改輸入」
+- [x] 2.5 RED: 補一個 it：「計算過程不修改輸入的歷史與名單」（以 `structuredClone` 前後深層比對）。**已確認為 regression guard**：寫入當下即綠（5 tests passed），`buildRosterUnion`／`tallyGamesAndResults` 全程只讀取 `history`／`players` 的欄位值並寫入另外配置的 `MutableStat`，未曾對輸入陣列或物件做 push／sort／賦值等原地操作，故未刻意讓 2.2／2.4 先寫錯來製造紅燈
+- [x] 2.6 GREEN／確認: 已確認為 regression guard，原實作未修改輸入——`grep -n "push\|\.sort(\|\[.*\] ="` 對 `player-stats.ts` 全檔無命中，2.7 的 mutation 測試另行複驗
 - [ ] 2.7 REFACTOR: 確認球員聯集的建構只有一處（不在後續 §3／§4 重新掃描一次 `history`／`players`）；確認本檔零 `window`／`document`／`localStorage`／`new Date()`／`fetch`；`PlayerStat` 為可序列化純資料（無函式、無 class 實例）
 
 ## 3. 統計計算核心 B：目前強度、已不在名單、強度淨變化（player-stats.ts）
