@@ -70,6 +70,39 @@ Depends on: §2
 - [x] 3.4 GREEN: 實作 `ratingDelta` 為該球員所有出場紀錄的 `ratingAfter - ratingBefore` 加總，`gamesPlayed===0` 時為 `0`。新增 `tallyRatingDelta`
 - [x] 3.5 REFACTOR: 已確認「依 `playedAt` 取最近一筆」邏輯只有 `pickValueAtLatestPlayedAt` 這一個具名 helper（`latestRatingAfterByPlayer` 呼叫它取得 off-roster 的 `ratingAfter`，供 §4 姓名解析共用同一份比較邏輯）；本檔仍零 `window`／`document`／`localStorage`／`new Date()`／`fetch`，無壞味道需處理
 
+> **§3 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。3.1／3.3 的紅燈宣稱以
+>   `git show <commit>^:<path>` 複驗屬實（`787b801^` 的 off-roster 分支 `currentRating` 固定為
+>   0、`59a3767^` 回傳的 `ratingDelta` 固定為 0）；3.1 的「名單內球員…」如實標註為
+>   regression guard；§2 既有 5 個 it 的斷言逐行未動。
+>   **觀察項**：spec prose 有「出場數為 0 時淨變化 MUST 為 0」，但 test-plan／delta spec 的
+>   Scenario 清單只列 golden path 一列，屬上游 artifact 的覆蓋缺口，非 Implementer 責任。
+> - Stage 2（品質）：`APPROVED`。獨立跑 20 個變異（18 次實跑），**修正前 3 個存活**
+>   （`latestRatingAfterByPlayer` 只掃 teamA、`tallyRatingDelta` 只掃 teamA、`!stat` 守衛移除）。
+>   Stage 2 依授權於 `7451aea` 只改測試檔補斷言，殺掉前兩個，並順手處理 Stage 1 的觀察項
+>   （在既有 it「出場數為零時勝率為零而非 NaN」內補 `ratingDelta === 0`，**未新增也未改名任何
+>   `it`**，總數維持 8 個，驗收錨點逐字不變）。
+>   **剩餘 1 個存活變異判定為 equivalent mutant**：`tallyRatingDelta`／`tallyGamesAndResults` 的
+>   `if (!stat) continue` 守衛——`buildRosterUnion` 已把 `history` 中每一位球員收進 union，
+>   而兩個 tally 掃的是同一份 `history`，`stats.get(id)` 在所有可達輸入下必定有值；該守衛是
+>   `Map.get(): T | undefined` 的型別收窄手段，移除它只會被迫改寫成 `!` 或 `as`，更差。
+> - §3.5 的單一 helper 要求已機械確認：全檔 `playedAt` 的比較只在
+>   `pickValueAtLatestPlayedAt` 內一處，且其簽章為泛型
+>   `<T>(candidates: readonly { playedAt: string; value: T }[]): T | undefined`，
+>   §4 可直接傳 `{ playedAt, value: name }` 解析姓名，未硬綁 `ratingAfter`。
+>
+> **§3 → §4 交棒（Stage 2 指定，MUST 處理）**
+> 1. **不要把「先建 `Map<id, candidates[]>` 再逐一取最大」的收集骨架抄第三次**。§4 若為姓名
+>    再抄一份，本檔就會有兩份幾乎相同的 map-building。建議在 §4.7 REFACTOR 把收集也抽成
+>    泛型 helper，並讓 `latestRatingAfterByPlayer` 一併改走它。
+> 2. **`playedAt` 完全相同的兩筆紀錄目前由陣列順序決勝**（`>` 為嚴格大於，先遇者留下），
+>    嚴格說仍與 design Decision 4 的「不依賴輸入陣列排列順序」有張力。§4.2／§4.7 MUST 擇一：
+>    ① 加一層確定性 tie-break（同 `playedAt` 時取姓名 UTF-16 較前者，正好與 Decision 5 同調），
+>    或 ② 在 helper 的 JSDoc 明文記載「同 `playedAt` 視為不可區分、取先遇者」為已知且可接受
+>    的行為。SHALL NOT 沉默略過。
+> 3. **§4 的測試 fixture MUST 讓受測球員同時出現在 `teamA` 與 `teamB` 的紀錄**。§3 實測證明
+>    「只掃 teamA」這類漏半邊的變異，在 fixture 全部集中於 teamA 時會存活。
+
 ## 4. 統計計算核心 C：最常搭檔／最常對手、排行榜排序（player-stats.ts）
 
 Depends on: §3
