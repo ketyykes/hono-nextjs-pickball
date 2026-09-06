@@ -6,6 +6,7 @@ import { CourtCard } from "./CourtCard";
 import type { CourtCardProps } from "./CourtCard";
 import type { Player } from "@/lib/matchmaker/types";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
+import { createInitialState } from "@/lib/scoreboard/reducer";
 
 // 測試專用預設球員：colorFrom／colorTo 沿用調色盤既有第一組即可，色塊背景本身不是本檔
 // 斷言重點（漸層與對比已由 tile-style.test.ts、colors.test.ts 涵蓋），這裡只需要合法 hex。
@@ -77,6 +78,8 @@ function buildProps(overrides: Partial<CourtCardProps> = {}): CourtCardProps {
 		matchSlot: null,
 		onSubmitScore: vi.fn(),
 		submitError: null,
+		onSwapPlayer: vi.fn(),
+		swapError: null,
 		...overrides,
 	};
 }
@@ -536,5 +539,103 @@ describe("CourtCard", () => {
 		const tileStyle = (screen.getByTestId("player-tile-p1") as HTMLElement).style;
 		expect(tileStyle.opacity).toBe("");
 		expect(tileStyle.filter).toBe("");
+	});
+
+	// M13（matchmaker-player-swap）§4：場地區塊的換人操作。以下六個 it 對應
+	// specs/match-stage/spec.md「場地區塊的換人操作」Requirement 的六個 Scenario。
+
+	it("pending 且未開始計分的場次每位球員格皆提供換人操作", () => {
+		const players = [
+			buildPlayer({ id: "p1", name: "球員一" }),
+			buildPlayer({ id: "p2", name: "球員二" }),
+			buildPlayer({ id: "p3", name: "球員三" }),
+			buildPlayer({ id: "p4", name: "球員四" }),
+			buildPlayer({ id: "p5", name: "候補一", isActive: true }),
+		];
+		const match = buildMatch({
+			format: "doubles",
+			doublesComposition: "general",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+		});
+		const round = buildRound({ matches: [match], restingPlayerIds: ["p5"] });
+		render(<CourtCard {...buildProps({ match, players, round })} />);
+
+		// 四位在場球員格，各自應提供一個換人操作（Select 觸發器的 role 為 combobox）。
+		expect(screen.getAllByRole("combobox")).toHaveLength(4);
+	});
+
+	it("選擇休息名單中的球員後呼叫 onSwapPlayer 並帶入場次 id、換出者與換入者 id", async () => {
+		const user = userEvent.setup();
+		const onSwapPlayer = vi.fn();
+		const players = [
+			buildPlayer({ id: "p1", name: "王小明" }),
+			buildPlayer({ id: "p2", name: "陳小華", gender: "female" }),
+			buildPlayer({ id: "p3", name: "候選一", isActive: true }),
+		];
+		const match = buildMatch({ id: "match-42" });
+		const round = buildRound({ matches: [match], restingPlayerIds: ["p3"] });
+		render(<CourtCard {...buildProps({ match, players, round, onSwapPlayer })} />);
+
+		const trigger = screen.getByRole("combobox", { name: "替 王小明 換人" });
+		await user.click(trigger);
+		const option = await screen.findByRole("option", { name: "候選一" });
+		await user.click(option);
+
+		expect(onSwapPlayer).toHaveBeenCalledTimes(1);
+		expect(onSwapPlayer).toHaveBeenCalledWith("match-42", "p1", "p3");
+	});
+
+	it("已完成場次不顯示換人操作", () => {
+		const match = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 5 },
+			winner: "teamA",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const round = buildRound({ matches: [match], restingPlayerIds: [] });
+		render(<CourtCard {...buildProps({ match, round })} />);
+
+		expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+	});
+
+	it("已有計分板槽的場次不顯示換人操作", () => {
+		const match = buildMatch({ id: "match-1", status: "pending" });
+		const round = buildRound({ matches: [match], restingPlayerIds: [] });
+		const matchSlot = createInitialState({ matchId: "match-1" });
+		render(<CourtCard {...buildProps({ match, round, matchSlot })} />);
+
+		expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+	});
+
+	it("休息名單無 active 球員可換時換人操作停用並顯示無可換之人", () => {
+		const round = buildRound({ restingPlayerIds: [] });
+		render(<CourtCard {...buildProps({ round })} />);
+
+		const triggers = screen.getAllByRole("combobox");
+		expect(triggers).toHaveLength(2);
+		for (const trigger of triggers) {
+			expect((trigger as HTMLButtonElement).disabled).toBe(true);
+			expect(trigger.textContent).toContain("無可換之人");
+		}
+	});
+
+	it("換人被拒絕時顯示帶 role alert 的繁體中文錯誤訊息", () => {
+		const message = "換人失敗，請確認休息名單後再試一次。";
+		const withError = render(<CourtCard {...buildProps({ swapError: message })} />);
+		const alert = withError.getByRole("alert");
+		expect(alert.textContent).toBe(message);
+		expect(alert.textContent).not.toMatch(/[A-Z_]{3,}/);
+		withError.unmount();
+
+		const withoutError = render(<CourtCard {...buildProps({ swapError: null })} />);
+		expect(withoutError.queryByRole("alert")).toBeNull();
+		withoutError.unmount();
 	});
 });
