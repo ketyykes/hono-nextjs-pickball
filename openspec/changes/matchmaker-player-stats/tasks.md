@@ -64,11 +64,11 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED: 補兩個 it：「名單內球員的目前強度取自名單目前的 rating」、「已離開名單的球員取歷史最近一筆的 ratingAfter 並標示已不在名單」。確認紅燈
-- [ ] 3.2 GREEN: 實作 `currentRating`／`onRoster`：名單內球員直接取 `players` 的 `rating`；不在名單者取其在傳入 `history` 中依 `playedAt` **最近**一筆的 `ratingAfter`（design Decision 4：以 ISO 字串字典序比較，SHALL NOT 依賴輸入陣列的排列順序），`onRoster` 設為 `false`
-- [ ] 3.3 RED: 補一個 it：「強度淨變化為所有出場紀錄賽前賽後分數差的加總」。確認紅燈
-- [ ] 3.4 GREEN: 實作 `ratingDelta` 為該球員所有出場紀錄的 `ratingAfter - ratingBefore` 加總，`gamesPlayed===0` 時為 `0`
-- [ ] 3.5 REFACTOR: 確認「依 `playedAt` 取最近一筆」的比較邏輯只有一個具名 helper（供 §4 的最常搭檔／對手姓名解析共用，design Decision 4 明訂不依賴輸入順序的規則對兩者皆適用）；確認本檔仍零 I/O
+- [x] 3.1 RED: 補兩個 it：「名單內球員的目前強度取自名單目前的 rating」、「已離開名單的球員取歷史最近一筆的 ratingAfter 並標示已不在名單」。確認紅燈。「已離開名單」該筆為真紅燈（`expected +0 to be 7`）；「名單內球員」該筆因 §2 已實作 `currentRating: player.rating` 而立即綠燈，屬 regression guard，但已依交棒事項對「roster 分支改成 0」的變異做 mutation 驗證並確認轉紅（見 §3 mutation 紀錄）
+- [x] 3.2 GREEN: 實作 `currentRating`／`onRoster`：名單內球員直接取 `players` 的 `rating`；不在名單者取其在傳入 `history` 中依 `playedAt` **最近**一筆的 `ratingAfter`（design Decision 4：以 ISO 字串字典序比較，SHALL NOT 依賴輸入陣列的排列順序），`onRoster` 設為 `false`。新增 `pickValueAtLatestPlayedAt`／`latestRatingAfterByPlayer` 兩個具名 helper
+- [x] 3.3 RED: 補一個 it：「強度淨變化為所有出場紀錄賽前賽後分數差的加總」。確認紅燈（`expected +0 to be close to 0.07`）
+- [x] 3.4 GREEN: 實作 `ratingDelta` 為該球員所有出場紀錄的 `ratingAfter - ratingBefore` 加總，`gamesPlayed===0` 時為 `0`。新增 `tallyRatingDelta`
+- [x] 3.5 REFACTOR: 已確認「依 `playedAt` 取最近一筆」邏輯只有 `pickValueAtLatestPlayedAt` 這一個具名 helper（`latestRatingAfterByPlayer` 呼叫它取得 off-roster 的 `ratingAfter`，供 §4 姓名解析共用同一份比較邏輯）；本檔仍零 `window`／`document`／`localStorage`／`new Date()`／`fetch`，無壞味道需處理
 
 ## 4. 統計計算核心 C：最常搭檔／最常對手、排行榜排序（player-stats.ts）
 
