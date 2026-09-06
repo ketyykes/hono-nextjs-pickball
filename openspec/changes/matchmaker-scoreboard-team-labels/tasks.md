@@ -70,9 +70,35 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED: `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts` 補三個 it：「seed 依對戰方式帶入對應人數的球員顯示資訊：單打 1 人、雙打 2 人」（分別以單打與雙打呼叫 `buildMatchSlotSeed`，斷言 `teamPlayers.us`／`teamPlayers.them` 的陣列長度與姓名依序對應）、「球員顯示資訊的前景色等於 pickTextColor 的回傳值」（斷言某筆 `foreground` 等於直接呼叫 `pickTextColor(colorFrom, colorTo)` 的回傳值，不硬寫顏色字串）、「名單中找不到該球員時球員顯示資訊以替代文字呈現且不拋錯」。三者呼叫 `buildMatchSlotSeed` 時傳入第三個 `players` 參數，此時函式仍是舊的兩參數簽章，額外參數在執行期被忽略，`teamPlayers` 因此為 `undefined`，三個新斷言皆失敗。確認紅燈並貼出輸出
-- [ ] 3.2 GREEN: `buildMatchSlotSeed` 新增必填的 `players: readonly Player[]` 第三參數（design Decision 4）；新增私有函式解析 `RoundTeam.playerIds → PlayerBadge[]`：查得到時取該員 `name`／`colorFrom`／`colorTo`，並以 `pickTextColor` 算出 `foreground`（design Decision 1）；查不到時（該員已被移除）以本模組私有的具名常數呈現替代文字「已離開名單」與中性灰色 `#9CA3AF`／`#4B5563`，該筆的 `foreground` 同樣經 `pickTextColor` 算出（design Decision 3，措辭與色碼沿用 `export-scene.ts` 既有慣例但不 import）。同步把 §1.5 記錄的 `scoreboard-binding.test.ts` 內全部既有呼叫 `buildMatchSlotSeed(round, match)` 的呼叫點（含「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」「seed 帶入該場次的場地編號」「多場次時 seed 取該場自己的場地編號，而非回合的第一場」「已有進度的場次再次進入時保留既有進度不覆蓋」「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」「SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed」）補上第三個 `players` 參數，**斷言一律不變**；`nextjs-pickball/components/matchmaker/CourtCard.tsx` 的 `handleEnterScoreboard` 呼叫處補上既有的 `players` prop 作為第三參數。完成後確認 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 通過
-- [ ] 3.3 REFACTOR: `grep -rn "lib/matchmaker" nextjs-pickball/lib/scoreboard/` 確認為空（單向相依未被打破，本組全部改動都在 matchmaker 側）；確認替代文字與中性色的具名常數只宣告一份，且檔頭或緊鄰處有註解說明「與 `visual-export` capability 的既有判斷同構但各自實作、不跨 capability import」（design Decision 3）；確認 `CourtCard.tsx` 除補上第三參數外沒有其他改動（色塊本身姓名／顏色呈現邏輯零變動）
+- [x] 3.1 RED: `nextjs-pickball/lib/matchmaker/scoreboard-binding.test.ts` 補三個 it：「seed 依對戰方式帶入對應人數的球員顯示資訊：單打 1 人、雙打 2 人」（分別以單打與雙打呼叫 `buildMatchSlotSeed`，斷言 `teamPlayers.us`／`teamPlayers.them` 的陣列長度與姓名依序對應）、「球員顯示資訊的前景色等於 pickTextColor 的回傳值」（斷言某筆 `foreground` 等於直接呼叫 `pickTextColor(colorFrom, colorTo)` 的回傳值，不硬寫顏色字串）、「名單中找不到該球員時球員顯示資訊以替代文字呈現且不拋錯」。三者呼叫 `buildMatchSlotSeed` 時傳入第三個 `players` 參數，此時函式仍是舊的兩參數簽章，額外參數在執行期被忽略，`teamPlayers` 因此為 `undefined`，三個新斷言皆失敗。確認紅燈並貼出輸出
+- [x] 3.2 GREEN: `buildMatchSlotSeed` 新增必填的 `players: readonly Player[]` 第三參數（design Decision 4）；新增私有函式解析 `RoundTeam.playerIds → PlayerBadge[]`：查得到時取該員 `name`／`colorFrom`／`colorTo`，並以 `pickTextColor` 算出 `foreground`（design Decision 1）；查不到時（該員已被移除）以本模組私有的具名常數呈現替代文字「已離開名單」與中性灰色 `#9CA3AF`／`#4B5563`，該筆的 `foreground` 同樣經 `pickTextColor` 算出（design Decision 3，措辭與色碼沿用 `export-scene.ts` 既有慣例但不 import）。同步把 §1.5 記錄的 `scoreboard-binding.test.ts` 內全部既有呼叫 `buildMatchSlotSeed(round, match)` 的呼叫點（含「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」「seed 帶入該場次的場地編號」「多場次時 seed 取該場自己的場地編號，而非回合的第一場」「已有進度的場次再次進入時保留既有進度不覆蓋」「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」「SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed」）補上第三個 `players` 參數，**斷言一律不變**；`nextjs-pickball/components/matchmaker/CourtCard.tsx` 的 `handleEnterScoreboard` 呼叫處補上既有的 `players` prop 作為第三參數。完成後確認 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 通過
+- [x] 3.3 REFACTOR: `grep -rn "lib/matchmaker" nextjs-pickball/lib/scoreboard/` 確認為空（單向相依未被打破，本組全部改動都在 matchmaker 側）；確認替代文字與中性色的具名常數只宣告一份，且檔頭或緊鄰處有註解說明「與 `visual-export` capability 的既有判斷同構但各自實作、不跨 capability import」（design Decision 3）；確認 `CourtCard.tsx` 除補上第三參數外沒有其他改動（色塊本身姓名／顏色呈現邏輯零變動）
+
+> **§3 兩階段審查結論**：Stage 1（規格符合，sonnet）**APPROVED**；Stage 2（程式品質，opus）**APPROVED**。
+> - commit：`c6542e9`（3.1 RED）、`2c75306`（3.2 GREEN）、`752f32a`（Stage 2 更名與補斷言）
+> - 紅燈複驗：Stage 1 以 `git show c6542e9^:...scoreboard-binding.ts` 確認 RED commit 前一版
+>   `buildMatchSlotSeed` 仍為兩參數且 seed 無 `teamPlayers`，三個新斷言必然失敗，為**真紅燈**。
+> - mutation（Stage 2 獨立重跑 14 條）：M1（`us`／`them` 對調）、M2（姓名改取 `id`）、
+>   M3（色碼對調）、M4（`foreground` 寫死）、M6（查無此人改跳過）、M7（查無此人改拋錯）、
+>   M8（替代文字改空字串）、M9（中性色改黑）、M10（人數固定取 2）、M11（`them` 改用第一隊）、
+>   M12（`them` 側色碼被覆寫）**共 11 條全數殺死**。存活 3 條均已歸責：
+>   **M5**（`pickTextColor` 兩參數對調）經逐行讀 `colors.ts` ＋ 20,000 組隨機色對實證確認
+>   `pickTextColor(a,b) ≡ pickTextColor(b,a)`，為**真等價變異**，無法也不需補斷言；
+>   **M13**（`players` 改 optional）為 Decision 4 的型別層決策，**任何測試層都無法建立
+>   regression guard**（既有呼叫點都有傳參數，放寬簽章不會讓任何呼叫失效），保護力來自
+>   `tsc` 的編譯期攔截；**M14** 為等價變異對照組，維持全綠證明 harness 健康。
+> - Stage 2 修正兩項首輪缺口（commit `752f32a`）：
+>   ① `them` 側色碼**零斷言**（M12 首輪存活）→ 於「球員顯示資訊的前景色等於 pickTextColor
+>   的回傳值」補 `them[0]` 的 `colorFrom`／`colorTo`／`foreground` 三欄斷言，重跑 M12 轉紅；
+>   ② 新私有函式原名 `resolveTeamPlayers` 與 **repo 內兩個既有同名函式**
+>   （`components/matchmaker/CourtCard.tsx`、`lib/matchmaker/round.ts`，兩者契約相同且皆
+>   **跳過**查無此人者）語意相反 → 更名為 `buildTeamPlayers`（`build` 前綴與
+>   `buildMatchSlotSeed`／`buildCourtTiles` 一致），並於 JSDoc 明示與同名函式「跳過 vs 補佔位」
+>   的差異與 design Decision 3 的取捨（原本這個刻意的不一致只寫在 design.md，程式碼零提示）。
+> - §2 轉交的 `PlayerBadge.foreground` 存活變異：已由 §3 的 M4 證明被「前景色等於 pickTextColor」
+>   與「名單中找不到該球員時…」兩個 it 鎖住，**責任已履行**。
+> - 收尾：`lib/matchmaker/` 29 test files／358 tests 全綠、`tsc --noEmit` 通過、
+>   `lint` 0 errors（3 個既有 warning 零新增）。
 
 ## 4. 計分板面板渲染與 E2E 驗收
 
@@ -110,3 +136,18 @@ Depends on: §2, §3
 > 斷言」：`nextjs-pickball/lib/scoreboard/rules.test.ts`（4 處）、
 > `nextjs-pickball/hooks/useScoreboardStore.test.tsx`（1 處）。機械確認方式：
 > `git --no-pager diff main..HEAD -- <該兩檔> | grep "^-"` 除 diff header 外**不得有任何輸出**。
+>
+> **【apply §3 增補，Stage 1 裁決 ACCEPT】既有 it「seed 帶入該輪的 targetScore 與對戰方式且
+> 分數自 0-0 起手」新增一行 `teamPlayers: seed.teamPlayers`**：該 it 原本是
+> `expect(seed).toEqual(createInitialState({ mode, targetScore, matchId, courtNumber }))` 的
+> **整體物件比對**，而 `createInitialState` 未覆寫時 `teamPlayers` 預設 `null`；由於該測試的
+> `match` 使用非空 `playerIds`，只要 `buildMatchSlotSeed` 依 spec 正確解析出非 `null` 的
+> `teamPlayers`，這條整體比對就必然失敗——「斷言字面不變」與「實作符合 spec」在此**數學上互斥**
+> （Stage 1 已獨立驗證此互斥性成立，並確認不存在更小的替代做法）。處理方式為在
+> `createInitialState(...)` 的引數物件內**新增一行**自我代入，**不刪除也不改寫任何既有行**，
+> 使該比對繼續守住其餘欄位（`firstServer`／`servingTeam`／`serverNumber`／`history`／`status`
+> ／分數），`teamPlayers` 本身的正確性改由本組三個新 it 專職把關（Stage 2 以 mutation M1～M4、
+> M6～M12 實證該三條 it 的偵測力足夠，自我代入未造成任何偵測缺口）。
+> 其餘 5 個既有呼叫點只補第三個參數（多為 `players: []`），Stage 1 已逐一確認其斷言
+> （`targetScore`／`courtNumber`／`mode`／不覆蓋既有進度／SSR 不拋錯）皆與球員資料無關，
+> 不因改走替代文字路徑而名不符實。
