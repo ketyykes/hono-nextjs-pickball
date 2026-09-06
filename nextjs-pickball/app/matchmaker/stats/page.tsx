@@ -30,6 +30,17 @@ export default function MatchmakerStatsPage() {
 	// 當下的 history 皆為空陣列（useRoundStore 於 effect 內才灌入資料），兩邊都走下方
 	// 的空狀態分支，時鐘取值根本不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
 	// 「統計頁載入後無 console error」即為此推論的實證。
+	//
+	// 與 HistoryView.tsx 的差異是刻意留下的、而非疏漏（Stage 2 review 裁決）：該元件
+	// 自己呼叫 readHistory()，故 M7 design Decision 7 要求它把「現在」在 hydration
+	// 取樣一次並存進 state，matchmaker-history.spec.ts 也以 page.clock 實測鎖住那個
+	// 「只取樣一次」的保證。本頁的 history 由 store 注入，不需要那條保證，因此每次
+	// render 重取時鐘——代價是本頁跨午夜後的下一次 render 會把「今日」重新判定，
+	// 歷史頁則維持開頁當下的判定。兩者皆未被 spec 規範，此處記下以免被誤讀為不一致。
+	//
+	// 這裡不包 useMemo：現有依賴（history／selectedRange）本來就是唯一會觸發 render 的
+	// 輸入，省不下實質重算；而 useMemo 一旦把 new Date() 關進依賴陣列，等於改變時鐘的
+	// 取樣時機，那是行為變更而非最佳化。
 	const filteredHistory = filterHistoryByRange(history, selectedRange, new Date());
 	// 目前強度不受區間篩選影響（spec「目前強度與已離開名單球員的標示」）：那是由
 	// players 的 rating 決定的，篩選只改變出場數／勝負／淨變化／搭檔對手等期間內統計。
