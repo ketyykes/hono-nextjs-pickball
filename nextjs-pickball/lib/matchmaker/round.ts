@@ -7,6 +7,7 @@
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
+import { labelDoublesComposition } from "./pairing";
 import { roundRating } from "./rating-math";
 import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
@@ -945,15 +946,37 @@ export interface SwapMatchPlayerFailure {
 
 export type SwapMatchPlayerResult = SwapMatchPlayerSuccess | SwapMatchPlayerFailure;
 
+// tasks 2.4：呼叫端可能持有過期的 matchId（場次已被重排移除），與 submitScore 的
+// MATCH_NOT_FOUND 同類防線，但訊息各自具名（design Decision 7）——不沿用 submitScore 的
+// MATCH_NOT_FOUND_MESSAGE 常數，避免兩個獨立失敗情境共用同一份文案而互相耦合。
+const SWAP_MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
+
+// 依 ids 的順序逐一從 players 解析出對應 Player；任一 id 解析不到即回傳 undefined。
+// 與 resolveTeamPlayers（依 players 陣列原有順序 filter）刻意不同：雙打組成標示重算
+// 需要保留呼叫端指定的 [teamA 成員 0, teamA 成員 1, teamB 成員 0, teamB 成員 1] 順序
+// （design Decision 3），filter 版本無法保證這個順序。
+function resolveInOrder(ids: readonly string[], players: readonly Player[]): Player[] | undefined {
+	const resolved: Player[] = [];
+	for (const id of ids) {
+		const player = players.find((p) => p.id === id);
+		if (player === undefined) {
+			return undefined;
+		}
+		resolved.push(player);
+	}
+	return resolved;
+}
+
 /**
  * 臨時換人：把某場 pending 場次中一位在場球員換成該輪休息名單中的另一位球員
  * （prd.md 6.3「主持人可能……臨時換人代打」）。純函式，回傳新回合，原 round／players
  * SHALL NOT 被就地修改。
  *
- * 本階段（tasks 2.2）只處理輸入合法的成功路徑：替換 playerIds、重算該隊隊伍分數
- * （design Decision 2：沿用 pairing.ts buildTeam 的既有算法——隊內成員 rating 總和，
- * 經 roundRating 正規化）、休息名單互換（design Decision 8：outPlayerId 附加於陣列尾端）。
- * 雙打組成標示重算（tasks 2.4）與前置條件檢查（tasks 2.6）留待後續步驟補齊。
+ * 本階段（tasks 2.4）在 tasks 2.2 的成功路徑上補齊雙打組成標示重算（design Decision 3：
+ * 重用已匯出的 pairing.ts labelDoublesComposition，以 [teamA 成員 0, teamA 成員 1,
+ * teamB 成員 0, teamB 成員 1] 的順序組出 4 元素 tuple；design Decision 9：任一位無法從
+ * players 解析時維持換人前的值，不拋例外也不退回 "general"）與 matchId 存在性檢查。
+ * 其餘四項前置條件檢查留待 tasks 2.6 補齊。
  */
 export function swapMatchPlayer(
 	round: Round,
@@ -963,6 +986,9 @@ export function swapMatchPlayer(
 	players: readonly Player[],
 ): SwapMatchPlayerResult {
 	const matchIndex = round.matches.findIndex((m) => m.id === matchId);
+	if (matchIndex === -1) {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND, message: SWAP_MATCH_NOT_FOUND_MESSAGE };
+	}
 	const match = round.matches[matchIndex];
 
 	const teamIndex = match.teams.findIndex((team) => team.playerIds.includes(outPlayerId));
@@ -976,7 +1002,22 @@ export function swapMatchPlayer(
 	const newTeam: RoundTeam = { playerIds: newPlayerIds, rating: newRating };
 	const newTeams: [RoundTeam, RoundTeam] = teamIndex === 0 ? [newTeam, match.teams[1]] : [match.teams[0], newTeam];
 
-	const updatedMatch: RoundMatch = { ...match, teams: newTeams };
+	// 雙打組成標示重算（design Decision 3、9）：唯一一處計算，單打分支完全不觸碰
+	// doublesComposition 欄位（match 本身即無此欄位）。
+	let doublesComposition = match.doublesComposition;
+	if (match.format === "doubles") {
+		const fourPlayerIds = [...newTeams[0].playerIds, ...newTeams[1].playerIds];
+		const fourPlayers = resolveInOrder(fourPlayerIds, players);
+		if (fourPlayers !== undefined && fourPlayers.length === PLAYERS_PER_MATCH.doubles) {
+			doublesComposition = labelDoublesComposition(fourPlayers as [Player, Player, Player, Player]);
+		}
+	}
+
+	const updatedMatch: RoundMatch = {
+		...match,
+		teams: newTeams,
+		...(match.format === "doubles" ? { doublesComposition } : {}),
+	};
 	const matches = round.matches.map((m, index) => (index === matchIndex ? updatedMatch : m));
 
 	// 休息名單互換：inPlayerId 移除、outPlayerId 附加於陣列尾端（design Decision 8，
