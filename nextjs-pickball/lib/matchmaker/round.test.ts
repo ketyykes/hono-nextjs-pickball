@@ -1836,4 +1836,94 @@ describe("swapMatchPlayer", () => {
 		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
 		expect(round).toEqual(roundSnapshot);
 	});
+
+	it("場次非 pending 時拒絕換人", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const completedMatch = makeCompletedRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [completedMatch], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_PENDING);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("outPlayerId 不在該場次的任一隊伍時拒絕換人", () => {
+		const players = [
+			makePlayer({ id: "p1" }),
+			makePlayer({ id: "p2" }),
+			makePlayer({ id: "p3" }),
+			makePlayer({ id: "unrelated" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "unrelated", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.OUT_PLAYER_NOT_IN_MATCH);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("inPlayerId 不在該輪休息名單時拒絕換人", () => {
+		// p3 本來就在場上（另一場次），不在 restingPlayerIds 裡。
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: [] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_RESTING);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("inPlayerId 存在於休息名單但非 active 時拒絕換人", () => {
+		const players = [
+			makePlayer({ id: "p1" }),
+			makePlayer({ id: "p2" }),
+			makePlayer({ id: "p3", isActive: false }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_ACTIVE);
+		expect(round).toEqual(roundSnapshot);
+	});
 });
