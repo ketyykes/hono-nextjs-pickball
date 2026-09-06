@@ -12,13 +12,20 @@ import type { Page } from "@playwright/test";
 // （見 lib/matchmaker/round-storage.ts 的 writeHistory 與 lib/matchmaker/storage.ts 的
 // writeRoster），不是裸陣列——外層 version 不符會被 reader 判為結構層級損壞而清空整份。
 //
-// 為避免 localStorage 跨測試污染，beforeEach 只清除本頁會讀到的兩個 key，
-// 刻意不用 localStorage.clear()（沿用 matchmaker-history.spec.ts 的既有慣例）。
+// 為避免 localStorage 跨測試污染，beforeEach 只清除本頁會讀到的三個 key（名單、歷史，
+// 以及 useRoundStore 一併 hydrate 的回合），刻意不用 localStorage.clear()
+//（沿用 matchmaker-history.spec.ts 的既有慣例）。
 
 const HISTORY_STORAGE_KEY = "matchmaker:history:v1";
 const ROSTER_STORAGE_KEY = "matchmaker:roster:v1";
+const ROUND_STORAGE_KEY = "matchmaker:round:v1";
 const STATS_PAGE = "/matchmaker/stats";
 const STATS_TABLE_NAME = "球員排行榜";
+
+// 支援寬度下限，與 match-stage.spec.ts 的「手機斷點觸控目標不小於 44px 且不橫向溢出」
+// 同一組數值。mobile-chrome（Pixel 5）與 mobile-safari（iPhone 12）兩個 project 自帶
+// 各自的 viewport，量測前 MUST 自行設定，否則五個 project 量到的其實是三種不同寬度。
+const NARROW_VIEWPORT = { width: 390, height: 844 };
 
 // 排行榜欄位在 <tr> 內的索引，供 getByRole("cell").nth() 精準取值——用整列
 // toContainText 會讓「出場數 2」與「勝負 2 - 0」等數字互相干擾，測不出單一欄位。
@@ -77,6 +84,42 @@ function seedRoster(page: Page, players: unknown[]) {
 		},
 		{ key: ROSTER_STORAGE_KEY, value: JSON.stringify({ version: 1, players }) },
 	);
+}
+
+// 單一回合 fixture，欄位順序 MUST 與 lib/matchmaker/round-types.ts 的 RoundSchema
+// （及其內層 RoundMatchSchema／RoundTeamSchema／PlayerRatingSchema／SeenSignaturesSchema）
+// shape 順序一致：zod 4 的 object 是依 shape 順序組出結果物件，順序一旦不同，
+// 回合被 store 回寫後 JSON 字串就不再逐字相同。狀態取 pending（scores／winner／
+// completedAt 皆為 null）以避開 RoundMatchSchema 對 completed 的跨欄位 refinement。
+function buildRound(matchId: string, teamAId: string, teamBId: string) {
+	return {
+		roundNumber: 1,
+		createdAt: isoToday(8),
+		format: "singles" as const,
+		courtCount: 1,
+		targetScore: 11,
+		matches: [
+			{
+				id: matchId,
+				courtNumber: 1,
+				format: "singles" as const,
+				teams: [
+					{ playerIds: [teamAId], rating: 3.5 },
+					{ playerIds: [teamBId], rating: 3.4 },
+				],
+				status: "pending" as const,
+				scores: null,
+				winner: null,
+				completedAt: null,
+				playerRatings: [
+					{ playerId: teamAId, before: 3.5, after: null },
+					{ playerId: teamBId, before: 3.4, after: null },
+				],
+			},
+		],
+		restingPlayerIds: [],
+		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+	};
 }
 
 // 單一名單球員 fixture，欄位形狀複製自 lib/matchmaker/types.ts 的 PlayerSchema。
@@ -152,7 +195,7 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 			for (const key of keys) {
 				window.localStorage.removeItem(key);
 			}
-		}, [HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY]);
+		}, [HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY]);
 	});
 
 	test("完全沒有歷史紀錄時顯示引導型空狀態", async ({ page }) => {
@@ -357,5 +400,135 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 			consoleIssues,
 			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
 		).toEqual([]);
+	});
+
+	test("排行榜表格於支援寬度下限不造成整頁橫向溢出", async ({ page }) => {
+		// 九欄 × 四位球員，姓名刻意取較長的中文：欄位數是本 change 唯一的橫向溢出
+		// 風險點（design Decision 7），資料太少會讓表格自然放得下而測不到任何事。
+		await page.setViewportSize(NARROW_VIEWPORT);
+		await seedRoster(page, [
+			rosterPlayer("p-narrow-a1", "窄螢幕排行員甲一", 4.5),
+			rosterPlayer("p-narrow-a2", "窄螢幕排行員甲二", 4.2),
+			rosterPlayer("p-narrow-b1", "窄螢幕排行員乙一", 3.9),
+			rosterPlayer("p-narrow-b2", "窄螢幕排行員乙二", 3.6),
+		]);
+		await seedHistory(page, [
+			buildEntry({
+				matchId: "e2e-stats-narrow-1",
+				playedAt: isoToday(10),
+				teamA: [
+					player("p-narrow-a1", "窄螢幕排行員甲一"),
+					player("p-narrow-a2", "窄螢幕排行員甲二"),
+				],
+				teamB: [
+					player("p-narrow-b1", "窄螢幕排行員乙一"),
+					player("p-narrow-b2", "窄螢幕排行員乙二"),
+				],
+			}),
+		]);
+
+		await page.goto(STATS_PAGE);
+		await expect(page.getByTestId("player-stat-row-p-narrow-a1")).toBeVisible();
+
+		// spec 的 THEN 本體：整頁 MUST NOT 橫向溢出。
+		const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+			scrollWidth: document.scrollingElement!.scrollWidth,
+			clientWidth: document.scrollingElement!.clientWidth,
+		}));
+		expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+
+		// 反向確認上一條不是恆真：390px 下九欄表格本來就放不下，橫向捲動 MUST 發生在
+		// table.tsx 的 overflow-x-auto 容器內而非整頁上。少了這條，把 viewport 設定
+		// 拿掉（改用桌面寬度、表格自然放得下）本 test 照樣全綠。順序刻意排在整頁量測
+		// 之後：擺在前面時，任何把版面撐寬的退化都會先在這裡失敗，反而測不出整頁那條
+		// 斷言到底有沒有作用（mutation 實測確認過此遮蔽效應）。
+		const tableContainer = page.locator('[data-slot="table-container"]');
+		const containerOverflow = await tableContainer.evaluate(
+			(el) => el.scrollWidth - el.clientWidth,
+		);
+		expect(containerOverflow).toBeGreaterThan(0);
+	});
+
+	// 這條斷言證明了什麼：切換區間與瀏覽本身不會改變任何持久化內容。頁面若不小心
+	// 呼叫了 store 的 setter（例如在 render 期間呼叫 updatePlayer、或把某個會寫入的
+	// 動作誤接上區間切換），三個 key 之一的內容必然改變而在此轉紅——這正是本條要
+	// 擋下的迴歸。
+	//
+	// 它沒有證明什麼：本頁確實會經由 useRosterStore／useRoundStore 的 write effect
+	// 把三個 key 重新序列化寫回。那兩個 hook 的 write effect 以 hasHydratedRef 守門，
+	// mount 時跳過，但 hydrate effect 一 dispatch HYDRATE，state 就變動、write effect
+	// 隨即觸發 writeRoster／writeRound／writeHistory。這是 M4／M5 既有的 hydration
+	// pattern，不是本頁引入的（/matchmaker 對戰頁同樣如此）。本 test 之所以能逐字
+	// 相同，是因為種入的資料已經是 schema 序列化後的正規化形狀（欄位順序與
+	// PlayerSchema／RoundSchema／MatchHistoryEntrySchema 的 shape 一致，真實使用者
+	// 資料一律如此），回寫等於逐位元組相同的重新序列化。若持久化資料的形狀與目前
+	// schema 序列化結果不同（例如被手動編輯過、或來自舊版格式），回寫會使其正規化，
+	// 此時逐字比對會失敗。
+	test("瀏覽統計頁不改動任何持久化資料", async ({ page }) => {
+		const rosterRaw = JSON.stringify({
+			version: 1,
+			players: [
+				rosterPlayer("p-readonly-a", "唯讀名單員甲", 4.1),
+				rosterPlayer("p-readonly-b", "唯讀名單員乙", 3.7),
+			],
+		});
+		const roundRaw = JSON.stringify({
+			version: 1,
+			round: buildRound("e2e-stats-readonly-match-1", "p-readonly-a", "p-readonly-b"),
+		});
+		// 兩筆分落今日與上月：五個區間的切換過程中會真的經歷「有資料」與「空區間」
+		// 兩種畫面，而不是每次點擊都渲染同一份內容。
+		const historyRaw = JSON.stringify({
+			version: 1,
+			entries: [
+				buildEntry({
+					matchId: "e2e-stats-readonly-1",
+					playedAt: isoToday(9),
+					teamA: [player("p-readonly-a", "唯讀名單員甲")],
+					teamB: [player("p-readonly-b", "唯讀名單員乙")],
+				}),
+				buildEntry({
+					matchId: "e2e-stats-readonly-2",
+					playedAt: isoLastMonth(),
+					teamA: [player("p-readonly-a", "唯讀名單員甲")],
+					teamB: [player("p-readonly-b", "唯讀名單員乙")],
+				}),
+			],
+		});
+
+		// beforeEach 已停在 "/"，此處直接寫入並記下原始字串，確保「記下開頁前的內容」
+		// 真的發生在統計頁載入之前，而不是與其競態（沿用 matchmaker-history.spec.ts
+		// 的唯讀 test 慣例）。
+		await page.evaluate(
+			(pairs: readonly (readonly [string, string])[]) => {
+				for (const [key, value] of pairs) {
+					window.localStorage.setItem(key, value);
+				}
+			},
+			[
+				[ROSTER_STORAGE_KEY, rosterRaw],
+				[ROUND_STORAGE_KEY, roundRaw],
+				[HISTORY_STORAGE_KEY, historyRaw],
+			] as const,
+		);
+
+		await page.goto(STATS_PAGE);
+		await expect(page.getByTestId("player-stat-row-p-readonly-a")).toBeVisible();
+
+		// 依序切換五個區間（今日為預設，故由本週起、最後切回今日）。
+		for (const rangeName of ["本週", "本月", "上月", "更早", "今日"] as const) {
+			await page.getByRole("radio", { name: rangeName }).click();
+		}
+		// 切完仍有內容：避免頁面整個壞掉、什麼都沒 render 時也「內容不變」而誤判通過。
+		await expect(page.getByTestId("player-stat-row-p-readonly-a")).toBeVisible();
+
+		for (const [key, expected] of [
+			[ROSTER_STORAGE_KEY, rosterRaw],
+			[ROUND_STORAGE_KEY, roundRaw],
+			[HISTORY_STORAGE_KEY, historyRaw],
+		] as const) {
+			const actual = await page.evaluate((k) => window.localStorage.getItem(k), key);
+			expect(actual, `${key} 的內容 MUST 與操作前逐字相同`).toBe(expected);
+		}
 	});
 });

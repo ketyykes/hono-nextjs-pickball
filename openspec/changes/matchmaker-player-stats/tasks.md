@@ -357,8 +357,10 @@ Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序
 
 Depends on: §6, §7
 
-- [ ] 8.1 RED: 於 `player-stats.spec.ts` 補兩個 test：「排行榜表格於支援寬度下限不造成整頁橫向溢出」（viewport 390x844，斷言 `document.scrollingElement.scrollWidth <= clientWidth + 1`）、「瀏覽統計頁不改動任何持久化資料」（`matchmaker:roster:v1`／`matchmaker:round:v1`／`matchmaker:history:v1` 皆先種資料，開啟頁面並依序切換五個區間，斷言三個 key 的內容與操作前逐字相同）。跑該檔確認結果——這兩條**很可能加入即綠**（§2～§6 已保證計算與 hook 消費皆為唯讀，`components/ui/table.tsx` 已內建橫向捲動容器），如實標註為 regression guard，SHALL NOT 用「改斷言看紅再改回」偽造紅燈
-- [ ] 8.2 確認: 若任一條為真紅燈則排查並修正（例如表格欄位過多需確認 `Table` 的捲動容器確實生效，或發現有遺漏的可存取名稱）；若皆為 regression guard 則如實註明
+- [x] 8.1 RED: 於 `player-stats.spec.ts` 補兩個 test：「排行榜表格於支援寬度下限不造成整頁橫向溢出」（viewport 390x844，斷言 `document.scrollingElement.scrollWidth <= clientWidth + 1`）、「瀏覽統計頁不改動任何持久化資料」（`matchmaker:roster:v1`／`matchmaker:round:v1`／`matchmaker:history:v1` 皆先種資料，開啟頁面並依序切換五個區間，斷言三個 key 的內容與操作前逐字相同）。跑該檔確認結果——這兩條**很可能加入即綠**（§2～§6 已保證計算與 hook 消費皆為唯讀，`components/ui/table.tsx` 已內建橫向捲動容器），如實標註為 regression guard，SHALL NOT 用「改斷言看紅再改回」偽造紅燈
+  —— **兩條皆為 regression guard（加入即綠，無紅燈）**：首次執行 `--project=chromium -g` 即 `2 passed`，未做任何實作變更。
+- [x] 8.2 確認: 若任一條為真紅燈則排查並修正（例如表格欄位過多需確認 `Table` 的捲動容器確實生效，或發現有遺漏的可存取名稱）；若皆為 regression guard 則如實註明
+  —— **兩條皆非真紅燈**，故無需修正：`components/ui/table.tsx` 的 `overflow-x-auto` 容器於 390px 確實生效（表格容器自身 `scrollWidth - clientWidth > 0`，整頁不溢出），統計頁亦未呼叫任何 store setter。
 - [ ] 8.3 REFACTOR: 把 `player-stats.spec.ts` 內「種名單＋種歷史＋開啟頁面」的前置動作收斂為單一 helper（比照 `matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry` 寫法），本檔全部 test 皆改走該 helper；helper 上方註明「回合／歷史格式來源為 `lib/matchmaker/round-storage.ts` 的 `writeRound`／`writeHistory`，改動請同步」
 
 ## 9. 收尾驗證
