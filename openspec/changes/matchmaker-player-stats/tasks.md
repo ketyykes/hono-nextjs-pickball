@@ -115,6 +115,40 @@ Depends on: §3
 - [x] 4.6 GREEN: 在 `computePlayerStats` 回傳前排序：目前強度 desc → 勝率 desc → 出場數 desc → 姓名（原生 `<`）asc
 - [x] 4.7 REFACTOR: 確認最常搭檔／最常對手的 tally 邏輯共用同一個內部 helper（非兩份幾乎相同的迴圈）；確認排序比較邏輯為單一具名函式；確認 `player-stats.ts` 全檔沒有任何中文顯示字面量（design Decision 2：純資料，文案交給呈現層）。另依交棒事項新增 `collectCandidatesByPlayer` 泛型 helper 收斂候選收集骨架，並在 `pickValueAtLatestPlayedAt` JSDoc 記錄 `playedAt` 同值 tie-break 決策（擇方案②文件化）。自我 mutation 測試找到 2 個存活並已補斷言修正（詳見交件回報）
 
+> **§4 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。四條紅燈宣稱複驗屬實（`c6ae3de^`／`7fe0143^` 的
+>   兩欄硬編 `null`、`a0a6757^` 全檔無 `.sort(`）；「從未打過雙打時最常搭檔為 null」的
+>   regression guard 標註屬實；`localeCompare` 全檔零實際呼叫（唯一命中是註解中的禁令文字）。
+>   Stage 1 另裁定 **4.5 的 fixture 擴為 8 人是必要補強**：若嚴格照 Scenario 字面「四位球員且
+>   強度兩兩相同」出題，全員 rating 相同，**根本測不出「強度層優先於其他層」**。
+> - Stage 2（品質）：`APPROVED`。獨立跑 **27 個變異，首輪 5 個存活**：
+>   ① `pickMostFrequentName` 的 `>` 放寬為 `>=`（既有平手測試的正解恰為後遇者，巧合答對）；
+>   ② 移除排序第 3 層 `gamesPlayed`（原 fixture 的出場數層與姓名層期望順序一致，**該層等於完全
+>   沒被測到**）；③ `latestNameByPlayer` 改成取最早姓名快照（**design Decision 4 的 MUST 在 §4
+>   原本零覆蓋**——§3 的測試只涵蓋 `ratingAfter`，不涵蓋姓名）；④ `mostFrequentOpponent` 無紀錄
+>   時回 `""`（對手欄的 `null` 邊界原本無任何斷言）；⑤ 等價變異（見下）。
+>   Stage 2 依授權於 `6fa95c9` 只改測試檔補齊前四項，並把 `collectCandidatesByPlayer` 的參數
+>   型別由索引存取鏈改為具名 `HistoryPlayer`（語意零變更）。
+>   **剩餘 1 個存活變異判定為 equivalent mutant**：`pickMostFrequentName` 對未知姓名的防禦分支
+>   不可達——`counts` 的 key 必由 `extractPairs` 從同一份 `history` 產生，而 `nameById` 涵蓋該
+>   `history` 每一隊每一位球員，`nameById.get(id)` 在合法輸入下永不為 `undefined`；移除它會逼出
+>   非空斷言，反而更差。
+> - Stage 2 另判定 **`player-stats.ts` 不拆檔**（399 行、12 個函式，低於 `round.ts` 的 915 行、
+>   與 `duplication.ts` 的 328 行同量級；且 §5～§8 產出的是元件與頁面，不會再往本檔加程式碼，
+>   本檔已近終態）。
+> - `efd8464` 對 §3 既有 `latestRatingAfterByPlayer` 的泛型重構經 `git show 8f7d7e9:` 逐行對照，
+>   確認為**語意等價**（迴圈逐字相同，只把 `historyPlayer.ratingAfter` 換成 `valueOf(historyPlayer)`），
+>   型別未變鬆（泛型 `<T>`，無 `any`、無新增 `as`）。
+>
+> **§4 → §5 交棒（Stage 2 指定，MUST 遵守）**
+> 1. `mostFrequentPartner`／`mostFrequentOpponent` 的 `null` 現在有雙欄斷言守住。
+>    `PlayerStatsTable.tsx` MUST 自行把 `null` 轉成顯示用的佔位文字（Decision 2），
+>    **SHALL NOT** 回頭要求 `player-stats.ts` 直接回傳文案。
+> 2. `computePlayerStats` 的回傳**已排序完成**，§5 的元件 **SHALL NOT 再排一次**；「名次」欄直接
+>    用陣列索引 +1。元件內若出現第二處 `.sort()`，4.7 的「單一具名函式」要求即被打破。
+> 3. `player-stats.ts` 已近終態，§5～§8 **不應再往本檔加程式碼**——這是「不拆檔」判定的前提。
+> 4. 已知等價變異（`pickMostFrequentName` 的未知姓名防禦分支不可達）已文件化，§5 不需為它補測試。
+
 ## 5. 排行榜表格元件（PlayerStatsTable.tsx）
 
 Depends on: §4
@@ -162,3 +196,12 @@ Depends on: §6, §7
 - [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」
 - [ ] 9.10 `DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
 - [ ] 9.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
+- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 3 個
+      不在 delta spec 驗收錨點內的 `it`（皆對應 spec prose 的 MUST 子句或 design Decision，
+      經 §4 Stage 1／Stage 2 判定為正當而非測試膨脹）。archive 前 MUST 把它們補登進
+      `test-plan.md`，避免日後稽核誤判為未經規劃的測試膨脹：
+      ① 「單打紀錄即使隊伍帶兩名球員也不計入最常搭檔（僅雙打計數）」（對應「最常搭檔 MUST 由該
+      球員所有**雙打**歷史紀錄中的隊友逐筆計數」）
+      ② 「最常搭檔次數平手時取姓名 UTF-16 code unit 較前者」（對應 Decision 5 的 tie-break）
+      ③ 「最常搭檔的顯示姓名取該對象 playedAt 最近一次的姓名快照」（對應 Decision 4 的 MUST，
+      §4 Stage 2 發現該條 MUST 原本零覆蓋）
