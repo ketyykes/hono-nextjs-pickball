@@ -30,7 +30,7 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/player-stats.test.ts`，寫入兩個 it：「名單成員即使無出場紀錄仍列入統計結果」、「已離開名單但曾出現於歷史的球員仍列入統計結果」。跑單檔確認紅燈（模組不存在）並貼出輸出
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/matchmaker/player-stats.test.ts`，寫入兩個 it：「名單成員即使無出場紀錄仍列入統計結果」、「已離開名單但曾出現於歷史的球員仍列入統計結果」。跑單檔確認紅燈（模組不存在）並貼出輸出
 - [ ] 2.2 GREEN: 實作 `nextjs-pickball/lib/matchmaker/player-stats.ts` 的 `computePlayerStats(history, players)` 骨架：以 `HistoryPlayer.id`／`Player.id` 為鍵，建立「目前名單」與「歷史紀錄中出現過的球員」的聯集，每位球員回傳 `PlayerStat`（`id`／`name`／`colorFrom`／`colorTo`／`onRoster`／`currentRating`／`gamesPlayed`／`wins`／`losses`／`winRate`／`ratingDelta`／`mostFrequentPartner`／`mostFrequentOpponent`，本階段除 `id`／`name`／`onRoster` 外可先給合理預設值）。名單內球員 `onRoster: true`、姓名與色塊取自 `players`；只出現在歷史的球員本階段先給暫定值（§3 補齊）
 - [ ] 2.3 RED: 補兩個 it：「出場數、勝場與敗場依歷史紀錄正確加總」、「出場數為零時勝率為零而非 NaN」。確認紅燈
 - [ ] 2.4 GREEN: 實作出場數（該球員出現的紀錄筆數）、勝場／敗場（依各筆 `winner` 與該球員所屬隊伍判定）、勝率（`wins/gamesPlayed`，`gamesPlayed===0` 時為 `0`）
