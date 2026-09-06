@@ -254,6 +254,33 @@ export const TeamPlayersSchema = z.object({
    實際文字，把本文件的 MODIFIED 區塊在該實際版本上重新對齊後再編輯，SHALL NOT 直接假設本文件
    撰寫時的版本仍是最新基底。
 
+   **【apply §1 已執行，結論：零漂移】**（2026-09-06，基底 `b7541af`，含 M10 `56331b0` 與
+   M11 `e8e97cf`）：
+   - `git diff 56331b0~1 HEAD -- lib/scoreboard/ lib/matchmaker/scoreboard-binding.ts
+     components/matchmaker/CourtCard.tsx components/scoreboard/ lib/matchmaker/colors.ts
+     lib/matchmaker/types.ts lib/matchmaker/round-types.ts
+     tests/e2e/specs/scoreboard-binding.spec.ts` 輸出為空——M10／M11 完全沒有動到本 change
+     引用的任何檔案。
+   - 兩處 MODIFIED delta 逐行 `diff` 主 spec 的對應 Requirement：`scoreboard` 的
+     「localStorage 持久化」與 `match-stage` 的「場地區塊的計分板入口」皆為主 spec 現況文字的
+     **逐字超集**，差異只有本 change 刻意新增的段落與 Scenario，無需重新對齊。
+   - 既有簽章逐一核對通過：`buildMatchSlotSeed(round, match)` 兩參數、
+     `createInitialState(overrides)`／`settingsOf(state)` 成對且已帶入 `matchId`／`courtNumber`、
+     `pickTextColor(colorFrom: string, colorTo: string): string`、
+     `RoundTeam.playerIds: string[]`、`Player` 具備 `name`／`colorFrom`／`colorTo`、
+     `CourtCard` 持有 `players: readonly Player[]` prop 且 `handleEnterScoreboard` 為唯一
+     生產呼叫點。
+
+4. **Decision 4 的「既有的三處呼叫」為本文件撰寫時的誤記**（apply §1.5 實測更正）：
+   `scoreboard-binding.test.ts` 內實際有 **7 個 `buildMatchSlotSeed(round, match)` 呼叫運算式，
+   分佈於 6 個 `it`**（「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」、
+   「seed 帶入該場次的場地編號」、「多場次時 seed 取該場自己的場地編號，而非回合的第一場」
+   ——此 it 內有 **2 次**呼叫、「已有進度的場次再次進入時保留既有進度不覆蓋」、
+   「尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed」、「SSR（無 window）時 ensureMatchSlot
+   不寫入也不 throw，仍回傳 seed」）。tasks.md §3.2 與 §5 結尾的清單所列的六個 it 才是正確
+   基準；Decision 4 內文另誤指「tasks §9.5」，正確位置為 tasks.md §5 之後的「本 change 唯一
+   容許變動的既有測試」段落。實作以 tasks.md 為準，斷言一律不變。
+
 2. **姓名色塊的視覺樣式（padding、字級、圓角）留給 apply 的 Stage 1／2 審查依既有
    `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的既有視覺語言判斷**，
    design 不預先訂死確切的 px 數值——本 change 的核心是「資料要不要顯示、從哪裡來、怎麼保證

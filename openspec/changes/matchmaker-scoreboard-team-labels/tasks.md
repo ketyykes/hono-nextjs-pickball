@@ -21,14 +21,22 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的假設與現況對齊，避免 §2
 > 之後整批建立在錯的簽章上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的工作路徑（主 repo）、`git branch --show-current` 為 `change/matchmaker-scoreboard-team-labels`，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M11（`matchmaker-player-stats`）已合併**：檢查 `openspec/changes/archive/` 是否有對應歸檔紀錄，或以 `git log --oneline main` 確認其提交已在目前分支歷史中。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M11（見 proposal 的「執行相依」與 design Open Questions 第 1 條）
-- [ ] 1.3 讀 `nextjs-pickball/lib/scoreboard/types.ts`，記錄 `ScoreboardStateSchema`／`MatchSettings` 目前的實際欄位（含 `matchId`、`courtNumber` 的既有寫法是否與本文件所述一致）。差異一律補記進 design.md 的 Open Questions，不要默默改實作去遷就
-- [ ] 1.4 讀 `nextjs-pickball/lib/scoreboard/reducer.ts`，記錄 `createInitialState(overrides)`／`settingsOf(state)` 的實際簽章與既有欄位帶入方式
-- [ ] 1.5 讀 `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 與其測試檔 `scoreboard-binding.test.ts`，記錄 `buildMatchSlotSeed(round, match)` 的現況簽章，並**逐一列出**該測試檔內全部呼叫 `buildMatchSlotSeed(round, match)` 的 `it` 名稱與呼叫次數（§3.2 會據此清單逐一補上第三參數）。同時讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`，確認 `handleEnterScoreboard` 內 `ensureMatchSlot(buildMatchSlotSeed(round, match))` 的呼叫處與該元件既有的 `players: readonly Player[]` prop
-- [ ] 1.6 讀 `nextjs-pickball/components/scoreboard/TeamPanel.tsx`，記錄既有名稱行的實際 JSX 結構（`<span>{label}</span>` 與 `· {targetScore} 分制` 的相對位置），確認新增內容的插入點
-- [ ] 1.7 確認 `nextjs-pickball/lib/matchmaker/colors.ts` 的 `pickTextColor(colorFrom, colorTo): string` 簽章、`nextjs-pickball/lib/matchmaker/round-types.ts` 的 `RoundTeam.playerIds: string[]`、`nextjs-pickball/lib/matchmaker/types.ts` 的 `Player`（`name`／`colorFrom`／`colorTo`）三者與 design Context 假設一致
-- [ ] 1.8 確認 `nextjs-pickball/package.json` 目前無任何新增相依需求前提不變（本 change 結束時 MUST 仍為零新增，Final Review 會以 `git diff package.json` 機械確認）
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的工作路徑（主 repo）、`git branch --show-current` 為 `change/matchmaker-scoreboard-team-labels`，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上 **M11（`matchmaker-player-stats`）已合併**：檢查 `openspec/changes/archive/` 是否有對應歸檔紀錄，或以 `git log --oneline main` 確認其提交已在目前分支歷史中。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M11（見 proposal 的「執行相依」與 design Open Questions 第 1 條）
+- [x] 1.3 讀 `nextjs-pickball/lib/scoreboard/types.ts`，記錄 `ScoreboardStateSchema`／`MatchSettings` 目前的實際欄位（含 `matchId`、`courtNumber` 的既有寫法是否與本文件所述一致）。差異一律補記進 design.md 的 Open Questions，不要默默改實作去遷就
+- [x] 1.4 讀 `nextjs-pickball/lib/scoreboard/reducer.ts`，記錄 `createInitialState(overrides)`／`settingsOf(state)` 的實際簽章與既有欄位帶入方式
+- [x] 1.5 讀 `nextjs-pickball/lib/matchmaker/scoreboard-binding.ts` 與其測試檔 `scoreboard-binding.test.ts`，記錄 `buildMatchSlotSeed(round, match)` 的現況簽章，並**逐一列出**該測試檔內全部呼叫 `buildMatchSlotSeed(round, match)` 的 `it` 名稱與呼叫次數（§3.2 會據此清單逐一補上第三參數）。同時讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`，確認 `handleEnterScoreboard` 內 `ensureMatchSlot(buildMatchSlotSeed(round, match))` 的呼叫處與該元件既有的 `players: readonly Player[]` prop
+- [x] 1.6 讀 `nextjs-pickball/components/scoreboard/TeamPanel.tsx`，記錄既有名稱行的實際 JSX 結構（`<span>{label}</span>` 與 `· {targetScore} 分制` 的相對位置），確認新增內容的插入點
+- [x] 1.7 確認 `nextjs-pickball/lib/matchmaker/colors.ts` 的 `pickTextColor(colorFrom, colorTo): string` 簽章、`nextjs-pickball/lib/matchmaker/round-types.ts` 的 `RoundTeam.playerIds: string[]`、`nextjs-pickball/lib/matchmaker/types.ts` 的 `Player`（`name`／`colorFrom`／`colorTo`）三者與 design Context 假設一致
+- [x] 1.8 確認 `nextjs-pickball/package.json` 目前無任何新增相依需求前提不變（本 change 結束時 MUST 仍為零新增，Final Review 會以 `git diff package.json` 機械確認）
+
+> **§1 執行結論（2026-09-06，基底 `b7541af`）**：全部八項通過，**零漂移**。baseline `pnpm test`
+> 全綠（前端 70 files／664 tests、後端 4 files／16 tests，無 EPERM）。M11（`e8e97cf`）與
+> M10（`56331b0`）對本 change 引用的所有檔案零改動，兩處 MODIFIED delta 為主 spec 現況的逐字
+> 超集。§1.5 實測更正：`scoreboard-binding.test.ts` 內共 **7 個** `buildMatchSlotSeed` 呼叫
+> 運算式分佈於 **6 個 `it`**（「多場次時 seed 取該場自己的場地編號，而非回合的第一場」該 it 內
+> 有 2 次呼叫），design.md Decision 4 誤記為「三處」已補記進 Open Questions 第 4 條。
+> 其餘實測記錄詳見 design.md Open Questions 第 1 條的「apply §1 已執行」段落。
 
 ## 2. 計分板 schema／reducer 擴充（teamPlayers 欄位）
 
