@@ -224,6 +224,67 @@ Depends on: §5
 >   頁面外層沿用其他 matchmaker 頁既有的 `max-w-5xl … px-4 py-8`，未加任何會撐破
 >   `table.tsx` 捲動容器的水平內距或 grid；窄螢幕隱藏欄位未自行處理。
 
+> **§6 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。紅燈複驗屬實（`4c8863d` 這個 RED commit 本身
+>   也不含 `page.tsx`，只新增 spec 檔）。三個錨點 test 名稱逐字相符。逐行證據：
+>   ① 空狀態 test 是**正面斷言表格不存在**，擋得住「同時渲染空表格」的退化；
+>   ② 「直接開啟」是真的 `page.goto`，九個欄位名稱全部針對**標題列**斷言而非整頁；
+>   ③ 「切換區間」斷言的是**出場數的具體數值**（2 → 1）並雙向可逆；
+>   ④ **空狀態判定用的是未篩選的 `history`**（第 45 行），不是 `filteredHistory`；
+>   ⑤ E2E fixture 已逐欄比對 zod schema（含 DU 兩分支的 `.strict()` 欄位集合與 `HexColorSchema`
+>   正則），確認能通過驗證而非被當成損毀資料丟棄；
+>   ⑥ 「初次開啟預設今日」的 MUST 落在「切換區間」test 的
+>   `getByRole("radio", { name: "今日", checked: true })`。
+>   Stage 1 確認 **spec 完全未規範時鐘取樣方式**，明文把 `new Date()` 議題移交 Stage 2。
+> - Stage 2（品質）：`APPROVED`。獨立跑 14 個變異（只在 chromium），**2 個存活**：
+>   ① `history.length === 0` 換成 `filteredHistory.length === 0` 竟全綠——三條錨點 test 的斷言
+>   時點都落在「目前區間有資料」，測不到這個分岔；該退化會讓空區間**謊稱使用者從未打過**且
+>   **連區間篩選器一起消失**（使用者切不回去）。② 整個頁面標題區被刪除也全綠（6.3 明文要求
+>   標題與說明文字，卻零保護）。Stage 2 依授權於 `742804a` 補一條非錨點 test
+>   「切換到沒有紀錄的區間時不顯示引導型空狀態」與兩條標題斷言，兩者復驗轉紅、存活歸零。
+> - **`new Date()` render-time 呼叫的裁決：維持現狀，可接受**。實際查證 `useRoundStore.ts` 的
+>   `createInitialState()` 回傳 `history: []`、hydrate 只發生在 `useEffect`，故 SSR 首次輸出與
+>   client hydration 當下皆走空狀態分支，**時鐘取值從未進入 DOM**，安全論證成立。與兩處先例的
+>   衝突是表面而非實質：`HistoryView.tsx` 自己呼叫 `readHistory()`，「只取樣一次」是它必須自備的
+>   保證；`app/matchmaker/page.tsx` 的既有註解講的是 `exportedAt`——一個**會被 render 進輸出**
+>   （檔名）的值。唯一實質差異是「跨午夜後本頁下一次 render 會重新判定今日、歷史頁維持開頁當下
+>   的判定」，兩者皆未被 spec 規範，已於 `f4a890a` 補進 `page.tsx` 註解。
+>   **`useMemo` 判定不應加**：唯一會觸發 render 的輸入就是 `history`／`selectedRange`，省不下實質
+>   重算；而把 `new Date()` 關進依賴陣列等於凍結時鐘成「首次 render 取樣一次」，**那是行為變更
+>   而非最佳化**。
+> - **`droppedCount` 未接手的判定：可接受的範圍外項目，非 §6 缺陷**。Decision 1 的否決理由說的是
+>   「自行 `readRoster()`／`readHistory()` 會讓 `droppedCount` **需要另外接手處理**」——那是在陳述
+>   被否決方案的額外成本，不是承諾本頁會顯示提示；選 hook 形態確實讓 `droppedCount` 零成本可得，
+>   理由未落空。且本頁與它抄的先例完全一致：`app/matchmaker/page.tsx`（M5）同樣不消費
+>   `droppedCount`，`useRoundStore.ts` 已明文記為「已知缺口」。**但存在使用者可見的不一致**：
+>   同一份損毀歷史，開 `/matchmaker/history` 看得到提示、開 `/matchmaker/stats` 只是靜默少了幾筆
+>   統計——與 `storage.ts` Decision 3「SHALL NOT 靜默處理」的 repo 級慣例相左。**留給人類裁示。**
+> - E2E 測試碼品質全數 PASS，含一項 Stage 2 實際驗算的結論：**「上月」的 fixture 用固定第 15 日
+>   而非「今天減 30 天」**，不受 1/31、2/28 等月長差異影響；1 月時 `m-1` 由 `Date` 自動正規化為
+>   去年 12 月，跨年安全；且對照 `history-range.ts` 的 `c3 = min(上月1日, c2)`，要讓它失效需
+>   「本週一早於上月 15 日」，而本週一最多只能回推 6 天，**數學上不可能**。
+>
+> **⚠️ §6 → §8 的升級項（Stage 2 提出，已回報 coordinator 裁示，§8 開工前 MUST 有結論）**
+>
+> **統計頁實際上會寫回 LocalStorage**，可能讓 §8 的唯讀 E2E 假綠。
+> spec「統計頁的可用性、無障礙與唯讀保證」明訂「統計頁 SHALL NOT 修改回合、名單或任何
+> LocalStorage 資料」，Scenario 要求三個 key「逐字相同」。但 Decision 1 選的 hook 形態**天生會
+> 寫回**：`useRosterStore.ts` 與 `useRoundStore.ts` 的 write effect 以 `hasHydratedRef` 守門，
+> HYDRATE dispatch 後 state 變動即觸發 `writeRoster`／`writeRound`／`writeHistory`（leader 已逐行
+> 複驗此行為屬實）。`HistoryView` 只呼叫 `readHistory()`、**從不碰 roster／round**，所以歷史頁的
+> 同名 test 能真的成立，統計頁**不能照抄**。
+>
+> Stage 2 的實測（臨時探針，已刪除）：
+> - 種入**與 schema 宣告順序完全一致**的資料 → 三個 key 皆逐字相同 → **§8 若照
+>   `matchmaker-history.spec.ts` 的既有寫法種資料，測試會綠，但頁面其實有寫。**
+> - 種入**欄位順序不同、且多一個未知欄位 `legacyNote`** 的 roster → **不相同**，回寫後
+>   `legacyNote` 被靜默丟棄、key 順序被重排。
+>
+> 待裁示的選項：① 維持 Decision 1，並把 spec 措辭澄清為「不改變任何持久化資料的**語意內容**」
+> （理由：頁面本身呼叫零個 store setter，寫回是既有 hydration pattern 的性質，M5 對戰頁同樣如此，
+> 非 M11 引入）；② 改 Decision 1 的資料路徑（回到被否決的 server page + View 形態，會重新引入
+> `droppedCount` 的問題）；③ §8 的 test 改用非正規化形狀種資料（**會直接紅**，等於暴露 spec 未達成）。
+
 ## 7. match-stage：第五個分頁「統計」納入區段導覽
 
 Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序列」規定序列執行；§7.3 的 e2e 需要 §6 已完成的頁面才有意義，故排在 §6 之後）
@@ -255,7 +316,7 @@ Depends on: §6, §7
 - [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」
 - [ ] 9.10 `DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
 - [ ] 9.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
-- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 12 個
+- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 16 個
       不在 delta spec 驗收錨點內的 `it`（皆對應 spec prose 的 MUST 子句或 design Decision，
       經 §4 Stage 1／Stage 2 判定為正當而非測試膨脹）。archive 前 MUST 把它們補登進
       `test-plan.md`，避免日後稽核誤判為未經規劃的測試膨脹：
@@ -275,3 +336,11 @@ Depends on: §6, §7
       ⑩ 「強度淨變化為零時不補正號」（`formatRatingDelta` 的具名顯示決策原本無護欄）
       ⑪ 「勝率以四捨五入取整數百分比呈現」（同上）
       ⑫ 「表格具備可存取名稱」（§5 Stage 2 補的 a11y 行為，spec「色彩非唯一資訊來源」的延伸）
+      §6 的 `tests/e2e/specs/player-stats.spec.ts` 另有四個：
+      ⑬ 「名單內球員取名單姓名與目前強度，已離開名單者標示且取歷史最後一筆」（鎖住 `page.tsx`
+      把 `players` 傳給 `computePlayerStats` 第二引數的接線，unit test 不可能覆蓋）
+      ⑭ 「統計頁載入後無 console error」（hydration 層級行為，render 期間取時鐘的實證）
+      ⑮ 「切換到沒有紀錄的區間時不顯示引導型空狀態」（§6 Stage 2 補：空狀態判定必須依據整份
+      `history` 而非 `filteredHistory`，否則空區間會謊稱使用者從未打過且篩選器一起消失）
+      ⑯ 註：§6 Stage 2 另在既有錨點 test「直接開啟 /matchmaker/stats 可載入排行榜表格」內補了
+      頁面標題與說明文字的兩條斷言（未新增 it，不需另外補登）
