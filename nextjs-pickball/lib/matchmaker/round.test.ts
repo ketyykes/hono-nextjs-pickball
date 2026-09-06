@@ -10,6 +10,7 @@ import {
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
 	SUBMIT_SCORE_FAILURE_CODE,
+	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
 } from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
@@ -1731,5 +1732,108 @@ describe("swapMatchPlayer", () => {
 		if (!result.ok) return;
 		expect(result.round.restingPlayerIds).toContain("p1");
 		expect(result.round.restingPlayerIds).not.toContain("p3");
+	});
+
+	it("雙打場次換人後以換人後四位球員重新判定組成標示", () => {
+		const players = [
+			makePlayer({ id: "p1", gender: "male" }),
+			makePlayer({ id: "p2", gender: "female" }),
+			makePlayer({ id: "p3", gender: "male" }),
+			makePlayer({ id: "p4", gender: "male" }),
+			makePlayer({ id: "p5", gender: "male" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			format: "doubles",
+			// 換人前為混雙（p2 為女性）；換人後四位球員皆為男性，SHALL NOT 沿用混雙標示。
+			doublesComposition: "mixed",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match], restingPlayerIds: ["p5"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p2", "p5", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.doublesComposition).toBe("mens");
+	});
+
+	it("換人不影響 restCount 與 seenSignatures", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({
+			matches: [match],
+			restingPlayerIds: ["p3"],
+			seenSignatures: { teammateKeys: ["tk"], opponentKeys: ["ok"], fullMatchKeys: ["fk"] },
+		});
+		const seenSignaturesSnapshot = structuredClone(round.seenSignatures);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		// SwapMatchPlayerSuccess 的形狀裡本來就沒有任何名單 patch 欄位——本函式不擁有名單，
+		// 也不重算休息次數（design：restCount 只在產生新一輪時結算）。
+		expect(result).not.toHaveProperty("playerPatches");
+		expect(result.round.seenSignatures).toEqual(seenSignaturesSnapshot);
+	});
+
+	it("雙打場次有隊友已從名單移除時組成標示維持換人前的值", () => {
+		// p4 已從名單移除（不在 players 陣列中），但仍留在該場次的 teamB——
+		// resolveTeamPlayers 對此一貫寬容降級（round.ts 既有行為），本函式不因此拋出例外。
+		const players = [
+			makePlayer({ id: "p1", gender: "male" }),
+			makePlayer({ id: "p2", gender: "female" }),
+			makePlayer({ id: "p3", gender: "male" }),
+			makePlayer({ id: "p5", gender: "male" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			format: "doubles",
+			doublesComposition: "mixed",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match], restingPlayerIds: ["p5"] });
+
+		expect(() => swapMatchPlayer(round, "m-1", "p2", "p5", players)).not.toThrow();
+		const result = swapMatchPlayer(round, "m-1", "p2", "p5", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.doublesComposition).toBe("mixed");
+	});
+
+	it("matchId 不存在於該回合時拒絕換人", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "no-such-match", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
+		expect(round).toEqual(roundSnapshot);
 	});
 });
