@@ -34,7 +34,11 @@ export interface PlayerStat {
 const OFF_ROSTER_COLOR_FROM = "#9CA3AF";
 const OFF_ROSTER_COLOR_TO = "#6B7280";
 
-/** 尚未套用 §4 邏輯前的可變累加狀態，累加完成後才轉成對外的 PlayerStat。 */
+/**
+ * 累加階段用的可變狀態，累加完成後才轉成對外的 `PlayerStat`。不含
+ * `mostFrequentPartner`／`mostFrequentOpponent`——這兩欄不是逐筆累加值，而是
+ * `computePlayerStats` 最後從獨立的配對計數（`tallyPairs`）另行解析後併入。
+ */
 interface MutableStat {
 	id: string;
 	name: string;
@@ -90,6 +94,105 @@ function latestRatingAfterByPlayer(history: readonly MatchHistoryEntry[]): Map<s
 		}
 	}
 	return result;
+}
+
+/**
+ * 依歷史紀錄逐筆解析每位球員最近一次出現的姓名快照，供最常搭檔／最常對手的顯示
+ * 姓名解析共用（design Decision 4：以 `playedAt` 明確比較，不依賴輸入陣列排列順序，
+ * 沿用 `pickValueAtLatestPlayedAt` 同一份比較邏輯，§3.5 交棒事項 1）。
+ */
+function latestNameByPlayer(history: readonly MatchHistoryEntry[]): Map<string, string> {
+	const candidatesByPlayer = new Map<string, { playedAt: string; value: string }[]>();
+
+	for (const entry of history) {
+		for (const team of [entry.teamA, entry.teamB]) {
+			for (const historyPlayer of team.players) {
+				const candidates = candidatesByPlayer.get(historyPlayer.id) ?? [];
+				candidates.push({ playedAt: entry.playedAt, value: historyPlayer.name });
+				candidatesByPlayer.set(historyPlayer.id, candidates);
+			}
+		}
+	}
+
+	const result = new Map<string, string>();
+	for (const [id, candidates] of candidatesByPlayer) {
+		const latest = pickValueAtLatestPlayedAt(candidates);
+		if (latest !== undefined) {
+			result.set(id, latest);
+		}
+	}
+	return result;
+}
+
+/**
+ * 依歷史紀錄逐筆計數「自己 id → 對象 id」的配對次數，建立
+ * `Map<selfId, Map<counterpartId, count>>`。最常搭檔（同隊隊友）與最常對手
+ * （對方隊伍球員）共用同一套計數骨架，差異只在 `extractPairs` 如何從一筆歷史紀錄
+ * 產生配對——SHALL NOT 為兩者各寫一份幾乎相同的迴圈（tasks 4.4）。
+ */
+function tallyPairs(
+	history: readonly MatchHistoryEntry[],
+	extractPairs: (entry: MatchHistoryEntry) => readonly (readonly [selfId: string, counterpartId: string])[],
+): Map<string, Map<string, number>> {
+	const result = new Map<string, Map<string, number>>();
+	for (const entry of history) {
+		for (const [selfId, counterpartId] of extractPairs(entry)) {
+			const counts = result.get(selfId) ?? new Map<string, number>();
+			counts.set(counterpartId, (counts.get(counterpartId) ?? 0) + 1);
+			result.set(selfId, counts);
+		}
+	}
+	return result;
+}
+
+/**
+ * 從一筆歷史紀錄取出「搭檔」配對：僅雙打紀錄計入（spec：最常搭檔 MUST 由雙打歷史
+ * 紀錄計數），同隊除自己外的每位隊友各自成對一次，單打隊伍（人數 < 2）自然不會
+ * 產生任何配對。
+ */
+function extractPartnerPairs(entry: MatchHistoryEntry): readonly (readonly [string, string])[] {
+	if (entry.format !== "doubles") {
+		return [];
+	}
+	const pairs: [string, string][] = [];
+	for (const team of [entry.teamA, entry.teamB]) {
+		for (const player of team.players) {
+			for (const teammate of team.players) {
+				if (teammate.id === player.id) {
+					continue;
+				}
+				pairs.push([player.id, teammate.id]);
+			}
+		}
+	}
+	return pairs;
+}
+
+/**
+ * 從「對象 id → 出現次數」的計數中取出次數最多者的姓名；次數相同時依姓名 UTF-16
+ * code unit 排序取序位在前者（design Decision 5，SHALL NOT 用 `localeCompare`），
+ * SHALL NOT 依 `Map` 迭代順序決定。找不到任何對象時回傳 `null`——不是空字串
+ * （design Decision 2）。`nameById` 找不到對應姓名的 id 視為資料不一致並略過：
+ * 在合法輸入下不會發生，因為 `counts` 的 key 必然來自同一份 `history`。
+ */
+function pickMostFrequentName(counts: ReadonlyMap<string, number>, nameById: ReadonlyMap<string, string>): string | null {
+	let bestId: string | undefined;
+	let bestCount = -Infinity;
+	let bestName = "";
+
+	for (const [id, count] of counts) {
+		const name = nameById.get(id);
+		if (name === undefined) {
+			continue;
+		}
+		if (count > bestCount || (count === bestCount && name < bestName)) {
+			bestId = id;
+			bestCount = count;
+			bestName = name;
+		}
+	}
+
+	return bestId === undefined ? null : bestName;
 }
 
 /**
@@ -208,8 +311,7 @@ function tallyRatingDelta(stats: ReadonlyMap<string, MutableStat>, history: read
 
 /**
  * 計算每位球員的統計，範圍為「目前名單」與「歷史紀錄中出現過的球員」的聯集。
- * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。`mostFrequentPartner`／
- * `mostFrequentOpponent` 為 §4 補齊前的暫定值。
+ * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。
  */
 export function computePlayerStats(
 	history: readonly MatchHistoryEntry[],
@@ -218,6 +320,9 @@ export function computePlayerStats(
 	const union = buildRosterUnion(history, players);
 	tallyGamesAndResults(union, history);
 	tallyRatingDelta(union, history);
+
+	const nameById = latestNameByPlayer(history);
+	const partnerTally = tallyPairs(history, extractPartnerPairs);
 
 	return Array.from(union.values()).map((stat) => ({
 		id: stat.id,
@@ -231,7 +336,7 @@ export function computePlayerStats(
 		losses: stat.losses,
 		winRate: winRateOf(stat.wins, stat.gamesPlayed),
 		ratingDelta: stat.ratingDelta,
-		mostFrequentPartner: null,
+		mostFrequentPartner: pickMostFrequentName(partnerTally.get(stat.id) ?? new Map(), nameById),
 		mostFrequentOpponent: null,
 	}));
 }
