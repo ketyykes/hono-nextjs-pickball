@@ -574,14 +574,26 @@ describe("CourtCard", () => {
 			buildPlayer({ id: "p1", name: "王小明" }),
 			buildPlayer({ id: "p2", name: "陳小華", gender: "female" }),
 			buildPlayer({ id: "p3", name: "候選一", isActive: true }),
+			buildPlayer({ id: "p4", name: "候選二", isActive: true }),
+			buildPlayer({ id: "p5", name: "已退出", isActive: false }),
 		];
 		const match = buildMatch({ id: "match-42" });
-		const round = buildRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const round = buildRound({ matches: [match], restingPlayerIds: ["p3", "p4", "p5"] });
 		render(<CourtCard {...buildProps({ match, players, round, onSwapPlayer })} />);
 
 		const trigger = screen.getByRole("combobox", { name: "替 王小明 換人" });
 		await user.click(trigger);
 		const option = await screen.findByRole("option", { name: "候選一" });
+
+		// 選項為休息名單中「所有」目前 active 的球員，不是其中任意一位——只斷言「找得到
+		// 候選一」測不出「清單被截成只剩第一位」這類變異；同時以非 active 的已退出球員
+		// 作為對照，確認 isActive 篩選在正向路徑上同樣生效。
+		expect(screen.getAllByRole("option").map((item) => item.textContent)).toEqual([
+			"候選一",
+			"候選二",
+		]);
+		expect(screen.queryByRole("option", { name: "已退出" })).toBeNull();
+
 		await user.click(option);
 
 		expect(onSwapPlayer).toHaveBeenCalledTimes(1);
