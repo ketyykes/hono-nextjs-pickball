@@ -1734,6 +1734,50 @@ describe("swapMatchPlayer", () => {
 		expect(result.round.restingPlayerIds).not.toContain("p3");
 	});
 
+	it("換出者附加於休息名單尾端且既有休息者的相對順序不變", () => {
+		// design Decision 8：休息名單的原始順序來自 candidates.ts 的休息次數優先排序，
+		// 換人 SHALL NOT 依 restCount 重新排序，換出者一律附加於尾端。上一個 it 用
+		// toContain 只驗「有沒有」，驗不出位置，故本 it 以完整陣列比對釘住尾端語意。
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3", "p4"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.restingPlayerIds).toEqual(["p4", "p1"]);
+	});
+
+	it("換出者屬第二隊時只更新第二隊、第一隊維持原樣", () => {
+		// 其餘成功路徑的 it 換的都是第一隊球員，teamIndex 為 1 的分支會沒有測試守住
+		// （把 newTeams 寫死成永遠更新 teams[0] 也不會被任何斷言抓到）。
+		const players = [makePlayer({ id: "p1", rating: 3 }), makePlayer({ id: "p2", rating: 3 }), makePlayer({ id: "p3", rating: 5.5 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p2", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.teams[1]).toEqual({ playerIds: ["p3"], rating: 5.5 });
+		// 對照組：換第二隊的人時，第一隊 SHALL NOT 被連帶改寫。
+		expect(updatedMatch?.teams[0]).toEqual({ playerIds: ["p1"], rating: 3 });
+	});
+
 	it("雙打場次換人後以換人後四位球員重新判定組成標示", () => {
 		const players = [
 			makePlayer({ id: "p1", gender: "male" }),
