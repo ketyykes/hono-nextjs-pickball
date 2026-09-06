@@ -615,8 +615,15 @@ describe("CourtCard", () => {
 	});
 
 	it("休息名單無 active 球員可換時換人操作停用並顯示無可換之人", () => {
-		const round = buildRound({ restingPlayerIds: [] });
-		render(<CourtCard {...buildProps({ round })} />);
+		// 休息名單非空但唯一成員已非 active（例如已被移出名單）：候選人篩選 MUST 同時
+		// 檢查 isActive，僅檢查「休息名單是否為空」測不出漏篩非 active 球員的變異。
+		const players = [
+			buildPlayer({ id: "p1" }),
+			buildPlayer({ id: "p2", name: "陳小華", gender: "female" }),
+			buildPlayer({ id: "p5", name: "已退出", isActive: false }),
+		];
+		const round = buildRound({ restingPlayerIds: ["p5"] });
+		render(<CourtCard {...buildProps({ players, round })} />);
 
 		const triggers = screen.getAllByRole("combobox");
 		expect(triggers).toHaveLength(2);
