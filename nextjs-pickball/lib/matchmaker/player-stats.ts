@@ -1,7 +1,7 @@
 // 球員統計計算核心。純函式、決定性、不修改輸入（design Decision 2：只回傳資料，
 // 不內嵌任何顯示文案；「已不在名單」等最終呈現文字交給 PlayerStatsTable.tsx）。
 
-import type { MatchHistoryEntry } from "./history";
+import type { MatchHistoryEntry, HistoryPlayer } from "./history";
 import type { Player } from "./types";
 
 /**
@@ -81,7 +81,7 @@ function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; v
  */
 function collectCandidatesByPlayer<T>(
 	history: readonly MatchHistoryEntry[],
-	valueOf: (historyPlayer: MatchHistoryEntry["teamA"]["players"][number]) => T,
+	valueOf: (historyPlayer: HistoryPlayer) => T,
 ): Map<string, { playedAt: string; value: T }[]> {
 	const result = new Map<string, { playedAt: string; value: T }[]>();
 	for (const entry of history) {

@@ -102,6 +102,10 @@ describe("computePlayerStats", () => {
 		expect(alice?.name).toBe("Alice");
 		expect(alice?.colorFrom).toBe("#111111");
 		expect(alice?.colorTo).toBe("#222222");
+		// 完全沒有任何紀錄時，兩個「最常」欄位 MUST 為 null 而非空字串——design Decision 2
+		// 明載找不到時是 null、由呈現層決定要顯示什麼字。少了對手這一條，只有搭檔那邊被守住。
+		expect(alice?.mostFrequentPartner).toBeNull();
+		expect(alice?.mostFrequentOpponent).toBeNull();
 	});
 
 	it("已離開名單但曾出現於歷史的球員仍列入統計結果", () => {
@@ -306,6 +310,40 @@ describe("computePlayerStats", () => {
 		expect(p1?.mostFrequentPartner).toBe("甲");
 	});
 
+	// 補強：自我變異測試發現，design Decision 4（姓名取該 id `playedAt` 最近一次的快照）
+	// 在 §4 沒有任何測試守住——把姓名解析改成取最早一筆仍全綠，因為既有的搭檔／對手
+	// fixture 中同一個 id 的姓名快照都相同。本測試讓同一位搭檔改過名，且刻意把較晚那筆
+	// 放在陣列前面：取最早、或取「陣列最後一筆」都會得到舊名而失敗。
+	it("最常搭檔的顯示姓名取該對象 playedAt 最近一次的姓名快照", () => {
+		const history = [
+			makeDoublesEntry({
+				matchId: "rename-later",
+				playedAt: "2026-08-20T00:00:00.000Z",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-jia", name: "甲新" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+			makeDoublesEntry({
+				matchId: "rename-earlier",
+				playedAt: "2026-08-10T00:00:00.000Z",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-jia", name: "甲舊" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const p1 = result.find((stat) => stat.id === "p1");
+		expect(p1?.mostFrequentPartner).toBe("甲新");
+	});
+
 	it("從未打過雙打時最常搭檔為 null", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice" })];
 		const history = [
@@ -372,6 +410,15 @@ describe("computePlayerStats", () => {
 		const p1 = result.find((stat) => stat.id === "p1");
 		// 甲（U+7532）與乙（U+4E59）各出現 1 次，UTF-16 code unit 較前者為乙。
 		expect(p1?.mostFrequentPartner).toBe("乙");
+
+		// 同一組資料再跑一次「乙先於甲」的排列：上面那組裡答案（乙）恰好是計數表中
+		// 後遇到的一筆，因此把挑選條件放寬成「次數相同也覆蓋」（`>=`）仍會巧合答對。
+		// 這裡把兩筆對調，讓答案變成先遇到的一筆——放寬成 `>=` 時會被後遇的甲覆寫而失敗，
+		// 兩個方向都測到才真的鎖住「取 UTF-16 較前者」而非「取後遇者」。
+		const reversed = computePlayerStats([history[1], history[0]], []);
+
+		const p1Reversed = reversed.find((stat) => stat.id === "p1");
+		expect(p1Reversed?.mostFrequentPartner).toBe("乙");
 	});
 
 	it("最常對手為對戰過的對手中出現次數最多者", () => {
@@ -439,7 +486,9 @@ describe("computePlayerStats", () => {
 		// （即使 uma 的勝率／出場數刻意偏低）。wendy／xena／raj／tom 的勝率兩兩不同，
 		// 驗證「勝率」層；raj 勝率低於 xena 但出場數更多，驗證勝率優先於出場數（而非反過來）。
 		// mona／nina 的強度、勝率、出場數三層皆同分，最終須以姓名決定順序；vic 與
-		// mona／nina 同強度同勝率但出場數較少，驗證「出場數」層。
+		// mona／nina 同強度同勝率但出場數較多，驗證「出場數」層——vic 的姓名 UTF-16
+		// 序位刻意排在 mona／nina 之後，兩層的期望順序因此相反：若實作漏掉出場數層，
+		// 直接遞補到姓名層會得到 mona／nina／vic 而測出來，不會巧合綠燈。
 		// 名單陣列刻意打亂、不依期望排序後的順序排列——本檔在排序邏輯落地前是以聯集的
 		// 插入順序（即 players 陣列順序）回傳結果，若這裡照期望順序排列，尚未實作排序時
 		// 也會巧合綠燈，紅燈就不是真的。
@@ -462,13 +511,13 @@ describe("computePlayerStats", () => {
 			...buildMatches("tom", 6, 10),
 			...buildMatches("mona", 5, 10),
 			...buildMatches("nina", 5, 10),
-			...buildMatches("vic", 3, 6),
+			...buildMatches("vic", 6, 12),
 		];
 
 		const result = computePlayerStats(history, players);
 
 		const ids = players.map((player) => player.id);
 		const order = result.filter((stat) => ids.includes(stat.id)).map((stat) => stat.id);
-		expect(order).toEqual(["uma", "wendy", "xena", "raj", "tom", "mona", "nina", "vic"]);
+		expect(order).toEqual(["uma", "wendy", "xena", "raj", "tom", "vic", "mona", "nina"]);
 	});
 });
