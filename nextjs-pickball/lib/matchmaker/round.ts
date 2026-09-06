@@ -960,22 +960,6 @@ const SWAP_IN_PLAYER_NOT_RESTING_MESSAGE = "指定要換入的球員目前不在
 // 時刻的資料，換人操作以當下狀態為準。
 const SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE = "指定要換入的球員目前為暫停出場狀態，請先恢復其出場狀態後再試一次。";
 
-// 依 ids 的順序逐一從 players 解析出對應 Player；任一 id 解析不到即回傳 undefined。
-// 與 resolveTeamPlayers（依 players 陣列原有順序 filter）刻意不同：雙打組成標示重算
-// 需要保留呼叫端指定的 [teamA 成員 0, teamA 成員 1, teamB 成員 0, teamB 成員 1] 順序
-// （design Decision 3），filter 版本無法保證這個順序。
-function resolveInOrder(ids: readonly string[], players: readonly Player[]): Player[] | undefined {
-	const resolved: Player[] = [];
-	for (const id of ids) {
-		const player = players.find((p) => p.id === id);
-		if (player === undefined) {
-			return undefined;
-		}
-		resolved.push(player);
-	}
-	return resolved;
-}
-
 /**
  * 臨時換人：把某場 pending 場次中一位在場球員換成該輪休息名單中的另一位球員
  * （prd.md 6.3「主持人可能……臨時換人代打」）。純函式，回傳新回合，原 round／players
@@ -987,10 +971,11 @@ function resolveInOrder(ids: readonly string[], players: readonly Player[]): Pla
  *
  * 成功時依序完成：替換 playerIds、重算該隊隊伍分數（design Decision 2：沿用 pairing.ts
  * buildTeam 的既有算法——隊內成員 rating 總和，經 roundRating 正規化）、雙打場次重算組成
- * 標示（design Decision 3：重用已匯出的 pairing.ts labelDoublesComposition，以
- * [teamA 成員 0, teamA 成員 1, teamB 成員 0, teamB 成員 1] 的順序組出 4 元素 tuple；
- * design Decision 9：任一位無法從 players 解析時維持換人前的值，不拋例外也不退回
- * "general"）、休息名單互換（design Decision 8：outPlayerId 附加於陣列尾端）。
+ * 標示（design Decision 3：重用已匯出的 pairing.ts labelDoublesComposition，以換人後兩隊
+ * 共四位球員呼叫；labelDoublesComposition 只讀性別集合、不讀順序，故解析用
+ * resolveTeamPlayers 即可，不需另外保序。design Decision 9：任一位無法從 players 解析時
+ * 維持換人前的值，不拋例外也不退回 "general"）、休息名單互換（design Decision 8：
+ * outPlayerId 附加於陣列尾端）。
  */
 export function swapMatchPlayer(
 	round: Round,
@@ -1042,13 +1027,19 @@ export function swapMatchPlayer(
 	const newTeams: [RoundTeam, RoundTeam] = teamIndex === 0 ? [newTeam, match.teams[1]] : [match.teams[0], newTeam];
 
 	// 雙打組成標示重算（design Decision 3、9）：唯一一處計算，單打分支完全不觸碰
-	// doublesComposition 欄位（match 本身即無此欄位）。
+	// doublesComposition 欄位（match 本身即無此欄位）。resolveTeamPlayers 已是 submitScore
+	// 沿用的既有球員解析函式，此處重用而非另寫一份；labelDoublesComposition 只讀性別集合、
+	// 不讀順序（design Decision 3 的「以 teamA 在前、teamB 在後組出 tuple」純粹是呼叫慣例，
+	// 不是判定所需的順序保證），resolveTeamPlayers 依 players 陣列原有順序 filter 完全足夠。
 	let doublesComposition = match.doublesComposition;
 	if (match.format === "doubles") {
 		const fourPlayerIds = [...newTeams[0].playerIds, ...newTeams[1].playerIds];
-		const fourPlayers = resolveInOrder(fourPlayerIds, players);
-		if (fourPlayers !== undefined && fourPlayers.length === PLAYERS_PER_MATCH.doubles) {
-			doublesComposition = labelDoublesComposition(fourPlayers as [Player, Player, Player, Player]);
+		const fourPlayers = resolveTeamPlayers(fourPlayerIds, players);
+		if (fourPlayers.length === PLAYERS_PER_MATCH.doubles) {
+			// 解構後以字面陣列重組成 tuple，讓 TS 依 labelDoublesComposition 的 tuple 參數型別
+			// 做 contextual typing，不需型別斷言（沿用 pairing.ts pairDoubles 的既有手法）。
+			const [first, second, third, fourth] = fourPlayers;
+			doublesComposition = labelDoublesComposition([first, second, third, fourth]);
 		}
 	}
 
