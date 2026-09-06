@@ -15,15 +15,15 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-06，M11 已合併）
+## 狀態快照（最後更新 2026-09-06，M12 已合併）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e8e97cf`（feat：合併 M11 matchmaker-player-stats） |
+| `main` HEAD | `ea71e08`（feat：合併 M12 matchmaker-scoreboard-team-labels） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
-| M12 | 未開始 |
+| M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
 | M13 | 未開始 |
 | M14 | 未開始 |
 | M15 | 未開始 |
@@ -102,6 +102,45 @@ E2E        589 passed / 21 skipped / 0 failed，--workers=1，11.9 分鐘（skip
 相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
 ```
 
+### M12 執行紀錄（2026-09-06）
+
+- **規模**：5 個群組（§1 前置確認、§2 schema/reducer、§3 seed 球員資訊、§4 面板渲染+E2E、
+  §5 收尾驗證）、19 個 commit、**一棒跑完未接力**。§2～§4 三個實作群組各跑 Stage 1＋Stage 2，
+  全數一次過（無退回），Final Code Review `APPROVED`。
+- **mutation 成效**：§2 8 條殺 6 存活 2（其中一條轉交下一組後被殺掉，另一條為型別層決策無法建測試
+  guard，保護力來自 `tsc`）；§3 14 條殺 11 存活 3（1 條經 20,000 組隨機色對實證為真等價變異、
+  1 條為對照組、1 條同前述型別層限制）；§4 Implementer 7 條 + Stage 2 獨立 5 條 + 自加對照組 1 條，
+  **最終存活 0**。
+- **審查揪出的實質缺陷**：① `key={badge.name}` 在雙打兩人同時離隊時必然碰撞（同一 fallback 字面量），
+  改用 index 為 key；② 姓名色塊顯示位置原本零測試把關，design 想歸類為「非可驗收分支」被 Stage 2
+  否決（spec 字面是 MUST）；③ 四組色塊漸層測試的前景色期望值全落在同一深色，使「color 寫死」變異
+  可存活，改為跨明暗兩側的調色盤；④ `resolveTeamPlayers` 與 repo 內既有兩個同名函式語意相反，
+  已更名 `buildTeamPlayers`；⑤ REFACTOR 一度把排版 class 誤動到 `teamPlayers === null` 分支，
+  兩階段審查逐字核對後修正。
+- **環境事故（不影響驗證結果）**：§5 期間某 Implementer 執行不分青紅皂白的 `pkill -f "chrome-headless-shell"`
+  清殘留 process，誤殺了同機另一個獨立專案（`Desktop/project/blender/pick-threejs`，另一個 coding
+  session）正在跑的 Playwright。本 repo port 全程未衝突、驗證結果不受影響，但已是明確的協作風險。
+- **派工紀律違規兩次**：§4 與 §5 的 Implementer 都曾用「開背景 monitor 後結束回合」的方式等 E2E，
+  導致工作中斷，各需 coordinator 用 SendMessage 喚回一次——執行紀律模板已明文禁止「派出後不可結束
+  回合」，仍發生兩次。
+- **9.6 全套 E2E**：coordinator 那輪 597 passed / 2 failed / 21 skipped，兩個失敗仍是
+  `quiz.spec.ts` 在 `[webkit]`／`[mobile-safari]`——**與 M10、M11 屬同一失敗家族**，零觸及
+  quiz 相關檔案，隔離重跑兩個 project 各 4 條共 8 條，1.5～2 秒全過，裁定非迴歸並合併。
+  leader 自己那輪（§5 最終狀態）599 passed / 21 skipped / 0 failed，跑前 load average
+  `53.55 / 54.08 / 117.88`（外部專案造成，非本 repo）、跑後 `4.77 / 9.96 / 35.16`。
+
+### `main` 品質基線（M12 合併後，coordinator 於 `ea71e08` 獨立實測）
+
+```
+前端單元   70 檔 / 672 測試 passed   （M11 後為 70 檔 / 664 測試，+0 檔 / +8 測試）
+後端單元   4 檔 / 16 測試 passed     （不變）
+tsc        pnpm -r exec tsc --noEmit → exit 0
+lint       0 errors / 3 warnings（hooks/ 下三支既存檔的 no-unused-vars，非本批造成）
+E2E        597 passed / 21 skipped / 2 failed，--workers=1，12.0 分鐘（skipped 數不變）
+           失敗為 quiz.spec.ts 在 webkit／mobile-safari 的既有 page.goto 逾時，隔離重跑全過，非 M12 迴歸
+相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
+```
+
 ## Pipeline 總覽
 
 ```
@@ -134,7 +173,7 @@ main@3fa2d22
 |---|---|---|---|---|---|---|---|---|
 | M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | 21 commit | §1～§5 五組 | 1 棒 | change/matchmaker-stage-gaps（已刪） | main @ `3fa2d22` | **已合併**（`56331b0`） |
 | M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | 53 commit | §1～§9 九組 | 1 棒 | change/matchmaker-player-stats（已刪） | main @ `56331b0` | **已合併**（`e8e97cf`） |
-| M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | <待填> | <待填> | <待填> | change/matchmaker-scoreboard-team-labels | M11 已合併 | 未開始 |
+| M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | <待填> | <待填> | <待填> | change/matchmaker-player-swap | M12 已合併 | 未開始 |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | <待填> | <待填> | <待填> | change/matchmaker-round-timer | M13 已合併 | 未開始 |
 | M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | <待填> | <待填> | <待填> | change/matchmaker-timed-draw | M14 已合併 | 未開始 |
@@ -331,6 +370,18 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     而 coordinator 合併前重跑整套反而 100% 綠。**兩種都不是迴歸，但診斷路徑不同**：
     先確認改動檔案與失敗檔案有無因果路徑 → 隔離或整套重跑 → 才看負載。
     無論結論如何，leader **不得自行判定為雜訊**，證據上報由 coordinator 裁定。
+18. **清殘留 process 禁止無差別 `pkill -f`**（M12 事故）：某 Implementer 用
+    `pkill -f "chrome-headless-shell"` 清自己的殘留，誤殺了同機另一個獨立專案正在跑的 Playwright。
+    本批機器上常有其他 session／專案同時在跑。**清 process 前 MUST 先 `ps aux` 確認執行路徑含
+    本 repo 路徑（`Desktop/project/nextjs-pickball`），再用 `kill <PID>` 指定殺，不可
+    `pkill -f` 這種按 command line pattern 全機掃射的殺法**——同樣的邏輯也適用於清 dev server、
+    清 node process 等所有場景。
+19. **派工單「派出後不可結束回合」屢禁不止**（M12 兩度違規）：§4、§5 的 Implementer 都用
+    「開背景 monitor 等 E2E 後結束回合」的方式，導致 coordinator 得手動 SendMessage 喚回，
+    白白多耗一輪等待。**leader 派工單要把這條規則放在最顯眼位置並重複強調**：
+    等待長指令（E2E、mutation sweep）時，agent 自己必須留在同一個回合裡用輪詢或阻塞式等待，
+    不可把等待動作丟給背景 process 然後結束回合——結束回合等於把「叫它繼續」的責任推給
+    coordinator，而 coordinator 不會主動戳一個「看起來已完成」的 agent。
 
 ## 跨 change 對齊提醒（交叉檢查結果，2026-09-03）
 
