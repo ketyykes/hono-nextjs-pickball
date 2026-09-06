@@ -352,4 +352,70 @@ describe("computePlayerStats", () => {
 		const p1 = result.find((stat) => stat.id === "p1");
 		expect(p1?.mostFrequentOpponent).toBe("丙");
 	});
+
+	it("排行榜依目前強度、勝率、出場數、姓名依序排序", () => {
+		// 建立「打 gamesPlayed 場、贏 wins 場」的單打歷史紀錄，球員輪流出現在 teamA／teamB，
+		// 對手固定用一位不在斷言範圍內的墊場球員。
+		function buildMatches(playerId: string, wins: number, gamesPlayed: number): MatchHistoryEntry[] {
+			const matches: MatchHistoryEntry[] = [];
+			for (let i = 0; i < gamesPlayed; i++) {
+				const onTeamA = i % 2 === 0;
+				const isWin = i < wins;
+				const winner = isWin === onTeamA ? "teamA" : "teamB";
+				matches.push(
+					makeEntry({
+						matchId: `${playerId}-m${i}`,
+						teamA: makeTeam({
+							players: [
+								makeHistoryPlayer({ id: onTeamA ? playerId : "p-filler", name: onTeamA ? playerId : "Filler" }),
+							],
+						}),
+						teamB: makeTeam({
+							players: [
+								makeHistoryPlayer({ id: onTeamA ? "p-filler" : playerId, name: onTeamA ? "Filler" : playerId }),
+							],
+						}),
+						winner,
+					}),
+				);
+			}
+			return matches;
+		}
+
+		// uma 的強度遠高於其餘六位（同為 5），驗證「目前強度」為第一排序層且優先於其他層
+		// （即使 uma 的勝率／出場數刻意偏低）。wendy／xena／raj／tom 的勝率兩兩不同，
+		// 驗證「勝率」層；raj 勝率低於 xena 但出場數更多，驗證勝率優先於出場數（而非反過來）。
+		// mona／nina 的強度、勝率、出場數三層皆同分，最終須以姓名決定順序；vic 與
+		// mona／nina 同強度同勝率但出場數較少，驗證「出場數」層。
+		// 名單陣列刻意打亂、不依期望排序後的順序排列——本檔在排序邏輯落地前是以聯集的
+		// 插入順序（即 players 陣列順序）回傳結果，若這裡照期望順序排列，尚未實作排序時
+		// 也會巧合綠燈，紅燈就不是真的。
+		const players = [
+			makePlayer({ id: "vic", name: "Vic", rating: 5 }),
+			makePlayer({ id: "nina", name: "Nina", rating: 5 }),
+			makePlayer({ id: "mona", name: "Mona", rating: 5 }),
+			makePlayer({ id: "tom", name: "Tom", rating: 5 }),
+			makePlayer({ id: "raj", name: "Raj", rating: 5 }),
+			makePlayer({ id: "xena", name: "Xena", rating: 5 }),
+			makePlayer({ id: "wendy", name: "Wendy", rating: 5 }),
+			makePlayer({ id: "uma", name: "Uma", rating: 8 }),
+		];
+
+		const history = [
+			...buildMatches("uma", 0, 2),
+			...buildMatches("wendy", 9, 10),
+			...buildMatches("xena", 7, 10),
+			...buildMatches("raj", 13, 20),
+			...buildMatches("tom", 6, 10),
+			...buildMatches("mona", 5, 10),
+			...buildMatches("nina", 5, 10),
+			...buildMatches("vic", 3, 6),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const ids = players.map((player) => player.id);
+		const order = result.filter((stat) => ids.includes(stat.id)).map((stat) => stat.id);
+		expect(order).toEqual(["uma", "wendy", "xena", "raj", "tom", "mona", "nina", "vic"]);
+	});
 });
