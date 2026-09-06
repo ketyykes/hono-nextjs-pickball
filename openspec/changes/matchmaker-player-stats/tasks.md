@@ -289,11 +289,11 @@ Depends on: §5
 
 Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序列」規定序列執行；§7.3 的 e2e 需要 §6 已完成的頁面才有意義，故排在 §6 之後）
 
-- [ ] 7.1 RED: 修改 `nextjs-pickball/lib/matchmaker/section-nav.test.ts` 既有的 it「分頁清單依序為對戰、參賽者、歷史與資料四筆」——更名為「分頁清單依序為對戰、參賽者、歷史、資料與統計五筆」，並把預期陣列擴充為五筆（新增 `{ label: "統計", href: "/matchmaker/stats", active: false }`）。跑單檔確認紅燈（`matchmakerSectionTabs` 目前仍只回傳四筆），貼出輸出。**這是本 change 對既有測試唯一容許的變動**，見 §9.8
-- [ ] 7.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/section-nav.ts` 的 `MATCHMAKER_SECTION_HREFS` 追加 `` `${MATCHMAKER_ROUTE}/stats` ``，`MATCHMAKER_SECTION_LABELS` 追加對應的 `"統計"` 標籤
-- [ ] 7.3 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 新增一個 test：「可由對戰頁的區段導覽點擊進入統計頁」（於對戰頁點擊區段導覽的「統計」，斷言導向 `/matchmaker/stats` 且該分頁帶 `aria-current="page"`）。跑該檔確認結果——若 7.2 與 §6 皆已完成，本項**可能一寫入即綠**（連結與導航邏輯皆為既有機制），如實標註為 regression guard，SHALL NOT 為了製造紅燈刻意延後 7.2 的實作
-- [ ] 7.4 確認: 若 7.3 為真紅燈則排查原因並修正至綠；若為 regression guard 則在本項註明「已確認為 regression guard，`MatchmakerTabs`／`section-nav.ts` 的既有機制已足夠支援第五分頁」
-- [ ] 7.5 REFACTOR: 確認 `section-nav.ts` 的改動僅為兩個陣列各追加一筆，沒有改動既有四筆的順序或內容；確認 `components/matchmaker/MatchmakerTabs.tsx` 未被改動（渲染邏輯完全由 `section-nav.ts` 驅動）
+- [x] 7.1 RED: 修改 `nextjs-pickball/lib/matchmaker/section-nav.test.ts` 既有的 it「分頁清單依序為對戰、參賽者、歷史與資料四筆」——更名為「分頁清單依序為對戰、參賽者、歷史、資料與統計五筆」，並把預期陣列擴充為五筆（新增 `{ label: "統計", href: "/matchmaker/stats", active: false }`）。跑單檔確認紅燈（`matchmakerSectionTabs` 目前仍只回傳四筆），貼出輸出。**這是本 change 對既有測試唯一容許的變動**，見 §9.8
+- [x] 7.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/section-nav.ts` 的 `MATCHMAKER_SECTION_HREFS` 追加 `` `${MATCHMAKER_ROUTE}/stats` ``，`MATCHMAKER_SECTION_LABELS` 追加對應的 `"統計"` 標籤
+- [x] 7.3 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 新增一個 test：「可由對戰頁的區段導覽點擊進入統計頁」（於對戰頁點擊區段導覽的「統計」，斷言導向 `/matchmaker/stats` 且該分頁帶 `aria-current="page"`）。跑該檔確認結果——若 7.2 與 §6 皆已完成，本項**可能一寫入即綠**（連結與導航邏輯皆為既有機制），如實標註為 regression guard，SHALL NOT 為了製造紅燈刻意延後 7.2 的實作 —— **實測一寫入即綠（chromium 20/20 passed），如實標註為 regression guard**
+- [x] 7.4 確認: 若 7.3 為真紅燈則排查原因並修正至綠；若為 regression guard 則在本項註明「已確認為 regression guard，`MatchmakerTabs`／`section-nav.ts` 的既有機制已足夠支援第五分頁」 —— **已確認為 regression guard，`MatchmakerTabs`／`section-nav.ts` 的既有機制已足夠支援第五分頁**；並以 mutation 驗證該 test 非空轉（拿掉 `aria-current`、無條件加上 `aria-current`、元件只渲染前四個分頁，三種變異皆轉紅）
+- [x] 7.5 REFACTOR: 確認 `section-nav.ts` 的改動僅為兩個陣列各追加一筆，沒有改動既有四筆的順序或內容；確認 `components/matchmaker/MatchmakerTabs.tsx` 未被改動（渲染邏輯完全由 `section-nav.ts` 驅動）
 
 ## 8. 唯讀保證與無障礙 E2E
 
