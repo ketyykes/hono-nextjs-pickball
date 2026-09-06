@@ -321,4 +321,35 @@ describe("computePlayerStats", () => {
 		expect(alice?.mostFrequentPartner).toBeNull();
 	});
 
+	it("最常對手為對戰過的對手中出現次數最多者", () => {
+		// p1 於 s1 在 teamA 對上丙（teamB），於 d1 改在 teamB 對上丙與 X（teamA）——
+		// 交棒事項 3：受測球員同時出現在 teamA／teamB；於 s2 在 teamA 對上丁一次。
+		// 丙共 2 次、丁共 1 次、X 共 1 次，丙應為最常對手。
+		const history = [
+			makeEntry({
+				matchId: "s1",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "P1" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p-bing", name: "丙" })] }),
+			}),
+			makeDoublesEntry({
+				matchId: "d1",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-bing", name: "丙" }), makeHistoryPlayer({ id: "p-x", name: "X" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+			makeEntry({
+				matchId: "s2",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "P1" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p-ding", name: "丁" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const p1 = result.find((stat) => stat.id === "p1");
+		expect(p1?.mostFrequentOpponent).toBe("丙");
+	});
 });
