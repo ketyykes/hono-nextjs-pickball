@@ -104,9 +104,54 @@ Depends on: §2
 
 Depends on: §2, §3
 
-- [ ] 4.1 RED: `nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts` 補兩個 test：「由對戰頁進入時面板顯示球員姓名」（種入名單並產生一輪雙打對戰、點擊「進入計分板」後，於兩隊面板查得雙方球員姓名文字，且各自的姓名色塊 `background` 含對應的 `colorFrom`／`colorTo`）、「綁定模式含球員姓名色塊時多 viewport 仍零捲動」（以雙打綁定場次於 390x844／844x390／768x1024／1024x600 四個 viewport 下開啟，斷言 `scrollHeight <= clientHeight + 1` 且「贏這球+」與 Undo／重置按鈕的 boundingBox 完整落在 viewport 內）。此時 `TeamPanel.tsx` 尚未渲染 `teamPlayers`，姓名文字與色塊查不到。確認紅燈並貼出輸出
-- [ ] 4.2 GREEN: `nextjs-pickball/components/scoreboard/TeamPanel.tsx` 在既有名稱行內、`<span>{label}</span>` 之後、`· {targetScore} 分制` 之前，當 `state.teamPlayers` 非 `null` 時依序渲染該隊每位球員的姓名色塊（`background: linear-gradient(...)` 取自 `colorFrom`／`colorTo`、`color` 取自已算好的 `foreground`、`truncate` 加固定 `max-width`、原生 `title` 屬性提供完整姓名，design Decision 5）；`teamPlayers` 為 `null` 時該區塊不渲染，既有 JSX 分支維持原樣
-- [ ] 4.3 REFACTOR: 確認 `TeamPanel.tsx` 內沒有任何亮度或對比計算邏輯（只讀取 `foreground`，design Decision 1）；`git diff` 確認 `teamPlayers` 為 `null` 時的既有渲染路徑逐字未變；確認姓名色塊的 class 與既有 `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的視覺語言（圓角、字級單位）不衝突
+- [x] 4.1 RED: `nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts` 補兩個 test：「由對戰頁進入時面板顯示球員姓名」（種入名單並產生一輪雙打對戰、點擊「進入計分板」後，於兩隊面板查得雙方球員姓名文字，且各自的姓名色塊 `background` 含對應的 `colorFrom`／`colorTo`）、「綁定模式含球員姓名色塊時多 viewport 仍零捲動」（以雙打綁定場次於 390x844／844x390／768x1024／1024x600 四個 viewport 下開啟，斷言 `scrollHeight <= clientHeight + 1` 且「贏這球+」與 Undo／重置按鈕的 boundingBox 完整落在 viewport 內）。此時 `TeamPanel.tsx` 尚未渲染 `teamPlayers`，姓名文字與色塊查不到。確認紅燈並貼出輸出
+- [x] 4.2 GREEN: `nextjs-pickball/components/scoreboard/TeamPanel.tsx` 在既有名稱行內、`<span>{label}</span>` 之後、`· {targetScore} 分制` 之前，當 `state.teamPlayers` 非 `null` 時依序渲染該隊每位球員的姓名色塊（`background: linear-gradient(...)` 取自 `colorFrom`／`colorTo`、`color` 取自已算好的 `foreground`、`truncate` 加固定 `max-width`、原生 `title` 屬性提供完整姓名，design Decision 5）；`teamPlayers` 為 `null` 時該區塊不渲染，既有 JSX 分支維持原樣
+- [x] 4.3 REFACTOR: 確認 `TeamPanel.tsx` 內沒有任何亮度或對比計算邏輯（只讀取 `foreground`，design Decision 1）；`git diff` 確認 `teamPlayers` 為 `null` 時的既有渲染路徑逐字未變；確認姓名色塊的 class 與既有 `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的視覺語言（圓角、字級單位）不衝突
+
+
+> **§4 兩階段審查結論**：Stage 1（規格符合，sonnet）**APPROVED**；Stage 2（程式品質，opus）**APPROVED**。
+> - commit：`d0dbef2`（4.1 RED）、`35ba3f4`（4.2 GREEN）、`8dbc00d`（4.3 REFACTOR）、
+>   `f2c218c`（Implementer 補 `color` 斷言殺 M4）、`10116fb`／`f102218`（Stage 2 修正）
+> - 紅燈複驗：Stage 1 以 `git show d0dbef2^:...TeamPanel.tsx` grep 不到任何 `teamPlayers`，
+>   確認 RED commit 前一版元件完全不認識該欄位，兩個新 E2E test 為**真紅燈**
+>   （實際失敗訊息為 `getByText('計分板測試員1', { exact: true })... element(s) not found`，
+>   跨 chromium／firefox／webkit 三個 engine）。
+> - 4.3 REFACTOR **有實質修正**：`35ba3f4` 一度把姓名色塊的排版 class 加到**外層名稱行 `div`**，
+>   導致 `teamPlayers` 為 `null` 時的既有排版也被改動；`8dbc00d` 改為把色塊群組另包一層
+>   `inline-flex span`、外層 `div` 還原原始 className。最終 `git diff ... | grep "^-"` 除 diff
+>   header 外零輸出，`null` 分支**逐字未變**。
+> - mutation：Implementer 先跑 7 條，Stage 2 **獨立重跑 5 條 ＋ 自加 1 條**，最終**存活 0**。
+>   N1（拿掉姓名文字）、N2（背景色寫死）、N3（`color` 寫死）、N4（拿掉 `null` 早退——獨立計分板
+>   整頁 crash，17 個既有 test 轉紅）全數殺死；N5（等價變異對照組）維持全綠證明 harness 正常。
+> - Stage 2 修正三項首輪缺口：
+>   ① **React key 碰撞**（`key={badge.name}`）：`PlayerBadge` 無 `id`、`PlayerSchema` 對 `name`
+>   無唯一性約束，且 design Decision 3 規定查無球員以**固定字面量**「已離開名單」呈現且不得少
+>   一筆——雙打某隊兩人都被移除時必然產生兩個同 key 的 badge。已改 `key={index}`（清單為靜態
+>   渲染、長度固定 1～2、無新增刪除排序，且 `PrintSheet.tsx` 已有 `key={teamIndex}` 前例），
+>   commit `10116fb`。
+>   ② **顯示位置零測試把關**：Implementer 的 M6（色塊搬出名稱行、另起一列）**存活**。Stage 2
+>   裁決 design 把它歸類為「非可獨立驗收的行為分支」**不成立**——spec 那句是 MUST，且失敗模式
+>   正是靜默裁切，零捲動測試在設計上就抓不到。已於 golden path test 內補最小結構斷言
+>   （斷言姓名色塊所在的 `div` 同時含「我方」與「分制」文字，**未新增 spec Scenario**），
+>   並實跑 M6′ 變異確認轉紅。
+>   ③ **前景色期望值單一**：原四組測試漸層經 `pickTextColor` 全部回傳同一個深色 `#030712`，
+>   使「`color` 寫死成該值」的變異會存活。已把第一組改為深色漸層 `#0E6B63 → #134E4A`
+>   （回傳淺色前景），commit `f102218`。
+> - 視覺語言（design Open Questions 第 2 條明文交給 Stage 2 裁決）：色塊幾何
+>   `rounded-full px-2 py-0.5` **與 `components/ui/badge.tsx` 的 shadcn Badge base class 完全
+>   一致**；唯一偏離是字級 `text-[0.6rem]`（低於 `text-xs`），正是 design Risks 明訂的
+>   「餘量不足時縮小色塊字級／padding」的正解方向。`normal-case tracking-normal` 覆寫**必要**
+>   ——`text-transform`／`letter-spacing` 皆為繼承屬性，不覆寫則姓名會被外層的
+>   `uppercase tracking-[3px]` 強制大寫並拉開字距。Stage 2 未調整任何數值（放大會威脅零捲動餘量）。
+> - 測試檔 import `lib/matchmaker/colors`（用於獨立算出期望的 `color`）：Stage 1 與 Stage 2 皆
+>   判定**不違反單向相依**（該限制只及生產程式碼 `components/scoreboard/` 與 `lib/scoreboard/`），
+>   且**不是恆真斷言**——生產路徑上 `pickTextColor` 在鏈的**起點**（`buildMatchSlotSeed`）被呼叫，
+>   測試在鏈的**終點**獨立算一次，比對的是「這條鏈有沒有把對的值原樣送到對的色塊」。
+> - E2E：Implementer 於 `f2c218c` 狀態跑過全套 **599 passed / 21 skipped / 0 failed（19.4 分鐘）**；
+>   Stage 2 於最終狀態跑 `scoreboard-binding.spec.ts --project=chromium` **20 passed 全綠**。
+>   （最終狀態的**全套** E2E 由 §5.6 補跑。）
+> - 收尾：前端單元測試 70 files／672 tests 全綠、`tsc --noEmit` 通過、`lint` 0 errors
+>   （3 個既有 warning 零新增）。
 
 ## 5. 收尾驗證
 
