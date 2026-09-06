@@ -143,10 +143,7 @@ export function CourtCard({
 				onValueChange={(inPlayerId) => handleSwapSelect(outPlayer.id, inPlayerId)}
 				disabled={noCandidate}
 			>
-				<SelectTrigger
-					className="w-full"
-					aria-label={`替 ${outPlayer.name} 換人`}
-				>
+				<SelectTrigger className="w-full" aria-label={`替 ${outPlayer.name} ${SWAP_PLAYER_LABEL}`}>
 					<SelectValue placeholder={noCandidate ? SWAP_PLAYER_NO_CANDIDATE_LABEL : SWAP_PLAYER_LABEL} />
 				</SelectTrigger>
 				<SelectContent position="popper">
