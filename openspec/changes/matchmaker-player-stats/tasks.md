@@ -295,6 +295,64 @@ Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序
 - [x] 7.4 確認: 若 7.3 為真紅燈則排查原因並修正至綠；若為 regression guard 則在本項註明「已確認為 regression guard，`MatchmakerTabs`／`section-nav.ts` 的既有機制已足夠支援第五分頁」 —— **已確認為 regression guard，`MatchmakerTabs`／`section-nav.ts` 的既有機制已足夠支援第五分頁**；並以 mutation 驗證該 test 非空轉（拿掉 `aria-current`、無條件加上 `aria-current`、元件只渲染前四個分頁，三種變異皆轉紅）
 - [x] 7.5 REFACTOR: 確認 `section-nav.ts` 的改動僅為兩個陣列各追加一筆，沒有改動既有四筆的順序或內容；確認 `components/matchmaker/MatchmakerTabs.tsx` 未被改動（渲染邏輯完全由 `section-nav.ts` 驅動）
 
+> **§7 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：`APPROVED`，必須修正項零。7.1 的紅燈（`f5cb453^` 只有四筆 href）與 7.3 的
+>   regression guard（`668b5cf^` 已含 stats 那筆）皆經 `git show` 獨立複驗屬實。新增的 E2E test
+>   **確實是先 `goto("/matchmaker")` 再 `click()`**（非直接 goto 統計頁），且**確實斷言
+>   `aria-current="page"`**，並額外反向斷言「對戰」連結沒有該屬性。前三個既有 Scenario 的
+>   驗收 test／it 全數未被改動。Stage 1 另裁定：§9.8 的白名單限制針對「**變動**既有測試」，
+>   **不禁止新增**，故額外新增的 unit test 不違規。
+> - Stage 2（品質）：`APPROVED`。獨立跑 10 個變異，**非等價存活數 0**——這是六輪以來
+>   **第一組 Implementer 自述被完全證實**的。Stage 2 依指示在 harness 中加了三重「確認變異真的
+>   落地」的檢查（強制 `count(old)==1`、`assert dst != src`、套用後 `git diff --stat` 必須有輸出），
+>   並放了一條**等價變異當對照組**（`pathname === href` → `href === pathname`）——該條如預期存活，
+>   證明 harness 正常運作而非全部誤報轉紅。
+> - **LABELS 型別關聯的結構性保障已實測確認雙向有效**：只加 HREFS 不加 LABELS →
+>   `tsc` 報 `TS2741`；只刪 LABELS 的 stats 而保留 HREFS → 同樣 `TS2741`。
+>   「不會漏加標籤」這件事**由型別而非測試守住**，第五筆加入後仍完整有效。
+> - Stage 2 依授權於 `a190e10` 修正了 `section-nav.ts` 的一段**誤導性註解**（僅動註解、零行為改動）：
+>   原文舉的 `/matchmaker/history` 是**清單內**的路徑，卻掛在「非本區段清單內的路徑」那句上，
+>   例子與結論對不起來；且 `===` 現在真正守住的風險是「清單內每個子頁路徑都以第一筆的
+>   `/matchmaker` 為前綴，改前綴比對會讓『對戰』在每個子頁一起亮起」，這個理由原本只寫在測試裡、
+>   實作檔一句沒提。已改寫為同時交代兩種情況，且刻意不寫死分頁筆數以免下次新增分頁又過時。
+> - Implementer 誠實揭露了一次 **mutation harness 失誤**（某次變異的縮排 pattern 沒對上，
+>   檔案根本沒被改到，測試「通過」是假訊號；他以 `grep -c` 發現後改用 regex 並加
+>   `assert s2 != s` 才判定）。這是本批第一次有 agent 主動揭露自己的驗證工具失效，
+>   已據此把「確認變異真的落地」列為後續所有 mutation 派工的必要機制。
+>
+> **§7 → §8 交棒（Stage 2 指定）**
+> 1. **§9.9 的 CLAUDE.md 同步範圍要擴大**：`nextjs-pickball/CLAUDE.md` 第 35 行目前寫
+>    「上述**四頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「**對戰／參賽者／歷史／資料**」…）」
+>    ——加入統計後這句的「四頁」與括號內的四個分頁名都已過時。§9.9 只交代「`/matchmaker` 段落
+>    補記 `/matchmaker/stats`」，若照字面做會**漏掉第 35 行**。MUST 一併把「四頁」改為「五頁」、
+>    括號補上「統計」。同行後半「列印時整條區段導覽會被 `@media print` 隱藏，新增分頁不需要
+>    另加 CSS 規則」仍然正確，不需改。
+> 2. §7 的 E2E 已覆蓋「對戰頁 → 統計頁」的導覽與 `aria-current`，**§8 不需重複驗證這段動線**；
+>    統計頁自身的可存取名稱／唯讀保證才是 §8 的增量。
+> 3. `section-nav.ts` 的 `===` 註解已於 `a190e10` 更新，後續引用請以新版為準。
+>
+> ---
+>
+> **⚠️ §8 開工前的 leader 裁決（2026-09-06）：唯讀斷言的實作方式**
+>
+> 承 §6 審查結論記載的升級項（統計頁因 store 的 hydration write-back 會回寫三個 key）。
+> coordinator 於本批開工時已明確指示「還沒做完就繼續往下執行，不用等回覆」，且截至 §8 開工前
+> 未收到針對本項的個別裁示，leader 依該指示採**選項 ①：維持 Decision 1，照 spec 的 Scenario
+> 字面實作**，並要求把限制**明寫在三個地方**（測試檔註解、本檔、design.md Open Questions），
+> **SHALL NOT 靜默當成已解決**：
+>
+> - §8 的唯讀 test **照 Scenario 字面實作**：種三個 key → 開頁 → 依序切換五個區間 →
+>   斷言三個 key 逐字相同。以**應用程式自己寫出的正規化形狀**種資料（真實使用者資料一律
+>   如此），此時 store 的回寫是逐位元組相同的重新序列化，斷言成立。
+> - 測試檔 MUST 有一段醒目註解說明：**這條斷言證明了什麼**（切換區間與瀏覽本身不會改變任何
+>   持久化內容，能抓到「誤觸 store setter」這類真正的迴歸）與**它沒有證明什麼**
+>   （頁面確實會經由 `useRosterStore`／`useRoundStore` 的 write effect 回寫三個 key；
+>   若持久化資料的形狀與目前 schema 序列化結果不同——例如手動編輯過、或來自舊版格式——
+>   回寫會使其正規化，此時逐字比對會失敗）。
+> - 這是**待人類最終確認**的暫定處置，不是定案。若 coordinator 日後裁定改採選項 ②
+>   （改 Decision 1 的資料路徑）或選項 ③（放寬 spec 措辭為「語意內容不變」），
+>   §8 的 test 與 spec 措辭需一併調整。
+
 ## 8. 唯讀保證與無障礙 E2E
 
 Depends on: §6, §7
@@ -313,10 +371,13 @@ Depends on: §6, §7
 - [ ] 9.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**，帶 `--workers=1`；既有 `match-stage.spec.ts`／`matchmaker-history.spec.ts`／`matchmaker-data-transfer.spec.ts`／`visual-export.spec.ts`／`scoreboard-binding.spec.ts` 等既有 spec 原樣通過
 - [ ] 9.7 `git diff package.json`、`pnpm-lock.yaml` 為空（本 change 零新增相依）；`git diff --stat` 確認 `hooks/` 零新增、M5～M9 既有元件檔（`MatchStage`／`CourtCard`／`RoundControls`／`RestingPanel`／`ExportActions`／`PrintSheet`／`HistoryView`／`HistoryRecordCard`／`HistoryRangeFilter`／`EmptyHistory`）零改動
 - [ ] 9.8 **本 change 唯一容許變動的既有測試**：`nextjs-pickball/lib/matchmaker/section-nav.test.ts` 的 it「分頁清單依序為對戰、參賽者、歷史與資料四筆」→ 更名為「分頁清單依序為對戰、參賽者、歷史、資料與統計五筆」並擴充預期陣列為五筆（§7.1）。**除此之外，其餘既有測試轉紅一律視為迴歸**
-- [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」
+- [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」。
+      **另 MUST 一併修正同檔第 35 行**（§7 Stage 2 指出，照本項字面做會漏掉）：
+      「上述**四頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「**對戰／參賽者／歷史／資料**」…）」
+      → 「四頁」改為「五頁」、括號補上「統計」。同行後半關於 `@media print` 的敘述仍正確，不需改。
 - [ ] 9.10 `DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
 - [ ] 9.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
-- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 16 個
+- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 17 個
       不在 delta spec 驗收錨點內的 `it`（皆對應 spec prose 的 MUST 子句或 design Decision，
       經 §4 Stage 1／Stage 2 判定為正當而非測試膨脹）。archive 前 MUST 把它們補登進
       `test-plan.md`，避免日後稽核誤判為未經規劃的測試膨脹：
@@ -342,5 +403,9 @@ Depends on: §6, §7
       ⑭ 「統計頁載入後無 console error」（hydration 層級行為，render 期間取時鐘的實證）
       ⑮ 「切換到沒有紀錄的區間時不顯示引導型空狀態」（§6 Stage 2 補：空狀態判定必須依據整份
       `history` 而非 `filteredHistory`，否則空區間會謊稱使用者從未打過且篩選器一起消失）
-      ⑯ 註：§6 Stage 2 另在既有錨點 test「直接開啟 /matchmaker/stats 可載入排行榜表格」內補了
+      §7 的 `lib/matchmaker/section-nav.test.ts` 另有一個：
+      ⑯ 「統計頁路徑下只有統計分頁為 active」（§7 Implementer 補：task 指定的兩條路徑沒有任何
+      斷言是站在 `/matchmaker/stats` 這一側觀察的，而「把 `===` 改成 `startsWith` 會讓對戰分頁
+      在每個子頁一起亮起」正是本 milestone 唯一的新風險點）
+      ⑰ 註：§6 Stage 2 另在既有錨點 test「直接開啟 /matchmaker/stats 可載入排行榜表格」內補了
       頁面標題與說明文字的兩條斷言（未新增 it，不需另外補登）
