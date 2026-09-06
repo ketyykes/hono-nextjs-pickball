@@ -54,8 +54,29 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 			橫向手機誤中過大字級而溢出的根因（見上方字級註解）；gap/padding
 			是版面密度而非內容本身，用斷點分流不會重蹈覆轍。 */}
 			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.25rem,3cqh,1.5rem)] p-[clamp(0.25rem,3cqh,1.5rem)] portrait:md:gap-[clamp(0.25rem,5.15cqh,2rem)] portrait:md:p-[clamp(0.25rem,5.15cqh,2rem)]">
-				<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
+				<div className="flex items-center gap-1 font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
 					<span>{label}</span>
+					{/* 綁定場次的球員姓名色塊（design Decision 5）：teamPlayers 為 null 時
+					（獨立計分板，或本次變更前已建立的舊版計分板槽）不渲染，維持既有的
+					「我方」／「對方」純文字呈現，不改變任何既有互動（spec「綁定場次的
+					隊伍標示」Requirement）。foreground 為 seed 建立端已算好存入的欄位，
+					本元件只讀取、直接當成 CSS color 值套用，不自行計算亮度或對比
+					（design Decision 1，維持 lib/scoreboard/ 不 import lib/matchmaker/
+					的單向相依）。 */}
+					{state.teamPlayers !== null &&
+						state.teamPlayers[team].map((badge) => (
+							<span
+								key={badge.name}
+								title={badge.name}
+								className="max-w-24 truncate rounded-full px-2 py-0.5 text-[0.6rem] normal-case tracking-normal"
+								style={{
+									background: `linear-gradient(135deg, ${badge.colorFrom}, ${badge.colorTo})`,
+									color: badge.foreground,
+								}}
+							>
+								{badge.name}
+							</span>
+						))}
 					<span className="opacity-70"> · {state.targetScore} 分制</span>
 				</div>
 				<div
