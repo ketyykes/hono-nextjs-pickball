@@ -271,6 +271,17 @@ export const TeamPlayersSchema = z.object({
      `CourtCard` 持有 `players: readonly Player[]` prop 且 `handleEnterScoreboard` 為唯一
      生產呼叫點。
 
+2. **姓名色塊的視覺樣式（padding、字級、圓角）留給 apply 的 Stage 1／2 審查依既有
+   `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的既有視覺語言判斷**，
+   design 不預先訂死確切的 px 數值——本 change 的核心是「資料要不要顯示、從哪裡來、怎麼保證
+   單向相依」，具體樣式數值屬 Code-Quality Reviewer 依既有慣例把關的範圍，過度預先訂死反而可能
+   與屆時 `main` 上的實際字級／間距慣例衝突。
+
+3. **`components/scoreboard/` 是否該為本次改動新增一份元件單元測試（打破既有的 E2E-only
+   慣例）？** 已於 Context／Non-Goals 決定**不新增**，沿用既有分層。若日後 `scoreboard` 元件
+   整體改為採用元件單元測試（例如與 `components/matchmaker/` 統一慣例），那是一個獨立的、
+   影響全 capability 的決策，不該由本 change 單方面開先例。
+
 4. **Decision 4 的「既有的三處呼叫」為本文件撰寫時的誤記**（apply §1.5 實測更正）：
    `scoreboard-binding.test.ts` 內實際有 **7 個 `buildMatchSlotSeed(round, match)` 呼叫運算式，
    分佈於 6 個 `it`**（「seed 帶入該輪的 targetScore 與對戰方式且分數自 0-0 起手」、
@@ -298,14 +309,3 @@ export const TeamPlayersSchema = z.object({
    路由常數且**均為 `main` 既有**（`git diff main..HEAD -- components/scoreboard/` 可證非本
    change 引入）。後續各組與 Final Review 一律以「實際 import 為零」為判準，SHALL NOT 因註解
    命中而誤判單向相依被打破。
-
-2. **姓名色塊的視覺樣式（padding、字級、圓角）留給 apply 的 Stage 1／2 審查依既有
-   `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的既有視覺語言判斷**，
-   design 不預先訂死確切的 px 數值——本 change 的核心是「資料要不要顯示、從哪裡來、怎麼保證
-   單向相依」，具體樣式數值屬 Code-Quality Reviewer 依既有慣例把關的範圍，過度預先訂死反而可能
-   與屆時 `main` 上的實際字級／間距慣例衝突。
-
-3. **`components/scoreboard/` 是否該為本次改動新增一份元件單元測試（打破既有的 E2E-only
-   慣例）？** 已於 Context／Non-Goals 決定**不新增**，沿用既有分層。若日後 `scoreboard` 元件
-   整體改為採用元件單元測試（例如與 `components/matchmaker/` 統一慣例），那是一個獨立的、
-   影響全 capability 的決策，不該由本 change 單方面開先例。
