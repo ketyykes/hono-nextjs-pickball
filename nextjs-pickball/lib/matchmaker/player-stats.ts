@@ -169,6 +169,27 @@ function extractPartnerPairs(entry: MatchHistoryEntry): readonly (readonly [stri
 }
 
 /**
+ * 從一筆歷史紀錄取出「對手」配對：單打與雙打皆計入（spec：最常對手 MUST 涵蓋
+ * 單打與雙打兩種來源）。雙向各自產生配對——己方隊伍每位球員對上對方隊伍每位球員，
+ * 兩隊都要輪流當「自己」，否則只從其中一隊的視角計數會漏掉另一隊球員的對手紀錄。
+ */
+function extractOpponentPairs(entry: MatchHistoryEntry): readonly (readonly [string, string])[] {
+	const pairs: [string, string][] = [];
+	const sides = [
+		{ self: entry.teamA, opponent: entry.teamB },
+		{ self: entry.teamB, opponent: entry.teamA },
+	];
+	for (const { self, opponent } of sides) {
+		for (const player of self.players) {
+			for (const opponentPlayer of opponent.players) {
+				pairs.push([player.id, opponentPlayer.id]);
+			}
+		}
+	}
+	return pairs;
+}
+
+/**
  * 從「對象 id → 出現次數」的計數中取出次數最多者的姓名；次數相同時依姓名 UTF-16
  * code unit 排序取序位在前者（design Decision 5，SHALL NOT 用 `localeCompare`），
  * SHALL NOT 依 `Map` 迭代順序決定。找不到任何對象時回傳 `null`——不是空字串
@@ -323,6 +344,7 @@ export function computePlayerStats(
 
 	const nameById = latestNameByPlayer(history);
 	const partnerTally = tallyPairs(history, extractPartnerPairs);
+	const opponentTally = tallyPairs(history, extractOpponentPairs);
 
 	return Array.from(union.values()).map((stat) => ({
 		id: stat.id,
@@ -337,6 +359,6 @@ export function computePlayerStats(
 		winRate: winRateOf(stat.wins, stat.gamesPlayed),
 		ratingDelta: stat.ratingDelta,
 		mostFrequentPartner: pickMostFrequentName(partnerTally.get(stat.id) ?? new Map(), nameById),
-		mostFrequentOpponent: null,
+		mostFrequentOpponent: pickMostFrequentName(opponentTally.get(stat.id) ?? new Map(), nameById),
 	}));
 }
