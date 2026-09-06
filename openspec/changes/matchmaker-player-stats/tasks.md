@@ -154,8 +154,8 @@ Depends on: §3
 Depends on: §4
 
 - [x] 5.1 RED: 新增 `nextjs-pickball/components/matchmaker/PlayerStatsTable.test.tsx`，寫入一個 it：「球員色塊沿用既有漸層且已不在名單者有文字標示」（傳入一位 `onRoster: true` 與一位 `onRoster: false` 的 `PlayerStat`，斷言在名單者背景為其 `colorFrom→colorTo` 漸層、前景色等於直接呼叫 `pickTextColor` 的回傳值；不在名單者姓名旁出現文字標示）。確認紅燈（元件尚不存在）。另補 5 個 it 覆蓋 mutation 缺口（見交件回報「偏離」欄），該錨點 it 名稱逐字未變
-- [ ] 5.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/labels.ts` 新增具名常數 `PLAYER_NOT_ON_ROSTER_LABEL = "已不在名單"`（純新增，不改動既有四個匯出）。實作 `nextjs-pickball/components/matchmaker/PlayerStatsTable.tsx`：`"use client"`，props 為 `{ stats: readonly PlayerStat[] }`，使用 `components/ui/table.tsx` 的 `Table`／`TableHeader`／`TableBody`／`TableRow`／`TableCell` 渲染九欄（名次、球員、強度、出場、勝－負、勝率、淨變化、常搭檔、常對手）；球員欄以 `colorFrom`／`colorTo` 內嵌 `linear-gradient` 背景與 `pickTextColor` 前景色呈現色塊，`onRoster===false` 時姓名旁加上 `PLAYER_NOT_ON_ROSTER_LABEL`；`mostFrequentPartner`／`mostFrequentOpponent` 為 `null` 時顯示本檔內具名的佔位符號（單一用途，不進 `labels.ts`）
-- [ ] 5.3 REFACTOR: 確認欄位順序與 spec 逐字相符；確認 `PLAYER_NOT_ON_ROSTER_LABEL` 只有這一個消費端且沒有第二份「已不在名單」字面量散在元件內；確認名次為傳入陣列的索引 + 1（`computePlayerStats` 已排序，元件不重新排序）；確認元件不 import 任何 store
+- [x] 5.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/labels.ts` 新增具名常數 `PLAYER_NOT_ON_ROSTER_LABEL = "已不在名單"`（純新增，不改動既有四個匯出）。實作 `nextjs-pickball/components/matchmaker/PlayerStatsTable.tsx`：`"use client"`，props 為 `{ stats: readonly PlayerStat[] }`，使用 `components/ui/table.tsx` 的 `Table`／`TableHeader`／`TableBody`／`TableRow`／`TableCell` 渲染九欄（名次、球員、強度、出場、勝－負、勝率、淨變化、常搭檔、常對手）；球員欄以 `colorFrom`／`colorTo` 內嵌 `linear-gradient` 背景與 `pickTextColor` 前景色呈現色塊，`onRoster===false` 時姓名旁加上 `PLAYER_NOT_ON_ROSTER_LABEL`；`mostFrequentPartner`／`mostFrequentOpponent` 為 `null` 時顯示本檔內具名的佔位符號（單一用途，不進 `labels.ts`）。標題列儲存格用 `TableHead`（非文字列出的 `TableCell`），理由見交件回報「偏離」欄
+- [x] 5.3 REFACTOR: 確認欄位順序與 spec 逐字相符；確認 `PLAYER_NOT_ON_ROSTER_LABEL` 只有這一個消費端且沒有第二份「已不在名單」字面量散在元件內；確認名次為傳入陣列的索引 + 1（`computePlayerStats` 已排序，元件不重新排序）；確認元件不 import 任何 store。逐項機械核對通過，無需改動程式碼
 
 ## 6. 統計頁掛載：路由、區間整合、空狀態（app/matchmaker/stats/page.tsx）
 
