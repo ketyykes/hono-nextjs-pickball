@@ -49,8 +49,11 @@ M10 已知缺口修補（stage-gaps） → 【M11 球員統計與排行榜頁（
   `lib/matchmaker/history-range.ts`／`components/matchmaker/HistoryRangeFilter.tsx`
   五個區間，篩選後的歷史紀錄再交給 `player-stats.ts` 計算。完全沒有歷史紀錄時顯示
   `components/matchmaker/EmptyHistory.tsx` 的引導型空狀態（`range={null}`），不顯示空表格。
-- **本頁全程唯讀**：不寫入任何 LocalStorage、不修改回合或名單、不呼叫任何 store 的 setter、
-  不發出任何網路請求。
+- **本頁全程唯讀**：不改變任何 LocalStorage 資料的內容、不修改回合或名單、不呼叫任何 store 的
+  setter、不發出任何網路請求。
+  唯一的界線是 `useRosterStore`／`useRoundStore` 的 write effect 在 hydrate 後對三個 key
+  做的**等值重新序列化**（既有 hydration 行為，非本頁引入，對戰頁同樣如此）——不視為修改，
+  細節見 design.md Open Questions 第 1-c 條與 delta spec 的「統計頁的可用性、無障礙與唯讀保證」。
 
 ### 明確不做
 
