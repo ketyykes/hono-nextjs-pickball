@@ -920,8 +920,7 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 /**
  * swapMatchPlayer 的失敗代碼：五種前置條件各自獨立（以函式名為前綴命名，比照
  * SET_TARGET_SCORE_FAILURE_CODE 的既有模式，不重蹈 M3 ROUND_FAILURE_CODE 未以函式名
- * 命名的教訓）。本階段（tasks 2.2）僅骨架宣告，各代碼要等對應前置條件實作後才會被回傳
- * （tasks 2.4、2.6）。
+ * 命名的教訓）。
  */
 export const SWAP_MATCH_PLAYER_FAILURE_CODE = {
 	MATCH_NOT_FOUND: "match-not-found",
@@ -950,6 +949,16 @@ export type SwapMatchPlayerResult = SwapMatchPlayerSuccess | SwapMatchPlayerFail
 // MATCH_NOT_FOUND 同類防線，但訊息各自具名（design Decision 7）——不沿用 submitScore 的
 // MATCH_NOT_FOUND_MESSAGE 常數，避免兩個獨立失敗情境共用同一份文案而互相耦合。
 const SWAP_MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
+// tasks 2.6：已完成場次的結果不可回溯更動、已開始計分者換人會讓正在進行的實體比賽與資料
+// 脫節（spec「臨時換人（球員與休息名單互換）」）。
+const SWAP_MATCH_NOT_PENDING_MESSAGE = "該場次已開始計分或已完成，無法臨時換人。";
+// tasks 2.6：呼叫端傳入不屬於該場的球員 id（例如 UI 狀態過期）。
+const SWAP_OUT_PLAYER_NOT_IN_MATCH_MESSAGE = "指定要換出的球員不在這場對戰中，請重新整理頁面後再試一次。";
+// tasks 2.6：防止「換入一個已經在場上的人」造成同一人出現在兩個位置。
+const SWAP_IN_PLAYER_NOT_RESTING_MESSAGE = "指定要換入的球員目前不在本輪休息名單中，請重新選擇。";
+// tasks 2.6：休息名單成員可能在換人當下已被使用者於名單頁切換為暫停出場，這是兩個獨立
+// 時刻的資料，換人操作以當下狀態為準。
+const SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE = "指定要換入的球員目前為暫停出場狀態，請先恢復其出場狀態後再試一次。";
 
 // 依 ids 的順序逐一從 players 解析出對應 Player；任一 id 解析不到即回傳 undefined。
 // 與 resolveTeamPlayers（依 players 陣列原有順序 filter）刻意不同：雙打組成標示重算
@@ -972,11 +981,16 @@ function resolveInOrder(ids: readonly string[], players: readonly Player[]): Pla
  * （prd.md 6.3「主持人可能……臨時換人代打」）。純函式，回傳新回合，原 round／players
  * SHALL NOT 被就地修改。
  *
- * 本階段（tasks 2.4）在 tasks 2.2 的成功路徑上補齊雙打組成標示重算（design Decision 3：
- * 重用已匯出的 pairing.ts labelDoublesComposition，以 [teamA 成員 0, teamA 成員 1,
- * teamB 成員 0, teamB 成員 1] 的順序組出 4 元素 tuple；design Decision 9：任一位無法從
- * players 解析時維持換人前的值，不拋例外也不退回 "general"）與 matchId 存在性檢查。
- * 其餘四項前置條件檢查留待 tasks 2.6 補齊。
+ * 五項前置條件（matchId 存在、場次為 pending、outPlayerId 屬該場、inPlayerId 屬休息
+ * 名單、inPlayerId 解析出的 isActive 為 true）任一不成立即拒絕並回傳可判讀的失敗結果，
+ * 原 round SHALL NOT 被修改（tasks 2.6）。
+ *
+ * 成功時依序完成：替換 playerIds、重算該隊隊伍分數（design Decision 2：沿用 pairing.ts
+ * buildTeam 的既有算法——隊內成員 rating 總和，經 roundRating 正規化）、雙打場次重算組成
+ * 標示（design Decision 3：重用已匯出的 pairing.ts labelDoublesComposition，以
+ * [teamA 成員 0, teamA 成員 1, teamB 成員 0, teamB 成員 1] 的順序組出 4 元素 tuple；
+ * design Decision 9：任一位無法從 players 解析時維持換人前的值，不拋例外也不退回
+ * "general"）、休息名單互換（design Decision 8：outPlayerId 附加於陣列尾端）。
  */
 export function swapMatchPlayer(
 	round: Round,
@@ -991,7 +1005,32 @@ export function swapMatchPlayer(
 	}
 	const match = round.matches[matchIndex];
 
+	if (match.status !== "pending") {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_PENDING, message: SWAP_MATCH_NOT_PENDING_MESSAGE };
+	}
+
 	const teamIndex = match.teams.findIndex((team) => team.playerIds.includes(outPlayerId));
+	if (teamIndex === -1) {
+		return {
+			ok: false,
+			code: SWAP_MATCH_PLAYER_FAILURE_CODE.OUT_PLAYER_NOT_IN_MATCH,
+			message: SWAP_OUT_PLAYER_NOT_IN_MATCH_MESSAGE,
+		};
+	}
+
+	if (!round.restingPlayerIds.includes(inPlayerId)) {
+		return {
+			ok: false,
+			code: SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_RESTING,
+			message: SWAP_IN_PLAYER_NOT_RESTING_MESSAGE,
+		};
+	}
+
+	const inPlayer = players.find((p) => p.id === inPlayerId);
+	if (inPlayer === undefined || !inPlayer.isActive) {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_ACTIVE, message: SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE };
+	}
+
 	const team = match.teams[teamIndex];
 
 	const newPlayerIds = team.playerIds.map((id) => (id === outPlayerId ? inPlayerId : id));
