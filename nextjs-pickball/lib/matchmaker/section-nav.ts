@@ -32,8 +32,9 @@ const MATCHMAKER_SECTION_LABELS: Record<
 	"/matchmaker/stats": "統計",
 };
 
-// 精確比對（===）是刻意的：app/matchmaker/ 下已有巢狀路由（例如 /matchmaker/history），
-// 但非本區段清單內的路徑一律回傳全部非 active，不做前綴比對。
+// 精確比對（===）是刻意的：清單內的子頁路徑都以第一筆的 /matchmaker 為前綴，改用前綴
+// 比對會讓「對戰」在每個子頁跟著亮起；清單外的巢狀路徑（例如 /matchmaker/history/xxx）
+// 則一律回傳全部非 active，同樣不做前綴比對。
 export function matchmakerSectionTabs(
 	pathname: string,
 ): MatchmakerSectionTab[] {
