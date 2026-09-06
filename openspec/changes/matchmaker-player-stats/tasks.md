@@ -349,9 +349,14 @@ Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序
 >   （頁面確實會經由 `useRosterStore`／`useRoundStore` 的 write effect 回寫三個 key；
 >   若持久化資料的形狀與目前 schema 序列化結果不同——例如手動編輯過、或來自舊版格式——
 >   回寫會使其正規化，此時逐字比對會失敗）。
-> - 這是**待人類最終確認**的暫定處置，不是定案。若 coordinator 日後裁定改採選項 ②
->   （改 Decision 1 的資料路徑）或選項 ③（放寬 spec 措辭為「語意內容不變」），
->   §8 的 test 與 spec 措辭需一併調整。
+> - **【2026-09-06 追認】coordinator 已明確回覆「方案①合理，追認」**，並指示 Open Questions
+>   留到 Final Code Review 一併檢視、不需為此暫停。故本項由「暫定處置」轉為**已追認的處置**，
+>   選項 ②／③ 不再採行。
+> - **仍保留在 design.md Open Questions 供 archive 前複核的理由**：這是 coordinator（派工方）的
+>   裁決，**不等同專案使用者對 spec 措辭的核可**。spec 的「統計頁 SHALL NOT 修改回合、名單或
+>   任何 LocalStorage 資料」一句在 archive 後會同步進主 spec，而 §8 的 mutation 已**實驗確證
+>   三個 key 確實會被回寫**（見下方 §8 審查結論）。是否要在措辭上補一句「store hydration 的
+>   等值重新序列化不視為修改」，屬 spec 文字層級的決定，留待 Final Code Review 一併判斷。
 
 ## 8. 唯讀保證與無障礙 E2E
 

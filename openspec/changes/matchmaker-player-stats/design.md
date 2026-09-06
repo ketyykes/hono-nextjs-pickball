@@ -308,6 +308,36 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
    Decision 6、`proposal.md` 三處的「勝－負」一併更正為「勝負」，避免 archive 時把這個自相矛盾
    同步進主 spec。`tasks.md` 的 5.2 保留原始指派文字作為歷史紀錄，不回頭改寫。
 
+1-c. **【apply §6～§8 發現，coordinator 已追認處置，archive 前仍需複核 spec 措辭】
+   統計頁實際上會把三個 LocalStorage key 重新序列化寫回**
+
+   spec「統計頁的可用性、無障礙與唯讀保證」寫的是「統計頁 SHALL NOT 修改回合、名單或任何
+   LocalStorage 資料，SHALL NOT 呼叫任何 store 的 setter」。**前半句與實作不符，後半句相符。**
+
+   **事實**（leader 逐行複驗 + §8 mutation 實驗確證，不是推測）：Decision 1 選的 hook 形態下，
+   `hooks/useRosterStore.ts` 與 `hooks/useRoundStore.ts` 的 write effect 以 `hasHydratedRef`
+   守門——mount 時跳過，但 hydrate effect 一 dispatch `HYDRATE`，state 就變動，write effect
+   隨即觸發 `writeRoster`／`writeRound`／`writeHistory`。§8 的 mutation M4a／M4b／M4c 各自對
+   一個 key 種入「合法但非 schema 序列化順序」的資料，三次都在**對應的那個 key** 上轉紅
+   ——這正面證明了三個 key 都真的被回寫（否則非正規化的種入值會原封不動留著、比對照樣通過）。
+
+   **這不是 M11 引入的**：`/matchmaker` 對戰頁（M5）採同一形態、同樣會回寫。
+   `HistoryView`（M7）只呼叫 `readHistory()`、從不碰 roster／round，所以歷史頁的同名唯讀 test
+   能真的成立，統計頁不能照抄。
+
+   **處置**（leader 於 §8 開工前裁決，coordinator 於 2026-09-06 回覆「方案①合理，追認」）：
+   維持 Decision 1，照 spec 的 Scenario **字面實作**——以應用程式自己寫出的正規化形狀種資料
+   （真實使用者資料一律如此，因為都是這兩個 store 自己寫的），此時回寫是逐位元組相同的重新
+   序列化，「逐字相同」的斷言成立。並在 `tests/e2e/specs/player-stats.spec.ts` 該 test 上方
+   寫明「這條斷言證明了什麼」（切換區間與瀏覽本身不會改變持久化內容，能抓到誤觸 store setter
+   的迴歸）與「它沒有證明什麼」（頁面確實會回寫；逐字相同成立的前提是種入資料已正規化，
+   若資料被手動編輯過或來自舊版格式，回寫會使其正規化而讓逐字比對失敗）。
+
+   **archive 前仍需複核的一點**：上述追認來自 coordinator（派工方），**不等同專案使用者對 spec
+   措辭的核可**。delta spec 這句話會在 archive 時同步進主 spec，屆時主 spec 將帶有一句與實作
+   有落差的 SHALL NOT。是否要補一句限定（例如「store hydration 造成的等值重新序列化不視為
+   修改」），或維持現狀並以本條 Open Question 作為說明，留待人類決定。
+
 2. **Elo 走勢圖是否值得做成獨立 change？** 本 change 的 Non-Goals 已排除圖表；若使用者
    日後認為排行榜的「淨變化」不足以呈現趨勢，需另外評估圖表庫選型（是否比照 M9 的
    canvas 手繪零相依路線，或首次為 matchmaker 引入一個圖表套件）。這是產品優先序問題，
