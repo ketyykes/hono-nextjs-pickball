@@ -697,4 +697,42 @@ test.describe("/matchmaker 對戰頁", () => {
 			expect(playingAfterIds).not.toContain(playerId);
 		}
 	});
+
+	// M13（matchmaker-player-swap）6.1：換人操作是 shadcn Select 觸發器（role="combobox"），
+	// 只有 spec「場地區塊的換人操作」要求的無障礙屬性——一律含所屬球員姓名的 aria-label——
+	// 才能讓讀屏使用者在雙打四格之間逐一分辨。unit／integration 測試驗不到真實 Tab 走訪
+	// 順序與跨元素的可存取名稱唯一性，故需要這條 E2E（apply §6 tasks 6.1）。
+	//
+	// 種 6 人：雙打 1 場地固定用 4 人，留 2 人休息，讓四個換人觸發器皆有候選人而非
+	// disabled（disabled 元素不會落在 Tab 焦點序列內，會讓本測試測不到目標）。
+	test("換人操作具備可存取名稱且可由鍵盤操作，並能區分不同球員", async ({ page }) => {
+		await seedRoster(page, 6);
+		await page.goto("/matchmaker");
+		await page.getByRole("radio", { name: "雙打" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(1);
+		const firstCourt = courtGrids.nth(0);
+
+		const swapTriggers = firstCourt.getByRole("combobox");
+		await expect(swapTriggers).toHaveCount(4);
+
+		// 依序 Tab 走訪四個觸發器：每次呼叫都從上一次聚焦到的位置繼續往後找，
+		// 天然符合「依序走訪」的驗收語意。
+		const names: string[] = [];
+		for (let i = 0; i < 4; i++) {
+			await tabUntilFocused(page, swapTriggers.nth(i), 60);
+			await expect(swapTriggers.nth(i)).toBeFocused();
+			const ariaLabel = await swapTriggers.nth(i).getAttribute("aria-label");
+			expect(ariaLabel).not.toBeNull();
+			// 候選人非空時的組字模板固定為「替 ${姓名} 換人」（CourtCard.tsx
+			// renderSwapTrigger），順帶驗證可存取名稱確實含所屬球員姓名。
+			expect(ariaLabel).toMatch(/^替 測試員\d+ 換人$/);
+			names.push(ariaLabel ?? "");
+		}
+
+		// 四者彼此不同：只有姓名不同才可能達成，因為組字模板其餘部分固定。
+		expect(new Set(names).size).toBe(4);
+	});
 });
