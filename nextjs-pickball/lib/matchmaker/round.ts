@@ -913,3 +913,75 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		boundaryHits,
 	};
 }
+
+// ---- 臨時換人（球員與休息名單互換，prd.md 6.3、matchmaker-player-swap change，M13） ----
+
+/**
+ * swapMatchPlayer 的失敗代碼：五種前置條件各自獨立（以函式名為前綴命名，比照
+ * SET_TARGET_SCORE_FAILURE_CODE 的既有模式，不重蹈 M3 ROUND_FAILURE_CODE 未以函式名
+ * 命名的教訓）。本階段（tasks 2.2）僅骨架宣告，各代碼要等對應前置條件實作後才會被回傳
+ * （tasks 2.4、2.6）。
+ */
+export const SWAP_MATCH_PLAYER_FAILURE_CODE = {
+	MATCH_NOT_FOUND: "match-not-found",
+	MATCH_NOT_PENDING: "match-not-pending",
+	OUT_PLAYER_NOT_IN_MATCH: "out-player-not-in-match",
+	IN_PLAYER_NOT_RESTING: "in-player-not-resting",
+	IN_PLAYER_NOT_ACTIVE: "in-player-not-active",
+} as const;
+
+export type SwapMatchPlayerFailureCode = (typeof SWAP_MATCH_PLAYER_FAILURE_CODE)[keyof typeof SWAP_MATCH_PLAYER_FAILURE_CODE];
+
+export interface SwapMatchPlayerSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface SwapMatchPlayerFailure {
+	readonly ok: false;
+	readonly code: SwapMatchPlayerFailureCode;
+	readonly message: string;
+}
+
+export type SwapMatchPlayerResult = SwapMatchPlayerSuccess | SwapMatchPlayerFailure;
+
+/**
+ * 臨時換人：把某場 pending 場次中一位在場球員換成該輪休息名單中的另一位球員
+ * （prd.md 6.3「主持人可能……臨時換人代打」）。純函式，回傳新回合，原 round／players
+ * SHALL NOT 被就地修改。
+ *
+ * 本階段（tasks 2.2）只處理輸入合法的成功路徑：替換 playerIds、重算該隊隊伍分數
+ * （design Decision 2：沿用 pairing.ts buildTeam 的既有算法——隊內成員 rating 總和，
+ * 經 roundRating 正規化）、休息名單互換（design Decision 8：outPlayerId 附加於陣列尾端）。
+ * 雙打組成標示重算（tasks 2.4）與前置條件檢查（tasks 2.6）留待後續步驟補齊。
+ */
+export function swapMatchPlayer(
+	round: Round,
+	matchId: string,
+	outPlayerId: string,
+	inPlayerId: string,
+	players: readonly Player[],
+): SwapMatchPlayerResult {
+	const matchIndex = round.matches.findIndex((m) => m.id === matchId);
+	const match = round.matches[matchIndex];
+
+	const teamIndex = match.teams.findIndex((team) => team.playerIds.includes(outPlayerId));
+	const team = match.teams[teamIndex];
+
+	const newPlayerIds = team.playerIds.map((id) => (id === outPlayerId ? inPlayerId : id));
+	// 隊伍分數重算沿用「總和」算法（design Decision 2）：resolveTeamPlayers 已是 submitScore
+	// 沿用的既有球員解析函式，此處重用而非另寫一份，遇缺員時同樣寬容降級（略過而非拋錯）。
+	const newTeamPlayers = resolveTeamPlayers(newPlayerIds, players);
+	const newRating = roundRating(newTeamPlayers.reduce((sum, player) => sum + player.rating, 0));
+	const newTeam: RoundTeam = { playerIds: newPlayerIds, rating: newRating };
+	const newTeams: [RoundTeam, RoundTeam] = teamIndex === 0 ? [newTeam, match.teams[1]] : [match.teams[0], newTeam];
+
+	const updatedMatch: RoundMatch = { ...match, teams: newTeams };
+	const matches = round.matches.map((m, index) => (index === matchIndex ? updatedMatch : m));
+
+	// 休息名單互換：inPlayerId 移除、outPlayerId 附加於陣列尾端（design Decision 8，
+	// SHALL NOT 依 restCount 重新排序）。
+	const restingPlayerIds = [...round.restingPlayerIds.filter((id) => id !== inPlayerId), outPlayerId];
+
+	return { ok: true, round: { ...round, matches, restingPlayerIds } };
+}
