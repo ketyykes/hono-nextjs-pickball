@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { TeamPlayers } from "@/lib/scoreboard/types";
 
 // /scoreboard?match=<matchId> 對戰場次綁定的 E2E 驗收。
 // 對應 matchmaker-scoreboard-binding change §7 的 test-plan：失效說明與出口、
@@ -28,16 +29,48 @@ const VIEWPORTS = [
 	{ width: 1024, height: 600 },
 ] as const;
 
+// 姓名色塊斷言用：瀏覽器讀出的 getComputedStyle().backgroundImage 一律把 hex 正規化為
+// rgb()（無論讀 inline style 或 computed style 皆同），故不能直接用 hex 字串比對，
+// 需先轉成同一種表示法再比對是否存在於 linear-gradient(...) 字串內。
+function hexToRgb(hex: string): string {
+	const value = hex.replace("#", "");
+	const r = parseInt(value.slice(0, 2), 16);
+	const g = parseInt(value.slice(2, 4), 16);
+	const b = parseInt(value.slice(4, 6), 16);
+	return `rgb(${r}, ${g}, ${b})`;
+}
+
+// 雙打綁定場次的球員姓名色塊種子資料（每隊 2 筆，內容量最大的情境，design Decision 5）。
+// foreground 為 seed 建立端已算好存入的欄位，測試不需要也不應該自行重算（見 spec
+// 「計分板 SHALL NOT 自行計算球員姓名色塊的前景文字色」）。
+const DOUBLES_TEAM_PLAYERS: TeamPlayers = {
+	us: [
+		{ name: "計分板測試員1", colorFrom: "#4f46e5", colorTo: "#818cf8", foreground: "#ffffff" },
+		{ name: "計分板測試員2", colorFrom: "#16a34a", colorTo: "#4ade80", foreground: "#052e16" },
+	],
+	them: [
+		{ name: "計分板測試員3", colorFrom: "#dc2626", colorTo: "#f87171", foreground: "#ffffff" },
+		{ name: "計分板測試員4", colorFrom: "#d97706", colorTo: "#fbbf24", foreground: "#451a03" },
+	],
+};
+
 // 種入單一場次的分槽條目，欄位形狀複製自 ScoreboardStateSchema（見頁首註解）。
 // 以 addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀到綁定資料。
 function seedMatchSlot(
 	page: import("@playwright/test").Page,
 	matchId: string,
-	overrides: { targetScore?: 11 | 15 | 21; courtNumber?: number | null } = {},
+	overrides: {
+		targetScore?: 11 | 15 | 21;
+		courtNumber?: number | null;
+		teamPlayers?: TeamPlayers | null;
+	} = {},
 ) {
 	// courtNumber 用 in 判斷而非 ??：`?? 3` 會把明確傳入的 null 一併吃成 3，
 	// 使「綁定但無場地編號」這個分支在測試裡根本無法表達（Stage 2 mutation 補洞）。
 	const courtNumber = "courtNumber" in overrides ? overrides.courtNumber : 3;
+	// teamPlayers 同理用 in 判斷：未傳入時維持既有測試「無球員姓名色塊」的既有行為
+	// （schema .default(null) 涵蓋的向後相容路徑），而非誤把「明確傳 null」與「未傳」混為一談。
+	const teamPlayers = "teamPlayers" in overrides ? overrides.teamPlayers : null;
 	const seed = {
 		mode: "doubles",
 		scores: { us: 0, them: 0 },
@@ -51,6 +84,7 @@ function seedMatchSlot(
 		targetScore: overrides.targetScore ?? 15,
 		matchId,
 		courtNumber,
+		teamPlayers,
 	};
 	return page.addInitScript(
 		(arg: { key: string; id: string; state: unknown }) => {
@@ -189,6 +223,56 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		}
 	});
 
+	// matchmaker-scoreboard-team-labels change §4：加入球員姓名色塊後，以雙打（每隊 2 筆，
+	// 內容量最大的情境）重新跑一次既有的零捲動驗收公式，而非信任「新增內容量不大所以應該
+	// 沒事」的直覺（design Decision 5、Risks）。
+	test("綁定模式含球員姓名色塊時多 viewport 仍零捲動", async ({ page }) => {
+		await seedMatchSlot(page, "m1", { teamPlayers: DOUBLES_TEAM_PLAYERS });
+
+		for (const vp of VIEWPORTS) {
+			await page.setViewportSize(vp);
+			await page.goto("/scoreboard?match=m1");
+			await expect(page.getByText("我方", { exact: true })).toBeVisible();
+			// 確認姓名色塊確實有被渲染，而非因為 teamPlayers 被忽略、本測試在
+			// 「畫面其實沒多渲染任何內容」的情況下巧合通過零捲動斷言（design Decision 5）。
+			await expect(
+				page.getByText(DOUBLES_TEAM_PLAYERS.us[0].name, { exact: true }),
+			).toBeVisible();
+
+			if (vp.width > vp.height) {
+				await expect(
+					page.getByRole("status").filter({ hasText: "建議橫向使用" }),
+				).toBeHidden();
+			}
+
+			const { scrollHeight, clientHeight } = await page.evaluate(() => ({
+				scrollHeight: document.scrollingElement!.scrollHeight,
+				clientHeight: document.scrollingElement!.clientHeight,
+			}));
+			expect(
+				scrollHeight,
+				`${vp.width}x${vp.height} 不應有垂直捲動`,
+			).toBeLessThanOrEqual(clientHeight + 1);
+
+			const coreButtons = [
+				page.getByRole("button", { name: /我方贏這一球/ }),
+				page.getByRole("button", { name: /對方贏這一球/ }),
+				page.getByRole("button", { name: "撤銷上一分" }),
+				page.getByRole("button", { name: "重置比賽" }),
+			];
+			for (const button of coreButtons) {
+				const box = await button.boundingBox();
+				expect(box, `${vp.width}x${vp.height} 按鈕應可見`).not.toBeNull();
+				if (box) {
+					expect(box.y).toBeGreaterThanOrEqual(0);
+					expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+					expect(box.x).toBeGreaterThanOrEqual(0);
+					expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+				}
+			}
+		}
+	});
+
 	// Stage 2 mutation 補洞：page.tsx 的 `Array.isArray(rawMatch) ? rawMatch[0] : rawMatch`
 	// 收斂零覆蓋——改成直接 `rawMatch as string` 後全套仍綠。同名 query 重複出現時
 	// searchParams 的值為 string[]，未收斂會把整個陣列當成 matchId，分槽查不到而
@@ -274,13 +358,24 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 // lib/scoreboard/types.ts 的 ScoreboardStateSchema（同上方 seedMatchSlot() 的
 // 既有慣例），schema 若異動需同步更新本檔。
 test.describe("/matchmaker 對戰頁的計分板接線", () => {
+	// 每位測試球員配不同的漸層色，而非全員共用同一組色碼：若「由對戰頁進入時面板顯示
+	// 球員姓名」test 只驗證色碼存在於畫面上某處，全員同色會讓「元件是否真的把每位球員
+	// 自己的 colorFrom／colorTo 接到對應色塊」這件事測不出來。
+	const PLAYER_COLOR_PALETTE = [
+		{ colorFrom: "#4f46e5", colorTo: "#818cf8" },
+		{ colorFrom: "#16a34a", colorTo: "#4ade80" },
+		{ colorFrom: "#dc2626", colorTo: "#f87171" },
+		{ colorFrom: "#d97706", colorTo: "#fbbf24" },
+	] as const;
+
 	function buildTestPlayer(index: number) {
+		const palette = PLAYER_COLOR_PALETTE[(index - 1) % PLAYER_COLOR_PALETTE.length];
 		return {
 			id: `e2e-binding-player-${index}`,
 			name: `計分板測試員${index}`,
 			gender: "other" as const,
-			colorFrom: "#4f46e5",
-			colorTo: "#818cf8",
+			colorFrom: palette.colorFrom,
+			colorTo: palette.colorTo,
 			rating: 5,
 			restCount: 0,
 			gamesPlayed: 0,
@@ -638,5 +733,50 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await expect(page.getByRole("link", { name: "改用獨立計分板" })).toBeVisible();
 		const bodyText = await page.locator("body").innerText();
 		expect(bodyText).not.toMatch(/Error/);
+	});
+
+	// matchmaker-scoreboard-team-labels change §4：golden path——本 change 唯一使用者可見的
+	// 最終行為，是整條資料鏈（seed → schema → reducer → 元件）真的接上的唯一證據。
+	test("由對戰頁進入時面板顯示球員姓名", async ({ page }) => {
+		await seedRoster(page, 4);
+		await page.goto("/matchmaker");
+		await page.getByRole("radio", { name: "雙打" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(
+			page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]'),
+		).toHaveCount(1);
+
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+
+		const testPlayers = [1, 2, 3, 4].map(buildTestPlayer);
+
+		// 主斷言：四位球員的姓名皆可見，且各自的姓名色塊 background 含對應的
+		// colorFrom／colorTo（見檔頭 hexToRgb 說明：瀏覽器一律把 hex 正規化為 rgb()）。
+		for (const player of testPlayers) {
+			const badge = page.getByText(player.name, { exact: true });
+			await expect(badge).toBeVisible();
+			const backgroundImage = await badge.evaluate(
+				(el) => getComputedStyle(el).backgroundImage,
+			);
+			expect(backgroundImage).toContain(hexToRgb(player.colorFrom));
+			expect(backgroundImage).toContain(hexToRgb(player.colorTo));
+		}
+
+		// 兩隊面板各顯示兩位球員（雙打）：TeamPanel 的 DOM 順序固定為「我方」先於
+		// 「對方」（Scoreboard.tsx 既有渲染順序），不受直式／橫式排版影響。
+		const panels = page.locator(".\\@container-size");
+		const usPanel = panels.nth(0);
+		const themPanel = panels.nth(1);
+		const usNameCounts = await Promise.all(
+			testPlayers.map((player) => usPanel.getByText(player.name, { exact: true }).count()),
+		);
+		expect(usNameCounts.filter((count) => count > 0)).toHaveLength(2);
+		const themNameCounts = await Promise.all(
+			testPlayers.map((player) => themPanel.getByText(player.name, { exact: true }).count()),
+		);
+		expect(themNameCounts.filter((count) => count > 0)).toHaveLength(2);
 	});
 });
