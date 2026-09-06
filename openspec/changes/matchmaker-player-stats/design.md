@@ -240,6 +240,59 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
    （例如 M10 也改了同一個 Requirement 或同一個檔案），MUST 重新對齊該 MODIFIED 區塊
    後才能繼續，SHALL NOT 直接套用本文件寫定的版本覆蓋 M10 的變動。
 
+   **【apply §1 對齊結論，2026-09-06 實測，base = `main` HEAD `5e564ee`】**
+
+   M10 已合併（merge commit `56331b0`）。以 `git show --stat 56331b0` 機械確認 M10 觸及的
+   檔案僅五個：`components/matchmaker/EmptyMatches.tsx`（新增）、
+   `components/matchmaker/HistoryView.tsx`、`components/matchmaker/MatchStage.tsx`、
+   `tests/e2e/specs/match-stage.spec.ts`、`tests/e2e/specs/matchmaker-history.spec.ts`
+   （其餘為 M10 自身的 openspec 文件）。**本 change 消費的九個檔案 M10 全數未觸及**，
+   `match-stage` 的 MODIFIED 區塊無需重新對齊。逐項核對結果：
+
+   - `hooks/useRoundStore.ts`：`UseRoundStoreOptions` 為 `{ players: readonly Player[];
+     updatePlayer: (id, patch) => void }` 兩者皆必填；`UseRoundStoreResult` 確實含
+     `history: MatchHistoryEntry[]` 與 `droppedCount: number`。**與 Decision 1 假設一致**。
+   - `hooks/useRosterStore.ts`：`UseRosterStoreResult` 含 `players: Player[]` 與
+     `updatePlayer(id, patch)`。**與假設一致**。
+   - `lib/matchmaker/history.ts`：`HistoryPlayerSchema` 為
+     `{ id, name, ratingBefore, ratingAfter }`；`HistoryEntryBaseSchema` 為
+     `{ matchId, courtNumber, playedAt, teamA, teamB, scoreA, scoreB, winner }`，
+     `winner` 為 `z.enum(["teamA","teamB"])`，`format` 由 discriminated union 提供。
+     `HistoryTeamSchema` 為 `{ players: HistoryPlayer[], rating: number }`
+     ——**注意隊伍球員在 `team.players` 底下，不是 `teamA` 直接是陣列**。
+   - `lib/matchmaker/history-range.ts`：`filterHistoryByRange(entries, range, now)` 簽章
+     一致，回傳已依 `playedAt` 由新到舊排序後再篩選；`HISTORY_RANGES` 為
+     `["today","thisWeek","thisMonth","lastMonth","earlier"]`。
+   - `components/matchmaker/HistoryRangeFilter.tsx`：`HistoryRangeFilterProps` 為
+     `{ value: HistoryRange; onChange: (range) => void }`，`role="radiogroup"`
+     且 `aria-label="歷史區間"`。
+   - `components/matchmaker/EmptyHistory.tsx`：`EmptyHistoryProps` 為
+     `{ range: HistoryRange | null }`，`range === null` 走引導型空狀態分支。
+   - `lib/matchmaker/section-nav.ts`：`MATCHMAKER_SECTION_HREFS` 與
+     `MATCHMAKER_SECTION_LABELS` **皆為模組私有（未 `export`）**，僅
+     `MATCHMAKER_ROUTE`／`matchmakerSectionTabs()`／`MatchmakerSectionTab` 對外匯出。
+     §7.2 只需在這兩個私有陣列／物件各追加一筆，不需要調整可見度。
+   - `lib/matchmaker/colors.ts`：`pickTextColor(colorFrom, colorTo): string` 簽章一致。
+   - `lib/matchmaker/labels.ts`：目前僅四個匯出（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／
+     `FORMAT_LABEL`／`DOUBLES_COMPOSITION_LABEL`），新增
+     `PLAYER_NOT_ON_ROSTER_LABEL` 不撞名。
+   - `lib/matchmaker/types.ts`：`PlayerSchema` 為
+     `{ id, name, colorFrom, colorTo, rating: z.number().min(1).max(8), isActive, ... }`。
+   - `components/ui/table.tsx`：外層 `data-slot="table-container"` 的 `div` 帶
+     `relative w-full overflow-x-auto`，Decision 7 的前提成立；匯出含
+     `Table`／`TableHeader`／`TableBody`／`TableRow`／`TableHead`／`TableCell` 等。
+   - `nextjs-pickball/package.json`：目前無任何圖表相依，`dependencies` 13 筆
+     （`@opennextjs/cloudflare`／兩個 radix／`class-variance-authority`／`clsx`／
+     `lucide-react`／`motion`／`next`／`radix-ui`／`react`／`react-dom`／
+     `tailwind-merge`／`zod`）。本 change 結束時此清單 MUST 不變。
+   - `app/matchmaker/` 目前有 `data`／`history`／`players` 三個子路由與
+     `layout.tsx`／`page.tsx`，**尚無 `stats/`**（§6 為全新目錄）。
+
+   **偏離記錄**：本批依 coordinator 指示不使用 git worktree，直接在主 repo 的
+   `change/matchmaker-player-stats` 分支上執行（見 environment.md 的 Verification）。
+   execution-plan 與本檔中所有「worktree 絕對路徑」一律改讀為
+   `/Users/m2_24gb/Desktop/project/nextjs-pickball`。
+
 2. **Elo 走勢圖是否值得做成獨立 change？** 本 change 的 Non-Goals 已排除圖表；若使用者
    日後認為排行榜的「淨變化」不足以呈現趨勢，需另外評估圖表庫選型（是否比照 M9 的
    canvas 手繪零相依路線，或首次為 matchmaker 引入一個圖表套件）。這是產品優先序問題，

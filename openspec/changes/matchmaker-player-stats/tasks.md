@@ -17,14 +17,14 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的 Open Questions 從假設
 > 變成事實，避免 §2 之後整批建立在錯的介面上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M10（`matchmaker-stage-gaps`）已合併**：於 `openspec/changes/archive/` 尋找該 change 目錄，或以 `git log --oneline main` 確認其相關 commit 已存在。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M10（見 proposal 的「執行相依」）
-- [ ] 1.3 讀 `nextjs-pickball/hooks/useRoundStore.ts` 與 `nextjs-pickball/hooks/useRosterStore.ts`，記錄 `UseRoundStoreResult.history`／`UseRosterStoreResult.players` 的實際型別與 `UseRoundStoreOptions` 的必填欄位。與 design Decision 1 的假設逐項比對，**差異一律補記進 design.md 的 Open Questions**，不要默默改實作去遷就；若 `history` 未如假設般存在於回傳值，MUST 依 execution-plan 的升級條件回報人類，SHALL NOT 為了拿資料去改既有 hook 介面
-- [ ] 1.4 讀 `nextjs-pickball/lib/matchmaker/history.ts`，記錄 `HistoryPlayerSchema`（`id`／`name`／`ratingBefore`／`ratingAfter`）與 `MatchHistoryEntrySchema`（`teamA`／`teamB`／`scoreA`／`scoreB`／`winner`／`format`／`playedAt`）的實際欄位，確認與 design 假設一致
-- [ ] 1.5 讀 `nextjs-pickball/lib/matchmaker/history-range.ts` 與 `nextjs-pickball/components/matchmaker/HistoryRangeFilter.tsx`，記錄 `filterHistoryByRange(entries, range, now)`／`HISTORY_RANGES`／`HistoryRangeFilterProps` 的實際簽章。§6 的頁面組裝依實際簽章取用，SHALL NOT 重新推導一次區間篩選規則
-- [ ] 1.6 讀 `nextjs-pickball/lib/matchmaker/section-nav.ts` 與 `nextjs-pickball/lib/matchmaker/section-nav.test.ts`，記錄 `MATCHMAKER_SECTION_HREFS`／`MATCHMAKER_SECTION_LABELS`／`matchmakerSectionTabs()` 的目前內容，以及既有 regression-guard test「分頁清單依序為對戰、參賽者、歷史與資料四筆」的完整斷言內容（§7 需要精確修改這個既有測試）
-- [ ] 1.7 讀 `nextjs-pickball/lib/matchmaker/colors.ts` 確認 `pickTextColor(colorFrom, colorTo)` 簽章；讀 `nextjs-pickball/lib/matchmaker/labels.ts` 確認目前匯出內容（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／`DOUBLES_COMPOSITION_LABEL` 四個），確認新增 `PLAYER_NOT_ON_ROSTER_LABEL` 不與既有匯出撞名
-- [ ] 1.8 讀 `nextjs-pickball/lib/matchmaker/types.ts` 確認 `PlayerSchema` 欄位（`id`／`name`／`colorFrom`／`colorTo`／`rating`／`isActive`）；確認 `nextjs-pickball/package.json` 目前無任何圖表或新增相依（本 change 結束時此事實 MUST 不變，Final Review 會以 `git diff package.json` 機械確認）
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上 **M10（`matchmaker-stage-gaps`）已合併**：於 `openspec/changes/archive/` 尋找該 change 目錄，或以 `git log --oneline main` 確認其相關 commit 已存在。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M10（見 proposal 的「執行相依」）
+- [x] 1.3 讀 `nextjs-pickball/hooks/useRoundStore.ts` 與 `nextjs-pickball/hooks/useRosterStore.ts`，記錄 `UseRoundStoreResult.history`／`UseRosterStoreResult.players` 的實際型別與 `UseRoundStoreOptions` 的必填欄位。與 design Decision 1 的假設逐項比對，**差異一律補記進 design.md 的 Open Questions**，不要默默改實作去遷就；若 `history` 未如假設般存在於回傳值，MUST 依 execution-plan 的升級條件回報人類，SHALL NOT 為了拿資料去改既有 hook 介面
+- [x] 1.4 讀 `nextjs-pickball/lib/matchmaker/history.ts`，記錄 `HistoryPlayerSchema`（`id`／`name`／`ratingBefore`／`ratingAfter`）與 `MatchHistoryEntrySchema`（`teamA`／`teamB`／`scoreA`／`scoreB`／`winner`／`format`／`playedAt`）的實際欄位，確認與 design 假設一致
+- [x] 1.5 讀 `nextjs-pickball/lib/matchmaker/history-range.ts` 與 `nextjs-pickball/components/matchmaker/HistoryRangeFilter.tsx`，記錄 `filterHistoryByRange(entries, range, now)`／`HISTORY_RANGES`／`HistoryRangeFilterProps` 的實際簽章。§6 的頁面組裝依實際簽章取用，SHALL NOT 重新推導一次區間篩選規則
+- [x] 1.6 讀 `nextjs-pickball/lib/matchmaker/section-nav.ts` 與 `nextjs-pickball/lib/matchmaker/section-nav.test.ts`，記錄 `MATCHMAKER_SECTION_HREFS`／`MATCHMAKER_SECTION_LABELS`／`matchmakerSectionTabs()` 的目前內容，以及既有 regression-guard test「分頁清單依序為對戰、參賽者、歷史與資料四筆」的完整斷言內容（§7 需要精確修改這個既有測試）
+- [x] 1.7 讀 `nextjs-pickball/lib/matchmaker/colors.ts` 確認 `pickTextColor(colorFrom, colorTo)` 簽章；讀 `nextjs-pickball/lib/matchmaker/labels.ts` 確認目前匯出內容（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／`DOUBLES_COMPOSITION_LABEL` 四個），確認新增 `PLAYER_NOT_ON_ROSTER_LABEL` 不與既有匯出撞名
+- [x] 1.8 讀 `nextjs-pickball/lib/matchmaker/types.ts` 確認 `PlayerSchema` 欄位（`id`／`name`／`colorFrom`／`colorTo`／`rating`／`isActive`）；確認 `nextjs-pickball/package.json` 目前無任何圖表或新增相依（本 change 結束時此事實 MUST 不變，Final Review 會以 `git diff package.json` 機械確認）
 
 ## 2. 統計計算核心 A：計算範圍、唯讀保證、出場／勝負／勝率（player-stats.ts）
 
