@@ -357,6 +357,10 @@ Depends on: §1（可與 §2～§6 並行構思，但仍依「群組間嚴格序
 >   任何 LocalStorage 資料」一句在 archive 後會同步進主 spec，而 §8 的 mutation 已**實驗確證
 >   三個 key 確實會被回寫**（見下方 §8 審查結論）。是否要在措辭上補一句「store hydration 的
 >   等值重新序列化不視為修改」，屬 spec 文字層級的決定，留待 Final Code Review 一併判斷。
+> - **【2026-09-06 Final Code Review 結論】採「補限定語」**：delta spec 該 Requirement 的 prose
+>   已改寫並另起一段明訂「等值的重新序列化 SHALL NOT 被視為修改」，同時封住放寬解讀。
+>   **Scenario、驗收錨點、測試名稱與所有程式碼皆零改動**，實作處置仍是上方已追認的方案①。
+>   完整理由與「人類可 `git revert` 推翻」的說明見 design.md Open Questions 第 1-c 條末段。
 
 ## 8. 唯讀保證與無障礙 E2E
 

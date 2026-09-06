@@ -338,6 +338,21 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
    有落差的 SHALL NOT。是否要補一句限定（例如「store hydration 造成的等值重新序列化不視為
    修改」），或維持現狀並以本條 Open Question 作為說明，留待人類決定。
 
+   **【Final Review 裁決，2026-09-06】採方案②：delta spec 已補上限定語。**
+   `specs/player-stats/spec.md` 的「統計頁的可用性、無障礙與唯讀保證」Requirement prose 改為
+   「SHALL NOT 呼叫任何 store 的 setter，SHALL NOT 改變……資料的**內容**」，並另起一段明訂
+   「等值的重新序列化 SHALL NOT 被視為修改」，同時封住放寬解讀（任何改變資料語意內容的寫入
+   仍在禁止之列）。**未更動任何 Scenario、驗收錨點或測試名稱**，實作與測試零改動。
+
+   理由是成本不對稱：Open Question 隨 change 一起進 `changes/archive/`，主 spec 的讀者不會
+   看到它；而主 spec 依 CLAUDE.md「不可直接編輯」的規則，archive 後要改這一句得再開一個
+   完整的 openspec change。留著一句與實作不符的 SHALL NOT，最可能的後果是日後有人把它當
+   bug 回報，並為了讓字面成立而拆掉 Decision 1 的 hook 形態（等於在兩個 hook 之外長出第三、
+   第四份 hydration 邏輯，正是 Decision 1 明確排除的方向）。
+
+   **這仍是可由人類推翻的編輯**：若使用者偏好維持原句、只靠本 Open Question 說明，
+   `git revert` 該次 commit 即可還原，不影響任何程式碼或測試。
+
 2. **Elo 走勢圖是否值得做成獨立 change？** 本 change 的 Non-Goals 已排除圖表；若使用者
    日後認為排行榜的「淨變化」不足以呈現趨勢，需另外評估圖表庫選型（是否比照 M9 的
    canvas 手繪零相依路線，或首次為 matchmaker 引入一個圖表套件）。這是產品優先序問題，
