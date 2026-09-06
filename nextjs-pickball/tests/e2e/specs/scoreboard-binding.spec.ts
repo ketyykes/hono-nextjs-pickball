@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type { TeamPlayers } from "@/lib/scoreboard/types";
+// pickTextColor 是純函式（不依賴瀏覽器 API），測試檔匯入以獨立算出預期前景色供斷言比對
+// 用，不違反 components/scoreboard/、lib/scoreboard/ 的單向相依限制（該限制只及於這兩個
+// 目錄本身，不含 tests/）。
+import { pickTextColor } from "@/lib/matchmaker/colors";
 
 // /scoreboard?match=<matchId> 對戰場次綁定的 E2E 驗收。
 // 對應 matchmaker-scoreboard-binding change §7 的 test-plan：失效說明與出口、
@@ -763,6 +767,11 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 			);
 			expect(backgroundImage).toContain(hexToRgb(player.colorFrom));
 			expect(backgroundImage).toContain(hexToRgb(player.colorTo));
+			// spec 明文要求「MUST 直接採用已算好的 foreground」，不得自行計算亮度或對比
+			// （design Decision 1）：獨立以 pickTextColor 算出預期值比對，而非只確認
+			// background 正確——否則「color 寫死固定色碼」這種變異測不出來。
+			const color = await badge.evaluate((el) => getComputedStyle(el).color);
+			expect(color).toBe(hexToRgb(pickTextColor(player.colorFrom, player.colorTo)));
 		}
 
 		// 兩隊面板各顯示兩位球員（雙打）：TeamPanel 的 DOM 順序固定為「我方」先於
