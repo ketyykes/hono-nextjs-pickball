@@ -61,6 +61,32 @@ function makeEntry(overrides: SinglesOverrides = {}): MatchHistoryEntry {
 	};
 }
 
+// 比照上方 SinglesOverrides 的樣板另建一份雙打版本，同樣排除 format 避免呼叫端
+// 誤把雙打分支覆寫成單打（或反之）卻讓 discriminated union 判斷失準（§4 需要雙打
+// fixture 來驗證最常搭檔邏輯，§2／§3 皆未建過這份樣板）。
+type DoublesOverrides = Partial<Omit<Extract<MatchHistoryEntry, { format: "doubles" }>, "format">>;
+
+/** 建立一筆合法的雙打測試用歷史紀錄，可透過 overrides 覆寫特定欄位。 */
+function makeDoublesEntry(overrides: DoublesOverrides = {}): MatchHistoryEntry {
+	return {
+		format: "doubles",
+		matchId: "match-d1",
+		courtNumber: 1,
+		playedAt: "2026-08-16T01:00:00.000Z",
+		doublesComposition: "general",
+		teamA: makeTeam({
+			players: [makeHistoryPlayer({ id: "p1", name: "Alice" }), makeHistoryPlayer({ id: "p2", name: "Bob" })],
+		}),
+		teamB: makeTeam({
+			players: [makeHistoryPlayer({ id: "p3", name: "Carol" }), makeHistoryPlayer({ id: "p4", name: "Dave" })],
+		}),
+		scoreA: 11,
+		scoreB: 5,
+		winner: "teamA",
+		...overrides,
+	};
+}
+
 describe("computePlayerStats", () => {
 	it("名單成員即使無出場紀錄仍列入統計結果", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice", colorFrom: "#111111", colorTo: "#222222" })];
@@ -239,4 +265,60 @@ describe("computePlayerStats", () => {
 		expect(players).toStrictEqual(playersSnapshot);
 		expect(history).toStrictEqual(historySnapshot);
 	});
+
+	it("最常搭檔為雙打隊友中出現次數最多者", () => {
+		// p1 在 d1 於 teamA 與甲搭檔、在 d2 於 teamB 與甲搭檔（交棒事項 3：受測球員需同時
+		// 出現在 teamA／teamB，否則「只掃 teamA」這類漏半邊的變異測不出來）、在 d3 於
+		// teamA 與乙搭檔一次——甲共 2 次、乙共 1 次，甲應為最常搭檔。
+		const history = [
+			makeDoublesEntry({
+				matchId: "d1",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-jia", name: "甲" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+			makeDoublesEntry({
+				matchId: "d2",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-jia", name: "甲" })],
+				}),
+			}),
+			makeDoublesEntry({
+				matchId: "d3",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-yi", name: "乙" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const p1 = result.find((stat) => stat.id === "p1");
+		expect(p1?.mostFrequentPartner).toBe("甲");
+	});
+
+	it("從未打過雙打時最常搭檔為 null", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" })];
+		const history = [
+			makeEntry({
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.mostFrequentPartner).toBeNull();
+	});
+
 });
