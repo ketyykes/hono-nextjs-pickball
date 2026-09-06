@@ -428,21 +428,75 @@ Depends on: §6, §7
 
 ## 9. 收尾驗證
 
-- [ ] 9.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
-- [ ] 9.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/player-stats`、`--run components/matchmaker/PlayerStatsTable`、`--run lib/matchmaker/section-nav` 全綠，貼出輸出
-- [ ] 9.3 `pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
-- [ ] 9.4 `pnpm typecheck`（`pnpm -r exec tsc --noEmit`）通過
-- [ ] 9.5 `pnpm test` 全套通過（確認未破壞 M1～M10 既有測試與 hono-pickball 後端測試）
-- [ ] 9.6 `pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**，帶 `--workers=1`；既有 `match-stage.spec.ts`／`matchmaker-history.spec.ts`／`matchmaker-data-transfer.spec.ts`／`visual-export.spec.ts`／`scoreboard-binding.spec.ts` 等既有 spec 原樣通過
-- [ ] 9.7 `git diff package.json`、`pnpm-lock.yaml` 為空（本 change 零新增相依）；`git diff --stat` 確認 `hooks/` 零新增、M5～M9 既有元件檔（`MatchStage`／`CourtCard`／`RoundControls`／`RestingPanel`／`ExportActions`／`PrintSheet`／`HistoryView`／`HistoryRecordCard`／`HistoryRangeFilter`／`EmptyHistory`）零改動
-- [ ] 9.8 **本 change 唯一容許變動的既有測試**：`nextjs-pickball/lib/matchmaker/section-nav.test.ts` 的 it「分頁清單依序為對戰、參賽者、歷史與資料四筆」→ 更名為「分頁清單依序為對戰、參賽者、歷史、資料與統計五筆」並擴充預期陣列為五筆（§7.1）。**除此之外，其餘既有測試轉紅一律視為迴歸**
-- [ ] 9.9 同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」。
+- [x] 9.1 **已完成**（以 python 腳本從 delta spec 抽出 `**驗收**：\`<path>\`，it/test 名稱「<name>」` 共 **22 個錨點**，逐一比對目標檔案內是否存在同名 `it(`／`test(`，**22/22 全部逐字相符**，未靠目視）。原文：逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
+- [x] 9.2 **已完成**：三個目標檔一次跑完 `Test Files 3 passed (3)` / `Tests 28 passed (28)`。原文：`pnpm --filter ./nextjs-pickball test --run lib/matchmaker/player-stats`、`--run components/matchmaker/PlayerStatsTable`、`--run lib/matchmaker/section-nav` 全綠，貼出輸出
+- [x] 9.3 **已完成**：`0 errors, 3 warnings`；三個 warning 全在既有檔案（`hooks/useQuiz.ts`、`hooks/useRosterStore.ts`、`hooks/useScoreboardStore.ts`），**本 change 零新增 warning**。原文：`pnpm lint` 通過（0 errors；既有 warning 清單見前一個 change 的紀錄，本 change 不得新增）
+- [x] 9.4 **已完成**：`pnpm -r exec tsc --noEmit` 無輸出、exit 0。原文：`pnpm typecheck`（`pnpm -r exec tsc --noEmit`）通過
+- [x] 9.5 **已完成**：前端 `70 passed (70)` 檔／`664 passed (664)` 測試，後端 `4 passed (4)` 檔／`16 passed (16)` 測試。相對 baseline（前端 68 檔／638 測試）為 **+2 檔／+26 測試**，後端不變，**零迴歸**。原文：`pnpm test` 全套通過（確認未破壞 M1～M10 既有測試與 hono-pickball 後端測試）
+- [x] 9.6 **已完成，但全套非 100% 綠——如實記錄如下**。實跑
+      `pnpm --filter ./nextjs-pickball test:e2e --workers=1`（五個 browser project 全跑）：
+      **587 passed、2 failed、21 skipped，耗時 11.0m**。
+      **本 change 相關的 spec 全部通過**：`player-stats.spec.ts` 8×5=40 條、
+      `match-stage.spec.ts` 20×5=100 條，皆全綠；`matchmaker-history.spec.ts`／
+      `matchmaker-data-transfer.spec.ts`／`visual-export.spec.ts`／`scoreboard-binding.spec.ts`
+      等既有 spec 亦原樣通過。
+      **2 個失敗集中在 `tests/e2e/specs/quiz.spec.ts:137` 的「D. 按「再試一次」回到第一題」，
+      只發生在 webkit 與 mobile-safari 兩個 project**，錯誤為
+      `Error: page.goto: Test timeout of 30000ms exceeded.`
+      判定證據（**未自行斷言為雜訊，證據與結論一併上報 coordinator**）：
+      ① 本 change 的 `git diff --name-only` 共 15 個檔案，**零觸及任何 quiz 相關檔案**
+      （`quiz.spec.ts`／`hooks/useQuiz.ts`／`components/quiz` 最後改動是 `7b151b7`
+      的 monorepo 重構，遠早於本 change）；
+      ② **針對性複跑**（`quiz.spec.ts --project=webkit --project=mobile-safari`）
+      **8 passed，含該條失敗 test 在兩個 project 各約 1.5 秒通過**，相對 30 秒逾時有 20 倍餘裕
+      ——屬**不可重現**，非穩定失敗；
+      ③ 跑前跑後 `lsof -i :3005 -i :8787` 與
+      `ps aux | grep -E "next-server|wrangler|workerd|playwright"` 皆零輸出，**無殘留 process**；
+      ④ `uptime` load average 全程 2.5～4.4（個位數，正常），**不屬「機器負載異常」情境**。
+      結論：與本 change 無因果關係的既有 E2E 不穩定（`page.goto` 逾時樣式），
+      與 M10 收尾時遇到的同型情況一致（見 `matchmaker-runbook-m10-m15.md`）。
+      原文：`pnpm --filter ./nextjs-pickball test:e2e` 全套通過，**五個 browser project 皆跑**，帶 `--workers=1`；既有 `match-stage.spec.ts`／`matchmaker-history.spec.ts`／`matchmaker-data-transfer.spec.ts`／`visual-export.spec.ts`／`scoreboard-binding.spec.ts` 等既有 spec 原樣通過
+- [x] 9.7 **已完成，四項機械確認全數為空**：
+      ① `git diff 5e564ee..HEAD -- nextjs-pickball/package.json pnpm-lock.yaml package.json hono-pickball/package.json` → **空**（零新增相依）；
+      ② `git diff 5e564ee..HEAD --stat -- nextjs-pickball/hooks` → **空**（`hooks/` 零新增、零改動，
+      因此 `openspec/specs/pickleball-guide-page/spec.md` 的 hooks 歸屬清單**不需要同步**，
+      `hooksInventory.test.ts` 亦持續通過）；
+      ③ M5～M9 既有元件檔（`MatchStage`／`CourtCard`／`RoundControls`／`RestingPanel`／
+      `ExportActions`／`PrintSheet`／`HistoryView`／`HistoryRecordCard`／`HistoryRangeFilter`／
+      `EmptyHistory`）→ **全部零改動**；
+      ④ 全 change 對 `nextjs-pickball`／`hono-pickball` 的產品面 diff 僅 **10 個檔案、
+      +1933／-3 行**（新增 6 檔、修改 4 檔），`hono-pickball/**` 零改動。
+      原文：`git diff package.json`、`pnpm-lock.yaml` 為空（本 change 零新增相依）；`git diff --stat` 確認 `hooks/` 零新增、M5～M9 既有元件檔（`MatchStage`／`CourtCard`／`RoundControls`／`RestingPanel`／`ExportActions`／`PrintSheet`／`HistoryView`／`HistoryRecordCard`／`HistoryRangeFilter`／`EmptyHistory`）零改動
+- [x] 9.8 **已完成並機械確認**：`section-nav.test.ts` 的改動為 **+13/-1**（該 it 更名 1 行 ＋
+      預期陣列擴為五筆 ＋ 新增一個非錨點 it）；`match-stage.spec.ts` 為 **+25/-0（純新增，零刪除）**，
+      未觸碰任何既有 test；其餘既有測試檔零改動。全套 unit 與 E2E 中，
+      **除白名單那一條更名外無任何既有測試轉紅**。原文：**本 change 唯一容許變動的既有測試**：`nextjs-pickball/lib/matchmaker/section-nav.test.ts` 的 it「分頁清單依序為對戰、參賽者、歷史與資料四筆」→ 更名為「分頁清單依序為對戰、參賽者、歷史、資料與統計五筆」並擴充預期陣列為五筆（§7.1）。**除此之外，其餘既有測試轉紅一律視為迴歸**
+- [x] 9.9 **已完成**：`nextjs-pickball/CLAUDE.md` 的 `/matchmaker` 段落新增 `/matchmaker/stats`
+      條目（含 `computePlayerStats` 的聯集語意、`PlayerStatsTable` 九欄、重用 M7 元件的要求，
+      以及「本頁載入時會經由兩個 store 的 write effect 回寫三個 storage key」的警語與交叉引用）；
+      **並依 §7 Stage 2 的交棒修正同檔第 35 行**，「上述**四頁**」→「上述**五頁**」、
+      括號內「對戰／參賽者／歷史／資料」→「對戰／參賽者／歷史／資料／統計」。
+      原文：同步 `nextjs-pickball/CLAUDE.md` 的架構總覽：`/matchmaker` 段落補記「`/matchmaker/stats` 提供球員統計與排行榜（milestone M11 = matchmaker-player-stats change）」。
       **另 MUST 一併修正同檔第 35 行**（§7 Stage 2 指出，照本項字面做會漏掉）：
       「上述**四頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「**對戰／參賽者／歷史／資料**」…）」
       → 「四頁」改為「五頁」、括號補上「統計」。同行後半關於 `@media print` 的敘述仍正確，不需改。
-- [ ] 9.10 `DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
-- [ ] 9.11 spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
-- [ ] 9.12 **補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 17 個
+- [x] 9.10 **已完成**：輸出 `Change 'matchmaker-player-stats' is valid`，exit 0。
+      原文：`DO_NOT_TRACK=1 openspec validate matchmaker-player-stats --strict` 通過
+- [x] 9.11 **已完成（delta 與既有主 spec 部分），但主 spec 的 `player-stats` 需 archive sync 後補跑**。
+      依 root `CLAUDE.md` 指定的 python 計數法實跑（**未使用 BSD `uniq`**）：
+      delta `specs/player-stats/spec.md` **無重複**（28 條標題）、
+      delta `specs/match-stage/spec.md` **無重複**（5 條標題）、
+      既有 `openspec/specs/match-stage/spec.md` **無重複**（67 條標題）。
+      ⚠️ `openspec/specs/player-stats/` **目前尚不存在**（本 change 是該 capability 的首次建立，
+      主 spec 於 archive 的 sync 階段才產生），故該檔的重複檢查 **MUST 於 archive sync 後補跑一次**。
+      原文：spec 條目重複檢查（依 root `CLAUDE.md` 指定的 python 計數法，**不使用 BSD `uniq`**——它會把內容不同的中文標題誤判為重複），對 `openspec/specs/player-stats/spec.md` 與 `openspec/specs/match-stage/spec.md`（sync 後）分別執行
+- [x] 9.12 **已完成**：`test-plan.md` 檔尾新增「補登：apply 階段新增的非錨點測試」一節，
+      以四張表（依所在檔案分組）逐條記錄 **17 條非錨點測試**的「補的是什麼缺口」「對應哪條 spec
+      MUST 或 design Decision」「由誰補」。**其中 16 條為 apply 階段新增**，
+      另 1 條（`分頁清單依序為對戰、參賽者、歷史、資料與統計五筆`）是 M5 既有的 regression guard、
+      由 §7.1 依本節 9.8 的白名單更名而來，已在表中註明以免誤讀為新增。
+      該節同時說明 `/opsx:verify` 的錨點核對是**單向**的（每個錨點都要找得到同名測試），
+      多出來的測試不會造成核對失敗。原文：**補登審查階段新增的非錨點測試**：apply 過程中為了殺掉 mutation 存活缺口，新增了 17 個
       不在 delta spec 驗收錨點內的 `it`（皆對應 spec prose 的 MUST 子句或 design Decision，
       經 §4 Stage 1／Stage 2 判定為正當而非測試膨脹）。archive 前 MUST 把它們補登進
       `test-plan.md`，避免日後稽核誤判為未經規劃的測試膨脹：
