@@ -99,56 +99,16 @@ function buildRosterUnion(
 }
 
 /**
- * 依歷史紀錄逐筆加總出場數、勝場與敗場：該球員所屬隊伍與 `winner` 相同記勝場，
- * 不同記敗場（spec：SHALL NOT 出現第三種計數）。只累加到 `stats` 內另外配置的
- * MutableStat 物件，SHALL NOT 修改 `history` 本身或其中任何物件。
- */
-function tallyGamesAndResults(
-	stats: ReadonlyMap<string, MutableStat>,
-	history: readonly MatchHistoryEntry[],
-): void {
-	for (const entry of history) {
-		const sides = [
-			{ winnerKey: "teamA" as const, team: entry.teamA },
-			{ winnerKey: "teamB" as const, team: entry.teamB },
-		];
-
-		for (const { winnerKey, team } of sides) {
-			for (const historyPlayer of team.players) {
-				const stat = stats.get(historyPlayer.id);
-				if (!stat) {
-					continue;
-				}
-				stat.gamesPlayed += 1;
-				if (entry.winner === winnerKey) {
-					stat.wins += 1;
-				} else {
-					stat.losses += 1;
-				}
-			}
-		}
-	}
-}
-
-/** 出場數為 0 時勝率為 0，SHALL NOT 產生 NaN 或除以零的未定義結果（spec）。 */
-function winRateOf(wins: number, gamesPlayed: number): number {
-	if (gamesPlayed === 0) {
-		return 0;
-	}
-	return wins / gamesPlayed;
-}
-
-/**
  * 計算每位球員的統計，範圍為「目前名單」與「歷史紀錄中出現過的球員」的聯集。
- * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。`ratingDelta`／
- * `mostFrequentPartner`／`mostFrequentOpponent` 為 §3／§4 補齊前的暫定值。
+ * 純函式：SHALL NOT 修改輸入的 `history` 或 `players`。本階段（§2.2）僅完成
+ * 聯集骨架，出場數／勝場／敗場／勝率暫定為 0，§2.4 會補上依歷史紀錄的真正加總；
+ * `ratingDelta`／`mostFrequentPartner`／`mostFrequentOpponent` 則留待 §3／§4。
  */
 export function computePlayerStats(
 	history: readonly MatchHistoryEntry[],
 	players: readonly Player[],
 ): PlayerStat[] {
 	const union = buildRosterUnion(history, players);
-	tallyGamesAndResults(union, history);
 
 	return Array.from(union.values()).map((stat) => ({
 		id: stat.id,
@@ -160,7 +120,7 @@ export function computePlayerStats(
 		gamesPlayed: stat.gamesPlayed,
 		wins: stat.wins,
 		losses: stat.losses,
-		winRate: winRateOf(stat.wins, stat.gamesPlayed),
+		winRate: 0,
 		ratingDelta: 0,
 		mostFrequentPartner: null,
 		mostFrequentOpponent: null,
