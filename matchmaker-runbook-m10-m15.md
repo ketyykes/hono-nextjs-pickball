@@ -15,19 +15,35 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-03，propose 階段完成）
+## 狀態快照（最後更新 2026-09-06，M10 已合併）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `3fa2d22`（docs：runbook 記錄 worktree teardown 完成） |
-| propose | **六個 change 的八份 artifact 皆已產出**，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過。尚未 commit。 |
-| M10 | 未開始 |
+| `main` HEAD | `56331b0`（feat：合併 M10 matchmaker-stage-gaps） |
+| propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
+| M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | 未開始 |
 | M12 | 未開始 |
 | M13 | 未開始 |
 | M14 | 未開始 |
 | M15 | 未開始 |
 | 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `main`，工作樹乾淨 |
+
+### M10 執行紀錄（2026-09-06）
+
+- 4 個實作群組（§2～§5）序列派工，§2／§3 各被 Stage 1 退回一次並修正，§4 一次過；Final Code Review APPROVED。
+  審查合計封住 6 個存活 mutation，其中 §2 抓到一個純靠讀 class 看不出來、必須實測 boundingBox 才發現的桌面版面 126px 破口（`EmptyMatches` 缺 `flex-1`）。
+- **一次 agent 並行事故**：coordinator 誤判 §2 Stage 2 Reviewer 卡住（實為長時間跑 tsc／lint／E2E 無輸出）而請 leader 重派，
+  resume 又讓原 agent復活，兩個 reviewer 短暫共寫同一非隔離工作樹。兩邊都自行偵測到競態並停手，事後交叉核對，無資料損毀，只多花一輪工。
+  **教訓**：判斷 subagent 是否卡住，只能看 transcript 最後一筆是否為「發出 Bash 指令、之後再無任何後續」且對應 process 已消失；
+  絕不可只憑「一段時間沒新 commit」就判定卡住並重派——tsc／lint／E2E 這類指令本來就會長時間無輸出。
+- **5.5（全套 E2E）一度卡住升級**：`scoreboard-binding.spec.ts` 在 `[webkit]`／`[mobile-safari]` 於 `beforeEach` 的 `page.goto("/")`
+  偶發逾時 30000ms，與本 change 零關聯。coordinator 獨立在 `main`（合併前）重跑一次全套 E2E，重現同樣的失敗家族（同檔案、同兩個 project、
+  同 beforeEach、命中的具體 test 不同），確認為**既有環境雜訊、非本 change 迴歸**，裁定通過。
+- **機器負載事故**：coordinator 事後想在 change 分支上再獨立重跑一次全套 E2E 做交叉驗證，途中主機 load average 飆到 100+（可用記憶體降到
+  個位數 MB），與本 repo 測試無關（疑似系統背景程序），導致 `[mobile-safari]` project 整批級聯逾時。判定為機器資源問題非程式缺陷，
+  清掉所有測試相關 process 後未再重跑，改採「leader 自己 Final Review 那輪全綠（160/160）＋ main 上的既有雜訊重現」作為合併依據，
+  經使用者確認後合併。**教訓**：機器 load average 需要在判斷 E2E 結果前一併檢查，異常高負載時的測試結果一律視為無效重跑。
 
 ### `main` 品質基線（coordinator 於 `3fa2d22` 獨立實測，2026-09-03）
 
@@ -71,7 +87,7 @@ main@3fa2d22
 
 | # | change id | 內容 | 規模 | tasks／群組 | 預估棒數 | branch | base 前提 | 狀態 |
 |---|---|---|---|---|---|---|---|---|
-| M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | <待填> | <待填> | <待填> | change/matchmaker-stage-gaps | main @ `3fa2d22` | 未開始 |
+| M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | 21 commit | §1～§5 五組 | 1 棒 | change/matchmaker-stage-gaps（已刪） | main @ `3fa2d22` | **已合併**（`56331b0`） |
 | M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | <待填> | <待填> | <待填> | change/matchmaker-player-stats | M10 已合併 | 未開始 |
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | <待填> | <待填> | <待填> | change/matchmaker-scoreboard-team-labels | M11 已合併 | 未開始 |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | <待填> | <待填> | <待填> | change/matchmaker-player-swap | M12 已合併 | 未開始 |
