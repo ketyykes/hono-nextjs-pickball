@@ -107,13 +107,13 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED: 補兩個 it：「最常搭檔為雙打隊友中出現次數最多者」、「從未打過雙打時最常搭檔為 null」。確認紅燈
-- [ ] 4.2 GREEN: 實作雙打隊友計數（同隊除自己外的其他球員逐筆計數，只計雙打紀錄）；取次數最多者的姓名，次數相同時依姓名以原生 `<` 排序取前者（design Decision 5，不用 `localeCompare`）；從未出現雙打隊友時為 `null`。姓名解析沿用 §3.5 的最近一次快照 helper（design Decision 4）
-- [ ] 4.3 RED: 補一個 it：「最常對手為對戰過的對手中出現次數最多者」。確認紅燈
-- [ ] 4.4 GREEN: 實作對方隊伍球員計數（單打與雙打皆計入），取次數最多者的姓名，同分規則與 4.2 相同。SHALL NOT 為對手另寫一份與 4.2 幾乎相同的計數迴圈——兩者共用同一個 tally helper，只有「同隊」或「對方隊」的輸入不同
-- [ ] 4.5 RED: 補一個 it：「排行榜依目前強度、勝率、出場數、姓名依序排序」。確認紅燈
-- [ ] 4.6 GREEN: 在 `computePlayerStats` 回傳前排序：目前強度 desc → 勝率 desc → 出場數 desc → 姓名（原生 `<`）asc
-- [ ] 4.7 REFACTOR: 確認最常搭檔／最常對手的 tally 邏輯共用同一個內部 helper（非兩份幾乎相同的迴圈）；確認排序比較邏輯為單一具名函式；確認 `player-stats.ts` 全檔沒有任何中文顯示字面量（design Decision 2：純資料，文案交給呈現層）
+- [x] 4.1 RED: 補兩個 it：「最常搭檔為雙打隊友中出現次數最多者」、「從未打過雙打時最常搭檔為 null」。確認紅燈。前者為真紅燈（`expected null to be '甲'`）；後者為 regression guard（實作固定回傳 `null`，寫入當下即綠）
+- [x] 4.2 GREEN: 實作雙打隊友計數（同隊除自己外的其他球員逐筆計數，只計雙打紀錄）；取次數最多者的姓名，次數相同時依姓名以原生 `<` 排序取前者（design Decision 5，不用 `localeCompare`）；從未出現雙打隊友時為 `null`。姓名解析沿用 §3.5 的最近一次快照 helper（design Decision 4）
+- [x] 4.3 RED: 補一個 it：「最常對手為對戰過的對手中出現次數最多者」。確認紅燈（`expected null to be '丙'`）
+- [x] 4.4 GREEN: 實作對方隊伍球員計數（單打與雙打皆計入），取次數最多者的姓名，同分規則與 4.2 相同。SHALL NOT 為對手另寫一份與 4.2 幾乎相同的計數迴圈——兩者共用同一個 tally helper（`tallyPairs`），只有「同隊」或「對方隊」的輸入不同
+- [x] 4.5 RED: 補一個 it：「排行榜依目前強度、勝率、出場數、姓名依序排序」。確認紅燈——名單陣列刻意打亂排列（不依期望順序），避免聯集插入順序巧合符合期望而偽造綠燈
+- [x] 4.6 GREEN: 在 `computePlayerStats` 回傳前排序：目前強度 desc → 勝率 desc → 出場數 desc → 姓名（原生 `<`）asc
+- [x] 4.7 REFACTOR: 確認最常搭檔／最常對手的 tally 邏輯共用同一個內部 helper（非兩份幾乎相同的迴圈）；確認排序比較邏輯為單一具名函式；確認 `player-stats.ts` 全檔沒有任何中文顯示字面量（design Decision 2：純資料，文案交給呈現層）。另依交棒事項新增 `collectCandidatesByPlayer` 泛型 helper 收斂候選收集骨架，並在 `pickValueAtLatestPlayedAt` JSDoc 記錄 `playedAt` 同值 tie-break 決策（擇方案②文件化）。自我 mutation 測試找到 2 個存活並已補斷言修正（詳見交件回報）
 
 ## 5. 排行榜表格元件（PlayerStatsTable.tsx）
 
