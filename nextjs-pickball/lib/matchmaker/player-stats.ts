@@ -57,6 +57,11 @@ interface MutableStat {
  * ISO 8601 字串字典序（design Decision 4），SHALL NOT 用 `new Date()` 解析。
  * 完整掃描全部候選而非只看陣列最後一個元素，結果因此不依賴呼叫端傳入的排列
  * 順序——供本檔目前強度計算與 §4 的最常搭檔／最常對手姓名解析共用同一份邏輯。
+ *
+ * `playedAt` 完全相同的兩筆候選視為不可區分、取先遇者（陣列中在前者）——
+ * 這是已知且可接受的行為，不另加同 `playedAt` 的 tie-break：實務上同一位球員
+ * 不會在完全相同的時間戳同時出現在兩筆不同紀錄中，加一層 tie-break 換來的
+ * 確定性在此不具實質意義（§3→§4 交棒事項 2，擇一採此文件化方案）。
  */
 function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; value: T }[]): T | undefined {
 	let latest: { playedAt: string; value: T } | undefined;
@@ -69,22 +74,35 @@ function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; v
 }
 
 /**
+ * 依歷史紀錄逐筆收集每位球員的候選值，供 `pickValueAtLatestPlayedAt` 取最近一筆。
+ * `latestRatingAfterByPlayer`（取 `ratingAfter`）與 `latestNameByPlayer`（取姓名
+ * 快照）共用同一套「先建 `Map<id, candidates[]>` 再逐一取值」骨架，避免抄第三份
+ * 幾乎相同的收集迴圈（§3→§4 交棒事項 1）。
+ */
+function collectCandidatesByPlayer<T>(
+	history: readonly MatchHistoryEntry[],
+	valueOf: (historyPlayer: MatchHistoryEntry["teamA"]["players"][number]) => T,
+): Map<string, { playedAt: string; value: T }[]> {
+	const result = new Map<string, { playedAt: string; value: T }[]>();
+	for (const entry of history) {
+		for (const team of [entry.teamA, entry.teamB]) {
+			for (const historyPlayer of team.players) {
+				const candidates = result.get(historyPlayer.id) ?? [];
+				candidates.push({ playedAt: entry.playedAt, value: valueOf(historyPlayer) });
+				result.set(historyPlayer.id, candidates);
+			}
+		}
+	}
+	return result;
+}
+
+/**
  * 已離開名單球員的目前強度：其在 `history` 中依 `playedAt` 最近一筆的
  * `ratingAfter`（spec「目前強度與已離開名單球員的標示」）。名單內球員的目前強度
  * 一律直接取自 `players` 的 `rating`，不經過本函式。
  */
 function latestRatingAfterByPlayer(history: readonly MatchHistoryEntry[]): Map<string, number> {
-	const candidatesByPlayer = new Map<string, { playedAt: string; value: number }[]>();
-
-	for (const entry of history) {
-		for (const team of [entry.teamA, entry.teamB]) {
-			for (const historyPlayer of team.players) {
-				const candidates = candidatesByPlayer.get(historyPlayer.id) ?? [];
-				candidates.push({ playedAt: entry.playedAt, value: historyPlayer.ratingAfter });
-				candidatesByPlayer.set(historyPlayer.id, candidates);
-			}
-		}
-	}
+	const candidatesByPlayer = collectCandidatesByPlayer(history, (historyPlayer) => historyPlayer.ratingAfter);
 
 	const result = new Map<string, number>();
 	for (const [id, candidates] of candidatesByPlayer) {
@@ -102,17 +120,7 @@ function latestRatingAfterByPlayer(history: readonly MatchHistoryEntry[]): Map<s
  * 沿用 `pickValueAtLatestPlayedAt` 同一份比較邏輯，§3.5 交棒事項 1）。
  */
 function latestNameByPlayer(history: readonly MatchHistoryEntry[]): Map<string, string> {
-	const candidatesByPlayer = new Map<string, { playedAt: string; value: string }[]>();
-
-	for (const entry of history) {
-		for (const team of [entry.teamA, entry.teamB]) {
-			for (const historyPlayer of team.players) {
-				const candidates = candidatesByPlayer.get(historyPlayer.id) ?? [];
-				candidates.push({ playedAt: entry.playedAt, value: historyPlayer.name });
-				candidatesByPlayer.set(historyPlayer.id, candidates);
-			}
-		}
-	}
+	const candidatesByPlayer = collectCandidatesByPlayer(history, (historyPlayer) => historyPlayer.name);
 
 	const result = new Map<string, string>();
 	for (const [id, candidates] of candidatesByPlayer) {
