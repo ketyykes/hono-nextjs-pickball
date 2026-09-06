@@ -29,3 +29,9 @@ export const DOUBLES_COMPOSITION_LABEL: Record<DoublesComposition, string> = {
 	womens: "女雙",
 	general: "一般雙打",
 };
+
+/**
+ * 排行榜（PlayerStatsTable）標示「已離開目前名單」球員的文字標籤。色彩不得作為唯一
+ * 資訊來源（prd.md 12.5），此文字標籤才是可靠依據，SHALL NOT 在元件內寫死字面量。
+ */
+export const PLAYER_NOT_ON_ROSTER_LABEL = "已不在名單";

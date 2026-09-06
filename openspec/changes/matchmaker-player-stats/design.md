@@ -177,7 +177,7 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
 
 `computePlayerStats` 同時輸出 `mostFrequentPartner` 與 `mostFrequentOpponent`
 兩個欄位，`PlayerStatsTable.tsx` 的欄位 MUST 兩者都顯示（常搭檔、常對手各一欄，
-共九欄：名次、球員、強度、出場、勝－負、勝率、淨變化、常搭檔、常對手）。
+共九欄：名次、球員、強度、出場、勝負、勝率、淨變化、常搭檔、常對手）。
 
 **理由**：M9 Final Review 的既有 checklist 明文要求「`ExportScene` 的欄位全數有消費端，
 零 dead data」；若 `mostFrequentOpponent` 只被計算卻從不顯示，就是同一種問題在本 change
@@ -239,6 +239,119 @@ Final Review 已認定該檔的私有常數屬於「例外層之外、`ExportSce
    `section-nav.ts` 的內容與本 change 的 `match-stage` MODIFIED 區塊不再逐字相符
    （例如 M10 也改了同一個 Requirement 或同一個檔案），MUST 重新對齊該 MODIFIED 區塊
    後才能繼續，SHALL NOT 直接套用本文件寫定的版本覆蓋 M10 的變動。
+
+   **【apply §1 對齊結論，2026-09-06 實測，base = `main` HEAD `5e564ee`】**
+
+   M10 已合併（merge commit `56331b0`）。以 `git show --stat 56331b0` 機械確認 M10 觸及的
+   檔案僅五個：`components/matchmaker/EmptyMatches.tsx`（新增）、
+   `components/matchmaker/HistoryView.tsx`、`components/matchmaker/MatchStage.tsx`、
+   `tests/e2e/specs/match-stage.spec.ts`、`tests/e2e/specs/matchmaker-history.spec.ts`
+   （其餘為 M10 自身的 openspec 文件）。**本 change 消費的九個檔案 M10 全數未觸及**，
+   `match-stage` 的 MODIFIED 區塊無需重新對齊。逐項核對結果：
+
+   - `hooks/useRoundStore.ts`：`UseRoundStoreOptions` 為 `{ players: readonly Player[];
+     updatePlayer: (id, patch) => void }` 兩者皆必填；`UseRoundStoreResult` 確實含
+     `history: MatchHistoryEntry[]` 與 `droppedCount: number`。**與 Decision 1 假設一致**。
+   - `hooks/useRosterStore.ts`：`UseRosterStoreResult` 含 `players: Player[]` 與
+     `updatePlayer(id, patch)`。**與假設一致**。
+   - `lib/matchmaker/history.ts`：`HistoryPlayerSchema` 為
+     `{ id, name, ratingBefore, ratingAfter }`；`HistoryEntryBaseSchema` 為
+     `{ matchId, courtNumber, playedAt, teamA, teamB, scoreA, scoreB, winner }`，
+     `winner` 為 `z.enum(["teamA","teamB"])`，`format` 由 discriminated union 提供。
+     `HistoryTeamSchema` 為 `{ players: HistoryPlayer[], rating: number }`
+     ——**注意隊伍球員在 `team.players` 底下，不是 `teamA` 直接是陣列**。
+   - `lib/matchmaker/history-range.ts`：`filterHistoryByRange(entries, range, now)` 簽章
+     一致，回傳已依 `playedAt` 由新到舊排序後再篩選；`HISTORY_RANGES` 為
+     `["today","thisWeek","thisMonth","lastMonth","earlier"]`。
+   - `components/matchmaker/HistoryRangeFilter.tsx`：`HistoryRangeFilterProps` 為
+     `{ value: HistoryRange; onChange: (range) => void }`，`role="radiogroup"`
+     且 `aria-label="歷史區間"`。
+   - `components/matchmaker/EmptyHistory.tsx`：`EmptyHistoryProps` 為
+     `{ range: HistoryRange | null }`，`range === null` 走引導型空狀態分支。
+   - `lib/matchmaker/section-nav.ts`：`MATCHMAKER_SECTION_HREFS` 與
+     `MATCHMAKER_SECTION_LABELS` **皆為模組私有（未 `export`）**，僅
+     `MATCHMAKER_ROUTE`／`matchmakerSectionTabs()`／`MatchmakerSectionTab` 對外匯出。
+     §7.2 只需在這兩個私有陣列／物件各追加一筆，不需要調整可見度。
+   - `lib/matchmaker/colors.ts`：`pickTextColor(colorFrom, colorTo): string` 簽章一致。
+   - `lib/matchmaker/labels.ts`：目前僅四個匯出（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／
+     `FORMAT_LABEL`／`DOUBLES_COMPOSITION_LABEL`），新增
+     `PLAYER_NOT_ON_ROSTER_LABEL` 不撞名。
+   - `lib/matchmaker/types.ts`：`PlayerSchema` 為
+     `{ id, name, colorFrom, colorTo, rating: z.number().min(1).max(8), isActive, ... }`。
+   - `components/ui/table.tsx`：外層 `data-slot="table-container"` 的 `div` 帶
+     `relative w-full overflow-x-auto`，Decision 7 的前提成立；匯出含
+     `Table`／`TableHeader`／`TableBody`／`TableRow`／`TableHead`／`TableCell` 等。
+   - `nextjs-pickball/package.json`：目前無任何圖表相依，`dependencies` 13 筆
+     （`@opennextjs/cloudflare`／兩個 radix／`class-variance-authority`／`clsx`／
+     `lucide-react`／`motion`／`next`／`radix-ui`／`react`／`react-dom`／
+     `tailwind-merge`／`zod`）。本 change 結束時此清單 MUST 不變。
+   - `app/matchmaker/` 目前有 `data`／`history`／`players` 三個子路由與
+     `layout.tsx`／`page.tsx`，**尚無 `stats/`**（§6 為全新目錄）。
+
+   **偏離記錄**：本批依 coordinator 指示不使用 git worktree，直接在主 repo 的
+   `change/matchmaker-player-stats` 分支上執行（見 environment.md 的 Verification）。
+   execution-plan 與本檔中所有「worktree 絕對路徑」一律改讀為
+   `/Users/m2_24gb/Desktop/project/nextjs-pickball`。
+
+1-b. **【apply §5 裁決，2026-09-06】delta spec 內部字面矛盾：「勝－負」vs「勝負」**
+
+   `specs/player-stats/spec.md` 的 Requirement prose 原本把第五欄寫成「**勝－負**」，但同一份
+   spec 的 Scenario「直接開啟 /matchmaker/stats 顯示排行榜表格」要求 §6 的 E2E 能在標題列比對到
+   「**勝負**」這個連續子字串——帶破折號的標題不含「勝負」，兩者不可能同時滿足。
+
+   對照可知 Scenario 的九個詞**全部都是欄位全名的子字串**（「強度」⊂「目前強度」、「出場」⊂
+   「出場數」、「淨變化」⊂「強度淨變化」、「常搭檔」⊂「最常搭檔」），唯獨「勝負」⊄「勝－負」
+   ——破折號是 prose 敘述時的便利寫法，不是 UI 文案規定。
+
+   **裁決**（§5 Stage 1 Reviewer 判定，leader 採納）：Scenario 是可執行、可機械驗證的契約，
+   prose 是自然語言描述；實作採「勝負」是正確的。已把 `specs/player-stats/spec.md`、本檔
+   Decision 6、`proposal.md` 三處的「勝－負」一併更正為「勝負」，避免 archive 時把這個自相矛盾
+   同步進主 spec。`tasks.md` 的 5.2 保留原始指派文字作為歷史紀錄，不回頭改寫。
+
+1-c. **【apply §6～§8 發現，coordinator 已追認處置，archive 前仍需複核 spec 措辭】
+   統計頁實際上會把三個 LocalStorage key 重新序列化寫回**
+
+   spec「統計頁的可用性、無障礙與唯讀保證」寫的是「統計頁 SHALL NOT 修改回合、名單或任何
+   LocalStorage 資料，SHALL NOT 呼叫任何 store 的 setter」。**前半句與實作不符，後半句相符。**
+
+   **事實**（leader 逐行複驗 + §8 mutation 實驗確證，不是推測）：Decision 1 選的 hook 形態下，
+   `hooks/useRosterStore.ts` 與 `hooks/useRoundStore.ts` 的 write effect 以 `hasHydratedRef`
+   守門——mount 時跳過，但 hydrate effect 一 dispatch `HYDRATE`，state 就變動，write effect
+   隨即觸發 `writeRoster`／`writeRound`／`writeHistory`。§8 的 mutation M4a／M4b／M4c 各自對
+   一個 key 種入「合法但非 schema 序列化順序」的資料，三次都在**對應的那個 key** 上轉紅
+   ——這正面證明了三個 key 都真的被回寫（否則非正規化的種入值會原封不動留著、比對照樣通過）。
+
+   **這不是 M11 引入的**：`/matchmaker` 對戰頁（M5）採同一形態、同樣會回寫。
+   `HistoryView`（M7）只呼叫 `readHistory()`、從不碰 roster／round，所以歷史頁的同名唯讀 test
+   能真的成立，統計頁不能照抄。
+
+   **處置**（leader 於 §8 開工前裁決，coordinator 於 2026-09-06 回覆「方案①合理，追認」）：
+   維持 Decision 1，照 spec 的 Scenario **字面實作**——以應用程式自己寫出的正規化形狀種資料
+   （真實使用者資料一律如此，因為都是這兩個 store 自己寫的），此時回寫是逐位元組相同的重新
+   序列化，「逐字相同」的斷言成立。並在 `tests/e2e/specs/player-stats.spec.ts` 該 test 上方
+   寫明「這條斷言證明了什麼」（切換區間與瀏覽本身不會改變持久化內容，能抓到誤觸 store setter
+   的迴歸）與「它沒有證明什麼」（頁面確實會回寫；逐字相同成立的前提是種入資料已正規化，
+   若資料被手動編輯過或來自舊版格式，回寫會使其正規化而讓逐字比對失敗）。
+
+   **archive 前仍需複核的一點**：上述追認來自 coordinator（派工方），**不等同專案使用者對 spec
+   措辭的核可**。delta spec 這句話會在 archive 時同步進主 spec，屆時主 spec 將帶有一句與實作
+   有落差的 SHALL NOT。是否要補一句限定（例如「store hydration 造成的等值重新序列化不視為
+   修改」），或維持現狀並以本條 Open Question 作為說明，留待人類決定。
+
+   **【Final Review 裁決，2026-09-06】採方案②：delta spec 已補上限定語。**
+   `specs/player-stats/spec.md` 的「統計頁的可用性、無障礙與唯讀保證」Requirement prose 改為
+   「SHALL NOT 呼叫任何 store 的 setter，SHALL NOT 改變……資料的**內容**」，並另起一段明訂
+   「等值的重新序列化 SHALL NOT 被視為修改」，同時封住放寬解讀（任何改變資料語意內容的寫入
+   仍在禁止之列）。**未更動任何 Scenario、驗收錨點或測試名稱**，實作與測試零改動。
+
+   理由是成本不對稱：Open Question 隨 change 一起進 `changes/archive/`，主 spec 的讀者不會
+   看到它；而主 spec 依 CLAUDE.md「不可直接編輯」的規則，archive 後要改這一句得再開一個
+   完整的 openspec change。留著一句與實作不符的 SHALL NOT，最可能的後果是日後有人把它當
+   bug 回報，並為了讓字面成立而拆掉 Decision 1 的 hook 形態（等於在兩個 hook 之外長出第三、
+   第四份 hydration 邏輯，正是 Decision 1 明確排除的方向）。
+
+   **這仍是可由人類推翻的編輯**：若使用者偏好維持原句、只靠本 Open Question 說明，
+   `git revert` 該次 commit 即可還原，不影響任何程式碼或測試。
 
 2. **Elo 走勢圖是否值得做成獨立 change？** 本 change 的 Non-Goals 已排除圖表；若使用者
    日後認為排行榜的「淨變化」不足以呈現趨勢，需另外評估圖表庫選型（是否比照 M9 的

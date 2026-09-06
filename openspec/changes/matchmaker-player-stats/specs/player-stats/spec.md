@@ -183,7 +183,7 @@ SHALL NOT 依紀錄出現順序或其他不穩定依據決定。該球員從未�
 直接開啟，不相依任何前一畫面留下的記憶體狀態（比照 `match-history` 的「歷史頁的導覽入口」
 既有先例）。
 
-排行榜表格 MUST 依序顯示下列欄位：名次、球員（色塊＋姓名）、目前強度、出場數、勝－負、
+排行榜表格 MUST 依序顯示下列欄位：名次、球員（色塊＋姓名）、目前強度、出場數、勝負、
 勝率、強度淨變化、最常搭檔、最常對手。球員色塊 MUST 沿用既有雙色漸層
 （`colorFrom`／`colorTo`）與 `nextjs-pickball/lib/matchmaker/colors.ts` 的 `pickTextColor`
 決定前景色，SHALL NOT 另寫一套亮度判斷。已不在名單的球員 MUST 於姓名旁顯示可讀的文字標示
@@ -233,8 +233,15 @@ SHALL NOT 顯示只有標題列的空表格——排行榜在完全沒有資料�
 不得只靠色塊或樣式區分（`prd.md` 12.5）。區間篩選控制項 MUST 可由鍵盤操作且具備可存取名稱
 （沿用 `HistoryRangeFilter` 既有的 `role="radiogroup"` 實作）。
 
-統計頁 SHALL NOT 修改回合、名單或任何 LocalStorage 資料，SHALL NOT 呼叫任何 store 的
-setter，也 SHALL NOT 發出任何網路請求。
+統計頁 SHALL NOT 呼叫任何 store 的 setter，SHALL NOT 改變回合、名單或歷史等 LocalStorage
+資料的**內容**，也 SHALL NOT 發出任何網路請求。
+
+上述唯讀保證的界線：統計頁比照 `/matchmaker` 對戰頁直接持有 `useRosterStore`／
+`useRoundStore`，兩個 hook 的 write effect 會在 hydrate 後把三個 LocalStorage key 各自
+**重新序列化寫回**（既有 hydration 行為，非統計頁引入）。這種等值的重新序列化 SHALL NOT
+被視為「修改」——寫回的是同一份資料經目前 schema 序列化後的形狀，對應用程式自己寫出的
+資料而言逐位元組相同。此界線僅涵蓋等值重新序列化，SHALL NOT 據以放寬前段：任何會改變
+資料語意內容的寫入仍在禁止之列。
 
 #### Scenario: 排行榜表格於支援寬度下限不造成整頁橫向溢出
 

@@ -32,7 +32,15 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   的 `@media print` 區塊 + `components/matchmaker/PrintSheet.tsx` 列印版）
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
 - `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
-- 上述四頁共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
+- `/matchmaker/stats` — 球員統計與排行榜（milestone M11 = matchmaker-player-stats change），同樣不在全站 navbar。
+  統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`
+  （球員範圍為「目前名單」與「歷史紀錄」的**聯集**，回傳已排序完成），呈現層為
+  `components/matchmaker/PlayerStatsTable.tsx`（九欄）。區間篩選與空狀態**重用 M7 的既有元件**
+  （`HistoryRangeFilter`／`EmptyHistory`），SHALL NOT 另寫第二套。
+  ⚠️ 本頁比照對戰頁形態直接持有 `useRosterStore`／`useRoundStore`，因此**載入時會經由兩個 store
+  的 write effect 把三個 storage key 重新序列化回寫**（M4／M5 既有的 hydration pattern，非本頁引入）；
+  頁面本身零 store setter 呼叫。細節見該 change 的 design.md Open Questions 第 1-c 條
+- 上述**五頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料／統計」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
   **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 

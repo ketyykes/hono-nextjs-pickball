@@ -21,11 +21,18 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0 實測回填（於本 worktree 執行 `pnpm install` 後
-  `pnpm test`，記錄前端／後端各自的檔案數與測試數、exit code；後端若出現
-  `listen EPERM 127.0.0.1` 屬沙箱限制，放行後重跑，不視為 baseline 不綠）。
-- **Initial commit hash**: 待 apply Step 0 實測回填（`main` 上 M10 已合併後的 HEAD）。
-- **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-player-stats`
+- **Baseline tests**（2026-09-06 實測，`pnpm install` 後 `pnpm test`）：
+  前端 `nextjs-pickball` 68 個測試檔／638 個測試全數通過；後端 `hono-pickball`
+  4 個測試檔／16 個測試全數通過；`pnpm test` exit code 0。未出現
+  `listen EPERM 127.0.0.1`（本輪未受沙箱限制）。`pnpm install` 後
+  `git status --porcelain` 為空，`pnpm-lock.yaml` 零變動。
+- **Initial commit hash**: `5e564ee712cc297bd5e19cacabcced52b2978ac6`
+  （`main` 上 M10 合併 commit `56331b0` 之後的 HEAD）。
+- **Worktree path**: **本批不使用 linked worktree**——依使用者（coordinator）本輪的明確指示，
+  M11 直接在主 repo `/Users/m2_24gb/Desktop/project/nextjs-pickball` 的
+  `change/matchmaker-player-stats` 分支上進行，SHALL NOT `git worktree add`、
+  SHALL NOT 切換分支、SHALL NOT `git merge`。apply Step 0 的 cwd 檢查以此路徑為準。
+  下方 Setup commands／Teardown 兩節保留原始 worktree 版本作為歷史紀錄，本批不執行。
 
 ## Teardown
 

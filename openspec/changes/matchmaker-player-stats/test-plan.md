@@ -94,3 +94,52 @@
 | 目前路徑對應的分頁為 active，其餘分頁為非 active | 區段導覽標示目前所在頁 | `/matchmaker`／`/matchmaker/players` 兩路徑呼叫分頁清單函式 → 對應分頁 `active=true`，另一個 `false` | 既有行為（M5 已實作並持續通過），MODIFIED 隨 Requirement 全文列出供覆蓋比對，本 change 不重寫 | unit |
 | 區段導覽可在對戰頁與參賽者名單頁之間來回切換 | 兩頁可互相切換 | 依序點擊「參賽者」「對戰」→ 依序導向兩個路徑，皆顯示區段導覽 | 既有行為（M5 已實作並持續通過），MODIFIED 隨 Requirement 全文列出供覆蓋比對，本 change 不重寫 | e2e |
 | 可由對戰頁的區段導覽點擊進入統計頁 | 統計分頁納入區段導覽並可點擊進入 | 於對戰頁點擊區段導覽的「統計」→ 導向 `/matchmaker/stats`，該分頁帶 `aria-current="page"` | golden path：本 change 對 `match-stage` 唯一新增的行為，確認第五個分頁真的接上路由而不只是清單多一筆資料 | e2e |
+
+---
+
+## 補登：apply 階段新增的非錨點測試（2026-09-06，tasks §9.12）
+
+> 下列測試**不對應任何 delta spec 的「驗收」錨點**，是 apply 過程中為了殺掉 mutation 存活缺口
+> 而補上的。每一條都對應 spec prose 的某條 MUST 子句或某個 design Decision，
+> 經各群組的 Stage 1／Stage 2 判定為**正當補強而非測試膨脹**。在此補登，避免日後稽核
+> 誤判為未經規劃的測試。
+>
+> `/opsx:verify` 的錨點核對是**單向**的（每個驗收錨點都要找得到同名測試），
+> 多出來的測試不會造成核對失敗。
+
+### `nextjs-pickball/lib/matchmaker/player-stats.test.ts`（unit）
+
+| Test name | 補的是什麼缺口 | 對應的 spec／design 條文 | 由誰補 |
+|-----------|----------------|--------------------------|--------|
+| 單打紀錄即使隊伍帶兩名球員也不計入最常搭檔（僅雙打計數） | 移除「只計雙打」判斷後仍全綠——既有 fixture 的單打隊伍固定只有 1 人，「排除自己」的判斷已足以讓單打自然不產生配對，遮蔽了這條判斷 | spec「最常搭檔 MUST 由該球員所有**雙打**歷史紀錄中的隊友逐筆計數」 | §4 Implementer |
+| 最常搭檔次數平手時取姓名 UTF-16 code unit 較前者 | 反轉同分 tie-break 方向仍全綠——既有搭檔／對手測試皆無次數平手情境 | design Decision 5 | §4 Implementer |
+| 最常搭檔的顯示姓名取該對象 playedAt 最近一次的姓名快照 | **design Decision 4 的 MUST 原本零覆蓋**——§3 的測試只涵蓋 `ratingAfter`，改成取最早姓名仍全綠 | design Decision 4 | §4 Stage 2 |
+
+### `nextjs-pickball/components/matchmaker/PlayerStatsTable.test.tsx`（integration）
+
+| Test name | 補的是什麼缺口 | 對應的 spec／design 條文 | 由誰補 |
+|-----------|----------------|--------------------------|--------|
+| 表格標題列依序顯示九個欄位名稱 | 九個欄位標題各自刪除的變異需有斷言守住 | spec「排行榜表格 MUST 依序顯示下列欄位…」＋ design Decision 6（零 dead data） | §5 Implementer |
+| 名次為傳入陣列的索引加一，不重新排序也不使用索引本身 | 名次改成索引本身或倒序的變異 | tasks 5.3；§4→§5 交棒事項 2（元件不重新排序） | §5 Implementer |
+| 各欄位如實顯示球員統計資料 | 九個 `TableCell` 資料來源互換的變異 | spec 的九欄對應正確性 | §5 Implementer |
+| 強度淨變化為負值時顯示負號，不強制補上正號 | 呈現層顯示決策無護欄 | design Decision 2（文案與呈現決策留給消費端） | §5 Implementer |
+| 最常搭檔與最常對手為 null 時顯示佔位符號而非空字串 | `?? 佔位符號` 改成 `?? ""` 的變異 | design Decision 2（`null` → 呈現層決定顯示什麼字） | §5 Implementer |
+| 球員欄的色塊內容為姓名本身 | **球員欄原本從未斷言「顯示的是姓名」**——色塊內容換成 `stat.id` 竟全綠 | spec「球員（色塊＋姓名）」 | §5 Stage 2 |
+| 強度淨變化為零時不補正號 | `delta > 0` 放寬為 `>=` 的變異；該邊界是元件內具名寫下的顯示決策卻無測試護欄 | design Decision 2 | §5 Stage 2 |
+| 勝率以四捨五入取整數百分比呈現 | `Math.round` 換成 `floor`／`ceil` 的變異 | 同上 | §5 Stage 2 |
+| 表格具備可存取名稱 | `<Table>` 原本沒有可存取名稱，螢幕閱讀器的表格清單只會讀到「表格」 | spec「色彩 SHALL NOT 作為唯一資訊來源」的無障礙延伸 | §5 Stage 2 |
+
+### `nextjs-pickball/lib/matchmaker/section-nav.test.ts`（unit）
+
+| Test name | 補的是什麼缺口 | 對應的 spec／design 條文 | 由誰補 |
+|-----------|----------------|--------------------------|--------|
+| 統計頁路徑下只有統計分頁為 active | task 指定的兩條路徑（`/matchmaker`、`/matchmaker/players`）**沒有任何斷言是站在 `/matchmaker/stats` 這一側觀察的**，而「把 `===` 改成 `startsWith` 會讓對戰分頁在每個子頁一起亮起」是本 milestone 唯一的新風險點 | `match-stage` spec「SHALL NOT 另立第二套判定邏輯」 | §7 Implementer |
+| 分頁清單依序為對戰、參賽者、歷史、資料與統計五筆 | **這一條不是新增的**——它是 M5 既有的 regression guard，由 §7.1 依 tasks §9.8 的白名單更名並把預期陣列由四筆擴為五筆。列在此處只是說明它同樣沒有對應錨點 | `match-stage` spec「`MATCHMAKER_SECTION_HREFS`／`MATCHMAKER_SECTION_LABELS` 各新增一筆」 | §7 Implementer（更名既有測試） |
+
+### `nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`（e2e）
+
+| Test name | 補的是什麼缺口 | 對應的 spec／design 條文 | 由誰補 |
+|-----------|----------------|--------------------------|--------|
+| 名單內球員取名單姓名與目前強度，已離開名單者標示且取歷史最後一筆 | 把 `computePlayerStats` 第二引數換成空陣列會全綠——這條**接線**只有 E2E 能驗（unit test 只測函式本身，不測 `page.tsx` 有沒有呼叫它、傳了什麼） | design Decision 1 的 store 接線 | §6 Implementer |
+| 統計頁載入後無 console error | `page.tsx` 在 render 期間呼叫 `new Date()`，此 test 是「不會造成 hydration mismatch」這個推論的實證 | design Decision 1 的代價（本頁非 server component） | §6 Implementer |
+| 切換到沒有紀錄的區間時不顯示引導型空狀態 | 空狀態判定誤用 `filteredHistory.length === 0` 竟全綠——該退化會讓空區間**謊稱使用者從未打過**，且**連區間篩選器一起消失**（使用者切不回去） | spec「空狀態的呈現」：`matchmaker:history:v1` **完全沒有任何紀錄**時才顯示引導型空狀態 | §6 Stage 2 |
