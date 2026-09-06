@@ -281,6 +281,24 @@ export const TeamPlayersSchema = z.object({
    基準；Decision 4 內文另誤指「tasks §9.5」，正確位置為 tasks.md §5 之後的「本 change 唯一
    容許變動的既有測試」段落。實作以 tasks.md 為準，斷言一律不變。
 
+5. **【apply §2 Stage 2 轉交】`PlayerBadge.foreground` 的覆蓋責任落在 §3／§4，不在 §2**：
+   Stage 2 獨立 mutation 顯示，把 `PlayerBadgeSchema` 的 `foreground: z.string()` 改為
+   `.optional()` 後，`lib/scoreboard/` 全部測試仍全綠（**存活**）。裁決為**不在 §2 補測試**——
+   spec 對 `foreground` 的規範是「計分板 SHALL NOT 自行計算前景文字色，MUST 直接採用
+   `teamPlayers` 內已算好的 `foreground`」，其驗收點在**寫入端**（§3 的
+   「球員顯示資訊的前景色等於 pickTextColor 的回傳值」）與**消費端**（§4 的 `TeamPanel.tsx`
+   渲染），schema／reducer 層沒有對應 Scenario。§3／§4 的 Stage 2 MUST 確認 `foreground`
+   確實被產生並被元件消費且有對應斷言，否則此變異會一路存活到 Final Review。
+
+6. **【apply §2 Stage 2 更正】tasks §3.3 的「`grep -rn "lib/matchmaker" nextjs-pickball/lib/scoreboard/`
+   確認為空」按字面**不可能**為空**：`lib/scoreboard/` 內有三處**純註解**提及該路徑
+   （`storage-keys.ts`、`storage.test.ts`，以及本 change 於 `types.ts` 新增的 Decision 6 理由
+   註解）。該檢查的真正語意是「**沒有任何實際 import**」。另 `components/scoreboard/` 有兩處
+   **真 import**（`ScoreboardSetup.tsx`、`MatchBindingNotice.tsx`），皆為 `MATCHMAKER_ROUTE`
+   路由常數且**均為 `main` 既有**（`git diff main..HEAD -- components/scoreboard/` 可證非本
+   change 引入）。後續各組與 Final Review 一律以「實際 import 為零」為判準，SHALL NOT 因註解
+   命中而誤判單向相依被打破。
+
 2. **姓名色塊的視覺樣式（padding、字級、圓角）留給 apply 的 Stage 1／2 審查依既有
    `components/scoreboard/`、`components/matchmaker/PlayerTile.tsx` 的既有視覺語言判斷**，
    design 不預先訂死確切的 px 數值——本 change 的核心是「資料要不要顯示、從哪裡來、怎麼保證

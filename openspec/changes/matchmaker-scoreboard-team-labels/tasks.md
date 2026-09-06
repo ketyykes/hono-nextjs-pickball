@@ -42,9 +42,29 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補兩個 it：「UNDO 與 RESET 後保留 teamPlayers，不退回 null」（比照既有的「UNDO 與 RESET 後保留 matchId，不退回 null」寫法）、「HYDRATE 原樣保留帶入的 teamPlayers」（比照既有的「HYDRATE 原樣保留帶入的 matchId」寫法）；`nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補一個 it：「舊版資料缺 teamPlayers 時補為 null 且不清除該筆」（`scoreboard:matches:v1` 內寫入一筆不含 `teamPlayers` 的合法舊資料，呼叫 `readMatchSlots()` 後斷言該筆 `teamPlayers` 為 `null` 且未被丟棄）。三者此時皆因 `teamPlayers` 尚不存在於 schema／`MatchSettings` 而斷言失敗。確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: `nextjs-pickball/lib/scoreboard/types.ts` 新增 `PlayerBadgeSchema`（`name`／`colorFrom`／`colorTo`／`foreground` 皆為 `z.string()`）與 `TeamPlayersSchema`（`{ us: z.array(PlayerBadgeSchema).min(1).max(2); them: z.array(PlayerBadgeSchema).min(1).max(2) }`，design Decision 6）；`ScoreboardStateSchema` 新增 `teamPlayers: TeamPlayersSchema.nullable().default(null)`；`MatchSettings` 新增 `teamPlayers: TeamPlayers | null`。`nextjs-pickball/lib/scoreboard/reducer.ts` 的 `createInitialState`／`settingsOf` 比照 `courtNumber` 既有寫法帶入 `teamPlayers`
-- [ ] 2.3 REFACTOR: 確認 `PlayerBadgeSchema`／`TeamPlayersSchema` 與其型別匯出緊鄰既有 schema 定義、命名風格與既有 `PascalCase`／`camelCase` 慣例一致；確認 `types.ts` 內沒有為 `colorFrom`／`colorTo` 另外引入 hex regex 驗證（design Decision 6 已裁決維持 `z.string()`）
+- [x] 2.1 RED: `nextjs-pickball/lib/scoreboard/reducer.test.ts` 補兩個 it：「UNDO 與 RESET 後保留 teamPlayers，不退回 null」（比照既有的「UNDO 與 RESET 後保留 matchId，不退回 null」寫法）、「HYDRATE 原樣保留帶入的 teamPlayers」（比照既有的「HYDRATE 原樣保留帶入的 matchId」寫法）；`nextjs-pickball/lib/scoreboard/match-slots.test.ts` 補一個 it：「舊版資料缺 teamPlayers 時補為 null 且不清除該筆」（`scoreboard:matches:v1` 內寫入一筆不含 `teamPlayers` 的合法舊資料，呼叫 `readMatchSlots()` 後斷言該筆 `teamPlayers` 為 `null` 且未被丟棄）。三者此時皆因 `teamPlayers` 尚不存在於 schema／`MatchSettings` 而斷言失敗。確認紅燈並貼出輸出
+- [x] 2.2 GREEN: `nextjs-pickball/lib/scoreboard/types.ts` 新增 `PlayerBadgeSchema`（`name`／`colorFrom`／`colorTo`／`foreground` 皆為 `z.string()`）與 `TeamPlayersSchema`（`{ us: z.array(PlayerBadgeSchema).min(1).max(2); them: z.array(PlayerBadgeSchema).min(1).max(2) }`，design Decision 6）；`ScoreboardStateSchema` 新增 `teamPlayers: TeamPlayersSchema.nullable().default(null)`；`MatchSettings` 新增 `teamPlayers: TeamPlayers | null`。`nextjs-pickball/lib/scoreboard/reducer.ts` 的 `createInitialState`／`settingsOf` 比照 `courtNumber` 既有寫法帶入 `teamPlayers`
+- [x] 2.3 REFACTOR: 確認 `PlayerBadgeSchema`／`TeamPlayersSchema` 與其型別匯出緊鄰既有 schema 定義、命名風格與既有 `PascalCase`／`camelCase` 慣例一致；確認 `types.ts` 內沒有為 `colorFrom`／`colorTo` 另外引入 hex regex 驗證（design Decision 6 已裁決維持 `z.string()`）
+      — Implementer 標為 skipped（無壞味道，未另立 commit）；Stage 2 複核通過（位置、命名、無 hex regex 皆符合）
+
+> **§2 兩階段審查結論**：Stage 1（規格符合，sonnet）**APPROVED**；Stage 2（程式品質，opus）**APPROVED**。
+> - commit：`e83944e`（2.1 RED）、`a6cfa3f`（2.2 GREEN）、`47d4e1f`（Stage 2 補測試與註解移位）
+> - 紅燈複驗：Stage 1 以 `git show e83944e^:...` 確認 RED commit 當下 `teamPlayers`／`TeamPlayers`／
+>   `PlayerBadge` 皆不存在於 `types.ts`／`reducer.ts`，三個新測試為**真紅燈**，非 regression guard。
+> - mutation（Stage 2 獨立重跑 8 條，不採信 Implementer 自述）：M1（去 `.default(null)`）、
+>   M2（刪 `teamPlayers` 欄位）、M3（`createInitialState` 恆為 null）、M4（`settingsOf` 改 null）
+>   四條關鍵變異**全數殺死**；M7（既有 `courtNumber` 對照）亦殺死，既有覆蓋健康；
+>   M8（等價變異對照組）維持全綠，harness 可信。
+>   **存活 2 條**：M6（`TeamPlayersSchema` 值域 `.min(1).max(2)` 零覆蓋）已由 Stage 2 補測試殺掉；
+>   M5（`PlayerBadge.foreground` 加 `.optional()` 存活）判定為 §3／§4 元件層的覆蓋責任，
+>   **最終存活 1 條，已轉交 §3／§4 追蹤**（見 design.md Open Questions 第 5 條）。
+> - Stage 2 另補兩項 design 明文要求但原本零覆蓋的測試：
+>   `teamPlayers 每隊人數超出 1～2 的分槽條目被逐筆丟棄，1 人與 2 人皆保留`（`match-slots.test.ts`，
+>   殺 M6）與 `含未知欄位的資料被剝除該欄位而非判為損壞`（`storage.test.ts`，滿足 design
+>   Migration Plan 的 Rollback「MUST 以測試實測確認」；**誠實標註為 regression guard**，
+>   其非恆真性另以 `z.object → z.strictObject` 變異驗證）。
+> - 收尾：`lib/scoreboard/` 5 test files／81 tests 全綠、`tsc --noEmit` 通過、
+>   `lint` 0 errors（3 個既有 warning 零新增）。
 
 ## 3. 計分板 seed 的球員顯示資訊（scoreboard-binding.ts 與 CourtCard.tsx 接線）
 
@@ -82,3 +102,11 @@ Depends on: §2, §3
 > ensureMatchSlot 不寫入也不 throw，仍回傳 seed」）因 `buildMatchSlotSeed` 新增必填第三參數而
 > 補上呼叫參數，**斷言一律不變**。除此之外，其餘既有測試轉紅**一律視為迴歸**，不得標記為此清單
 > 的一部分。
+>
+> **【apply §2 增補，Stage 1 裁決 ACCEPT】平行條目：新增 schema 必要欄位觸發的「型別層字面量補丁」**
+> ——`ScoreboardState`／`MatchSettings` 新增 `teamPlayers` 後，以物件字面量手動建構這兩個型別的
+> 既有測試檔在編譯期必然缺欄位報錯。以下兩檔各補 `teamPlayers: null,` 字面量、**零斷言變更**，
+> 與 `matchId`／`courtNumber` 當初加入時的同類修補同構，屬型別層必然連鎖而非「既有測試轉紅去改
+> 斷言」：`nextjs-pickball/lib/scoreboard/rules.test.ts`（4 處）、
+> `nextjs-pickball/hooks/useScoreboardStore.test.tsx`（1 處）。機械確認方式：
+> `git --no-pager diff main..HEAD -- <該兩檔> | grep "^-"` 除 diff header 外**不得有任何輸出**。
