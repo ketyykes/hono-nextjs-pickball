@@ -1,16 +1,15 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-// /matchmaker/stats 球員統計與排行榜頁的 E2E 驗收（M11 §6）。
-// 對應 test-plan 的三條 e2e 錨點：空狀態、直接開啟路由載入表格、切換區間後只反映該區間。
+// /matchmaker/stats 球員統計與排行榜頁的 E2E 驗收（M11 §6、§8）。
+// 對應 test-plan 的五條 e2e 錨點：空狀態、直接開啟路由載入表格、切換區間後只反映該區間、
+// 支援寬度下限不橫向溢出、瀏覽不改動持久化資料。
 //
 // 本頁屬 TDD 例外層（app/**/page.tsx 不強制單元 TDD，見 nextjs-pickball/CLAUDE.md），
 // 所有驗收落在本檔。
 //
-// 歷史資料存在 localStorage["matchmaker:history:v1"]、名單存在
-// localStorage["matchmaker:roster:v1"]，兩者的容器形狀皆為 { version: 1, ... }
-// （見 lib/matchmaker/round-storage.ts 的 writeHistory 與 lib/matchmaker/storage.ts 的
-// writeRoster），不是裸陣列——外層 version 不符會被 reader 判為結構層級損壞而清空整份。
+// 三個資料域的容器形狀皆為 { version: 1, ... }（見下方 openStatsPage 的說明），
+// 不是裸陣列——外層 version 不符會被 reader 判為結構層級損壞而清空整份。
 //
 // 為避免 localStorage 跨測試污染，beforeEach 只清除本頁會讀到的三個 key（名單、歷史，
 // 以及 useRoundStore 一併 hydrate 的回合），刻意不用 localStorage.clear()
@@ -63,27 +62,6 @@ function isoToday(hour = 10): string {
 }
 function isoLastMonth(day = 15, hour = 10): string {
 	return new Date(now.getFullYear(), now.getMonth() - 1, day, hour, 0, 0).toISOString();
-}
-
-// 種入一批歷史紀錄：外層容器 MUST 是 { version: 1, entries: [...] }。
-// 以 page.addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀得到。
-function seedHistory(page: Page, entries: unknown[]) {
-	return page.addInitScript(
-		(arg: { key: string; value: string }) => {
-			window.localStorage.setItem(arg.key, arg.value);
-		},
-		{ key: HISTORY_STORAGE_KEY, value: JSON.stringify({ version: 1, entries }) },
-	);
-}
-
-// 種入名單：外層容器 MUST 是 { version: 1, players: [...] }（writeRoster 的寫入形狀）。
-function seedRoster(page: Page, players: unknown[]) {
-	return page.addInitScript(
-		(arg: { key: string; value: string }) => {
-			window.localStorage.setItem(arg.key, arg.value);
-		},
-		{ key: ROSTER_STORAGE_KEY, value: JSON.stringify({ version: 1, players }) },
-	);
 }
 
 // 單一回合 fixture，欄位順序 MUST 與 lib/matchmaker/round-types.ts 的 RoundSchema
@@ -188,6 +166,64 @@ function buildEntry(options: EntryFixtureOptions) {
 	return { ...base, format: "singles" as const };
 }
 
+/** openStatsPage() 實際寫進 localStorage 的原始字串，key 為資料域名稱。 */
+type SeededRawValues = Partial<Record<"roster" | "round" | "history", string>>;
+
+interface OpenStatsPageOptions {
+	roster?: readonly unknown[];
+	round?: unknown;
+	history?: readonly unknown[];
+	/** 未指定時沿用各 browser project 自己的 viewport。 */
+	viewport?: { width: number; height: number };
+}
+
+// 「種名單／回合／歷史 → 開啟統計頁」的唯一前置動作組裝點（8.3 REFACTOR）：本檔全部
+// test 皆走這裡，不再各自拼一次 addInitScript 與 page.goto。
+//
+// 回合／歷史格式來源為 `lib/matchmaker/round-storage.ts` 的 `writeRound`／`writeHistory`，
+// 改動請同步；名單則為 `lib/matchmaker/storage.ts` 的 `writeRoster`。三個 key 的外層容器
+// 一律是 { version: 1, ... }，裸陣列會被 reader 判為結構層級損壞而整份清空。
+//
+// 以 page.addInitScript 於頁面任何 script 執行前寫入，保證第一次載入就讀得到。未指定的
+// 資料域完全不寫該 key（beforeEach 已清空），空狀態的 test 因此不需要任何布林旗標。
+// 回傳實際寫入的原始字串，供「瀏覽統計頁不改動任何持久化資料」逐字比對。
+async function openStatsPage(
+	page: Page,
+	options: OpenStatsPageOptions = {},
+): Promise<SeededRawValues> {
+	const seeded: SeededRawValues = {};
+	const writes: [string, string][] = [];
+
+	if (options.roster !== undefined) {
+		seeded.roster = JSON.stringify({ version: 1, players: options.roster });
+		writes.push([ROSTER_STORAGE_KEY, seeded.roster]);
+	}
+	if (options.round !== undefined) {
+		seeded.round = JSON.stringify({ version: 1, round: options.round });
+		writes.push([ROUND_STORAGE_KEY, seeded.round]);
+	}
+	if (options.history !== undefined) {
+		seeded.history = JSON.stringify({ version: 1, entries: options.history });
+		writes.push([HISTORY_STORAGE_KEY, seeded.history]);
+	}
+
+	if (writes.length > 0) {
+		await page.addInitScript((pairs: [string, string][]) => {
+			for (const [key, value] of pairs) {
+				window.localStorage.setItem(key, value);
+			}
+		}, writes);
+	}
+	// viewport MUST 在 goto 之前設定：量測的是首次載入後的版面，載入後才改寬度會多出
+	// 一次 reflow，也與 mobile 兩個 project 的初始寬度不一致。
+	if (options.viewport !== undefined) {
+		await page.setViewportSize(options.viewport);
+	}
+
+	await page.goto(STATS_PAGE);
+	return seeded;
+}
+
 test.describe("/matchmaker/stats 球員統計頁", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto("/");
@@ -199,7 +235,8 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	});
 
 	test("完全沒有歷史紀錄時顯示引導型空狀態", async ({ page }) => {
-		await page.goto(STATS_PAGE);
+		// 不帶任何資料域：三個 key 皆維持 beforeEach 清空後的「不存在」狀態。
+		await openStatsPage(page);
 
 		// 引導型空狀態＝EmptyHistory 的 range === null 分支（data-testid="empty-history"）。
 		await expect(page.getByTestId("empty-history")).toBeVisible();
@@ -214,16 +251,16 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	});
 
 	test("直接開啟 /matchmaker/stats 可載入排行榜表格", async ({ page }) => {
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-load-1",
-				playedAt: isoToday(),
-				teamA: [player("p-load-a", "排行今日壹")],
-				teamB: [player("p-load-b", "排行今日貳")],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-load-1",
+					playedAt: isoToday(),
+					teamA: [player("p-load-a", "排行今日壹")],
+					teamB: [player("p-load-b", "排行今日貳")],
+				}),
+			],
+		});
 
 		// 頁面標題區（tasks 6.3：標題與說明文字為繁體中文且不與其他 matchmaker 頁面
 		// 重複措辭）。沿用 matchmaker-history.spec.ts 對 h1 的既有斷言慣例——沒有這兩條
@@ -262,28 +299,28 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 		// 焦點球員今日兩場、上月一場：三個區間狀態（今日 2、上月 1、未篩選 3）互不相同，
 		// 任一端接錯都會讓出場數對不上——只種「今日一場、上月一場」時，把
 		// computePlayerStats 的第一引數換成未篩選的 history 仍可能矇混過關。
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-range-today-1",
-				playedAt: isoToday(10),
-				teamA: [player("p-range-focus", "區間焦點員")],
-				teamB: [player("p-range-today-1", "區間今日對手壹")],
-			}),
-			buildEntry({
-				matchId: "e2e-stats-range-today-2",
-				playedAt: isoToday(14),
-				teamA: [player("p-range-focus", "區間焦點員")],
-				teamB: [player("p-range-today-2", "區間今日對手貳")],
-			}),
-			buildEntry({
-				matchId: "e2e-stats-range-lastmonth-1",
-				playedAt: isoLastMonth(),
-				teamA: [player("p-range-focus", "區間焦點員")],
-				teamB: [player("p-range-lastmonth", "區間上月對手")],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-range-today-1",
+					playedAt: isoToday(10),
+					teamA: [player("p-range-focus", "區間焦點員")],
+					teamB: [player("p-range-today-1", "區間今日對手壹")],
+				}),
+				buildEntry({
+					matchId: "e2e-stats-range-today-2",
+					playedAt: isoToday(14),
+					teamA: [player("p-range-focus", "區間焦點員")],
+					teamB: [player("p-range-today-2", "區間今日對手貳")],
+				}),
+				buildEntry({
+					matchId: "e2e-stats-range-lastmonth-1",
+					playedAt: isoLastMonth(),
+					teamA: [player("p-range-focus", "區間焦點員")],
+					teamB: [player("p-range-lastmonth", "區間上月對手")],
+				}),
+			],
+		});
 
 		const focusRow = page.getByTestId("player-stat-row-p-range-focus");
 		await expect(focusRow).toBeVisible();
@@ -325,16 +362,16 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	// 引導型空狀態的語意是「從沒打過」（EmptyHistory 的 range === null 分支文案），
 	// 空區間顯示它會謊稱使用者從未有過任何紀錄——這正是本條要擋下的退化。
 	test("切換到沒有紀錄的區間時不顯示引導型空狀態", async ({ page }) => {
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-emptyrange-1",
-				playedAt: isoToday(10),
-				teamA: [player("p-emptyrange-a", "空區間今日員甲")],
-				teamB: [player("p-emptyrange-b", "空區間今日員乙")],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-emptyrange-1",
+					playedAt: isoToday(10),
+					teamA: [player("p-emptyrange-a", "空區間今日員甲")],
+					teamB: [player("p-emptyrange-b", "空區間今日員乙")],
+				}),
+			],
+		});
 		await expect(page.getByTestId("player-stat-row-p-emptyrange-a")).toBeVisible();
 
 		// 唯一一筆紀錄落在今日，上月因此必為空區間。
@@ -354,17 +391,17 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	test("名單內球員取名單姓名與目前強度，已離開名單者標示且取歷史最後一筆", async ({ page }) => {
 		// 名單裡的 rating（4.80）與歷史快照的 ratingAfter（3.10）刻意不同，且姓名也不同，
 		// 兩個欄位各自都能單獨指出「這筆讀的是名單還是歷史」。
-		await seedRoster(page, [rosterPlayer("p-roster-a", "名單內成員", 4.8)]);
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-roster-1",
-				playedAt: isoToday(9),
-				teamA: [player("p-roster-a", "名單內成員的舊名", 3.0, 3.1)],
-				teamB: [player("p-off-roster", "已離開名單者", 3.0, 2.9)],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			roster: [rosterPlayer("p-roster-a", "名單內成員", 4.8)],
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-roster-1",
+					playedAt: isoToday(9),
+					teamA: [player("p-roster-a", "名單內成員的舊名", 3.0, 3.1)],
+					teamB: [player("p-off-roster", "已離開名單者", 3.0, 2.9)],
+				}),
+			],
+		});
 
 		const rosterRow = page.getByTestId("player-stat-row-p-roster-a");
 		await expect(rosterRow).toBeVisible();
@@ -382,17 +419,19 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	// 非錨點補強：本頁在 render 期間取「現在」（new Date()），這條確認它沒有造成
 	// hydration mismatch——首屏空狀態與 hydration 後的表格切換 MUST 靜默完成。
 	test("統計頁載入後無 console error", async ({ page }) => {
+		// trackConsoleIssues MUST 在 openStatsPage（內含 page.goto）之前掛上，
+		// 否則載入期間的 console 事件收不到。
 		const consoleIssues = trackConsoleIssues(page);
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-hydration-1",
-				playedAt: isoToday(11),
-				teamA: [player("p-hydration-a", "統計載入員甲")],
-				teamB: [player("p-hydration-b", "統計載入員乙")],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-hydration-1",
+					playedAt: isoToday(11),
+					teamA: [player("p-hydration-a", "統計載入員甲")],
+					teamB: [player("p-hydration-b", "統計載入員乙")],
+				}),
+			],
+		});
 
 		await expect(page.getByTestId("player-stat-row-p-hydration-a")).toBeVisible();
 
@@ -405,29 +444,29 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	test("排行榜表格於支援寬度下限不造成整頁橫向溢出", async ({ page }) => {
 		// 九欄 × 四位球員，姓名刻意取較長的中文：欄位數是本 change 唯一的橫向溢出
 		// 風險點（design Decision 7），資料太少會讓表格自然放得下而測不到任何事。
-		await page.setViewportSize(NARROW_VIEWPORT);
-		await seedRoster(page, [
-			rosterPlayer("p-narrow-a1", "窄螢幕排行員甲一", 4.5),
-			rosterPlayer("p-narrow-a2", "窄螢幕排行員甲二", 4.2),
-			rosterPlayer("p-narrow-b1", "窄螢幕排行員乙一", 3.9),
-			rosterPlayer("p-narrow-b2", "窄螢幕排行員乙二", 3.6),
-		]);
-		await seedHistory(page, [
-			buildEntry({
-				matchId: "e2e-stats-narrow-1",
-				playedAt: isoToday(10),
-				teamA: [
-					player("p-narrow-a1", "窄螢幕排行員甲一"),
-					player("p-narrow-a2", "窄螢幕排行員甲二"),
-				],
-				teamB: [
-					player("p-narrow-b1", "窄螢幕排行員乙一"),
-					player("p-narrow-b2", "窄螢幕排行員乙二"),
-				],
-			}),
-		]);
-
-		await page.goto(STATS_PAGE);
+		await openStatsPage(page, {
+			viewport: NARROW_VIEWPORT,
+			roster: [
+				rosterPlayer("p-narrow-a1", "窄螢幕排行員甲一", 4.5),
+				rosterPlayer("p-narrow-a2", "窄螢幕排行員甲二", 4.2),
+				rosterPlayer("p-narrow-b1", "窄螢幕排行員乙一", 3.9),
+				rosterPlayer("p-narrow-b2", "窄螢幕排行員乙二", 3.6),
+			],
+			history: [
+				buildEntry({
+					matchId: "e2e-stats-narrow-1",
+					playedAt: isoToday(10),
+					teamA: [
+						player("p-narrow-a1", "窄螢幕排行員甲一"),
+						player("p-narrow-a2", "窄螢幕排行員甲二"),
+					],
+					teamB: [
+						player("p-narrow-b1", "窄螢幕排行員乙一"),
+						player("p-narrow-b2", "窄螢幕排行員乙二"),
+					],
+				}),
+			],
+		});
 		await expect(page.getByTestId("player-stat-row-p-narrow-a1")).toBeVisible();
 
 		// spec 的 THEN 本體：整頁 MUST NOT 橫向溢出。
@@ -465,22 +504,19 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	// schema 序列化結果不同（例如被手動編輯過、或來自舊版格式），回寫會使其正規化，
 	// 此時逐字比對會失敗。
 	test("瀏覽統計頁不改動任何持久化資料", async ({ page }) => {
-		const rosterRaw = JSON.stringify({
-			version: 1,
-			players: [
+		// openStatsPage 以 addInitScript 於頁面任何 script 執行前寫入，並回傳它實際寫進
+		// 去的原始字串——「操作前的內容」因此是已知的字面值，不需要再讀一次 localStorage
+		// 去記錄（也就沒有與頁面載入競態的空間）。
+		//
+		// 歷史兩筆分落今日與上月：切換五個區間的過程中會真的經歷「有資料」與「空區間」
+		// 兩種畫面，而不是每次點擊都渲染同一份內容。
+		const seeded = await openStatsPage(page, {
+			roster: [
 				rosterPlayer("p-readonly-a", "唯讀名單員甲", 4.1),
 				rosterPlayer("p-readonly-b", "唯讀名單員乙", 3.7),
 			],
-		});
-		const roundRaw = JSON.stringify({
-			version: 1,
 			round: buildRound("e2e-stats-readonly-match-1", "p-readonly-a", "p-readonly-b"),
-		});
-		// 兩筆分落今日與上月：五個區間的切換過程中會真的經歷「有資料」與「空區間」
-		// 兩種畫面，而不是每次點擊都渲染同一份內容。
-		const historyRaw = JSON.stringify({
-			version: 1,
-			entries: [
+			history: [
 				buildEntry({
 					matchId: "e2e-stats-readonly-1",
 					playedAt: isoToday(9),
@@ -496,23 +532,6 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 			],
 		});
 
-		// beforeEach 已停在 "/"，此處直接寫入並記下原始字串，確保「記下開頁前的內容」
-		// 真的發生在統計頁載入之前，而不是與其競態（沿用 matchmaker-history.spec.ts
-		// 的唯讀 test 慣例）。
-		await page.evaluate(
-			(pairs: readonly (readonly [string, string])[]) => {
-				for (const [key, value] of pairs) {
-					window.localStorage.setItem(key, value);
-				}
-			},
-			[
-				[ROSTER_STORAGE_KEY, rosterRaw],
-				[ROUND_STORAGE_KEY, roundRaw],
-				[HISTORY_STORAGE_KEY, historyRaw],
-			] as const,
-		);
-
-		await page.goto(STATS_PAGE);
 		await expect(page.getByTestId("player-stat-row-p-readonly-a")).toBeVisible();
 
 		// 依序切換五個區間（今日為預設，故由本週起、最後切回今日）。
@@ -522,11 +541,13 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 		// 切完仍有內容：避免頁面整個壞掉、什麼都沒 render 時也「內容不變」而誤判通過。
 		await expect(page.getByTestId("player-stat-row-p-readonly-a")).toBeVisible();
 
+		// 三個 key 逐一比對（不是只比其中一個）：任何一個資料域被寫壞都 MUST 在此現形。
 		for (const [key, expected] of [
-			[ROSTER_STORAGE_KEY, rosterRaw],
-			[ROUND_STORAGE_KEY, roundRaw],
-			[HISTORY_STORAGE_KEY, historyRaw],
+			[ROSTER_STORAGE_KEY, seeded.roster],
+			[ROUND_STORAGE_KEY, seeded.round],
+			[HISTORY_STORAGE_KEY, seeded.history],
 		] as const) {
+			expect(expected, `${key} 應已被種入`).toBeDefined();
 			const actual = await page.evaluate((k) => window.localStorage.getItem(k), key);
 			expect(actual, `${key} 的內容 MUST 與操作前逐字相同`).toBe(expected);
 		}
