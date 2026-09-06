@@ -138,6 +138,7 @@ describe("useScoreboardStore", () => {
 			targetScore: 15 as const,
 			matchId: "m1",
 			courtNumber: null,
+			teamPlayers: null,
 		};
 		writeMatchSlot(m1Seed);
 

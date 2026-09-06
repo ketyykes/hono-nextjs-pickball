@@ -1,4 +1,12 @@
-import type { Action, Mode, MatchSettings, ScoreboardState, Team, TargetScore } from "./types";
+import type {
+	Action,
+	Mode,
+	MatchSettings,
+	ScoreboardState,
+	Team,
+	TargetScore,
+	TeamPlayers,
+} from "./types";
 import { applyRallyResult, isGameWon } from "./rules";
 
 /**
@@ -16,6 +24,7 @@ export function createInitialState(
 	const targetScore: TargetScore = overrides.targetScore ?? 11;
 	const matchId: string | null = overrides.matchId ?? null;
 	const courtNumber: number | null = overrides.courtNumber ?? null;
+	const teamPlayers: TeamPlayers | null = overrides.teamPlayers ?? null;
 	const isDoubles = mode === "doubles";
 
 	return {
@@ -33,10 +42,11 @@ export function createInitialState(
 		targetScore,
 		matchId,
 		courtNumber,
+		teamPlayers,
 	};
 }
 
-// 從 state 取出五項賽前設定，供重建初始狀態時原樣帶入
+// 從 state 取出六項賽前設定，供重建初始狀態時原樣帶入
 function settingsOf(state: ScoreboardState): MatchSettings {
 	return {
 		mode: state.mode,
@@ -44,6 +54,7 @@ function settingsOf(state: ScoreboardState): MatchSettings {
 		targetScore: state.targetScore,
 		matchId: state.matchId,
 		courtNumber: state.courtNumber,
+		teamPlayers: state.teamPlayers,
 	};
 }
 
