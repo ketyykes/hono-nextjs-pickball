@@ -442,8 +442,10 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	});
 
 	test("排行榜表格於支援寬度下限不造成整頁橫向溢出", async ({ page }) => {
-		// 九欄 × 四位球員，姓名刻意取較長的中文：欄位數是本 change 唯一的橫向溢出
-		// 風險點（design Decision 7），資料太少會讓表格自然放得下而測不到任何事。
+		// 九欄 × 四位球員 × 多筆紀錄，姓名刻意取較長的中文：欄位數是本 change 唯一的
+		// 橫向溢出風險點（design Decision 7），資料太少會讓表格自然放得下而測不到任何事。
+		// 三筆的兩隊配對逐筆輪換，讓「最常搭檔」「最常對手」兩欄在每一列都填得出實際
+		// 姓名而非佔位符號——那兩欄是九欄裡最寬的，用佔位符號會低估真實欄寬壓力。
 		await openStatsPage(page, {
 			viewport: NARROW_VIEWPORT,
 			roster: [
@@ -463,6 +465,35 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 					teamB: [
 						player("p-narrow-b1", "窄螢幕排行員乙一"),
 						player("p-narrow-b2", "窄螢幕排行員乙二"),
+					],
+				}),
+				buildEntry({
+					matchId: "e2e-stats-narrow-2",
+					playedAt: isoToday(11),
+					courtNumber: 2,
+					teamA: [
+						player("p-narrow-a1", "窄螢幕排行員甲一"),
+						player("p-narrow-b1", "窄螢幕排行員乙一"),
+					],
+					teamB: [
+						player("p-narrow-a2", "窄螢幕排行員甲二"),
+						player("p-narrow-b2", "窄螢幕排行員乙二"),
+					],
+					scoreA: 9,
+					scoreB: 11,
+					winner: "teamB",
+				}),
+				buildEntry({
+					matchId: "e2e-stats-narrow-3",
+					playedAt: isoToday(12),
+					courtNumber: 3,
+					teamA: [
+						player("p-narrow-a1", "窄螢幕排行員甲一"),
+						player("p-narrow-b2", "窄螢幕排行員乙二"),
+					],
+					teamB: [
+						player("p-narrow-a2", "窄螢幕排行員甲二"),
+						player("p-narrow-b1", "窄螢幕排行員乙一"),
 					],
 				}),
 			],
