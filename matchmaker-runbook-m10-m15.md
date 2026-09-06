@@ -15,14 +15,14 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-06，M10 已合併）
+## 狀態快照（最後更新 2026-09-06，M11 已合併）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `56331b0`（feat：合併 M10 matchmaker-stage-gaps） |
+| `main` HEAD | `e8e97cf`（feat：合併 M11 matchmaker-player-stats） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
-| M11 | 未開始 |
+| M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | 未開始 |
 | M13 | 未開始 |
 | M14 | 未開始 |
@@ -57,6 +57,51 @@ E2E        上一次全量（M9 合併前）514 passed / 21 skipped / 0 failed�
 
 每一棒合併前後都要重量一次，數字只能增加不能減少（skipped 數不變）。
 
+### M11 執行紀錄（2026-09-06）
+
+- **規模**：9 個群組（§1 前置確認、§2～§8 實作、§9 收尾驗證）、53 個 commit、**一棒跑完未接力**。
+  產品面 diff 僅 10 檔（新增 6、修改 4），`hono-pickball/**` 零改動。
+- **審查**：§2～§8 七個實作群組各跑 Stage 1＋Stage 2，僅 §8 被 Stage 1 退回一次
+  （溢出 test 只種 1 筆歷史紀錄、字面不滿足 Scenario 的「已有多筆」），修正後複審通過。
+  Final Code Review `APPROVED`，必須修正項零。
+- **mutation 成效**：Stage 2 累計獨立跑 136 組變異，**七組裡有七組推翻了 Implementer 的自述**
+  （§7 是唯一自述被完全證實者）。補上 17 條非錨點測試，其中三個是實質缺口：
+  ① 排行榜排序**第三層「出場數」完全沒被測到**（原 fixture 的出場數層與姓名層期望順序一致，
+  移除該層答案不變）；② **design Decision 4 的姓名快照 MUST 零覆蓋**（既有測試只涵蓋 `ratingAfter`）；
+  ③ **球員欄從未斷言「顯示的是姓名」**（把色塊內容換成 `stat.id` 竟全綠）。
+- **兩處 spec 自身的問題在 apply 階段才被發現**：
+  ① `player-stats` delta spec 的 Requirement prose 寫欄位名「勝－負」，但同一份 spec 的 Scenario
+  要求 E2E 比對到「勝負」——Scenario 的九個詞全是欄位全名的**子字串**，唯獨這個被破折號切斷，
+  兩者不可能同時滿足。已修正 spec／design／proposal 三處（commit `6ff2247`）。
+  ② 同一份 spec 的「統計頁 SHALL NOT 修改回合、名單或任何 LocalStorage 資料」**與實作不符**：
+  統計頁比照對戰頁直接持有 `useRosterStore`／`useRoundStore`，兩者的 write effect 在 hydrate 後
+  會把三個 key 各自重新序列化寫回（既有 hydration pattern，非本 change 引入）。
+  §8 的 mutation 對每個 key 各種入一份「合法但非 schema 序列化順序」的資料，三次都在對應的 key 上
+  轉紅，**實驗確證三個 key 都真的被回寫**。經 coordinator 追認後，Final Review 於 `9649242`／`e4230f0`
+  把措辭改為「SHALL NOT 呼叫任何 store 的 setter、SHALL NOT 改變資料的**內容**」，
+  另起一段把例外**窄化到「等值的重新序列化」**並明寫不得據以放寬。Scenario、驗收錨點、
+  測試名稱、程式碼全部零改動。
+- **一個斷言遮蔽缺口**：§8 的溢出 test 原本把「容器可捲動」的反向護欄排在 spec 主斷言前面，
+  做 `min-w-[900px]` 變異時紅的是護欄而非主斷言——也就是「整頁不溢出」這條 spec 斷言
+  **從未被證明有效**。調整順序後兩條斷言經實測各自獨立生效。
+- **9.6 全套 E2E 一度未達 100% 綠**：leader 那輪 587 passed / 2 failed / 21 skipped，
+  兩個失敗在 `quiz.spec.ts:137` 的 `[webkit]`／`[mobile-safari]`（`page.goto` 逾時 30000ms），
+  與本 change 零關聯（15 個改動檔案零觸及 quiz 相關檔案）。leader 未自行判定為雜訊，證據上報。
+  coordinator 合併前獨立重跑一次全套 E2E：**589 passed / 0 failed / 21 skipped，100% 綠**，
+  證實前一輪的兩個失敗是環境雜訊、非本 change 迴歸，裁定通過並合併。
+  **與 M10 的 `scoreboard-binding.spec.ts` 屬同一失敗家族**（webkit／mobile-safari 的 `page.goto` 逾時）。
+
+### `main` 品質基線（M11 合併後，coordinator 於 `e8e97cf` 獨立實測）
+
+```
+前端單元   70 檔 / 664 測試 passed   （M10 後為 68 檔 / 638 測試，+2 檔 / +26 測試）
+後端單元   4 檔 / 16 測試 passed     （不變）
+tsc        pnpm -r exec tsc --noEmit → exit 0
+lint       0 errors / 3 warnings（hooks/ 下三支既存檔的 no-unused-vars，非本批造成）
+E2E        589 passed / 21 skipped / 0 failed，--workers=1，11.9 分鐘（skipped 數不變）
+相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
+```
+
 ## Pipeline 總覽
 
 ```
@@ -88,7 +133,7 @@ main@3fa2d22
 | # | change id | 內容 | 規模 | tasks／群組 | 預估棒數 | branch | base 前提 | 狀態 |
 |---|---|---|---|---|---|---|---|---|
 | M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | 21 commit | §1～§5 五組 | 1 棒 | change/matchmaker-stage-gaps（已刪） | main @ `3fa2d22` | **已合併**（`56331b0`） |
-| M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | <待填> | <待填> | <待填> | change/matchmaker-player-stats | M10 已合併 | 未開始 |
+| M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | 53 commit | §1～§9 九組 | 1 棒 | change/matchmaker-player-stats（已刪） | main @ `56331b0` | **已合併**（`e8e97cf`） |
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | <待填> | <待填> | <待填> | change/matchmaker-scoreboard-team-labels | M11 已合併 | 未開始 |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | <待填> | <待填> | <待填> | change/matchmaker-player-swap | M12 已合併 | 未開始 |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | <待填> | <待填> | <待填> | change/matchmaker-round-timer | M13 已合併 | 未開始 |
@@ -260,6 +305,32 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     這只影響 coordinator 的 session 停止，不影響 leader（subagent）；每棒收尾時樹必須回到 tsc 綠。
 12. **指令裡的 `cd` 會觸發權限提示**（2026-09-04 實測）：auto mode 遇到「cd 之後接相對路徑」算不出實際目錄，
     又因全域 settings 有 `Read()` deny 規則，就改問使用者，背景 agent 全部卡住。派工單一律要求絕對路徑、禁止 cd。
+    **這條也適用於 leader 自己下的指令，不只是它派給 subagent 的**（M11 leader 第一次派工即因此卡死，見 M11 執行紀錄）。
+13. **Implementer 的 mutation 自述不可採信，這條在 M11 又被驗證七次**（八組裡七組被 Stage 2 推翻）。
+    但 M11 也證明**「取樣次數」不是重點，「逐分支逐欄位機械盤點」才是**：
+    §4 的 Implementer 做了 11 次仍漏掉「排序第三層完全沒被測到」，
+    §5 的 Implementer 做了 17 次仍漏掉「球員欄從未斷言顯示的是姓名」。
+    派工單要逐條列出必做變異（每個分支、每個欄位、排序的每一層、每一層的方向、層與層的先後），
+    而不是只寫「請做 mutation」。
+14. **mutation harness 本身會失效而產生假訊號**（M11 §7 Implementer 主動揭露）：
+    python 的縮排 pattern 沒對上（該行 5 個 tab、pattern 寫 6 個），檔案根本沒被改到，
+    測試「通過」被誤讀成存活。**所有 mutation 派工一律要求三重落地檢查**：
+    ① 強制 `src.count(old) == 1`（0 次＝沒改到、多次＝誤改）② 替換後 `assert new != old`
+    ③ 套用後 `git --no-pager diff --stat -- <file>` 必須有輸出，否則中止不跑測試。
+    另建議放一條**等價變異當對照組**（例如 `a === b` → `b === a`，應存活）——
+    若連它都「轉紅」，代表 harness 有問題而非程式碼有問題。
+15. **E2E 的斷言順序會造成遮蔽**（M11 §8）：把「反向護欄」排在 spec 主斷言前面時，
+    變異會先讓護欄轉紅，主斷言其實從未被證明有效。**spec 的主斷言一律排最前面**，
+    護欄放後面；並用變異確認「紅在哪一行」而不只是「有沒有紅」。
+16. **spec 自身的內部矛盾要到 apply 才會現形**（M11 兩例：欄位名破折號、唯讀 SHALL NOT 與實作不符）。
+    propose 階段的交叉檢查看不出來，因為兩處各自都合理。**apply 的 Stage 1 Reviewer 要被明確授權
+    「裁決 spec 內部不一致」**，而不是硬把實作扭去迎合其中一句；leader 則要把裁決結果**同步回
+    delta spec**，否則矛盾會隨 archive 進主 spec。
+17. **E2E 全套跑完的失敗，先看「是否可隔離重現」再看 load average**（M11 補充第 4 點）：
+    M10 的情境是 load average 飆到 100+，M11 的情境是 load average 正常（2.5～6.4）但仍失敗，
+    而 coordinator 合併前重跑整套反而 100% 綠。**兩種都不是迴歸，但診斷路徑不同**：
+    先確認改動檔案與失敗檔案有無因果路徑 → 隔離或整套重跑 → 才看負載。
+    無論結論如何，leader **不得自行判定為雜訊**，證據上報由 coordinator 裁定。
 
 ## 跨 change 對齊提醒（交叉檢查結果，2026-09-03）
 
