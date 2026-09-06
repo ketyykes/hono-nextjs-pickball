@@ -321,6 +321,59 @@ describe("computePlayerStats", () => {
 		expect(alice?.mostFrequentPartner).toBeNull();
 	});
 
+	// 補強：自我變異測試發現，若移除「僅雙打計入」的判斷，單打隊伍固定只有 1 名球員，
+	// 排除自己的判斷本身就足以讓單打紀錄自然不產生任何配對，使該判斷成為存活變異。
+	// 本測試刻意讓單打紀錄的隊伍帶兩名球員（schema 未限制人數），逼出「僅雙打計入」
+	// 這條判斷真正被需要的情境。
+	it("單打紀錄即使隊伍帶兩名球員也不計入最常搭檔（僅雙打計數）", () => {
+		const history = [
+			makeEntry({
+				matchId: "s-multi",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-x", name: "X" })],
+				}),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p-y", name: "Y" })] }),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const p1 = result.find((stat) => stat.id === "p1");
+		expect(p1?.mostFrequentPartner).toBeNull();
+	});
+
+	// 補強：自我變異測試發現，既有的搭檔／對手測試皆無次數平手的情境，反轉同分
+	// tie-break 方向（取 UTF-16 較後者）不會被既有測試發現。本測試刻意讓兩位搭檔
+	// 次數相同，驗證取 UTF-16 較前者（design Decision 5）。
+	it("最常搭檔次數平手時取姓名 UTF-16 code unit 較前者", () => {
+		const history = [
+			makeDoublesEntry({
+				matchId: "tie-1",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-jia", name: "甲" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+			}),
+			makeDoublesEntry({
+				matchId: "tie-2",
+				teamA: makeTeam({
+					players: [makeHistoryPlayer({ id: "p-x", name: "X" }), makeHistoryPlayer({ id: "p-y", name: "Y" })],
+				}),
+				teamB: makeTeam({
+					players: [makeHistoryPlayer({ id: "p1", name: "P1" }), makeHistoryPlayer({ id: "p-yi", name: "乙" })],
+				}),
+			}),
+		];
+
+		const result = computePlayerStats(history, []);
+
+		const p1 = result.find((stat) => stat.id === "p1");
+		// 甲（U+7532）與乙（U+4E59）各出現 1 次，UTF-16 code unit 較前者為乙。
+		expect(p1?.mostFrequentPartner).toBe("乙");
+	});
+
 	it("最常對手為對戰過的對手中出現次數最多者", () => {
 		// p1 於 s1 在 teamA 對上丙（teamB），於 d1 改在 teamB 對上丙與 X（teamA）——
 		// 交棒事項 3：受測球員同時出現在 teamA／teamB；於 s2 在 teamA 對上丁一次。
