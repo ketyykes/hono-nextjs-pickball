@@ -369,6 +369,63 @@ Depends on: §6, §7
 - [x] 8.3 REFACTOR: 把 `player-stats.spec.ts` 內「種名單＋種歷史＋開啟頁面」的前置動作收斂為單一 helper（比照 `matchmaker-history.spec.ts` 的 `seedHistory`／`buildEntry` 寫法），本檔全部 test 皆改走該 helper；helper 上方註明「回合／歷史格式來源為 `lib/matchmaker/round-storage.ts` 的 `writeRound`／`writeHistory`，改動請同步」
   —— helper 為 `openStatsPage(page, { roster?, round?, history?, viewport? })`，本檔 8 個 test 全數改走它；`seedHistory`／`seedRoster` 已移除。以「未指定的資料域不寫該 key」取代布林旗標，空狀態 test 直接 `openStatsPage(page)`。helper 另回傳實際寫入的原始字串，供唯讀那條逐字比對。
 
+> **§8 兩階段審查結論（2026-09-06）**
+> - Stage 1（規格）：先裁決 `CHANGES_REQUESTED`（**本批唯一一次退回**），理由是溢出 test 只種入
+>   1 筆 `MatchHistoryEntry`，字面不滿足 Scenario 的 GIVEN「已有**多筆**歷史紀錄」。
+>   Implementer 於 `ee9401c` 補為 3 筆（兩隊配對逐筆輪換，讓「最常搭檔」「最常對手」兩欄在
+>   每一列都填得出實際姓名而非佔位符號——那兩欄是九欄裡最寬的，用佔位符號會**低估真實欄寬
+>   壓力**），複審後 `APPROVED`。
+>   Stage 1 另做了三項超出最低要求的查證：① 逐段核對確認 refactor 刪掉的 95 行前置動作
+>   **沒有弱化 §6／§7 既有 6 個 test 的任何斷言**；② 用獨立 node 腳本實測 zod4 的鍵序行為
+>   （`z.object().parse()` 依 schema shape 順序而非輸入順序、`.extend()` 是 base 鍵在前），
+>   再逐一核對各 fixture 與 `writeRound`／`writeRoster`／`writeHistory` 的容器層鍵序，
+>   **確認「種入合法形狀後 round-trip 逐字相同」的技術主張成立**；③ 確認 `buildRound` 取
+>   `pending` 狀態避開了 `RoundMatchSchema.superRefine` 對 `completed` 的跨欄位約束。
+> - Stage 2（品質）：`APPROVED`，必須修正項零，**未動任何檔案、未產生任何 commit**，
+>   §8「零產品程式碼改動」的事實維持不變。獨立跑 **12 次變異、10 次轉紅、2 個存活**，
+>   兩個存活皆經追加對照實驗或分析判定為**等價變異而非覆蓋缺口**：
+>   - **M6（移除「切換五個區間」的迴圈）存活，但不是缺口**。Stage 2 指出：M6 刪的是**測試動作**
+>     而非產品程式碼，在產品正確的前提下移除一組無副作用的操作本來就不該讓綠燈變紅。它因此
+>     追加了決定性的對照實驗：把產品端改成「**切換區間時才寫入**」（載入時不寫），
+>     **迴圈保留 → RED（M6b）；迴圈移除 → GREEN（M6c）**。⇒ 該迴圈是**唯一**能覆蓋
+>     「切換區間不寫入」的機制，確實承重，該 test 並非只驗到「載入不寫入」。
+>   - M8（`setViewportSize` 移到 `goto` 之後）存活：Playwright 的 `setViewportSize` 會等待
+>     resize 完成，reflow 後仍量得到 390 寬，**不構成實務脆弱點**。
+> - **本組最重要的假綠風險（唯讀 test 的回寫競態）已由實驗排除**：M7a／M7b／M7c 各自對一個 key
+>   種入「合法但非 schema 序列化順序」的資料，三次都在**對應的那個 key** 上轉紅。這在邏輯上
+>   只有一種可能——三個 key 都真的被 store 回寫過，**且斷言發生在回寫之後**；若斷言早於回寫，
+>   非正規化的種子字串會原封不動留著、比對必然通過。同時證明三個 key 都真的被逐一比對。
+> - Stage 2 對兩項判斷題的明確意見：① **`openStatsPage` 回傳原始字串屬可接受的輕度耦合**
+>   ——回傳值是 helper 本來就已算出的衍生資料，且對照 `matchmaker-history.spec.ts` 的同型唯讀
+>   test（該處刻意不走 helper、改用額外 `goto("/")` 以避開「記下開頁前字串」與載入的競態），
+>   在 §8.3「全部 test 皆走 helper」的約束下，回傳原始字串是**比既有先例更好**的解法，
+>   競態視窗直接歸零。② `addInitScript` 的選擇正確（本檔無 `location.reload()`，其唯一已知
+>   副作用不會被觸發）。
+> - 溢出 test 的兩條斷言經 M1／M2（紅在整頁斷言）與 M3／M4（紅在反向護欄）實測，
+>   **各自獨立生效、無互相遮蔽**——這是實驗確證，不是採信註解。
+> - `document.scrollingElement` 用 `!` 非空斷言無顯式守衛，經核對為本 repo 既有慣例
+>   （`match-stage.spec.ts`／`scoreboard.spec.ts`／`scoreboard-binding.spec.ts` 全數如此），
+>   依「既有 codebase 風格勝出」判為 PASS。
+> - `setViewportSize(390)` 在五個 project 的實際作用已釐清：Pixel 5 由 393 收窄為 390
+>   （**確實有作用**）、iPhone 12 本身即 390×844（no-op）、三個桌面 project 由 1280 收窄。
+>
+> **§8 → §9／Final Review 交棒（Stage 2 指定）**
+> 1. **五 project 完整跑務必納入，重點看 `mobile-chrome`**——五個 project 中只有它的 device
+>    預設寬度（393）與 `setViewportSize(390)` 真的不同；溢出 test 若要出岔，最可能是這 3px 差。
+> 2. **主 spec 措辭的收尾決策（archive 前必須有結論）**：見 design.md Open Questions 第 1-c 條。
+>    建議補「store hydration 的等值回寫不算寫入」一類的限定語，別讓不精確的 SHALL NOT
+>    隨 archive 靜默進入主 spec。
+> 3. **`[data-slot="table-container"]` 的單一性前提**：溢出 test 依賴統計頁全頁只有一個 `Table`。
+>    未來若增加第二個表格，該斷言會因 Playwright strict mode **大聲報錯而非靜默取錯**，
+>    但錯誤訊息不會自解釋。列入跨群組風險清單。
+> 4. **跨檔 fixture 重複請明文記為「已知且接受」**：`player-stats.spec.ts` 與
+>    `matchmaker-history.spec.ts` 各自持有幾乎相同的 `player`／`averageRating`／`buildEntry`／
+>    `isoToday`／`isoLastMonth`。§8.3 只授權收斂**單一檔案內**的前置動作，故這是刻意不處理的；
+>    Final Review MUST 明文記錄，避免下一位 reviewer 當成漏網之魚。
+> 5. **§6 留在 `page.tsx` 的時鐘取樣註解需最終確認仍成立**（該註解把「統計頁載入後無 console
+>    error」當作 hydration 無 mismatch 的實證）。
+> 6. 8.1／8.2 的 regression guard 標註 Stage 2 已獨立複驗成立，**未發現任何偽造紅燈的痕跡**。
+
 ## 9. 收尾驗證
 
 - [ ] 9.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
