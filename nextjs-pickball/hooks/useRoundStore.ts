@@ -181,8 +181,9 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	// 「原值 + 1」的絕對值 patch 而非差值，重複套用同一份結果相同。不改用「把
 	// state.round 的讀取搬進 reducer」來根治：那會迫使 reducer 呼叫 crypto.randomUUID()
 	// 與 new Date() 而不再是純函式，也讓本函式無法同步回傳 CreateRoundResult 供 UI
-	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。resetIncompleteMatches／submitScore
-	// 同樣讀 render scope 的 state.round，適用同一條限制。
+	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。resetIncompleteMatches／submitScore／
+	// swapMatchPlayer 同樣讀 render scope 的 state.round，適用同一條限制（換人尤其明顯：
+	// 同一次 render 內連換兩次，第二次會以換人前的回合為基底，第一次的換人結果被覆蓋掉）。
 	//
 	// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）：createRound() 一次算出
 	// 新回合與 restSettlements，本函式在同一次同步呼叫內依序 dispatch 新回合、
