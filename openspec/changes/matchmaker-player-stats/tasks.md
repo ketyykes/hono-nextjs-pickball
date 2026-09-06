@@ -36,7 +36,7 @@ Depends on: §1
 - [x] 2.4 GREEN: 實作出場數（該球員出現的紀錄筆數）、勝場／敗場（依各筆 `winner` 與該球員所屬隊伍判定）、勝率（`wins/gamesPlayed`，`gamesPlayed===0` 時為 `0`）
 - [x] 2.5 RED: 補一個 it：「計算過程不修改輸入的歷史與名單」（以 `structuredClone` 前後深層比對）。**已確認為 regression guard**：寫入當下即綠（5 tests passed），`buildRosterUnion`／`tallyGamesAndResults` 全程只讀取 `history`／`players` 的欄位值並寫入另外配置的 `MutableStat`，未曾對輸入陣列或物件做 push／sort／賦值等原地操作，故未刻意讓 2.2／2.4 先寫錯來製造紅燈
 - [x] 2.6 GREEN／確認: 已確認為 regression guard，原實作未修改輸入——`grep -n "push\|\.sort(\|\[.*\] ="` 對 `player-stats.ts` 全檔無命中，2.7 的 mutation 測試另行複驗
-- [ ] 2.7 REFACTOR: 確認球員聯集的建構只有一處（不在後續 §3／§4 重新掃描一次 `history`／`players`）；確認本檔零 `window`／`document`／`localStorage`／`new Date()`／`fetch`；`PlayerStat` 為可序列化純資料（無函式、無 class 實例）
+- [x] 2.7 REFACTOR: 確認球員聯集的建構只有一處（不在後續 §3／§4 重新掃描一次 `history`／`players`）；確認本檔零 `window`／`document`／`localStorage`／`new Date()`／`fetch`；`PlayerStat` 為可序列化純資料（無函式、無 class 實例）
 
 ## 3. 統計計算核心 B：目前強度、已不在名單、強度淨變化（player-stats.ts）
 
