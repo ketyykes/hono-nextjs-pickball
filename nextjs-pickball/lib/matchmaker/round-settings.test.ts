@@ -22,7 +22,12 @@ describe("createRoundSettings", () => {
 			format: DEFAULT_FORMAT,
 			courtCount: DEFAULT_COURT_COUNT,
 			targetScore: DEFAULT_TARGET_SCORE,
+			timerDurationMinutes: null,
 		});
+	});
+
+	it("每輪設定預設計時為不計時", () => {
+		expect(createRoundSettings().timerDurationMinutes).toBeNull();
 	});
 });
 
