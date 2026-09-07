@@ -4,11 +4,13 @@ import {
 	createRound,
 	resetIncompleteMatches,
 	setTargetScore,
+	setTimerDuration,
 	submitScore,
 	swapMatchPlayer,
 	validateScoreInput,
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
+	SET_TIMER_DURATION_FAILURE_CODE,
 	SUBMIT_SCORE_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
@@ -820,6 +822,47 @@ describe("setTargetScore", () => {
 			expect(rejected.ok).toBe(false);
 			if (rejected.ok) continue;
 			expect(rejected.message).toContain("目標分數");
+			expect(lockedRound).toEqual(lockedRoundSnapshot);
+		}
+	});
+});
+
+describe("setTimerDuration", () => {
+	it("所有場次皆為 pending 時可改計時設定並重置為未開始，已有場次離開 pending 時拒絕", () => {
+		const pendingRound = makeRound({
+			matches: [makeRoundMatch({ id: "m-1" }), makeRoundMatch({ id: "m-2", courtNumber: 2 })],
+			timer: { durationMinutes: 10, startedAt: "2026-08-16T00:30:00.000Z" },
+		});
+		const pendingRoundSnapshot = structuredClone(pendingRound);
+
+		const changed = setTimerDuration(pendingRound, 20);
+
+		expect(changed.ok).toBe(true);
+		if (!changed.ok) return;
+		// 即使變更前已開始計時（startedAt 非 null），變更後仍重置為 null（design Decision 3）。
+		expect(changed.round.timer).toEqual({ durationMinutes: 20, startedAt: null });
+		expect(pendingRound).toEqual(pendingRoundSnapshot);
+
+		// scoring 與 completed 都算「已離開 pending」，兩者分別驗證：只測其中一個時，
+		// 把判定寫成單一狀態比對（例如僅檢查 completed）的實作仍會全綠。
+		const lockedMatches: RoundMatch[] = [
+			makeRoundMatch({ id: "m-2", courtNumber: 2, status: "scoring" }),
+			makeCompletedRoundMatch({ id: "m-2", courtNumber: 2 }),
+		];
+
+		for (const lockedMatch of lockedMatches) {
+			const lockedRound = makeRound({
+				matches: [makeRoundMatch({ id: "m-1" }), lockedMatch],
+				timer: { durationMinutes: 10, startedAt: null },
+			});
+			const lockedRoundSnapshot = structuredClone(lockedRound);
+
+			const rejected = setTimerDuration(lockedRound, 20);
+
+			expect(rejected.ok).toBe(false);
+			if (rejected.ok) continue;
+			expect(rejected.code).toBe(SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED);
+			expect(rejected.message).toContain("計時");
 			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
 	});
