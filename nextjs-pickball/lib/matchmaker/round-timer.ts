@@ -53,7 +53,8 @@ export function isExpired(timer: RoundTimer, nowIso: string): boolean {
 /**
  * 剩餘秒數格式化為兩位數的 mm:ss。padStart 只保證兩位數，未防禦 minutes 超過
  * 99 的情況——本 change 的計時長度上限為 20 分鐘（ROUND_TIMER_DURATION_OPTIONS），
- * 呼叫端（remainingSeconds）的回傳值必落在 [0, 1200] 秒內，不會產生三位數分鐘，
+ * 而 seconds 的唯一來源 remainingSeconds 兩端都夾值，回傳值必落在 [0, 1200] 秒內
+ * （本檔的「不防三位數分鐘」與「夾住剩餘秒數上限」兩個決策互相依賴），不會產生三位數分鐘，
  * 額外防呆屬於臆測需求（working-principles Rule 2：不做超出範圍的推測性功能）。
  */
 export function formatRemaining(seconds: number): string {
