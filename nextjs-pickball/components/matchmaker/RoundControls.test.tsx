@@ -515,4 +515,57 @@ describe("RoundControls", () => {
 		// 文案本身也釘住：套在計時控制項旁的說明 SHALL NOT 提及「目標分數」。
 		expect(ROUND_TIMER_LOCKED_REASON).not.toContain("目標分數");
 	});
+
+	// 計時長度刻意用 20（前兩條計時測試用 10）：fixture 對 durationMinutes 只餵單一值時，
+	// 「忽略該欄位、寫死一個值」的實作會恆綠。
+	it("已設定計時長度且尚未開始時顯示可點擊的開始計時按鈕", () => {
+		const round = buildRound({ timer: { durationMinutes: 20, startedAt: null } });
+		render(<RoundControls {...buildProps({ round })} />);
+
+		const startButton = screen.getByRole("button", { name: "開始計時" }) as HTMLButtonElement;
+		expect(startButton.disabled).toBe(false);
+	});
+
+	// spec 明訂條件不成立時 MUST 不渲染，SHALL NOT 渲染一顆恆為 disabled 的按鈕——
+	// 因此三種情境都用 queryByRole 斷言「不存在」而非斷言 disabled。
+	it("不計時或計時已開始時不顯示開始計時按鈕", () => {
+		const withoutTimer = render(
+			<RoundControls {...buildProps({ round: buildRound({ timer: null }) })} />,
+		);
+		expect(withoutTimer.queryByRole("button", { name: "開始計時" })).toBeNull();
+		withoutTimer.unmount();
+
+		const started = render(
+			<RoundControls
+				{...buildProps({
+					round: buildRound({
+						timer: { durationMinutes: 15, startedAt: "2026-08-23T00:30:00.000Z" },
+					}),
+				})}
+			/>,
+		);
+		expect(started.queryByRole("button", { name: "開始計時" })).toBeNull();
+		started.unmount();
+
+		// 尚無目前回合時同樣沒有可開始的計時。
+		const withoutRound = render(<RoundControls {...buildProps({ round: null })} />);
+		expect(withoutRound.queryByRole("button", { name: "開始計時" })).toBeNull();
+		withoutRound.unmount();
+	});
+
+	it("點擊開始計時會呼叫注入的 startTimer 一次", async () => {
+		const user = userEvent.setup();
+		const startTimer = vi.fn();
+		const setTimerDuration = vi.fn();
+		const round = buildRound({ timer: { durationMinutes: 20, startedAt: null } });
+		render(<RoundControls {...buildProps({ round, startTimer, setTimerDuration })} />);
+
+		await user.click(screen.getByRole("button", { name: "開始計時" }));
+
+		expect(startTimer).toHaveBeenCalledTimes(1);
+		// 零參數：now 由 useRoundStore 注入，本元件不得把事件物件或時間傳進去。
+		expect(startTimer).toHaveBeenCalledWith();
+		// 「開始計時」是獨立入口，SHALL NOT 順手改動計時長度。
+		expect(setTimerDuration).not.toHaveBeenCalled();
+	});
 });
