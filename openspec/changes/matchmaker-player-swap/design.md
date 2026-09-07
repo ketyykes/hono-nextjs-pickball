@@ -310,3 +310,117 @@ from "./round"`，若 `round.ts` 也 import `scoreboard-binding.ts`，兩檔互�
    內容（只確認其存在與部分結構），apply 的 §0 或對應群組的 RED 階段 MUST 實讀該檔既有
    `buildProps` 與 `makePlayer`／`makeRound` 系列 fixture 的簽章後再決定是否新增或調整，
    SHALL NOT 假設現有 fixture 已滿足需求。
+
+## Apply §1 對齊紀錄（2026-09-06，合併 M10／M11／M12 後的 `main`）
+
+tasks.md §1 要求把上方 Context 與 Open Questions 從 propose 當下的快照（`3fa2d22`）更新為
+apply 當下的事實。以下為實讀 `b69a418`（含 M12 合併 commit `ea71e08`）後的逐項核對結果。
+
+**Open Question 1 → 已解決（`CourtCard.tsx`／`MatchStage.tsx` 對齊完成）**
+
+- `CourtCardProps` 實際欄位為 `match`／`players`／`round`／`matchSlot`／`onSubmitScore`／
+  `submitError` 六個，與 design 撰寫時的假設**完全一致**。M12 只動了
+  `handleEnterScoreboard` 內一行（`buildMatchSlotSeed(round, match, players)` 補上第三參數
+  `players`），**未新增或移除任何 prop**，色塊呈現邏輯與私有的 `resolveTeamPlayers` 零改動。
+- `inProgress = matchSlot !== null`（`CourtCard.tsx:65`）仍存在且語意未變，Decision 4 的
+  「重用同一個變數」可照原計畫執行。
+- `MatchStageProps` 實際欄位為 `round`／`players`／`hasActivePlayers`／`matchSlots`／
+  `onSubmitScore`／`submitError`，`MatchStageSubmitError`（`{ matchId; message }`）已存在，
+  tasks §5.1 的 `MatchStageSwapError` 可逐字比照。
+- `app/matchmaker/page.tsx` 以
+  `const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore } =
+  useRoundStore({ players, updatePlayer })` 持有 store，並已有
+  `const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null)` 與
+  `handleSubmitScore` 的既有寫法，tasks §5.2 可逐字比照。
+- `round.ts` 的既有失敗碼家族實測為四組：`SET_TARGET_SCORE_FAILURE_CODE`、
+  `RESET_INCOMPLETE_MATCHES_FAILURE_CODE`、`VALIDATE_SCORE_FAILURE_CODE`、
+  `SUBMIT_SCORE_FAILURE_CODE`（另有未以函式名命名的舊 `ROUND_FAILURE_CODE`，即 tasks §2.6
+  所稱的 M3 教訓）。`roundRating` 已於檔頭 import（`round.ts:10`），私有
+  `resolveTeamPlayers`（`round.ts:742`）對解析不到的 id 一貫略過而不拋錯。
+  `labelDoublesComposition` 目前**尚未**被 `round.ts` import，§2 需新增
+  `import { labelDoublesComposition } from "./pairing"`。
+- `pairing.ts` 的 `labelDoublesComposition(fourPlayers: readonly [Player, Player, Player, Player])`
+  與 `rating-math.ts` 的 `roundRating(value: number): number` 兩個簽章皆與 Context 記載相符，
+  無需修改 `match-allocation` 的任何檔案。
+- `labels.ts` 目前收錄 `TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／
+  `DOUBLES_COMPOSITION_LABEL`／`PLAYER_NOT_ON_ROSTER_LABEL`（最後一項為 M11 新增），
+  全數為靜態顯示詞彙，Decision 7 的界線在合併後依然成立。
+- `components/ui/select.tsx` 匯出 `Select`／`SelectTrigger`／`SelectValue`／`SelectContent`／
+  `SelectItem` 等，`PlayerForm.tsx:200-211` 的性別選單即以
+  `<SelectTrigger id=… aria-label="性別">` 的形態使用，§4 可沿用同一組件與 `aria-label`
+  擺放慣例。
+
+**Open Question 4 → 已解決（fixture 只需補欄位）**
+
+`CourtCard.test.tsx` 既有 fixture 為 `buildPlayer`／`buildMatch`／`buildRound`／`buildProps`
+四個（非 propose 階段猜測的 `makePlayer`／`makeRound`）。`buildRound` 已含
+`restingPlayerIds: []` 欄位，`buildProps` 已含 `round`／`matchSlot` 預設值。§4 只需在
+`buildProps` 追加 `onSwapPlayer: vi.fn()` 與 `swapError: null` 兩個預設欄位即可，**既有 14 個
+it 的斷言本體逐字不動**，符合 tasks.md「本 change 唯一容許變動的既有測試」段落的既定裁決。
+
+**Open Question 2 → 已解決（apply §4 Stage 2 裁定：維持每格顯示）**
+
+裁定者為 §4 的 Stage 2 Code-Quality Reviewer（design 明文把此決定權留給該階段）。結論是
+**維持「無可換之人」在雙打四格各自顯示**，但附帶一項**必要的實作修正**：
+
+原實作把「無可換之人」只放在 `SelectValue` 的 placeholder，而觸發器帶有 `aria-label`——
+`aria-label` 會**覆蓋**元素的內部文字，因此讀屏使用者實際只會聽到「替 X 換人，已停用」，
+永遠聽不到停用原因。也就是說 `prd.md` 12.3 的「disabled 要解釋自己」對讀屏使用者**並未
+成立**，而「每格獨立解釋自己」正是本 change 選擇每格顯示（而非場地層級顯示一次）的唯一
+理由——前提不成立，裁定就無從支撐。修正方式為停用時把原因併入 `aria-label`
+（`替 X 換人（無可換之人）`），使可見與可聽到的資訊一致（commit `ad86744`）。
+
+修正後維持每格顯示的理由：① 無障礙前提成立後，逐格 Tab 的使用者不會漏掉原因；
+② 零額外 DOM——原因文字放在 `Select` 既有的 placeholder 槽，改為場地層級反而要新增說明
+區塊並在該區塊與四個觸發器之間建立一條新的狀態耦合；③ 重複只出現在候選清單為空的邊界
+狀態（此時四個觸發器皆為 disabled 的低對比樣式），正常狀態下四格顯示的是「換人」這個
+標準控制項標籤，本就會重複、不算雜訊。spec 的 MUST 兩案皆滿足，故以無障礙穩健度裁量。
+
+**§4 交接給 §5／§6 的兩項已知風險（不阻擋 §4，但後續群組 MUST 注意）**
+
+1. **同一場地卡片可能同時出現兩個 `role="alert"`**：`swapError` 的 alert 由 `CourtCard`
+   直接渲染於卡片頂部，`submitError` 的 alert 在 `ScoreEntry` 內，兩者分屬獨立的錯誤來源。
+   Stage 2 以臨時探針實測確認：兩者同時非 `null` 時 `getByRole("alert")`（單數）**會 throw**。
+   既有測試不受影響（`buildProps` 讓兩條 alert 測試各自只設一個錯誤），但 §5／§6 若要在
+   場地卡片上查 alert，MUST 改用 `getAllByRole` 或 `within(場地卡片)` ＋ 文字過濾。
+   **SHALL NOT 為此把兩個 alert 合併成一個**——那會遺失資訊，並逼 `CourtCard` 持有
+   「哪個錯誤優先」這種它不該做的判斷。
+2. **`Player.name` 不保證唯一**：換人操作的可存取名稱以球員姓名組成，兩位同名球員會產生
+   **相同的可存取名稱**。§6 E2E 的 fixture MUST 避免同名球員，否則 locator 會有歧義。
+   根治需把 id 帶進可存取名稱（會讓文案不通順），留給日後真的出現同名情境時再處理。
+
+**apply §5 Stage 2 的三項結構性發現（記錄，非缺陷）**
+
+1. **`swapMatchPlayer` 的五個失敗碼在目前 UI 上全部不可達**。`CourtCard` 自身的守衛已把每一種
+   前置條件擋在前面：`matchId` 取自正在渲染的 `match.id`；`canSwap = !completed && !inProgress`
+   使非 pending 場次根本不渲染換人操作；換出者取自該球員格自己；候選人取自
+   `round.restingPlayerIds` 且已 `.filter(isActive)`。因此 `swapError` 的顯示接線是**純防禦性
+   程式碼**，E2E 無法以正常操作觸達。`match-stage` 的「換人被拒絕時顯示繁體中文錯誤訊息」
+   Scenario 由 §4 的 integration 測試（直接以 prop 傳入 `swapError`）驗收，這是正確且唯一
+   可行的驗收層級；**§6 SHALL NOT 嘗試用 E2E 觸發換人失敗訊息**——寫了只會得到一個永遠走不到
+   的分支，或一個造假的 seeding。已知覆蓋缺口：`MatchStage`／`page.tsx` 的 `swapError` 定位
+   接線（變異 P1／P3／P7／Q1／Q3）目前無任何自動化防線，且因不可達而無法補 E2E；風險已因
+   不可達而大幅降低，記錄於此供後續 change 參考。
+2. **兩個同形型別不提供編譯期保護**。`MatchStageSwapError` 與 `MatchStageSubmitError` 結構
+   完全相同，TypeScript 為結構型別系統，故 `submitError={swapError}` 這種誤傳**編譯完全合法**
+   （變異 Q3 實測 tsc exit 0）。維持兩個型別分離的價值是**文件性／語意性**的，不是編譯期強制
+   的——先前假設「不合併能換到型別安全」並不成立。若日後真要編譯期保護，唯一手段是 branded
+   type（各加一個 `readonly kind` 判別欄位）。本 change 不做（既有 codebase 的四組
+   `*_FAILURE_CODE` 同樣是各自獨立而非共用泛用列舉，方向一致）。
+3. **`components/matchmaker/CourtCard.test.tsx` 在全套並行執行下有低頻不穩定**（Stage 2 實測
+   9 次全套執行中出現 1 次，失敗的是「每個色塊顯示姓名、性別與強度分數」與「雙打場次顯示
+   男雙女雙混雙或一般雙打的組成標示」兩個**既有** it）。經單檔重跑 20/20 綠、變異下全套再跑
+   4 次全綠、基準全套跑 5 次全綠交叉確認，判定為 flake 而非真實防線。**非本 change 引入、
+   也非本 change 修復範圍**，記錄於此避免後續群組把它誤讀成真紅燈。
+
+**新增 Open Question 5 → 已解決（M12 的 `teamPlayers` 快照不需要換人更新路徑）**
+
+M12 在 `lib/matchmaker/scoreboard-binding.ts` 讓 `buildMatchSlotSeed(round, match, players)`
+把兩隊球員姓名與隊色寫成 `teamPlayers`，該值是**建立計分板槽當下的快照**，M12 刻意未提供
+任何事後更新路徑。換人是否需要同步更新它？**不需要**，且本 change 不新增該路徑：
+`ensureMatchSlot(buildMatchSlotSeed(...))` 只在使用者點擊「進入計分板」時執行，因此
+「槽已存在」與「換人被允許」在本 change 的規格下是互斥的兩個狀態——`match-stage` 的
+「場地區塊的換人操作」Requirement 明訂計分板槽存在（`matchSlot !== null`）時 SHALL NOT
+顯示換人操作。換人只可能發生在尚未建立槽的場次，之後使用者再點擊入口時 seed 才被建立，
+屆時讀到的必然是換人後的 `round`／`players`，快照天然正確。此判定與 Decision 4 的
+「UI 層以 `inProgress` 額外收斂」是同一條規則的兩個後果，不需要新的機制。

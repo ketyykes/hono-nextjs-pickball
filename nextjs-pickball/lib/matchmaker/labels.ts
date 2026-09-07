@@ -35,3 +35,16 @@ export const DOUBLES_COMPOSITION_LABEL: Record<DoublesComposition, string> = {
  * 資訊來源（prd.md 12.5），此文字標籤才是可靠依據，SHALL NOT 在元件內寫死字面量。
  */
 export const PLAYER_NOT_ON_ROSTER_LABEL = "已不在名單";
+
+/**
+ * CourtCard 換人操作（Select 觸發器）候選人不為空時的顯示文案（M13
+ * matchmaker-player-swap change，design Decision 7）。
+ */
+export const SWAP_PLAYER_LABEL = "換人";
+
+/**
+ * CourtCard 換人操作候選人為空時的顯示文案，操作 MUST 同時以 disabled 表達
+ * （prd.md 12.3：disabled 要解釋自己），SHALL NOT 只隱藏操作（M13
+ * matchmaker-player-swap change，design Decision 7）。
+ */
+export const SWAP_PLAYER_NO_CANDIDATE_LABEL = "無可換之人";

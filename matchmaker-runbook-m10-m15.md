@@ -15,7 +15,7 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-06，M12 已合併）
+## 狀態快照（最後更新 2026-09-06，M13 進行中、使用者要求暫停）
 
 | 項目 | 值 |
 |---|---|
@@ -24,10 +24,36 @@
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
-| M13 | 未開始 |
-| M14 | 未開始 |
-| M15 | 未開始 |
-| 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `main`，工作樹乾淨 |
+| M13 | **進行中，暫停**（`change/matchmaker-player-swap`，尚未合併）。§1～§5 已完成兩階段審查，§6（E2E 換人操作可存取性測試）撰寫中就暫停。詳見下方「M13 進行中紀錄」。 |
+| M14 | 未開始（需等 M13 合併） |
+| M15 | 未開始（需等 M14 合併） |
+| 工作位置 | 主 repo 直接開分支，不用 worktree；**目前在 `change/matchmaker-player-swap`，工作樹乾淨**（commit 到 §6 前的部分都已落地）；下一棒接手前先 `git status` 確認乾淨、`git branch --show-current` 確認在這條分支上 |
+
+### ⚠️ M13 暫停時，背景 agent 可能仍在跑
+
+暫停指令下達當下，M13 的 leader（`general-purpose`、opus）與其派出的 §6 Implementer 仍在背景執行
+（未 `TaskStop`，只是不再排 coordinator 的自動輪詢）。下一個接手的 coordinator session：
+1. 先跑 `ListAgents` 看這兩個 agent還在不在跑、有沒有已經跑完卡在等回覆。
+2. 若還在跑，比照本檔「派工經驗」一節的兩段判斷式（transcript 最後一筆有沒有 `tool_result` ×
+   對應 process 還在不在）判斷是真的卡住還是仍在正常執行，不要直接 `TaskStop`。
+3. 若已完成（Final Code Review APPROVED），比照 M11／M12 的模式做 coordinator 獨立驗證後再合併，
+   不要相信 leader 自報的結果。
+
+### M13 進行中紀錄（2026-09-06，暫停時快照）
+
+- **規模（目前已知）**：§1～§6 六組，§1～§5 已完成兩階段審查並各自 commit，§6（E2E）進行中。
+- **§1～§4**：核心換人邏輯（`round.ts` 的 `swapMatchPlayer`）、`useRoundStore` 接線、`CourtCard` UI 操作。
+  §2 有一次 Stage 2 CHANGES_REQUESTED（多餘的 `resolveInOrder` 輔助函式與其 `as [Player,Player,Player,Player]`
+  型別斷言，改用既有 `resolveTeamPlayers` 拆解模式修正）。§4 有兩次 Stage 2 自行抓到的存活 mutation
+  （候選清單被截斷、換人停用原因沒併入可存取名稱）。
+- **§5**：`MatchStage`／`page.tsx` 接線，把 `onSwapPlayer`／`swapError` 設為必填 prop 逼型別系統擋掉忘記接線。
+  Stage 1 盤點出 7 個這一層専屬的 mutation 缺口，其中 **P5／P6（整條換人路徑完全失效）沒有任何自動化測試會抓到**，
+  已列為 §6 E2E 派工單的設計輸入。
+- **§6**：E2E 撰寫中（換人操作可存取名稱互不相同、可鍵盤操作），已有一個先行 commit
+  `89c9f34`（測驗可存取名稱互不相同且可由鍵盤操作），暫停時 Implementer 仍在補完整份 spec 檔。
+- **尚未做**：§6 完成與審查、Final Code Review、coordinator 獨立驗證（tsc／lint／unit／
+  `openspec validate --strict`／全套 E2E）、`git merge --no-ff` 進 `main`、分支刪除、
+  正式的「M13 執行紀錄」與「main 品質基線」段落（比照 M11／M12 格式）。
 
 ### M10 執行紀錄（2026-09-06）
 
@@ -174,7 +200,7 @@ main@3fa2d22
 | M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | 21 commit | §1～§5 五組 | 1 棒 | change/matchmaker-stage-gaps（已刪） | main @ `3fa2d22` | **已合併**（`56331b0`） |
 | M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | 53 commit | §1～§9 九組 | 1 棒 | change/matchmaker-player-stats（已刪） | main @ `56331b0` | **已合併**（`e8e97cf`） |
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
-| M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | <待填> | <待填> | <待填> | change/matchmaker-player-swap | M12 已合併 | 未開始 |
+| M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 至少 15 commit（§1～§5，§6 未計） | §1～§6 六組 | 1 棒 | change/matchmaker-player-swap | M12 已合併 | **進行中，暫停**（§1～§5 完成，§6 撰寫中） |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | <待填> | <待填> | <待填> | change/matchmaker-round-timer | M13 已合併 | 未開始 |
 | M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | <待填> | <待填> | <待填> | change/matchmaker-timed-draw | M14 已合併 | 未開始 |
 

@@ -16,6 +16,13 @@ export interface MatchStageSubmitError {
 	readonly message: string;
 }
 
+/** 換人失敗時要顯示在哪一場地卡片上——形態比照 MatchStageSubmitError（見上方註解），
+ * matchId 決定「哪一格」、message 是要顯示的內容。 */
+export interface MatchStageSwapError {
+	readonly matchId: string;
+	readonly message: string;
+}
+
 export interface MatchStageProps {
 	round: Round;
 	players: readonly Player[];
@@ -25,6 +32,10 @@ export interface MatchStageProps {
 	matchSlots: MatchSlots;
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: MatchStageSubmitError | null;
+	// 換人操作的委派回呼（spec「場地區塊的換人操作」，design Decision 6：候選人清單由
+	// CourtCard 內部依 round／players 推導，本層不重算）。
+	onSwapPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => void;
+	swapError: MatchStageSwapError | null;
 }
 
 // 舞台版面：場次網格＋休息名單，RWD 三斷點（design Decision 2）。桌面（lg 起）
@@ -48,6 +59,8 @@ export function MatchStage({
 	matchSlots,
 	onSubmitScore,
 	submitError,
+	onSwapPlayer,
+	swapError,
 }: MatchStageProps) {
 	const resting = round.restingPlayerIds
 		.map((id) => players.find((player) => player.id === id))
@@ -76,6 +89,8 @@ export function MatchStage({
 							matchSlot={matchSlots[match.id] ?? null}
 							onSubmitScore={onSubmitScore}
 							submitError={submitError?.matchId === match.id ? submitError.message : null}
+							onSwapPlayer={onSwapPlayer}
+							swapError={swapError?.matchId === match.id ? swapError.message : null}
 						/>
 					))}
 				</div>

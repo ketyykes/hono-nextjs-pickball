@@ -7,8 +7,10 @@ import {
 	resetIncompleteMatches as resetIncompleteMatchesPure,
 	submitScore as submitScorePure,
 	setTargetScore as setTargetScorePure,
+	swapMatchPlayer as swapMatchPlayerPure,
 	SUBMIT_SCORE_FAILURE_CODE,
 	SET_TARGET_SCORE_FAILURE_CODE,
+	SWAP_MATCH_PLAYER_FAILURE_CODE,
 } from "@/lib/matchmaker/round";
 import { clearDiscardedMatchSlots } from "@/lib/matchmaker/scoreboard-binding";
 import type {
@@ -17,6 +19,7 @@ import type {
 	ResetIncompleteMatchesResult,
 	SubmitScoreResult,
 	SetTargetScoreResult,
+	SwapMatchPlayerResult,
 } from "@/lib/matchmaker/round";
 import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
@@ -45,7 +48,8 @@ type RoundStoreAction =
 	| { type: "GENERATE_ROUND"; round: Round }
 	| { type: "RESET_INCOMPLETE_MATCHES"; round: Round }
 	| { type: "SUBMIT_SCORE"; round: Round; historyEntry: MatchHistoryEntry }
-	| { type: "SET_TARGET_SCORE"; round: Round };
+	| { type: "SET_TARGET_SCORE"; round: Round }
+	| { type: "SWAP_MATCH_PLAYER"; round: Round };
 
 function createInitialState(): RoundStoreState {
 	return { round: null, history: [], droppedCount: 0 };
@@ -62,6 +66,8 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 		case "SUBMIT_SCORE":
 			return { ...state, round: action.round, history: [...state.history, action.historyEntry] };
 		case "SET_TARGET_SCORE":
+			return { ...state, round: action.round };
+		case "SWAP_MATCH_PLAYER":
 			return { ...state, round: action.round };
 		default:
 			return state;
@@ -101,6 +107,9 @@ export interface UseRoundStoreResult {
 	 * 時才允許），失敗（`ok: false`）時不套用任何變動（match-stage 的 MODIFIED
 	 * 「目標分數選擇器」——8.6 起才有非測試呼叫端接上這個原本懸空的純函式）。 */
 	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
+	/** 臨時換人：委派 round.ts 的 swapMatchPlayer，把某場 pending 場次中一位在場球員換成
+	 * 休息名單中的另一位球員，失敗（`ok: false`）時不套用任何變動。 */
+	swapMatchPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => SwapMatchPlayerResult;
 }
 
 // 「找不到目前回合」與 round.ts 私有的 MATCH_NOT_FOUND_MESSAGE（「找不到指定的場次」）
@@ -115,6 +124,14 @@ const NO_ROUND_TO_SUBMIT_MESSAGE = "目前沒有進行中的回合，請重新�
 // 防線，並非真的會被觸發的分支。SetTargetScoreFailureCode 目前只有 SCORING_STARTED
 // 一個成員，沿用它純粹是型別上沒有更貼切的選項，不代表本情境真的是「已開始計分」。
 const NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
+
+// swapMatchPlayer 只會在畫面已渲染出換人操作時才會被呼叫（該操作只存在於 round !== null
+// 的畫面裡），這裡的 null 檢查與上面兩個 NO_ROUND_TO_* 常數同樣是不可達的型別安全防線。
+// 「找不到目前回合」與 round.ts 私有的 SWAP_MATCH_NOT_FOUND_MESSAGE（「找不到指定的場次」）
+// 是不同情境：後者是「回合存在但 matchId 過期」，前者是「整個回合都不存在」——沿用
+// submitScore 既有先例：MATCH_NOT_FOUND 是 SWAP_MATCH_PLAYER_FAILURE_CODE 五個成員中對
+// 「整個回合都不存在」相對貼切的選擇。
+const NO_ROUND_TO_SWAP_MATCH_PLAYER_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
 
 // 整合 reducer 與 localStorage，結構比照 useRosterStore.ts：write effect 放前面
 // （mount 時 ref=false 故跳過）、read/hydrate effect 放後面，避免 read 前就被
@@ -164,8 +181,9 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	// 「原值 + 1」的絕對值 patch 而非差值，重複套用同一份結果相同。不改用「把
 	// state.round 的讀取搬進 reducer」來根治：那會迫使 reducer 呼叫 crypto.randomUUID()
 	// 與 new Date() 而不再是純函式，也讓本函式無法同步回傳 CreateRoundResult 供 UI
-	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。resetIncompleteMatches／submitScore
-	// 同樣讀 render scope 的 state.round，適用同一條限制。
+	// 判斷 ok。UI 端 MUST 確保一次互動只呼叫一次。resetIncompleteMatches／submitScore／
+	// swapMatchPlayer 同樣讀 render scope 的 state.round，適用同一條限制（換人尤其明顯：
+	// 同一次 render 內連換兩次，第二次會以換人前的回合為基底，第一次的換人結果被覆蓋掉）。
 	//
 	// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）：createRound() 一次算出
 	// 新回合與 restSettlements，本函式在同一次同步呼叫內依序 dispatch 新回合、
@@ -272,6 +290,26 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return result;
 	}
 
+	// 臨時換人（round-lifecycle 的「臨時換人（球員與休息名單互換）」Requirement）：委派
+	// round.ts 的純函式，成功時 dispatch 新回合；失敗（五項前置條件任一不成立）時不套用
+	// 任何變動，形態比照 setTargetScore 的「呼叫純函式 → 判 ok → dispatch」。
+	function swapMatchPlayer(matchId: string, outPlayerId: string, inPlayerId: string): SwapMatchPlayerResult {
+		if (state.round === null) {
+			return {
+				ok: false,
+				code: SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND,
+				message: NO_ROUND_TO_SWAP_MATCH_PLAYER_MESSAGE,
+			};
+		}
+
+		const result = swapMatchPlayerPure(state.round, matchId, outPlayerId, inPlayerId, players);
+		if (result.ok) {
+			dispatch({ type: "SWAP_MATCH_PLAYER", round: result.round });
+		}
+
+		return result;
+	}
+
 	return {
 		round: state.round,
 		history: state.history,
@@ -280,5 +318,6 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		resetIncompleteMatches,
 		submitScore,
 		setTargetScore,
+		swapMatchPlayer,
 	};
 }

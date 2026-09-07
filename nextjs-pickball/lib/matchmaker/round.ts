@@ -7,6 +7,7 @@
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
 import { buildSignatureIndex } from "./duplication";
+import { labelDoublesComposition } from "./pairing";
 import { roundRating } from "./rating-math";
 import { updateRatings } from "./rating";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
@@ -912,4 +913,146 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		playerPatches,
 		boundaryHits,
 	};
+}
+
+// ---- 臨時換人（球員與休息名單互換，prd.md 6.3、matchmaker-player-swap change，M13） ----
+
+/**
+ * swapMatchPlayer 的失敗代碼：五種前置條件各自獨立（以函式名為前綴命名，比照
+ * SET_TARGET_SCORE_FAILURE_CODE 的既有模式，不重蹈 M3 ROUND_FAILURE_CODE 未以函式名
+ * 命名的教訓）。
+ */
+export const SWAP_MATCH_PLAYER_FAILURE_CODE = {
+	MATCH_NOT_FOUND: "match-not-found",
+	MATCH_NOT_PENDING: "match-not-pending",
+	OUT_PLAYER_NOT_IN_MATCH: "out-player-not-in-match",
+	IN_PLAYER_NOT_RESTING: "in-player-not-resting",
+	IN_PLAYER_NOT_ACTIVE: "in-player-not-active",
+} as const;
+
+export type SwapMatchPlayerFailureCode = (typeof SWAP_MATCH_PLAYER_FAILURE_CODE)[keyof typeof SWAP_MATCH_PLAYER_FAILURE_CODE];
+
+export interface SwapMatchPlayerSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface SwapMatchPlayerFailure {
+	readonly ok: false;
+	readonly code: SwapMatchPlayerFailureCode;
+	readonly message: string;
+}
+
+export type SwapMatchPlayerResult = SwapMatchPlayerSuccess | SwapMatchPlayerFailure;
+
+// tasks 2.4：呼叫端可能持有過期的 matchId（場次已被重排移除），與 submitScore 的
+// MATCH_NOT_FOUND 同類防線，但訊息各自具名（design Decision 7）——不沿用 submitScore 的
+// MATCH_NOT_FOUND_MESSAGE 常數，避免兩個獨立失敗情境共用同一份文案而互相耦合。
+const SWAP_MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
+// tasks 2.6：已完成場次的結果不可回溯更動、已開始計分者換人會讓正在進行的實體比賽與資料
+// 脫節（spec「臨時換人（球員與休息名單互換）」）。
+const SWAP_MATCH_NOT_PENDING_MESSAGE = "該場次已開始計分或已完成，無法臨時換人。";
+// tasks 2.6：呼叫端傳入不屬於該場的球員 id（例如 UI 狀態過期）。
+const SWAP_OUT_PLAYER_NOT_IN_MATCH_MESSAGE = "指定要換出的球員不在這場對戰中，請重新整理頁面後再試一次。";
+// tasks 2.6：防止「換入一個已經在場上的人」造成同一人出現在兩個位置。
+const SWAP_IN_PLAYER_NOT_RESTING_MESSAGE = "指定要換入的球員目前不在本輪休息名單中，請重新選擇。";
+// tasks 2.6：休息名單成員可能在換人當下已被使用者於名單頁切換為暫停出場，這是兩個獨立
+// 時刻的資料，換人操作以當下狀態為準。
+const SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE = "指定要換入的球員目前為暫停出場狀態，請先恢復其出場狀態後再試一次。";
+
+/**
+ * 臨時換人：把某場 pending 場次中一位在場球員換成該輪休息名單中的另一位球員
+ * （prd.md 6.3「主持人可能……臨時換人代打」）。純函式，回傳新回合，原 round／players
+ * SHALL NOT 被就地修改。
+ *
+ * 五項前置條件（matchId 存在、場次為 pending、outPlayerId 屬該場、inPlayerId 屬休息
+ * 名單、inPlayerId 解析出的 isActive 為 true）任一不成立即拒絕並回傳可判讀的失敗結果，
+ * 原 round SHALL NOT 被修改（tasks 2.6）。
+ *
+ * 成功時依序完成：替換 playerIds、重算該隊隊伍分數（design Decision 2：沿用 pairing.ts
+ * buildTeam 的既有算法——隊內成員 rating 總和，經 roundRating 正規化）、雙打場次重算組成
+ * 標示（design Decision 3：重用已匯出的 pairing.ts labelDoublesComposition，以換人後兩隊
+ * 共四位球員呼叫；labelDoublesComposition 只讀性別集合、不讀順序，故解析用
+ * resolveTeamPlayers 即可，不需另外保序。design Decision 9：任一位無法從 players 解析時
+ * 維持換人前的值，不拋例外也不退回 "general"）、休息名單互換（design Decision 8：
+ * outPlayerId 附加於陣列尾端）。
+ */
+export function swapMatchPlayer(
+	round: Round,
+	matchId: string,
+	outPlayerId: string,
+	inPlayerId: string,
+	players: readonly Player[],
+): SwapMatchPlayerResult {
+	const matchIndex = round.matches.findIndex((m) => m.id === matchId);
+	if (matchIndex === -1) {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND, message: SWAP_MATCH_NOT_FOUND_MESSAGE };
+	}
+	const match = round.matches[matchIndex];
+
+	if (match.status !== "pending") {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_PENDING, message: SWAP_MATCH_NOT_PENDING_MESSAGE };
+	}
+
+	const teamIndex = match.teams.findIndex((team) => team.playerIds.includes(outPlayerId));
+	if (teamIndex === -1) {
+		return {
+			ok: false,
+			code: SWAP_MATCH_PLAYER_FAILURE_CODE.OUT_PLAYER_NOT_IN_MATCH,
+			message: SWAP_OUT_PLAYER_NOT_IN_MATCH_MESSAGE,
+		};
+	}
+
+	if (!round.restingPlayerIds.includes(inPlayerId)) {
+		return {
+			ok: false,
+			code: SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_RESTING,
+			message: SWAP_IN_PLAYER_NOT_RESTING_MESSAGE,
+		};
+	}
+
+	const inPlayer = players.find((p) => p.id === inPlayerId);
+	if (inPlayer === undefined || !inPlayer.isActive) {
+		return { ok: false, code: SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_ACTIVE, message: SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE };
+	}
+
+	const team = match.teams[teamIndex];
+
+	const newPlayerIds = team.playerIds.map((id) => (id === outPlayerId ? inPlayerId : id));
+	// 隊伍分數重算沿用「總和」算法（design Decision 2）：resolveTeamPlayers 已是 submitScore
+	// 沿用的既有球員解析函式，此處重用而非另寫一份，遇缺員時同樣寬容降級（略過而非拋錯）。
+	const newTeamPlayers = resolveTeamPlayers(newPlayerIds, players);
+	const newRating = roundRating(newTeamPlayers.reduce((sum, player) => sum + player.rating, 0));
+	const newTeam: RoundTeam = { playerIds: newPlayerIds, rating: newRating };
+	const newTeams: [RoundTeam, RoundTeam] = teamIndex === 0 ? [newTeam, match.teams[1]] : [match.teams[0], newTeam];
+
+	// 雙打組成標示重算（design Decision 3、9）：唯一一處計算，單打分支完全不觸碰
+	// doublesComposition 欄位（match 本身即無此欄位）。resolveTeamPlayers 已是 submitScore
+	// 沿用的既有球員解析函式，此處重用而非另寫一份；labelDoublesComposition 只讀性別集合、
+	// 不讀順序（design Decision 3 的「以 teamA 在前、teamB 在後組出 tuple」純粹是呼叫慣例，
+	// 不是判定所需的順序保證），resolveTeamPlayers 依 players 陣列原有順序 filter 完全足夠。
+	let doublesComposition = match.doublesComposition;
+	if (match.format === "doubles") {
+		const fourPlayerIds = [...newTeams[0].playerIds, ...newTeams[1].playerIds];
+		const fourPlayers = resolveTeamPlayers(fourPlayerIds, players);
+		if (fourPlayers.length === PLAYERS_PER_MATCH.doubles) {
+			// 解構後以字面陣列重組成 tuple，讓 TS 依 labelDoublesComposition 的 tuple 參數型別
+			// 做 contextual typing，不需型別斷言（沿用 pairing.ts pairDoubles 的既有手法）。
+			const [first, second, third, fourth] = fourPlayers;
+			doublesComposition = labelDoublesComposition([first, second, third, fourth]);
+		}
+	}
+
+	const updatedMatch: RoundMatch = {
+		...match,
+		teams: newTeams,
+		...(match.format === "doubles" ? { doublesComposition } : {}),
+	};
+	const matches = round.matches.map((m, index) => (index === matchIndex ? updatedMatch : m));
+
+	// 休息名單互換：inPlayerId 移除、outPlayerId 附加於陣列尾端（design Decision 8，
+	// SHALL NOT 依 restCount 重新排序）。
+	const restingPlayerIds = [...round.restingPlayerIds.filter((id) => id !== inPlayerId), outPlayerId];
+
+	return { ok: true, round: { ...round, matches, restingPlayerIds } };
 }

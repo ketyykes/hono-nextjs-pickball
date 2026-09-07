@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useRoundStore } from "./useRoundStore";
-import { createRound, submitScore, SUBMIT_SCORE_FAILURE_CODE } from "@/lib/matchmaker/round";
+import { createRound, submitScore, SUBMIT_SCORE_FAILURE_CODE, SWAP_MATCH_PLAYER_FAILURE_CODE } from "@/lib/matchmaker/round";
 import { readRound, readHistory, writeRound, writeHistory } from "@/lib/matchmaker/round-storage";
 import type {
 	CreateRoundResult,
 	ResetIncompleteMatchesResult,
 	SubmitScoreResult,
 	SetTargetScoreResult,
+	SwapMatchPlayerResult,
 } from "@/lib/matchmaker/round";
 import type { Player } from "@/lib/matchmaker/types";
 import { writeMatchSlot, readMatchSlot } from "@/lib/scoreboard/match-slots";
@@ -407,6 +408,64 @@ describe("useRoundStore", () => {
 		});
 		expect(failResult?.ok).toBe(false);
 		expect(result.current.round).toBeNull();
+	});
+
+	// M13：swapMatchPlayer 是 round.ts 第四個「純函式回傳 ok/失敗 → hook 判 ok → dispatch」
+	// 家族成員（§2 已完成並通過審查），本測試比照 resetIncompleteMatches／setTargetScore
+	// 既有形態驗證接線。成功情境用 3 位單打（1 場出賽、1 人休息）換人，斷言換入者出現在
+	// 該場、換出者出現在休息名單（而非只看 ok，殺參數順序互換與 players 被換成空陣列兩類
+	// 變異）；失敗情境用過期 matchId（round 已存在但場次不存在）觸發純函式的 MATCH_NOT_FOUND，
+	// round 參考需維持不變（toBe，殺「失敗仍 dispatch」變異）。
+	it("swapMatchPlayer 成功時套用新回合、失敗時 round 參考不變", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1 });
+		});
+		const matchId = result.current.round!.matches[0].id;
+		const outPlayerId = result.current.round!.matches[0].teams[0].playerIds[0];
+		const inPlayerId = result.current.round!.restingPlayerIds[0];
+
+		let successResult: SwapMatchPlayerResult | undefined;
+		act(() => {
+			successResult = result.current.swapMatchPlayer(matchId, outPlayerId, inPlayerId);
+		});
+		expect(successResult?.ok).toBe(true);
+		if (!successResult?.ok) {
+			throw new Error("測試前置失敗：swapMatchPlayer 未成功");
+		}
+		expect(result.current.round).toEqual(successResult.round);
+		expect(result.current.round?.matches[0].teams[0].playerIds).toContain(inPlayerId);
+		expect(result.current.round?.restingPlayerIds).toContain(outPlayerId);
+
+		// 失敗情境：round 已存在但 matchId 過期，round 參考不變（toBe，非 toEqual）
+		const roundBeforeFailure = result.current.round;
+		let failResult: SwapMatchPlayerResult | undefined;
+		act(() => {
+			failResult = result.current.swapMatchPlayer("nonexistent-match", outPlayerId, inPlayerId);
+		});
+		expect(failResult?.ok).toBe(false);
+		expect(result.current.round).toBe(roundBeforeFailure);
+	});
+
+	it("尚無目前回合時呼叫 swapMatchPlayer 回傳失敗且不 dispatch", () => {
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players: [], updatePlayer }));
+
+		let failResult: SwapMatchPlayerResult | undefined;
+		act(() => {
+			failResult = result.current.swapMatchPlayer("match-1", "p1", "p2");
+		});
+
+		expect(failResult?.ok).toBe(false);
+		if (failResult?.ok) {
+			throw new Error("測試前置錯誤：預期失敗，但回傳成功");
+		}
+		expect(failResult?.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
+		expect(result.current.round).toBeNull();
+		expect(updatePlayer).not.toHaveBeenCalled();
 	});
 
 	it("送出比分後 history 確實持久化到 localStorage（殺 write effect 依賴陣列改 [] 或整個 effect 被刪除的變異）", () => {

@@ -20,9 +20,20 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0 實測回填（tasks.md 1.1）。
-- **Initial commit hash**: 待 apply Step 0 實測回填（tasks.md 1.1）。
-- **Worktree path**: `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-player-swap`
+- **Baseline tests**: 2026-09-06 於 `change/matchmaker-player-swap` 實測 `pnpm test` 全綠——
+  `nextjs-pickball` 70 個測試檔／672 個測試通過，`hono-pickball` 4 個測試檔／16 個測試通過
+  （後端未出現 `listen EPERM 127.0.0.1`，不需放行重跑）。`pnpm install` 為 `Already up to date`，
+  `git status --porcelain` 於安裝後仍為空（lockfile 零變動）。
+- **Initial commit hash**: `b69a418`（本分支開工前的 HEAD，其 parent 鏈已含 M10／M11／M12；
+  M12 的合併 commit 為 `ea71e08`）。
+- **Worktree path**: `/Users/m2_24gb/Desktop/project/nextjs-pickball`（**主 repo**）。
+
+> ⚠️ **本批不使用 git worktree**（apply 階段由 coordinator 裁決，覆寫上方 Setup commands
+> 的原始寫法）：M11、M13 兩次派工都曾因 `cd <path> && <相對路徑指令>` 讓背景 agent 卡在
+> 無法回答的權限提示而永久停擺。本批改為全程在主 repo 的 `change/matchmaker-player-swap`
+> 分支上作業，所有指令**一律禁止出現 `cd`**，需要指定目錄時改用完整絕對路徑參數或
+> `pnpm --filter ./<workspace> <script>`（於 repo root 執行）。因此上方 Teardown 的
+> `git worktree remove` 不適用，合併後只需刪分支。
 
 ## Teardown
 

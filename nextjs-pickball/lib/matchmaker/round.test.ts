@@ -5,14 +5,17 @@ import {
 	resetIncompleteMatches,
 	setTargetScore,
 	submitScore,
+	swapMatchPlayer,
 	validateScoreInput,
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
 	SUBMIT_SCORE_FAILURE_CODE,
+	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
 } from "./round";
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
 import { appendHistoryEntry, MatchHistoryEntrySchema } from "./history";
+import { roundRating } from "./rating-math";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
@@ -1635,5 +1638,336 @@ describe("submitScore", () => {
 		// 也會失去參照意義。
 		const keptMatch = resetResult.round.matches.find((m) => m.id === "done");
 		expect(keptMatch?.status).toBe("completed");
+	});
+});
+
+// swapMatchPlayer：臨時換人（round-lifecycle spec「臨時換人（球員與休息名單互換）」，M13）。
+describe("swapMatchPlayer", () => {
+	it("換人成功時以休息名單球員取代該場的在場球員", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		// 其餘成員與另一隊不變：第一隊只有 p1 被換成 p3，第二隊的 p2 完全不動。
+		expect(updatedMatch?.teams[0].playerIds).toEqual(["p3"]);
+		expect(updatedMatch?.teams[1].playerIds).toEqual(["p2"]);
+	});
+
+	it("單打場次換人後重算該隊隊伍分數為換入球員的 rating", () => {
+		const players = [
+			makePlayer({ id: "p1", rating: 3 }),
+			makePlayer({ id: "p2", rating: 3 }),
+			makePlayer({ id: "p3", rating: 5.5 }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.teams[0].rating).toBe(5.5);
+	});
+
+	it("雙打場次換人後重算該隊隊伍分數為兩位隊員 rating 總和", () => {
+		const players = [
+			makePlayer({ id: "p1", rating: 4.2 }),
+			makePlayer({ id: "p2", rating: 2 }),
+			makePlayer({ id: "p3", rating: 2 }),
+			makePlayer({ id: "p4", rating: 2 }),
+			makePlayer({ id: "p5", rating: 3.1 }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			format: "doubles",
+			doublesComposition: "general",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6.2 },
+				{ playerIds: ["p3", "p4"], rating: 4 },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match], restingPlayerIds: ["p5"] });
+
+		// p2 換成 p5：留任隊員 p1 rating 4.20，換入 p5 rating 3.10。
+		const result = swapMatchPlayer(round, "m-1", "p2", "p5", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.teams[0].rating).toBe(roundRating(4.2 + 3.1));
+	});
+
+	it("換人後換出者進入休息名單、換入者自休息名單移除", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.restingPlayerIds).toContain("p1");
+		expect(result.round.restingPlayerIds).not.toContain("p3");
+	});
+
+	it("換出者附加於休息名單尾端且既有休息者的相對順序不變", () => {
+		// design Decision 8：休息名單的原始順序來自 candidates.ts 的休息次數優先排序，
+		// 換人 SHALL NOT 依 restCount 重新排序，換出者一律附加於尾端。上一個 it 用
+		// toContain 只驗「有沒有」，驗不出位置，故本 it 以完整陣列比對釘住尾端語意。
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3", "p4"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.restingPlayerIds).toEqual(["p4", "p1"]);
+	});
+
+	it("換出者屬第二隊時只更新第二隊、第一隊維持原樣", () => {
+		// 其餘成功路徑的 it 換的都是第一隊球員，teamIndex 為 1 的分支會沒有測試守住
+		// （把 newTeams 寫死成永遠更新 teams[0] 也不會被任何斷言抓到）。
+		const players = [makePlayer({ id: "p1", rating: 3 }), makePlayer({ id: "p2", rating: 3 }), makePlayer({ id: "p3", rating: 5.5 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p2", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.teams[1]).toEqual({ playerIds: ["p3"], rating: 5.5 });
+		// 對照組：換第二隊的人時，第一隊 SHALL NOT 被連帶改寫。
+		expect(updatedMatch?.teams[0]).toEqual({ playerIds: ["p1"], rating: 3 });
+	});
+
+	it("雙打場次換人後以換人後四位球員重新判定組成標示", () => {
+		const players = [
+			makePlayer({ id: "p1", gender: "male" }),
+			makePlayer({ id: "p2", gender: "female" }),
+			makePlayer({ id: "p3", gender: "male" }),
+			makePlayer({ id: "p4", gender: "male" }),
+			makePlayer({ id: "p5", gender: "male" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			format: "doubles",
+			// 換人前為混雙（p2 為女性）；換人後四位球員皆為男性，SHALL NOT 沿用混雙標示。
+			doublesComposition: "mixed",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match], restingPlayerIds: ["p5"] });
+
+		const result = swapMatchPlayer(round, "m-1", "p2", "p5", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.doublesComposition).toBe("mens");
+	});
+
+	it("換人不影響 restCount 與 seenSignatures", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({
+			matches: [match],
+			restingPlayerIds: ["p3"],
+			seenSignatures: { teammateKeys: ["tk"], opponentKeys: ["ok"], fullMatchKeys: ["fk"] },
+		});
+		const seenSignaturesSnapshot = structuredClone(round.seenSignatures);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		// SwapMatchPlayerSuccess 的形狀裡本來就沒有任何名單 patch 欄位——本函式不擁有名單，
+		// 也不重算休息次數（design：restCount 只在產生新一輪時結算）。
+		expect(result).not.toHaveProperty("playerPatches");
+		expect(result.round.seenSignatures).toEqual(seenSignaturesSnapshot);
+	});
+
+	it("雙打場次有隊友已從名單移除時組成標示維持換人前的值", () => {
+		// p4 已從名單移除（不在 players 陣列中），但仍留在該場次的 teamB——
+		// resolveTeamPlayers 對此一貫寬容降級（round.ts 既有行為），本函式不因此拋出例外。
+		const players = [
+			makePlayer({ id: "p1", gender: "male" }),
+			makePlayer({ id: "p2", gender: "female" }),
+			makePlayer({ id: "p3", gender: "male" }),
+			makePlayer({ id: "p5", gender: "male" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			format: "doubles",
+			doublesComposition: "mixed",
+			teams: [
+				{ playerIds: ["p1", "p2"], rating: 6 },
+				{ playerIds: ["p3", "p4"], rating: 6 },
+			],
+		});
+		const round = makeRound({ format: "doubles", matches: [match], restingPlayerIds: ["p5"] });
+
+		expect(() => swapMatchPlayer(round, "m-1", "p2", "p5", players)).not.toThrow();
+		const result = swapMatchPlayer(round, "m-1", "p2", "p5", players);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const updatedMatch = result.round.matches.find((m) => m.id === "m-1");
+		expect(updatedMatch?.doublesComposition).toBe("mixed");
+	});
+
+	it("matchId 不存在於該回合時拒絕換人", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "no-such-match", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("場次非 pending 時拒絕換人", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const completedMatch = makeCompletedRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [completedMatch], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_PENDING);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("outPlayerId 不在該場次的任一隊伍時拒絕換人", () => {
+		const players = [
+			makePlayer({ id: "p1" }),
+			makePlayer({ id: "p2" }),
+			makePlayer({ id: "p3" }),
+			makePlayer({ id: "unrelated" }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "unrelated", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.OUT_PLAYER_NOT_IN_MATCH);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("inPlayerId 不在該輪休息名單時拒絕換人", () => {
+		// p3 本來就在場上（另一場次），不在 restingPlayerIds 裡。
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: [] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_RESTING);
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("inPlayerId 存在於休息名單但非 active 時拒絕換人", () => {
+		const players = [
+			makePlayer({ id: "p1" }),
+			makePlayer({ id: "p2" }),
+			makePlayer({ id: "p3", isActive: false }),
+		];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [
+				{ playerIds: ["p1"], rating: 3 },
+				{ playerIds: ["p2"], rating: 3 },
+			],
+		});
+		const round = makeRound({ matches: [match], restingPlayerIds: ["p3"] });
+		const roundSnapshot = structuredClone(round);
+
+		const result = swapMatchPlayer(round, "m-1", "p1", "p3", players);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.IN_PLAYER_NOT_ACTIVE);
+		expect(round).toEqual(roundSnapshot);
 	});
 });

@@ -697,4 +697,109 @@ test.describe("/matchmaker 對戰頁", () => {
 			expect(playingAfterIds).not.toContain(playerId);
 		}
 	});
+
+	// M13（matchmaker-player-swap）6.1：換人操作是 shadcn Select 觸發器（role="combobox"），
+	// 只有 spec「場地區塊的換人操作」要求的無障礙屬性——一律含所屬球員姓名的 aria-label——
+	// 才能讓讀屏使用者在雙打四格之間逐一分辨。unit／integration 測試驗不到真實 Tab 走訪
+	// 順序與跨元素的可存取名稱唯一性，故需要這條 E2E（apply §6 tasks 6.1）。
+	//
+	// 種 6 人：雙打 1 場地固定用 4 人，留 2 人休息，讓四個換人觸發器皆有候選人而非
+	// disabled（disabled 元素不會落在 Tab 焦點序列內，會讓本測試測不到目標）。
+	test("換人操作具備可存取名稱且可由鍵盤操作，並能區分不同球員", async ({ page }) => {
+		await seedRoster(page, 6);
+		await page.goto("/matchmaker");
+		await page.getByRole("radio", { name: "雙打" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(1);
+		const firstCourt = courtGrids.nth(0);
+
+		const swapTriggers = firstCourt.getByRole("combobox");
+		await expect(swapTriggers).toHaveCount(4);
+
+		// 依序 Tab 走訪四個觸發器：每次呼叫都從上一次聚焦到的位置繼續往後找，
+		// 天然符合「依序走訪」的驗收語意。
+		const names: string[] = [];
+		for (let i = 0; i < 4; i++) {
+			await tabUntilFocused(page, swapTriggers.nth(i), 60);
+			await expect(swapTriggers.nth(i)).toBeFocused();
+			const ariaLabel = await swapTriggers.nth(i).getAttribute("aria-label");
+			expect(ariaLabel).not.toBeNull();
+			// 候選人非空時的組字模板固定為「替 ${姓名} 換人」（CourtCard.tsx
+			// renderSwapTrigger），順帶驗證可存取名稱確實含所屬球員姓名。
+			expect(ariaLabel).toMatch(/^替 測試員\d+ 換人$/);
+			names.push(ariaLabel ?? "");
+		}
+
+		// 四者彼此不同：只有姓名不同才可能達成，因為組字模板其餘部分固定。
+		expect(new Set(names).size).toBe(4);
+	});
+
+	// M13（matchmaker-player-swap）6.3（leader 於 apply §5 Stage 2 之後授權新增，非原
+	// tasks.md 項目）：封住換人整條線路完全失效（P5：handleSwapPlayer 不呼叫
+	// swapMatchPlayer；P6：onSwapPlayer 傳 no-op）或引數對調（Q2：outPlayerId／inPlayerId
+	// 對調）這三種變異——這些缺口在全套單元測試與 tsc 皆為綠燈的情況下完全不會被
+	// 發現，因為 §4 的 integration 測試只驗到 CourtCard 正確委派回呼，回呼之後的路徑
+	// 無人守衛。
+	//
+	// 換人操作以 id（e2e-player-N）與姓名（測試員N）的索引一致這件事推導換入／換出者
+	// 的期望姓名，不假設配對演算法固定挑中哪 4 人上場。
+	test("換人成功後場地色塊與休息名單同步更新", async ({ page }) => {
+		await seedRoster(page, 6);
+		await page.goto("/matchmaker");
+		await page.getByRole("radio", { name: "雙打" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(1);
+		const firstCourt = courtGrids.nth(0);
+		const restingPanel = page.getByTestId("match-stage-resting");
+
+		const courtTileIds = await firstCourt
+			.locator('[data-testid^="player-tile-"]')
+			.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-testid") ?? ""));
+		expect(courtTileIds).toHaveLength(4);
+		// 休息名單以 RestingPanel 渲染，其球員項目的 data-testid 為
+		// `resting-player-${id}`（見 RestingPanel.tsx），與場地卡片內 PlayerTile
+		// 的 `player-tile-${id}` 是兩套不同前綴，不可混用。
+		const restingIds = await restingPanel
+			.locator('[data-testid^="resting-player-"]')
+			.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-testid") ?? ""));
+		expect(restingIds.length).toBeGreaterThan(0);
+
+		function playerIdFromCourtTestId(testId: string): string {
+			return testId.replace("player-tile-", "");
+		}
+		function playerIdFromRestingTestId(testId: string): string {
+			return testId.replace("resting-player-", "");
+		}
+		function nameFromPlayerId(playerId: string): string {
+			const index = playerId.replace("e2e-player-", "");
+			return `測試員${index}`;
+		}
+
+		const outPlayerId = playerIdFromCourtTestId(courtTileIds[0]);
+		const inPlayerId = playerIdFromRestingTestId(restingIds[0]);
+		const outName = nameFromPlayerId(outPlayerId);
+		const inName = nameFromPlayerId(inPlayerId);
+
+		const swapTrigger = firstCourt.getByRole("combobox", { name: `替 ${outName} 換人`, exact: true });
+		await swapTrigger.click();
+		await page.getByRole("option", { name: inName, exact: true }).click();
+
+		// spec 主斷言：換入者出現在場地、換出者移到休息名單。
+		await expect(firstCourt.locator(`[data-testid="player-tile-${inPlayerId}"]`)).toBeVisible();
+		await expect(restingPanel.locator(`[data-testid="resting-player-${outPlayerId}"]`)).toBeVisible();
+		await expect(firstCourt.locator(`[data-testid="player-tile-${outPlayerId}"]`)).toHaveCount(0);
+		await expect(restingPanel.locator(`[data-testid="resting-player-${inPlayerId}"]`)).toHaveCount(0);
+
+		// 反向護欄排最後：換人成功路徑不應觸發任何 role="alert"（swapError 為 null）。
+		// 範圍限定在 match-stage-courts：page 層級查 getByRole("alert") 會連帶命中
+		// Next.js App Router 內建的 AppRouterAnnouncer（route-announcer，見
+		// next/dist/client/components/app-router-announcer.js）——它以 Shadow DOM
+		// 掛在 document.body，永遠帶 role="alert" 供路由切換時播報用，與本頁任何
+		// 換人／送出邏輯無關；不限定範圍會讓本斷言恆為「至少 1」而失去鑑別力。
+		await expect(page.getByTestId("match-stage-courts").getByRole("alert")).toHaveCount(0);
+	});
 });
