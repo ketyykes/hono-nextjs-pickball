@@ -15,45 +15,46 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-06，M13 進行中、使用者要求暫停）
+## 狀態快照（最後更新 2026-09-07，M13 已合併）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `ea71e08`（feat：合併 M12 matchmaker-scoreboard-team-labels） |
+| `main` HEAD | `e6a4713`（feat：合併 M13 matchmaker-player-swap） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
-| M13 | **進行中，暫停**（`change/matchmaker-player-swap`，尚未合併）。§1～§5 已完成兩階段審查，§6（E2E 換人操作可存取性測試）撰寫中就暫停。詳見下方「M13 進行中紀錄」。 |
-| M14 | 未開始（需等 M13 合併） |
+| M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
+| M14 | 未開始 |
 | M15 | 未開始（需等 M14 合併） |
-| 工作位置 | 主 repo 直接開分支，不用 worktree；**目前在 `change/matchmaker-player-swap`，工作樹乾淨**（commit 到 §6 前的部分都已落地）；下一棒接手前先 `git status` 確認乾淨、`git branch --show-current` 確認在這條分支上 |
+| 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `main`，工作樹乾淨 |
 
-### ⚠️ M13 暫停時，背景 agent 可能仍在跑
+### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
-暫停指令下達當下，M13 的 leader（`general-purpose`、opus）與其派出的 §6 Implementer 仍在背景執行
-（未 `TaskStop`，只是不再排 coordinator 的自動輪詢）。下一個接手的 coordinator session：
-1. 先跑 `ListAgents` 看這兩個 agent還在不在跑、有沒有已經跑完卡在等回覆。
-2. 若還在跑，比照本檔「派工經驗」一節的兩段判斷式（transcript 最後一筆有沒有 `tool_result` ×
-   對應 process 還在不在）判斷是真的卡住還是仍在正常執行，不要直接 `TaskStop`。
-3. 若已完成（Final Code Review APPROVED），比照 M11／M12 的模式做 coordinator 獨立驗證後再合併，
-   不要相信 leader 自報的結果。
-
-### M13 進行中紀錄（2026-09-06，暫停時快照）
-
-- **規模（目前已知）**：§1～§6 六組，§1～§5 已完成兩階段審查並各自 commit，§6（E2E）進行中。
-- **§1～§4**：核心換人邏輯（`round.ts` 的 `swapMatchPlayer`）、`useRoundStore` 接線、`CourtCard` UI 操作。
-  §2 有一次 Stage 2 CHANGES_REQUESTED（多餘的 `resolveInOrder` 輔助函式與其 `as [Player,Player,Player,Player]`
-  型別斷言，改用既有 `resolveTeamPlayers` 拆解模式修正）。§4 有兩次 Stage 2 自行抓到的存活 mutation
-  （候選清單被截斷、換人停用原因沒併入可存取名稱）。
-- **§5**：`MatchStage`／`page.tsx` 接線，把 `onSwapPlayer`／`swapError` 設為必填 prop 逼型別系統擋掉忘記接線。
-  Stage 1 盤點出 7 個這一層専屬的 mutation 缺口，其中 **P5／P6（整條換人路徑完全失效）沒有任何自動化測試會抓到**，
-  已列為 §6 E2E 派工單的設計輸入。
-- **§6**：E2E 撰寫中（換人操作可存取名稱互不相同、可鍵盤操作），已有一個先行 commit
-  `89c9f34`（測驗可存取名稱互不相同且可由鍵盤操作），暫停時 Implementer 仍在補完整份 spec 檔。
-- **尚未做**：§6 完成與審查、Final Code Review、coordinator 獨立驗證（tsc／lint／unit／
-  `openspec validate --strict`／全套 E2E）、`git merge --no-ff` 進 `main`、分支刪除、
-  正式的「M13 執行紀錄」與「main 品質基線」段落（比照 M11／M12 格式）。
+- **規模**：§1～§7 七組、30 個 commit。前一個 session 完成 §1～§5（兩階段審查全過）並在 §6 撰寫到一半時
+  依使用者指示暫停；本 session 以新 coordinator 身分接手，`ListAgents` 確認前一個 session 已離線、
+  無殘留背景 agent，`ps aux` 確認無殘留 dev server，直接切到既有 `change/matchmaker-player-swap` 分支續跑。
+- **§1～§5**（前一 session 完成）：核心換人邏輯（`round.ts` 的 `swapMatchPlayer`）、`useRoundStore` 接線、
+  `CourtCard` UI 操作、`MatchStage`／`page.tsx` 接線（`onSwapPlayer`／`swapError` 設為必填 prop 逼型別系統
+  擋掉忘記接線）。§2 一次 Stage 2 CHANGES_REQUESTED（多餘的 `resolveInOrder` 輔助函式與型別斷言，改用既有
+  `resolveTeamPlayers` 拆解模式修正）；§4 兩次 Stage 2 自抓存活 mutation（候選清單被截斷、換人停用原因沒併入
+  可存取名稱）；§5 盤點出 P5／P6（整條換人路徑完全失效）沒有任何自動化測試會抓到，列為 §6 E2E 設計輸入。
+- **§6**（本 session 接手完成）：兩個 E2E test 已在暫停前寫入 `match-stage.spec.ts`（6.1 可存取名稱／鍵盤操作、
+  6.3 leader 授權新增的換人成功同步更新），但 `tasks.md` checkbox 未補勾（教訓 #5 情境再現，已依 `git log`
+  補勾）。coordinator 獨立重跑 `match-stage.spec.ts` 三輪，兩個 §6 test 全數綠燈；過程中發現一個新的
+  **指令語法陷阱**，詳見下方新增教訓 #20。
+- **§7 收尾驗證**：19 個驗收錨點逐字核對全過；`round.test.ts`／`useRoundStore.test.tsx`／`CourtCard.test.tsx`
+  三檔 100 測試全綠；`pnpm test` 前端 70 檔／694 測試、後端 4 檔／16 測試全綠；`tsc --noEmit` exit 0；
+  `lint` 0 errors／3 warnings（與基線一致）；`git diff` 確認零新增相依、`allocation.ts`／`pairing.ts`／
+  `duplication.ts`／`candidates.ts`／`round-types.ts`／`PlayerTile.tsx`／`hono-pickball/**` 皆零改動、
+  `hooks/` 零新增檔案（只改既有 `useRoundStore.ts`）；`openspec validate --strict` 通過；spec 重複標題
+  python 計數法檢查兩份 delta spec 皆無重複。
+- **全套 E2E（§7.5）**：首次以慣用語法 `pnpm --filter ./nextjs-pickball test:e2e -- --workers=1` 執行
+  出現「No tests found」（見教訓 #20 診斷過程），改用 `pnpm --filter ./nextjs-pickball exec playwright test
+  --workers=1` 後正常執行，**609 passed / 21 skipped / 0 failed，15.9 分鐘，100% 綠燈**（較 M12 基線
+  597 passed 多 12 個測試，即 §6 兩條新 E2E ＋既有 spec 因 M13 新增互動元素而多出的 it 分支）。
+  過程中machine load average 一度飆到 60+（本 session 自己連續起多輪 E2E 造成，非外部程序），曾在此期間
+  誤跑出 5～21 個與 M13 無關的隨機失敗，判定為雜訊後未採信，待 load 回穩到個位數才做定案的全套執行。
 
 ### M10 執行紀錄（2026-09-06）
 
@@ -167,6 +168,19 @@ E2E        597 passed / 21 skipped / 2 failed，--workers=1，12.0 分鐘（skip
 相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
 ```
 
+### `main` 品質基線（M13 合併後，coordinator 於 `e6a4713` 獨立實測）
+
+```
+前端單元   70 檔 / 694 測試 passed   （M12 後為 70 檔 / 672 測試，+0 檔 / +22 測試）
+後端單元   4 檔 / 16 測試 passed     （不變）
+tsc        pnpm -r exec tsc --noEmit → exit 0
+lint       0 errors / 3 warnings（hooks/ 下三支既存檔的 no-unused-vars，非本批造成）
+E2E        609 passed / 21 skipped / 0 failed，--workers=1，15.9 分鐘（skipped 數不變，100% 綠燈）
+           須用 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（不經 `test:e2e --` 轉發），
+           見教訓 #20
+相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
+```
+
 ## Pipeline 總覽
 
 ```
@@ -200,7 +214,7 @@ main@3fa2d22
 | M10 | matchmaker-stage-gaps | 空場次說明、損毀筆數提示、重設／重排 E2E | 21 commit | §1～§5 五組 | 1 棒 | change/matchmaker-stage-gaps（已刪） | main @ `3fa2d22` | **已合併**（`56331b0`） |
 | M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | 53 commit | §1～§9 九組 | 1 棒 | change/matchmaker-player-stats（已刪） | main @ `56331b0` | **已合併**（`e8e97cf`） |
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
-| M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 至少 15 commit（§1～§5，§6 未計） | §1～§6 六組 | 1 棒 | change/matchmaker-player-swap | M12 已合併 | **進行中，暫停**（§1～§5 完成，§6 撰寫中） |
+| M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 30 commit | §1～§7 七組 | 1 棒（跨兩個 session） | change/matchmaker-player-swap（已刪） | M12 已合併 | **已合併**（`e6a4713`） |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | <待填> | <待填> | <待填> | change/matchmaker-round-timer | M13 已合併 | 未開始 |
 | M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | <待填> | <待填> | <待填> | change/matchmaker-timed-draw | M14 已合併 | 未開始 |
 
@@ -249,7 +263,7 @@ main@3fa2d22
    pnpm --filter ./nextjs-pickball lint   # 0 errors，warning 數不得多於基線 3
    pnpm test                         # 前後端全綠，檔數／測試數 ≥ 前一棒
    DO_NOT_TRACK=1 openspec validate <change-id> --strict
-   pnpm --filter ./nextjs-pickball test:e2e -- --workers=1   # 既有 spec 原樣通過
+   pnpm --filter ./nextjs-pickball exec playwright test --workers=1   # 既有 spec 原樣通過（教訓 #20：不要用 test:e2e --）
    ```
    tasks.md 的勾選數與 `git log main..HEAD` 對得上；抽 2～3 個 RED commit 用
    `git show <commit>^:<path>` 複驗紅燈是真的。
@@ -325,7 +339,9 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
 - 編輯器診斷不可信（整批 Cannot find module 多半是假的），一律以
   pnpm -r exec tsc --noEmit 的 exit code 為準；唯一可信的例外是「單一新檔的單一 import 解不到」。
 - 跑 E2E／preview 前先 lsof -i :3005 -i :8787 並且 ps aux | grep -E "next-server|wrangler|workerd|playwright"
-  交叉核對殘留 process 並全數 kill；跑完立刻清掉自己起的 process。E2E 一律帶 --workers=1。
+  交叉核對殘留 process 並全數 kill；跑完立刻清掉自己起的 process。E2E 一律帶 --workers=1，
+  指令用 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（不要用
+  `test:e2e -- --workers=1`，見教訓 #20）。
 - **指令裡禁止 cd，一律用絕對路徑**（例：grep -n "x" /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/lib/...）。
   cd 之後接相對路徑會讓 auto mode 算不出實際目錄，因全域有 Read() deny 規則而跳出權限提示，整條鏈就停住。
   這條規則要原樣寫進每一張派工單。
@@ -408,6 +424,23 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     等待長指令（E2E、mutation sweep）時，agent 自己必須留在同一個回合裡用輪詢或阻塞式等待，
     不可把等待動作丟給背景 process 然後結束回合——結束回合等於把「叫它繼續」的責任推給
     coordinator，而 coordinator 不會主動戳一個「看起來已完成」的 agent。
+20. **`pnpm --filter ./nextjs-pickball test:e2e -- --workers=1`（不帶檔案路徑）會噴
+    `Error: No tests found`，帶檔案路徑時則會忽略 `--workers=1`／`--project=`／`-g` 等旗標、
+    改用預設並行度整套多瀏覽器亂跑**（M13 coordinator 續跑時實測發現，先前 M10～M12 用同一句指令
+    看似成功，但當時很可能是「剛好只受影響於檔案過濾，worker 數其實沒被鎖到 1」的僥倖，
+    只是尚未遇到需要嚴格單一 worker 才會現形的競態）。根因：`nextjs-pickball/package.json` 的
+    `test:e2e` script 本體就是裸的 `playwright test`，pnpm 透過 `--` 轉發額外參數時，這個
+    `--` 會被 playwright 自己的 commander CLI 當成「之後全部都是檔案樣式（positional glob）」
+    的分隔符，而非單純的「pnpm 專用、不轉發」分隔符：沒有後續檔案樣式時，`--workers=1` 本身
+    被當一個匹配不到任何檔案的樣式，`playwright test` 判定「沒有任何測試」直接報錯；有檔案樣式時，
+    該檔案樣式仍會正確匹配，但 `--workers=1` 等旗標會被一起吃進「樣式清單」而不生效，實際跑的
+    worker 數退回 playwright 內建預設（多工，非 1）。**正確作法**：改用
+    `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 [樣式...]`（`exec` 直接呼叫
+    二進位、不經 pnpm script 的 `--` 轉發），旗標與檔案樣式都會被正確解析。**本檔與各 change 的
+    execution-plan／派工單只要出現 `test:e2e -- --workers=1` 字樣，之後一律替換為
+    `exec playwright test --workers=1`**；若沿用舊語法且出現不明所以、忽多忽少、與改動檔案零因果
+    關係的隨機失敗，先懷疑此陷阱，不要直接套教訓 #17 的「機器負載」判斷（M13 續跑時兩者一度疊加，
+    先排除語法陷阱才看得出負載其實已經回穩）。
 
 ## 跨 change 對齊提醒（交叉檢查結果，2026-09-03）
 
