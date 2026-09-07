@@ -92,9 +92,9 @@ Depends on: §7
 
 Depends on: §4
 
-- [ ] 9.1 RED: 於 `nextjs-pickball/hooks/useRoundStore.test.tsx` 補 it「重新掛載後仍保留已開始計時的 timer，startedAt 不被重置」。確認紅燈
-- [ ] 9.2 GREEN: `useRoundStore` 新增 `SET_TIMER_DURATION`／`START_TIMER` 兩個 reducer action；實作 `setTimerDuration(durationMinutes)`／`startTimer()` 兩個回傳方法，比照既有 `setTargetScore` 的「呼叫純函式 → 判 `ok` → dispatch」形態，`now` 由呼叫端以 `new Date().toISOString()` 注入
-- [ ] 9.3 REFACTOR: 確認兩個新方法的回傳型別與既有 `UseRoundStoreResult` 其餘方法風格一致；`state.round` 為 `null` 時的型別安全防線訊息比照既有 `NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE` 命名風格
+- [x] 9.1 RED: 於 `nextjs-pickball/hooks/useRoundStore.test.tsx` 補 it「重新掛載後仍保留已開始計時的 timer，startedAt 不被重置」。確認紅燈
+- [x] 9.2 GREEN: `useRoundStore` 新增 `SET_TIMER_DURATION`／`START_TIMER` 兩個 reducer action；實作 `setTimerDuration(durationMinutes)`／`startTimer()` 兩個回傳方法，比照既有 `setTargetScore` 的「呼叫純函式 → 判 `ok` → dispatch」形態，`now` 由呼叫端以 `new Date().toISOString()` 注入
+- [x] 9.3 REFACTOR: 確認兩個新方法的回傳型別與既有 `UseRoundStoreResult` 其餘方法風格一致；`state.round` 為 `null` 時的型別安全防線訊息比照既有 `NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE` 命名風格。【apply 追加】自跑 mutation 時實測 setTimerDuration 的 dispatch 邏輯、startTimer 的 `now` 注入、兩者的 null 防線共 3 類變異在僅有 9.1 該 1 個 it 時存活，補 2 個 it（`setTimerDuration` 接線測試、兩方法尚無回合時的 null 防線測試）與 9.1 內 1 條 state-level 斷言、1 段 fake timer 精確比對 `now` 後全數轉紅，最終 `useRoundStore.test.tsx` 由 13 個 it 增為 16 個（非原規劃的 1 個），既有 13 個 it 名稱與斷言皆未變動
 
 ## 10. 計時設定與開始計時的 UI（RoundControls.tsx）
 
