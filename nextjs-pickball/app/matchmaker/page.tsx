@@ -168,6 +168,8 @@ export default function MatchmakerPage() {
 			    不在可動檔案清單內，改由本層以 CSS 選擇器精準只挑出「無 role 也無
 			    aria-label」的按鈕——這正好排除所有 radio（帶 role="radio"）與圖示按鈕
 			    （帶 aria-label），只命中「產生本輪對戰」「重設／再排」這兩顆。
+			    M14 新增的「開始計時」同樣無 role 也無 aria-label，因此一併被命中而取得
+			    ≥44px 觸控目標——它是一次性主要操作，這個順帶結果符合原意，故不調整選擇器。
 			    §8：這顆包裝 div 同時也是 RoundControls 的操作控制項容器，列印時隱藏
 			    （裁決 5）。 */}
 			<div

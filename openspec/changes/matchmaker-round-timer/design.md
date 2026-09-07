@@ -468,3 +468,42 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    **§12.2 因此只剩「掛載 `RoundTimerBanner`（傳入 `round?.timer ?? null`）」一件事**，
    §12 的 Implementer 與審查者 MUST 知悉這兩行已存在，**不應**判為「§12 已被別人先做掉」
    或重複實作。
+
+
+9. **【apply 新增，2026-09-07】發現一個既有 bug：目標分數 radiogroup 的方向鍵起算值錯誤**
+   （§10 Stage 2 以暫時 probe 測試實跑證實，**不是本 change 造成的，本 change 未修**）
+
+   `RoundControls.tsx` 既有的 `handleTargetScoreKeyDown` 以
+   `TARGET_SCORE_OPTIONS.indexOf(settings.targetScore)` 起算，但畫面上 `aria-checked="true"`
+   與 `tabIndex={0}` 的那一顆是依 `displayedTargetScore`（`round !== null` 時為
+   `round.targetScore`）決定的。兩者分歧時，方向鍵會**從畫面上沒被選中的位置**開始移動，
+   focus 也跟著落到錯的按鈕。
+
+   **實測證據**（probe：`round.targetScore = 21`、`settings.targetScore = 11`、未鎖定，
+   按 ArrowRight）：
+   ```
+   AssertionError: expected "vi.fn()" to be called with arguments: [ 11 ]
+   1st vi.fn() call: [ 15 ]   ← 實際
+   ```
+   畫面上選中的是 index 2（21），卻從 index 0 起算跳到 index 1（15）。
+
+   **兩者在真實 app 中確實會分歧**（非假設情境）：`app/matchmaker/page.tsx` 的 `settings` 是
+   本地 `useState(() => createRoundSettings())`，**從未由 `round` 回填**。兩條分歧路徑：
+   ① 重新載入頁面時 `round` 由 localStorage hydrate、`settings` 仍是預設值；
+   ② 回合存在時改目標分數只走 `commitTargetScore`、**不呼叫** `onSettingsChange`。
+
+   **本 change 的處置**：§10 新增的計時 radiogroup **刻意寫對**（`currentIndex` 取自
+   `displayedTimerDuration`），並補了一條 regression guard 釘住這個差異——否則日後有人
+   「順手統一成既有寫法」會把這個 bug 靜默複製到計時路徑。既有那條**未修**：
+   超出本 change 範圍，且會動到既有測試釘住的路徑。
+
+   **建議**：另開 change 處理。修法看似只是一行（`settings.targetScore` →
+   `displayedTargetScore`），但 `settings` 長期與 `round` 分歧這件事本身仍在，
+   應連同 `page.tsx` 的 `settings`／`round` 同步策略一起檢視。
+
+10. **【apply 新增，2026-09-07】repo 級無障礙觀察（本 change 未開新先例）**
+
+    三處 radiogroup（目標分數、計時、`ScoreboardSetup`）的鎖定都用原生 `disabled` 而非
+    `aria-disabled`，螢幕報讀器使用者因此 Tab 不到控制項、也聽不到相鄰的鎖定原因 `<p>`。
+    WAI-ARIA APG 對 radio group 傾向 `aria-disabled`。§10 依「既有慣例勝出」照做是對的；
+    若要改應是獨立的 a11y change，一次改三處。
