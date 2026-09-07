@@ -656,6 +656,45 @@ describe("RoundControls", () => {
 		expect(checked[0].textContent).toBe("10 分鐘");
 	});
 
+	// Stage 2 mutation 補洞（regression guard，加入即綠）：handleTimerKeyDown 的起算索引
+	// MUST 取自「畫面上選中的值」（displayedTimerDuration），SHALL NOT 取自 settings——
+	// 回合已產生後 settings.timerDurationMinutes 不再被同步（page.tsx 只在無回合時才寫回
+	// settings），兩者會分歧，以 settings 起算會讓方向鍵從畫面上看不到的位置開始移動。
+	// 把起算值換成 settings.timerDurationMinutes 時本檔原有 22 條全綠，這條補上偵測力。
+	// 起算刻意用 ArrowLeft：從畫面選中的「20 分鐘」（index 3）往左為 15，而以 settings
+	// 的 null（index 0）起算往左會循環到 20，兩者結果不同才測得出來。
+	it("計時方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算", () => {
+		const round = buildRound({
+			timer: { durationMinutes: 20, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({
+					round,
+					matchSlots: {},
+					settings: buildSettings({ timerDurationMinutes: null }),
+					setTimerDuration,
+				})}
+			/>,
+		);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		// 前提：畫面上選中的是回合的 20 分鐘，而非 settings 的「不計時」。
+		const checkedBefore = within(timerGroup)
+			.getAllByRole("radio")
+			.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checkedBefore[0].textContent).toBe("20 分鐘");
+
+		fireEvent.keyDown(timerGroup, { key: "ArrowLeft" });
+
+		expect(setTimerDuration).toHaveBeenCalledTimes(1);
+		expect(setTimerDuration).toHaveBeenCalledWith(15);
+		// focus 也 MUST 落在新選中的那一顆，而不是索引錯位後的另一顆。
+		expect(document.activeElement?.textContent).toBe("15 分鐘");
+	});
+
 	// 對照組（regression guard）：未鎖定時方向鍵應正常運作，證明上一條測到的是「鎖定」
 	// 這個條件本身，而不是 fireEvent.keyDown 這個手法本來就測不出東西。
 	it("計時未鎖定時方向鍵呼叫 onSettingsChange 並移動到下一個選項", () => {
