@@ -342,6 +342,7 @@ describe("RoundControls", () => {
 			format: "doubles",
 			courtCount: 3,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		await user.click(screen.getByRole("button", { name: "增加場地數" }));
@@ -349,6 +350,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 4,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		await user.click(screen.getByRole("button", { name: "減少場地數" }));
@@ -356,6 +358,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 2,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
@@ -364,6 +367,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 3,
 			targetScore: 15,
+			timerDurationMinutes: null,
 		});
 
 		expect(onSettingsChange).toHaveBeenCalledTimes(4);
