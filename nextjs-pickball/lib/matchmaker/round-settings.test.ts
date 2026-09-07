@@ -6,11 +6,23 @@ import {
 	MAX_COURT_COUNT,
 } from "./allocation-types";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
+import type { RoundSettings } from "./round-settings";
 import {
 	createRoundSettings,
 	changeCourtCount,
 	courtCountBounds,
 } from "./round-settings";
+
+// 型別層防線：timerDurationMinutes 為必要欄位（非 optional）。物件字面量在「必要且值為
+// null」與「optional 但仍賦值為 null」兩種宣告下，執行期回傳值完全相同，
+// toEqual／toBeNull 這類執行期斷言測不出兩者差異；若該欄位被誤改為 optional，
+// 下面這行會在 tsc --noEmit 階段編譯失敗（`undefined extends ...` 成立，
+// RequiredTimerDuration 收斂為 never，無法指派 true）。
+type RequiredTimerDuration = undefined extends RoundSettings["timerDurationMinutes"]
+	? never
+	: true;
+const _timerDurationMinutesIsRequired: RequiredTimerDuration = true;
+void _timerDurationMinutesIsRequired;
 
 // 本輪設定的預設值與場地數夾值——純函式，元件層（RoundControls 的加減按鈕）以 useState
 // 消費而非 hook，見 design Decision 3。

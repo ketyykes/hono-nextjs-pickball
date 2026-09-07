@@ -41,9 +41,9 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 3.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-settings.test.ts` 補 it「每輪設定預設計時為不計時」。確認紅燈
-- [ ] 3.2 GREEN: `RoundSettings` 介面新增 `timerDurationMinutes: RoundTimerDurationMinutes | null`；`createRoundSettings()` 回傳值補 `timerDurationMinutes: null`
-- [ ] 3.3 REFACTOR: 確認型別匯入路徑（`from "./round-types"`）與既有欄位（`targetScore`）風格一致
+- [x] 3.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-settings.test.ts` 補 it「每輪設定預設計時為不計時」。確認紅燈
+- [x] 3.2 GREEN: `RoundSettings` 介面新增 `timerDurationMinutes: RoundTimerDurationMinutes | null`；`createRoundSettings()` 回傳值補 `timerDurationMinutes: null`
+- [x] 3.3 REFACTOR: 確認型別匯入路徑（`from "./round-types"`）與既有欄位（`targetScore`）風格一致（已核對，`round.ts` 亦採單行多型別匯入，無需變更）
 
 ## 4. 計時的產生、變更與開始（round.ts）
 
