@@ -50,6 +50,14 @@ export const SWAP_PLAYER_LABEL = "換人";
 export const SWAP_PLAYER_NO_CANDIDATE_LABEL = "無可換之人";
 
 /**
+ * 計時控制項「不計時」選項的顯示文案（M14 matchmaker-round-timer change）。資料層以
+ * Round.timer 為 null 表示不計時，此文字標籤是使用者端唯一可讀的表達方式，
+ * SHALL NOT 在元件內寫死字面量——其餘計時長度選項的「N 分鐘」由長度值推導，不入本檔
+ * （比照 FORMAT_OPTIONS：清單由呼叫端推導，固定文案才收斂到這裡）。
+ */
+export const ROUND_TIMER_OFF_LABEL = "不計時";
+
+/**
  * 計時控制項因本輪已開始計分而鎖定時顯示的原因文案（M14 matchmaker-round-timer change，
  * design Decision 2）。鎖定與否重用 isTargetScoreLocked 的 locked 布林值，但文案**不重用**
  * 它回傳的 reason——該字串固定提及「目標分數」，顯示在計時控制項旁會讓使用者誤以為看錯

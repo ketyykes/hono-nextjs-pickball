@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { courtCountBounds, changeCourtCount } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import { PLAYERS_PER_MATCH } from "@/lib/matchmaker/allocation-types";
-import { FORMAT_LABEL, ROUND_TIMER_LOCKED_REASON } from "@/lib/matchmaker/labels";
+import {
+	FORMAT_LABEL,
+	ROUND_TIMER_LOCKED_REASON,
+	ROUND_TIMER_OFF_LABEL,
+} from "@/lib/matchmaker/labels";
 import type { MatchFormat } from "@/lib/matchmaker/allocation-types";
 import { ROUND_TIMER_DURATION_OPTIONS, TARGET_SCORE_OPTIONS } from "@/lib/matchmaker/round-types";
 import type {
@@ -39,13 +43,9 @@ const TIMER_OPTIONS: readonly (RoundTimerDurationMinutes | null)[] = [
 	...ROUND_TIMER_DURATION_OPTIONS,
 ];
 
-// 「不計時」的顯示文案只有本元件用得到，故留在本檔而不進 labels.ts——該檔收斂的是
-// 「同一份文案散落在多個元件」的問題（見該檔頁首），不是所有字串的集中地。
-const TIMER_OFF_LABEL = "不計時";
-
 /** 計時選項的顯示文案：null 為「不計時」，其餘由長度值推導，不逐一寫死四個字面量。 */
 function timerOptionLabel(option: RoundTimerDurationMinutes | null): string {
-	return option === null ? TIMER_OFF_LABEL : `${option} 分鐘`;
+	return option === null ? ROUND_TIMER_OFF_LABEL : `${option} 分鐘`;
 }
 
 export interface RoundControlsProps {
@@ -152,6 +152,12 @@ export function RoundControls({
 	// 預備設定），唯一的差別是「不計時」這個選項：round-lifecycle 沒有把已產生的本輪改回
 	// 不計時的入口（round.ts 的 setTimerDuration 只接受 10／15／20），而本元件 SHALL NOT
 	// 自行改寫回合物件，因此回合已存在時選到「不計時」只能不作為。
+	//
+	// ⚠️ 下面那行 `if (durationMinutes === null) return;` 是**暫行處置，不是漏實作**：
+	// 「本輪已產生後能否改回不計時」在 M14 是已知缺口、已升級給人類裁決，尚未定案。
+	// 目前的使用者可見後果是「不計時」這顆 radio 看起來可按、按下去卻毫無反應也不解釋
+	// （aria-checked 不變），這正是待裁決的部分——補 round-lifecycle 的 clearTimer 入口、
+	// 或改為在回合存在時 disable 這顆選項並說明原因，都要等裁決結果，SHALL NOT 在此自行決定。
 	function handleTimerDurationChange(durationMinutes: RoundTimerDurationMinutes | null) {
 		if (round !== null) {
 			if (durationMinutes === null) return;
