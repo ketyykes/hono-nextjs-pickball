@@ -49,14 +49,14 @@ Depends on: §1
 
 Depends on: §2, §3
 
-- [ ] 4.1 RED: 於 `nextjs-pickball/lib/matchmaker/round.test.ts` 補 it「產生本輪時依設定決定計時長度，未指定時 timer 為 null」。確認紅燈
-- [ ] 4.2 GREEN: `CreateRoundInput` 新增 `readonly timerDurationMinutes?: RoundTimerDurationMinutes | null`；`createRound()` 解構 `timerDurationMinutes = null` 為預設，並在建構的 `round` 物件加入 `timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null }`
-- [ ] 4.3 RED: 補 it「所有場次皆為 pending 時可改計時設定並重置為未開始，已有場次離開 pending 時拒絕」。確認紅燈
-- [ ] 4.4 GREEN: 新增 `SET_TIMER_DURATION_FAILURE_CODE`、`SetTimerDurationResult` 型別與 `setTimerDuration(round, durationMinutes)` 函式，鎖定條件比照 `setTargetScore`（`round.matches.some((m) => m.status !== "pending")`），成功時一律回傳全新的 `timer` 物件（`startedAt` 重置為 `null`，design Decision 3）
-- [ ] 4.5 RED: 補兩個 it「已設定計時長度且尚未開始時，開始計時寫入 startedAt」、「未設定計時長度或計時已開始時拒絕再次開始並回傳可判讀訊息」。確認紅燈
-- [ ] 4.6 GREEN: 新增 `START_TIMER_FAILURE_CODE`、`StartTimerResult` 型別與 `startTimer(round, now)` 函式：`timer === null` 或 `timer.startedAt !== null` 時拒絕，否則寫入 `startedAt` 為 `now`
-- [ ] 4.7 RED: 補兩個 it「重排未完成場次不重置計時」、「產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null」。**預期兩者皆因既有 `resetIncompleteMatches` 的物件展開實作與 4.2 的建構方式而立即全綠**（design Decision 4）——若如此 MUST 在本項後方誠實標註為 **regression guard**，SHALL NOT 為了製造紅燈而先破壞 `resetIncompleteMatches` 或 `createRound` 的既有實作
-- [ ] 4.8 REFACTOR: 確認失敗代碼常數、訊息常數命名與既有 `SET_TARGET_SCORE_FAILURE_CODE` 系列風格一致；確認 `setTimerDuration`／`startTimer` 皆為純函式，零就地修改傳入的 `round` 參數
+- [x] 4.1 RED: 於 `nextjs-pickball/lib/matchmaker/round.test.ts` 補 it「產生本輪時依設定決定計時長度，未指定時 timer 為 null」。確認紅燈
+- [x] 4.2 GREEN: `CreateRoundInput` 新增 `readonly timerDurationMinutes?: RoundTimerDurationMinutes | null`；`createRound()` 解構 `timerDurationMinutes = null` 為預設，並在建構的 `round` 物件加入 `timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null }`
+- [x] 4.3 RED: 補 it「所有場次皆為 pending 時可改計時設定並重置為未開始，已有場次離開 pending 時拒絕」。確認紅燈
+- [x] 4.4 GREEN: 新增 `SET_TIMER_DURATION_FAILURE_CODE`、`SetTimerDurationResult` 型別與 `setTimerDuration(round, durationMinutes)` 函式，鎖定條件比照 `setTargetScore`（`round.matches.some((m) => m.status !== "pending")`），成功時一律回傳全新的 `timer` 物件（`startedAt` 重置為 `null`，design Decision 3）
+- [x] 4.5 RED: 補兩個 it「已設定計時長度且尚未開始時，開始計時寫入 startedAt」、「未設定計時長度或計時已開始時拒絕再次開始並回傳可判讀訊息」。確認紅燈
+- [x] 4.6 GREEN: 新增 `START_TIMER_FAILURE_CODE`、`StartTimerResult` 型別與 `startTimer(round, now)` 函式：`timer === null` 或 `timer.startedAt !== null` 時拒絕，否則寫入 `startedAt` 為 `now`
+- [x] 4.7 RED: 補兩個 it「重排未完成場次不重置計時」、「產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null」。**兩者在寫入當下即為綠燈**（design Decision 4：`resetIncompleteMatches` 的物件展開實作與 4.2 的 `createRound` 建構方式已自然滿足這兩條規則），**誠實標註為 regression guard**，未破壞既有實作來偽造紅燈。額外提醒：對 4.5／4.6 新增的 `startTimer` 純函式做交件前 mutation 稽核時，發現「成功時就地修改 `round.timer.startedAt`」這一項存活（既有測試沒有斷言原 `round` 未被修改），已在 4.7 的同一個 commit 內為該 it 補上 `structuredClone` 快照比對堵住
+- [x] 4.8 REFACTOR: 確認失敗代碼常數、訊息常數命名與既有 `SET_TARGET_SCORE_FAILURE_CODE` 系列風格一致；確認 `setTimerDuration`／`startTimer` 皆為純函式，零就地修改傳入的 `round` 參數（mutation 稽核逐項驗證，見上；程式碼風格已與既有系列一致，無壞味道，refactor skipped）
 
 ## 5. 倒數與到期的純函式判定（round-timer.ts）
 
