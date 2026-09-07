@@ -150,6 +150,46 @@ export const TARGET_SCORE_OPTIONS: readonly RoundTargetScore[] =
 // 確保這裡的字面量不會脫離合法值域，同時仍保留字面量型別 11 而非收斂為 number。
 export const DEFAULT_TARGET_SCORE = 11 satisfies RoundTargetScore;
 
+// 計時長度僅接受 10 | 15 | 20 分鐘（M14 新增，prd.md 6.1／6.5 之外的每輪設定）。
+// 與 RoundTargetScoreSchema 同樣定義為固定字面量 union，理由相同：值域一旦擴充，
+// 依賴 ROUND_TIMER_DURATION_OPTIONS 的呼叫端要能被同步提醒，而不是各自寫死一份。
+export const RoundTimerDurationMinutesSchema = z.union([
+	z.literal(10),
+	z.literal(15),
+	z.literal(20),
+]);
+
+export type RoundTimerDurationMinutes = z.infer<
+	typeof RoundTimerDurationMinutesSchema
+>;
+
+// 由 RoundTimerDurationMinutesSchema 的 union 選項推導，而非另外寫死一份 [10, 15, 20]——
+// 理由同 TARGET_SCORE_OPTIONS：避免有人日後在 union 加減字面量時，這裡沒有任何編譯
+// 錯誤或紅燈同步提醒。
+export const ROUND_TIMER_DURATION_OPTIONS: readonly RoundTimerDurationMinutes[] =
+	RoundTimerDurationMinutesSchema.options.flatMap((literal) => [
+		...literal.values,
+	]);
+
+// 「本輪計時」物件：durationMinutes 決定倒數長度，startedAt 為 null 代表尚未按下
+// 「開始計時」、一旦開始即寫入 ISO 字串。倒數與時間到的判定不放在 schema 這一層，
+// 見 round-timer.ts 的純函式；schema 只描述資料形狀。
+export const RoundTimerObjectSchema = z.object({
+	durationMinutes: RoundTimerDurationMinutesSchema,
+	startedAt: z.iso.datetime().nullable(),
+});
+
+// Round.timer 以 .nullable().default(null) 定義：null 代表「不計時」（M14 的預設值），
+// 同時讓不含本欄位的既有 matchmaker:round:v1 資料（M14 之前寫入）在 safeParse 時
+// 自動補上 null 而非被判為損壞——與 scoreboard capability 的「向後相容策略」及 M6
+// 對 courtNumber 的 delta 是同一手法，因此本 change SHALL NOT 因新增本欄位而
+// bump storage key 版本。
+export const RoundTimerSchema = RoundTimerObjectSchema.nullable().default(
+	null,
+);
+
+export type RoundTimer = z.infer<typeof RoundTimerSchema>;
+
 export const RoundSchema = z.object({
 	roundNumber: z.number().int().positive(),
 	createdAt: z.iso.datetime(),
@@ -159,6 +199,7 @@ export const RoundSchema = z.object({
 	matches: z.array(RoundMatchSchema),
 	restingPlayerIds: z.array(z.string()),
 	seenSignatures: SeenSignaturesSchema,
+	timer: RoundTimerSchema,
 });
 
 export type MatchStatus = z.infer<typeof MatchStatusSchema>;
