@@ -64,3 +64,10 @@ export const ROUND_TIMER_OFF_LABEL = "不計時";
  * 區塊，因此本常數 SHALL NOT 提及「目標分數」。
  */
 export const ROUND_TIMER_LOCKED_REASON = "本輪已開始計分，計時設定不可更改。";
+
+/**
+ * 計時器時間到時顯示的繁體中文提示文案（M14 matchmaker-round-timer change，
+ * spec「計時器顯示與時間到提示」逐字指定）。顯示於 RoundTimerBanner.tsx 的
+ * `role="alert"` 區塊，SHALL NOT 在元件內寫死字面量。
+ */
+export const ROUND_TIMER_EXPIRED_MESSAGE = "時間到：領先者勝，平手請再打一球";
