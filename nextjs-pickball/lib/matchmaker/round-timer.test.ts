@@ -13,6 +13,9 @@ describe("remainingSeconds", () => {
 		};
 		expect(remainingSeconds(timer, "2026-09-03T01:00:30.000Z")).toBe(570);
 		expect(remainingSeconds(timer, "2026-09-03T01:11:00.000Z")).toBe(0);
+		// 非整秒的經過時間（30.4 秒）：取整方式若從 ceil 換成 floor 會在此處露餡
+		// （570 vs 569），單靠上面兩個整秒案例測不出取整方式被改動。
+		expect(remainingSeconds(timer, "2026-09-03T01:00:30.400Z")).toBe(570);
 	});
 });
 

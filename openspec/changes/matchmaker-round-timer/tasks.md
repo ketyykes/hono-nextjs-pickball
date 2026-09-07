@@ -63,7 +63,7 @@ Depends on: §2, §3
 Depends on: §2
 
 - [x] 5.1 RED: 新增 `nextjs-pickball/lib/matchmaker/round-timer.test.ts`，寫入三個 it：「剩餘秒數依經過時間遞減，超過設定長度後夾在 0 不為負數」、「剩餘秒數格式化為兩位數的 mm:ss」、「remainingSeconds 與 isExpired 皆為純函式，不修改輸入的 timer」。確認紅燈
-- [ ] 5.2 GREEN: 實作 `remainingSeconds(timer, nowIso)`、`isExpired(timer, nowIso)`、`formatRemaining(seconds)`；`timer` 為 `null` 或 `startedAt` 為 `null` 時 `remainingSeconds` 回傳 `null`、`isExpired` 回傳 `false`
+- [x] 5.2 GREEN: 實作 `remainingSeconds(timer, nowIso)`、`isExpired(timer, nowIso)`、`formatRemaining(seconds)`；`timer` 為 `null` 或 `startedAt` 為 `null` 時 `remainingSeconds` 回傳 `null`、`isExpired` 回傳 `false`
 - [ ] 5.3 REFACTOR: 確認本檔零 `window`／`document`／`setInterval`／`new Date()`／`Date.now()` 引用；確認三個函式的參數皆不接受 `Round` 或 `RoundMatch[]`（design Decision 5：型別簽章上物理排除「時間到自動改場次狀態」的可能）
 
 ## 6. 時間到的提示音（round-timer-sound.ts，例外層）
