@@ -80,7 +80,13 @@ describe("changeCourtCount", () => {
 	// 這種測資看不出「用變動前的值判定邊界」這種錯誤，這裡補上真的會變動的案例。
 	it("場地數從邊界前一格加減至邊界時，回報的是變動後的邊界", () => {
 		const toMax = changeCourtCount(
-			{ ...createRoundSettings(), courtCount: MAX_COURT_COUNT - 1 },
+			// timerDurationMinutes 刻意給非預設值：它的預設就是 null，若沿用預設值，
+			// 「原樣帶出」與「被重設為 null」兩種實作的回傳值完全相同，斷言等於沒寫。
+			{
+				...createRoundSettings(),
+				courtCount: MAX_COURT_COUNT - 1,
+				timerDurationMinutes: 15,
+			},
 			1,
 		);
 		expect(toMax.settings.courtCount).toBe(MAX_COURT_COUNT);
@@ -89,6 +95,7 @@ describe("changeCourtCount", () => {
 		// settings 的其餘欄位須原樣帶出，而非被夾值後的物件蓋掉。
 		expect(toMax.settings.format).toBe(DEFAULT_FORMAT);
 		expect(toMax.settings.targetScore).toBe(DEFAULT_TARGET_SCORE);
+		expect(toMax.settings.timerDurationMinutes).toBe(15);
 
 		const toMin = changeCourtCount(
 			{ ...createRoundSettings(), courtCount: MIN_COURT_COUNT + 1 },
