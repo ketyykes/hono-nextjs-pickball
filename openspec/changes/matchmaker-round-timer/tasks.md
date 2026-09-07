@@ -70,8 +70,8 @@ Depends on: §2
 
 Depends on: §1
 
-- [ ] 6.1 GREEN（例外層，不強制紅燈）: 新增 `nextjs-pickball/lib/matchmaker/round-timer-sound.ts`，實作 `playTimerExpiredChime(): void`：建構 `AudioContext` → `OscillatorNode` → 短暫 `gain` 包絡 → 自動停止；執行環境未提供 `AudioContext` 時安全返回，不拋出例外
-- [ ] 6.2 REFACTOR: 於檔頭以繁體中文註解說明本檔為何是例外層（無分支決策、以 E2E／元件層注入驗收，比照 `scene-canvas.ts` 的既有先例），並記錄與 `useRoundTimer.ts` 的分工邊界（design Decision 6：一個是持續的時間來源、一個是一次性的副作用，不合併在同一檔）
+- [x] 6.1 GREEN（例外層，不強制紅燈）: 新增 `nextjs-pickball/lib/matchmaker/round-timer-sound.ts`，實作 `playTimerExpiredChime(): void`：建構 `AudioContext` → `OscillatorNode` → 短暫 `gain` 包絡 → 自動停止；執行環境未提供 `AudioContext` 時安全返回，不拋出例外
+- [x] 6.2 REFACTOR: 於檔頭以繁體中文註解說明本檔為何是例外層（無分支決策、以 E2E／元件層注入驗收，比照 `scene-canvas.ts` 的既有先例），並記錄與 `useRoundTimer.ts` 的分工邊界（design Decision 6：一個是持續的時間來源、一個是一次性的副作用，不合併在同一檔）——檔頭註解已於 6.1 一併寫好，本步驟誠實記為 skipped（無獨立實質變更），未另立 commit
 
 ## 7. 每秒 tick 的計時 hook（useRoundTimer.ts）
 
