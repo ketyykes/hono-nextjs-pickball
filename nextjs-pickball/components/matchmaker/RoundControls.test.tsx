@@ -4,6 +4,7 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RoundControls } from "./RoundControls";
 import type { RoundControlsProps } from "./RoundControls";
+import { ROUND_TIMER_LOCKED_REASON } from "@/lib/matchmaker/labels";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
@@ -15,6 +16,8 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 // matchSlots／setTargetScore 為 8.6 新增的必填 props：matchSlots 預設空集合
 // （無任何場次開始場邊計分），setTargetScore 預設 vi.fn()——多數既有測試不涉及
 // 目標分數鎖定判定或變更委派，給這兩個預設值即可，需要的測試再各自 override。
+// setTimerDuration／startTimer 為 M14 §10 新增的必填 props，理由與上述兩個相同：
+// 既有測試都不涉及計時，一律給 vi.fn() 預設值，涉及計時的測試再各自 override。
 function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsProps {
 	return {
 		settings: createRoundSettings(),
@@ -23,6 +26,8 @@ function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsP
 		activePlayerCount: 10,
 		matchSlots: {},
 		setTargetScore: vi.fn(),
+		setTimerDuration: vi.fn(),
+		startTimer: vi.fn(),
 		onGenerate: vi.fn(),
 		onReset: vi.fn(),
 		...overrides,
@@ -449,5 +454,65 @@ describe("RoundControls", () => {
 
 		expect(onSettingsChange).toHaveBeenCalledTimes(1);
 		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, targetScore: 15 });
+	});
+
+	// M14 §10：計時設定控制項。選項清單為「不計時」＋ round-lifecycle 匯出的
+	// ROUND_TIMER_DURATION_OPTIONS（10／15／20），元件內 SHALL NOT 另寫一份
+	// [10, 15, 20]；此處只釘住畫面上的四個選項、其可用性與預設選中項。
+	it("計時選項為不計時／10／15／20 分鐘且預設選中不計時", () => {
+		render(<RoundControls {...buildProps({ round: null })} />);
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		const radios = within(timerGroup).getAllByRole("radio");
+
+		expect(radios).toHaveLength(4);
+		expect(radios.map((radio) => radio.textContent)).toEqual([
+			"不計時",
+			"10 分鐘",
+			"15 分鐘",
+			"20 分鐘",
+		]);
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(false);
+		});
+		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("不計時");
+		// 尚無目前回合時不應顯示鎖定說明——避免鎖定文字被寫死成恆顯示。
+		expect(screen.queryByText(ROUND_TIMER_LOCKED_REASON)).toBeNull();
+	});
+
+	// design Decision 2：鎖定與否重用 isTargetScoreLocked 的 locked 布林值（此處以
+	// 「任一場次 completed」這條件觸發），但顯示的原因文案 MUST 是 labels.ts 的
+	// ROUND_TIMER_LOCKED_REASON，而非 isTargetScoreLocked 回傳的 reason。
+	it("本輪已開始計分時計時控制項 disabled 並顯示鎖定原因", () => {
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [
+				buildMatch({
+					status: "completed",
+					scores: { teamA: 11, teamB: 5 },
+					winner: "teamA",
+					completedAt: "2026-08-23T01:00:00.000Z",
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: 3.1 },
+						{ playerId: "p2", before: 3, after: 2.9 },
+					],
+				}),
+			],
+		});
+		render(<RoundControls {...buildProps({ round, matchSlots: {} })} />);
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		const radios = within(timerGroup).getAllByRole("radio");
+
+		expect(radios).toHaveLength(4);
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(true);
+		});
+		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("10 分鐘");
+		expect(screen.getByText(ROUND_TIMER_LOCKED_REASON)).not.toBeNull();
+		// 文案本身也釘住：套在計時控制項旁的說明 SHALL NOT 提及「目標分數」。
+		expect(ROUND_TIMER_LOCKED_REASON).not.toContain("目標分數");
 	});
 });

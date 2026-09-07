@@ -48,3 +48,11 @@ export const SWAP_PLAYER_LABEL = "換人";
  * matchmaker-player-swap change，design Decision 7）。
  */
 export const SWAP_PLAYER_NO_CANDIDATE_LABEL = "無可換之人";
+
+/**
+ * 計時控制項因本輪已開始計分而鎖定時顯示的原因文案（M14 matchmaker-round-timer change，
+ * design Decision 2）。鎖定與否重用 isTargetScoreLocked 的 locked 布林值，但文案**不重用**
+ * 它回傳的 reason——該字串固定提及「目標分數」，顯示在計時控制項旁會讓使用者誤以為看錯
+ * 區塊，因此本常數 SHALL NOT 提及「目標分數」。
+ */
+export const ROUND_TIMER_LOCKED_REASON = "本輪已開始計分，計時設定不可更改。";
