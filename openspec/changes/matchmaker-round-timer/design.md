@@ -370,9 +370,9 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    Code-Quality／Final Review 以人工閱讀把關。
 
 
-5. **【apply 新增，2026-09-07】本 change 實測到的「恆真斷言」四種形態**（供 Final Review 與
-   後續 milestone 參考；四種都是在 Stage 2 的獨立 mutation 中才被抓到，Implementer 自查
-   全數漏掉）：
+5. **【apply 新增，2026-09-07】本 change 實測到的「恆真斷言」五種形態**（供 Final Review 與
+   後續 milestone 參考；前三種與第五種是在 Stage 2 的獨立 mutation 中才被抓到、Implementer
+   自查漏掉，第四種則是 §11 的 Implementer 自己抓到的）：
 
    1. **輸入用了預設值**（§3 實測）：測「原樣帶出」時若欄位值就是預設值（`null`），
       「保留」與「被重設為預設值」的結果相同，斷言恆真。→ 斷言用的輸入 MUST 用非預設值。
@@ -380,7 +380,13 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
       就地修改 `round.timer` 時兩邊同時被改，斷言恆真。→ MUST 先 `structuredClone` 留快照，
       與**快照**比對。
    3. **`toEqual` 兩邊指向同一參考**（既有紀律）。
-   4. **fixture 對某輸入欄位只用單一值**（§5 實測）：`round-timer.test.ts` 全檔
+   4. **子字串斷言被另一段包含該子字串的文案矇混**（§11 實測）：
+      斷言 alert 區塊 `toContain("時間到")`，但 `ROUND_TIMER_EXPIRED_MESSAGE` 的文案
+      **本身就是**「**時間到**：領先者勝，平手請再打一球」——開頭就含這三個字。
+      於是把「時間到」大字整個拿掉，子字串斷言照樣通過。
+      → 改用 `within(alert).getByText("時間到")` 精確比對才轉紅。
+      凡是「容器內含某短字串」的斷言，MUST 確認容器內沒有第二段文字包含它。
+   5. **fixture 對某輸入欄位只用單一值**（§5 實測）：`round-timer.test.ts` 全檔
       `durationMinutes` 都是 `10`，於是「忽略 `timer.durationMinutes`、寫死 10」的實作
       恆綠。→ union 型別欄位（`durationMinutes` 10/15/20、`targetScore` 11/15/21）
       MUST 至少用兩個不同值。
@@ -507,3 +513,30 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
     `aria-disabled`，螢幕報讀器使用者因此 Tab 不到控制項、也聽不到相鄰的鎖定原因 `<p>`。
     WAI-ARIA APG 對 radio group 傾向 `aria-disabled`。§10 依「既有慣例勝出」照做是對的；
     若要改應是獨立的 a11y change，一次改三處。
+
+11. **【apply 新增，2026-09-08】⚠️ 需要人類裁決：計時到期後重新整理頁面會再播一次提示音**
+    （§11 Stage 2 以 probe 測試實測，並與 §6 Stage 2 的 `suspended` 洩漏發現連起來）
+
+    `RoundTimerBanner` 的「同一次到期只播一次」是靠 `useRef` 旗標（記錄已為哪個 `startedAt`
+    播過）。`useRef` **無法跨 mount 存活**，因此：
+
+    > 計時已到期的回合，使用者**重新整理頁面**時，`round.timer` 由 localStorage 還原、
+    > 首次 render 即 `expired`，於是**再播一次提示音**。每重整一次就再播一次。
+
+    **與 §6 的發現疊加後有第二層影響**：依 `round-timer-sound.ts` 的分析，若
+    `AudioContext` 因自動播放政策停在 `suspended`（頁面載入後尚無使用者手勢，正是重整當下
+    的情境），`currentTime` 凍結 → `onended` 不觸發 → `close()` 從未執行 →
+    **每次重整洩漏一個 `AudioContext`**。實務衝擊小（瀏覽器對並存數量的上限量級是個位數，
+    且 suspended 時實際無聲），但這是「聽不到聲音」之外的第二個後果。
+
+    **§11 的處置**：維持現狀，不在元件內處理。要跨 mount 去重就得把「已播過」寫進
+    localStorage，遠超 spec 範圍；而 `useRef` 的行為本身是 React 的定義，不是實作瑕疵。
+
+    **候選解法（需人類裁決）**：
+    1. 維持現狀 —— 重整後再響一次視為可接受（甚至可能是想要的：使用者重整回來，
+       提示他這一輪時間已到）。
+    2. `page.tsx` 掛載時加條件（例如只在 `startedAt` 晚於本次頁面載入時間時才掛載）
+       —— 正確的接線點在 page 層，**不是** `RoundTimerBanner` 或 `round-timer-sound.ts`。
+    3. 把「已播過」持久化 —— 成本最高，需要新的 storage 欄位或 key。
+
+    在裁決之前 apply **維持解法 1**（現狀），並以本條留痕。
