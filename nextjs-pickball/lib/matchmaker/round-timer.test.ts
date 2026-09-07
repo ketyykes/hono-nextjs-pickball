@@ -40,5 +40,26 @@ describe("純函式性", () => {
 		isExpired(timer, "2026-09-03T01:00:30.000Z");
 
 		expect(timer).toEqual(snapshot);
+
+		// 本檔唯一測到 isExpired 實際回傳值正確性的地方（spec 的三個驗收 Scenario
+		// 都沒有另外針對 isExpired 的布林值立案），一併釘住 null／尚未開始／剛好到期／
+		// 超過到期四種邊界，避免只驗證了「沒有被就地修改」卻漏了「回傳值本身是否正確」。
+		expect(isExpired(timer, "2026-09-03T01:00:30.000Z")).toBe(false);
+		expect(isExpired(timer, "2026-09-03T01:10:00.000Z")).toBe(true);
+		expect(isExpired(timer, "2026-09-03T01:11:00.000Z")).toBe(true);
+		expect(isExpired(null, "2026-09-03T01:00:30.000Z")).toBe(false);
+		expect(
+			isExpired(
+				{ durationMinutes: 10, startedAt: null },
+				"2026-09-03T01:00:30.000Z",
+			),
+		).toBe(false);
+		expect(remainingSeconds(null, "2026-09-03T01:00:30.000Z")).toBeNull();
+		expect(
+			remainingSeconds(
+				{ durationMinutes: 10, startedAt: null },
+				"2026-09-03T01:00:30.000Z",
+			),
+		).toBeNull();
 	});
 });

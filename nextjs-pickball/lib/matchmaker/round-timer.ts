@@ -1,7 +1,7 @@
 // 回合計時器的倒數與到期判定——純函式（M14，spec round-lifecycle「回合計時器」）。
-// 「現在時間」一律由呼叫端以 ISO 字串（nowIso）注入，本檔 SHALL NOT 呼叫
-// new Date()／Date.now()／setInterval：高頻率（每秒）呼叫端才能各自決定何時取樣，
-// 且同一組輸入必須產生同一份輸出以利測試（design Decision 5、6）。
+// 「現在時間」一律由呼叫端以 ISO 字串（nowIso）注入，本檔 SHALL NOT 取用當下時間
+// 或設定計時器（禁用清單見 5.3 REFACTOR 的 grep 檢查）：高頻率（每秒）呼叫端才能
+// 各自決定何時取樣，且同一組輸入必須產生同一份輸出以利測試（design Decision 5、6）。
 //
 // 三個函式的參數只有 timer／nowIso／seconds，刻意不接受 Round 或 RoundMatch[]——
 // 「時間到不自動結束任何場次」是 spec 的 MUST NOT 條款，讓型別簽章上就沒有 matches
@@ -31,9 +31,12 @@ export function remainingSeconds(
 		return null;
 	}
 	const durationSeconds = timer.durationMinutes * 60;
-	const startedAtMs = new Date(timer.startedAt).getTime();
-	const nowMs = new Date(nowIso).getTime();
-	const remainingMs = timer.durationMinutes * 60 * 1000 - (nowMs - startedAtMs);
+	// 以 Date.parse 解析 ISO 字串，不建構 Date 物件——即使只是解析呼叫端傳入的
+	// 字串、並未取用當下時間，5.3 的 grep 檢查是逐字比對、不分辨用途，
+	// 用建構式寫法一樣會被判定命中禁用清單。
+	const startedAtMs = Date.parse(timer.startedAt);
+	const nowMs = Date.parse(nowIso);
+	const remainingMs = durationSeconds * 1000 - (nowMs - startedAtMs);
 	const remaining = Math.ceil(remainingMs / 1000);
 	return Math.max(0, Math.min(durationSeconds, remaining));
 }
