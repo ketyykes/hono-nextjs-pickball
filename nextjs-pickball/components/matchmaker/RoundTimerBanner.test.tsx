@@ -24,12 +24,12 @@ describe("RoundTimerBanner", () => {
 
 		render(<RoundTimerBanner timer={timer} />);
 
-		expect(screen.getByText("10:00")).toBeInTheDocument();
+		expect(screen.getByText("10:00")).not.toBeNull();
 
 		act(() => {
 			vi.advanceTimersByTime(30 * 1000);
 		});
 
-		expect(screen.queryByText("10:00")).not.toBeInTheDocument();
+		expect(screen.queryByText("10:00")).toBeNull();
 	});
 });

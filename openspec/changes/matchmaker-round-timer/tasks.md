@@ -110,8 +110,8 @@ Depends on: §2, §3, §4, §9
 
 Depends on: §7, §6
 
-- [ ] 11.1 RED: 新增 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx`，寫入 it「倒數期間顯示 mm:ss 格式的剩餘時間且每秒遞減」。確認紅燈
-- [ ] 11.2 GREEN: 實作 `RoundTimerBanner` 骨架：`timer` 為 `null` 或 `timer.startedAt` 為 `null` 時回傳 `null`；否則呼叫 `useRoundTimer(timer)`，顯示 `formatRemaining(remainingSeconds ?? 0)`
+- [x] 11.1 RED: 新增 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx`，寫入 it「倒數期間顯示 mm:ss 格式的剩餘時間且每秒遞減」。確認紅燈
+- [x] 11.2 GREEN: 實作 `RoundTimerBanner` 骨架：`timer` 為 `null` 或 `timer.startedAt` 為 `null` 時回傳 `null`；否則呼叫 `useRoundTimer(timer)`，顯示 `formatRemaining(remainingSeconds ?? 0)`
 - [ ] 11.3 RED: 補兩個 it：「時間到時顯示帶 role alert 的時間到大字與繁體中文提示文案」、「時間到時播放提示音，同一次到期不因重新渲染而重複播放」（第二個以可選注入 prop 傳入計數用假函式驗證，預設值為 `playTimerExpiredChime`）。確認紅燈
 - [ ] 11.4 GREEN: `expired` 為 `true` 時渲染 `role="alert"` 大字「時間到」＋`labels.ts` 的 `ROUND_TIMER_EXPIRED_MESSAGE`；`useEffect` 監看 `expired` 由 `false` 轉 `true` 時呼叫注入的音效函式一次，以 `useRef` 旗標防止同一次到期重複播放
 - [ ] 11.5 REFACTOR: 確認「時間到」的視覺呈現為**靜態文字**、零任何 CSS 動畫或 `animate-*` utility（design Decision 7）；確認音效注入點的 props 命名與 `printer?`（M9 `ExportActions` 先例）同構
