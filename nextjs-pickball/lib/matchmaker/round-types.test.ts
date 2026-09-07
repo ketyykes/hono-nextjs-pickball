@@ -196,6 +196,44 @@ describe("RoundSchema", () => {
 		}
 	});
 
+	it("timer 為物件時 startedAt 未開始為 null、開始後為 ISO 字串", () => {
+		// Stage 2 mutation 補洞：上面兩個 it 只建構過 timer 為 null 或完全缺欄位的回合，
+		// RoundTimerObjectSchema 的兩個欄位因此零覆蓋——把 startedAt 的 .nullable()
+		// 拿掉、或把 RoundSchema 的 timer 換成別的 schema，測試都不會轉紅。
+		const notStarted = RoundSchema.safeParse(
+			makeRound({ timer: { durationMinutes: 15, startedAt: null } }),
+		);
+		expect(notStarted.success).toBe(true);
+		if (notStarted.success) {
+			expect(notStarted.data.timer).toEqual({
+				durationMinutes: 15,
+				startedAt: null,
+			});
+		}
+
+		const started = RoundSchema.safeParse(
+			makeRound({
+				timer: { durationMinutes: 20, startedAt: "2026-08-16T00:10:00.000Z" },
+			}),
+		);
+		expect(started.success).toBe(true);
+		if (started.success) {
+			expect(started.data.timer).toEqual({
+				durationMinutes: 20,
+				startedAt: "2026-08-16T00:10:00.000Z",
+			});
+		}
+
+		// 非法的 durationMinutes 在 Round 這一層也要被擋下，而非只有單獨 parse
+		// RoundTimerDurationMinutesSchema 時才擋（safeParse 參數型別為 unknown，
+		// 故意帶入非法字面量不需要 cast）。
+		const invalidDuration = RoundSchema.safeParse({
+			...makeRound(),
+			timer: { durationMinutes: 25, startedAt: null },
+		});
+		expect(invalidDuration.success).toBe(false);
+	});
+
 	it("計時長度僅接受 10、15、20 分鐘", () => {
 		const valid10 = RoundTimerDurationMinutesSchema.safeParse(10);
 		const valid15 = RoundTimerDurationMinutesSchema.safeParse(15);
