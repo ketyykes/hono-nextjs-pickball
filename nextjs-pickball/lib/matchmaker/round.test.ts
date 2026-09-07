@@ -789,6 +789,32 @@ describe("createRound", () => {
 		expect(omitted.round.timer).toBeNull();
 		expect(explicitNull.round.timer).toBeNull();
 	});
+
+	// regression guard（design Decision 4）：createRound 逐欄列舉回傳物件，timer 這一行
+	// 是本 change 在 round.ts 唯一需要主動加程式碼才能滿足此規則的地方（見 4.2）；
+	// 本 it 專門釘住「即使兩輪長度相同也不能沿用上一輪 timer 物件」，這是 test-plan 點名
+	// 最容易被誤實作成「反正一樣就不用重建」的地方。
+	it("產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const previousRound = makeRound({
+			roundNumber: 1,
+			timer: { durationMinutes: 10, startedAt: "2026-08-16T00:30:00.000Z" },
+		});
+
+		const result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: 10,
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: null });
+	});
 });
 
 describe("setTargetScore", () => {
@@ -873,12 +899,15 @@ describe("setTimerDuration", () => {
 describe("startTimer", () => {
 	it("已設定計時長度且尚未開始時，開始計時寫入 startedAt", () => {
 		const round = makeRound({ timer: { durationMinutes: 10, startedAt: null } });
+		const roundSnapshot = structuredClone(round);
 
 		const result = startTimer(round, "2026-09-03T01:00:00.000Z");
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: "2026-09-03T01:00:00.000Z" });
+		// 純函式：原回合 SHALL NOT 被就地修改，回傳的必須是新物件。
+		expect(round).toEqual(roundSnapshot);
 	});
 
 	it("未設定計時長度或計時已開始時拒絕再次開始並回傳可判讀訊息", () => {
@@ -1262,6 +1291,36 @@ describe("resetIncompleteMatches", () => {
 		expect(Object.keys(result).sort()).toEqual(["ok", "round"]);
 		// 也沒有任何 Player 被就地改動：本函式是純函式，restCount 的唯一結算點在 createRound。
 		expect(players).toEqual(playersSnapshot);
+	});
+
+	// regression guard（design Decision 4）：resetIncompleteMatches 以
+	// `{ ...round, matches, restingPlayerIds, seenSignatures }` 展開建構回傳值，
+	// timer 欄位不在展開時被覆寫的欄位清單內，這條規則在程式碼不變的情況下已自然成立，
+	// 本 it 純粹釘住此行為，避免日後改寫展開方式時悄悄破壞它。
+	it("重排未完成場次不重置計時", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const round = makeRound({
+			timer: { durationMinutes: 15, startedAt: "2026-08-16T00:30:00.000Z" },
+			matches: [
+				makeRoundMatch({
+					id: "todo",
+					teams: [
+						{ playerIds: ["p1"], rating: 3 },
+						{ playerIds: ["p2"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: null },
+						{ playerId: "p2", before: 3, after: null },
+					],
+				}),
+			],
+		});
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual(round.timer);
 	});
 });
 
