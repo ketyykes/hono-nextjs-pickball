@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { RoundSchema, MatchStatusSchema, TARGET_SCORE_OPTIONS } from "./round-types";
+import {
+	RoundSchema,
+	MatchStatusSchema,
+	TARGET_SCORE_OPTIONS,
+	RoundTimerDurationMinutesSchema,
+} from "./round-types";
 import type { Round, RoundMatch } from "./round-types";
 import { TargetScoreSchema } from "../scoreboard/types";
 
@@ -165,5 +170,33 @@ describe("RoundSchema", () => {
 		);
 
 		expect(roundOptions).toEqual(scoreboardOptions);
+	});
+
+	it("回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料", () => {
+		// 模擬 M14 之前寫入的既有 matchmaker:round:v1 資料：不含 timer 欄位。
+		const roundWithoutTimer: Record<string, unknown> = { ...makeRound() };
+		delete roundWithoutTimer.timer;
+
+		const result = RoundSchema.safeParse(roundWithoutTimer);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.timer).toBeNull();
+		}
+	});
+
+	it("計時長度僅接受 10、15、20 分鐘", () => {
+		const valid10 = RoundTimerDurationMinutesSchema.safeParse(10);
+		const valid15 = RoundTimerDurationMinutesSchema.safeParse(15);
+		const valid20 = RoundTimerDurationMinutesSchema.safeParse(20);
+		expect(valid10.success).toBe(true);
+		expect(valid15.success).toBe(true);
+		expect(valid20.success).toBe(true);
+
+		const invalid5 = RoundTimerDurationMinutesSchema.safeParse(5);
+		const invalid30 = RoundTimerDurationMinutesSchema.safeParse(30);
+		const invalid0 = RoundTimerDurationMinutesSchema.safeParse(0);
+		expect(invalid5.success).toBe(false);
+		expect(invalid30.success).toBe(false);
+		expect(invalid0.success).toBe(false);
 	});
 });
