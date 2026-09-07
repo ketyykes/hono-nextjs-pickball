@@ -83,6 +83,7 @@ export function RoundControls({
 	onReset,
 	setTargetScore: commitTargetScore,
 	setTimerDuration: commitTimerDuration,
+	startTimer,
 }: RoundControlsProps) {
 	// 目標分數 radiogroup 的三顆按鈕 DOM 參照，供方向鍵導覽後 .focus() 新選中項。
 	const targetScoreButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -102,6 +103,12 @@ export function RoundControls({
 	const displayedTimerDuration: RoundTimerDurationMinutes | null = round
 		? (roundTimer === null ? null : roundTimer.durationMinutes)
 		: settings.timerDurationMinutes;
+	// 「開始計時」的顯示條件：本輪已設定計時長度（timer !== null）且尚未開始
+	// （startedAt === null）。不符合時 MUST 不渲染，SHALL NOT 改成一顆恆為 disabled 的
+	// 按鈕——這與同一區塊內「radiogroup 鎖定要 disabled 並解釋原因」的處置刻意相反：
+	// 「開始計時」是一次性操作，不計時模式下根本沒有這個動作可做，擺一顆說不出理由的
+	// disabled 按鈕只會製造疑惑（spec「計時器顯示與時間到提示」明訂）。
+	const canStartTimer = roundTimer !== null && roundTimer.startedAt === null;
 	// 每場所需人數唯一取自 PLAYERS_PER_MATCH，不得另行寫死 2／4。
 	const requiredPlayers = PLAYERS_PER_MATCH[settings.format];
 	const insufficientPlayers = activePlayerCount < requiredPlayers;
@@ -287,6 +294,11 @@ export function RoundControls({
 				    lockResult.reason——後者固定提及「目標分數」，出現在計時區塊會誤導使用者
 				    以為看錯區塊（design Decision 2）。 */}
 				{locked && <p className="text-xs text-muted-foreground">{ROUND_TIMER_LOCKED_REASON}</p>}
+				{canStartTimer && (
+					<Button type="button" variant="outline" size="sm" onClick={() => startTimer()}>
+						開始計時
+					</Button>
+				)}
 			</div>
 
 			<div className="flex flex-col gap-1">
