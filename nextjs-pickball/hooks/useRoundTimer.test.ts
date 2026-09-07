@@ -57,6 +57,21 @@ describe("useRoundTimer", () => {
 		expect(result.current.remainingSeconds).toBe(20 * 60);
 	});
 
+	// 對應「初始值必須是現在」：計時已開始 5 分鐘後才掛載，第一次 render（尚未 tick）
+	// 就要算出 5 分鐘。若把 useState 初始值寫成固定的過去時間，remainingSeconds 的上限
+	// 夾值會把它夾成完整的 10 分鐘——看起來像正常值卻是錯的，缺這條斷言就抓不到。
+	it("計時已開始一段時間後才掛載時，首次 render 即反映已流逝的時間", () => {
+		vi.setSystemTime(new Date("2026-09-07T00:05:00.000Z"));
+		const timer: RoundTimer = {
+			durationMinutes: 10,
+			startedAt: "2026-09-07T00:00:00.000Z",
+		};
+
+		const { result } = renderHook(() => useRoundTimer(timer));
+
+		expect(result.current.remainingSeconds).toBe(5 * 60);
+	});
+
 	it("timer 為 null 時不啟動 interval", () => {
 		renderHook(() => useRoundTimer(null));
 
