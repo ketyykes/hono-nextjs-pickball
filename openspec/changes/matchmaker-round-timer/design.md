@@ -271,6 +271,56 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    `CreateRoundInput` 的欄位、`RoundControls.tsx` 的 props 清單、`useRoundStore` 的
    解構清單），apply 的 §1 前置確認 MUST 以合併後的 `main` 重新核對本 design 的假設，
    差異一律補記於此節，不要默默改實作遷就本文件寫作當下的假設。
+
+   **【apply §1 對齊結果，2026-09-07，base commit `1125d53`】** 已逐檔實讀合併後 `main`
+   的 `round.ts`／`useRoundStore.ts`／`app/matchmaker/page.tsx`／`RoundControls.tsx`／
+   `scoreboard-binding.ts`／`round-types.ts`／`round-settings.ts`／`labels.ts`，
+   本 design 的假設**全部成立**，M10～M13 對這幾個檔案的改動皆為**純新增**：
+
+   - `CreateRoundInput` 仍為 `players`／`format`／`courtCount`／`previousRound`／`now`／
+     `newMatchId`／`targetScore?`，`targetScore` 以解構預設值
+     （`targetScore = DEFAULT_TARGET_SCORE`）落在函式層而非 schema 層 —— §4.2 的
+     `timerDurationMinutes?` 照此形態新增即可。
+   - `createRound()` 的 `const round: Round = { ... }` 仍為**逐欄列舉**（
+     `roundNumber`／`createdAt`／`format`／`courtCount`／`targetScore`／`matches`／
+     `restingPlayerIds`／`seenSignatures`），`resetIncompleteMatches()` 仍以
+     `{ ...round, matches, restingPlayerIds, seenSignatures }` **物件展開**回傳 ——
+     Decision 4 的兩條規則「各自自然成立」維持有效，§4.7 兩個 it 仍預期為 regression guard。
+   - `setTargetScore()` 的鎖定條件仍為 `round.matches.some((match) => match.status !== "pending")`，
+     失敗代碼結構為 `SET_TARGET_SCORE_FAILURE_CODE = { SCORING_STARTED: "scoring-started" }`
+     ＋私有 `SCORING_STARTED_MESSAGE` ＋ `SetTargetScoreSuccess`／`SetTargetScoreFailure`／
+     `SetTargetScoreResult` 三個型別 —— §4.4／§4.6 照此形狀對稱撰寫。
+     M13 新增的 `swapMatchPlayer` 亦沿用同一形狀（`SWAP_MATCH_PLAYER_FAILURE_CODE`）。
+   - `isTargetScoreLocked(round, slots): { locked, reason }` 簽章不變，私有常數
+     `TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可更改。"` 仍為私有（未匯出）
+     —— Decision 2「重用 `locked`、不重用 `reason`」的前提成立。
+   - `RoundControlsProps` 為 `settings`／`onSettingsChange`／`round`／`matchSlots`／
+     `activePlayerCount`／`onGenerate`／`onReset`／`setTargetScore` 共 8 項，**M13 未對本元件
+     加任何 prop**；目標分數 radiogroup 的鎖定顯示模式為
+     `const lockResult = round !== null ? isTargetScoreLocked(round, matchSlots) : { locked: false, reason: null }`，
+     鍵盤導覽委派 `lib/scoreboard/radio-navigation.ts` 的 `nextRadioIndex`。
+   - `useRoundStore` 已有 6 個 action（`HYDRATE`／`GENERATE_ROUND`／`RESET_INCOMPLETE_MATCHES`／
+     `SUBMIT_SCORE`／`SET_TARGET_SCORE`／`SWAP_MATCH_PLAYER`）與 5 個回傳方法；
+     `setTargetScore` 的接線形態為「`state.round === null` 型別安全防線 → 呼叫純函式 →
+     判 `ok` → `dispatch`」，§9 照此比照即可。
+   - `app/matchmaker/page.tsx` 的 `RoundControls` 掛載點在
+     `<div data-print="hide" className="max-md:[&_button:not([role]):not([aria-label])]:min-h-11">`
+     之內；M13 只為 `MatchStage` 增加了 `onSwapPlayer`／`swapError` 兩個 prop 與
+     `handleSwapPlayer`，與本 change 的掛載點無衝突。
+   - `nextjs-pickball/package.json` 的 dependencies 為 `@opennextjs/cloudflare`／
+     `@radix-ui/react-label`／`@radix-ui/react-slot`／`class-variance-authority`／`clsx`／
+     `lucide-react`／`motion`／`next`／`radix-ui`／`react`／`react-dom`／`tailwind-merge`／
+     `zod`，**確認無任何計時或音效相依**（`motion` 為 tour 動畫用，本 change 不得使用）。
+   - `labels.ts` 現有 6 個具名匯出（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／
+     `DOUBLES_COMPOSITION_LABEL`／`PLAYER_NOT_ON_ROSTER_LABEL`／`SWAP_PLAYER_LABEL`／
+     `SWAP_PLAYER_NO_CANDIDATE_LABEL`），與本 change 要新增的
+     `ROUND_TIMER_LOCKED_REASON`／`ROUND_TIMER_EXPIRED_MESSAGE` 無命名衝突。
+
+   **唯一與文件不符之處（tasks.md 的事實誤記，不影響設計）**：`tasks.md` 的 10.1 與 13.12①
+   寫「既有 4 個 it 的斷言與名稱不變」，實測 `RoundControls.test.tsx` 目前有 **14 個既有
+   `it`**（design Decision 8 的 Alternatives 段落寫的「14 個既有 it」才是正確數字）。
+   apply 一律以「**14 個既有 it 的名稱與斷言全部不得變動**，只允許替 `buildProps()`
+   補上 `setTimerDuration`／`startTimer` 兩個 `vi.fn()` 預設值」為準。
 2. **Playwright `page.clock` 對本專案 `setInterval`-based hook 的相容性**：design 假設
    `page.clock.install()` + `page.clock.fastForward()` 可以正確驅動
    `useRoundTimer.ts` 的 `setInterval` tick 並反映在畫面上，但本 repo 尚無先例。

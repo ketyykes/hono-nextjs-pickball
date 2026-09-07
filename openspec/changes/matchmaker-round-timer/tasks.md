@@ -20,14 +20,14 @@
 > 本節全部是「讀與記錄」，不動任何檔案內容；目的是把 design.md 的假設從推測變成事實，
 > 避免 §2 之後整批建立在錯的介面上。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的路徑（本批不用 git worktree，即主 repo `/Users/m2_24gb/Desktop/project/nextjs-pickball`）且已切到 `change/matchmaker-round-timer` 分支，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M13（`matchmaker-player-swap`）已合併**：讀 `nextjs-pickball/lib/matchmaker/round.ts`、`hooks/useRoundStore.ts`、`app/matchmaker/page.tsx`，確認三者存在且含 M13 的產出（記錄三者目前的完整匯出清單與 `page.tsx` 取得「目前回合」與「名單」的方式）。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M13（見 proposal 的「執行相依」）
-- [ ] 1.3 讀 `round-types.ts` 與 `round-settings.ts`，記錄 `RoundTargetScoreSchema`／`TARGET_SCORE_OPTIONS`／`DEFAULT_TARGET_SCORE` 與 `RoundSettings` 介面的既有寫法，供 §2／§3 比照撰寫 `RoundTimerDurationMinutesSchema` 等對應物，SHALL NOT 另創一套風格
-- [ ] 1.4 讀 `round.ts` 的 `createRound`／`setTargetScore`／`resetIncompleteMatches` 三個函式全文，記錄各自的失敗代碼結構、訊息常數命名與回傳物件的建構方式（逐欄列舉 vs 物件展開）。與 design Decision 4 的假設逐項比對，差異一律補記進 `design.md` 的 Open Questions，不要默默改實作遷就假設
-- [ ] 1.5 讀 `scoreboard-binding.ts` 的 `isTargetScoreLocked` 全文與其私有 `TARGET_SCORE_LOCKED_REASON` 常數，確認簽章與 design Decision 2 的假設一致
-- [ ] 1.6 讀 `RoundControls.tsx` 與 `RoundControls.test.tsx` 全文，記錄現有 props 清單、目標分數選擇器的 radiogroup／鎖定顯示實作模式，以及既有全部 it 名稱清單（避免 §9 撞名）
-- [ ] 1.7 讀 `useRoundStore.ts` 全文，記錄現有 action 清單與 `setTargetScore` 的接線模式（呼叫純函式 → 判 `ok` → dispatch），供 §8 比照
-- [ ] 1.8 讀 `labels.ts` 現況與 `app/matchmaker/page.tsx` 全文，確認新增常數命名不與既有常數衝突、確認掛載點位置；確認 `nextjs-pickball/package.json` 目前無任何計時或音效相關相依（本 change 結束時此事實 MUST 不變）
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的路徑（本批不用 git worktree，即主 repo `/Users/m2_24gb/Desktop/project/nextjs-pickball`）且已切到 `change/matchmaker-round-timer` 分支，且 baseline `pnpm test` 全綠；把 baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
+- [x] 1.2 確認 `main` 上 **M13（`matchmaker-player-swap`）已合併**：讀 `nextjs-pickball/lib/matchmaker/round.ts`、`hooks/useRoundStore.ts`、`app/matchmaker/page.tsx`，確認三者存在且含 M13 的產出（記錄三者目前的完整匯出清單與 `page.tsx` 取得「目前回合」與「名單」的方式）。**不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M13（見 proposal 的「執行相依」）
+- [x] 1.3 讀 `round-types.ts` 與 `round-settings.ts`，記錄 `RoundTargetScoreSchema`／`TARGET_SCORE_OPTIONS`／`DEFAULT_TARGET_SCORE` 與 `RoundSettings` 介面的既有寫法，供 §2／§3 比照撰寫 `RoundTimerDurationMinutesSchema` 等對應物，SHALL NOT 另創一套風格
+- [x] 1.4 讀 `round.ts` 的 `createRound`／`setTargetScore`／`resetIncompleteMatches` 三個函式全文，記錄各自的失敗代碼結構、訊息常數命名與回傳物件的建構方式（逐欄列舉 vs 物件展開）。與 design Decision 4 的假設逐項比對，差異一律補記進 `design.md` 的 Open Questions，不要默默改實作遷就假設
+- [x] 1.5 讀 `scoreboard-binding.ts` 的 `isTargetScoreLocked` 全文與其私有 `TARGET_SCORE_LOCKED_REASON` 常數，確認簽章與 design Decision 2 的假設一致
+- [x] 1.6 讀 `RoundControls.tsx` 與 `RoundControls.test.tsx` 全文，記錄現有 props 清單、目標分數選擇器的 radiogroup／鎖定顯示實作模式，以及既有全部 it 名稱清單（避免 §9 撞名）
+- [x] 1.7 讀 `useRoundStore.ts` 全文，記錄現有 action 清單與 `setTargetScore` 的接線模式（呼叫純函式 → 判 `ok` → dispatch），供 §8 比照
+- [x] 1.8 讀 `labels.ts` 現況與 `app/matchmaker/page.tsx` 全文，確認新增常數命名不與既有常數衝突、確認掛載點位置；確認 `nextjs-pickball/package.json` 目前無任何計時或音效相關相依（本 change 結束時此事實 MUST 不變）
 
 ## 2. 回合資料模型的計時 schema（round-types.ts）
 

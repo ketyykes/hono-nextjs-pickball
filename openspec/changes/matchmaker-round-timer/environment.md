@@ -32,9 +32,13 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**：待 apply Step 0（tasks 1.1）實測回填，不在此先行編造數字。
-- **Initial commit hash**：待 apply Step 0 實測回填（`main` 上須含 M10～M13 全部已合併
-  的產出）。
+- **Baseline tests**：2026-09-07 實跑 `pnpm install`（`Lockfile is up to date` / `Already up to date`，
+  工作樹維持乾淨）後跑 `pnpm test`（`pnpm -r test`）全綠，exit code 0：
+  - `nextjs-pickball`：Test Files 70 passed (70)、Tests 694 passed (694)
+  - `hono-pickball`：Test Files 4 passed (4)、Tests 16 passed (16)（未出現 `listen EPERM 127.0.0.1`）
+- **Initial commit hash**：`1125d53796df10b00b0a2e4b55cb46133060bf26`
+  （`docs: runbook 記錄 M13 完成並合併,收錄 test:e2e -- 語法陷阱教訓`；其前一個 commit
+  `e6a4713` 即 M13 `matchmaker-player-swap` 的合併產出，M10～M13 皆已在 `main` 上）。
 - **Worktree path**（absolute；本批無實體 worktree，此欄位值為主 repo 路徑本身，
   供 apply Step 0 的 cwd 檢查比對）：
   `/Users/m2_24gb/Desktop/project/nextjs-pickball`
