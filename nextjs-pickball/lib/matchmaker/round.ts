@@ -425,6 +425,55 @@ export function setTimerDuration(round: Round, durationMinutes: RoundTimerDurati
 	return { ok: true, round: { ...round, timer: { durationMinutes, startedAt: null } } };
 }
 
+// ---- 開始計時：與「是否已開始計分」的鎖定判定無關（design：開始計時與比分無關） ----
+
+/**
+ * startTimer 的失敗代碼。兩種前置條件不成立的情境分開表達（同 RESET_INCOMPLETE_MATCHES_FAILURE_CODE
+ * 的先例）：NOT_CONFIGURED 代表使用者根本還沒選計時長度，下一步是先設定；ALREADY_STARTED
+ * 代表倒數已經在跑，下一步是等待或改長度，兩者的修正方式不同。
+ */
+export const START_TIMER_FAILURE_CODE = {
+	NOT_CONFIGURED: "not-configured",
+	ALREADY_STARTED: "already-started",
+} as const;
+
+export type StartTimerFailureCode = (typeof START_TIMER_FAILURE_CODE)[keyof typeof START_TIMER_FAILURE_CODE];
+
+const TIMER_NOT_CONFIGURED_MESSAGE = "本輪尚未設定計時長度，請先選擇計時長度後再開始計時。";
+const TIMER_ALREADY_STARTED_MESSAGE = "本輪計時已經開始，無法重複開始。";
+
+export interface StartTimerSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface StartTimerFailure {
+	readonly ok: false;
+	readonly code: StartTimerFailureCode;
+	readonly message: string;
+}
+
+export type StartTimerResult = StartTimerSuccess | StartTimerFailure;
+
+/**
+ * 開始本輪計時：本輪已設定計時長度（timer !== null）且尚未開始（timer.startedAt === null）
+ * 時，寫入 startedAt 為呼叫當下時間；否則拒絕並回傳可判讀的失敗結果，SHALL NOT 拋出例外
+ * （spec「開始計時」）。純函式，時間由呼叫端注入（design：不呼叫 Date.now()）。
+ *
+ * 刻意不檢查任何場次狀態——開始計時與比分無關，主持人可能在任何一場開打前就先啟動倒數，
+ * 因此 SHALL NOT 依賴 setTargetScore／setTimerDuration 共用的「是否已開始計分」鎖定判定。
+ */
+export function startTimer(round: Round, now: string): StartTimerResult {
+	if (round.timer === null) {
+		return { ok: false, code: START_TIMER_FAILURE_CODE.NOT_CONFIGURED, message: TIMER_NOT_CONFIGURED_MESSAGE };
+	}
+	if (round.timer.startedAt !== null) {
+		return { ok: false, code: START_TIMER_FAILURE_CODE.ALREADY_STARTED, message: TIMER_ALREADY_STARTED_MESSAGE };
+	}
+
+	return { ok: true, round: { ...round, timer: { ...round.timer, startedAt: now } } };
+}
+
 // ---- 重設與重排未完成場次（prd.md 6.2、design Decision 5） ----
 
 /**
