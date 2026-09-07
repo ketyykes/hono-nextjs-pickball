@@ -120,9 +120,9 @@ Depends on: §7, §6
 
 Depends on: §10, §11
 
-- [ ] 12.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/round-timer.spec.ts`，寫入兩個 test：「計時到期不自動結束任何場次，仍可手動送出比分」、「開始計時後快轉至到期會顯示時間到並觸發一次提示音」（後者以 `page.clock` 快轉、`addInitScript` stub `window.AudioContext` 為記錄呼叫次數的假建構函式）。種子資料的產生方式沿用既有 `match-stage.spec.ts`／`visual-export.spec.ts` 的 `seedRoster` helper 慣例（於本檔案內建立同構的區域函式）。確認紅燈（畫面尚無計時控制項與 `RoundTimerBanner` 可互動）
-- [ ] 12.2 GREEN: 於 `app/matchmaker/page.tsx` 掛入 `RoundTimerBanner`（傳入 `round?.timer ?? null`），並把 `setTimerDuration`／`startTimer` 傳給 `RoundControls`
-- [ ] 12.3 REFACTOR: 確認 `page.tsx` 只新增掛載與 prop 傳遞，未混入任何計時邏輯本體；新增節點的 `data-print` 包裝比照既有操作控制項慣例（design Decision 8：不修改 `MatchStage.tsx`／`CourtCard.tsx`／`RestingPanel.tsx` 任何一個檔案，`git diff --stat` 機械確認）
+- [x] 12.1 RED: 新增 `nextjs-pickball/tests/e2e/specs/round-timer.spec.ts`，寫入兩個 test：「計時到期不自動結束任何場次，仍可手動送出比分」、「開始計時後快轉至到期會顯示時間到並觸發一次提示音」（後者以 `page.clock` 快轉、`addInitScript` stub `window.AudioContext` 為記錄呼叫次數的假建構函式）。種子資料的產生方式沿用既有 `match-stage.spec.ts`／`visual-export.spec.ts` 的 `seedRoster` helper 慣例（於本檔案內建立同構的區域函式）。確認紅燈（畫面尚無計時控制項與 `RoundTimerBanner` 可互動）
+- [x] 12.2 GREEN: 於 `app/matchmaker/page.tsx` 掛入 `RoundTimerBanner`（傳入 `round?.timer ?? null`），並把 `setTimerDuration`／`startTimer` 傳給 `RoundControls`
+- [x] 12.3 REFACTOR: 確認 `page.tsx` 只新增掛載與 prop 傳遞，未混入任何計時邏輯本體；新增節點的 `data-print` 包裝比照既有操作控制項慣例（design Decision 8：不修改 `MatchStage.tsx`／`CourtCard.tsx`／`RestingPanel.tsx` 任何一個檔案，`git diff --stat` 機械確認）
 
 ## 13. 收尾驗證
 
