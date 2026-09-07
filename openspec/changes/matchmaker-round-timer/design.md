@@ -368,3 +368,24 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    與既有 `TARGET_SCORE_OPTIONS` 同款的結構性限制——值相同時任何值層級的斷言都測不出
    「由 schema 推導」與「寫死」的差別。已誠實記錄，未以偽造斷言掩蓋；此點由
    Code-Quality／Final Review 以人工閱讀把關。
+
+
+5. **【apply 新增，2026-09-07】本 change 實測到的「恆真斷言」四種形態**（供 Final Review 與
+   後續 milestone 參考；四種都是在 Stage 2 的獨立 mutation 中才被抓到，Implementer 自查
+   全數漏掉）：
+
+   1. **輸入用了預設值**（§3 實測）：測「原樣帶出」時若欄位值就是預設值（`null`），
+      「保留」與「被重設為預設值」的結果相同，斷言恆真。→ 斷言用的輸入 MUST 用非預設值。
+   2. **比對基準用了活參考**（§4 實測）：`expect(result.timer).toEqual(round.timer)` 在實作
+      就地修改 `round.timer` 時兩邊同時被改，斷言恆真。→ MUST 先 `structuredClone` 留快照，
+      與**快照**比對。
+   3. **`toEqual` 兩邊指向同一參考**（既有紀律）。
+   4. **fixture 對某輸入欄位只用單一值**（§5 實測）：`round-timer.test.ts` 全檔
+      `durationMinutes` 都是 `10`，於是「忽略 `timer.durationMinutes`、寫死 10」的實作
+      恆綠。→ union 型別欄位（`durationMinutes` 10/15/20、`targetScore` 11/15/21）
+      MUST 至少用兩個不同值。
+
+   另記錄一則**流程教訓**：§5 的 Implementer 自述「10 項 mutation 全數轉紅、0 存活」，
+   Stage 2 獨立重跑後實測有 **3 項存活**，其中 M2（拿掉 `remainingSeconds` 的上限夾值）
+   正是該 Implementer 自己列為「邊界決策 #1」的那條防禦——**自述的 mutation 結果不可採信**，
+   Stage 2 的獨立重跑是必要而非冗餘。
