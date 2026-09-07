@@ -100,11 +100,11 @@ Depends on: §4
 
 Depends on: §2, §3, §4, §9
 
-- [ ] 10.1 RED: 於 `nextjs-pickball/components/matchmaker/RoundControls.test.tsx` 補兩個 it：「計時選項為不計時／10／15／20 分鐘且預設選中不計時」、「本輪已開始計分時計時控制項 disabled 並顯示鎖定原因」。同時更新 `buildProps()` 輔助函式，補上必填的 `setTimerDuration`／`startTimer` 兩個 `vi.fn()` 預設值（既有 4 個 it 的斷言與名稱不變，僅共用 fixture 補值）。跑單檔確認新增兩個 it 紅燈，且既有 4 個 it 因 fixture 更新後仍維持綠燈
-- [ ] 10.2 GREEN: 於 `RoundControls.tsx` 新增計時 `radiogroup`（不計時／10／15／20 分鐘四個選項），沿用目標分數選擇器的 WAI-ARIA radiogroup 鍵盤導覽模式（`nextRadioIndex`）；鎖定狀態委派 `isTargetScoreLocked(round, matchSlots)` 的 `locked` 布林值，鎖定原因顯示 `labels.ts` 新增的 `ROUND_TIMER_LOCKED_REASON`（**不重用** `isTargetScoreLocked` 回傳的 `reason`，design Decision 2）
-- [ ] 10.3 RED: 補三個 it：「已設定計時長度且尚未開始時顯示可點擊的開始計時按鈕」、「不計時或計時已開始時不顯示開始計時按鈕」、「點擊開始計時會呼叫注入的 startTimer 一次」。確認紅燈
-- [ ] 10.4 GREEN: 新增「開始計時」按鈕，顯示條件為 `round.timer !== null && round.timer.startedAt === null`（不符合時**不渲染**，非 `disabled`）；點擊委派 `props.startTimer`
-- [ ] 10.5 REFACTOR: 確認計時區塊與目標分數區塊共用同一套 radiogroup 鍵盤導覽模式而非各寫一份；確認未重用 `isTargetScoreLocked` 的 `reason` 給計時區塊顯示；確認新 props 命名與既有（`setTargetScore`）風格一致，非 `onXxx` 命名（比照既有 `setTargetScore` 的先例，屬注入的相依而非事件回呼）
+- [x] 10.1 RED: 於 `nextjs-pickball/components/matchmaker/RoundControls.test.tsx` 補兩個 it：「計時選項為不計時／10／15／20 分鐘且預設選中不計時」、「本輪已開始計分時計時控制項 disabled 並顯示鎖定原因」。同時更新 `buildProps()` 輔助函式，補上必填的 `setTimerDuration`／`startTimer` 兩個 `vi.fn()` 預設值（既有 4 個 it 的斷言與名稱不變，僅共用 fixture 補值）。跑單檔確認新增兩個 it 紅燈，且既有 4 個 it 因 fixture 更新後仍維持綠燈
+- [x] 10.2 GREEN: 於 `RoundControls.tsx` 新增計時 `radiogroup`（不計時／10／15／20 分鐘四個選項），沿用目標分數選擇器的 WAI-ARIA radiogroup 鍵盤導覽模式（`nextRadioIndex`）；鎖定狀態委派 `isTargetScoreLocked(round, matchSlots)` 的 `locked` 布林值，鎖定原因顯示 `labels.ts` 新增的 `ROUND_TIMER_LOCKED_REASON`（**不重用** `isTargetScoreLocked` 回傳的 `reason`，design Decision 2）
+- [x] 10.3 RED: 補三個 it：「已設定計時長度且尚未開始時顯示可點擊的開始計時按鈕」、「不計時或計時已開始時不顯示開始計時按鈕」、「點擊開始計時會呼叫注入的 startTimer 一次」。確認紅燈
+- [x] 10.4 GREEN: 新增「開始計時」按鈕，顯示條件為 `round.timer !== null && round.timer.startedAt === null`（不符合時**不渲染**，非 `disabled`）；點擊委派 `props.startTimer`
+- [x] 10.5 REFACTOR: 確認計時區塊與目標分數區塊共用同一套 radiogroup 鍵盤導覽模式而非各寫一份；確認未重用 `isTargetScoreLocked` 的 `reason` 給計時區塊顯示；確認新 props 命名與既有（`setTargetScore`）風格一致，非 `onXxx` 命名（比照既有 `setTargetScore` 的先例，屬注入的相依而非事件回呼）
 
 ## 11. 倒數顯示與時間到提示（RoundTimerBanner.tsx）
 
