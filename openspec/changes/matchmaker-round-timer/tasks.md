@@ -77,9 +77,9 @@ Depends on: §1
 
 Depends on: §5
 
-- [ ] 7.1 RED: 新增 `nextjs-pickball/hooks/useRoundTimer.test.ts`，寫入 it「每秒更新剩餘秒數，超過設定長度後 expired 回傳 true」（使用 `vi.useFakeTimers()`）。確認紅燈
-- [ ] 7.2 GREEN: 實作 `useRoundTimer(timer)`：以 `useState` 持有目前時間 ISO 字串，`useEffect` 內 `setInterval` 每秒更新，回傳 `{ remainingSeconds, expired }`（呼叫 §5 的純函式取得）；`timer` 為 `null` 或 `startedAt` 為 `null` 時不啟動 interval
-- [ ] 7.3 REFACTOR: 確認本 hook 是本 change **唯一**的 `setInterval`／`new Date()` 呼叫點；確認 interval 於 unmount 或 `timer` 變動時正確清除，不遺留計時器
+- [x] 7.1 RED: 新增 `nextjs-pickball/hooks/useRoundTimer.test.ts`，寫入 it「每秒更新剩餘秒數，超過設定長度後 expired 回傳 true」（使用 `vi.useFakeTimers()`）。確認紅燈
+- [x] 7.2 GREEN: 實作 `useRoundTimer(timer)`：以 `useState` 持有目前時間 ISO 字串，`useEffect` 內 `setInterval` 每秒更新，回傳 `{ remainingSeconds, expired }`（呼叫 §5 的純函式取得）；`timer` 為 `null` 或 `startedAt` 為 `null` 時不啟動 interval
+- [x] 7.3 REFACTOR: 確認本 hook 是本 change **唯一**的 `setInterval`／`new Date()` 呼叫點；確認 interval 於 unmount 或 `timer` 變動時正確清除，不遺留計時器
 
 ## 8. hooks 歸屬清單同步（pickleball-guide-page）
 
