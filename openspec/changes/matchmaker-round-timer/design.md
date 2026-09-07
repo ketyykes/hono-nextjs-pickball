@@ -389,3 +389,41 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    Stage 2 獨立重跑後實測有 **3 項存活**，其中 M2（拿掉 `remainingSeconds` 的上限夾值）
    正是該 Implementer 自己列為「邊界決策 #1」的那條防禦——**自述的 mutation 結果不可採信**，
    Stage 2 的獨立重跑是必要而非冗餘。
+
+
+6. **【apply 新增，2026-09-07】archive 階段必讀：主 spec 歸屬清單有被靜默回捲的風險**
+   （§8 Stage 2 查 openspec CLI `@fission-ai/openspec@1.9.0` 原始碼後的實測結論）
+
+   §8 依 tasks 8.2 把 `useRoundTimer` 提前同步進主 spec
+   （`openspec/specs/pickleball-guide-page/spec.md`），因為 `hooksInventory.test.ts` 讀的是
+   主 spec 而非 delta。已查證 CLI **明文支援**這個「early-sync pattern」：
+   `specs-apply.js` 對內容相同的 MODIFIED 只是不計入 `modifiedApplied`，
+   `archive.js` 在該 capability 的四類操作計數全為 0 時直接 `continue`。
+   因此 archive 對 `pickleball-guide-page` 會是 **no-op**，`Totals` 的 `~` 數字會比 delta 的
+   MODIFIED 總數少 1——**這是預期行為，不是漏處理**，不要因此加 `--skip-specs` 或手動再套一次。
+   （已實測：delta 該檔**整份**只有一個 MODIFIED Requirement，且與主 spec 該區塊
+   `normalizeBlockRaw` 後 sha256 相同，不存在「還有其他未同步內容」的情境。）
+
+   **真正的風險方向相反**：MODIFIED 是**整塊取代**，而 archive 唯一的內容保護
+   `findMissingCurrentScenarios()` **只檢查 Scenario 有沒有被漏掉，不檢查散文**——
+   而 hooks 歸屬清單那一行正是散文。因此：
+
+   > 本 change archive **之前**，若任何人／任何後續 milestone 又往主 spec 的歸屬清單加了新 hook
+   > 卻沒有同步改本 change 的 delta，archive 會把整塊 Requirement 換回 delta 的版本，
+   > **靜默抹掉那筆新增**，而 `Totals` 只會顯示 `~ 1`（看起來完全正常）。
+   > 事後唯一的偵測是 `hooksInventory.test.ts` 下一次執行轉紅，但那已在 archive commit 之後。
+
+   **可行動的處置**：
+   - archive 前 MUST 先 `diff` 確認主 spec 該 Requirement 區塊與 delta 仍逐字相同；
+     若不同，**先把主 spec 的新內容補進 delta**，再 archive。
+   - 本 change archive 前，**不要「順手潤飾」主 spec 這個 Requirement 的任何措辭**
+     （包含「每支 hook SHALL 有對應 `*.test.ts` 檔」這句略有歧義的用字）——改了會被靜默回捲。
+     要澄清措辭請另開 change，同時改 delta 與主 spec。
+   - 後續任何 milestone 於 `nextjs-pickball/hooks/` 新增 hook 時，MUST **同時**更新主 spec
+     與該 change 的 delta 兩份。
+
+   附帶澄清（避免後續 milestone 誤讀該 Requirement）：標題的「三支」指的是
+   **pickleball-guide-page 自己擁有**的三支（`useScrollShadow`／`useScrollSpy`／`useScrolledPast`），
+   不是 `hooks/` 目錄總數（目前已 13 支）；「每支 hook SHALL 有對應 `*.test.ts` 檔」的先行詞
+   是同句的那三支，**不涵蓋**跨 capability 的其餘 hook——`useRoundTimer` 的測試義務來自 root
+   `CLAUDE.md` 的 TDD 規則與 `round-lifecycle` 規格，不由這份規格管。
