@@ -5,12 +5,14 @@ import {
 	resetIncompleteMatches,
 	setTargetScore,
 	setTimerDuration,
+	startTimer,
 	submitScore,
 	swapMatchPlayer,
 	validateScoreInput,
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
 	SET_TIMER_DURATION_FAILURE_CODE,
+	START_TIMER_FAILURE_CODE,
 	SUBMIT_SCORE_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
@@ -865,6 +867,52 @@ describe("setTimerDuration", () => {
 			expect(rejected.message).toContain("計時");
 			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
+	});
+});
+
+describe("startTimer", () => {
+	it("已設定計時長度且尚未開始時，開始計時寫入 startedAt", () => {
+		const round = makeRound({ timer: { durationMinutes: 10, startedAt: null } });
+
+		const result = startTimer(round, "2026-09-03T01:00:00.000Z");
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: "2026-09-03T01:00:00.000Z" });
+	});
+
+	it("未設定計時長度或計時已開始時拒絕再次開始並回傳可判讀訊息", () => {
+		const noTimerRound = makeRound({ timer: null });
+		const noTimerSnapshot = structuredClone(noTimerRound);
+		const alreadyStartedRound = makeRound({
+			timer: { durationMinutes: 15, startedAt: "2026-09-03T00:00:00.000Z" },
+		});
+		const alreadyStartedSnapshot = structuredClone(alreadyStartedRound);
+
+		let noTimerResult: ReturnType<typeof startTimer> | undefined;
+		let alreadyStartedResult: ReturnType<typeof startTimer> | undefined;
+
+		// 兩者皆 SHALL NOT 拋出例外——理由同 resetIncompleteMatches 對應測試。
+		expect(() => {
+			noTimerResult = startTimer(noTimerRound, "2026-09-03T01:00:00.000Z");
+		}).not.toThrow();
+		expect(() => {
+			alreadyStartedResult = startTimer(alreadyStartedRound, "2026-09-03T01:00:00.000Z");
+		}).not.toThrow();
+
+		expect(noTimerResult?.ok).toBe(false);
+		if (noTimerResult !== undefined && !noTimerResult.ok) {
+			expect(noTimerResult.code).toBe(START_TIMER_FAILURE_CODE.NOT_CONFIGURED);
+			expect(noTimerResult.message).toContain("計時");
+		}
+		expect(noTimerRound).toEqual(noTimerSnapshot);
+
+		expect(alreadyStartedResult?.ok).toBe(false);
+		if (alreadyStartedResult !== undefined && !alreadyStartedResult.ok) {
+			expect(alreadyStartedResult.code).toBe(START_TIMER_FAILURE_CODE.ALREADY_STARTED);
+			expect(alreadyStartedResult.message).toContain("計時");
+		}
+		expect(alreadyStartedRound).toEqual(alreadyStartedSnapshot);
 	});
 });
 
