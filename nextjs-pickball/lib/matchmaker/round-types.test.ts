@@ -45,6 +45,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
+		timer: null,
 		...overrides,
 	};
 }
@@ -181,6 +182,17 @@ describe("RoundSchema", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.timer).toBeNull();
+		}
+
+		// 除了「完全缺少欄位」，M14 之後由本 capability 寫入、明確帶 timer: null
+		// 的「不計時」資料也必須通過驗證——這一段語意由 .nullable() 負責，
+		// 與「完全缺少欄位」時由 .default(null) 補值是兩件不同的事。
+		const explicitNullResult = RoundSchema.safeParse(
+			makeRound({ timer: null }),
+		);
+		expect(explicitNullResult.success).toBe(true);
+		if (explicitNullResult.success) {
+			expect(explicitNullResult.data.timer).toBeNull();
 		}
 	});
 
