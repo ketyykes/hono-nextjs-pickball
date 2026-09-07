@@ -553,6 +553,16 @@ describe("useRoundStore", () => {
 		expect(result.current.round?.timer?.durationMinutes).toBe(20);
 		expect(result.current.round?.timer?.startedAt).toBeNull();
 
+		// 再改一次為另一個長度（殺「忽略 durationMinutes 參數、寫死某個值」變異）：成功路徑
+		// 只用單一值時，寫死該值的實作與正確實作結果相同，測不出參數有沒有真的被傳下去；
+		// 兩個不同的值才能釘住「寫入的是呼叫端給的那一個」。
+		let secondResult: SetTimerDurationResult | undefined;
+		act(() => {
+			secondResult = result.current.setTimerDuration(15);
+		});
+		expect(secondResult?.ok).toBe(true);
+		expect(result.current.round?.timer?.durationMinutes).toBe(15);
+
 		// 完成該場後已開始計分，變更應被拒絕，round 參考不變（toBe，非 toEqual，
 		// 殺「失敗時仍 dispatch」變異）。
 		act(() => {
@@ -565,6 +575,40 @@ describe("useRoundStore", () => {
 		});
 		expect(failResult?.ok).toBe(false);
 		expect(result.current.round).toBe(roundAfterComplete);
+	});
+
+	// regression guard（非 test-plan 內、非 9.1 驗收錨點）：上方錨點 it 只走 startTimer 的成功
+	// 路徑，下方 null 防線 it 又在防線就 return，兩者都到不了「回合存在但純函式拒絕」這條路徑
+	// ——審查時實測把 startTimer 改成「失敗時也 dispatch」，全套測試仍然全綠。既有
+	// setTargetScore／setTimerDuration／swapMatchPlayer 三者都有對應的「非 null 回合失敗時
+	// round 參考不變」測試，此處補齊，使五個方法的覆蓋一致。
+	it("已開始計時後再次呼叫 startTimer 回傳 ALREADY_STARTED 且 round 參考不變（殺「失敗時仍 dispatch」變異）", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		act(() => {
+			result.current.startTimer();
+		});
+		expect(result.current.round?.timer?.startedAt).not.toBeNull();
+
+		const roundAfterStart = result.current.round;
+		let failResult: StartTimerResult | undefined;
+		act(() => {
+			failResult = result.current.startTimer();
+		});
+
+		expect(failResult?.ok).toBe(false);
+		if (failResult?.ok) {
+			throw new Error("測試前置錯誤：預期失敗，但回傳成功");
+		}
+		// 釘住代碼而非只看 ok：確認 hook 原樣回傳純函式的失敗結果，而不是自己另造一個。
+		expect(failResult?.code).toBe(START_TIMER_FAILURE_CODE.ALREADY_STARTED);
+		// toBe（參考相等）而非 toEqual：只有參考相等能證明 reducer 真的沒有被 dispatch。
+		expect(result.current.round).toBe(roundAfterStart);
 	});
 
 	it("尚無目前回合時呼叫 setTimerDuration／startTimer 皆回傳失敗且不 dispatch（殺 state.round === null 防線被移除的變異）", () => {
