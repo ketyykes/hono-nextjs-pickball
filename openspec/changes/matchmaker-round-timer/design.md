@@ -427,3 +427,44 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    不是 `hooks/` 目錄總數（目前已 13 支）；「每支 hook SHALL 有對應 `*.test.ts` 檔」的先行詞
    是同句的那三支，**不涵蓋**跨 capability 的其餘 hook——`useRoundTimer` 的測試義務來自 root
    `CLAUDE.md` 的 TDD 規則與 `round-lifecycle` 規格，不由這份規格管。
+
+
+7. **【apply 新增，2026-09-07】⚠️ 需要人類裁決：本輪已產生後無法改回「不計時」**
+   （§10 Implementer 回報的設計缺口，spec 與 design 皆未涵蓋）
+
+   **現象**：計時 radiogroup 有四個選項（不計時／10／15／20），但
+   `round.ts` 的 `setTimerDuration(round, durationMinutes)` 的參數型別是
+   `RoundTimerDurationMinutes`（`10 | 15 | 20`），**沒有接受 `null` 的多載**，
+   `round-lifecycle` 也**沒有**「把已產生的本輪改回不計時」的入口。
+   因此 `round === null`（尚未產生本輪）時選「不計時」可正常寫入 `settings`；
+   但 `round` 已存在時點「不計時」**沒有任何反應**。
+
+   **§10 的處置（暫行，已在程式碼註解標明）**：依 spec「SHALL NOT 在 UI 層直接改寫回合物件」，
+   把這條路徑實作為**不作為**（`if (durationMinutes === null) return;`），
+   SHALL NOT 讓 UI 自己組一個 `timer: null` 的回合。
+
+   **三個候選解法，皆超出 §10 範圍，需人類裁決**：
+   1. `round-lifecycle` 補一個 `clearTimer(round)` 入口（或讓 `setTimerDuration` 接受 `null`）
+      —— 行為最完整，但要改 spec 與 delta，屬新增 Requirement 條款。
+   2. 回合已存在時把「不計時」該顆設為 `disabled` 並附說明 —— 純 UI 層，但與 spec
+      「四個選項」「鎖定時四顆皆 disabled」的既有敘述會產生第三種狀態，需補 Scenario。
+   3. 維持現狀（不作為）並在 spec 明訂「計時長度於產生本輪時決定，本輪進行中只能在
+      10／15／20 之間調整，不能改回不計時」—— 改動最小，但要確認這是產品意圖。
+
+   在裁決之前，apply **維持解法 3 的行為**（不作為），並以本條記錄留痕。
+   ⚠️ **這一條 SHALL NOT 由 subagent 自行決定**——execution-plan 的 Escalation 明訂
+   設計決策需人類確認。
+
+8. **【apply 新增，2026-09-07】`page.tsx` 的 `RoundControls` prop 接線已由 leader 提前完成**
+
+   §10 為 `RoundControlsProps` 加入**必填**的 `setTimerDuration`／`startTimer` 後，
+   `app/matchmaker/page.tsx`（`RoundControls` 的唯一呼叫點）立即出現 TS2739，
+   而 `app/**` 不在 §10 的可動檔案清單內——§10 依規回報 `BLOCKED` 後停手，**判斷正確**。
+
+   因主 repo 的 Stop hook 對 tsc 錯誤是 exit 2 擋下（本批無 linked worktree），
+   不能讓紅燈跨越群組邊界，故由 **leader 提前完成 §12.2 的其中兩行**：
+   `useRoundStore` 的解構加入兩個方法、`<RoundControls>` 加入兩個 prop。
+
+   **§12.2 因此只剩「掛載 `RoundTimerBanner`（傳入 `round?.timer ?? null`）」一件事**，
+   §12 的 Implementer 與審查者 MUST 知悉這兩行已存在，**不應**判為「§12 已被別人先做掉」
+   或重複實作。

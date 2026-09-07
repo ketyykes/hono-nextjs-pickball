@@ -33,7 +33,7 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
 	const { players, updatePlayer } = useRosterStore();
-	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, swapMatchPlayer } = useRoundStore({
+	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, setTimerDuration, startTimer, swapMatchPlayer } = useRoundStore({
 		players,
 		updatePlayer,
 	});
@@ -183,6 +183,8 @@ export default function MatchmakerPage() {
 					onGenerate={handleGenerate}
 					onReset={handleReset}
 					setTargetScore={setTargetScore}
+					setTimerDuration={setTimerDuration}
+					startTimer={startTimer}
 				/>
 			</div>
 
