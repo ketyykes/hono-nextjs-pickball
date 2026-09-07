@@ -8,6 +8,7 @@ import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError, MatchStageSwapError } from "@/components/matchmaker/MatchStage";
 import { PrintSheet } from "@/components/matchmaker/PrintSheet";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
+import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
@@ -188,6 +189,19 @@ export default function MatchmakerPage() {
 					setTimerDuration={setTimerDuration}
 					startTimer={startTimer}
 				/>
+			</div>
+
+			{/* M14 design Decision 8：倒數是「整輪共用的單一計時」，不屬於任何一張場地卡片，
+			    故獨立掛載於本層而非塞進 MatchStage／CourtCard（沿用 M9 的 ExportActions／
+			    PrintSheet 同一條理由）。本層只負責掛載與傳值：倒數取樣、到期判定與提示音
+			    去重全在 RoundTimerBanner 與其委派的 hook／純函式內，SHALL NOT 在頁面層
+			    重複一份。
+			    不包一層 `round !== null &&` 條件式：RoundTimerBanner 自行處理 timer 為 null
+			    與尚未開始兩種早退並回傳 null（畫面結果相同），而包了條件式會在回合有無之間
+			    製造 unmount／remount，把「同一次到期只播一次」所倚賴的 useRef 旗標清掉。
+			    §8：倒數是螢幕上的操作輔助資訊，列印時隱藏，包裝方式比照上下兩區。 */}
+			<div data-print="hide">
+				<RoundTimerBanner timer={round?.timer ?? null} />
 			</div>
 
 			{/* §8：舞台區是螢幕版的對戰畫面（比分輸入等互動），列印時由下方的 PrintSheet
