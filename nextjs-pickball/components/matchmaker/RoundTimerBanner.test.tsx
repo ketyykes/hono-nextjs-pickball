@@ -1,5 +1,5 @@
 // components/matchmaker/RoundTimerBanner.test.tsx
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoundTimerBanner } from "./RoundTimerBanner";
 import type { RoundTimer } from "@/lib/matchmaker/round-types";
@@ -50,8 +50,11 @@ describe("RoundTimerBanner", () => {
 		});
 
 		const alert = screen.getByRole("alert");
-		expect(alert.textContent).toContain("時間到");
-		expect(alert.textContent).toContain(ROUND_TIMER_EXPIRED_MESSAGE);
+		// 用精確文字比對（getByText 預設 exact match）分別驗證「時間到」大字與提示文案
+		// 兩個獨立節點，不用子字串比對（toContain）——ROUND_TIMER_EXPIRED_MESSAGE 本身
+		// 就含有「時間到」三個字，子字串比對即使拿掉大字節點也會誤判通過。
+		expect(within(alert).getByText("時間到")).not.toBeNull();
+		expect(within(alert).getByText(ROUND_TIMER_EXPIRED_MESSAGE)).not.toBeNull();
 	});
 
 	it("時間到時播放提示音，同一次到期不因重新渲染而重複播放", () => {
@@ -78,5 +81,48 @@ describe("RoundTimerBanner", () => {
 		rerender(<RoundTimerBanner timer={timer} playChime={playChime} />);
 
 		expect(playChime).toHaveBeenCalledTimes(1);
+	});
+
+	// 「同一次到期不重播」的保證不能只靠 useEffect 依賴陣列本身（依賴不變就不重跑），
+	// 必須靠 useRef 記住「已為哪個 startedAt 播放過」——本測試模擬呼叫端傳入不穩定的
+	// 音效函式參考（例如每次 render 都建立新的箭頭函式，而非模組層級具名函式），
+	// 讓 playChime 這個 prop 本身變動、觸發 effect 依賴陣列重新執行；即使如此，
+	// 同一次到期（startedAt 不變）仍不應呼叫這個新的函式參考。
+	it("到期後音效函式參考改變時，新的參考不會被重複呼叫", () => {
+		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
+		const timer: RoundTimer = {
+			durationMinutes: 10,
+			startedAt: "2026-09-07T00:00:00.000Z",
+		};
+		const firstPlayChime = vi.fn();
+		const secondPlayChime = vi.fn();
+
+		const { rerender } = render(
+			<RoundTimerBanner timer={timer} playChime={firstPlayChime} />,
+		);
+
+		act(() => {
+			vi.advanceTimersByTime(10 * 60 * 1000);
+		});
+
+		expect(firstPlayChime).toHaveBeenCalledTimes(1);
+
+		rerender(<RoundTimerBanner timer={timer} playChime={secondPlayChime} />);
+
+		expect(secondPlayChime).not.toHaveBeenCalled();
+	});
+
+	it("timer 為 null 時不渲染任何內容", () => {
+		const { container } = render(<RoundTimerBanner timer={null} />);
+
+		expect(container.firstChild).toBeNull();
+	});
+
+	it("timer.startedAt 為 null（尚未開始計時）時不渲染任何內容", () => {
+		const timer: RoundTimer = { durationMinutes: 10, startedAt: null };
+
+		const { container } = render(<RoundTimerBanner timer={timer} />);
+
+		expect(container.firstChild).toBeNull();
 	});
 });
