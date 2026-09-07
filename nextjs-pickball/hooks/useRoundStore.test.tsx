@@ -8,6 +8,7 @@ import type {
 	ResetIncompleteMatchesResult,
 	SubmitScoreResult,
 	SetTargetScoreResult,
+	StartTimerResult,
 	SwapMatchPlayerResult,
 } from "@/lib/matchmaker/round";
 import type { Player } from "@/lib/matchmaker/types";
@@ -466,6 +467,48 @@ describe("useRoundStore", () => {
 		expect(failResult?.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
 		expect(result.current.round).toBeNull();
 		expect(updatePlayer).not.toHaveBeenCalled();
+	});
+
+	// M14：startTimer 是 round.ts 第五個「純函式回傳 ok/失敗 → hook 判 ok → dispatch」家族
+	// 成員（§4 已完成並通過審查）。本測試特意透過 hook 自己的 generateRound／startTimer
+	// 方法（而非直接呼叫 round.ts 純函式後手動 writeRound）產生已開始計時的回合，
+	// 目的是連帶驗證「開始計時後真的經由既有 write effect 持久化」——若只用純函式組出
+	// 持久化資料再單獨 mount 一次（如上方「重新掛載後還原目前回合與歷史」的做法），
+	// 測不出 write effect 是否真的隨 startTimer 的 dispatch 一起觸發。
+	// 比對基準用 structuredClone 快照而非活參考：round 物件在 dispatch 後會被整份取代，
+	// 若改用活參考，重新掛載後的新物件與快照物件即使內容不同也可能因為某些欄位共用
+	// 参考而誤判相等，快照能確保比對的是「當下內容」而非「當下參考」。
+	it("重新掛載後仍保留已開始計時的 timer，startedAt 不被重置", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result, unmount } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		expect(result.current.round?.timer?.durationMinutes).toBe(10);
+		expect(result.current.round?.timer?.startedAt).toBeNull();
+
+		let startResult: StartTimerResult | undefined;
+		act(() => {
+			startResult = result.current.startTimer();
+		});
+		expect(startResult?.ok).toBe(true);
+		if (!startResult?.ok) {
+			throw new Error("測試前置失敗：startTimer 未成功");
+		}
+		expect(startResult.round.timer?.startedAt).not.toBeNull();
+
+		const timerBeforeRemount = structuredClone(result.current.round?.timer);
+		unmount();
+
+		// WHEN：重新掛載 useRoundStore（模擬重新整理頁面）。
+		const { result: remounted } = renderHook(() =>
+			useRoundStore({ players, updatePlayer: () => {} }),
+		);
+
+		// THEN：還原後的 timer 與掛載前完全相同，startedAt 不被重置。
+		expect(remounted.current.round?.timer).toEqual(timerBeforeRemount);
 	});
 
 	it("送出比分後 history 確實持久化到 localStorage（殺 write effect 依賴陣列改 [] 或整個 effect 被刪除的變異）", () => {
