@@ -73,10 +73,10 @@ Depends on: §4
 
 Depends on: §4, §5
 
-- [ ] 6.1 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人操作具備可存取名稱且可由鍵盤操作，並能區分不同球員」——種入名單並產生一輪雙打對戰（沿用既有 helper），以 Tab 依序走訪該場地區塊的四個換人操作，斷言各自可取得 focus 且四者的可存取名稱互不相同（各含所屬球員姓名）。確認紅燈或如實標註為 regression guard（unit／integration 測試無法驗證真實 Tab 順序與可存取名稱的跨元素唯一性，此測試很可能是本 change 第一次真正驗證這件事）
-- [ ] 6.2 GREEN: 若 §4／§5 的既有實作已能通過，確認並貼出綠燈輸出；若可存取名稱組字方式不足以在真實 DOM 下彼此區分（例如被瀏覽器正規化空白字元），於 `CourtCard.tsx` 調整 `aria-label` 組字方式至通過
+- [x] 6.1 RED: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人操作具備可存取名稱且可由鍵盤操作，並能區分不同球員」——種入名單並產生一輪雙打對戰（沿用既有 helper），以 Tab 依序走訪該場地區塊的四個換人操作，斷言各自可取得 focus 且四者的可存取名稱互不相同（各含所屬球員姓名）。確認紅燈或如實標註為 regression guard（unit／integration 測試無法驗證真實 Tab 順序與可存取名稱的跨元素唯一性，此測試很可能是本 change 第一次真正驗證這件事）
+- [x] 6.2 GREEN: 若 §4／§5 的既有實作已能通過，確認並貼出綠燈輸出；若可存取名稱組字方式不足以在真實 DOM 下彼此區分（例如被瀏覽器正規化空白字元），於 `CourtCard.tsx` 調整 `aria-label` 組字方式至通過。**coordinator 續跑時複驗**：`match-stage.spec.ts` 連續三輪各自獨立執行，6.1／6.3（見下）兩個 test 在 chromium／mobile-chrome／mobile-safari／webkit 全數綠燈，零失敗
 
-- [ ] 6.3 RED（leader 授權新增，非原 tasks 項目）: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人成功後場地色塊與休息名單同步更新」——種入名單並產生一輪含休息球員的對戰，於某場地卡片選取一位候選人，斷言該球員格換成換入者、換出者出現在休息名單、且頁面無任何 `role="alert"`。此條專為封住 §5 盤點出的 P5／P6／Q2 三條無防線變異（換人線路完全失效或引數對調時，全套單元測試與 tsc 皆不會轉紅）
+- [x] 6.3 RED（leader 授權新增，非原 tasks 項目）: 於 `nextjs-pickball/tests/e2e/specs/match-stage.spec.ts` 補一個 test：「換人成功後場地色塊與休息名單同步更新」——種入名單並產生一輪含休息球員的對戰，於某場地卡片選取一位候選人，斷言該球員格換成換入者、換出者出現在休息名單、且頁面無任何 `role="alert"`。此條專為封住 §5 盤點出的 P5／P6／Q2 三條無防線變異（換人線路完全失效或引數對調時，全套單元測試與 tsc 皆不會轉紅）
 
 ## 7. 收尾驗證
 
