@@ -76,8 +76,11 @@ MUST 與目標分數選擇器共用同一個判定——`nextjs-pickball/lib/mat
 
 對戰頁 SHALL 提供「開始計時」操作入口與倒數顯示，實作為新元件
 `nextjs-pickball/components/matchmaker/RoundTimerBanner.tsx`，由
-`nextjs-pickball/app/matchmaker/page.tsx` 掛載（僅在目前回合存在時掛載，並傳入
-`round.timer`）。
+`nextjs-pickball/app/matchmaker/page.tsx` 掛載並傳入 `round?.timer ?? null`。
+掛載 SHALL NOT 外包一層「目前回合是否存在」的條件式——該元件自行處理 `timer` 為 `null`
+（不計時）與 `startedAt` 為 `null`（尚未開始）兩種早退並回傳 `null`，畫面結果相同；
+而外包條件式會在回合有無之間製造 unmount／remount，把「同一次到期只播一次」所倚賴的
+`useRef` 旗標清掉。
 
 「開始計時」按鈕 MUST 位於 `RoundControls.tsx` 的計時設定區塊，**僅在**本輪已設定計時長度
 （`timer !== null`）且尚未開始（`timer.startedAt === null`）時才顯示且可點擊，點擊 MUST
