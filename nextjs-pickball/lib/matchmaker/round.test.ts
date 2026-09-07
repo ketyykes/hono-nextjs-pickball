@@ -869,6 +869,9 @@ describe("setTimerDuration", () => {
 		if (!changed.ok) return;
 		// 即使變更前已開始計時（startedAt 非 null），變更後仍重置為 null（design Decision 3）。
 		expect(changed.round.timer).toEqual({ durationMinutes: 20, startedAt: null });
+		// 「其餘欄位不變」：把 timer 改回原值後應與原回合完全相等，寫法與理由同 setTargetScore
+		// 的同款斷言——逐欄只證明「列出來的那幾個欄位沒變」，也擋不住漏寫 ...round 的實作。
+		expect({ ...changed.round, timer: pendingRound.timer }).toEqual(pendingRound);
 		expect(pendingRound).toEqual(pendingRoundSnapshot);
 
 		// scoring 與 completed 都算「已離開 pending」，兩者分別驗證：只測其中一個時，
@@ -906,6 +909,9 @@ describe("startTimer", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: "2026-09-03T01:00:00.000Z" });
+		// 「其餘欄位不變」：把 timer 改回原值後應與原回合完全相等，寫法與理由同 setTargetScore
+		// 的同款斷言——逐欄只證明「列出來的那幾個欄位沒變」，也擋不住漏寫 ...round 的實作。
+		expect({ ...result.round, timer: roundSnapshot.timer }).toEqual(roundSnapshot);
 		// 純函式：原回合 SHALL NOT 被就地修改，回傳的必須是新物件。
 		expect(round).toEqual(roundSnapshot);
 	});
@@ -1316,11 +1322,16 @@ describe("resetIncompleteMatches", () => {
 			],
 		});
 
+		// 比對基準取快照而非 round.timer 本身：後者與回傳值可能是同一個物件參考，
+		// 實作若改成「就地把 startedAt 清成 null」，兩邊會一起被改而讓斷言恆真。
+		const roundSnapshot = structuredClone(round);
+
 		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.round.timer).toEqual(round.timer);
+		expect(result.round.timer).toEqual(roundSnapshot.timer);
+		expect(round).toEqual(roundSnapshot);
 	});
 });
 
