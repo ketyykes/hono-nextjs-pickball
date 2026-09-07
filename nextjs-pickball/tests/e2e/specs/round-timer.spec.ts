@@ -11,6 +11,23 @@ import type { Locator, Page } from "@playwright/test";
 // 常數、trackConsoleIssues／buildTestPlayer／seedRoster 的形態沿用 match-stage.spec.ts
 // 的既有慣例，並依 tasks 12.1 於本檔內建立同構的區域函式，不跨檔 import helper。
 //
+// ── page.clock 的語意實測結論（本 repo 第一次使用這個 API，design Risks 要求 apply
+//    階段實測確認；以下數字是 chromium 上實跑觀察到的，不是照文件推測）──
+//   ① install() 後假時鐘會隨真實時間自走：Node 端真的等 2 秒後，頁面的 Date.now() 前進
+//      2001ms，畫面倒數同步由 10:00 走到 09:58——即 setInterval 在假時鐘下照常每秒觸發。
+//   ② runFor(1000) 逐一觸發中間回呼，畫面恰好走一秒（09:58 → 09:57）。
+//   ③ pauseAt() 之後時鐘凍結：真實再等 2 秒，畫面停在 09:01 不動。
+//   ④ 承 ③ 的凍結狀態下單獨呼叫 fastForward(30s)，畫面前進到 08:31——排除「碰巧被真實
+//      時間推動」之後，仍會前進，證明 fastForward 本身確實觸發了 setInterval 回呼並讓
+//      React 重新 render。本檔因此用 fastForward 而非 runFor：兩者都能驅動，但到期判定
+//      是由 startedAt 與當下時間現算（useRoundTimer 不做累加式計數），只需要「到期後至少
+//      觸發一次回呼」，fastForward 一次跳完 10 分鐘遠比 runFor 逐一觸發 600 次便宜。
+//   ⑤ 對照組：凍結狀態下改用 setSystemTime() 把時間直接設到到期之後（該 API 只改時間、
+//      不觸發任何 timer），畫面停在 09:01、「時間到」節點數為 0。這條反證了畫面是被
+//      timer 回呼推動的，而不是「Date 變了就會自己更新」。
+
+
+//
 // 為避免 localStorage 跨測試污染，beforeEach 只清除本 capability 的三個 key，
 // 刻意不用 localStorage.clear()（會誤傷 scoreboard:current:v1）。
 
