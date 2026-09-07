@@ -33,9 +33,9 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-types.test.ts` 補兩個 it：「計時長度僅接受 10、15、20 分鐘」、「回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料」。跑單檔確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: 新增 `RoundTimerDurationMinutesSchema`（`z.union([z.literal(10), z.literal(15), z.literal(20)])`）、`RoundTimerObjectSchema`（`{ durationMinutes, startedAt: z.iso.datetime().nullable() }`）、`RoundTimerSchema`（`RoundTimerObjectSchema.nullable().default(null)`）、`ROUND_TIMER_DURATION_OPTIONS`（由 schema options 推導，比照 `TARGET_SCORE_OPTIONS` 寫法，SHALL NOT 另寫死 `[10, 15, 20]`）；於 `RoundSchema` 新增 `timer: RoundTimerSchema` 欄位
-- [ ] 2.3 REFACTOR: 確認具名匯出與既有 `TARGET_SCORE` 系列命名風格一致；匯出 `RoundTimer`／`RoundTimerDurationMinutes` 型別；確認註解記錄「為何以 `.nullable().default(null)` 向後相容既有 `matchmaker:round:v1` 資料且不 bump storage key」
+- [x] 2.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-types.test.ts` 補兩個 it：「計時長度僅接受 10、15、20 分鐘」、「回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料」。跑單檔確認紅燈並貼出輸出
+- [x] 2.2 GREEN: 新增 `RoundTimerDurationMinutesSchema`（`z.union([z.literal(10), z.literal(15), z.literal(20)])`）、`RoundTimerObjectSchema`（`{ durationMinutes, startedAt: z.iso.datetime().nullable() }`）、`RoundTimerSchema`（`RoundTimerObjectSchema.nullable().default(null)`）、`ROUND_TIMER_DURATION_OPTIONS`（由 schema options 推導，比照 `TARGET_SCORE_OPTIONS` 寫法，SHALL NOT 另寫死 `[10, 15, 20]`）；於 `RoundSchema` 新增 `timer: RoundTimerSchema` 欄位
+- [x] 2.3 REFACTOR: 確認具名匯出與既有 `TARGET_SCORE` 系列命名風格一致；匯出 `RoundTimer`／`RoundTimerDurationMinutes` 型別；確認註解記錄「為何以 `.nullable().default(null)` 向後相容既有 `matchmaker:round:v1` 資料且不 bump storage key」（GREEN 階段已同步做到，無壞味道，refactor 無實質變更，skipped）
 
 ## 3. 每輪設定的計時預設值（round-settings.ts）
 
