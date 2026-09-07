@@ -16,7 +16,15 @@ import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "
 import type { MatchHistoryEntry } from "./history";
 import type { RatingChange, RatingPlayerInput, RatingUpdateResult } from "./rating-types";
 import type { Player } from "./types";
-import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
+import type {
+	PlayerRating,
+	Round,
+	RoundMatch,
+	RoundTargetScore,
+	RoundTeam,
+	RoundTimerDurationMinutes,
+	SeenSignatures,
+} from "./round-types";
 
 /**
  * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
@@ -59,6 +67,11 @@ export interface CreateRoundInput {
 	 * RoundSchema 刻意不帶 .default()，否則一份 targetScore 損壞的回合資料會被靜默補成 11
 	 * 而不是被判為損壞（design Decision 4）。 */
 	readonly targetScore?: RoundTargetScore;
+	/** 本輪的計時長度，省略或為 null 時採不計時（design Decision 1：計時比照目標分數的
+	 * 每輪設定模式）。與 targetScore 不同，這裡刻意允許顯式傳入 null——「不計時」是
+	 * RoundTimerDurationMinutes 值域外的合法選項，不能用「省略」與「顯式選擇不計時」
+	 * 共用同一種表達。 */
+	readonly timerDurationMinutes?: RoundTimerDurationMinutes | null;
 }
 
 /** 休息次數結算 patch，形狀可直接餵給 roster.ts 的 updatePlayer(id, { restCount })。 */
@@ -251,7 +264,16 @@ function computeRestSettlements(players: readonly Player[], previousRound: Round
  * 只負責一次算出兩者，不負責套用。
  */
 export function createRound(input: CreateRoundInput): CreateRoundResult {
-	const { players, format, courtCount, previousRound, now, newMatchId, targetScore = DEFAULT_TARGET_SCORE } = input;
+	const {
+		players,
+		format,
+		courtCount,
+		previousRound,
+		now,
+		newMatchId,
+		targetScore = DEFAULT_TARGET_SCORE,
+		timerDurationMinutes = null,
+	} = input;
 
 	// 邊界檢查集中於此一處（tasks 4.10）：allocateRound 對名單相關的邊界不拋錯而是自然
 	// 回傳空 matches（M2 的既有行為，見 allocation.ts 頂端註解），本函式是唯一呼叫端，
@@ -303,9 +325,9 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
 		seenSignatures: toArrays(ownSignatures),
-		// 目前一律不計時。這一行只是讓 Round 的必填 timer 欄位有值，尚未讀取任何設定——
-		// 「依本輪設定決定計時長度」的邏輯屬後續 task，屆時會把本行換成依輸入決定的表達式。
-		timer: null,
+		// 產生本輪一律給全新的 timer（design Decision 4）：即使沿用與上一輪相同的
+		// durationMinutes，startedAt 仍固定為 null，不沿用上一輪 timer 物件的倒數狀態。
+		timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null },
 	};
 
 	return {
