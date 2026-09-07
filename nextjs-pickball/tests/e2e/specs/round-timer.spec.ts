@@ -25,8 +25,6 @@ import type { Locator, Page } from "@playwright/test";
 //   ⑤ 對照組：凍結狀態下改用 setSystemTime() 把時間直接設到到期之後（該 API 只改時間、
 //      不觸發任何 timer），畫面停在 09:01、「時間到」節點數為 0。這條反證了畫面是被
 //      timer 回呼推動的，而不是「Date 變了就會自己更新」。
-
-
 //
 // 為避免 localStorage 跨測試污染，beforeEach 只清除本 capability 的三個 key，
 // 刻意不用 localStorage.clear()（會誤傷 scoreboard:current:v1）。
