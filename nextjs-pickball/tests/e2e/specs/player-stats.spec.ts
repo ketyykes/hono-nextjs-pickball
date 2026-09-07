@@ -97,6 +97,12 @@ function buildRound(matchId: string, teamAId: string, teamBId: string) {
 		],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+		// M14 為 Round 新增 timer 欄位（null 代表不計時）。種子資料 MUST 與目前 schema
+		// 序列化後的形狀一致——「瀏覽統計頁不改動任何持久化資料」是逐位元組比對，
+		// 少了這個欄位，hydrate 時 zod 的 .default(null) 會補上它、write effect 隨即
+		// 把正規化後的形狀寫回，該測試就會在「回寫內容與種入內容不同」上轉紅
+		// （那條測試的註解已預告過這個情境）。
+		timer: null,
 	};
 }
 

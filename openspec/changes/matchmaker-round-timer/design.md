@@ -316,6 +316,19 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
      `SWAP_PLAYER_NO_CANDIDATE_LABEL`），與本 change 要新增的
      `ROUND_TIMER_LOCKED_REASON`／`ROUND_TIMER_EXPIRED_MESSAGE` 無命名衝突。
 
+   **【§13 收尾驗證的補充，2026-09-08】這條漣漪的第二波：`tsc` 抓不到 E2E 的種子 fixture。**
+   apply 當時我（leader）以 `grep -rn "seenSignatures:"` 掃出所有 `Round` 字面量，
+   其中 `tests/e2e/specs/player-stats.spec.ts` 也在命中清單內，但我判斷它「多半是
+   `addInitScript` 內的純物件、沒有型別標註」而未處理——**這個判斷是對的，處置卻是錯的**：
+   正因為沒有型別標註，`tsc --noEmit` 一路綠燈，8 個單元測試 fixture 的編譯錯誤全被抓到，
+   唯獨這一個沒有任何靜態訊號。它一直潛伏到 §13 實跑**完整 E2E** 才現形：
+   該檔既有的「瀏覽統計頁不改動任何持久化資料」是逐位元組比對，種子停留在 M14 前的形狀，
+   hydrate 時 `.default(null)` 補上 `timer`、write effect 把正規化後的形狀寫回，
+   於是五個 browser project 全數轉紅。
+   **教訓**：schema 新增必填輸出欄位時，「靠 `tsc` 找出所有 fixture」是不完整的策略——
+   未標註型別的持久化種子資料（E2E、手寫 JSON、測試用的 `addInitScript`）不在 `tsc` 的
+   守備範圍內，MUST 另外用「哪些測試會把該 schema 的資料種進 localStorage」這個角度掃一遍。
+
    **唯一與文件不符之處（tasks.md 的事實誤記，不影響設計）**：`tasks.md` 的 10.1 與 13.12①
    寫「既有 4 個 it 的斷言與名稱不變」，實測 `RoundControls.test.tsx` 目前有 **14 個既有
    `it`**（design Decision 8 的 Alternatives 段落寫的「14 個既有 it」才是正確數字）。
