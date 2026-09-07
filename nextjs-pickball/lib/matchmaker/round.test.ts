@@ -745,6 +745,46 @@ describe("createRound", () => {
 			}
 		}
 	});
+
+	it("產生本輪時依設定決定計時長度，未指定時 timer 為 null", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+		const withDuration = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: 15,
+		});
+		const omitted = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		const explicitNull = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: null,
+		});
+
+		expect(withDuration.ok).toBe(true);
+		expect(omitted.ok).toBe(true);
+		expect(explicitNull.ok).toBe(true);
+		if (!withDuration.ok || !omitted.ok || !explicitNull.ok) return;
+
+		expect(withDuration.round.timer).toEqual({ durationMinutes: 15, startedAt: null });
+		expect(omitted.round.timer).toBeNull();
+		expect(explicitNull.round.timer).toBeNull();
+	});
 });
 
 describe("setTargetScore", () => {
