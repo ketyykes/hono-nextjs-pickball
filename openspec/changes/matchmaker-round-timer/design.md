@@ -333,3 +333,38 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    播放），理論上應與瀏覽器引擎無關，但仍需 apply 階段五個 browser project 全數
    實跑後才能確認；若某個 project 不穩，處理方式比照 execution-plan 的既有升級條件
    （SHALL NOT 靜默 `test.skip`，須記明原因與改用的驗證方式）。
+
+4. **【apply 新增，2026-09-07】`Round.timer` 為必填輸出欄位造成的全 repo fixture 漣漪**：
+   propose 階段未預見——zod 的 `.default(null)` 只讓**輸入**端可省略該鍵，**輸出**型別
+   （`z.infer` = `z.output`）中 `timer` 仍是**必填**。因此 `RoundSchema` 一加上 `timer`
+   欄位，所有以 `const x: Round = { ... }`／`function buildRound(...): Round` 形式建構的
+   既有 fixture 都會出現 TS2739，涉及約十個檔案（`round.test.ts`／`round-storage.test.ts`／
+   `scoreboard-binding.test.ts`／`export-scene.test.ts`／`transfer-storage.test.ts`／
+   `backup.test.ts`／`CourtCard.test.tsx`／`RoundControls.test.tsx` 等）。
+
+   本批**不用 linked worktree**（見 environment.md），而 `.claude/hooks/stop-typecheck.sh`
+   對**主 worktree** 的 tsc 錯誤是 **exit 2 擋下 session**（只有 linked worktree 才是
+   「提示不擋」）。因此不能讓 tsc 紅燈跨越群組邊界。
+
+   **處置（2026-09-07）**：§2 的 Implementer 依其派工單的檔案邊界，正確地**拒絕**了
+   跨檔修補（其派工單明文限定只可改 `round-types.ts`／`round-types.test.ts`，且要求
+   遇到超範圍情況回報而非自行擴大）——這個判斷是對的，記錄於此以免日後被誤讀為漏做。
+   跨群組的型別修補因此改由 **leader 自己執行**，作為獨立於任何 § 群組的
+   「群組間過渡態修補」，單獨一個 commit：
+   ① 對 8 個既有 `Round` 字面量 fixture 機械式補 `timer: null`
+   （`CourtCard.test.tsx`／`RoundControls.test.tsx`／`backup.test.ts`／`export-scene.test.ts`／
+   `round-storage.test.ts`／`round.test.ts`／`scoreboard-binding.test.ts`／
+   `transfer-storage.test.ts`；**只補欄位**，零 `it` 名稱與斷言變更）；
+   ② 於 `round.ts` 的 `createRound()` 回傳物件補**一行** `timer: null,` 作為維持型別正確的
+   最小值，註解註明「計時長度的實際決定邏輯屬後續 task」。
+   §4.2 屆時把這一行替換為
+   `timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null }`，
+   §4.1 的 RED 仍為真紅燈（`timerDurationMinutes: 15` 的那條斷言在此最小值下必然失敗）。
+   §4 的 Implementer 與 Stage 1 reviewer MUST 知悉這一行的存在與來歷，**不應**把它判為
+   「§4 已被別人先做掉」或 scope creep。
+
+   附帶記錄（§2 的 mutation 自查結論，供 Final Review 參考）：
+   `ROUND_TIMER_DURATION_OPTIONS` 改寫死 `[10, 15, 20]` 這個 mutation **存活**，
+   與既有 `TARGET_SCORE_OPTIONS` 同款的結構性限制——值相同時任何值層級的斷言都測不出
+   「由 schema 推導」與「寫死」的差別。已誠實記錄，未以偽造斷言掩蓋；此點由
+   Code-Quality／Final Review 以人工閱讀把關。

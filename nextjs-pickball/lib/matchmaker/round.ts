@@ -303,6 +303,9 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
 		seenSignatures: toArrays(ownSignatures),
+		// 目前一律不計時。這一行只是讓 Round 的必填 timer 欄位有值，尚未讀取任何設定——
+		// 「依本輪設定決定計時長度」的邏輯屬後續 task，屆時會把本行換成依輸入決定的表達式。
+		timer: null,
 	};
 
 	return {
