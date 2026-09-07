@@ -477,6 +477,8 @@ describe("RoundControls", () => {
 		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
 		expect(checked).toHaveLength(1);
 		expect(checked[0].textContent).toBe("不計時");
+		// roving tabindex（WAI-ARIA APG radio group）：只有選中項可被 Tab 聚焦，其餘為 -1。
+		expect(radios.map((radio) => radio.getAttribute("tabindex"))).toEqual(["0", "-1", "-1", "-1"]);
 		// 尚無目前回合時不應顯示鎖定說明——避免鎖定文字被寫死成恆顯示。
 		expect(screen.queryByText(ROUND_TIMER_LOCKED_REASON)).toBeNull();
 	});
@@ -567,5 +569,104 @@ describe("RoundControls", () => {
 		expect(startTimer).toHaveBeenCalledWith();
 		// 「開始計時」是獨立入口，SHALL NOT 順手改動計時長度。
 		expect(setTimerDuration).not.toHaveBeenCalled();
+	});
+
+	// §10.5 mutation 補洞（不對應 spec 驗收錨點，為 regression guard、加入即綠）：
+	// 上述五條 spec 測試都沒有點過計時選項，因此「回合存在時仍走 onSettingsChange」與
+	// 「尚無回合時改走 setTimerDuration」兩種接線反轉都測不出來。比照既有的
+	// 「onSettingsChange 契約」與「回合存在但尚未開始計分時……委派 setTargetScore」兩條
+	// 對目標分數的覆蓋方式，替計時補上同一組斷言。
+	it("計時變更契約：尚無回合時以完整設定物件回呼 onSettingsChange，回合存在時委派 setTimerDuration", async () => {
+		const user = userEvent.setup();
+		const settings = buildSettings({ format: "doubles", courtCount: 3, targetScore: 15 });
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		const withoutRound = render(
+			<RoundControls
+				{...buildProps({ round: null, settings, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+		await user.click(
+			within(withoutRound.getByRole("radiogroup", { name: "計時" })).getByRole("radio", {
+				name: "15 分鐘",
+			}),
+		);
+		expect(onSettingsChange).toHaveBeenCalledTimes(1);
+		expect(onSettingsChange).toHaveBeenCalledWith({
+			format: "doubles",
+			courtCount: 3,
+			targetScore: 15,
+			timerDurationMinutes: 15,
+		});
+		expect(setTimerDuration).not.toHaveBeenCalled();
+		withoutRound.unmount();
+
+		// 回合存在且尚未開始計分：變更 MUST 委派 round-lifecycle 的 setTimerDuration，
+		// SHALL NOT 走 onSettingsChange（那是給「尚無回合」情境的預備設定用的）。
+		// 起始長度 10、點選 20，兩個值不同才能證明傳進去的是被點的那一個。
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const onSettingsChangeWithRound = vi.fn();
+		const setTimerDurationWithRound = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({
+					round,
+					matchSlots: {},
+					onSettingsChange: onSettingsChangeWithRound,
+					setTimerDuration: setTimerDurationWithRound,
+				})}
+			/>,
+		);
+		await user.click(
+			within(screen.getByRole("radiogroup", { name: "計時" })).getByRole("radio", {
+				name: "20 分鐘",
+			}),
+		);
+		expect(setTimerDurationWithRound).toHaveBeenCalledTimes(1);
+		expect(setTimerDurationWithRound).toHaveBeenCalledWith(20);
+		expect(onSettingsChangeWithRound).not.toHaveBeenCalled();
+	});
+
+	// §10.5 mutation 補洞（regression guard）：比照目標分數既有的同款測試——鎖定時四顆
+	// radio 皆 disabled，真實鍵盤路徑進不了容器，handleTimerKeyDown 內的 if (locked) return;
+	// 只能用 fireEvent 直接對容器派發事件才命中得到。
+	it("計時鎖定時方向鍵不得呼叫 setTimerDuration 或 onSettingsChange，也不改變選取（覆蓋 if (locked) return; 防線）", () => {
+		const round = buildRound({ timer: { durationMinutes: 10, startedAt: null } });
+		const matchSlots: MatchSlots = { "match-1": buildSlot({ status: "playing" }) };
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({ round, matchSlots, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		fireEvent.keyDown(timerGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).not.toHaveBeenCalled();
+		expect(setTimerDuration).not.toHaveBeenCalled();
+		const checked = within(timerGroup)
+			.getAllByRole("radio")
+			.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("10 分鐘");
+	});
+
+	// 對照組（regression guard）：未鎖定時方向鍵應正常運作，證明上一條測到的是「鎖定」
+	// 這個條件本身，而不是 fireEvent.keyDown 這個手法本來就測不出東西。
+	it("計時未鎖定時方向鍵呼叫 onSettingsChange 並移動到下一個選項", () => {
+		const settings = buildSettings({ timerDurationMinutes: null });
+		const onSettingsChange = vi.fn();
+		render(<RoundControls {...buildProps({ round: null, settings, onSettingsChange })} />);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		fireEvent.keyDown(timerGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).toHaveBeenCalledTimes(1);
+		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, timerDurationMinutes: 10 });
 	});
 });
