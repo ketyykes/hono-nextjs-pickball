@@ -112,6 +112,42 @@ describe("RoundTimerBanner", () => {
 		expect(secondPlayChime).not.toHaveBeenCalled();
 	});
 
+	// regression guard（非 spec 錨點）：去重旗標記錄的是「已為哪個 startedAt 播放過」而非
+	// 單純的 boolean，語意是「這一次計時器的這一次到期有沒有播過」——同一輪重新開始計時
+	// （新的 startedAt）後再次到期時仍應播放一次。把旗標換成永不重置的 boolean 會讓第二次
+	// 到期被永久靜音，且上方任何一個測試都抓不到（審查時實測該變異存活），故補本測試守住。
+	it("換成新的計時器後再次到期時會再播放一次", () => {
+		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
+		const first: RoundTimer = {
+			durationMinutes: 10,
+			startedAt: "2026-09-07T00:00:00.000Z",
+		};
+		const playChime = vi.fn();
+
+		const { rerender } = render(
+			<RoundTimerBanner timer={first} playChime={playChime} />,
+		);
+
+		act(() => {
+			vi.advanceTimersByTime(10 * 60 * 1000);
+		});
+
+		expect(playChime).toHaveBeenCalledTimes(1);
+
+		// 同一個元件實例（未 unmount，useRef 不會重置）收到重新開始計時後的新 startedAt。
+		const second: RoundTimer = {
+			durationMinutes: 10,
+			startedAt: "2026-09-07T00:10:00.000Z",
+		};
+		rerender(<RoundTimerBanner timer={second} playChime={playChime} />);
+
+		act(() => {
+			vi.advanceTimersByTime(10 * 60 * 1000);
+		});
+
+		expect(playChime).toHaveBeenCalledTimes(2);
+	});
+
 	it("timer 為 null 時不渲染任何內容", () => {
 		const { container } = render(<RoundTimerBanner timer={null} />);
 

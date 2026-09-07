@@ -13,11 +13,17 @@ export interface RoundTimerBannerProps {
 	timer: RoundTimer;
 	/**
 	 * 時間到提示音的注入點；省略時使用 playTimerExpiredChime（design Decision 6）。
-	 * 命名與型別形狀比照 M9 ExportActions 的 `printer?` 先例：可選注入 prop，
-	 * 預設值直接寫在解構參數上，而非 `playChime ?? playTimerExpiredChime` 這種
-	 * 呼叫端才決議的寫法——因為本 prop 需要進 useEffect 依賴陣列，解構預設值
-	 * 在每次 render 都拿到同一個具名函式參考（模組層級函式，非重新建立的箭頭函式），
-	 * 依賴陣列才不會誤判成「變了」而重複觸發播放。
+	 *
+	 * 「可選注入 prop」這個角色比照 M9 ExportActions 的 `printer?` 先例，但型別刻意收窄為
+	 * `() => void` 而非該處的 `unknown`：`printer` 用 `unknown` 是為了讓「呼叫端傳入非函式值」
+	 * 這條路徑留在 requestPrint 的執行期判定裡（收窄型別會讓那條路徑變成型別錯誤而測不到），
+	 * 本 prop 沒有對應的執行期判定、只是直接呼叫並列入依賴陣列，用精確型別才是同一個先例的
+	 * 正確套用而非偏離。
+	 *
+	 * 預設值直接寫在解構參數上，而非 `playChime ?? playTimerExpiredChime` 這種呼叫端才決議
+	 * 的寫法——模組層級具名函式的參考每次 render 都相同，依賴陣列才不會每次都誤判成「變了」。
+	 * 注意這只是避免 effect 白跑：真正擋住重複播放的是下方的 useRef 旗標，不是這裡的參考
+	 * 穩定性（實測把預設值換成箭頭函式包裝，播放次數不變）。
 	 */
 	playChime?: () => void;
 }
