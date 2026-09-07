@@ -85,8 +85,8 @@ Depends on: §5
 
 Depends on: §7
 
-- [ ] 8.1 RED（既有測試因 §7 新增檔案而轉紅，非新寫測試）: 執行 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認既有 it「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `hooks/useRoundTimer.ts` 已存在但規格清單尚未更新而**真的轉紅**，貼出輸出
-- [ ] 8.2 GREEN: 於 `openspec/specs/pickleball-guide-page/spec.md` 的歸屬清單加入 `useRoundTimer` → `round-lifecycle` 一行（比照本 change `specs/pickleball-guide-page/spec.md` 已寫好的 MODIFIED 內容原樣套用）；重跑 `hooksInventory.test.ts` 確認兩條既有 it 皆轉綠
+- [x] 8.1 RED（既有測試因 §7 新增檔案而轉紅，非新寫測試）: 執行 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認既有 it「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `hooks/useRoundTimer.ts` 已存在但規格清單尚未更新而**真的轉紅**，貼出輸出
+- [x] 8.2 GREEN: 於 `openspec/specs/pickleball-guide-page/spec.md` 的歸屬清單加入 `useRoundTimer` → `round-lifecycle` 一行（比照本 change `specs/pickleball-guide-page/spec.md` 已寫好的 MODIFIED 內容原樣套用）；重跑 `hooksInventory.test.ts` 確認兩條既有 it 皆轉綠
 
 ## 9. useRoundStore 接線（setTimerDuration／startTimer）
 
