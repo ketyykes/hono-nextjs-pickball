@@ -382,6 +382,49 @@ export function setTargetScore(round: Round, targetScore: RoundTargetScore): Set
 	return { ok: true, round: { ...round, targetScore } };
 }
 
+// ---- 計時設定：每輪設定，開始計分後鎖定（design Decision 1，鎖定條件比照 setTargetScore） ----
+
+/**
+ * setTimerDuration 的失敗代碼。與 SET_TARGET_SCORE_FAILURE_CODE 分開宣告的理由相同：
+ * 兩者是各自獨立的結果型別的 code 來源，混用會讓呼叫端的分支處理多出不存在的分支。
+ */
+export const SET_TIMER_DURATION_FAILURE_CODE = {
+	SCORING_STARTED: "scoring-started",
+} as const;
+
+export type SetTimerDurationFailureCode = (typeof SET_TIMER_DURATION_FAILURE_CODE)[keyof typeof SET_TIMER_DURATION_FAILURE_CODE];
+
+const TIMER_SCORING_STARTED_MESSAGE = "本輪已有場次開始計分，計時設定不可再更改；如需改用其他計時長度，請於產生新一輪時設定。";
+
+export interface SetTimerDurationSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface SetTimerDurationFailure {
+	readonly ok: false;
+	readonly code: SetTimerDurationFailureCode;
+	readonly message: string;
+}
+
+export type SetTimerDurationResult = SetTimerDurationSuccess | SetTimerDurationFailure;
+
+/**
+ * 更改該輪的計時長度：鎖定條件與 setTargetScore 完全相同（該輪所有場次仍為 pending 時才
+ * 允許），否則回傳失敗結果且原回合 SHALL NOT 被修改（純函式，回傳新回合由呼叫端套用）。
+ *
+ * 成功時一律回傳全新的 timer 物件、startedAt 重置為 null（design Decision 3）：變更計時
+ * 長度代表使用者想要一段新的倒數，沿用舊的 startedAt 會讓剩餘時間依新長度立即重新計算，
+ * 等同在使用者不知情的情況下悄悄跳秒。
+ */
+export function setTimerDuration(round: Round, durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+	if (round.matches.some((match) => match.status !== "pending")) {
+		return { ok: false, code: SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED, message: TIMER_SCORING_STARTED_MESSAGE };
+	}
+
+	return { ok: true, round: { ...round, timer: { durationMinutes, startedAt: null } } };
+}
+
 // ---- 重設與重排未完成場次（prd.md 6.2、design Decision 5） ----
 
 /**
