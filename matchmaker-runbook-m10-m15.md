@@ -15,19 +15,19 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-07，M13 已合併）
+## 狀態快照（最後更新 2026-09-08，M14 因電腦當機中斷於 §13 收尾驗證）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e6a4713`（feat：合併 M13 matchmaker-player-swap） |
+| `main` HEAD | `e6a4713`（feat：合併 M13 matchmaker-player-swap，M14 尚未合併） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
 | M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
-| M14 | 未開始 |
+| M14 | **中斷、未合併**——`change/matchmaker-round-timer` 分支上，§1～§13 的邏輯與程式碼已全部完成（65 個 commit），**但 §13.8 全套 E2E 五個 browser project 尚未拿到一次乾淨的全綠結果**，電腦當機中斷驗證，詳見下方「M14 中斷紀錄」。**下一個 session 必須先重跑 §13.8 全套 E2E 才能合併，不得憑當機前的部分結果直接判定通過** |
 | M15 | 未開始（需等 M14 合併） |
-| 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `main`，工作樹乾淨 |
+| 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `change/matchmaker-round-timer`，工作樹乾淨（tasks.md 進度已 commit） |
 
 ### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
@@ -180,6 +180,44 @@ E2E        609 passed / 21 skipped / 0 failed，--workers=1，15.9 分鐘（skip
            見教訓 #20
 相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
 ```
+
+### M14 中斷紀錄（2026-09-08，電腦當機，尚未合併）
+
+**分支 `change/matchmaker-round-timer`，65 個 commit，§1～§13 邏輯與程式碼皆已完成，但驗證未收尾就當機。**
+下一個 session 接手時**不要重新開分支、也不要重跑 §1～§12**——直接 `git switch change/matchmaker-round-timer`
+確認 `git status --porcelain` 乾淨、`git log main..HEAD --oneline | wc -l` 應為 65，即可從 §13.8 續驗。
+
+- **§1～§12**：opus leader 依 execution-plan 逐組派工完成，含兩處依 escalation 條款升級 opus 的組
+  （§10 `RoundControls` 計時 UI、§12 `page.clock`／`AudioContext` stub）。過程中 Stage 2 mutation 審查
+  多次抓到存活變異並修正（詳見 leader 逐輪報告，未整理進本檔——如需細節看 session transcript）。
+- **§13 收尾驗證，13.1～13.7 與 13.9～13.12 已完成且通過**（tasks.md 已勾選並 commit）：
+  - 37 個驗收錨點機械比對全數命中；`lib/matchmaker/`／`hooks/`／`components/matchmaker/` 分項全綠；
+    `pnpm lint` 0 error／3 warning（既有基線）；`pnpm -r exec tsc --noEmit` exit 0；
+    `pnpm test` 全套前端 73 檔 737 測試、後端 4 檔 16 測試（皆高於 M13 基線 70/694、4/16）；
+    相依與指定檔案零改動；`openspec validate --strict` valid；三份 delta spec 皆無重複標題（python 計數法）；
+    既有測試完整性核對（零個 it/test 被刪改，非 import 的刪除僅一處且為加強版 fixture）。
+  - 13.12 收錄了 §13 驗證期間才發現的一個**真迴歸**並已修正：`tests/e2e/specs/player-stats.spec.ts` 的
+    `buildRound()` 種子 fixture 缺 `timer` 欄位，導致「瀏覽統計頁不改動任何持久化資料」這條逐位元組比對的
+    E2E 在五個 browser project 全數轉紅。已補 `timer: null` 並 commit（`318c7fe`），單檔複驗 40 passed。
+    **教訓（已寫入 design.md，值得抄進本檔「教訓」節）：schema 新增必填輸出欄位時，「靠 `tsc` 找出所有
+    fixture」不完整——未標註型別的持久化種子資料（E2E `addInitScript`、手寫 JSON）不在 `tsc` 守備範圍，
+    只有實跑完整 E2E 才會現形，須另外從「哪些測試會把該 schema 資料種進 localStorage」的角度盤點。**
+- **13.8（全套 E2E 五個 browser project）——當機前未拿到一次乾淨的全綠結果，狀態不明確，MUST 重跑**：
+  1. 修正 `318c7fe` 前的完整跑（10.8 分鐘）：5 failed，全部是上述 `player-stats` 迴歸，webkit 其餘測試全綠。
+  2. 修正後的完整跑：**系統以記憶體不足（OOM）終止，無結果**。
+  3. 改成逐 project 分開跑：chromium 128 passed；firefox 121 passed + 7 skipped；
+     **webkit 115 passed + 6 個 `page.goto: Test timeout of 30000ms exceeded`**（`beforeEach` 就逾時，
+     非斷言失敗；其中一個是與本 change 無關的 `quiz.spec.ts`；且第 1 輪完整跑時這些測試是綠的）。
+     leader 當下判斷「像是環境問題（OOM 後機器仍吃緊），不是迴歸」，但**明確表示不採信這個判斷，
+     要重跑 webkit 確認**，正在重跑時電腦當機，**這個重跑結果沒有留下**。
+  - coordinator（本 session）當機前用 `ps`／`vm_stat` 側面確認過機器當時記憶體確實吃緊（23G 已用、
+    僅 175M 未用），load average 一度飆到 146（重開機後的殘影，非本 change 造成）。
+  - **下一個 session 的第一件事**：在機器負載正常（`uptime` 1 分鐘平均個位數）時，
+    用 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1` 完整跑一次五個 project，
+    只有這一次真正乾淨的全綠（或找到真失敗並修正後再全綠）才能繼續 §13 收尾與合併。
+    **不要相信當機前 webkit 那次「像是環境問題」的判斷是結論**——leader 自己也還沒信。
+- **合併前還缺**：13.8 確認全綠 → Final Code Review（leader 尚未派出，因未確認 E2E 前明確拒絕派）→
+  `--no-ff` 合併 `main` → 合併後複驗 → 刪分支 → 更新本檔狀態快照與 Pipeline 表。
 
 ## Pipeline 總覽
 
