@@ -249,22 +249,25 @@ describe("buildExportScene", () => {
 			makePlayer({ id: "p1", name: "小明" }),
 			makePlayer({ id: "p2", name: "小華" }),
 		];
-		const round = makeRound({
-			matches: [
-				makeRoundMatch({
-					status: "completed",
-					scores: { teamA: 11, teamB: 11 },
-					winner: "draw",
-					completedAt: "2026-08-16T01:00:00.000Z",
-					playerRatings: [
-						{ playerId: "p1", before: 5, after: 5 },
-						{ playerId: "p2", before: 6, after: 6 },
-					],
-				}),
-			],
-		});
+		// 平局兩隊比分必定相同（round.ts 以 scoreA === scoreB 推導 winner 為 "draw"），
+		// 故只讓呼叫端指定單一平手比分，避免 fixture 表達出實際不會產生的「平局但比分不等」。
+		const drawRound = (tiedScore: number) =>
+			makeRound({
+				matches: [
+					makeRoundMatch({
+						status: "completed",
+						scores: { teamA: tiedScore, teamB: tiedScore },
+						winner: "draw",
+						completedAt: "2026-08-16T01:00:00.000Z",
+						playerRatings: [
+							{ playerId: "p1", before: 5, after: 5 },
+							{ playerId: "p2", before: 6, after: 6 },
+						],
+					}),
+				],
+			});
 
-		const scene = buildExportScene(round, players);
+		const scene = buildExportScene(drawRound(11), players);
 
 		// 升級為完整字串（順序敏感）比對，取代逐項 toContain：能同時擋下「省略比分」
 		// 「誤加 WINNER_SUFFIX（變成『平手獲勝』）」等 mutant。全形空白為 STATUS_SEPARATOR。
@@ -272,6 +275,12 @@ describe("buildExportScene", () => {
 		// 明確驗證 spec 要求的「不含任一隊隊名」，兩隊隊名皆需驗到。
 		expect(scene.courts[0].statusText).not.toContain(TEAM_LABELS[0]);
 		expect(scene.courts[0].statusText).not.toContain(TEAM_LABELS[1]);
+
+		// 11:11 兩數相同，單靠上面的斷言分不出比分是真的取自 scores，還是把「11」乃至
+		// 整串「11 : 11　平手」寫死（Stage 2 mutation 實測兩種 mutant 皆存活）。再取一組
+		// 不同的平手比分作對照才釘得住；0:0 是計時回合時間到即結束的合法平局比分。
+		const zeroScene = buildExportScene(drawRound(0), players);
+		expect(zeroScene.courts[0].statusText).toBe("0 : 0　平手");
 	});
 
 	it("未完成場次顯示未完成狀態而非空白比分", () => {
@@ -319,19 +328,35 @@ describe("buildExportScene", () => {
 			makePlayer({ id: "p1", name: "小明" }),
 			makePlayer({ id: "p2", name: "小華" }),
 		];
-		const round = makeRound({
+		const pendingRound = makeRound({
 			matches: [
 				makeRoundMatch({
+					id: "m-pending",
 					status: "pending",
 					scores: { teamA: 11, teamB: 7 },
 					winner: "teamA",
 				}),
 			],
 		});
+		// 只驗 pending 時，把守衛放寬成 status !== "pending" 的 mutant 會存活（Stage 2 實測）：
+		// 三種 status 裡 scoring 才是「非 completed 也非 pending」的那一種，帶著比分與勝方
+		// 一起驗到，才真的釘住本測試名稱宣稱的「completed 是唯一放行條件」。
+		const scoringRound = makeRound({
+			matches: [
+				makeRoundMatch({
+					id: "m-scoring",
+					status: "scoring",
+					scores: { teamA: 11, teamB: 7 },
+					winner: "teamA",
+				}),
+			],
+		});
 
-		const scene = buildExportScene(round, players);
+		const pendingScene = buildExportScene(pendingRound, players);
+		const scoringScene = buildExportScene(scoringRound, players);
 
-		expect(scene.courts[0].statusText).toBe("未完成");
+		expect(pendingScene.courts[0].statusText).toBe("未完成");
+		expect(scoringScene.courts[0].statusText).toBe("未完成");
 	});
 
 	it("狀態為 completed 但比分或勝方缺漏時退回未完成文字而非拋錯", () => {
