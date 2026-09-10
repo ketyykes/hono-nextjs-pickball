@@ -149,7 +149,7 @@ export function updateRatings(input: RatingUpdateInput): RatingUpdateResult {
 	for (const teamIndex of [0, 1] as const) {
 		const team = teams[teamIndex];
 		const e = expectedScores[teamIndex];
-		const s = winnerIndex === teamIndex ? 1 : 0;
+		const s = winnerIndex === "draw" ? 0.5 : (winnerIndex === teamIndex ? 1 : 0);
 
 		for (const player of team) {
 			changes.push(applyDelta(player, s, e));

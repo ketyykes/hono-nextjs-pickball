@@ -48,12 +48,14 @@ export type Side = readonly RatingPlayerInput[];
  * 評分更新的單場輸入。
  * format 指定對戰方式（單打或雙打）。
  * teams 為兩支隊伍各自的選手清單，以 [隊伍 A, 隊伍 B] 的順序排列。
- * winnerIndex 表勝隊的索引：0 = 隊伍 A 勝、1 = 隊伍 B 勝，與 teams 的順序對應。
+ * winnerIndex 表本場結果：0 = 隊伍 A 勝、1 = 隊伍 B 勝，與 teams 的順序對應；
+ * "draw" 表平局，此時雙方的 S 皆為 0.5（是否允許以平局送出屬呼叫端的比分驗證職責，
+ * 本模組只負責在收到 "draw" 時正確計算）。
  */
 export interface RatingUpdateInput {
 	readonly format: MatchFormat;
 	readonly teams: readonly [Side, Side];
-	readonly winnerIndex: 0 | 1;
+	readonly winnerIndex: 0 | 1 | "draw";
 }
 
 /**
