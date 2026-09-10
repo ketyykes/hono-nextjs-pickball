@@ -150,6 +150,14 @@ describe("MatchHistoryEntrySchema", () => {
 		expect(formatCovered).toBe(true);
 	});
 
+	it("winner 欄位新增 draw 列舉值時通過驗證", () => {
+		const drawEntry = MatchHistoryEntrySchema.safeParse(makeDoublesEntry({ winner: "draw" }));
+		expect(drawEntry.success).toBe(true);
+
+		const tieEntry = MatchHistoryEntrySchema.safeParse(makeDoublesEntry({ winner: "tie" as never }));
+		expect(tieEntry.success).toBe(false);
+	});
+
 	it("單打不得帶雙打組成標示，雙打必須帶", () => {
 		// 單打帶了 doublesComposition 應失敗
 		const singlesWithComposition: Record<string, unknown> = {
