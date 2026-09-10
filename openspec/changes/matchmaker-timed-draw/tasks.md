@@ -87,9 +87,9 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 4.1 RED: 於 `nextjs-pickball/lib/matchmaker/history.test.ts` 新增 it「winner 欄位新增 draw 列舉值時通過驗證」：`MatchHistoryEntrySchema.safeParse` 對 `winner: "draw"`（其餘欄位合法）斷言 `success: true`；對 `winner: "tie"` 斷言 `success: false`。確認紅燈並貼出輸出
-- [ ] 4.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/history.ts` 的 `HistoryEntryBaseSchema.winner` 由 `z.enum(["teamA", "teamB"])` 改為 `z.enum(["teamA", "teamB", "draw"])`
-- [ ] 4.3 REFACTOR: 確認 `MatchHistoryEntry` 的衍生型別正確反映三值聯集，`tsc --noEmit` 對本檔通過；確認未動到 `AssertFormatCovered` 型別斷言（該斷言只與 `format` 有關，與 `winner` 無關）
+- [x] 4.1 RED: 於 `nextjs-pickball/lib/matchmaker/history.test.ts` 新增 it「winner 欄位新增 draw 列舉值時通過驗證」：`MatchHistoryEntrySchema.safeParse` 對 `winner: "draw"`（其餘欄位合法）斷言 `success: true`；對 `winner: "tie"` 斷言 `success: false`。確認紅燈並貼出輸出
+- [x] 4.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/history.ts` 的 `HistoryEntryBaseSchema.winner` 由 `z.enum(["teamA", "teamB"])` 改為 `z.enum(["teamA", "teamB", "draw"])`
+- [x] 4.3 REFACTOR: 確認 `MatchHistoryEntry` 的衍生型別正確反映三值聯集，`tsc --noEmit` 對本檔通過；確認未動到 `AssertFormatCovered` 型別斷言（該斷言只與 `format` 有關，與 `winner` 無關）。mutation 自測發現既有測試從未以 `winner: "teamB"` 斷言成功，補上一條 regression guard 測試釘住既有列舉值（見 commit 438d88b）
 
 ## 5. 比分驗證與送出流程（round.ts）
 
