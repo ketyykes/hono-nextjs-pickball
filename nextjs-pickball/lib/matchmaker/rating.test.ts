@@ -257,6 +257,27 @@ describe("零和的成立條件", () => {
 		expect(result.changes[1].after).toBe(4.0);
 	});
 
+	it("平局時實力不同的雙方變動方向相反，高分方下降低分方上升", () => {
+		// rating 6.00 與 4.00、gamesPlayed 皆 0：E_A ≈ 0.8227（高分方）、E_B ≈ 0.1773（低分方）。
+		// 平局的 S 對雙方皆為 0.5，但 (S - E) 恆為相反號：高分方 0.5 - E < 0 故下降，
+		// 低分方 0.5 - (1 - E) = E - 0.5 > 0 故上升，兩者互為相反數——
+		// 驗證零和的方向性保證延伸至平局，而非因 S 相同而誤以為兩者皆不變動。
+		const teams = makeSinglesTeams(6.0, 4.0);
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: "draw",
+		});
+
+		const highScorerDelta = result.changes[0].delta;
+		const lowScorerDelta = result.changes[1].delta;
+
+		expect(highScorerDelta).toBeLessThan(0);
+		expect(lowScorerDelta).toBeGreaterThan(0);
+		expect(Math.abs(highScorerDelta)).toBe(Math.abs(lowScorerDelta));
+	});
+
 	it("雙方 K_eff 相同且未觸界時總分守恆", () => {
 		const teams = makeSinglesTeams(5.0, 4.0);
 
