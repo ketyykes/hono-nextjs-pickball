@@ -130,9 +130,9 @@ Depends on: §2, §5
 
 Depends on: §4
 
-- [ ] 8.1 RED: 於 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 新增 test「平局紀錄顯示平手而非任一隊勝方」：以 helper 種入一筆 `winner: "draw"` 的 `matchmaker:history:v1` 紀錄，開啟 `/matchmaker/history` → 斷言畫面顯示「平手」文字，第一隊與第二隊皆查不到「勝」標籤。確認紅燈並貼出輸出
-- [ ] 8.2 GREEN: 於 `nextjs-pickball/components/matchmaker/HistoryRecordCard.tsx` 匯入 `DRAW_LABEL`；在既有 `isWinner={entry.winner === "teamA"}`／`isWinner={entry.winner === "teamB"}` 兩處旁新增條件渲染：`entry.winner === "draw"` 時顯示帶 `DRAW_LABEL` 文字的標籤（比照既有勝方標籤的視覺權重）
-- [ ] 8.3 REFACTOR: 確認新增的平手標籤與既有勝方標籤共用同一套樣式 class（不另立一套視覺語彙）；確認本檔沒有把「平手」寫成第二份字面量
+- [x] 8.1 RED: 於 `nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts` 新增 test「平局紀錄顯示平手而非任一隊勝方」：以 helper 種入一筆 `winner: "draw"` 的 `matchmaker:history:v1` 紀錄，開啟 `/matchmaker/history` → 斷言畫面顯示「平手」文字，第一隊與第二隊皆查不到「勝」標籤。確認紅燈並貼出輸出
+- [x] 8.2 GREEN: 於 `nextjs-pickball/components/matchmaker/HistoryRecordCard.tsx` 匯入 `DRAW_LABEL`；在既有 `isWinner={entry.winner === "teamA"}`／`isWinner={entry.winner === "teamB"}` 兩處旁新增條件渲染：`entry.winner === "draw"` 時顯示帶 `DRAW_LABEL` 文字的標籤（比照既有勝方標籤的視覺權重）
+- [x] 8.3 REFACTOR: 確認新增的平手標籤與既有勝方標籤共用同一套樣式 class（不另立一套視覺語彙）；確認本檔沒有把「平手」寫成第二份字面量
 
 ## 9. CSV 勝方欄與 JSON 匯入的回歸保護（history-csv.ts／backup.ts）
 
