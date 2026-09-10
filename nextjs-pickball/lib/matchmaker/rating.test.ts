@@ -278,6 +278,54 @@ describe("零和的成立條件", () => {
 		expect(Math.abs(highScorerDelta)).toBe(Math.abs(lowScorerDelta));
 	});
 
+	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
+	// 上一條的「兩者絕對值相等」是在四捨五入到兩位小數之後才比較，掩蓋得住 1e-17 等級的不對稱：
+	// 實測把 rating.ts 的 1 - expectedScoreA 改寫成 expectedScore(avgRatingB, avgRatingA) 後，
+	// 三條平局測試依然全綠（mutation 存活）——而 spec 明訂同場雙方 MUST 共用同一個 E
+	// （一方為 E、另一方為 1 - E）。故改以未經四捨五入的 expectedScores 直接比對完全相等，
+	// 才真正守住平局方向保證所倚賴的浮點對稱性。
+	it("平局時雙方共用同一個 E，第二隊的預測勝率恰為 1 減第一隊", () => {
+		const teams = makeSinglesTeams(6.0, 4.0);
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: "draw",
+		});
+
+		expect(result.expectedScores[1]).toBe(1 - result.expectedScores[0]);
+		// 兩者在數學上相等而在 IEEE754 下不相等，正是此斷言能辨別改寫的原因
+		expect(result.expectedScores[1]).not.toBe(expectedScore(4.0, 6.0));
+	});
+
+	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
+	// spec 的「零和的成立條件」明文把不守恆延伸至平局（雙方 K_eff 不同時總分變動同樣不必守恆，
+	// 且 SHALL NOT 為了守恆而調整），但既有測試只涵蓋勝負路徑的 K_eff 不同情境。
+	// 平局時雙方的 (S - E) 恆互為相反數，唯有 K_eff 也相同時總分才會守恆；
+	// 此處鎖住「方向仍相反、幅度因 K_eff 而不同、總分因此不守恆」不被日後的補償邏輯偷改。
+	it("平局時雙方 K_eff 不同則變動幅度不同且總分不守恆", () => {
+		const teams: readonly [Side, Side] = [
+			[makeRatingPlayer("A1", 5.0, 0)],
+			[makeRatingPlayer("B1", 4.0, 60)],
+		];
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: "draw",
+		});
+
+		// 高分方仍下降、低分方仍上升：方向保證不受 K_eff 差異影響
+		expect(result.changes[0].delta).toBe(-0.05);
+		expect(result.changes[1].delta).toBe(0.03);
+		expect(Math.abs(result.changes[0].delta)).not.toBe(Math.abs(result.changes[1].delta));
+
+		// 總分由 9.00 變為 8.98，未被事後補償回 9.00
+		const afterSum = result.changes[0].after + result.changes[1].after;
+		expect(afterSum).toBe(8.98);
+		expect(afterSum).not.toBe(9.0);
+	});
+
 	it("雙方 K_eff 相同且未觸界時總分守恆", () => {
 		const teams = makeSinglesTeams(5.0, 4.0);
 
@@ -413,6 +461,42 @@ describe("邊界 clamp 與觸界標示", () => {
 		expect(result.changes[0].delta).toBe(-0.15);
 		expect(result.changes[0].atUpperBound).toBe(false);
 		expect(result.changes[0].clamped).toBe(false);
+	});
+
+	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
+	// design Risks 點名平局讓觸界旗標出現全新的語意組合：過去「賽後停在界上」只發生於
+	// 勝方被夾在上限或敗方被夾在下限（clamped 必為 true），平局讓「停在界上但完全沒被夾」
+	// 成為可達情境——E 為 0.5 時 delta 恰為 0，分數原地不動卻仍在界上。
+	// 實測 mutation：把旗標改成 roundedAfter > RATING_MAX（即「只有真被夾才算觸界」）後
+	// 全套測試依然全綠，代表此組合無人看守，故補上本條。
+	// 另註：平局永遠不會讓 clamped 為 true——(S - E) 的推力恆小於與邊界的距離
+	// （1.00～8.00 全域掃描實測無一例外），因此本條刻意不去斷言平局會被夾值。
+	it("平局時已在邊界者停在界上，觸界旗標為真但未被夾值", () => {
+		const upperResult = updateRatings({
+			format: "singles",
+			teams: makeSinglesTeams(RATING_MAX, RATING_MAX),
+			winnerIndex: "draw",
+		});
+
+		for (const change of upperResult.changes) {
+			expect(change.after).toBe(RATING_MAX);
+			expect(change.delta).toBe(0);
+			expect(change.atUpperBound).toBe(true);
+			expect(change.clamped).toBe(false);
+		}
+
+		const lowerResult = updateRatings({
+			format: "singles",
+			teams: makeSinglesTeams(RATING_MIN, RATING_MIN),
+			winnerIndex: "draw",
+		});
+
+		for (const change of lowerResult.changes) {
+			expect(change.after).toBe(RATING_MIN);
+			expect(change.delta).toBe(0);
+			expect(change.atLowerBound).toBe(true);
+			expect(change.clamped).toBe(false);
+		}
 	});
 
 	it("賽後分數為兩位小數且可通過 PlayerSchema 的 rating 驗證", () => {
