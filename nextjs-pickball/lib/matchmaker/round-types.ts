@@ -69,7 +69,7 @@ export const RoundMatchSchema = z
 				teamB: z.number().int().nonnegative(),
 			})
 			.nullable(),
-		winner: z.enum(["teamA", "teamB"]).nullable(),
+		winner: z.enum(["teamA", "teamB", "draw"]).nullable(),
 		completedAt: z.iso.datetime().nullable(),
 		playerRatings: z.array(PlayerRatingSchema),
 	})
