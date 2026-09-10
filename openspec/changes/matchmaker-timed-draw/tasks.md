@@ -121,9 +121,10 @@ Depends on: §2
 
 Depends on: §2, §5
 
-- [ ] 7.1 RED: 於 `nextjs-pickball/components/matchmaker/CourtCard.test.tsx` 新增 it「平局場次不顯示任一隊勝方標籤而顯示平手標籤」：渲染一場已完成、比分 `11:11`、`winner: "draw"` 的對戰 → 斷言第一隊與第二隊皆查不到「勝」文字標籤，且畫面另外查得到「平手」文字。同時新增 it「兩隊比分相同時 UI 仍照常委派送出而不自行攔截」：兩個比分欄位皆填入 `"11"` 後按下送出 → 斷言 `onSubmitScore` 被呼叫一次、帶入該場次識別與兩個 `"11"`。確認紅燈（前者因目前沒有任何「平手」顯示邏輯而查無此文字；後者若寫入當下即綠，MUST 誠實標註為 regression guard——`onSubmitScore` 目前本來就是無條件轉發）並貼出兩者輸出
-- [ ] 7.2 GREEN: 於 `CourtCard.tsx` 匯入 `nextjs-pickball/lib/matchmaker/labels.ts` 的 `DRAW_LABEL`；於已完成場次的資訊列（`data-testid="court-${match.id}-score"` 附近）新增條件渲染：`match.winner === "draw"` 時顯示帶 `DRAW_LABEL` 文字的 `Badge`（比照既有「勝」`Badge` 的視覺權重，見 design Decision 7）
-- [ ] 7.3 REFACTOR: 確認 `renderTeamLabel` 不需要為 `"draw"` 新增任何分支（`match.winner === winnerKey` 在 `winnerKey` 為 `"teamA"`／`"teamB"` 時對 `"draw"` 自然為 `false`，這是既有程式碼的正確行為，不需修改，只需在旁補一句註解說明「平手」的顯示位置不在這裡）；確認 `onSubmitScore` 委派邏輯與 §1.10 記錄的現況逐位元組相同（design Decision 6 的分層驗證）
+- [x] 7.1 RED: 於 `nextjs-pickball/components/matchmaker/CourtCard.test.tsx` 新增 it「平局場次不顯示任一隊勝方標籤而顯示平手標籤」：渲染一場已完成、比分 `11:11`、`winner: "draw"` 的對戰 → 斷言第一隊與第二隊皆查不到「勝」文字標籤，且畫面另外查得到「平手」文字。同時新增 it「兩隊比分相同時 UI 仍照常委派送出而不自行攔截」：兩個比分欄位皆填入 `"11"` 後按下送出 → 斷言 `onSubmitScore` 被呼叫一次、帶入該場次識別與兩個 `"11"`。確認紅燈（前者因目前沒有任何「平手」顯示邏輯而查無此文字；後者若寫入當下即綠，MUST 誠實標註為 regression guard——`onSubmitScore` 目前本來就是無條件轉發）並貼出兩者輸出
+  **誠實標註：第一條（平局標籤）寫入當下確實紅燈（`getByText(DRAW_LABEL)` 查無此文字）；第二條（比分相同 pass-through）寫入當下即綠（22 個 it 中僅平局標籤那條失敗），為 regression guard 而非真紅燈——`onSubmitScore` 本來就是無條件轉發，本測試只是把這件事釘成斷言（commit `2f92f3c`）**
+- [x] 7.2 GREEN: 於 `CourtCard.tsx` 匯入 `nextjs-pickball/lib/matchmaker/labels.ts` 的 `DRAW_LABEL`；於已完成場次的資訊列（`data-testid="court-${match.id}-score"` 附近）新增條件渲染：`match.winner === "draw"` 時顯示帶 `DRAW_LABEL` 文字的 `Badge`（比照既有「勝」`Badge` 的視覺權重，見 design Decision 7）（commit `c1f9324`，22/22 全綠，`tsc --noEmit` 0 錯誤）
+- [x] 7.3 REFACTOR: 確認 `renderTeamLabel` 不需要為 `"draw"` 新增任何分支（`match.winner === winnerKey` 在 `winnerKey` 為 `"teamA"`／`"teamB"` 時對 `"draw"` 自然為 `false`，這是既有程式碼的正確行為，不需修改，只需在旁補一句註解說明「平手」的顯示位置不在這裡）；確認 `onSubmitScore` 委派邏輯與 §1.10 記錄的現況逐位元組相同（design Decision 6 的分層驗證）（commit `5854249`，僅新增註解，`git diff` 確認 `onSubmitScore`／`handleScoreSubmit` 零改動）
 
 ## 8. 歷史頁的平手顯示（HistoryRecordCard.tsx）
 
