@@ -894,7 +894,7 @@ function toHistoryEntry(
 	match: RoundMatch,
 	scoreA: number,
 	scoreB: number,
-	winner: "teamA" | "teamB",
+	winner: "teamA" | "teamB" | "draw",
 	completedAt: string,
 	changes: readonly RatingChange[],
 	matchPlayers: readonly Player[],
@@ -971,8 +971,9 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 	}
 	const { scoreA, scoreB } = validated;
 
-	// 勝方判定的唯一實作位置（tasks 6.7）：上面已擋下平局，此處 scoreA、scoreB 必不相等。
-	const winner: "teamA" | "teamB" = scoreA > scoreB ? "teamA" : "teamB";
+	// 勝方判定的唯一實作位置（tasks 6.7）：比分相同只可能在計時回合走到這裡（非計時回合
+	// 已被上面的驗證擋下），此時勝方為 "draw"。
+	const winner: "teamA" | "teamB" | "draw" = scoreA === scoreB ? "draw" : scoreA > scoreB ? "teamA" : "teamB";
 
 	const teamAPlayers = resolveTeamPlayers(match.teams[0].playerIds, players);
 	const teamBPlayers = resolveTeamPlayers(match.teams[1].playerIds, players);
@@ -992,7 +993,9 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		ratingResult = updateRatings({
 			format: match.format,
 			teams: [teamAPlayers.map(toRatingInput), teamBPlayers.map(toRatingInput)],
-			winnerIndex: winner === "teamA" ? 0 : 1,
+			// 平局 MUST 以 "draw" 傳遞而非任一隊的索引（spec：雙方 S 皆為 0.5）——
+			// 型別上 0／1 也合法，誤傳只會靜默算出一勝一負的分數，沒有任何執行期錯誤可依。
+			winnerIndex: winner === "draw" ? "draw" : winner === "teamA" ? 0 : 1,
 		});
 	} catch {
 		return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: SCORING_FAILED_MESSAGE };
