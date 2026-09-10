@@ -27,7 +27,10 @@ export function effectiveK(gamesPlayed: number): number {
 
 // 計算單一球員的評分變動。逐人套用自己的 K_eff（design Decision 3），
 // 允許同隊兩人若出場次數不同時有不同變動幅度。
-// s = 該隊是否獲勝（1 或 0），e = 該隊的預測勝率（由隊伍層級計算、於此處套用在個人身上）。
+// s = 該隊本場結果（勝 1、敗 0、平局 0.5，由呼叫端依 winnerIndex 算好才傳入），
+// e = 該隊的預測勝率（由隊伍層級計算、於此處套用在個人身上）；
+// 此函式不判讀 winnerIndex，s 是否為平局的分支只在呼叫端算一次，
+// clamp／四捨五入邏輯對三種 s 值一視同仁，不需另外複製一份。
 // 邊界處理順序為先四捨五入至兩位小數、再 clamp 於 RATING_MIN～RATING_MAX（design Decision 5）：
 // 若先 clamp 再 round，理論值 8.0049 會被判定為「被夾值」——但它捨入後本來就是 8.00，
 // 使用者一分都沒少拿，M5 卻會誤報「已被上限截斷」的提示；先 round 再 clamp 則只有真正損失分數的情況才標記。
