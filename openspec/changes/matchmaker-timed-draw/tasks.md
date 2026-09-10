@@ -70,9 +70,9 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-types.test.ts` 新增 it「winner 欄位新增 draw 列舉值且 completed 場次可帶 draw」：`RoundMatchSchema.safeParse` 對一個 `status: "completed"`、`winner: "draw"`、`scores` 兩隊比分相同、其餘欄位合法的物件斷言 `success: true`；另對 `winner: "tie"` 斷言 `success: false`。確認紅燈並貼出輸出
-- [ ] 2.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/round-types.ts` 的 `RoundMatchSchema.winner` 由 `z.enum(["teamA", "teamB"]).nullable()` 改為 `z.enum(["teamA", "teamB", "draw"]).nullable()`
-- [ ] 2.3 REFACTOR: 確認 `RoundMatch`／`Round` 的衍生型別（`z.infer`）正確反映三值聯集，`tsc --noEmit` 對本檔通過；欄位旁註解補一句說明 `"draw"` 僅可能出現於計時回合（引用 `round-lifecycle` 的「比分驗證」）
+- [x] 2.1 RED: 於 `nextjs-pickball/lib/matchmaker/round-types.test.ts` 新增 it「winner 欄位新增 draw 列舉值且 completed 場次可帶 draw」：`RoundMatchSchema.safeParse` 對一個 `status: "completed"`、`winner: "draw"`、`scores` 兩隊比分相同、其餘欄位合法的物件斷言 `success: true`；另對 `winner: "tie"` 斷言 `success: false`。確認紅燈並貼出輸出
+- [x] 2.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/round-types.ts` 的 `RoundMatchSchema.winner` 由 `z.enum(["teamA", "teamB"]).nullable()` 改為 `z.enum(["teamA", "teamB", "draw"]).nullable()`
+- [x] 2.3 REFACTOR: 確認 `RoundMatch`／`Round` 的衍生型別（`z.infer`）正確反映三值聯集，`tsc --noEmit` 對本檔通過；欄位旁註解補一句說明 `"draw"` 僅可能出現於計時回合（引用 `round-lifecycle` 的「比分驗證」）
 
 ## 3. 評分更新的 winnerIndex 擴增（rating-types.ts／rating.ts）
 
