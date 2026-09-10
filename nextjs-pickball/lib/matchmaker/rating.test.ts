@@ -217,7 +217,46 @@ describe("單打評分更新", () => {
 	});
 });
 
+describe("平局評分更新", () => {
+	it("平局時雙方 S 皆為 0.5 而非任一方視為勝負", () => {
+		// ratingA 5.00、ratingB 4.00、gamesPlayed 皆 0：E_A ≈ 0.6830、E_B ≈ 0.3170，kEff = 0.30。
+		// 以 S=0.5 計算：deltaA = kEff × (0.5 - E_A) ≈ -0.05、deltaB = kEff × (0.5 - E_B) ≈ 0.05。
+		// 刻意與「以 S=1 算勝方」（deltaA = 0.10）、「以 S=0 算敗方」（deltaA = -0.20）
+		// 兩者皆不同，藉此驗證平局走的是 S=0.5 這條新分支，而非誤把某一方當勝負方計算。
+		const teams = makeSinglesTeams(5.0, 4.0);
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: "draw",
+		});
+
+		expect(result.changes[0].delta).toBe(-0.05);
+		expect(result.changes[0].after).toBe(4.95);
+		expect(result.changes[1].delta).toBe(0.05);
+		expect(result.changes[1].after).toBe(4.05);
+	});
+});
+
 describe("零和的成立條件", () => {
+	it("平局時勢均力敵雙方 E 與 S 皆為 0.5 而變動值為零", () => {
+		// rating 皆 4.00、gamesPlayed 皆 0：E = 0.5、S = 0.5，(S - E) 恰為 0，
+		// 是本 change 新增的唯一「雙方變動皆為零」邊界情境（既有 win/lose 路徑
+		// 因 S ∈ {0,1} 與 E ∈ (0,1) 永遠不會讓 S - E 恰為 0）。
+		const teams = makeSinglesTeams(4.0, 4.0);
+
+		const result = updateRatings({
+			format: "singles",
+			teams,
+			winnerIndex: "draw",
+		});
+
+		expect(result.changes[0].delta).toBe(0);
+		expect(result.changes[0].after).toBe(4.0);
+		expect(result.changes[1].delta).toBe(0);
+		expect(result.changes[1].after).toBe(4.0);
+	});
+
 	it("雙方 K_eff 相同且未觸界時總分守恆", () => {
 		const teams = makeSinglesTeams(5.0, 4.0);
 
