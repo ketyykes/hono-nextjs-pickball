@@ -20,6 +20,7 @@ import {
 import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
 import { appendHistoryEntry, MatchHistoryEntrySchema } from "./history";
 import { roundRating } from "./rating-math";
+import { updateRatings } from "./rating";
 import { updatePlayer } from "./roster";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 import { PLAYERS_PER_MATCH } from "./allocation-types";
@@ -1773,6 +1774,92 @@ describe("submitScore", () => {
 		if (!scoringFailedResult.ok) {
 			expect(scoringFailedResult.code).toBe(SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED);
 		}
+	});
+
+	it("計時回合送出平局比分後場次標記為完成且 winner 為 draw", () => {
+		const players = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
+		});
+		// startedAt 刻意留 null：「本輪為計時制」只由 timer 是否存在決定，與倒數是否已開始、
+		// 是否已到期無關（M14 明訂時間到不自動變更任何場次狀態）。若實作額外要求 startedAt
+		// 已寫入，這個 fixture 會直接轉紅。
+		const round = makeRound({ matches: [match], timer: { durationMinutes: 15, startedAt: null } });
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "11", rawScoreB: "11", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const updated = result.round.matches.find((m) => m.id === "m-1");
+		expect(updated?.status).toBe("completed");
+		expect(updated?.scores).toEqual({ teamA: 11, teamB: 11 });
+		expect(updated?.winner).toBe("draw");
+		expect(updated?.completedAt).toBe(FIXED_NOW);
+
+		// 場次與歷史是同一場比賽的兩份紀錄：勝方若不同步，歷史頁會為這場平局顯示出一個贏家。
+		expect(MatchHistoryEntrySchema.safeParse(result.historyEntry).success).toBe(true);
+		expect(result.historyEntry.winner).toBe("draw");
+	});
+
+	it("計時回合平局時 playerRatings 仍逐一對應該場每位球員", () => {
+		// 兩隊實力刻意不對等：兩隊同分時預測勝率恰為 0.5，平局的變動量為零，會分辨不出
+		// 實作到底有沒有把平局轉譯成 winnerIndex: "draw"（誤傳 0 或 1 時 S 是 1 或 0，
+		// 賽後分數才會與本測試的期望值不同）。
+		const players = [
+			makePlayer({ id: "p1", rating: 4, gamesPlayed: 0 }),
+			makePlayer({ id: "p2", rating: 4, gamesPlayed: 0 }),
+			makePlayer({ id: "p3", rating: 2, gamesPlayed: 0 }),
+			makePlayer({ id: "p4", rating: 2, gamesPlayed: 0 }),
+		];
+		const match = makeRoundMatch({
+			id: "m-d",
+			format: "doubles",
+			doublesComposition: "general",
+			teams: [makeTeamFixture(["p1", "p2"], 8), makeTeamFixture(["p3", "p4"], 4)],
+			playerRatings: [
+				makePendingPlayerRating("p1", 4),
+				makePendingPlayerRating("p2", 4),
+				makePendingPlayerRating("p3", 2),
+				makePendingPlayerRating("p4", 2),
+			],
+		});
+		const round = makeRound({
+			format: "doubles",
+			matches: [match],
+			timer: { durationMinutes: 20, startedAt: "2026-08-23T00:00:00.000Z" },
+		});
+
+		const result = submitScore({ round, players, matchId: "m-d", rawScoreA: "11", rawScoreB: "11", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const updated = result.round.matches.find((m) => m.id === "m-d");
+		expect(updated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.doubles);
+		expect(new Set(updated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2", "p3", "p4"]));
+
+		// 期望值直接以 winnerIndex: "draw" 呼叫評分模組取得，不在本檔重算一次 Elo——
+		// 本測試要驗的是「round.ts 有沒有把平局正確轉譯給評分模組」，不是公式本身。
+		const toRatingInput = (player: Player) => ({ id: player.id, rating: player.rating, gamesPlayed: player.gamesPlayed });
+		const expected = updateRatings({
+			format: "doubles",
+			teams: [players.slice(0, 2).map(toRatingInput), players.slice(2).map(toRatingInput)],
+			winnerIndex: "draw",
+		});
+		const expectedById = new Map(expected.changes.map((change) => [change.id, change]));
+		for (const rating of updated?.playerRatings ?? []) {
+			const change = expectedById.get(rating.playerId);
+			expect(rating.before).toBe(change?.before);
+			expect(rating.after).toBe(change?.after);
+			// 實力不對等的平局必定造成分數變動，確保上面兩條比對不是拿相同的值互相印證。
+			expect(rating.after).not.toBe(rating.before);
+		}
+
+		// 平局同樣計入出場經驗（spec：累加規則不因平局而不同）。
+		expect(result.playerPatches.map((patch) => patch.gamesPlayed)).toEqual([1, 1, 1, 1]);
 	});
 
 	it("已完成場次重複送出時歷史筆數不變", () => {
