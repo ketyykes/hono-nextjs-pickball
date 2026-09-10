@@ -8,6 +8,7 @@ import { MatchStage } from "@/components/matchmaker/MatchStage";
 import type { MatchStageSubmitError, MatchStageSwapError } from "@/components/matchmaker/MatchStage";
 import { PrintSheet } from "@/components/matchmaker/PrintSheet";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
+import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
@@ -33,7 +34,7 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
 	const { players, updatePlayer } = useRosterStore();
-	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, swapMatchPlayer } = useRoundStore({
+	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, setTimerDuration, startTimer, swapMatchPlayer } = useRoundStore({
 		players,
 		updatePlayer,
 	});
@@ -168,6 +169,8 @@ export default function MatchmakerPage() {
 			    不在可動檔案清單內，改由本層以 CSS 選擇器精準只挑出「無 role 也無
 			    aria-label」的按鈕——這正好排除所有 radio（帶 role="radio"）與圖示按鈕
 			    （帶 aria-label），只命中「產生本輪對戰」「重設／再排」這兩顆。
+			    M14 新增的「開始計時」同樣無 role 也無 aria-label，因此一併被命中而取得
+			    ≥44px 觸控目標——它是一次性主要操作，這個順帶結果符合原意，故不調整選擇器。
 			    §8：這顆包裝 div 同時也是 RoundControls 的操作控制項容器，列印時隱藏
 			    （裁決 5）。 */}
 			<div
@@ -183,7 +186,22 @@ export default function MatchmakerPage() {
 					onGenerate={handleGenerate}
 					onReset={handleReset}
 					setTargetScore={setTargetScore}
+					setTimerDuration={setTimerDuration}
+					startTimer={startTimer}
 				/>
+			</div>
+
+			{/* M14 design Decision 8：倒數是「整輪共用的單一計時」，不屬於任何一張場地卡片，
+			    故獨立掛載於本層而非塞進 MatchStage／CourtCard（沿用 M9 的 ExportActions／
+			    PrintSheet 同一條理由）。本層只負責掛載與傳值：倒數取樣、到期判定與提示音
+			    去重全在 RoundTimerBanner 與其委派的 hook／純函式內，SHALL NOT 在頁面層
+			    重複一份。
+			    不包一層 `round !== null &&` 條件式：RoundTimerBanner 自行處理 timer 為 null
+			    與尚未開始兩種早退並回傳 null（畫面結果相同），而包了條件式會在回合有無之間
+			    製造 unmount／remount，把「同一次到期只播一次」所倚賴的 useRef 旗標清掉。
+			    §8：倒數是螢幕上的操作輔助資訊，列印時隱藏，包裝方式比照上下兩區。 */}
+			<div data-print="hide">
+				<RoundTimerBanner timer={round?.timer ?? null} />
 			</div>
 
 			{/* §8：舞台區是螢幕版的對戰畫面（比分輸入等互動），列印時由下方的 PrintSheet

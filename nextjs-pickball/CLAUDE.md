@@ -75,7 +75,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
   - `guide/HeroTourCta` 是 **server component 例外**（其餘 guide 元件皆標 `"use client"`）；其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 依 capability 分組。跨 capability 歸屬清單的**單一來源**是 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement——**任何** capability 新增 hook 時，其 change 須一併更新該清單（歷史上曾漏更新導致規格失真）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
-  - quiz：`useQuiz`；player-roster：`useRosterStore`；round-lifecycle：`useRoundStore`
+  - quiz：`useQuiz`；player-roster：`useRosterStore`；round-lifecycle：`useRoundStore`、`useRoundTimer`
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）

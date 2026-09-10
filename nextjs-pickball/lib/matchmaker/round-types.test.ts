@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { RoundSchema, MatchStatusSchema, TARGET_SCORE_OPTIONS } from "./round-types";
+import {
+	RoundSchema,
+	MatchStatusSchema,
+	TARGET_SCORE_OPTIONS,
+	RoundTimerDurationMinutesSchema,
+} from "./round-types";
 import type { Round, RoundMatch } from "./round-types";
 import { TargetScoreSchema } from "../scoreboard/types";
 
@@ -40,6 +45,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
+		timer: null,
 		...overrides,
 	};
 }
@@ -165,5 +171,82 @@ describe("RoundSchema", () => {
 		);
 
 		expect(roundOptions).toEqual(scoreboardOptions);
+	});
+
+	it("回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料", () => {
+		// 模擬 M14 之前寫入的既有 matchmaker:round:v1 資料：不含 timer 欄位。
+		const roundWithoutTimer: Record<string, unknown> = { ...makeRound() };
+		delete roundWithoutTimer.timer;
+
+		const result = RoundSchema.safeParse(roundWithoutTimer);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.timer).toBeNull();
+		}
+
+		// 除了「完全缺少欄位」，M14 之後由本 capability 寫入、明確帶 timer: null
+		// 的「不計時」資料也必須通過驗證——這一段語意由 .nullable() 負責，
+		// 與「完全缺少欄位」時由 .default(null) 補值是兩件不同的事。
+		const explicitNullResult = RoundSchema.safeParse(
+			makeRound({ timer: null }),
+		);
+		expect(explicitNullResult.success).toBe(true);
+		if (explicitNullResult.success) {
+			expect(explicitNullResult.data.timer).toBeNull();
+		}
+	});
+
+	it("timer 為物件時 startedAt 未開始為 null、開始後為 ISO 字串", () => {
+		// Stage 2 mutation 補洞：上面兩個 it 只建構過 timer 為 null 或完全缺欄位的回合，
+		// RoundTimerObjectSchema 的兩個欄位因此零覆蓋——把 startedAt 的 .nullable()
+		// 拿掉、或把 RoundSchema 的 timer 換成別的 schema，測試都不會轉紅。
+		const notStarted = RoundSchema.safeParse(
+			makeRound({ timer: { durationMinutes: 15, startedAt: null } }),
+		);
+		expect(notStarted.success).toBe(true);
+		if (notStarted.success) {
+			expect(notStarted.data.timer).toEqual({
+				durationMinutes: 15,
+				startedAt: null,
+			});
+		}
+
+		const started = RoundSchema.safeParse(
+			makeRound({
+				timer: { durationMinutes: 20, startedAt: "2026-08-16T00:10:00.000Z" },
+			}),
+		);
+		expect(started.success).toBe(true);
+		if (started.success) {
+			expect(started.data.timer).toEqual({
+				durationMinutes: 20,
+				startedAt: "2026-08-16T00:10:00.000Z",
+			});
+		}
+
+		// 非法的 durationMinutes 在 Round 這一層也要被擋下，而非只有單獨 parse
+		// RoundTimerDurationMinutesSchema 時才擋（safeParse 參數型別為 unknown，
+		// 故意帶入非法字面量不需要 cast）。
+		const invalidDuration = RoundSchema.safeParse({
+			...makeRound(),
+			timer: { durationMinutes: 25, startedAt: null },
+		});
+		expect(invalidDuration.success).toBe(false);
+	});
+
+	it("計時長度僅接受 10、15、20 分鐘", () => {
+		const valid10 = RoundTimerDurationMinutesSchema.safeParse(10);
+		const valid15 = RoundTimerDurationMinutesSchema.safeParse(15);
+		const valid20 = RoundTimerDurationMinutesSchema.safeParse(20);
+		expect(valid10.success).toBe(true);
+		expect(valid15.success).toBe(true);
+		expect(valid20.success).toBe(true);
+
+		const invalid5 = RoundTimerDurationMinutesSchema.safeParse(5);
+		const invalid30 = RoundTimerDurationMinutesSchema.safeParse(30);
+		const invalid0 = RoundTimerDurationMinutesSchema.safeParse(0);
+		expect(invalid5.success).toBe(false);
+		expect(invalid30.success).toBe(false);
+		expect(invalid0.success).toBe(false);
 	});
 });

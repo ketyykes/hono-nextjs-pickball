@@ -59,6 +59,9 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 		matches: [buildMatch()],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
+		timer: null,
 		...overrides,
 	};
 }

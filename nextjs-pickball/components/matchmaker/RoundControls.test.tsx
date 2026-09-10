@@ -4,6 +4,7 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RoundControls } from "./RoundControls";
 import type { RoundControlsProps } from "./RoundControls";
+import { ROUND_TIMER_LOCKED_REASON } from "@/lib/matchmaker/labels";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
@@ -15,6 +16,8 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 // matchSlots／setTargetScore 為 8.6 新增的必填 props：matchSlots 預設空集合
 // （無任何場次開始場邊計分），setTargetScore 預設 vi.fn()——多數既有測試不涉及
 // 目標分數鎖定判定或變更委派，給這兩個預設值即可，需要的測試再各自 override。
+// setTimerDuration／startTimer 為 M14 §10 新增的必填 props，理由與上述兩個相同：
+// 既有測試都不涉及計時，一律給 vi.fn() 預設值，涉及計時的測試再各自 override。
 function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsProps {
 	return {
 		settings: createRoundSettings(),
@@ -23,6 +26,8 @@ function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsP
 		activePlayerCount: 10,
 		matchSlots: {},
 		setTargetScore: vi.fn(),
+		setTimerDuration: vi.fn(),
+		startTimer: vi.fn(),
 		onGenerate: vi.fn(),
 		onReset: vi.fn(),
 		...overrides,
@@ -70,6 +75,9 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 		matches: [buildMatch()],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
+		timer: null,
 		...overrides,
 	};
 }
@@ -339,6 +347,7 @@ describe("RoundControls", () => {
 			format: "doubles",
 			courtCount: 3,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		await user.click(screen.getByRole("button", { name: "增加場地數" }));
@@ -346,6 +355,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 4,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		await user.click(screen.getByRole("button", { name: "減少場地數" }));
@@ -353,6 +363,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 2,
 			targetScore: 21,
+			timerDurationMinutes: null,
 		});
 
 		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
@@ -361,6 +372,7 @@ describe("RoundControls", () => {
 			format: "singles",
 			courtCount: 3,
 			targetScore: 15,
+			timerDurationMinutes: null,
 		});
 
 		expect(onSettingsChange).toHaveBeenCalledTimes(4);
@@ -442,5 +454,258 @@ describe("RoundControls", () => {
 
 		expect(onSettingsChange).toHaveBeenCalledTimes(1);
 		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, targetScore: 15 });
+	});
+
+	// M14 §10：計時設定控制項。選項清單為「不計時」＋ round-lifecycle 匯出的
+	// ROUND_TIMER_DURATION_OPTIONS（10／15／20），元件內 SHALL NOT 另寫一份
+	// [10, 15, 20]；此處只釘住畫面上的四個選項、其可用性與預設選中項。
+	it("計時選項為不計時／10／15／20 分鐘且預設選中不計時", () => {
+		render(<RoundControls {...buildProps({ round: null })} />);
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		const radios = within(timerGroup).getAllByRole("radio");
+
+		expect(radios).toHaveLength(4);
+		expect(radios.map((radio) => radio.textContent)).toEqual([
+			"不計時",
+			"10 分鐘",
+			"15 分鐘",
+			"20 分鐘",
+		]);
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(false);
+		});
+		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("不計時");
+		// roving tabindex（WAI-ARIA APG radio group）：只有選中項可被 Tab 聚焦，其餘為 -1。
+		expect(radios.map((radio) => radio.getAttribute("tabindex"))).toEqual(["0", "-1", "-1", "-1"]);
+		// 尚無目前回合時不應顯示鎖定說明——避免鎖定文字被寫死成恆顯示。
+		expect(screen.queryByText(ROUND_TIMER_LOCKED_REASON)).toBeNull();
+	});
+
+	// design Decision 2：鎖定與否重用 isTargetScoreLocked 的 locked 布林值（此處以
+	// 「任一場次 completed」這條件觸發），但顯示的原因文案 MUST 是 labels.ts 的
+	// ROUND_TIMER_LOCKED_REASON，而非 isTargetScoreLocked 回傳的 reason。
+	it("本輪已開始計分時計時控制項 disabled 並顯示鎖定原因", () => {
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [
+				buildMatch({
+					status: "completed",
+					scores: { teamA: 11, teamB: 5 },
+					winner: "teamA",
+					completedAt: "2026-08-23T01:00:00.000Z",
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: 3.1 },
+						{ playerId: "p2", before: 3, after: 2.9 },
+					],
+				}),
+			],
+		});
+		render(<RoundControls {...buildProps({ round, matchSlots: {} })} />);
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		const radios = within(timerGroup).getAllByRole("radio");
+
+		expect(radios).toHaveLength(4);
+		radios.forEach((radio) => {
+			expect((radio as HTMLButtonElement).disabled).toBe(true);
+		});
+		const checked = radios.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("10 分鐘");
+		expect(screen.getByText(ROUND_TIMER_LOCKED_REASON)).not.toBeNull();
+		// 文案本身也釘住：套在計時控制項旁的說明 SHALL NOT 提及「目標分數」。
+		expect(ROUND_TIMER_LOCKED_REASON).not.toContain("目標分數");
+	});
+
+	// 計時長度刻意用 20（前兩條計時測試用 10）：fixture 對 durationMinutes 只餵單一值時，
+	// 「忽略該欄位、寫死一個值」的實作會恆綠。
+	it("已設定計時長度且尚未開始時顯示可點擊的開始計時按鈕", () => {
+		const round = buildRound({ timer: { durationMinutes: 20, startedAt: null } });
+		render(<RoundControls {...buildProps({ round })} />);
+
+		const startButton = screen.getByRole("button", { name: "開始計時" }) as HTMLButtonElement;
+		expect(startButton.disabled).toBe(false);
+	});
+
+	// spec 明訂條件不成立時 MUST 不渲染，SHALL NOT 渲染一顆恆為 disabled 的按鈕——
+	// 因此三種情境都用 queryByRole 斷言「不存在」而非斷言 disabled。
+	it("不計時或計時已開始時不顯示開始計時按鈕", () => {
+		const withoutTimer = render(
+			<RoundControls {...buildProps({ round: buildRound({ timer: null }) })} />,
+		);
+		expect(withoutTimer.queryByRole("button", { name: "開始計時" })).toBeNull();
+		withoutTimer.unmount();
+
+		const started = render(
+			<RoundControls
+				{...buildProps({
+					round: buildRound({
+						timer: { durationMinutes: 15, startedAt: "2026-08-23T00:30:00.000Z" },
+					}),
+				})}
+			/>,
+		);
+		expect(started.queryByRole("button", { name: "開始計時" })).toBeNull();
+		started.unmount();
+
+		// 尚無目前回合時同樣沒有可開始的計時。
+		const withoutRound = render(<RoundControls {...buildProps({ round: null })} />);
+		expect(withoutRound.queryByRole("button", { name: "開始計時" })).toBeNull();
+		withoutRound.unmount();
+	});
+
+	it("點擊開始計時會呼叫注入的 startTimer 一次", async () => {
+		const user = userEvent.setup();
+		const startTimer = vi.fn();
+		const setTimerDuration = vi.fn();
+		const round = buildRound({ timer: { durationMinutes: 20, startedAt: null } });
+		render(<RoundControls {...buildProps({ round, startTimer, setTimerDuration })} />);
+
+		await user.click(screen.getByRole("button", { name: "開始計時" }));
+
+		expect(startTimer).toHaveBeenCalledTimes(1);
+		// 零參數：now 由 useRoundStore 注入，本元件不得把事件物件或時間傳進去。
+		expect(startTimer).toHaveBeenCalledWith();
+		// 「開始計時」是獨立入口，SHALL NOT 順手改動計時長度。
+		expect(setTimerDuration).not.toHaveBeenCalled();
+	});
+
+	// §10.5 mutation 補洞（不對應 spec 驗收錨點，為 regression guard、加入即綠）：
+	// 上述五條 spec 測試都沒有點過計時選項，因此「回合存在時仍走 onSettingsChange」與
+	// 「尚無回合時改走 setTimerDuration」兩種接線反轉都測不出來。比照既有的
+	// 「onSettingsChange 契約」與「回合存在但尚未開始計分時……委派 setTargetScore」兩條
+	// 對目標分數的覆蓋方式，替計時補上同一組斷言。
+	it("計時變更契約：尚無回合時以完整設定物件回呼 onSettingsChange，回合存在時委派 setTimerDuration", async () => {
+		const user = userEvent.setup();
+		const settings = buildSettings({ format: "doubles", courtCount: 3, targetScore: 15 });
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		const withoutRound = render(
+			<RoundControls
+				{...buildProps({ round: null, settings, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+		await user.click(
+			within(withoutRound.getByRole("radiogroup", { name: "計時" })).getByRole("radio", {
+				name: "15 分鐘",
+			}),
+		);
+		expect(onSettingsChange).toHaveBeenCalledTimes(1);
+		expect(onSettingsChange).toHaveBeenCalledWith({
+			format: "doubles",
+			courtCount: 3,
+			targetScore: 15,
+			timerDurationMinutes: 15,
+		});
+		expect(setTimerDuration).not.toHaveBeenCalled();
+		withoutRound.unmount();
+
+		// 回合存在且尚未開始計分：變更 MUST 委派 round-lifecycle 的 setTimerDuration，
+		// SHALL NOT 走 onSettingsChange（那是給「尚無回合」情境的預備設定用的）。
+		// 起始長度 10、點選 20，兩個值不同才能證明傳進去的是被點的那一個。
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const onSettingsChangeWithRound = vi.fn();
+		const setTimerDurationWithRound = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({
+					round,
+					matchSlots: {},
+					onSettingsChange: onSettingsChangeWithRound,
+					setTimerDuration: setTimerDurationWithRound,
+				})}
+			/>,
+		);
+		await user.click(
+			within(screen.getByRole("radiogroup", { name: "計時" })).getByRole("radio", {
+				name: "20 分鐘",
+			}),
+		);
+		expect(setTimerDurationWithRound).toHaveBeenCalledTimes(1);
+		expect(setTimerDurationWithRound).toHaveBeenCalledWith(20);
+		expect(onSettingsChangeWithRound).not.toHaveBeenCalled();
+	});
+
+	// §10.5 mutation 補洞（regression guard）：比照目標分數既有的同款測試——鎖定時四顆
+	// radio 皆 disabled，真實鍵盤路徑進不了容器，handleTimerKeyDown 內的 if (locked) return;
+	// 只能用 fireEvent 直接對容器派發事件才命中得到。
+	it("計時鎖定時方向鍵不得呼叫 setTimerDuration 或 onSettingsChange，也不改變選取（覆蓋 if (locked) return; 防線）", () => {
+		const round = buildRound({ timer: { durationMinutes: 10, startedAt: null } });
+		const matchSlots: MatchSlots = { "match-1": buildSlot({ status: "playing" }) };
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({ round, matchSlots, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		fireEvent.keyDown(timerGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).not.toHaveBeenCalled();
+		expect(setTimerDuration).not.toHaveBeenCalled();
+		const checked = within(timerGroup)
+			.getAllByRole("radio")
+			.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toBe("10 分鐘");
+	});
+
+	// Stage 2 mutation 補洞（regression guard，加入即綠）：handleTimerKeyDown 的起算索引
+	// MUST 取自「畫面上選中的值」（displayedTimerDuration），SHALL NOT 取自 settings——
+	// 回合已產生後 settings.timerDurationMinutes 不再被同步（page.tsx 只在無回合時才寫回
+	// settings），兩者會分歧，以 settings 起算會讓方向鍵從畫面上看不到的位置開始移動。
+	// 把起算值換成 settings.timerDurationMinutes 時本檔原有 22 條全綠，這條補上偵測力。
+	// 起算刻意用 ArrowLeft：從畫面選中的「20 分鐘」（index 3）往左為 15，而以 settings
+	// 的 null（index 0）起算往左會循環到 20，兩者結果不同才測得出來。
+	it("計時方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算", () => {
+		const round = buildRound({
+			timer: { durationMinutes: 20, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({
+					round,
+					matchSlots: {},
+					settings: buildSettings({ timerDurationMinutes: null }),
+					setTimerDuration,
+				})}
+			/>,
+		);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		// 前提：畫面上選中的是回合的 20 分鐘，而非 settings 的「不計時」。
+		const checkedBefore = within(timerGroup)
+			.getAllByRole("radio")
+			.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checkedBefore[0].textContent).toBe("20 分鐘");
+
+		fireEvent.keyDown(timerGroup, { key: "ArrowLeft" });
+
+		expect(setTimerDuration).toHaveBeenCalledTimes(1);
+		expect(setTimerDuration).toHaveBeenCalledWith(15);
+		// focus 也 MUST 落在新選中的那一顆，而不是索引錯位後的另一顆。
+		expect(document.activeElement?.textContent).toBe("15 分鐘");
+	});
+
+	// 對照組（regression guard）：未鎖定時方向鍵應正常運作，證明上一條測到的是「鎖定」
+	// 這個條件本身，而不是 fireEvent.keyDown 這個手法本來就測不出東西。
+	it("計時未鎖定時方向鍵呼叫 onSettingsChange 並移動到下一個選項", () => {
+		const settings = buildSettings({ timerDurationMinutes: null });
+		const onSettingsChange = vi.fn();
+		render(<RoundControls {...buildProps({ round: null, settings, onSettingsChange })} />);
+
+		const timerGroup = screen.getByRole("radiogroup", { name: "計時" });
+		fireEvent.keyDown(timerGroup, { key: "ArrowRight" });
+
+		expect(onSettingsChange).toHaveBeenCalledTimes(1);
+		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, timerDurationMinutes: 10 });
 	});
 });

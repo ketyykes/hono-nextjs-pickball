@@ -6,11 +6,23 @@ import {
 	MAX_COURT_COUNT,
 } from "./allocation-types";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
+import type { RoundSettings } from "./round-settings";
 import {
 	createRoundSettings,
 	changeCourtCount,
 	courtCountBounds,
 } from "./round-settings";
+
+// 型別層防線：timerDurationMinutes 為必要欄位（非 optional）。物件字面量在「必要且值為
+// null」與「optional 但仍賦值為 null」兩種宣告下，執行期回傳值完全相同，
+// toEqual／toBeNull 這類執行期斷言測不出兩者差異；若該欄位被誤改為 optional，
+// 下面這行會在 tsc --noEmit 階段編譯失敗（`undefined extends ...` 成立，
+// RequiredTimerDuration 收斂為 never，無法指派 true）。
+type RequiredTimerDuration = undefined extends RoundSettings["timerDurationMinutes"]
+	? never
+	: true;
+const _timerDurationMinutesIsRequired: RequiredTimerDuration = true;
+void _timerDurationMinutesIsRequired;
 
 // 本輪設定的預設值與場地數夾值——純函式，元件層（RoundControls 的加減按鈕）以 useState
 // 消費而非 hook，見 design Decision 3。
@@ -22,7 +34,12 @@ describe("createRoundSettings", () => {
 			format: DEFAULT_FORMAT,
 			courtCount: DEFAULT_COURT_COUNT,
 			targetScore: DEFAULT_TARGET_SCORE,
+			timerDurationMinutes: null,
 		});
+	});
+
+	it("每輪設定預設計時為不計時", () => {
+		expect(createRoundSettings().timerDurationMinutes).toBeNull();
 	});
 });
 
@@ -63,7 +80,13 @@ describe("changeCourtCount", () => {
 	// 這種測資看不出「用變動前的值判定邊界」這種錯誤，這裡補上真的會變動的案例。
 	it("場地數從邊界前一格加減至邊界時，回報的是變動後的邊界", () => {
 		const toMax = changeCourtCount(
-			{ ...createRoundSettings(), courtCount: MAX_COURT_COUNT - 1 },
+			// timerDurationMinutes 刻意給非預設值：它的預設就是 null，若沿用預設值，
+			// 「原樣帶出」與「被重設為 null」兩種實作的回傳值完全相同，斷言等於沒寫。
+			{
+				...createRoundSettings(),
+				courtCount: MAX_COURT_COUNT - 1,
+				timerDurationMinutes: 15,
+			},
 			1,
 		);
 		expect(toMax.settings.courtCount).toBe(MAX_COURT_COUNT);
@@ -72,6 +95,7 @@ describe("changeCourtCount", () => {
 		// settings 的其餘欄位須原樣帶出，而非被夾值後的物件蓋掉。
 		expect(toMax.settings.format).toBe(DEFAULT_FORMAT);
 		expect(toMax.settings.targetScore).toBe(DEFAULT_TARGET_SCORE);
+		expect(toMax.settings.timerDurationMinutes).toBe(15);
 
 		const toMin = changeCourtCount(
 			{ ...createRoundSettings(), courtCount: MIN_COURT_COUNT + 1 },

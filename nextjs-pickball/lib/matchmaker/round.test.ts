@@ -4,11 +4,15 @@ import {
 	createRound,
 	resetIncompleteMatches,
 	setTargetScore,
+	setTimerDuration,
+	startTimer,
 	submitScore,
 	swapMatchPlayer,
 	validateScoreInput,
 	RESET_INCOMPLETE_MATCHES_FAILURE_CODE,
 	ROUND_FAILURE_CODE,
+	SET_TIMER_DURATION_FAILURE_CODE,
+	START_TIMER_FAILURE_CODE,
 	SUBMIT_SCORE_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
@@ -99,6 +103,9 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
+		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
+		timer: null,
 		...overrides,
 	};
 }
@@ -742,6 +749,72 @@ describe("createRound", () => {
 			}
 		}
 	});
+
+	it("產生本輪時依設定決定計時長度，未指定時 timer 為 null", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+
+		const withDuration = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: 15,
+		});
+		const omitted = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+		});
+		const explicitNull = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: null,
+		});
+
+		expect(withDuration.ok).toBe(true);
+		expect(omitted.ok).toBe(true);
+		expect(explicitNull.ok).toBe(true);
+		if (!withDuration.ok || !omitted.ok || !explicitNull.ok) return;
+
+		expect(withDuration.round.timer).toEqual({ durationMinutes: 15, startedAt: null });
+		expect(omitted.round.timer).toBeNull();
+		expect(explicitNull.round.timer).toBeNull();
+	});
+
+	// regression guard（design Decision 4）：createRound 逐欄列舉回傳物件，timer 這一行
+	// 是本 change 在 round.ts 唯一需要主動加程式碼才能滿足此規則的地方（見 4.2）；
+	// 本 it 專門釘住「即使兩輪長度相同也不能沿用上一輪 timer 物件」，這是 test-plan 點名
+	// 最容易被誤實作成「反正一樣就不用重建」的地方。
+	it("產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const previousRound = makeRound({
+			roundNumber: 1,
+			timer: { durationMinutes: 10, startedAt: "2026-08-16T00:30:00.000Z" },
+		});
+
+		const result = createRound({
+			players,
+			format: "singles",
+			courtCount: 1,
+			previousRound,
+			now: FIXED_NOW,
+			newMatchId: makeIdGenerator("m"),
+			timerDurationMinutes: 10,
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: null });
+	});
 });
 
 describe("setTargetScore", () => {
@@ -779,6 +852,102 @@ describe("setTargetScore", () => {
 			expect(rejected.message).toContain("目標分數");
 			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
+	});
+});
+
+describe("setTimerDuration", () => {
+	it("所有場次皆為 pending 時可改計時設定並重置為未開始，已有場次離開 pending 時拒絕", () => {
+		const pendingRound = makeRound({
+			matches: [makeRoundMatch({ id: "m-1" }), makeRoundMatch({ id: "m-2", courtNumber: 2 })],
+			timer: { durationMinutes: 10, startedAt: "2026-08-16T00:30:00.000Z" },
+		});
+		const pendingRoundSnapshot = structuredClone(pendingRound);
+
+		const changed = setTimerDuration(pendingRound, 20);
+
+		expect(changed.ok).toBe(true);
+		if (!changed.ok) return;
+		// 即使變更前已開始計時（startedAt 非 null），變更後仍重置為 null（design Decision 3）。
+		expect(changed.round.timer).toEqual({ durationMinutes: 20, startedAt: null });
+		// 「其餘欄位不變」：把 timer 改回原值後應與原回合完全相等，寫法與理由同 setTargetScore
+		// 的同款斷言——逐欄只證明「列出來的那幾個欄位沒變」，也擋不住漏寫 ...round 的實作。
+		expect({ ...changed.round, timer: pendingRound.timer }).toEqual(pendingRound);
+		expect(pendingRound).toEqual(pendingRoundSnapshot);
+
+		// scoring 與 completed 都算「已離開 pending」，兩者分別驗證：只測其中一個時，
+		// 把判定寫成單一狀態比對（例如僅檢查 completed）的實作仍會全綠。
+		const lockedMatches: RoundMatch[] = [
+			makeRoundMatch({ id: "m-2", courtNumber: 2, status: "scoring" }),
+			makeCompletedRoundMatch({ id: "m-2", courtNumber: 2 }),
+		];
+
+		for (const lockedMatch of lockedMatches) {
+			const lockedRound = makeRound({
+				matches: [makeRoundMatch({ id: "m-1" }), lockedMatch],
+				timer: { durationMinutes: 10, startedAt: null },
+			});
+			const lockedRoundSnapshot = structuredClone(lockedRound);
+
+			const rejected = setTimerDuration(lockedRound, 20);
+
+			expect(rejected.ok).toBe(false);
+			if (rejected.ok) continue;
+			expect(rejected.code).toBe(SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED);
+			expect(rejected.message).toContain("計時");
+			expect(lockedRound).toEqual(lockedRoundSnapshot);
+		}
+	});
+});
+
+describe("startTimer", () => {
+	it("已設定計時長度且尚未開始時，開始計時寫入 startedAt", () => {
+		const round = makeRound({ timer: { durationMinutes: 10, startedAt: null } });
+		const roundSnapshot = structuredClone(round);
+
+		const result = startTimer(round, "2026-09-03T01:00:00.000Z");
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual({ durationMinutes: 10, startedAt: "2026-09-03T01:00:00.000Z" });
+		// 「其餘欄位不變」：把 timer 改回原值後應與原回合完全相等，寫法與理由同 setTargetScore
+		// 的同款斷言——逐欄只證明「列出來的那幾個欄位沒變」，也擋不住漏寫 ...round 的實作。
+		expect({ ...result.round, timer: roundSnapshot.timer }).toEqual(roundSnapshot);
+		// 純函式：原回合 SHALL NOT 被就地修改，回傳的必須是新物件。
+		expect(round).toEqual(roundSnapshot);
+	});
+
+	it("未設定計時長度或計時已開始時拒絕再次開始並回傳可判讀訊息", () => {
+		const noTimerRound = makeRound({ timer: null });
+		const noTimerSnapshot = structuredClone(noTimerRound);
+		const alreadyStartedRound = makeRound({
+			timer: { durationMinutes: 15, startedAt: "2026-09-03T00:00:00.000Z" },
+		});
+		const alreadyStartedSnapshot = structuredClone(alreadyStartedRound);
+
+		let noTimerResult: ReturnType<typeof startTimer> | undefined;
+		let alreadyStartedResult: ReturnType<typeof startTimer> | undefined;
+
+		// 兩者皆 SHALL NOT 拋出例外——理由同 resetIncompleteMatches 對應測試。
+		expect(() => {
+			noTimerResult = startTimer(noTimerRound, "2026-09-03T01:00:00.000Z");
+		}).not.toThrow();
+		expect(() => {
+			alreadyStartedResult = startTimer(alreadyStartedRound, "2026-09-03T01:00:00.000Z");
+		}).not.toThrow();
+
+		expect(noTimerResult?.ok).toBe(false);
+		if (noTimerResult !== undefined && !noTimerResult.ok) {
+			expect(noTimerResult.code).toBe(START_TIMER_FAILURE_CODE.NOT_CONFIGURED);
+			expect(noTimerResult.message).toContain("計時");
+		}
+		expect(noTimerRound).toEqual(noTimerSnapshot);
+
+		expect(alreadyStartedResult?.ok).toBe(false);
+		if (alreadyStartedResult !== undefined && !alreadyStartedResult.ok) {
+			expect(alreadyStartedResult.code).toBe(START_TIMER_FAILURE_CODE.ALREADY_STARTED);
+			expect(alreadyStartedResult.message).toContain("計時");
+		}
+		expect(alreadyStartedRound).toEqual(alreadyStartedSnapshot);
 	});
 });
 
@@ -1128,6 +1297,41 @@ describe("resetIncompleteMatches", () => {
 		expect(Object.keys(result).sort()).toEqual(["ok", "round"]);
 		// 也沒有任何 Player 被就地改動：本函式是純函式，restCount 的唯一結算點在 createRound。
 		expect(players).toEqual(playersSnapshot);
+	});
+
+	// regression guard（design Decision 4）：resetIncompleteMatches 以
+	// `{ ...round, matches, restingPlayerIds, seenSignatures }` 展開建構回傳值，
+	// timer 欄位不在展開時被覆寫的欄位清單內，這條規則在程式碼不變的情況下已自然成立，
+	// 本 it 純粹釘住此行為，避免日後改寫展開方式時悄悄破壞它。
+	it("重排未完成場次不重置計時", () => {
+		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const round = makeRound({
+			timer: { durationMinutes: 15, startedAt: "2026-08-16T00:30:00.000Z" },
+			matches: [
+				makeRoundMatch({
+					id: "todo",
+					teams: [
+						{ playerIds: ["p1"], rating: 3 },
+						{ playerIds: ["p2"], rating: 3 },
+					],
+					playerRatings: [
+						{ playerId: "p1", before: 3, after: null },
+						{ playerId: "p2", before: 3, after: null },
+					],
+				}),
+			],
+		});
+
+		// 比對基準取快照而非 round.timer 本身：後者與回傳值可能是同一個物件參考，
+		// 實作若改成「就地把 startedAt 清成 null」，兩邊會一起被改而讓斷言恆真。
+		const roundSnapshot = structuredClone(round);
+
+		const result = resetIncompleteMatches(round, players, { newMatchId: makeIdGenerator("r") });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.round.timer).toEqual(roundSnapshot.timer);
+		expect(round).toEqual(roundSnapshot);
 	});
 });
 

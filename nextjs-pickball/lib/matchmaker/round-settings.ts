@@ -8,14 +8,15 @@ import {
 	MIN_COURT_COUNT,
 	MAX_COURT_COUNT,
 } from "./allocation-types";
-import type { RoundTargetScore } from "./round-types";
+import type { RoundTargetScore, RoundTimerDurationMinutes } from "./round-types";
 import { DEFAULT_TARGET_SCORE } from "./round-types";
 
-/** 本輪設定：對戰方式、場地數、目標分數。 */
+/** 本輪設定：對戰方式、場地數、目標分數、計時長度。 */
 export interface RoundSettings {
 	readonly format: MatchFormat;
 	readonly courtCount: number;
 	readonly targetScore: RoundTargetScore;
+	readonly timerDurationMinutes: RoundTimerDurationMinutes | null;
 }
 
 /** 場地數是否已達加減的上下限，供 RoundControls 的加減按鈕接到 disabled 屬性。 */
@@ -36,12 +37,16 @@ export interface CourtCountChangeResult extends CourtCountBounds {
 	readonly settings: RoundSettings;
 }
 
-/** 建立一組全新的本輪設定，三個欄位皆取自 match-allocation／round-types 匯出的常數。 */
+/**
+ * 建立一組全新的本輪設定，format／courtCount／targetScore 取自 match-allocation／
+ * round-types 匯出的常數；timerDurationMinutes 預設為 null（不計時，spec 回合計時器）。
+ */
 export function createRoundSettings(): RoundSettings {
 	return {
 		format: DEFAULT_FORMAT,
 		courtCount: DEFAULT_COURT_COUNT,
 		targetScore: DEFAULT_TARGET_SCORE,
+		timerDurationMinutes: null,
 	};
 }
 

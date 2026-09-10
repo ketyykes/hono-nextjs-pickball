@@ -7,9 +7,13 @@ import {
 	resetIncompleteMatches as resetIncompleteMatchesPure,
 	submitScore as submitScorePure,
 	setTargetScore as setTargetScorePure,
+	setTimerDuration as setTimerDurationPure,
+	startTimer as startTimerPure,
 	swapMatchPlayer as swapMatchPlayerPure,
 	SUBMIT_SCORE_FAILURE_CODE,
 	SET_TARGET_SCORE_FAILURE_CODE,
+	SET_TIMER_DURATION_FAILURE_CODE,
+	START_TIMER_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 } from "@/lib/matchmaker/round";
 import { clearDiscardedMatchSlots } from "@/lib/matchmaker/scoreboard-binding";
@@ -19,12 +23,14 @@ import type {
 	ResetIncompleteMatchesResult,
 	SubmitScoreResult,
 	SetTargetScoreResult,
+	SetTimerDurationResult,
+	StartTimerResult,
 	SwapMatchPlayerResult,
 } from "@/lib/matchmaker/round";
 import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
-import type { Round, RoundTargetScore } from "@/lib/matchmaker/round-types";
+import type { Round, RoundTargetScore, RoundTimerDurationMinutes } from "@/lib/matchmaker/round-types";
 import type { Player } from "@/lib/matchmaker/types";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
@@ -49,6 +55,8 @@ type RoundStoreAction =
 	| { type: "RESET_INCOMPLETE_MATCHES"; round: Round }
 	| { type: "SUBMIT_SCORE"; round: Round; historyEntry: MatchHistoryEntry }
 	| { type: "SET_TARGET_SCORE"; round: Round }
+	| { type: "SET_TIMER_DURATION"; round: Round }
+	| { type: "START_TIMER"; round: Round }
 	| { type: "SWAP_MATCH_PLAYER"; round: Round };
 
 function createInitialState(): RoundStoreState {
@@ -66,6 +74,10 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 		case "SUBMIT_SCORE":
 			return { ...state, round: action.round, history: [...state.history, action.historyEntry] };
 		case "SET_TARGET_SCORE":
+			return { ...state, round: action.round };
+		case "SET_TIMER_DURATION":
+			return { ...state, round: action.round };
+		case "START_TIMER":
 			return { ...state, round: action.round };
 		case "SWAP_MATCH_PLAYER":
 			return { ...state, round: action.round };
@@ -107,6 +119,14 @@ export interface UseRoundStoreResult {
 	 * 時才允許），失敗（`ok: false`）時不套用任何變動（match-stage 的 MODIFIED
 	 * 「目標分數選擇器」——8.6 起才有非測試呼叫端接上這個原本懸空的純函式）。 */
 	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
+	/** 更改本輪計時長度：委派 round.ts 的 setTimerDuration（鎖定條件與 setTargetScore 相同，
+	 * 該輪所有場次仍為 pending 時才允許），失敗（`ok: false`）時不套用任何變動；成功時一律
+	 * 得到全新的 timer 物件（`startedAt` 重置為 `null`，見 round.ts 該函式的註解）。 */
+	setTimerDuration: (durationMinutes: RoundTimerDurationMinutes) => SetTimerDurationResult;
+	/** 開始本輪計時：委派 round.ts 的 startTimer（本輪已設定計時長度且尚未開始時才允許，
+	 * 與是否已開始計分無關），`now` 由本 hook 以 `new Date().toISOString()` 注入；失敗
+	 * （`ok: false`）時不套用任何變動。 */
+	startTimer: () => StartTimerResult;
 	/** 臨時換人：委派 round.ts 的 swapMatchPlayer，把某場 pending 場次中一位在場球員換成
 	 * 休息名單中的另一位球員，失敗（`ok: false`）時不套用任何變動。 */
 	swapMatchPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => SwapMatchPlayerResult;
@@ -124,6 +144,19 @@ const NO_ROUND_TO_SUBMIT_MESSAGE = "目前沒有進行中的回合，請重新�
 // 防線，並非真的會被觸發的分支。SetTargetScoreFailureCode 目前只有 SCORING_STARTED
 // 一個成員，沿用它純粹是型別上沒有更貼切的選項，不代表本情境真的是「已開始計分」。
 const NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
+
+// setTimerDuration 只會在計時長度選擇器已經拿到非 null 的 round 時才會被呼叫，這裡的
+// null 檢查與上方 NO_ROUND_TO_SET_TARGET_SCORE_MESSAGE 同樣是不可達的型別安全防線。
+// SetTimerDurationFailureCode 目前只有 SCORING_STARTED 一個成員，沿用它純粹是型別上
+// 沒有更貼切的選項，不代表本情境真的是「已開始計分」。
+const NO_ROUND_TO_SET_TIMER_DURATION_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
+
+// startTimer 只會在畫面已渲染出「開始計時」操作時才會被呼叫（該操作只存在於 round !== null
+// 的畫面裡），這裡的 null 檢查同樣是不可達的型別安全防線。START_TIMER_FAILURE_CODE 有
+// NOT_CONFIGURED／ALREADY_STARTED 兩個成員：NOT_CONFIGURED 語意上相對貼切——回合不存在時
+// 「本輪尚未設定計時長度」在字面上依然成立（沒有回合就不可能有計時設定）；ALREADY_STARTED
+// 隱含「計時已經在跑」，與「整個回合都不存在」互相矛盾，故不採用。
+const NO_ROUND_TO_START_TIMER_MESSAGE = "目前沒有進行中的回合，請重新整理頁面後再試一次。";
 
 // swapMatchPlayer 只會在畫面已渲染出換人操作時才會被呼叫（該操作只存在於 round !== null
 // 的畫面裡），這裡的 null 檢查與上面兩個 NO_ROUND_TO_* 常數同樣是不可達的型別安全防線。
@@ -290,6 +323,47 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return result;
 	}
 
+	// 更改本輪計時長度：委派 round.ts 的純函式，成功時 dispatch 新回合；失敗（該輪已有
+	// 場次非 pending）時不套用任何變動，形態比照 setTargetScore 的
+	// 「呼叫純函式 → 判 ok → dispatch」。
+	function setTimerDuration(durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+		if (state.round === null) {
+			return {
+				ok: false,
+				code: SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED,
+				message: NO_ROUND_TO_SET_TIMER_DURATION_MESSAGE,
+			};
+		}
+
+		const result = setTimerDurationPure(state.round, durationMinutes);
+		if (result.ok) {
+			dispatch({ type: "SET_TIMER_DURATION", round: result.round });
+		}
+
+		return result;
+	}
+
+	// 開始本輪計時：委派 round.ts 的純函式，`now` 由本 hook（呼叫端）以
+	// `new Date().toISOString()` 注入——round.ts 的 startTimer 是純函式，時間一律由呼叫端
+	// 提供；成功時 dispatch 新回合，失敗（尚未設定計時長度／已經開始計時）時不套用任何
+	// 變動，形態比照 setTargetScore。
+	function startTimer(): StartTimerResult {
+		if (state.round === null) {
+			return {
+				ok: false,
+				code: START_TIMER_FAILURE_CODE.NOT_CONFIGURED,
+				message: NO_ROUND_TO_START_TIMER_MESSAGE,
+			};
+		}
+
+		const result = startTimerPure(state.round, new Date().toISOString());
+		if (result.ok) {
+			dispatch({ type: "START_TIMER", round: result.round });
+		}
+
+		return result;
+	}
+
 	// 臨時換人（round-lifecycle 的「臨時換人（球員與休息名單互換）」Requirement）：委派
 	// round.ts 的純函式，成功時 dispatch 新回合；失敗（五項前置條件任一不成立）時不套用
 	// 任何變動，形態比照 setTargetScore 的「呼叫純函式 → 判 ok → dispatch」。
@@ -318,6 +392,8 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		resetIncompleteMatches,
 		submitScore,
 		setTargetScore,
+		setTimerDuration,
+		startTimer,
 		swapMatchPlayer,
 	};
 }

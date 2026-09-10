@@ -76,8 +76,11 @@ MUST 與目標分數選擇器共用同一個判定——`nextjs-pickball/lib/mat
 
 對戰頁 SHALL 提供「開始計時」操作入口與倒數顯示，實作為新元件
 `nextjs-pickball/components/matchmaker/RoundTimerBanner.tsx`，由
-`nextjs-pickball/app/matchmaker/page.tsx` 掛載（僅在目前回合存在時掛載，並傳入
-`round.timer`）。
+`nextjs-pickball/app/matchmaker/page.tsx` 掛載並傳入 `round?.timer ?? null`。
+掛載 SHALL NOT 外包一層「目前回合是否存在」的條件式——該元件自行處理 `timer` 為 `null`
+（不計時）與 `startedAt` 為 `null`（尚未開始）兩種早退並回傳 `null`，畫面結果相同；
+而外包條件式會在回合有無之間製造 unmount／remount，把「同一次到期只播一次」所倚賴的
+`useRef` 旗標清掉。
 
 「開始計時」按鈕 MUST 位於 `RoundControls.tsx` 的計時設定區塊，**僅在**本輪已設定計時長度
 （`timer !== null`）且尚未開始（`timer.startedAt === null`）時才顯示且可點擊，點擊 MUST
@@ -89,9 +92,10 @@ MUST 與目標分數選擇器共用同一個判定——`nextjs-pickball/lib/mat
 
 倒數顯示 MUST 呈現剩餘時間的 `mm:ss`（`nextjs-pickball/lib/matchmaker/round-timer.ts` 的
 `formatRemaining`），每秒更新一次，更新來源 MUST 為
-`nextjs-pickball/hooks/useRoundTimer.ts`——本 hook 是本 change 唯一呼叫 `setInterval`／
-`new Date()` 的位置，`round-timer.ts` 與其餘元件 SHALL NOT 各自另起計時器或直接讀取目前
-時間。
+`nextjs-pickball/hooks/useRoundTimer.ts`——本 hook 是本 change 唯一以 `setInterval`
+持續取樣目前時間的位置，`round-timer.ts` 與其餘元件 SHALL NOT 各自另起計時器或直接讀取
+目前時間。`startTimer` 的一次性 `now` 由 `useRoundStore` 注入（比照既有
+`generateRound`／`submitScore`），不受本條約束。
 
 倒數期間的畫面更新 SHALL NOT 使用 `aria-live`——每秒宣讀一次剩餘秒數對螢幕報讀器使用者是
 干擾而非幫助。時間到（剩餘秒數為 `0`）時 MUST 改為顯示大字「時間到」與繁體中文提示文案

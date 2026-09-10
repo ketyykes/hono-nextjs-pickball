@@ -271,6 +271,69 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    `CreateRoundInput` 的欄位、`RoundControls.tsx` 的 props 清單、`useRoundStore` 的
    解構清單），apply 的 §1 前置確認 MUST 以合併後的 `main` 重新核對本 design 的假設，
    差異一律補記於此節，不要默默改實作遷就本文件寫作當下的假設。
+
+   **【apply §1 對齊結果，2026-09-07，base commit `1125d53`】** 已逐檔實讀合併後 `main`
+   的 `round.ts`／`useRoundStore.ts`／`app/matchmaker/page.tsx`／`RoundControls.tsx`／
+   `scoreboard-binding.ts`／`round-types.ts`／`round-settings.ts`／`labels.ts`，
+   本 design 的假設**全部成立**，M10～M13 對這幾個檔案的改動皆為**純新增**：
+
+   - `CreateRoundInput` 仍為 `players`／`format`／`courtCount`／`previousRound`／`now`／
+     `newMatchId`／`targetScore?`，`targetScore` 以解構預設值
+     （`targetScore = DEFAULT_TARGET_SCORE`）落在函式層而非 schema 層 —— §4.2 的
+     `timerDurationMinutes?` 照此形態新增即可。
+   - `createRound()` 的 `const round: Round = { ... }` 仍為**逐欄列舉**（
+     `roundNumber`／`createdAt`／`format`／`courtCount`／`targetScore`／`matches`／
+     `restingPlayerIds`／`seenSignatures`），`resetIncompleteMatches()` 仍以
+     `{ ...round, matches, restingPlayerIds, seenSignatures }` **物件展開**回傳 ——
+     Decision 4 的兩條規則「各自自然成立」維持有效，§4.7 兩個 it 仍預期為 regression guard。
+   - `setTargetScore()` 的鎖定條件仍為 `round.matches.some((match) => match.status !== "pending")`，
+     失敗代碼結構為 `SET_TARGET_SCORE_FAILURE_CODE = { SCORING_STARTED: "scoring-started" }`
+     ＋私有 `SCORING_STARTED_MESSAGE` ＋ `SetTargetScoreSuccess`／`SetTargetScoreFailure`／
+     `SetTargetScoreResult` 三個型別 —— §4.4／§4.6 照此形狀對稱撰寫。
+     M13 新增的 `swapMatchPlayer` 亦沿用同一形狀（`SWAP_MATCH_PLAYER_FAILURE_CODE`）。
+   - `isTargetScoreLocked(round, slots): { locked, reason }` 簽章不變，私有常數
+     `TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可更改。"` 仍為私有（未匯出）
+     —— Decision 2「重用 `locked`、不重用 `reason`」的前提成立。
+   - `RoundControlsProps` 為 `settings`／`onSettingsChange`／`round`／`matchSlots`／
+     `activePlayerCount`／`onGenerate`／`onReset`／`setTargetScore` 共 8 項，**M13 未對本元件
+     加任何 prop**；目標分數 radiogroup 的鎖定顯示模式為
+     `const lockResult = round !== null ? isTargetScoreLocked(round, matchSlots) : { locked: false, reason: null }`，
+     鍵盤導覽委派 `lib/scoreboard/radio-navigation.ts` 的 `nextRadioIndex`。
+   - `useRoundStore` 已有 6 個 action（`HYDRATE`／`GENERATE_ROUND`／`RESET_INCOMPLETE_MATCHES`／
+     `SUBMIT_SCORE`／`SET_TARGET_SCORE`／`SWAP_MATCH_PLAYER`）與 5 個回傳方法；
+     `setTargetScore` 的接線形態為「`state.round === null` 型別安全防線 → 呼叫純函式 →
+     判 `ok` → `dispatch`」，§9 照此比照即可。
+   - `app/matchmaker/page.tsx` 的 `RoundControls` 掛載點在
+     `<div data-print="hide" className="max-md:[&_button:not([role]):not([aria-label])]:min-h-11">`
+     之內；M13 只為 `MatchStage` 增加了 `onSwapPlayer`／`swapError` 兩個 prop 與
+     `handleSwapPlayer`，與本 change 的掛載點無衝突。
+   - `nextjs-pickball/package.json` 的 dependencies 為 `@opennextjs/cloudflare`／
+     `@radix-ui/react-label`／`@radix-ui/react-slot`／`class-variance-authority`／`clsx`／
+     `lucide-react`／`motion`／`next`／`radix-ui`／`react`／`react-dom`／`tailwind-merge`／
+     `zod`，**確認無任何計時或音效相依**（`motion` 為 tour 動畫用，本 change 不得使用）。
+   - `labels.ts` 現有 6 個具名匯出（`TEAM_LABELS`／`TEAM_LABELS_BY_KEY`／`FORMAT_LABEL`／
+     `DOUBLES_COMPOSITION_LABEL`／`PLAYER_NOT_ON_ROSTER_LABEL`／`SWAP_PLAYER_LABEL`／
+     `SWAP_PLAYER_NO_CANDIDATE_LABEL`），與本 change 要新增的
+     `ROUND_TIMER_LOCKED_REASON`／`ROUND_TIMER_EXPIRED_MESSAGE` 無命名衝突。
+
+   **【§13 收尾驗證的補充，2026-09-08】這條漣漪的第二波：`tsc` 抓不到 E2E 的種子 fixture。**
+   apply 當時我（leader）以 `grep -rn "seenSignatures:"` 掃出所有 `Round` 字面量，
+   其中 `tests/e2e/specs/player-stats.spec.ts` 也在命中清單內，但我判斷它「多半是
+   `addInitScript` 內的純物件、沒有型別標註」而未處理——**這個判斷是對的，處置卻是錯的**：
+   正因為沒有型別標註，`tsc --noEmit` 一路綠燈，8 個單元測試 fixture 的編譯錯誤全被抓到，
+   唯獨這一個沒有任何靜態訊號。它一直潛伏到 §13 實跑**完整 E2E** 才現形：
+   該檔既有的「瀏覽統計頁不改動任何持久化資料」是逐位元組比對，種子停留在 M14 前的形狀，
+   hydrate 時 `.default(null)` 補上 `timer`、write effect 把正規化後的形狀寫回，
+   於是五個 browser project 全數轉紅。
+   **教訓**：schema 新增必填輸出欄位時，「靠 `tsc` 找出所有 fixture」是不完整的策略——
+   未標註型別的持久化種子資料（E2E、手寫 JSON、測試用的 `addInitScript`）不在 `tsc` 的
+   守備範圍內，MUST 另外用「哪些測試會把該 schema 的資料種進 localStorage」這個角度掃一遍。
+
+   **唯一與文件不符之處（tasks.md 的事實誤記，不影響設計）**：`tasks.md` 的 10.1 與 13.12①
+   寫「既有 4 個 it 的斷言與名稱不變」，實測 `RoundControls.test.tsx` 目前有 **14 個既有
+   `it`**（design Decision 8 的 Alternatives 段落寫的「14 個既有 it」才是正確數字）。
+   apply 一律以「**14 個既有 it 的名稱與斷言全部不得變動**，只允許替 `buildProps()`
+   補上 `setTimerDuration`／`startTimer` 兩個 `vi.fn()` 預設值」為準。
 2. **Playwright `page.clock` 對本專案 `setInterval`-based hook 的相容性**：design 假設
    `page.clock.install()` + `page.clock.fastForward()` 可以正確驅動
    `useRoundTimer.ts` 的 `setInterval` tick 並反映在畫面上，但本 repo 尚無先例。
@@ -283,3 +346,210 @@ startedAt: null }` 這一行，是本 change 在 `round.ts` 唯一需要「主�
    播放），理論上應與瀏覽器引擎無關，但仍需 apply 階段五個 browser project 全數
    實跑後才能確認；若某個 project 不穩，處理方式比照 execution-plan 的既有升級條件
    （SHALL NOT 靜默 `test.skip`，須記明原因與改用的驗證方式）。
+
+4. **【apply 新增，2026-09-07】`Round.timer` 為必填輸出欄位造成的全 repo fixture 漣漪**：
+   propose 階段未預見——zod 的 `.default(null)` 只讓**輸入**端可省略該鍵，**輸出**型別
+   （`z.infer` = `z.output`）中 `timer` 仍是**必填**。因此 `RoundSchema` 一加上 `timer`
+   欄位，所有以 `const x: Round = { ... }`／`function buildRound(...): Round` 形式建構的
+   既有 fixture 都會出現 TS2739，涉及約十個檔案（`round.test.ts`／`round-storage.test.ts`／
+   `scoreboard-binding.test.ts`／`export-scene.test.ts`／`transfer-storage.test.ts`／
+   `backup.test.ts`／`CourtCard.test.tsx`／`RoundControls.test.tsx` 等）。
+
+   本批**不用 linked worktree**（見 environment.md），而 `.claude/hooks/stop-typecheck.sh`
+   對**主 worktree** 的 tsc 錯誤是 **exit 2 擋下 session**（只有 linked worktree 才是
+   「提示不擋」）。因此不能讓 tsc 紅燈跨越群組邊界。
+
+   **處置（2026-09-07）**：§2 的 Implementer 依其派工單的檔案邊界，正確地**拒絕**了
+   跨檔修補（其派工單明文限定只可改 `round-types.ts`／`round-types.test.ts`，且要求
+   遇到超範圍情況回報而非自行擴大）——這個判斷是對的，記錄於此以免日後被誤讀為漏做。
+   跨群組的型別修補因此改由 **leader 自己執行**，作為獨立於任何 § 群組的
+   「群組間過渡態修補」，單獨一個 commit：
+   ① 對 8 個既有 `Round` 字面量 fixture 機械式補 `timer: null`
+   （`CourtCard.test.tsx`／`RoundControls.test.tsx`／`backup.test.ts`／`export-scene.test.ts`／
+   `round-storage.test.ts`／`round.test.ts`／`scoreboard-binding.test.ts`／
+   `transfer-storage.test.ts`；**只補欄位**，零 `it` 名稱與斷言變更）；
+   ② 於 `round.ts` 的 `createRound()` 回傳物件補**一行** `timer: null,` 作為維持型別正確的
+   最小值，註解註明「計時長度的實際決定邏輯屬後續 task」。
+   §4.2 屆時把這一行替換為
+   `timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null }`，
+   §4.1 的 RED 仍為真紅燈（`timerDurationMinutes: 15` 的那條斷言在此最小值下必然失敗）。
+   §4 的 Implementer 與 Stage 1 reviewer MUST 知悉這一行的存在與來歷，**不應**把它判為
+   「§4 已被別人先做掉」或 scope creep。
+
+   附帶記錄（§2 的 mutation 自查結論，供 Final Review 參考）：
+   `ROUND_TIMER_DURATION_OPTIONS` 改寫死 `[10, 15, 20]` 這個 mutation **存活**，
+   與既有 `TARGET_SCORE_OPTIONS` 同款的結構性限制——值相同時任何值層級的斷言都測不出
+   「由 schema 推導」與「寫死」的差別。已誠實記錄，未以偽造斷言掩蓋；此點由
+   Code-Quality／Final Review 以人工閱讀把關。
+
+
+5. **【apply 新增，2026-09-07】本 change 實測到的「恆真斷言」五種形態**（供 Final Review 與
+   後續 milestone 參考；前三種與第五種是在 Stage 2 的獨立 mutation 中才被抓到、Implementer
+   自查漏掉，第四種則是 §11 的 Implementer 自己抓到的）：
+
+   1. **輸入用了預設值**（§3 實測）：測「原樣帶出」時若欄位值就是預設值（`null`），
+      「保留」與「被重設為預設值」的結果相同，斷言恆真。→ 斷言用的輸入 MUST 用非預設值。
+   2. **比對基準用了活參考**（§4 實測）：`expect(result.timer).toEqual(round.timer)` 在實作
+      就地修改 `round.timer` 時兩邊同時被改，斷言恆真。→ MUST 先 `structuredClone` 留快照，
+      與**快照**比對。
+   3. **`toEqual` 兩邊指向同一參考**（既有紀律）。
+   4. **子字串斷言被另一段包含該子字串的文案矇混**（§11 實測）：
+      斷言 alert 區塊 `toContain("時間到")`，但 `ROUND_TIMER_EXPIRED_MESSAGE` 的文案
+      **本身就是**「**時間到**：領先者勝，平手請再打一球」——開頭就含這三個字。
+      於是把「時間到」大字整個拿掉，子字串斷言照樣通過。
+      → 改用 `within(alert).getByText("時間到")` 精確比對才轉紅。
+      凡是「容器內含某短字串」的斷言，MUST 確認容器內沒有第二段文字包含它。
+   5. **fixture 對某輸入欄位只用單一值**（§5 實測）：`round-timer.test.ts` 全檔
+      `durationMinutes` 都是 `10`，於是「忽略 `timer.durationMinutes`、寫死 10」的實作
+      恆綠。→ union 型別欄位（`durationMinutes` 10/15/20、`targetScore` 11/15/21）
+      MUST 至少用兩個不同值。
+
+   另記錄一則**流程教訓**：§5 的 Implementer 自述「10 項 mutation 全數轉紅、0 存活」，
+   Stage 2 獨立重跑後實測有 **3 項存活**，其中 M2（拿掉 `remainingSeconds` 的上限夾值）
+   正是該 Implementer 自己列為「邊界決策 #1」的那條防禦——**自述的 mutation 結果不可採信**，
+   Stage 2 的獨立重跑是必要而非冗餘。
+
+
+6. **【apply 新增，2026-09-07】archive 階段必讀：主 spec 歸屬清單有被靜默回捲的風險**
+   （§8 Stage 2 查 openspec CLI `@fission-ai/openspec@1.9.0` 原始碼後的實測結論）
+
+   §8 依 tasks 8.2 把 `useRoundTimer` 提前同步進主 spec
+   （`openspec/specs/pickleball-guide-page/spec.md`），因為 `hooksInventory.test.ts` 讀的是
+   主 spec 而非 delta。已查證 CLI **明文支援**這個「early-sync pattern」：
+   `specs-apply.js` 對內容相同的 MODIFIED 只是不計入 `modifiedApplied`，
+   `archive.js` 在該 capability 的四類操作計數全為 0 時直接 `continue`。
+   因此 archive 對 `pickleball-guide-page` 會是 **no-op**，`Totals` 的 `~` 數字會比 delta 的
+   MODIFIED 總數少 1——**這是預期行為，不是漏處理**，不要因此加 `--skip-specs` 或手動再套一次。
+   （已實測：delta 該檔**整份**只有一個 MODIFIED Requirement，且與主 spec 該區塊
+   `normalizeBlockRaw` 後 sha256 相同，不存在「還有其他未同步內容」的情境。）
+
+   **真正的風險方向相反**：MODIFIED 是**整塊取代**，而 archive 唯一的內容保護
+   `findMissingCurrentScenarios()` **只檢查 Scenario 有沒有被漏掉，不檢查散文**——
+   而 hooks 歸屬清單那一行正是散文。因此：
+
+   > 本 change archive **之前**，若任何人／任何後續 milestone 又往主 spec 的歸屬清單加了新 hook
+   > 卻沒有同步改本 change 的 delta，archive 會把整塊 Requirement 換回 delta 的版本，
+   > **靜默抹掉那筆新增**，而 `Totals` 只會顯示 `~ 1`（看起來完全正常）。
+   > 事後唯一的偵測是 `hooksInventory.test.ts` 下一次執行轉紅，但那已在 archive commit 之後。
+
+   **可行動的處置**：
+   - archive 前 MUST 先 `diff` 確認主 spec 該 Requirement 區塊與 delta 仍逐字相同；
+     若不同，**先把主 spec 的新內容補進 delta**，再 archive。
+   - 本 change archive 前，**不要「順手潤飾」主 spec 這個 Requirement 的任何措辭**
+     （包含「每支 hook SHALL 有對應 `*.test.ts` 檔」這句略有歧義的用字）——改了會被靜默回捲。
+     要澄清措辭請另開 change，同時改 delta 與主 spec。
+   - 後續任何 milestone 於 `nextjs-pickball/hooks/` 新增 hook 時，MUST **同時**更新主 spec
+     與該 change 的 delta 兩份。
+
+   附帶澄清（避免後續 milestone 誤讀該 Requirement）：標題的「三支」指的是
+   **pickleball-guide-page 自己擁有**的三支（`useScrollShadow`／`useScrollSpy`／`useScrolledPast`），
+   不是 `hooks/` 目錄總數（目前已 13 支）；「每支 hook SHALL 有對應 `*.test.ts` 檔」的先行詞
+   是同句的那三支，**不涵蓋**跨 capability 的其餘 hook——`useRoundTimer` 的測試義務來自 root
+   `CLAUDE.md` 的 TDD 規則與 `round-lifecycle` 規格，不由這份規格管。
+
+
+7. **【apply 新增，2026-09-07】⚠️ 需要人類裁決：本輪已產生後無法改回「不計時」**
+   （§10 Implementer 回報的設計缺口，spec 與 design 皆未涵蓋）
+
+   **現象**：計時 radiogroup 有四個選項（不計時／10／15／20），但
+   `round.ts` 的 `setTimerDuration(round, durationMinutes)` 的參數型別是
+   `RoundTimerDurationMinutes`（`10 | 15 | 20`），**沒有接受 `null` 的多載**，
+   `round-lifecycle` 也**沒有**「把已產生的本輪改回不計時」的入口。
+   因此 `round === null`（尚未產生本輪）時選「不計時」可正常寫入 `settings`；
+   但 `round` 已存在時點「不計時」**沒有任何反應**。
+
+   **§10 的處置（暫行，已在程式碼註解標明）**：依 spec「SHALL NOT 在 UI 層直接改寫回合物件」，
+   把這條路徑實作為**不作為**（`if (durationMinutes === null) return;`），
+   SHALL NOT 讓 UI 自己組一個 `timer: null` 的回合。
+
+   **三個候選解法，皆超出 §10 範圍，需人類裁決**：
+   1. `round-lifecycle` 補一個 `clearTimer(round)` 入口（或讓 `setTimerDuration` 接受 `null`）
+      —— 行為最完整，但要改 spec 與 delta，屬新增 Requirement 條款。
+   2. 回合已存在時把「不計時」該顆設為 `disabled` 並附說明 —— 純 UI 層，但與 spec
+      「四個選項」「鎖定時四顆皆 disabled」的既有敘述會產生第三種狀態，需補 Scenario。
+   3. 維持現狀（不作為）並在 spec 明訂「計時長度於產生本輪時決定，本輪進行中只能在
+      10／15／20 之間調整，不能改回不計時」—— 改動最小，但要確認這是產品意圖。
+
+   在裁決之前，apply **維持解法 3 的行為**（不作為），並以本條記錄留痕。
+   ⚠️ **這一條 SHALL NOT 由 subagent 自行決定**——execution-plan 的 Escalation 明訂
+   設計決策需人類確認。
+
+8. **【apply 新增，2026-09-07】`page.tsx` 的 `RoundControls` prop 接線已由 leader 提前完成**
+
+   §10 為 `RoundControlsProps` 加入**必填**的 `setTimerDuration`／`startTimer` 後，
+   `app/matchmaker/page.tsx`（`RoundControls` 的唯一呼叫點）立即出現 TS2739，
+   而 `app/**` 不在 §10 的可動檔案清單內——§10 依規回報 `BLOCKED` 後停手，**判斷正確**。
+
+   因主 repo 的 Stop hook 對 tsc 錯誤是 exit 2 擋下（本批無 linked worktree），
+   不能讓紅燈跨越群組邊界，故由 **leader 提前完成 §12.2 的其中兩行**：
+   `useRoundStore` 的解構加入兩個方法、`<RoundControls>` 加入兩個 prop。
+
+   **§12.2 因此只剩「掛載 `RoundTimerBanner`（傳入 `round?.timer ?? null`）」一件事**，
+   §12 的 Implementer 與審查者 MUST 知悉這兩行已存在，**不應**判為「§12 已被別人先做掉」
+   或重複實作。
+
+
+9. **【apply 新增，2026-09-07】發現一個既有 bug：目標分數 radiogroup 的方向鍵起算值錯誤**
+   （§10 Stage 2 以暫時 probe 測試實跑證實，**不是本 change 造成的，本 change 未修**）
+
+   `RoundControls.tsx` 既有的 `handleTargetScoreKeyDown` 以
+   `TARGET_SCORE_OPTIONS.indexOf(settings.targetScore)` 起算，但畫面上 `aria-checked="true"`
+   與 `tabIndex={0}` 的那一顆是依 `displayedTargetScore`（`round !== null` 時為
+   `round.targetScore`）決定的。兩者分歧時，方向鍵會**從畫面上沒被選中的位置**開始移動，
+   focus 也跟著落到錯的按鈕。
+
+   **實測證據**（probe：`round.targetScore = 21`、`settings.targetScore = 11`、未鎖定，
+   按 ArrowRight）：
+   ```
+   AssertionError: expected "vi.fn()" to be called with arguments: [ 11 ]
+   1st vi.fn() call: [ 15 ]   ← 實際
+   ```
+   畫面上選中的是 index 2（21），卻從 index 0 起算跳到 index 1（15）。
+
+   **兩者在真實 app 中確實會分歧**（非假設情境）：`app/matchmaker/page.tsx` 的 `settings` 是
+   本地 `useState(() => createRoundSettings())`，**從未由 `round` 回填**。兩條分歧路徑：
+   ① 重新載入頁面時 `round` 由 localStorage hydrate、`settings` 仍是預設值；
+   ② 回合存在時改目標分數只走 `commitTargetScore`、**不呼叫** `onSettingsChange`。
+
+   **本 change 的處置**：§10 新增的計時 radiogroup **刻意寫對**（`currentIndex` 取自
+   `displayedTimerDuration`），並補了一條 regression guard 釘住這個差異——否則日後有人
+   「順手統一成既有寫法」會把這個 bug 靜默複製到計時路徑。既有那條**未修**：
+   超出本 change 範圍，且會動到既有測試釘住的路徑。
+
+   **建議**：另開 change 處理。修法看似只是一行（`settings.targetScore` →
+   `displayedTargetScore`），但 `settings` 長期與 `round` 分歧這件事本身仍在，
+   應連同 `page.tsx` 的 `settings`／`round` 同步策略一起檢視。
+
+10. **【apply 新增，2026-09-07】repo 級無障礙觀察（本 change 未開新先例）**
+
+    三處 radiogroup（目標分數、計時、`ScoreboardSetup`）的鎖定都用原生 `disabled` 而非
+    `aria-disabled`，螢幕報讀器使用者因此 Tab 不到控制項、也聽不到相鄰的鎖定原因 `<p>`。
+    WAI-ARIA APG 對 radio group 傾向 `aria-disabled`。§10 依「既有慣例勝出」照做是對的；
+    若要改應是獨立的 a11y change，一次改三處。
+
+11. **【apply 新增，2026-09-08】⚠️ 需要人類裁決：計時到期後重新整理頁面會再播一次提示音**
+    （§11 Stage 2 以 probe 測試實測，並與 §6 Stage 2 的 `suspended` 洩漏發現連起來）
+
+    `RoundTimerBanner` 的「同一次到期只播一次」是靠 `useRef` 旗標（記錄已為哪個 `startedAt`
+    播過）。`useRef` **無法跨 mount 存活**，因此：
+
+    > 計時已到期的回合，使用者**重新整理頁面**時，`round.timer` 由 localStorage 還原、
+    > 首次 render 即 `expired`，於是**再播一次提示音**。每重整一次就再播一次。
+
+    **與 §6 的發現疊加後有第二層影響**：依 `round-timer-sound.ts` 的分析，若
+    `AudioContext` 因自動播放政策停在 `suspended`（頁面載入後尚無使用者手勢，正是重整當下
+    的情境），`currentTime` 凍結 → `onended` 不觸發 → `close()` 從未執行 →
+    **每次重整洩漏一個 `AudioContext`**。實務衝擊小（瀏覽器對並存數量的上限量級是個位數，
+    且 suspended 時實際無聲），但這是「聽不到聲音」之外的第二個後果。
+
+    **§11 的處置**：維持現狀，不在元件內處理。要跨 mount 去重就得把「已播過」寫進
+    localStorage，遠超 spec 範圍；而 `useRef` 的行為本身是 React 的定義，不是實作瑕疵。
+
+    **候選解法（需人類裁決）**：
+    1. 維持現狀 —— 重整後再響一次視為可接受（甚至可能是想要的：使用者重整回來，
+       提示他這一輪時間已到）。
+    2. `page.tsx` 掛載時加條件（例如只在 `startedAt` 晚於本次頁面載入時間時才掛載）
+       —— 正確的接線點在 page 層，**不是** `RoundTimerBanner` 或 `round-timer-sound.ts`。
+    3. 把「已播過」持久化 —— 成本最高，需要新的 storage 欄位或 key。
+
+    在裁決之前 apply **維持解法 1**（現狀），並以本條留痕。

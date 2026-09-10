@@ -16,7 +16,15 @@ import type { Match, MatchFormat, RoundAllocation, SignatureIndex, Team } from "
 import type { MatchHistoryEntry } from "./history";
 import type { RatingChange, RatingPlayerInput, RatingUpdateResult } from "./rating-types";
 import type { Player } from "./types";
-import type { PlayerRating, Round, RoundMatch, RoundTargetScore, RoundTeam, SeenSignatures } from "./round-types";
+import type {
+	PlayerRating,
+	Round,
+	RoundMatch,
+	RoundTargetScore,
+	RoundTeam,
+	RoundTimerDurationMinutes,
+	SeenSignatures,
+} from "./round-types";
 
 /**
  * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
@@ -59,6 +67,11 @@ export interface CreateRoundInput {
 	 * RoundSchema 刻意不帶 .default()，否則一份 targetScore 損壞的回合資料會被靜默補成 11
 	 * 而不是被判為損壞（design Decision 4）。 */
 	readonly targetScore?: RoundTargetScore;
+	/** 本輪的計時長度，省略或為 null 時採不計時（design Decision 1：計時比照目標分數的
+	 * 每輪設定模式）。與 targetScore 不同，這裡刻意允許顯式傳入 null——「不計時」是
+	 * RoundTimerDurationMinutes 值域外的合法選項，不能用「省略」與「顯式選擇不計時」
+	 * 共用同一種表達。 */
+	readonly timerDurationMinutes?: RoundTimerDurationMinutes | null;
 }
 
 /** 休息次數結算 patch，形狀可直接餵給 roster.ts 的 updatePlayer(id, { restCount })。 */
@@ -251,7 +264,16 @@ function computeRestSettlements(players: readonly Player[], previousRound: Round
  * 只負責一次算出兩者，不負責套用。
  */
 export function createRound(input: CreateRoundInput): CreateRoundResult {
-	const { players, format, courtCount, previousRound, now, newMatchId, targetScore = DEFAULT_TARGET_SCORE } = input;
+	const {
+		players,
+		format,
+		courtCount,
+		previousRound,
+		now,
+		newMatchId,
+		targetScore = DEFAULT_TARGET_SCORE,
+		timerDurationMinutes = null,
+	} = input;
 
 	// 邊界檢查集中於此一處（tasks 4.10）：allocateRound 對名單相關的邊界不拋錯而是自然
 	// 回傳空 matches（M2 的既有行為，見 allocation.ts 頂端註解），本函式是唯一呼叫端，
@@ -303,6 +325,9 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
 		seenSignatures: toArrays(ownSignatures),
+		// 產生本輪一律給全新的 timer（design Decision 4）：即使沿用與上一輪相同的
+		// durationMinutes，startedAt 仍固定為 null，不沿用上一輪 timer 物件的倒數狀態。
+		timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null },
 	};
 
 	return {
@@ -355,6 +380,98 @@ export function setTargetScore(round: Round, targetScore: RoundTargetScore): Set
 	}
 
 	return { ok: true, round: { ...round, targetScore } };
+}
+
+// ---- 計時設定：每輪設定，開始計分後鎖定（design Decision 1，鎖定條件比照 setTargetScore） ----
+
+/**
+ * setTimerDuration 的失敗代碼。與 SET_TARGET_SCORE_FAILURE_CODE 分開宣告的理由相同：
+ * 兩者是各自獨立的結果型別的 code 來源，混用會讓呼叫端的分支處理多出不存在的分支。
+ */
+export const SET_TIMER_DURATION_FAILURE_CODE = {
+	SCORING_STARTED: "scoring-started",
+} as const;
+
+export type SetTimerDurationFailureCode = (typeof SET_TIMER_DURATION_FAILURE_CODE)[keyof typeof SET_TIMER_DURATION_FAILURE_CODE];
+
+const TIMER_SCORING_STARTED_MESSAGE = "本輪已有場次開始計分，計時設定不可再更改；如需改用其他計時長度，請於產生新一輪時設定。";
+
+export interface SetTimerDurationSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface SetTimerDurationFailure {
+	readonly ok: false;
+	readonly code: SetTimerDurationFailureCode;
+	readonly message: string;
+}
+
+export type SetTimerDurationResult = SetTimerDurationSuccess | SetTimerDurationFailure;
+
+/**
+ * 更改該輪的計時長度：鎖定條件與 setTargetScore 完全相同（該輪所有場次仍為 pending 時才
+ * 允許），否則回傳失敗結果且原回合 SHALL NOT 被修改（純函式，回傳新回合由呼叫端套用）。
+ *
+ * 成功時一律回傳全新的 timer 物件、startedAt 重置為 null（design Decision 3）：變更計時
+ * 長度代表使用者想要一段新的倒數，沿用舊的 startedAt 會讓剩餘時間依新長度立即重新計算，
+ * 等同在使用者不知情的情況下悄悄跳秒。
+ */
+export function setTimerDuration(round: Round, durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+	if (round.matches.some((match) => match.status !== "pending")) {
+		return { ok: false, code: SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED, message: TIMER_SCORING_STARTED_MESSAGE };
+	}
+
+	return { ok: true, round: { ...round, timer: { durationMinutes, startedAt: null } } };
+}
+
+// ---- 開始計時：與「是否已開始計分」的鎖定判定無關（design：開始計時與比分無關） ----
+
+/**
+ * startTimer 的失敗代碼。兩種前置條件不成立的情境分開表達（同 RESET_INCOMPLETE_MATCHES_FAILURE_CODE
+ * 的先例）：NOT_CONFIGURED 代表使用者根本還沒選計時長度，下一步是先設定；ALREADY_STARTED
+ * 代表倒數已經在跑，下一步是等待或改長度，兩者的修正方式不同。
+ */
+export const START_TIMER_FAILURE_CODE = {
+	NOT_CONFIGURED: "not-configured",
+	ALREADY_STARTED: "already-started",
+} as const;
+
+export type StartTimerFailureCode = (typeof START_TIMER_FAILURE_CODE)[keyof typeof START_TIMER_FAILURE_CODE];
+
+const TIMER_NOT_CONFIGURED_MESSAGE = "本輪尚未設定計時長度，請先選擇計時長度後再開始計時。";
+const TIMER_ALREADY_STARTED_MESSAGE = "本輪計時已經開始，無法重複開始。";
+
+export interface StartTimerSuccess {
+	readonly ok: true;
+	readonly round: Round;
+}
+
+export interface StartTimerFailure {
+	readonly ok: false;
+	readonly code: StartTimerFailureCode;
+	readonly message: string;
+}
+
+export type StartTimerResult = StartTimerSuccess | StartTimerFailure;
+
+/**
+ * 開始本輪計時：本輪已設定計時長度（timer !== null）且尚未開始（timer.startedAt === null）
+ * 時，寫入 startedAt 為呼叫當下時間；否則拒絕並回傳可判讀的失敗結果，SHALL NOT 拋出例外
+ * （spec「開始計時」）。純函式，時間由呼叫端注入（design：不呼叫 Date.now()）。
+ *
+ * 刻意不檢查任何場次狀態——開始計時與比分無關，主持人可能在任何一場開打前就先啟動倒數，
+ * 因此 SHALL NOT 依賴 setTargetScore／setTimerDuration 共用的「是否已開始計分」鎖定判定。
+ */
+export function startTimer(round: Round, now: string): StartTimerResult {
+	if (round.timer === null) {
+		return { ok: false, code: START_TIMER_FAILURE_CODE.NOT_CONFIGURED, message: TIMER_NOT_CONFIGURED_MESSAGE };
+	}
+	if (round.timer.startedAt !== null) {
+		return { ok: false, code: START_TIMER_FAILURE_CODE.ALREADY_STARTED, message: TIMER_ALREADY_STARTED_MESSAGE };
+	}
+
+	return { ok: true, round: { ...round, timer: { ...round.timer, startedAt: now } } };
 }
 
 // ---- 重設與重排未完成場次（prd.md 6.2、design Decision 5） ----

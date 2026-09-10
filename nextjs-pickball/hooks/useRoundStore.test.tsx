@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useRoundStore } from "./useRoundStore";
-import { createRound, submitScore, SUBMIT_SCORE_FAILURE_CODE, SWAP_MATCH_PLAYER_FAILURE_CODE } from "@/lib/matchmaker/round";
+import {
+	createRound,
+	submitScore,
+	SUBMIT_SCORE_FAILURE_CODE,
+	SWAP_MATCH_PLAYER_FAILURE_CODE,
+	START_TIMER_FAILURE_CODE,
+} from "@/lib/matchmaker/round";
 import { readRound, readHistory, writeRound, writeHistory } from "@/lib/matchmaker/round-storage";
 import type {
 	CreateRoundResult,
 	ResetIncompleteMatchesResult,
 	SubmitScoreResult,
 	SetTargetScoreResult,
+	SetTimerDurationResult,
+	StartTimerResult,
 	SwapMatchPlayerResult,
 } from "@/lib/matchmaker/round";
 import type { Player } from "@/lib/matchmaker/types";
@@ -466,6 +474,164 @@ describe("useRoundStore", () => {
 		expect(failResult?.code).toBe(SWAP_MATCH_PLAYER_FAILURE_CODE.MATCH_NOT_FOUND);
 		expect(result.current.round).toBeNull();
 		expect(updatePlayer).not.toHaveBeenCalled();
+	});
+
+	// M14：startTimer 是 round.ts 第五個「純函式回傳 ok/失敗 → hook 判 ok → dispatch」家族
+	// 成員（§4 已完成並通過審查）。本測試特意透過 hook 自己的 generateRound／startTimer
+	// 方法（而非直接呼叫 round.ts 純函式後手動 writeRound）產生已開始計時的回合，
+	// 目的是連帶驗證「開始計時後真的經由既有 write effect 持久化」——若只用純函式組出
+	// 持久化資料再單獨 mount 一次（如上方「重新掛載後還原目前回合與歷史」的做法），
+	// 測不出 write effect 是否真的隨 startTimer 的 dispatch 一起觸發。
+	// 比對基準用 structuredClone 快照而非活參考：round 物件在 dispatch 後會被整份取代，
+	// 若改用活參考，重新掛載後的新物件與快照物件即使內容不同也可能因為某些欄位共用
+	// 参考而誤判相等，快照能確保比對的是「當下內容」而非「當下參考」。
+	it("重新掛載後仍保留已開始計時的 timer，startedAt 不被重置", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result, unmount } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		expect(result.current.round?.timer?.durationMinutes).toBe(10);
+		expect(result.current.round?.timer?.startedAt).toBeNull();
+
+		// 用 fake timer 固定系統時鐘，驗證 startTimer 寫入的 startedAt 真的等於呼叫當下的
+		// new Date().toISOString()（殺「now 改成固定字串」變異：若本 hook 沒有真的呼叫
+		// new Date().toISOString()，startedAt 不會等於這裡固定的系統時間）。
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-08-23T00:01:00.000Z"));
+		let startResult: StartTimerResult | undefined;
+		act(() => {
+			startResult = result.current.startTimer();
+		});
+		vi.useRealTimers();
+		expect(startResult?.ok).toBe(true);
+		if (!startResult?.ok) {
+			throw new Error("測試前置失敗：startTimer 未成功");
+		}
+		expect(startResult.round.timer?.startedAt).toBe("2026-08-23T00:01:00.000Z");
+		// 斷言 state（而非只有純函式的回傳值）已真的被 dispatch 套用（殺「成功時不 dispatch」
+		// 變異：若不 dispatch，state.round.timer 仍是呼叫前的舊值，下面這條會落空）。
+		expect(result.current.round?.timer).toEqual(startResult.round.timer);
+
+		const timerBeforeRemount = structuredClone(result.current.round?.timer);
+		unmount();
+
+		// WHEN：重新掛載 useRoundStore（模擬重新整理頁面）。
+		const { result: remounted } = renderHook(() =>
+			useRoundStore({ players, updatePlayer: () => {} }),
+		);
+
+		// THEN：還原後的 timer 與掛載前完全相同，startedAt 不被重置。
+		expect(remounted.current.round?.timer).toEqual(timerBeforeRemount);
+	});
+
+	// regression guard（非 test-plan 內、非 9.1 驗收錨點）：上方「重新掛載後仍保留已開始
+	// 計時的 timer」只走 startTimer 的成功路徑，測不到 setTimerDuration 本身的接線是否正確、
+	// 也測不到兩者在「尚無回合」時的 null 防線。比照既有 setTargetScore 的兩條接線測試
+	// （「setTargetScore 成功時套用新目標分數、已開始計分時拒絕且 round 參考不變」與
+	// 「尚無目前回合時呼叫 setTargetScore 回傳失敗且不 dispatch」）補齊同等覆蓋，
+	// 殺 setTimerDuration／startTimer「成功時不 dispatch」「失敗時仍 dispatch」
+	// 「null 防線被移除」三類變異。
+	it("setTimerDuration 成功時套用新計時長度、已開始計分時拒絕且 round 參考不變", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		expect(result.current.round?.timer?.durationMinutes).toBe(10);
+
+		let successResult: SetTimerDurationResult | undefined;
+		act(() => {
+			successResult = result.current.setTimerDuration(20);
+		});
+		expect(successResult?.ok).toBe(true);
+		// 讀 state（而非只讀純函式回傳值）確認真的被 dispatch（殺「成功時不 dispatch」）。
+		expect(result.current.round?.timer?.durationMinutes).toBe(20);
+		expect(result.current.round?.timer?.startedAt).toBeNull();
+
+		// 再改一次為另一個長度（殺「忽略 durationMinutes 參數、寫死某個值」變異）：成功路徑
+		// 只用單一值時，寫死該值的實作與正確實作結果相同，測不出參數有沒有真的被傳下去；
+		// 兩個不同的值才能釘住「寫入的是呼叫端給的那一個」。
+		let secondResult: SetTimerDurationResult | undefined;
+		act(() => {
+			secondResult = result.current.setTimerDuration(15);
+		});
+		expect(secondResult?.ok).toBe(true);
+		expect(result.current.round?.timer?.durationMinutes).toBe(15);
+
+		// 完成該場後已開始計分，變更應被拒絕，round 參考不變（toBe，非 toEqual，
+		// 殺「失敗時仍 dispatch」變異）。
+		act(() => {
+			result.current.submitScore(result.current.round!.matches[0].id, "11", "3");
+		});
+		const roundAfterComplete = result.current.round;
+		let failResult: SetTimerDurationResult | undefined;
+		act(() => {
+			failResult = result.current.setTimerDuration(15);
+		});
+		expect(failResult?.ok).toBe(false);
+		expect(result.current.round).toBe(roundAfterComplete);
+	});
+
+	// regression guard（非 test-plan 內、非 9.1 驗收錨點）：上方錨點 it 只走 startTimer 的成功
+	// 路徑，下方 null 防線 it 又在防線就 return，兩者都到不了「回合存在但純函式拒絕」這條路徑
+	// ——審查時實測把 startTimer 改成「失敗時也 dispatch」，全套測試仍然全綠。既有
+	// setTargetScore／setTimerDuration／swapMatchPlayer 三者都有對應的「非 null 回合失敗時
+	// round 參考不變」測試，此處補齊，使五個方法的覆蓋一致。
+	it("已開始計時後再次呼叫 startTimer 回傳 ALREADY_STARTED 且 round 參考不變（殺「失敗時仍 dispatch」變異）", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		act(() => {
+			result.current.startTimer();
+		});
+		expect(result.current.round?.timer?.startedAt).not.toBeNull();
+
+		const roundAfterStart = result.current.round;
+		let failResult: StartTimerResult | undefined;
+		act(() => {
+			failResult = result.current.startTimer();
+		});
+
+		expect(failResult?.ok).toBe(false);
+		if (failResult?.ok) {
+			throw new Error("測試前置錯誤：預期失敗，但回傳成功");
+		}
+		// 釘住代碼而非只看 ok：確認 hook 原樣回傳純函式的失敗結果，而不是自己另造一個。
+		expect(failResult?.code).toBe(START_TIMER_FAILURE_CODE.ALREADY_STARTED);
+		// toBe（參考相等）而非 toEqual：只有參考相等能證明 reducer 真的沒有被 dispatch。
+		expect(result.current.round).toBe(roundAfterStart);
+	});
+
+	it("尚無目前回合時呼叫 setTimerDuration／startTimer 皆回傳失敗且不 dispatch（殺 state.round === null 防線被移除的變異）", () => {
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players: [], updatePlayer }));
+
+		let setTimerDurationFailResult: SetTimerDurationResult | undefined;
+		act(() => {
+			setTimerDurationFailResult = result.current.setTimerDuration(10);
+		});
+		expect(setTimerDurationFailResult?.ok).toBe(false);
+		expect(result.current.round).toBeNull();
+
+		let startTimerFailResult: StartTimerResult | undefined;
+		act(() => {
+			startTimerFailResult = result.current.startTimer();
+		});
+		expect(startTimerFailResult?.ok).toBe(false);
+		if (startTimerFailResult?.ok) {
+			throw new Error("測試前置錯誤：預期失敗，但回傳成功");
+		}
+		expect(startTimerFailResult?.code).toBe(START_TIMER_FAILURE_CODE.NOT_CONFIGURED);
+		expect(result.current.round).toBeNull();
 	});
 
 	it("送出比分後 history 確實持久化到 localStorage（殺 write effect 依賴陣列改 [] 或整個 effect 被刪除的變異）", () => {
