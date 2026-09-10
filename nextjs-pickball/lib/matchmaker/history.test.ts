@@ -158,6 +158,14 @@ describe("MatchHistoryEntrySchema", () => {
 		expect(tieEntry.success).toBe(false);
 	});
 
+	// regression guard：既有測試皆以 winner: "teamA" 建構合法案例，從未有測試以
+	// winner: "teamB" 斷言 safeParse 成功——mutation 自測證實把 "teamB" 從列舉移除
+	// 全套測試依然全綠。本項補上這個缺口，行為本身早已成立，非本次新增。
+	it("winner 為 teamB 時通過驗證（既有列舉值 regression guard）", () => {
+		const teamBWins = MatchHistoryEntrySchema.safeParse(makeDoublesEntry({ winner: "teamB" }));
+		expect(teamBWins.success).toBe(true);
+	});
+
 	it("單打不得帶雙打組成標示，雙打必須帶", () => {
 		// 單打帶了 doublesComposition 應失敗
 		const singlesWithComposition: Record<string, unknown> = {
