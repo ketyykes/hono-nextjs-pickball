@@ -15,19 +15,19 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-08，M14 因電腦當機中斷於 §13 收尾驗證）
+## 狀態快照（最後更新 2026-09-10，M14 已合併，M15 待開始）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e6a4713`（feat：合併 M13 matchmaker-player-swap，M14 尚未合併） |
+| `main` HEAD | `a858b59`（feat：合併 M14 matchmaker-round-timer） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
 | M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
-| M14 | **中斷、未合併**——`change/matchmaker-round-timer` 分支上，§1～§13 的邏輯與程式碼已全部完成（65 個 commit），**但 §13.8 全套 E2E 五個 browser project 尚未拿到一次乾淨的全綠結果**，電腦當機中斷驗證，詳見下方「M14 中斷紀錄」。**下一個 session 必須先重跑 §13.8 全套 E2E 才能合併，不得憑當機前的部分結果直接判定通過** |
-| M15 | 未開始（需等 M14 合併） |
-| 工作位置 | 主 repo 直接開分支，不用 worktree；目前在 `change/matchmaker-round-timer`，工作樹乾淨（tasks.md 進度已 commit） |
+| M14 | **已合併**（`change/matchmaker-round-timer` → `main`，分支已刪，70 個 commit。前一 session 電腦當機中斷於 §13.8；本 session 接手，機器負載正常（load average 2.4）時重跑全套 E2E 拿到乾淨全綠，派 opus leader 做 Final Code Review APPROVED 後合併，詳見下方「M14 完成紀錄」） |
+| M15 | 未開始（M14 已合併，可開工） |
+| 工作位置 | 主 repo `main` 分支，工作樹乾淨，尚未開 `change/matchmaker-timed-draw` |
 
 ### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
@@ -181,7 +181,7 @@ E2E        609 passed / 21 skipped / 0 failed，--workers=1，15.9 分鐘（skip
 相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
 ```
 
-### M14 中斷紀錄（2026-09-08，電腦當機，尚未合併）
+### M14 完成紀錄（2026-09-08 中斷 → 2026-09-10 接手完成並合併）
 
 **分支 `change/matchmaker-round-timer`，65 個 commit，§1～§13 邏輯與程式碼皆已完成，但驗證未收尾就當機。**
 下一個 session 接手時**不要重新開分支、也不要重跑 §1～§12**——直接 `git switch change/matchmaker-round-timer`
@@ -219,6 +219,50 @@ E2E        609 passed / 21 skipped / 0 failed，--workers=1，15.9 分鐘（skip
 - **合併前還缺**：13.8 確認全綠 → Final Code Review（leader 尚未派出，因未確認 E2E 前明確拒絕派）→
   `--no-ff` 合併 `main` → 合併後複驗 → 刪分支 → 更新本檔狀態快照與 Pipeline 表。
 
+**以下為 2026-09-10 接手 session 的收尾紀錄：**
+
+- **13.8 重跑**：接手第一件事先查機器狀態——`uptime` load average 2.41/2.17/2.49（正常，非中斷前的
+  OOM／高負載殘影），`lsof -i :3005 -i :8787` 與 `ps aux` 皆無殘留 dev server／測試 process，
+  分支狀態與 runbook 記載一致（`git status --porcelain` 乾淨，僅 commit 數為 67 非 65——中斷前多了
+  兩個 docs commit，非異常）。直接背景執行
+  `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（不帶檔案樣式，五個 project 全跑），
+  10.9 分鐘後**619 passed / 21 skipped / 0 failed，100% 綠燈，一次到位**（較 M13 基線 609 passed 多 10，
+  即 `round-timer.spec.ts` 新增測試）。**先前 webkit「像是環境問題」的懷疑成立**：機器負載正常後同一批
+  測試全過，中斷前的失敗確實是 OOM／高負載造成的環境雜訊，非迴歸。勾選 13.8 並 commit（`5401f6a`）。
+- **Final Code Review**：派 opus leader（純 review，不派實作）依 execution-plan 第 155～177 行 checklist
+  逐條核對，**結論 APPROVED**。leader 額外發現並修正一處超出 proposal Impact 清單的遺漏：
+  `nextjs-pickball/CLAUDE.md` 的 hooks 歸屬清單鏡像漏了 `useRoundTimer`（主 spec 已於 §8 同步，
+  但 workspace CLAUDE.md 的鏡像清單沒跟上），補上並 commit（`35bac71`）。另提出一項非阻斷建議：
+  `useRoundTimer.ts` 與 delta spec 的註解字面「本 change 唯一呼叫 `setInterval`／`new Date()` 的位置」
+  可能被誤讀為禁止 `useRoundStore.startTimer` 注入一次性 `now`（該注入比照既有
+  `generateRound`／`submitScore` 先例，非缺陷）。coordinator 判斷此為合併前可一併處理的低風險純文件澄清，
+  直接改字為「唯一以 `setInterval` **持續取樣**目前時間的位置」並補一句排除 `startTimer` 的說明，
+  兩處（hook 註解與 delta spec）同步修正並 commit（`86fbdd8`），未另派 leader。
+- **coordinator 獨立驗證**（合併前，比照「每開一個新 change 的標準流程」步驟 4）：
+  分支／工作樹／相依 diff／commit 數核對通過；`pnpm -r exec tsc --noEmit` exit 0；
+  `pnpm --filter ./nextjs-pickball lint` 0 errors／3 warnings（既有基線）；`pnpm test` 前端 73 檔 737 測試、
+  後端 4 檔 16 測試全綠；`openspec validate matchmaker-round-timer --strict` valid；三份 delta spec
+  python 計數法皆無重複標題。E2E 已在同一分支近期跑過乾淨全綠且後續兩個 commit 皆為純文件改動，未重跑。
+- **合併**：`git merge --no-ff change/matchmaker-round-timer` → `main`，34 檔、+2609/-88 行，
+  合併 commit `a858b59`。合併後複驗 `pnpm -r exec tsc --noEmit` exit 0、`pnpm test` 前端 73/737、
+  後端 4/16 全綠，無迴歸。刪分支 `change/matchmaker-round-timer`。
+- **與 M14 相關、尚未處理的既有待辦**（design.md 已留痕，非本次新發現，留給 M15 之後的
+  `/opsx:verify`／`/opsx:archive` 階段一併裁決）：design Open Questions 第 7 條（本輪已產生計時設定後
+  無法改回「不計時」）、第 11 條（時間到後重整頁面會再播一次提示音），皆標記為 ⚠️ 需人類裁決，
+  未阻斷本次合併。
+
+### `main` 品質基線（M14 合併後，coordinator 於 `a858b59` 獨立實測）
+
+```
+前端單元   73 檔 / 737 測試 passed   （M13 後為 70 檔 / 694 測試，+3 檔 / +43 測試）
+後端單元   4 檔 / 16 測試 passed     （不變）
+tsc        pnpm -r exec tsc --noEmit → exit 0
+lint       0 errors / 3 warnings（hooks/ 下三支既存檔的 no-unused-vars，非本批造成）
+E2E        619 passed / 21 skipped / 0 failed，--workers=1，10.9 分鐘（skipped 數不變，100% 綠燈）
+           指令用 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（見教訓 #20）
+相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
+```
+
 ## Pipeline 總覽
 
 ```
@@ -253,7 +297,7 @@ main@3fa2d22
 | M11 | matchmaker-player-stats | 球員統計與排行榜頁 `/matchmaker/stats` | 53 commit | §1～§9 九組 | 1 棒 | change/matchmaker-player-stats（已刪） | main @ `56331b0` | **已合併**（`e8e97cf`） |
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 30 commit | §1～§7 七組 | 1 棒（跨兩個 session） | change/matchmaker-player-swap（已刪） | M12 已合併 | **已合併**（`e6a4713`） |
-| M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | <待填> | <待填> | <待填> | change/matchmaker-round-timer | M13 已合併 | 未開始 |
+| M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | 70 commit | §1～§13 十三組 | 1 棒（跨兩個 session，中間因當機交接） | change/matchmaker-round-timer（已刪） | M13 已合併 | **已合併**（`a858b59`） |
 | M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | <待填> | <待填> | <待填> | change/matchmaker-timed-draw | M14 已合併 | 未開始 |
 
 > `quick-rating-spec-backfill`（0／6，純規格回填）**不在本批範圍**。它只動
