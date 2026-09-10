@@ -12,8 +12,10 @@ interface UseRoundTimerResult {
 	expired: boolean;
 }
 
-// 每秒 tick 的計時 hook——本 change 唯一呼叫 setInterval／new Date() 的位置
+// 每秒 tick 的計時 hook——本 change 唯一以 setInterval 持續取樣目前時間的位置
 // （design Decision 5、6；specs/match-stage/spec.md「計時器顯示與時間到提示」）。
+// startTimer 的一次性 now 由 useRoundStore 注入（比照既有 generateRound／submitScore），
+// 不在此清單內。
 // 倒數與到期判定委派給 lib/matchmaker/round-timer.ts 的純函式，本檔只負責
 // 「現在時間」的取樣與驅動 React 重新 render，SHALL NOT 自行判斷到期或格式化。
 export function useRoundTimer(timer: RoundTimer): UseRoundTimerResult {
