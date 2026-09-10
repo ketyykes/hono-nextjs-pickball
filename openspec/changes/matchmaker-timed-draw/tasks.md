@@ -78,10 +78,10 @@ Depends on: §1
 
 Depends on: §1
 
-- [ ] 3.1 RED: 於 `nextjs-pickball/lib/matchmaker/rating.test.ts` 新增兩個 it：「平局時雙方 S 皆為 0.5 而非任一方視為勝負」、「平局時勢均力敵雙方 E 與 S 皆為 0.5 而變動值為零」。以 `winnerIndex: "draw"` 呼叫 `updateRatings`（此時型別尚未支援 `"draw"`，預期為 `tsc` 型別錯誤或編譯失敗）。確認紅燈並貼出輸出
-- [ ] 3.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/rating-types.ts` 的 `RatingUpdateInput.winnerIndex` 由 `0 | 1` 改為 `0 | 1 | "draw"`，並更新該欄位的既有 JSDoc 說明；於 `nextjs-pickball/lib/matchmaker/rating.ts` 把 `const s = winnerIndex === teamIndex ? 1 : 0;` 改為 `const s = winnerIndex === "draw" ? 0.5 : (winnerIndex === teamIndex ? 1 : 0);`
-- [ ] 3.3 RED: 新增 it「平局時實力不同的雙方變動方向相反，高分方下降低分方上升」：`rating` 6.00 與 4.00（`gamesPlayed` 皆 0）以 `winnerIndex: "draw"` 呼叫 → 斷言高分方變動值 < 0、低分方變動值 > 0、兩者絕對值相等。確認紅燈（此時 GREEN 尚未驗證方向性，理論上應已因 3.2 的公式而轉綠——若寫入當下即綠，MUST 誠實標註為 regression guard）
-- [ ] 3.4 REFACTOR: 確認 `applyDelta` 內對 `s` 的來源只有一處計算（不因 `winnerIndex` 是否為 `"draw"` 而複製一份 clamp／四捨五入邏輯）；`rating-types.ts` 的 JSDoc 更新「winnerIndex 表勝隊的索引」為同時涵蓋平局的完整說明
+- [x] 3.1 RED: 於 `nextjs-pickball/lib/matchmaker/rating.test.ts` 新增兩個 it：「平局時雙方 S 皆為 0.5 而非任一方視為勝負」、「平局時勢均力敵雙方 E 與 S 皆為 0.5 而變動值為零」。以 `winnerIndex: "draw"` 呼叫 `updateRatings`（此時型別尚未支援 `"draw"`，預期為 `tsc` 型別錯誤或編譯失敗）。確認紅燈並貼出輸出（真紅燈：`tsc` 報兩筆 `TS2322`，`vitest` 因目前實作把 `"draw"` 誤算成兩隊皆輸而斷言不符，commit `bb813c9`）
+- [x] 3.2 GREEN: 把 `nextjs-pickball/lib/matchmaker/rating-types.ts` 的 `RatingUpdateInput.winnerIndex` 由 `0 | 1` 改為 `0 | 1 | "draw"`，並更新該欄位的既有 JSDoc 說明；於 `nextjs-pickball/lib/matchmaker/rating.ts` 把 `const s = winnerIndex === teamIndex ? 1 : 0;` 改為 `const s = winnerIndex === "draw" ? 0.5 : (winnerIndex === teamIndex ? 1 : 0);`（commit `5057ae2`）
+- [x] 3.3 RED: 新增 it「平局時實力不同的雙方變動方向相反，高分方下降低分方上升」：`rating` 6.00 與 4.00（`gamesPlayed` 皆 0）以 `winnerIndex: "draw"` 呼叫 → 斷言高分方變動值 < 0、低分方變動值 > 0、兩者絕對值相等。確認紅燈（此時 GREEN 尚未驗證方向性，理論上應已因 3.2 的公式而轉綠——若寫入當下即綠，MUST 誠實標註為 regression guard）**誠實標註：本項寫入當下即全綠（30/30 通過，`tsc` 無新增錯誤），為 regression guard 而非真紅燈——3.2 的 `S = 0.5` 公式已使方向性成立，未偽造斷言（commit `0ae3680`）**
+- [x] 3.4 REFACTOR: 確認 `applyDelta` 內對 `s` 的來源只有一處計算（不因 `winnerIndex` 是否為 `"draw"` 而複製一份 clamp／四捨五入邏輯）；`rating-types.ts` 的 JSDoc 更新「winnerIndex 表勝隊的索引」為同時涵蓋平局的完整說明（JSDoc 已於 3.2 一併更新；`applyDelta` 確認為單一計算路徑，僅更新其旁註解使其不再與 3.2 的行為不符，commit `841f41c`）
 
 ## 4. 歷史紀錄的 winner 擴增（history.ts）
 
