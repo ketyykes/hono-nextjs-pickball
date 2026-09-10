@@ -1862,6 +1862,40 @@ describe("submitScore", () => {
 		expect(result.playerPatches.map((patch) => patch.gamesPlayed)).toEqual([1, 1, 1, 1]);
 	});
 
+	// regression guard（Stage 2 補；行為早已成立，寫入當下即綠，非 TDD 紅燈）：
+	// 計時制放寬的只有「比分相同也能送出」，勝負判定本身不因回合計時而改變。原本
+	// 「計時回合」的斷言全部集中在平局，獨立 mutation 測試因此發現兩個存活變異——
+	// 把勝方改成「計時回合一律 draw」（不看比分）、以及把非平局分支塌陷成永遠 "teamA"，
+	// 全套測試皆維持全綠。teamB 獲勝的計時場次一次釘住這兩條：勝方既不得被誤判為平局，
+	// 也不得忽略比分方向。
+	it("計時回合比分不同時仍依比分判定勝方", () => {
+		const players = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
+		const match = makeRoundMatch({
+			id: "m-1",
+			teams: [makeTeamFixture(["p1"], 3), makeTeamFixture(["p2"], 3)],
+			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
+		});
+		const round = makeRound({ matches: [match], timer: { durationMinutes: 15, startedAt: FIXED_NOW } });
+
+		const result = submitScore({ round, players, matchId: "m-1", rawScoreA: "7", rawScoreB: "11", now: FIXED_NOW });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const updated = result.round.matches.find((m) => m.id === "m-1");
+		expect(updated?.status).toBe("completed");
+		expect(updated?.scores).toEqual({ teamA: 7, teamB: 11 });
+		expect(updated?.winner).toBe("teamB");
+		expect(result.historyEntry.winner).toBe("teamB");
+
+		// 勝方不只寫進欄位，也必須真的餵給評分模組：兩人同分開局時，誤傳 winnerIndex: 0
+		// 或 "draw" 都會讓 p2 的賽後分數不再高於賽前。
+		const loser = updated?.playerRatings.find((r) => r.playerId === "p1");
+		const winner = updated?.playerRatings.find((r) => r.playerId === "p2");
+		expect(winner?.after).toBeGreaterThan(winner?.before ?? Number.POSITIVE_INFINITY);
+		expect(loser?.after).toBeLessThan(loser?.before ?? Number.NEGATIVE_INFINITY);
+	});
+
 	it("已完成場次重複送出時歷史筆數不變", () => {
 		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
 		const completedMatch = makeCompletedRoundMatch({ id: "m-1" });
