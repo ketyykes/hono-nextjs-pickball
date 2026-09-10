@@ -4,7 +4,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { DOUBLES_COMPOSITION_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@/lib/matchmaker/labels";
+import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@/lib/matchmaker/labels";
 import type { HistoryTeam, MatchHistoryEntry } from "@/lib/matchmaker/history";
 
 export interface HistoryRecordCardProps {
@@ -31,11 +31,13 @@ function TeamBlock({
 	team,
 	label,
 	isWinner,
+	isDraw,
 	testId,
 }: {
 	team: HistoryTeam;
 	label: string;
 	isWinner: boolean;
+	isDraw: boolean;
 	testId: string;
 }) {
 	return (
@@ -45,6 +47,14 @@ function TeamBlock({
 				{isWinner && (
 					<Badge variant="outline" className="border-current bg-transparent text-current">
 						勝
+					</Badge>
+				)}
+				{/* 平局（僅計時回合可能出現）不得為任一隊顯示「勝」，改顯示平手標籤——
+				    色彩不得為唯一資訊來源（prd.md 12.5），視覺權重比照上方「勝」Badge
+				    共用同一套樣式 class（M15 matchmaker-timed-draw change，design Decision 7）。 */}
+				{isDraw && (
+					<Badge variant="outline" className="border-current bg-transparent text-current">
+						{DRAW_LABEL}
 					</Badge>
 				)}
 			</div>
@@ -87,12 +97,14 @@ export function HistoryRecordCard({ entry }: HistoryRecordCardProps) {
 						team={entry.teamA}
 						label={TEAM_LABELS[0]}
 						isWinner={entry.winner === "teamA"}
+						isDraw={entry.winner === "draw"}
 						testId={`history-record-${entry.matchId}-team-a`}
 					/>
 					<TeamBlock
 						team={entry.teamB}
 						label={TEAM_LABELS[1]}
 						isWinner={entry.winner === "teamB"}
+						isDraw={entry.winner === "draw"}
 						testId={`history-record-${entry.matchId}-team-b`}
 					/>
 				</div>
