@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { buildExportScene, EXPORT_APP_NAME } from "./export-scene";
 import { pickTextColor, DARK_FOREGROUND } from "./colors";
+import { TEAM_LABELS } from "./labels";
 import type { Round, RoundMatch } from "./round-types";
 import type { Player } from "./types";
 
@@ -241,6 +242,36 @@ describe("buildExportScene", () => {
 		const scene = buildExportScene(round, players);
 
 		expect(scene.courts[0].statusText).toBe("7 : 11　第二隊獲勝");
+	});
+
+	it("已完成場次為平局時顯示比分與平手而非任一隊勝方", () => {
+		const players = [
+			makePlayer({ id: "p1", name: "小明" }),
+			makePlayer({ id: "p2", name: "小華" }),
+		];
+		const round = makeRound({
+			matches: [
+				makeRoundMatch({
+					status: "completed",
+					scores: { teamA: 11, teamB: 11 },
+					winner: "draw",
+					completedAt: "2026-08-16T01:00:00.000Z",
+					playerRatings: [
+						{ playerId: "p1", before: 5, after: 5 },
+						{ playerId: "p2", before: 6, after: 6 },
+					],
+				}),
+			],
+		});
+
+		const scene = buildExportScene(round, players);
+
+		// 升級為完整字串（順序敏感）比對，取代逐項 toContain：能同時擋下「省略比分」
+		// 「誤加 WINNER_SUFFIX（變成『平手獲勝』）」等 mutant。全形空白為 STATUS_SEPARATOR。
+		expect(scene.courts[0].statusText).toBe("11 : 11　平手");
+		// 明確驗證 spec 要求的「不含任一隊隊名」，兩隊隊名皆需驗到。
+		expect(scene.courts[0].statusText).not.toContain(TEAM_LABELS[0]);
+		expect(scene.courts[0].statusText).not.toContain(TEAM_LABELS[1]);
 	});
 
 	it("未完成場次顯示未完成狀態而非空白比分", () => {
