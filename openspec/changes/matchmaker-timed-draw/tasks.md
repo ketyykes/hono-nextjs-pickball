@@ -20,50 +20,50 @@
 > 變成事實，避免 §2 之後整批建立在錯的介面上。**本節重點是 M14（`matchmaker-round-timer`）
 > 的欄位重新對齊**——本文件撰寫時 M14 尚未存在，design.md 的 `round.timer` 純屬假設。
 
-- [ ] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把
+- [x] 1.1 確認目前 cwd 為 environment.md 宣告的 worktree，且 baseline `pnpm test` 全綠；把
       baseline 結果與初始 commit hash 回填 environment.md 的 Verification 三欄位
-- [ ] 1.2 確認 `main` 上 **M10～M14（含 `matchmaker-round-timer`）已合併**：以
+- [x] 1.2 確認 `main` 上 **M10～M14（含 `matchmaker-round-timer`）已合併**：以
       `git log --oneline main` 或等效方式確認七棒（M10 stage-gaps → M11 player-stats →
       M12 scoreboard-team-labels → M13 player-swap → M14 round-timer）皆已合併回 `main`。
       **不存在則立即停止並回報**，SHALL NOT 在本 change 內補做 M10～M14（見 proposal 的
       「執行相依」）
-- [ ] 1.3 讀 `main` 上合併後的 `nextjs-pickball/lib/matchmaker/round-types.ts`（或 M14
+- [x] 1.3 讀 `main` 上合併後的 `nextjs-pickball/lib/matchmaker/round-types.ts`（或 M14
       實際存放計時欄位的檔案），找出「本輪是否為計時制」的實際判定條件（欄位名稱、型別、
       `null`／非 `null` 或布林值的語意）。與 design.md 全篇假設的 `round.timer !== null`
       逐項比對，**差異一律補記進 design.md 的 Open Questions**，不要默默改實作去遷就假設。
       若判定條件的欄位名稱不同，MUST 把本 change 六份 delta spec（`round-lifecycle`、
       `match-stage`）與 design.md 中所有寫死 `round.timer` 字樣之處**同步改名**，SHALL NOT
       依本文件的假設欄位名稱開工（見 design Open Questions 第 1 條）
-- [ ] 1.4 讀 M14 是否已對 `round-lifecycle` 的「回合資料模型」Requirement 做過 MODIFIED
+- [x] 1.4 讀 M14 是否已對 `round-lifecycle` 的「回合資料模型」Requirement 做過 MODIFIED
       （新增計時欄位的表格列）。若已修改，本 change 的 `specs/round-lifecycle/spec.md` 的
       「回合資料模型」MODIFIED 區塊 MUST 以 M14 合併後的實際版本為基礎重新複製、再疊加本
       change 的 `winner` 欄位擴增，SHALL NOT 以本文件寫作時（M14 尚未存在）的舊版本文字為
       準，否則會在 archive 時覆寫掉 M14 已合併的欄位描述
-- [ ] 1.5 讀 `nextjs-pickball/lib/matchmaker/round.ts` 現況，記錄 `validateScoreInput`／
+- [x] 1.5 讀 `nextjs-pickball/lib/matchmaker/round.ts` 現況，記錄 `validateScoreInput`／
       `submitScore`／`VALIDATE_SCORE_FAILURE_CODE`／`TIE_MESSAGE` 的實際簽章與內容，並以
       `grep -rn "validateScoreInput" nextjs-pickball --include="*.ts" --include="*.tsx"`
       確認全 repo 呼叫點清單（本文件撰寫時僅 `round.ts` 自身與 `round.test.ts`）。若 M14
       新增了其他呼叫點，MUST 記錄下來供 §5 群組一併處理
-- [ ] 1.6 讀 `nextjs-pickball/lib/matchmaker/rating.ts`／`rating-types.ts` 現況，確認
+- [x] 1.6 讀 `nextjs-pickball/lib/matchmaker/rating.ts`／`rating-types.ts` 現況，確認
       `updateRatings`／`RatingUpdateInput.winnerIndex` 的實際簽章與 design Context 描述
       一致（`winnerIndex: 0 | 1`，`rating.ts` 內 `const s = winnerIndex === teamIndex ? 1 : 0`
       為唯一讀取點）
-- [ ] 1.7 讀 `nextjs-pickball/lib/matchmaker/history.ts`／`round-types.ts`，確認
+- [x] 1.7 讀 `nextjs-pickball/lib/matchmaker/history.ts`／`round-types.ts`，確認
       `MatchHistoryEntrySchema.winner`／`RoundMatchSchema.winner` 目前確實為
       `z.enum(["teamA", "teamB"])`（前者不可為 `null`、後者 `.nullable()`），與本 change
       MODIFIED 的起點一致
-- [ ] 1.8 讀 `nextjs-pickball/lib/matchmaker/labels.ts`，確認 `TEAM_LABELS_BY_KEY`／
+- [x] 1.8 讀 `nextjs-pickball/lib/matchmaker/labels.ts`，確認 `TEAM_LABELS_BY_KEY`／
       `TEAM_LABELS` 現況與本 change 假設一致，且尚未存在名為 `DRAW_LABEL` 的匯出（避免
       §7、§8、§9 群組重複定義）
-- [ ] 1.9 讀 `nextjs-pickball/lib/matchmaker/backup.ts`／`transfer-types.ts`，確認
+- [x] 1.9 讀 `nextjs-pickball/lib/matchmaker/backup.ts`／`transfer-types.ts`，確認
       `BackupSchema` 目前確實透過 `RoundSchema`／`MatchHistoryEntrySchema` 組合而非重新
       宣告 `winner`（design Decision 5 的前提），這是 §9 群組「零修改也該有效」論證能成立
       的必要條件
-- [ ] 1.10 讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`／`ScoreEntry.tsx`／
+- [x] 1.10 讀 `nextjs-pickball/components/matchmaker/CourtCard.tsx`／`ScoreEntry.tsx`／
       `HistoryRecordCard.tsx` 現況，記錄 `onSubmitScore`／`renderTeamLabel`／`isWinner`
       等既有邏輯的實際寫法與行號，與 design Context 描述一致；確認 `ScoreEntry.tsx` 確實
       沒有複製任何比分驗證規則
-- [ ] 1.11 確認 `nextjs-pickball/package.json` 目前無任何與本 change 相關的新增相依（本
+- [x] 1.11 確認 `nextjs-pickball/package.json` 目前無任何與本 change 相關的新增相依（本
       change 結束時此事實 MUST 不變，Final Review 會以 `git diff package.json` 機械確認）
 
 ## 2. 回合資料模型的 winner 擴增（round-types.ts）

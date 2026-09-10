@@ -15,6 +15,12 @@
 
 ## Setup commands
 
+> ⚠️ **apply 實際執行時的偏離（2026-09-10，使用者指示）**：本批（M10～M15）自 M10 起
+> **不使用 git worktree**，一律在主 repo `/Users/m2_24gb/Desktop/project/nextjs-pickball`
+> 的 `change/matchmaker-timed-draw` 分支上直接施工。下方 `git worktree add` 指令為 propose
+> 階段的模板，**本次未執行**；apply Step 0 的 cwd 檢查改以主 repo 路徑通過。
+> 禁止 `git worktree add`、禁止切換分支、禁止 `git merge`。
+
 ```bash
 git worktree add /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-timed-draw -b change/matchmaker-timed-draw main
 cd /Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-timed-draw
@@ -24,11 +30,16 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0 實測回填（本文件為 propose 階段產出，M10～M14 尚未
-  合併，無法在此時取得真實 baseline 數字；SHALL NOT 沿用 M9 的舊數字或憑空估計）。
-- **Initial commit hash**: 待 apply Step 0 實測回填（MUST 為 `main` 上已包含 M10～M14 全部
-  七棒＋本批次前五棒的 commit，而非本文件撰寫時的 `3fa2d22`）。
-- **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-timed-draw`
+- **Baseline tests**: 2026-09-10 於本分支實測 `pnpm test` 全綠（exit 0）——
+  前端 `nextjs-pickball` **73 個測試檔／737 個測試全數通過**，
+  後端 `hono-pickball` **4 個測試檔／16 個測試全數通過**（未出現 `listen EPERM`）。
+  `pnpm install` 後 `git status --porcelain` 為空，`pnpm-lock.yaml` 零變動。
+- **Initial commit hash**: `b0e45fe`（`change/matchmaker-timed-draw` 的起點，
+  其 parent `a858b59` 即 M14 `matchmaker-round-timer` 合併回 `main` 的 commit；
+  M10～M14 五棒皆已在 `main` 上，§1.2 已以 `git log --oneline main` 核對）。
+- **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`
+  （**本次不開 worktree**，見上方 Setup commands 的偏離說明；原規劃路徑
+  `/Users/m2_24gb/Desktop/project/pickball-worktrees/matchmaker-timed-draw` 未建立）。
 
 ## Teardown
 

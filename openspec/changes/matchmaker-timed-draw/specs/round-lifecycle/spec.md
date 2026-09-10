@@ -16,6 +16,7 @@
 | `matches` | RoundMatch[] | 本輪對戰清單，見下表 |
 | `restingPlayerIds` | string[] | 本輪休息名單（僅 id） |
 | `seenSignatures` | `{ teammateKeys, opponentKeys, fullMatchKeys }` | 三組字串陣列，本輪分配所用的重複比對基準 |
+| `timer` | `{ durationMinutes, startedAt } \| null` | 本輪計時設定；預設（不計時）為 `null`，見「回合計時器」 |
 
 單一場次 `RoundMatch` 的欄位：
 
@@ -40,6 +41,8 @@
 
 回合的球員只保存 **id 與該輪的分數快照**，SHALL NOT 內嵌整個 `Player` 物件——姓名、顏色、`isActive` 等欄位由名單即時解析。回合與名單雙寫同一份資料會在使用者於回合進行中改名或改分數時產生兩個互相矛盾的真相（見 design Decision 3）。
 
+`timer` 欄位於本 capability（M14）新增，型別為 `{ durationMinutes: 10 | 15 | 20; startedAt: string | null } | null`。SHALL 以 `.nullable().default(null)` 定義，使既有（不含本欄位的）`matchmaker:round:v1` 資料仍可通過驗證且被判讀為「不計時」，SHALL NOT 因新增本欄位而 bump storage key 版本——`scoreboard` capability 的「向後相容策略」與 M6 對 `courtNumber` 的 delta 已為此模式立下先例。完整的行為定義（設定、鎖定、開始、倒數判定、重排與新一輪時的重置語意）見「回合計時器」Requirement。
+
 實作位於 `nextjs-pickball/lib/matchmaker/round-types.ts`。
 
 #### Scenario: 合法回合通過驗證
@@ -62,6 +65,13 @@
 - **THEN** 驗證失敗
 - **AND** `status` 為 `"pending"` 且三者皆為 `null` 時驗證通過
 - **驗收**：`nextjs-pickball/lib/matchmaker/round-types.test.ts`，it 名稱「completed 場次缺少比分、勝方或完成時間時驗證失敗」
+
+#### Scenario: 舊資料缺少 timer 欄位時以 null 通過驗證
+
+- **GIVEN** 一份合法回合資料，但不含 `timer` 欄位（模擬 M14 之前寫入的既有資料）
+- **WHEN** 以 `RoundSchema.safeParse` 驗證
+- **THEN** `success` 為 `true`，且解析結果的 `timer` 為 `null`
+- **驗收**：`nextjs-pickball/lib/matchmaker/round-types.test.ts`，it 名稱「回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料」
 
 #### Scenario: winner 欄位新增 draw 列舉值
 
