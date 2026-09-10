@@ -69,6 +69,8 @@ export const RoundMatchSchema = z
 				teamB: z.number().int().nonnegative(),
 			})
 			.nullable(),
+		// "draw"（M15 新增）僅可能出現於計時回合：兩隊比分相同時計時回合允許判定平局，
+		// 見 round-lifecycle 的「比分驗證」——非計時回合 SHALL NOT 產生 "draw"。
 		winner: z.enum(["teamA", "teamB", "draw"]).nullable(),
 		completedAt: z.iso.datetime().nullable(),
 		playerRatings: z.array(PlayerRatingSchema),
