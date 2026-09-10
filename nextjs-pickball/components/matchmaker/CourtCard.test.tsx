@@ -694,6 +694,28 @@ describe("CourtCard", () => {
 		const winView = render(<CourtCard {...buildProps({ match: winMatch })} />);
 		expect(winView.queryByText(DRAW_LABEL)).toBeNull();
 		winView.unmount();
+
+		// 第二組對照：比分同樣是 11:11，但 winner 為 "teamA"。這組 fixture 刻意內部不一致
+		// （正常資料不會出現），存在的唯一理由是釘住平手標籤的資料來源是 match.winner，
+		// 而不是 UI 自己比較兩隊比分——上面平局案例的 11:11 是對稱的，少了這組，把條件寫成
+		// match.scores.teamA === match.scores.teamB 的實作測不出任何差異（實測確認該變異在
+		// 補這組之前完全存活）。「比分相同是否算平局」是回合層的判定，RoundMatchSchema 只
+		// 保證 completed 場次帶有 winner，並未保證「比分相同 ⇔ 平局」，UI SHALL NOT 自行
+		// 複製一份這條規則（design Decision 6）。
+		const tieScoreWithWinnerMatch = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 11 },
+			winner: "teamA",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const tieScoreView = render(<CourtCard {...buildProps({ match: tieScoreWithWinnerMatch })} />);
+		expect(tieScoreView.queryByText(DRAW_LABEL)).toBeNull();
+		expect(tieScoreView.getByTestId("court-match-1-team-a").textContent).toBe("第一隊勝");
+		tieScoreView.unmount();
 	});
 
 	// M15（matchmaker-timed-draw）§7：UI 層 SHALL NOT 複製「兩隊比分相同是否可送出」這條
@@ -711,6 +733,10 @@ describe("CourtCard", () => {
 
 		expect(onSubmitScore).toHaveBeenCalledTimes(1);
 		expect(onSubmitScore).toHaveBeenCalledWith("match-42", "11", "11");
+		// 「有委派」證明不了「沒有攔截」：一個「比分相同時照常委派、但自己另外顯示錯誤」的
+		// 實作會通過上面兩條斷言（實測確認這種變異在補這條之前完全存活）。錯誤要不要顯示
+		// 一律等 round-lifecycle 回傳後由 submitError 決定，送出當下畫面不得自行冒出 alert。
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("換人被拒絕時顯示帶 role alert 的繁體中文錯誤訊息", () => {
