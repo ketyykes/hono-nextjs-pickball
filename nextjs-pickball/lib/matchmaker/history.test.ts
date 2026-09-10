@@ -166,6 +166,35 @@ describe("MatchHistoryEntrySchema", () => {
 		expect(teamBWins.success).toBe(true);
 	});
 
+	// regression guard：spec 要求「平局時兩隊亦各自保留 per-player 的賽前／賽後分數，與
+	// 勝負場次的欄位形狀完全一致，不因平局而簡化」，但既有的「每位球員各帶賽前與賽後分數」
+	// 一項只對建構用的原始物件做 typeof 檢查，測不到 schema 是否真的把這兩個欄位列為必填
+	// ——mutation 實測把 ratingBefore／ratingAfter 改成 optional、甚至把 teamA／teamB 整個
+	// 換成 z.unknown()，全套測試依然全綠。本項改以 safeParse 失敗釘住必填性，行為本身早已
+	// 成立，非本次新增。
+	it("平局紀錄的球員缺少賽前或賽後分數時驗證失敗（per-player 欄位形狀 regression guard）", () => {
+		// 比分相同才是計時制平局的真實形狀，避免用不可能出現的資料建立假前提。
+		const drawEntry = makeDoublesEntry({ winner: "draw", scoreA: 11, scoreB: 11 });
+		// 控制組：未動欄位的平局紀錄必須通過，否則下方兩條失敗斷言會變成恆真。
+		expect(MatchHistoryEntrySchema.safeParse(drawEntry).success).toBe(true);
+
+		const missingRatingBefore: Record<string, unknown> = { ...makePlayerSnapshot() };
+		delete missingRatingBefore.ratingBefore;
+		const teamAMissingBefore: Record<string, unknown> = {
+			...drawEntry,
+			teamA: { ...drawEntry.teamA, players: [missingRatingBefore] },
+		};
+		expect(MatchHistoryEntrySchema.safeParse(teamAMissingBefore).success).toBe(false);
+
+		const missingRatingAfter: Record<string, unknown> = { ...makePlayerSnapshot() };
+		delete missingRatingAfter.ratingAfter;
+		const teamBMissingAfter: Record<string, unknown> = {
+			...drawEntry,
+			teamB: { ...drawEntry.teamB, players: [missingRatingAfter] },
+		};
+		expect(MatchHistoryEntrySchema.safeParse(teamBMissingAfter).success).toBe(false);
+	});
+
 	it("單打不得帶雙打組成標示，雙打必須帶", () => {
 		// 單打帶了 doublesComposition 應失敗
 		const singlesWithComposition: Record<string, unknown> = {
