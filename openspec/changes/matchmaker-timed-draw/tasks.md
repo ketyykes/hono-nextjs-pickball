@@ -113,9 +113,9 @@ Depends on: §2, §3, §4
 
 Depends on: §2
 
-- [ ] 6.1 RED: 於 `nextjs-pickball/lib/matchmaker/export-scene.test.ts` 新增 it「已完成場次為平局時顯示比分與平手而非任一隊勝方」：場次 `status: "completed"`、`scores: { teamA: 11, teamB: 11 }`、`winner: "draw"` → 呼叫 `buildExportScene` 後斷言該場地區塊的狀態文字同時含 `"11"`、`"11"` 與「平手」，且不含 `TEAM_LABELS` 的任一隊隊名。確認紅燈（此時 `tsc` 因 §5 已完成的 `winner` 三值化而報型別錯誤，或執行期因 `TEAM_LABELS_BY_KEY["draw"]` 為 `undefined` 而斷言不符——兩者皆為真紅燈）並貼出輸出
-- [ ] 6.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/labels.ts` 新增具名常數 `DRAW_LABEL = "平手"`（含一句 JSDoc 說明用途與出處，見 design Decision 7）；於 `export-scene.ts` 的 `buildStatusText` 新增分支：`match.winner === "draw"` 時回傳 `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${DRAW_LABEL}`（不含 `WINNER_SUFFIX`），其餘（`"teamA"`／`"teamB"`）維持原有 `TEAM_LABELS_BY_KEY` 查表邏輯
-- [ ] 6.3 REFACTOR: 確認 `buildStatusText` 的三個分支（未完成／勝負／平局）彼此互斥且窮舉 `winner` 的全部合法值；確認 `DRAW_LABEL` 為本檔唯一「平手」字面量的匯入來源，本檔不重複寫死；`pnpm --filter ./nextjs-pickball exec tsc --noEmit` 通過
+- [x] 6.1 RED: 於 `nextjs-pickball/lib/matchmaker/export-scene.test.ts` 新增 it「已完成場次為平局時顯示比分與平手而非任一隊勝方」：場次 `status: "completed"`、`scores: { teamA: 11, teamB: 11 }`、`winner: "draw"` → 呼叫 `buildExportScene` 後斷言該場地區塊的狀態文字同時含 `"11"`、`"11"` 與「平手」，且不含 `TEAM_LABELS` 的任一隊隊名。確認紅燈（此時 `tsc` 因 §5 已完成的 `winner` 三值化而報型別錯誤，或執行期因 `TEAM_LABELS_BY_KEY["draw"]` 為 `undefined` 而斷言不符——兩者皆為真紅燈）並貼出輸出
+- [x] 6.2 GREEN: 於 `nextjs-pickball/lib/matchmaker/labels.ts` 新增具名常數 `DRAW_LABEL = "平手"`（含一句 JSDoc 說明用途與出處，見 design Decision 7）；於 `export-scene.ts` 的 `buildStatusText` 新增分支：`match.winner === "draw"` 時回傳 `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${DRAW_LABEL}`（不含 `WINNER_SUFFIX`），其餘（`"teamA"`／`"teamB"`）維持原有 `TEAM_LABELS_BY_KEY` 查表邏輯
+- [x] 6.3 REFACTOR: 確認 `buildStatusText` 的三個分支（未完成／勝負／平局）彼此互斥且窮舉 `winner` 的全部合法值；確認 `DRAW_LABEL` 為本檔唯一「平手」字面量的匯入來源，本檔不重複寫死；`pnpm --filter ./nextjs-pickball exec tsc --noEmit` 通過
 
 ## 7. 對戰頁的平手標籤與 UI pass-through 驗證（CourtCard.tsx）
 
