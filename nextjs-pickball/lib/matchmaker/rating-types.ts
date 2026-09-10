@@ -51,6 +51,9 @@ export type Side = readonly RatingPlayerInput[];
  * winnerIndex 表本場結果：0 = 隊伍 A 勝、1 = 隊伍 B 勝，與 teams 的順序對應；
  * "draw" 表平局，此時雙方的 S 皆為 0.5（是否允許以平局送出屬呼叫端的比分驗證職責，
  * 本模組只負責在收到 "draw" 時正確計算）。
+ * 平局以第三個字面量表達而非另加 isDraw 布林旗標，是為了讓 winnerIndex 維持唯一的
+ * 「結果」真相來源：兩個欄位會生出 isDraw 為真但 winnerIndex 仍指向某隊的無效組合，
+ * 而型別擋不住它（design Decision 1；前例為 MatchStatus 由兩值擴為三值時同樣走字面量聯集）。
  */
 export interface RatingUpdateInput {
 	readonly format: MatchFormat;
