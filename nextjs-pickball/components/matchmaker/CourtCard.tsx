@@ -181,6 +181,10 @@ export function CourtCard({
 				className="flex items-center gap-1 text-xs text-muted-foreground"
 			>
 				<span>{TEAM_LABELS[index]}</span>
+				{/* match.winner === winnerKey 在 winnerKey 為 "teamA"／"teamB" 時對 "draw"
+				    自然為 false，不需要為平局另外新增分支；「平手」標籤改顯示於已完成場次的
+				    比分列（見下方 data-testid="court-${match.id}-score" 附近），不在這裡
+				    （M15 matchmaker-timed-draw change，design Decision 7）。 */}
 				{completed && match.winner === winnerKey && (
 					<Badge variant="outline" className="border-current bg-transparent text-current">
 						勝
