@@ -422,9 +422,11 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 
 		const drawCard = page.getByTestId(`history-record-${drawMatchId}`);
 		await expect(drawCard).toBeVisible();
-		await expect(drawCard.getByText("平手")).toBeVisible();
-		// 兩隊皆查不到「勝」標籤，以各自隊伍區塊的 data-testid 為作用域，雙隊都驗。
+		// 兩隊皆顯示「平手」、皆查不到「勝」標籤，以各自隊伍區塊的 data-testid 為作用域，
+		// 雙隊都驗（比照既有「勝」標籤兩處各自渲染的視覺權重）。
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-a`)).toContainText("平手");
 		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-a`)).not.toContainText("勝");
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-b`)).toContainText("平手");
 		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-b`)).not.toContainText("勝");
 
 		const winCard = page.getByTestId(`history-record-${winMatchId}`);
