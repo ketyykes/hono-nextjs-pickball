@@ -676,7 +676,9 @@ export type ValidateScoreFailureCode = (typeof VALIDATE_SCORE_FAILURE_CODE)[keyo
 const EMPTY_FIELD_MESSAGE = "兩隊比分皆須填寫，請輸入完整比分後再試一次。";
 const INVALID_NUMBER_MESSAGE = "比分須為有效的整數，請重新輸入。";
 const NEGATIVE_SCORE_MESSAGE = "比分不可為負數，請輸入 0 或以上的整數。";
-const TIE_MESSAGE = "兩隊比分相同時無法判定勝方，請確認比分後再試一次。";
+// 訊息 MUST 指出「非計時回合」：本 change 之後平局在計時回合是合法送出的，只說
+// 「無法判定勝方」會讓使用者以為平局一律不可送出，而看不出修正方式其實是改設定為計時制。
+const TIE_MESSAGE = "非計時回合不得送出平局，兩隊比分相同時無法判定勝方，請確認比分後再試一次。";
 const ALREADY_COMPLETED_MESSAGE = "此場次已完成，無法再次送出比分。";
 
 export interface ValidateScoreSuccess {
@@ -748,8 +750,18 @@ function parseScoreField(raw: string): ScoreFieldParseResult {
  * 驗證一場比分的輸入是否可以送出：欄位空白、非數字、負數、平局、場次已完成五種情況皆
  * MUST 拒絕（spec「比分驗證」），拒絕時回傳可判讀的失敗結果而非拋出例外或只回布林值。
  * 純函式，不修改傳入的 match。
+ *
+ * isTimedRound 由呼叫端注入（design Decision 2），本函式刻意不收整個 Round：這裡需要的
+ * 資訊只有「是不是計時回合」這一個布林值，收下整個回合等於宣稱本函式可能會用到回合的
+ * 其他欄位，且既有呼叫點的 fixture 全部得跟著改造。為 true 時平局改走成功路徑
+ * （計時制沒有打到目標分數才停的機制，時間到就是平手，見 spec「比分驗證」）。
  */
-export function validateScoreInput(match: RoundMatch, rawScoreA: string, rawScoreB: string): ValidateScoreResult {
+export function validateScoreInput(
+	match: RoundMatch,
+	rawScoreA: string,
+	rawScoreB: string,
+	isTimedRound: boolean,
+): ValidateScoreResult {
 	// 場次已完成是最優先的門檻：一旦成立，比分欄位本身合不合法已經無關緊要——已完成的
 	// 場次不該再被任何欄位內容說服而重新計分。
 	if (match.status === "completed") {
@@ -771,7 +783,7 @@ export function validateScoreInput(match: RoundMatch, rawScoreA: string, rawScor
 
 	// 至此 scoreA、scoreB 皆已排除 "empty"／"invalid"／"negative" 三種字面量，TS 將
 	// ScoreFieldParseResult 收斂為 number，不需要斷言。
-	if (scoreA === scoreB) {
+	if (scoreA === scoreB && !isTimedRound) {
 		return { ok: false, code: VALIDATE_SCORE_FAILURE_CODE.TIE, message: TIE_MESSAGE };
 	}
 
@@ -947,7 +959,13 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 		return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.MATCH_NOT_FOUND, message: MATCH_NOT_FOUND_MESSAGE };
 	}
 
-	const validated = validateScoreInput(match, rawScoreA, rawScoreB);
+	// 「本輪是否為計時制」只看 timer 是否存在，與倒數是否已開始（startedAt）或是否已到期
+	// 皆無關：M14 明訂時間到 MUST NOT 自動變更任何場次狀態，到期與否是呼叫端即時算出的
+	// 衍生資訊、不落地為欄位，拿它當送出條件會讓同一份回合資料在不同時刻有不同的驗證結果。
+	// 唯一的推導點（design Decision 2）：validateScoreInput 只收布林值，不接觸 timer 欄位。
+	const isTimedRound = round.timer !== null;
+
+	const validated = validateScoreInput(match, rawScoreA, rawScoreB, isTimedRound);
 	if (!validated.ok) {
 		return validated;
 	}
