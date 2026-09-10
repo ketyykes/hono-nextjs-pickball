@@ -133,7 +133,7 @@ Depends on: §10, §11
 - [x] 13.5 `pnpm lint` 通過（0 errors；既有 warning 清單不得新增）
 - [x] 13.6 `pnpm -r exec tsc --noEmit` 通過
 - [x] 13.7 `pnpm test` 全套（`-r`，前後端）通過，確認未破壞 M1～M13 既有測試與 `hono-pickball` 後端測試
-- [ ] 13.8 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過，**五個 browser project 皆跑**；`round-timer.spec.ts` 與既有 E2E 一律原樣通過（`page.clock`／`AudioContext` stub 在 WebKit／Mobile Safari 上的行為若與 Chromium 不同，依 execution-plan 的升級條件處理，SHALL NOT 靜默 `test.skip`）
+- [x] 13.8 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過，**五個 browser project 皆跑**；`round-timer.spec.ts` 與既有 E2E 一律原樣通過（`page.clock`／`AudioContext` stub 在 WebKit／Mobile Safari 上的行為若與 Chromium 不同，依 execution-plan 的升級條件處理，SHALL NOT 靜默 `test.skip`）
 - [x] 13.9 `git diff main --stat -- pnpm-lock.yaml package.json nextjs-pickball/package.json hono-pickball/package.json` 為空（本 change 零新增相依，比照 `matchmaker-runbook-m10-m15.md` 的 coordinator 獨立驗證指令）；`git diff --stat` 確認 `app/globals.css`、`components/matchmaker/MatchStage.tsx`／`CourtCard.tsx`／`RestingPanel.tsx`、`lib/matchmaker/scoreboard-binding.ts` 皆零改動
 - [x] 13.10 `DO_NOT_TRACK=1 openspec validate matchmaker-round-timer --strict` 通過
 - [x] 13.11 對本 change 的三份 delta spec 各跑一次 root `CLAUDE.md` 指定的 python 計數法，檢查 `### Requirement:`／`#### Scenario:` 標題有無重複，**不得用 BSD `uniq`**
