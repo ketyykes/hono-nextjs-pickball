@@ -15,19 +15,19 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-10，M14 已合併，M15 待開始）
+## 狀態快照（最後更新 2026-09-10，M15 進行中、使用者關機暫停）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `a858b59`（feat：合併 M14 matchmaker-round-timer） |
+| `main` HEAD | `a858b59`（feat：合併 M14 matchmaker-round-timer，M15 尚未合併） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
 | M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
 | M14 | **已合併**（`change/matchmaker-round-timer` → `main`，分支已刪，70 個 commit。前一 session 電腦當機中斷於 §13.8；本 session 接手，機器負載正常（load average 2.4）時重跑全套 E2E 拿到乾淨全綠，派 opus leader 做 Final Code Review APPROVED 後合併，詳見下方「M14 完成紀錄」） |
-| M15 | 未開始（M14 已合併，可開工） |
-| 工作位置 | 主 repo `main` 分支，工作樹乾淨，尚未開 `change/matchmaker-timed-draw` |
+| M15 | **進行中、使用者主動關機暫停**——`change/matchmaker-timed-draw` 分支，opus leader 背景執行中，**§1～§5 已完成並 commit（24 個 commit，tasks.md 26/52 已勾）**，最後一個乾淨 commit 為 `e9f4eef`。leader 正在跑 §6（匯出內容的平手顯示，`export-scene.ts`），**這組是否有 commit 落地，關機當下不明**，詳見下方「M15 中斷紀錄」 |
+| 工作位置 | 主 repo，分支 `change/matchmaker-timed-draw`。**下一個 session 開工前 MUST 先 `git status --porcelain` 與 `git log --oneline main..HEAD \| wc -l` 核對本檔記載，不吻合則以實測為準並更新本檔** |
 
 ### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
@@ -263,6 +263,47 @@ E2E        619 passed / 21 skipped / 0 failed，--workers=1，10.9 分鐘（skip
 相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
 ```
 
+### M15 中斷紀錄（2026-09-10，使用者主動關機，尚未合併）
+
+**分支 `change/matchmaker-timed-draw`，opus leader 依 execution-plan 逐組派工中。§1～§5 共 24 個 commit
+已完成且 commit（tasks.md 26/52 已勾），最後一個確認乾淨的 commit 為 `e9f4eef`
+（`test(matchmaker): 補計時回合非平局送出的 regression guard（M15 §5 Stage 2）`）。**
+使用者在 leader 執行 §6（匯出內容的平手顯示，`export-scene.ts`／`scene-canvas.ts`）期間主動要求關機暫停，
+**leader 是被強制中斷，不是正常收尾**——coordinator 記錄本段時，§6 的 subagent 已跑約 7 分鐘、
+工作樹當下（記錄前最後一次確認）仍乾淨，但**關機瞬間工作樹狀態未知**（可能停在某個檔案的
+半成品編輯、或剛好卡在一次 commit 之間）。
+
+- **已完成群組**（§1～§5，皆已 commit，tasks.md 已勾）：
+  - §1 前置確認：把 design.md 對 M14 `round.timer` 欄位的假設與合併後 `main` 實際核對過，
+    無差異需要記錄（詳見 §1.3～§1.10 的逐項核對，commit 記載於分支歷史）。
+  - §2 `round-types.ts` 的 `RoundMatchSchema.winner` 擴增 `"draw"` 列舉值。
+  - §3 `rating-types.ts`／`rating.ts` 的 `winnerIndex` 擴增 `"draw"`，平局時 S = 0.5。
+  - §4 `history.ts` 的 `MatchHistoryEntrySchema.winner` 同步擴增 `"draw"`。
+  - §5 `round.ts` 的 `validateScoreInput`／`submitScore`：非計時回合仍拒絕平局送出（訊息含
+    「非計時回合」），計時回合允許平局送出、`winner` 記為 `"draw"`、評分以 S=0.5 更新；
+    Stage 2 補了「計時回合非平局送出」的 regression guard（`e9f4eef`）。
+- **已知的下游斷點（§5 完成後、§6 修正前必然存在，這是設計上的交棒點，不是缺陷）**：
+  `nextjs-pickball/lib/matchmaker/export-scene.ts:172` 因 `RoundMatch.winner` 現含 `"draw"`
+  而出現 `TS7053`（索引 `Record<"teamA" | "teamB", string>` 缺 `"draw"` 鍵）。tasks.md 第 104 行
+  已預告「交棒給 §6／§7 的約束」，這正是該斷點，**下一個 session 續跑時不要誤判為迴歸**。
+  若當機／關機瞬間工作樹卡在半成品狀態，這個 `tsc` 錯誤大機率仍會是第一個看到的訊號，
+  屬預期範圍；但若 `tsc` 錯誤與這條**不同**，才需要當成真異常處理。
+- **下一個 session 接手步驟**：
+  1. `git branch --show-current` 確認在 `change/matchmaker-timed-draw`；`git status --porcelain`——
+     若非空，先讀懂是哪個檔案的半成品（`git diff` 檢視），判斷是可以繼續完成的部分編輯還是該捨棄的
+     殘留，**不要盲目 `git checkout .`／`git reset --hard` 清空**，那可能會丟掉 leader 已完成但
+     未 commit 的工作。
+  2. `git log --oneline main..HEAD | wc -l`：若為 24 且 `HEAD` 為 `e9f4eef`，代表 §6 完全沒有進度落地，
+     從 §6.1 開工即可；若大於 24，以 `git log --oneline -10` 核對實際做到哪一項 task，
+     用 `git log main..HEAD --oneline` 比對 tasks.md 的勾選數（教訓 #5）。
+  3. 確認機器狀態正常（`uptime`、`lsof -i :3005 -i :8787`、`ps aux | grep -E
+     "next-server|wrangler|workerd|playwright"`，全數清空殘留），比照 M14 中斷後的復原程序。
+  4. 派新的 opus leader（沿用本檔「Leader prompt 模板」，change-id 填 `matchmaker-timed-draw`、
+     Mn 填 `M15`）續跑剩餘群組（§6～§10），**不要重新開分支、不要重跑 §1～§5**。
+  5. 全部完成後：Final Code Review → coordinator 獨立驗證 → `--no-ff` 合併 `main` →
+     合併後複驗 → 刪分支 → 更新本檔狀態快照與 Pipeline 表 → 全部六棒完成後依「全部合併後」一節
+     跑 `/opsx:verify`／`/opsx:archive`。
+
 ## Pipeline 總覽
 
 ```
@@ -298,7 +339,7 @@ main@3fa2d22
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 30 commit | §1～§7 七組 | 1 棒（跨兩個 session） | change/matchmaker-player-swap（已刪） | M12 已合併 | **已合併**（`e6a4713`） |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | 70 commit | §1～§13 十三組 | 1 棒（跨兩個 session，中間因當機交接） | change/matchmaker-round-timer（已刪） | M13 已合併 | **已合併**（`a858b59`） |
-| M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | <待填> | <待填> | <待填> | change/matchmaker-timed-draw | M14 已合併 | 未開始 |
+| M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | 24＋個 commit（進行中） | §1～§10 十組（52 task） | 預估 1 棒 | change/matchmaker-timed-draw | M14 已合併 | **進行中、使用者關機暫停**（§1～§5 完成，見「M15 中斷紀錄」） |
 
 > `quick-rating-spec-backfill`（0／6，純規格回填）**不在本批範圍**。它只動
 > `components/matchmaker/PlayerForm.test.tsx`（新增）與 `tests/e2e/specs/player-roster.spec.ts`，
