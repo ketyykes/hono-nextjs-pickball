@@ -1345,7 +1345,7 @@ describe("validateScoreInput", () => {
 			["11", ""],
 			["11", "   "],
 		] as const) {
-			const result = validateScoreInput(match, rawScoreA, rawScoreB);
+			const result = validateScoreInput(match, rawScoreA, rawScoreB, false);
 
 			expect(result.ok).toBe(false);
 			if (result.ok) continue;
@@ -1367,7 +1367,7 @@ describe("validateScoreInput", () => {
 		// scoreA/scoreB 變成 1e20，寫回 Round 時才被 RoundMatchSchema 的
 		// Number.MAX_SAFE_INTEGER 上限拒絕，一份無筆可救的單一物件整份被判定損壞。
 		for (const rawScoreA of ["abc", "1a", "NaN", "1.5", "1e3", "１１", "99999999999999999999"]) {
-			const result = validateScoreInput(match, rawScoreA, "11");
+			const result = validateScoreInput(match, rawScoreA, "11", false);
 
 			expect(result.ok).toBe(false);
 			if (result.ok) continue;
@@ -1378,13 +1378,13 @@ describe("validateScoreInput", () => {
 	it("比分為負數時拒絕送出，0 本身可接受", () => {
 		const match = makeRoundMatch();
 
-		const negative = validateScoreInput(match, "-1", "11");
+		const negative = validateScoreInput(match, "-1", "11", false);
 		expect(negative.ok).toBe(false);
 		if (!negative.ok) {
 			expect(negative.code).toBe(VALIDATE_SCORE_FAILURE_CODE.NEGATIVE_SCORE);
 		}
 
-		const zeroValid = validateScoreInput(match, "0", "11");
+		const zeroValid = validateScoreInput(match, "0", "11", false);
 		expect(zeroValid.ok).toBe(true);
 		if (zeroValid.ok) {
 			expect(zeroValid.scoreA).toBe(0);
@@ -1393,26 +1393,40 @@ describe("validateScoreInput", () => {
 
 		// tasks 6.2 的邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
 		// 這是使用者打字最常見的失手，不應被當成錯誤輸入拒絕。
-		const trimmed = validateScoreInput(match, " 0 ", " 11 ");
+		const trimmed = validateScoreInput(match, " 0 ", " 11 ", false);
 		expect(trimmed.ok).toBe(true);
 	});
 
 	it("兩隊比分相同時拒絕送出", () => {
 		const match = makeRoundMatch();
 
-		const result = validateScoreInput(match, "11", "11");
+		const result = validateScoreInput(match, "11", "11", false);
 
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		expect(result.code).toBe(VALIDATE_SCORE_FAILURE_CODE.TIE);
+		// 拒絕原因必須說清楚「為什麼這次不行」：計時回合的平局現已放行，訊息若只說
+		// 「無法判定勝方」，使用者無從得知同一組比分在計時回合是可以送出的。
+		expect(result.message).toContain("非計時回合");
 		expect(result.message).toContain("勝方");
+	});
+
+	it("計時回合兩隊比分相同時允許送出", () => {
+		const match = makeRoundMatch();
+
+		const result = validateScoreInput(match, "11", "11", true);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.scoreA).toBe(11);
+		expect(result.scoreB).toBe(11);
 	});
 
 	it("已完成場次再次送出時被拒絕且既有結果不變", () => {
 		const completedMatch = makeCompletedRoundMatch();
 		const snapshot = structuredClone(completedMatch);
 
-		const result = validateScoreInput(completedMatch, "20", "15");
+		const result = validateScoreInput(completedMatch, "20", "15", false);
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
