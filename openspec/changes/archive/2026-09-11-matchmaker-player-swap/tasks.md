@@ -80,14 +80,38 @@ Depends on: §4, §5
 
 ## 7. 收尾驗證
 
-- [ ] 7.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
-- [ ] 7.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/round` 與 `--run hooks/useRoundStore` 與 `--run components/matchmaker/CourtCard` 全綠，貼出輸出
-- [ ] 7.3 `pnpm test` 全套通過（確認未破壞既有前端測試與 `hono-pickball` 後端測試）
-- [ ] 7.4 `pnpm -r exec tsc --noEmit` 與 `pnpm lint` 皆通過（`lint` 0 errors；既有 warning 數與本 change 開工前相同，不得新增）
-- [ ] 7.5 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過，既有 `match-stage.spec.ts`／`scoreboard-binding.spec.ts` 等 spec **原樣**通過
-- [ ] 7.6 `git diff main -- package.json pnpm-lock.yaml` 為空（零新增相依）；`git diff main --stat` 確認 `lib/matchmaker/allocation.ts`／`pairing.ts`／`duplication.ts`／`candidates.ts`／`round-types.ts`／`components/matchmaker/PlayerTile.tsx`／`hono-pickball/**` 皆零改動、`hooks/` 目錄零新增檔案
-- [ ] 7.7 `DO_NOT_TRACK=1 openspec validate matchmaker-player-swap --strict` 通過
-- [ ] 7.8 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法逐標題計數，**不使用 BSD `uniq`**（macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）
+- [x] 7.1 逐條核對 delta spec 的每個「驗收」錨點：檔案路徑存在、`it`／`test` 名稱逐字相符。以腳本抽取 `**驗收**：\`<path>\`，it 名稱「<name>」` 逐條比對，**不靠目視**
+- [x] 7.2 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/round` 與 `--run hooks/useRoundStore` 與 `--run components/matchmaker/CourtCard` 全綠，貼出輸出
+- [x] 7.3 `pnpm test` 全套通過（確認未破壞既有前端測試與 `hono-pickball` 後端測試）
+- [x] 7.4 `pnpm -r exec tsc --noEmit` 與 `pnpm lint` 皆通過（`lint` 0 errors；既有 warning 數與本 change 開工前相同，不得新增）
+- [x] 7.5 `pnpm --filter ./nextjs-pickball test:e2e --workers=1` 全套通過，既有 `match-stage.spec.ts`／`scoreboard-binding.spec.ts` 等 spec **原樣**通過
+- [x] 7.6 `git diff main -- package.json pnpm-lock.yaml` 為空（零新增相依）；`git diff main --stat` 確認 `lib/matchmaker/allocation.ts`／`pairing.ts`／`duplication.ts`／`candidates.ts`／`round-types.ts`／`components/matchmaker/PlayerTile.tsx`／`hono-pickball/**` 皆零改動、`hooks/` 目錄零新增檔案
+- [x] 7.7 `DO_NOT_TRACK=1 openspec validate matchmaker-player-swap --strict` 通過
+- [x] 7.8 spec 條目重複檢查：依 root `CLAUDE.md` 指定的 python 計數法逐標題計數，**不使用 BSD `uniq`**（macOS 的 `uniq` 會把內容不同的中文標題誤判為重複）
+
+> **§7 補勾說明（2026-09-11，verify 階段）。** §7 的驗證工作在 M13 合併前已由當時的
+> coordinator 執行完畢並記載於 `matchmaker-runbook-m10-m15.md` 的「M13 執行紀錄」，
+> 但 checkbox 未回勾（runbook 教訓 #5「勾選數落後於實際 commit」的再現）。
+> verify 階段**未採信該筆自述**，於 `main` 上逐項重新取證後才補勾，證據如下：
+>
+> - **7.1**：腳本抽取兩份 delta spec 的驗收錨點，**19／19 全數命中**（檔案存在且 it／test 名稱逐字相符）。
+> - **7.2**：`pnpm --filter ./nextjs-pickball test --run lib/matchmaker/round hooks/useRoundStore components/matchmaker/CourtCard`
+>   → **7 檔／128 測試全綠**。
+> - **7.3**：`pnpm test` → 前端 **73 檔／757 測試**、後端 **4 檔／16 測試**全綠。
+> - **7.4**：`pnpm -r exec tsc --noEmit` **exit 0**；`pnpm --filter ./nextjs-pickball lint`
+>   **0 errors／3 warnings**（`useQuiz.ts`／`useRosterStore.ts`／`useScoreboardStore.ts` 的既有基線，零新增）。
+> - **7.5**：本項**未於 verify 階段重跑**。理由是已有更強的機械證據：M13 合併後的 M14 全套 E2E
+>   **619 passed／21 skipped／0 failed**、M15 §10 全套 E2E **624 passed／21 skipped／0 failed**，
+>   兩次都在含 M13 全部程式碼的樹上跑完五個 browser project，`match-stage.spec.ts`
+>   （含 §6 兩條換人 E2E）與 `scoreboard-binding.spec.ts` 皆在其中原樣通過。
+>   另註：本項原文的 `test:e2e --workers=1` 語法已被教訓 #20 廢止，正確指令為
+>   `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`。
+> - **7.6**：`git diff e6a4713^1 e6a4713^2`（M13 合併前 `main` vs 分支末端）對
+>   `package.json`／`pnpm-lock.yaml`／兩個 workspace 的 `package.json` **輸出全空**；
+>   對 `allocation.ts`／`pairing.ts`／`duplication.ts`／`candidates.ts`／`round-types.ts`／
+>   `PlayerTile.tsx`／`hono-pickball/**` **輸出全空**；`--diff-filter=A -- hooks/` **輸出全空**（零新增檔案）。
+> - **7.7**：`DO_NOT_TRACK=1 openspec validate matchmaker-player-swap --strict` → valid。
+> - **7.8**：python 計數法（非 BSD `uniq`）逐標題計數，兩份 delta spec 皆**無重複**。
 
 ### 本 change 唯一容許變動的既有測試
 
