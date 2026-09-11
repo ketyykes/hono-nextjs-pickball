@@ -1,5 +1,42 @@
 # Matchmaker M10～M15 apply 執行手冊（runbook）
 
+## 🏁 全流程結束：apply、merge、verify、archive 皆已完成（2026-09-11）
+
+**matchmaker M10～M15 六個 change 全部 apply、合併、verify、archive 完畢，本檔已無待辦事項。**
+
+- **apply／merge**：六棒依序在主 repo（不用 worktree）逐一開分支、opus leader 執行、coordinator
+  獨立驗證、`--no-ff` 合併回 `main`、刪分支。過程中歷經 M13 跨兩個 session 接力、M14 電腦當機中斷、
+  M15 兩度暫停（使用者關機、帳號整週 rate limit），皆依本檔紀錄安全交接、零工作遺失。
+  合併 commit：M10～M15 依序見下方「Pipeline 總覽」。
+- **verify**：六個 change 依序跑 `/opsx:verify`，task／scenario／驗收錨點皆 100% 命中
+  （M13 補齊了 §7 收尾驗證原本沒回勾的 8 項，取證後才補勾，未採信自述）。
+- **archive**：依 M10→M11→M12→M13→M14→M15 序列（**M14 先於 M15**，避免 `round-lifecycle`
+  「回合資料模型」的 MODIFIED 區塊互相覆寫）。18 個 MODIFIED 區塊全部是主 spec 的嚴格超集，
+  **本批未出現 M6 那種需要 RENAMED→REMOVED→ADDED 三段式的情境**。archive 後
+  `DO_NOT_TRACK=1 openspec validate --all --strict` 17 項全過，16 份主 spec 皆無重複標題
+  （python 計數法），`tsc`／`pnpm test`／`lint` 與合併後基線一致，archive commit 純文件變動、
+  零程式碼異動。六個 change 目錄已移入 `openspec/changes/archive/2026-09-11-*`，
+  `openspec/changes/` 下只剩不在本批範圍的 `quick-rating-spec-backfill`。
+- **未 push**：本機 `main` 領先 `origin/main` 多個 commit，是否 push 由使用者決定。
+
+### 六棒 archive 後浮現、留給使用者裁決的待辦（不在本批範圍，未動）
+
+1. **`player-stats.ts` 把平局計為雙方各一敗場**：`tallyGamesAndResults` 對 `winner === "draw"`
+   的場次兩隊都判定為敗場，影響 `/matchmaker/stats` 排行榜的勝率計算。成因是 M11 的 spec
+   寫作時 `winner` 還是二值，M15 才讓 `"draw"` 首次可達。修正需要另開一個小 change（改動
+   M11 的 spec 與 `player-stats.ts`），不在 M10～M15 六棒範圍內。
+2. **M14 的 `ROUND_TIMER_EXPIRED_MESSAGE = "時間到：領先者勝，平手請再打一球"` 與 M15 新行為矛盾**
+   （M15 已允許並記錄平局，不需要「再打一球」）。同樣需要另開小 change 修正這行文案。
+3. **M14 design Open Questions 第 7、11 條**仍標記 ⚠️ 需人類裁決：①本輪已產生計時設定後
+   無法改回「不計時」②時間到後重整頁面會再播一次提示音。
+4. `hooksInventory.test.ts` 目前直接讀主 spec，導致 apply 階段偶爾需要直接編輯主 spec
+   （M14 的 `4b99156`，已核對內容與 delta 逐字相同、archive 時為 no-op，未造成不可重建的破口，
+   但根除需要改這支測試的資料來源）。
+
+> 以下為完整執行歷程存檔，供之後回頭查證細節或類似批次參考；日常操作只需看上方本節。
+
+## Matchmaker M10～M15 apply 執行手冊（歷程存檔）
+
 > 給下一個接手的 coordinator agent。目標：把 openspec 的 6 個 matchmaker change（M10～M15）
 > 依相依順序全部跑完 `/opsx:apply`、逐一合併回本機 `main`、最後 verify 與 archive。
 >
@@ -15,11 +52,12 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-11，**M10～M15 六棒全數合併完成**，待 verify／archive）
+## 狀態快照（最後更新 2026-09-11，**M10～M15 六棒全數合併、verify、archive 完成**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `da1fa35`（feat：合併 M15 matchmaker-timed-draw，六棒全數合併完成） |
+| `main` HEAD | `d1c30d2`（chore：M15 verify／archive，六棒 apply／merge／verify／archive 全部完成） |
+| verify／archive | 六個 change 依序完成，commit 依序為 `ce340b8`（M10）／`0a3eafa`（M11）／`eceb0d5`（M12）／`33a1fd7`（M13）／`8dcb7fc`（M14）／`d1c30d2`（M15）。`openspec validate --all --strict` 17 項全過，16 份主 spec 零重複標題，`tsc`／`pnpm test`／`lint` 與合併後基線一致。細節見上方「🏁 全流程結束」 |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
@@ -27,7 +65,7 @@
 | M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
 | M14 | **已合併**（`change/matchmaker-round-timer` → `main`，分支已刪，70 個 commit。前一 session 電腦當機中斷於 §13.8；本 session 接手，機器負載正常（load average 2.4）時重跑全套 E2E 拿到乾淨全綠，派 opus leader 做 Final Code Review APPROVED 後合併，詳見下方「M14 完成紀錄」） |
 | M15 | **已合併**（`change/matchmaker-timed-draw` → `main`，分支已刪，46 個 commit）。中途經歷關機暫停（已恢復）與帳號整週 rate limit 中斷（2026-09-11 04:00 Asia/Taipei 重置後由新 leader 接手完成 §9～§10），Final Code Review APPROVED，coordinator 獨立驗證（含隔離重跑確認 E2E 唯二失敗為既有 quiz.spec.ts webkit／mobile-safari 雜訊）後合併。詳見下方「M15 完成紀錄」，含 leader 提出的 4 項裁決事項（其中 2 項待六棒 archive 後另議） |
-| 工作位置 | 主 repo `main` 分支，工作樹乾淨。**六個 change 全數合併，下一步是依「全部合併後」一節跑 `/opsx:verify` 與 `/opsx:archive`**（archive 順序 MUST 為 M10→M11→M12→M13→M14→M15，尤其 M14 必須先於 M15，兩者皆 MODIFIED `round-lifecycle`「回合資料模型」，顛倒會讓 M14 的區塊覆寫掉 M15 的 `winner` 三值化） |
+| 工作位置 | 主 repo `main` 分支，工作樹乾淨。**本批全部完成，無待辦**；未 push（本機領先 `origin/main` 多個 commit，是否 push 由使用者決定）。archive 後浮現的 2 項後續 bug（player-stats 平局誤計、M14 計時到期文案）與 M14 的 2 條 Open Questions 留給使用者決定是否另開新 change |
 
 ### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
