@@ -24,7 +24,7 @@
 | `teamB` | HistoryTeam | 第二隊 |
 | `scoreA` | number | 第一隊比分，非負整數 |
 | `scoreB` | number | 第二隊比分，非負整數 |
-| `winner` | `"teamA" \| "teamB"` | 勝方 |
+| `winner` | `"teamA" \| "teamB" \| "draw"` | 勝方；兩隊比分相同的計時回合為 `"draw"`（見 `round-lifecycle` 的「比分驗證」） |
 
 `HistoryTeam` MUST 含該隊每位球員的快照：
 
@@ -36,7 +36,7 @@
 | `players[].ratingAfter` | number | 該員賽後分數（clamp 後） |
 | `rating` | number | 該隊的隊伍分數（賽前，單打為該員 rating、雙打為兩人總和） |
 
-賽前與賽後分數 MUST 為 **per-player**，SHALL NOT 只保存隊伍層級的一個數字——`prd.md` 9.3.1 的 CSV 匯出明列「各員賽前分數與賽後分數」，且雙打同隊兩人的起點不同，只存隊伍值就無法還原任何一位球員的變化。
+賽前與賽後分數 MUST 為 **per-player**，SHALL NOT 只保存隊伍層級的一個數字——`prd.md` 9.3.1 的 CSV 匯出明列「各員賽前分數與賽後分數」，且雙打同隊兩人的起點不同，只存隊伍值就無法還原任何一位球員的變化。平局時兩隊亦各自保留 per-player 的賽前／賽後分數，與勝負場次的欄位形狀完全一致，不因平局而簡化。
 
 紀錄 MUST 是**自足的快照**：寫入後即使該球員從名單中被刪除或改名，這筆歷史仍 MUST 能完整顯示當時的姓名、比分與分數變化。SHALL NOT 以 `playerId` 於呈現時回查名單取得姓名（見 design Decision 3）。
 
@@ -79,6 +79,13 @@
 - **WHEN** 其中一位球員自名單中被移除
 - **THEN** 該筆紀錄的姓名、比分、賽前與賽後分數 MUST 完全不受影響
 - **驗收**：`nextjs-pickball/lib/matchmaker/history.test.ts`，it 名稱「球員自名單刪除後歷史紀錄的姓名與分數仍完整」
+
+#### Scenario: winner 欄位新增 draw 列舉值時通過驗證
+
+- **WHEN** 一筆歷史紀錄的 `winner` 為 `"draw"`，其餘欄位合法
+- **THEN** 驗證通過
+- **AND** `winner` 為 `"tie"` 這類未列舉的字面量時驗證失敗
+- **驗收**：`nextjs-pickball/lib/matchmaker/history.test.ts`，it 名稱「winner 欄位新增 draw 列舉值時通過驗證」
 
 ---
 
@@ -307,7 +314,7 @@ C3 = min(上月 1 日 00:00, C2)
 
 雙打組成標示 MUST 只在對戰方式為雙打時顯示；單打紀錄 SHALL NOT 顯示該欄位（單打沒有組成可言，顯示空白或「一般雙打」都是錯誤資訊）。
 
-勝方 MUST 以文字或圖示明確標示，SHALL NOT 僅以顏色區分（`prd.md` 12.5：色彩不得為唯一資訊來源）。
+勝方 MUST 以文字或圖示明確標示，SHALL NOT 僅以顏色區分（`prd.md` 12.5：色彩不得為唯一資訊來源）。`winner` 為 `"draw"` 時 MUST 顯示可判讀的「平手」文字，SHALL NOT 顯示任一隊為勝方，也 SHALL NOT 留白——顯示任一隊會誤導使用者以為該隊真的獲勝，留白則與「未完成」場次的呈現無法區分。
 
 歷史頁 SHALL NOT 重新計算任何分數：賽前／賽後分數、比分與勝方一律照 M4 寫入的值原樣呈現。
 
@@ -334,7 +341,12 @@ C3 = min(上月 1 日 00:00, C2)
 - **THEN** 該球員同時顯示 4.20 與 4.35 兩個值
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，test 名稱「每位球員同時顯示賽前與賽後分數」
 
----
+#### Scenario: 平局紀錄顯示平手而非任一隊勝方
+
+- **GIVEN** `matchmaker:history:v1` 中有一筆 `winner` 為 `"draw"` 的紀錄
+- **WHEN** 於歷史頁檢視該筆紀錄
+- **THEN** 畫面顯示可判讀的「平手」文字，且第一隊與第二隊皆不出現「勝」之類的勝方標籤
+- **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，test 名稱「平局紀錄顯示平手而非任一隊勝方」
 
 ### Requirement: 空區間的友善空狀態
 

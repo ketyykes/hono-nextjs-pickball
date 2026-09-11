@@ -36,7 +36,7 @@
 | `teams` | `[RoundTeam, RoundTeam]` | 第一隊與第二隊，各含 `playerIds` 與 `rating`（隊伍分數） |
 | `status` | `"pending" \| "scoring" \| "completed"` | 見下方狀態語意 |
 | `scores` | `{ teamA, teamB } \| null` | 最終比分，非負整數；未完成時為 `null` |
-| `winner` | `"teamA" \| "teamB" \| null` | 勝方；未完成時為 `null` |
+| `winner` | `"teamA" \| "teamB" \| "draw" \| null` | 勝方；兩隊比分相同的計時回合為 `"draw"`（見「比分驗證」），SHALL NOT 於非計時回合出現；未完成時為 `null` |
 | `completedAt` | `string \| null` | 完成時間，ISO 8601；未完成時為 `null` |
 | `playerRatings` | `{ playerId, before, after }[]` | 該場每位球員的賽前與賽後分數；`before` 於建立回合時填入，`after` 未完成時為 `null` |
 
@@ -44,7 +44,7 @@
 
 - `pending`——已排定但尚未開始，是「未完成場次」的唯一可重排對象。
 - `scoring`——**進行中**，已開始計分但尚未判定勝負。本 capability SHALL 在 schema 與「未完成」判定中接受此值，但 SHALL NOT 自行產生它——實際的進入時機需要場邊計分的銜接，屬後續 milestone。先納入 schema 是為了避免對 `matchmaker:round:v1` 做破壞性遷移（沿用 `player-roster` 對 `restCount`／`gamesPlayed` 的同一教訓）。
-- `completed`——已完成，MUST 同時帶齊 `scores`、`winner`、`completedAt`，且 `playerRatings` 每筆的 `after` MUST 為數字。已完成場次 SHALL NOT 再次送出比分（`prd.md` 6.5）。
+- `completed`——已完成，MUST 同時帶齊 `scores`、`winner`、`completedAt`，且 `playerRatings` 每筆的 `after` MUST 為數字。已完成場次 SHALL NOT 再次送出比分（`prd.md` 6.5）。`winner` 為 `"draw"` 時同樣視為「已帶有 winner」（非 `null`），不觸發「completed 場次必須帶有 winner」的驗證失敗。
 
 回合的球員只保存 **id 與該輪的分數快照**，SHALL NOT 內嵌整個 `Player` 物件——姓名、顏色、`isActive` 等欄位由名單即時解析。回合與名單雙寫同一份資料會在使用者於回合進行中改名或改分數時產生兩個互相矛盾的真相（見 design Decision 3）。
 
@@ -79,6 +79,13 @@
 - **WHEN** 以 `RoundSchema.safeParse` 驗證
 - **THEN** `success` 為 `true`，且解析結果的 `timer` 為 `null`
 - **驗收**：`nextjs-pickball/lib/matchmaker/round-types.test.ts`，it 名稱「回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料」
+
+#### Scenario: winner 欄位新增 draw 列舉值
+
+- **WHEN** 一個 `completed` 場次的 `winner` 為 `"draw"`、`scores` 兩隊比分相同，其餘欄位合法
+- **THEN** 驗證通過
+- **AND** `winner` 為 `"tie"` 這類未列舉的字面量時驗證失敗
+- **驗收**：`nextjs-pickball/lib/matchmaker/round-types.test.ts`，it 名稱「winner 欄位新增 draw 列舉值且 completed 場次可帶 draw」
 
 ---
 
@@ -299,8 +306,15 @@
 - 任一欄位未填寫（空字串或僅空白）。
 - 任一欄位不是有效數字。
 - 任一欄位為負數。
-- 兩隊比分相同（平局）。
+- 兩隊比分相同（平局）**且本回合非計時制**。
 - 場次已完成（`status === "completed"`）。
+
+`validateScoreInput` MUST 接受第四個參數 `isTimedRound: boolean`，表示本回合是否為計時制
+（呼叫端由 `round.timer !== null` 推導——`timer` 欄位本身由 `matchmaker-round-timer`／M14
+引入，不屬本 Requirement 定義範圍）。`isTimedRound` 為 `true` 時，兩隊比分相同 MUST 被接受，
+`scoreA`／`scoreB` 一併回傳；`isTimedRound` 為 `false` 時維持既有行為，兩隊比分相同 MUST 被
+拒絕（`prd.md` 13.4 對非計時回合「平局不得送出」不變，計時制平局為本 capability 新增的唯一
+例外，見 `matchmaker-timed-draw`）。
 
 拒絕時 MUST 回傳**可判讀的失敗結果**（含具名的錯誤代碼與繁體中文訊息），SHALL NOT 拋出例外、SHALL NOT 只回傳布林值——`prd.md` 第 11 節要求錯誤訊息說明可採取的修正方式，只回布林值的介面在型別上就沒有訊息可傳給 UI。
 
@@ -329,9 +343,17 @@
 
 #### Scenario: 兩隊比分相同
 
+- **GIVEN** 本回合非計時制（`isTimedRound` 為 `false`）
 - **WHEN** 兩隊比分皆為 `11`
-- **THEN** 送出被拒絕，錯誤訊息說明平局無法判定勝方
+- **THEN** 送出被拒絕，錯誤訊息以繁體中文明確指出「非計時回合不得送出平局」、兩隊比分相同時無法判定勝方
 - **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「兩隊比分相同時拒絕送出」
+
+#### Scenario: 計時回合兩隊比分相同時允許送出為平局
+
+- **GIVEN** 本回合為計時制（`isTimedRound` 為 `true`）
+- **WHEN** 兩隊比分皆為 `11`
+- **THEN** 送出被接受（`ok` 為 `true`），回傳的 `scoreA`／`scoreB` 皆為 `11`
+- **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「計時回合兩隊比分相同時允許送出」
 
 #### Scenario: 場次已完成
 
@@ -351,11 +373,11 @@
 3. 追加**一筆**歷史紀錄（欄位與寫入時機見 `match-history`）。
 4. 該場出賽的 4 位（雙打）或 2 位（單打）球員 `gamesPlayed` 各 +1。
 
-勝方 MUST 為比分較高的一隊。賽前分數 MUST 取「送出當下該員在名單中的 rating」，賽後分數 MUST 取評分 API clamp 後的結果。觸頂或觸底時 rating MUST 停在邊界值，且流程 MUST 保留評分 API 回報的觸界訊息供 UI 提示（`prd.md` 6.4.6 要求 UI 明確標示「已達上限／下限」，SHALL NOT 靜默卡住）。
+勝方 MUST 為比分較高的一隊；**兩隊比分相同時（僅計時回合可能發生，見「比分驗證」），勝方 MUST 為 `"draw"`，且評分 API 的呼叫 MUST 以雙方 `S = 0.5` 計算**（`match-rating` 的「評分更新公式與常數」）。賽前分數 MUST 取「送出當下該員在名單中的 rating」，賽後分數 MUST 取評分 API clamp 後的結果，平局時亦同。觸頂或觸底時 rating MUST 停在邊界值，且流程 MUST 保留評分 API 回報的觸界訊息供 UI 提示（`prd.md` 6.4.6 要求 UI 明確標示「已達上限／下限」，SHALL NOT 靜默卡住）。
 
 本流程 MUST 為**原子**：任一步驟失敗時，回合、名單與歷史三者 SHALL NOT 有任何部分變更——只寫了歷史卻沒更新評分（或反之）會產生無法自我修復的不一致資料。
 
-`gamesPlayed` 的累加 MUST 只發生在此處，SHALL NOT 於產生回合或重排時發生——`gamesPlayed` 的用途是評分的信賴度加權（`prd.md` 6.4.3），未打完的場次不構成出場經驗。
+`gamesPlayed` 的累加 MUST 只發生在此處，SHALL NOT 於產生回合或重排時發生——`gamesPlayed` 的用途是評分的信賴度加權（`prd.md` 6.4.3），未打完的場次不構成出場經驗；平局同樣計入出場經驗，累加規則不因平局而不同。
 
 本 capability SHALL NOT 自行實作 Elo 公式；`D`、`K_base` 與 K 遞減皆屬評分 capability。
 
@@ -399,11 +421,24 @@
 
 #### Scenario: 驗證失敗時回合、名單與歷史皆不變
 
+- **GIVEN** 本回合非計時制（`round.timer` 為 `null`）
 - **WHEN** 以平局比分送出
 - **THEN** 回合物件、名單中所有 `rating` 與 `gamesPlayed`、歷史筆數 MUST 與送出前完全相同
 - **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「送出失敗時回合、名單與歷史皆不變」
 
----
+#### Scenario: 計時回合送出平局比分後場次標記為完成且 winner 為 draw
+
+- **GIVEN** 一個計時回合（`round.timer !== null`）中 `pending` 的單打場次
+- **WHEN** 送出比分 `11` 比 `11`
+- **THEN** 該場 `status` 為 `"completed"`，`scores` 為 `{ teamA: 11, teamB: 11 }`，`winner` 為 `"draw"`，`completedAt` 為注入的時間
+- **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「計時回合送出平局比分後場次標記為完成且 winner 為 draw」
+
+#### Scenario: 計時回合平局時 playerRatings 仍逐一對應該場每位球員
+
+- **GIVEN** 一個計時回合的雙打場次
+- **WHEN** 送出平局比分
+- **THEN** `playerRatings` MUST 恰有 4 筆，每筆的 `before`／`after` 皆為以 `S = 0.5` 計算後的結果
+- **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「計時回合平局時 playerRatings 仍逐一對應該場每位球員」
 
 ### Requirement: 回合與歷史的持久化與損壞降級
 

@@ -111,6 +111,12 @@ JSON」（`prd.md` 9.3 前言）。此說明 MUST 出現在畫面上，SHALL NOT
 
 匯入的寫入 MUST 為**先全部驗證、再一次寫入**：任一 key 寫入前 MUST 已確認整份備份合法。
 
+`BackupSchema` 直接重用 `round-lifecycle` 的 `RoundSchema` 與 `match-history` 的
+`MatchHistoryEntrySchema`（不重新宣告 `winner` 欄位，見 `nextjs-pickball/lib/matchmaker/backup.ts`
+的既有慣例），因此備份中回合場次或歷史紀錄的 `winner` MUST 接受 `"draw"`——此為兩份巢狀
+schema 各自擴增列舉值後的**自動結果**，`parseBackup` 本身不需要新增任何平局專屬的判斷分支。
+既有備份（`winner` 僅 `"teamA"`／`"teamB"`）不受影響，仍可正常匯入。
+
 實作位於 `nextjs-pickball/lib/matchmaker/backup.ts`、
 `nextjs-pickball/lib/matchmaker/transfer-types.ts` 與
 `nextjs-pickball/lib/matchmaker/transfer-storage.ts`。
@@ -156,7 +162,12 @@ JSON」（`prd.md` 9.3 前言）。此說明 MUST 出現在畫面上，SHALL NOT
 - **THEN** 參賽者頁顯示備份中的參賽者，歷史資料同步還原
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，test 名稱「匯入合法 JSON 備份後參賽者與歷史一併還原」
 
----
+#### Scenario: 備份內回合或歷史含平局時仍通過驗證
+
+- **GIVEN** 一份備份的 `currentRound.matches` 或 `history` 中，有一筆的 `winner` 為 `"draw"`
+- **WHEN** 呼叫 `parseBackup`
+- **THEN** 回傳成功結果，該筆的 `winner` 於還原後仍為 `"draw"`
+- **驗收**：`nextjs-pickball/lib/matchmaker/backup.test.ts`，it 名稱「備份內回合或歷史含平局的 winner 為 draw 時仍通過驗證」
 
 ### Requirement: 歷史賽果的 CSV 匯出
 
@@ -180,6 +191,11 @@ MUST 以 UTF-8 BOM（`﻿`）開頭——Excel 在無 BOM 時會以系統預設�
 球員姓名與賽前／賽後分數 MUST 取自歷史紀錄本身的**快照欄位**，SHALL NOT 以球員 id 回查目前
 名單——歷史紀錄被設計成自足快照正是為了讓球員被刪除或改名後仍能完整呈現；在匯出時回查名單，
 會讓已刪除球員的那幾列變成空白，等於把該設計作廢。
+
+「勝方」欄 MUST 依 `entry.winner` 三種值輸出對應文字：`"teamA"` 輸出第一隊隊名、`"teamB"`
+輸出第二隊隊名、`"draw"` MUST 輸出「平手」——SHALL NOT 把 `"draw"` 誤判為任一隊（例如以
+`winner === "teamA" ? 隊A : 隊B` 的二元判斷會把平局靜默算成第二隊獲勝，是使用者事後對帳時
+最難察覺的一種錯誤）。
 
 本 requirement 只負責「把全部歷史轉成 CSV」，SHALL NOT 實作任何時間區間篩選（那屬歷史頁）。
 
@@ -217,6 +233,13 @@ MUST 以 UTF-8 BOM（`﻿`）開頭——Excel 在無 BOM 時會以系統預設�
 - **WHEN** 歷史為空陣列
 - **THEN** 輸出只含標題列（加 BOM）的 CSV，SHALL NOT 為空字串
 - **驗收**：`nextjs-pickball/lib/matchmaker/history-csv.test.ts`，it 名稱「歷史為空時仍輸出只有標題列的 CSV」
+
+#### Scenario: 平局歷史的勝方欄輸出平手
+
+- **GIVEN** 一筆 `winner` 為 `"draw"` 的歷史紀錄
+- **WHEN** 匯出 CSV
+- **THEN** 該列的「勝方」欄為「平手」，不含第一隊或第二隊的隊名
+- **驗收**：`nextjs-pickball/lib/matchmaker/history-csv.test.ts`，it 名稱「平局歷史的勝方欄輸出平手而非任一隊隊名」
 
 ---
 

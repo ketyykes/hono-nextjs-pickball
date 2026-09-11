@@ -60,7 +60,7 @@ capability 的任何既有 Requirement**——M6～M9 為並行 worktree，同�
 | 場地編號 | 每個場地區塊 MUST 標示其 `courtNumber` |
 | 球員色塊 | 每格 MUST 帶該員的 `colorFrom` → `colorTo` 雙色漸層 |
 | 姓名 | 每格 MUST 顯示該員姓名 |
-| 比分或未完成狀態 | 已完成場次 MUST 顯示最終比分與勝方；未完成場次 MUST 顯示可判讀的「未完成」狀態，SHALL NOT 留白 |
+| 比分或未完成狀態 | 已完成場次 MUST 顯示最終比分；`winner` 為 `"teamA"` 或 `"teamB"` 時 MUST 顯示對應勝方，`winner` 為 `"draw"` 時 MUST 顯示可判讀的「平手」文字而非任一隊隊名；未完成場次 MUST 顯示可判讀的「未完成」狀態，SHALL NOT 留白 |
 
 每格的前景文字色 MUST 由 `nextjs-pickball/lib/matchmaker/colors.ts` 的 `pickTextColor`
 決定，SHALL NOT 另寫一套亮度判斷（`prd.md` 4.1.1）。每格的隊伍歸屬與列欄位置 MUST 取自
@@ -120,7 +120,12 @@ SHALL NOT 在本模組重新推導一次單打／雙打的排列規則。
 - **AND** 同為 1 個場地時，雙打的 `height` 大於單打的 `height`
 - **驗收**：`nextjs-pickball/lib/matchmaker/export-scene.test.ts`，it 名稱「畫布高度依場地數與對戰方式遞增」
 
----
+#### Scenario: 已完成場次為平局時顯示比分與平手而非任一隊勝方
+
+- **WHEN** 場次狀態為 `completed`、比分為 11 比 11、`winner` 為 `"draw"`
+- **THEN** 該場地區塊的狀態文字同時含 11、11 與可判讀的「平手」文字
+- **AND** 狀態文字不含任一隊的隊伍名稱
+- **驗收**：`nextjs-pickball/lib/matchmaker/export-scene.test.ts`，it 名稱「已完成場次為平局時顯示比分與平手而非任一隊勝方」
 
 ### Requirement: JPG 檔案的產生與下載
 

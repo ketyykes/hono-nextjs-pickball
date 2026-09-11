@@ -368,9 +368,13 @@ SHALL NOT 依賴場邊計分路徑存在。
 
 送出 MUST 委派回合 capability 的送出 pipeline（記錄最終比分 → 更新評分 → 寫入歷史），
 SHALL NOT 在 UI 層自行更新任何評分或歷史資料。比分驗證規則（空白、非數字、平局、場次已完成）
-歸屬回合 capability，UI SHALL NOT 複製一份；UI 的責任是把 pipeline 回傳的驗證失敗以**繁體
-中文**呈現在該場次區塊內，並帶 `role="alert"` 使讀屏能即時播報（`prd.md` 6.3.2、第 11 節、
-12.5）。
+歸屬回合 capability，UI SHALL NOT 複製一份——**含「兩隊比分相同是否可送出」這條規則本身**：
+計時回合（`round.timer !== null`）下兩隊比分相同 MUST 被 pipeline 接受為平局，非計時回合維持
+拒絕，UI 元件 SHALL NOT 依 `round.timer` 自行攔截或另外判斷，一律把欄位原樣往上傳、讓
+`round-lifecycle` 的 `validateScoreInput` 決定是否接受（見該 capability 的「比分驗證」）。
+UI 的責任是把 pipeline 回傳的驗證失敗以**繁體中文**呈現在該場次區塊內，並帶 `role="alert"`
+使讀屏能即時播報（`prd.md` 6.3.2、第 11 節、12.5）；非計時回合的平局拒絕訊息 MUST 明確指出
+「非計時回合不得送出平局」，不得只顯示「無法判定勝方」這類未區分原因的舊文案。
 
 已完成場次的比分欄位與送出控制 MUST 為 `disabled`，使同一份比分無法再次送出
 （`prd.md` 6.5）。
@@ -401,6 +405,13 @@ SHALL NOT 在 UI 層自行更新任何評分或歷史資料。比分驗證規則
 - **THEN** 兩個比分欄位與送出控制皆帶 `disabled` 屬性
 - **驗收**：`nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，it 名稱「已完成場次的比分欄位與送出按鈕皆為 disabled」
 
+#### Scenario: 兩隊比分相同時 UI 仍照常委派送出不自行攔截
+
+- **WHEN** 於某場次的兩個比分欄位皆填入 `11` 後按下送出（不論本回合是否為計時制）
+- **THEN** 回合 capability 的送出函式仍被呼叫一次，帶入該場次識別與兩隊相同的分數
+- **AND** UI 自身不因兩隊比分相同而提前阻擋送出或另外顯示錯誤
+- **驗收**：`nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，it 名稱「兩隊比分相同時 UI 仍照常委派送出而不自行攔截」
+
 ---
 
 ### Requirement: 完成場次的視覺與資訊
@@ -411,6 +422,10 @@ SHALL NOT 在 UI 層自行更新任何評分或歷史資料。比分驗證規則
 
 已完成場次 MUST 顯示最終比分、勝方與完成時間。勝方 MUST 以**文字標籤**標示（例如「勝」），
 SHALL NOT 僅以顏色或飽和度差異表達——色彩不得作為唯一資訊來源（`prd.md` 12.5）。
+
+平局場次（`match.winner === "draw"`，僅計時回合可能出現）MUST NOT 為任一隊顯示「勝」文字
+標籤，MUST 改顯示可判讀的「平手」文字標籤，理由與上一段相同——色彩（若有）不得為唯一資訊
+來源，且顯示任一隊「勝」會誤導使用者以為該隊真的獲勝。
 
 #### Scenario: 完成場次為半透明低飽和
 
@@ -431,7 +446,12 @@ SHALL NOT 僅以顏色或飽和度差異表達——色彩不得作為唯一資�
 - **THEN** 勝方隊伍帶有可讀的文字標籤，非勝方沒有該標籤
 - **驗收**：`nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，it 名稱「勝方以文字標籤標示而非僅以顏色區分」
 
----
+#### Scenario: 平局場次不顯示任一隊勝方標籤而顯示平手標籤
+
+- **WHEN** 渲染一場已完成、比分 11:11、`winner` 為 `"draw"` 的對戰
+- **THEN** 第一隊與第二隊皆不出現「勝」文字標籤
+- **AND** 畫面另外顯示可判讀的「平手」文字標籤
+- **驗收**：`nextjs-pickball/components/matchmaker/CourtCard.test.tsx`，it 名稱「平局場次不顯示任一隊勝方標籤而顯示平手標籤」
 
 ### Requirement: 強度分數觸頂與觸底標示
 
