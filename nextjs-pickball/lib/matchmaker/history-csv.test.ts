@@ -62,7 +62,7 @@ function makeDoublesEntry(
 		doublesComposition: DoublesComposition;
 		scoreA: number;
 		scoreB: number;
-		winner: "teamA" | "teamB";
+		winner: "teamA" | "teamB" | "draw";
 	}> = {},
 ): MatchHistoryEntry {
 	return {
@@ -179,6 +179,17 @@ describe("history-csv", () => {
 		const rows = parseCsv(csvText);
 
 		expect(rows[1]?.[8]).toBe(label);
+	});
+
+	it("平局歷史的勝方欄輸出平手而非任一隊隊名", () => {
+		// M15 matchmaker-timed-draw：既有 entry.winner === "teamA" ? TEAM_LABELS[0] :
+		// TEAM_LABELS[1] 是二元判斷，會把 "draw" 誤判為 TEAM_LABELS[1]（第二隊獲勝）。
+		const entry = makeDoublesEntry({ winner: "draw" });
+
+		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
+		const rows = parseCsv(csvText);
+
+		expect(rows[1]?.[8]).toBe("平手");
 	});
 
 	it("多筆歷史依原順序逐列輸出，且列數與筆數一致", () => {
