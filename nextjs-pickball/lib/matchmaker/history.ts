@@ -34,7 +34,7 @@ const HistoryEntryBaseSchema = z.object({
 	teamB: HistoryTeamSchema,
 	scoreA: z.number().int().nonnegative(),
 	scoreB: z.number().int().nonnegative(),
-	winner: z.enum(["teamA", "teamB"]),
+	winner: z.enum(["teamA", "teamB", "draw"]),
 });
 
 // 以 discriminated union 表達 doublesComposition 的有無，而非 optional 欄位——

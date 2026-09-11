@@ -71,3 +71,11 @@ export const ROUND_TIMER_LOCKED_REASON = "本輪已開始計分，計時設定�
  * `role="alert"` 區塊，SHALL NOT 在元件內寫死字面量。
  */
 export const ROUND_TIMER_EXPIRED_MESSAGE = "時間到：領先者勝，平手請再打一球";
+
+/**
+ * 平手的顯示文案，計時回合平局時使用（M15 matchmaker-timed-draw change）。
+ * history-csv.ts（勝方欄）、export-scene.ts（buildStatusText）、CourtCard.tsx、
+ * HistoryRecordCard.tsx 四處平手顯示皆改用此常數，SHALL NOT 各自寫死字面量
+ * （design Decision 7）。
+ */
+export const DRAW_LABEL = "平手";

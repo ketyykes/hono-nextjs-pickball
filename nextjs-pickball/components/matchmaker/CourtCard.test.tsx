@@ -7,6 +7,7 @@ import type { CourtCardProps } from "./CourtCard";
 import type { Player } from "@/lib/matchmaker/types";
 import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
 import { createInitialState } from "@/lib/scoreboard/reducer";
+import { DRAW_LABEL } from "@/lib/matchmaker/labels";
 
 // 測試專用預設球員：colorFrom／colorTo 沿用調色盤既有第一組即可，色塊背景本身不是本檔
 // 斷言重點（漸層與對比已由 tile-style.test.ts、colors.test.ts 涵蓋），這裡只需要合法 hex。
@@ -654,6 +655,88 @@ describe("CourtCard", () => {
 			"替 王小明 換人（無可換之人）",
 			"替 陳小華 換人（無可換之人）",
 		]);
+	});
+
+	// M15（matchmaker-timed-draw）§7：平局場次（僅計時回合可能出現）不得為任一隊顯示
+	// 「勝」文字標籤，MUST 改顯示「平手」文字標籤——色彩不得為唯一資訊來源（prd.md 12.5），
+	// 且顯示任一隊「勝」會誤導使用者以為該隊真的獲勝。
+	it("平局場次不顯示任一隊勝方標籤而顯示平手標籤", () => {
+		const match = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 11 },
+			winner: "draw",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3 },
+				{ playerId: "p2", before: 3, after: 3 },
+			],
+		});
+		const view = render(<CourtCard {...buildProps({ match })} />);
+
+		// 兩隊都要驗，不是只驗一隊——避免「只有一隊漏改」的變異存活。
+		expect(view.getByTestId("court-match-1-team-a").textContent).not.toMatch(/勝/);
+		expect(view.getByTestId("court-match-1-team-b").textContent).not.toMatch(/勝/);
+		expect(view.getByText(DRAW_LABEL)).not.toBeNull();
+		view.unmount();
+
+		// 對照組：非平局的一般勝負場次不得顯示「平手」標籤，防止「平手標籤無條件渲染」
+		// 這種變異存活（只驗平局案例測不出恆渲染）。
+		const winMatch = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 5 },
+			winner: "teamA",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const winView = render(<CourtCard {...buildProps({ match: winMatch })} />);
+		expect(winView.queryByText(DRAW_LABEL)).toBeNull();
+		winView.unmount();
+
+		// 第二組對照：比分同樣是 11:11，但 winner 為 "teamA"。這組 fixture 刻意內部不一致
+		// （正常資料不會出現），存在的唯一理由是釘住平手標籤的資料來源是 match.winner，
+		// 而不是 UI 自己比較兩隊比分——上面平局案例的 11:11 是對稱的，少了這組，把條件寫成
+		// match.scores.teamA === match.scores.teamB 的實作測不出任何差異（實測確認該變異在
+		// 補這組之前完全存活）。「比分相同是否算平局」是回合層的判定，RoundMatchSchema 只
+		// 保證 completed 場次帶有 winner，並未保證「比分相同 ⇔ 平局」，UI SHALL NOT 自行
+		// 複製一份這條規則（design Decision 6）。
+		const tieScoreWithWinnerMatch = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 11 },
+			winner: "teamA",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const tieScoreView = render(<CourtCard {...buildProps({ match: tieScoreWithWinnerMatch })} />);
+		expect(tieScoreView.queryByText(DRAW_LABEL)).toBeNull();
+		expect(tieScoreView.getByTestId("court-match-1-team-a").textContent).toBe("第一隊勝");
+		tieScoreView.unmount();
+	});
+
+	// M15（matchmaker-timed-draw）§7：UI 層 SHALL NOT 複製「兩隊比分相同是否可送出」這條
+	// 驗證規則（design Decision 6）——一律原樣往上傳，由 round-lifecycle 的
+	// validateScoreInput 決定是否接受平局。這條測試證明 CourtCard 本身沒有這種複製。
+	it("兩隊比分相同時 UI 仍照常委派送出而不自行攔截", async () => {
+		const user = userEvent.setup();
+		const onSubmitScore = vi.fn();
+		const match = buildMatch({ id: "match-42" });
+		render(<CourtCard {...buildProps({ match, onSubmitScore })} />);
+
+		await user.type(screen.getByLabelText("第一隊比分"), "11");
+		await user.type(screen.getByLabelText("第二隊比分"), "11");
+		await user.click(screen.getByRole("button", { name: "送出比分" }));
+
+		expect(onSubmitScore).toHaveBeenCalledTimes(1);
+		expect(onSubmitScore).toHaveBeenCalledWith("match-42", "11", "11");
+		// 「有委派」證明不了「沒有攔截」：一個「比分相同時照常委派、但自己另外顯示錯誤」的
+		// 實作會通過上面兩條斷言（實測確認這種變異在補這條之前完全存活）。錯誤要不要顯示
+		// 一律等 round-lifecycle 回傳後由 submitError 決定，送出當下畫面不得自行冒出 alert。
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("換人被拒絕時顯示帶 role alert 的繁體中文錯誤訊息", () => {

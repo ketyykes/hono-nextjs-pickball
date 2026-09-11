@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	RoundSchema,
+	RoundMatchSchema,
 	MatchStatusSchema,
 	TARGET_SCORE_OPTIONS,
 	RoundTimerDurationMinutesSchema,
@@ -248,5 +249,71 @@ describe("RoundSchema", () => {
 		expect(invalid5.success).toBe(false);
 		expect(invalid30.success).toBe(false);
 		expect(invalid0.success).toBe(false);
+	});
+
+	it("winner 欄位新增 draw 列舉值且 completed 場次可帶 draw", () => {
+		// draw：completed 場次、兩隊比分相同，其餘欄位合法應通過驗證
+		const drawResult = RoundMatchSchema.safeParse(
+			makeRoundMatch({
+				status: "completed",
+				scores: { teamA: 11, teamB: 11 },
+				winner: "draw",
+				completedAt: "2026-08-16T01:00:00.000Z",
+				playerRatings: [
+					{ playerId: "p1", before: 5, after: 5 },
+					{ playerId: "p2", before: 6, after: 6 },
+				],
+			}),
+		);
+		expect(drawResult.success).toBe(true);
+
+		// tie 不在列舉值域內（safeParse 參數型別為 unknown，故意帶入非法字面量
+		// 不需要 cast，寫法沿用本檔既有的 invalid9／invalid13 模式）
+		const tieResult = RoundMatchSchema.safeParse({
+			...makeRoundMatch({
+				status: "completed",
+				scores: { teamA: 11, teamB: 11 },
+				completedAt: "2026-08-16T01:00:00.000Z",
+				playerRatings: [
+					{ playerId: "p1", before: 5, after: 5 },
+					{ playerId: "p2", before: 6, after: 6 },
+				],
+			}),
+			winner: "tie",
+		});
+		expect(tieResult.success).toBe(false);
+	});
+
+	it("winner 欄位仍接受 teamA、teamB 兩個既有勝方值", () => {
+		// Stage 2 mutation 補洞（regression guard，非 TDD 紅燈）：既有測試只在「預期失敗」的
+		// 案例裡帶過 winner: "teamA"，"teamB" 則從未出現過，因此把列舉縮寫成 ["draw"] 時
+		// 整個 lib/matchmaker 仍全綠。M15 把本列舉擴為三值後更需要把另外兩個值釘住，
+		// 否則日後誤刪任一個既有勝方值都不會有測試轉紅。
+		const completedPlayerRatings = [
+			{ playerId: "p1", before: 5, after: 6 },
+			{ playerId: "p2", before: 6, after: 5 },
+		];
+
+		const teamAResult = RoundMatchSchema.safeParse(
+			makeRoundMatch({
+				status: "completed",
+				scores: { teamA: 11, teamB: 9 },
+				winner: "teamA",
+				completedAt: "2026-08-16T01:00:00.000Z",
+				playerRatings: completedPlayerRatings,
+			}),
+		);
+		expect(teamAResult.success).toBe(true);
+
+		const teamBResult = RoundMatchSchema.safeParse(
+			makeRoundMatch({
+				status: "completed",
+				scores: { teamA: 9, teamB: 11 },
+				winner: "teamB",
+				completedAt: "2026-08-16T01:00:00.000Z",
+				playerRatings: completedPlayerRatings,
+			}),
+		);
+		expect(teamBResult.success).toBe(true);
 	});
 });

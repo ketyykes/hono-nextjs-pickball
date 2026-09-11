@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { buildCourtTiles } from "@/lib/matchmaker/stage-layout";
 import {
 	DOUBLES_COMPOSITION_LABEL,
+	DRAW_LABEL,
 	SWAP_PLAYER_LABEL,
 	SWAP_PLAYER_NO_CANDIDATE_LABEL,
 	TEAM_LABELS,
@@ -180,6 +181,10 @@ export function CourtCard({
 				className="flex items-center gap-1 text-xs text-muted-foreground"
 			>
 				<span>{TEAM_LABELS[index]}</span>
+				{/* match.winner === winnerKey 在 winnerKey 為 "teamA"／"teamB" 時對 "draw"
+				    自然為 false，不需要為平局另外新增分支；「平手」標籤改顯示於已完成場次的
+				    比分列（見下方 data-testid="court-${match.id}-score" 附近），不在這裡
+				    （M15 matchmaker-timed-draw change，design Decision 7）。 */}
 				{completed && match.winner === winnerKey && (
 					<Badge variant="outline" className="border-current bg-transparent text-current">
 						勝
@@ -285,6 +290,14 @@ export function CourtCard({
 									<span>{match.scores.teamA}</span>
 									<span>:</span>
 									<span>{match.scores.teamB}</span>
+									{/* 平局（僅計時回合可能出現）不得為任一隊顯示「勝」，改在此處以
+									    平手標籤標示——色彩不得為唯一資訊來源（prd.md 12.5），視覺權重
+									    比照 renderTeamLabel 既有的「勝」Badge（M15 design Decision 7）。 */}
+									{match.winner === "draw" && (
+										<Badge variant="outline" className="border-current bg-transparent text-current">
+											{DRAW_LABEL}
+										</Badge>
+									)}
 								</div>
 							)}
 							{match.completedAt && (

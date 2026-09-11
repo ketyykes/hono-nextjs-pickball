@@ -4,7 +4,7 @@
 // ExportScene 為可序列化純資料（無函式、無 class 實例）。
 
 import { pickTextColor } from "./colors";
-import { FORMAT_LABEL, TEAM_LABELS_BY_KEY } from "./labels";
+import { DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS_BY_KEY } from "./labels";
 import { buildCourtTiles } from "./stage-layout";
 import type { CourtTileTeamSource } from "./stage-layout";
 import type { MatchFormat } from "./allocation-types";
@@ -164,11 +164,18 @@ function resolvePlayer(playerId: string, players: readonly Player[]): Player {
 }
 
 /**
- * 場次狀態文字：已完成場次顯示最終比分與勝方；未完成場次（pending／scoring 一律視為
- * 未完成，不為 scoring 另立第三種文案）顯示可判讀的「未完成」文字，SHALL NOT 留白。
+ * 場次狀態文字，互斥且窮舉 `winner` 全部合法值的三個分支（M15 matchmaker-timed-draw）：
+ * 未完成場次（pending／scoring 一律視為未完成，不為 scoring 另立第三種文案）顯示
+ * 可判讀的「未完成」文字，SHALL NOT 留白；已完成場次的 `winner` 為 `"teamA"`／`"teamB"`
+ * 時顯示比分與對應隊伍的勝方文案；`winner` 為 `"draw"` 時顯示比分與 `DRAW_LABEL`，
+ * 不帶 `WINNER_SUFFIX`（平手不是一支隊伍勝出，SHALL NOT 顯示「平手獲勝」）。
  */
 function buildStatusText(match: RoundMatch): string {
 	if (match.status === "completed" && match.scores !== null && match.winner !== null) {
+		if (match.winner === "draw") {
+			return `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${DRAW_LABEL}`;
+		}
+
 		const winnerLabel = TEAM_LABELS_BY_KEY[match.winner];
 		return `${match.scores.teamA}${SCORE_SEPARATOR}${match.scores.teamB}${STATUS_SEPARATOR}${winnerLabel}${WINNER_SUFFIX}`;
 	}

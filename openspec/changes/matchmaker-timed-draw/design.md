@@ -352,14 +352,84 @@ Final Review F-5 收斂後）才剛統一的檔案——本 change 若在四個�
    - 若 M14 交付的計時語意比「整輪二元開關」更複雜（例如「已過期」與「進行中」是不同狀態），
      MUST 停下並回報人類決定「計時制平局」該對應哪一種狀態，SHALL NOT 自行擴大解讀。
 
-2. **「平手」文案是否需要在 JPG／列印稿以外的方式強調（例如額外的顏色或圖示）**——本 change
+   **【apply §1 實測結論，2026-09-10 於 `main @ a858b59`（M14 已合併）核對】——本條至此結案，
+   假設全數成立，無需人類裁決：**
+   - **欄位名稱與型別逐字相符**。`nextjs-pickball/lib/matchmaker/round-types.ts` 定義
+     `RoundTimerObjectSchema = z.object({ durationMinutes: RoundTimerDurationMinutesSchema,
+     startedAt: z.iso.datetime().nullable() })`、
+     `RoundTimerSchema = RoundTimerObjectSchema.nullable().default(null)`，並於
+     `RoundSchema` 掛在 `timer` 欄位上；`durationMinutes` 的值域為 `10 | 15 | 20`。
+     與本文件全篇假設的 `{ durationMinutes: 10 | 15 | 20; startedAt: string | null } | null`
+     完全一致，`round.timer !== null` 即「本輪為計時制」成立。
+   - **整輪層級，非逐場計時**（Open Questions 第 3 條同步結案）。`timer` 掛在 `Round` 而非
+     `RoundMatch`，`RoundMatch` 的欄位表無任何計時欄位。「不做每場獨立計時」的排除仍然成立。
+   - **無「已過期／進行中」的額外狀態機**。到期判定是 `round-timer.ts` 的純函式
+     （`isExpired(timer, nowIso)`）由呼叫端即時計算，不落地為欄位；M14 的「回合計時器」
+     Requirement 明文「時間到（剩餘秒數為 `0`）時 MUST NOT 自動結束任何場次或變更任何場次
+     狀態」。因此「計時制平局」對應的就是單純的 `timer !== null`，**與是否已開始計時
+     （`startedAt`）、是否已到期皆無關**——主持人在計時回合送出相同比分即可平局，本 change
+     SHALL NOT 額外要求 `isExpired` 為 `true`（那會是 spec 沒有要求的 scope creep）。
+   - **`validateScoreInput` 的全 repo 呼叫點仍只有兩處**（`round.ts:950` 自身與
+     `round.test.ts`），M14 未新增第三處，Escalation 的對應條件未觸發。
+   - **`rating-types.ts` / `history.ts` / `labels.ts` / `backup.ts` 的現況與 Context 描述
+     逐項相符**，未發現 `DRAW_LABEL` 既有匯出，`BackupSchema` 確實組合既有 schema。
+
+2. **【apply §1.4 新發現，需 coordinator 在 archive 時注意的順序約束】M14 已合併但
+   **尚未 archive**，其 `openspec/changes/matchmaker-round-timer/specs/round-lifecycle/spec.md`
+   對「回合資料模型」Requirement 做了 MODIFIED（新增 `timer` 欄位列、`timer` 說明段落與
+   「舊資料缺少 timer 欄位時以 null 通過驗證」Scenario），因此 `openspec/specs/round-lifecycle/spec.md`
+   主 spec 此刻**尚無** `timer` 的任何描述。**apply §1.4 已依 tasks.md 的指示，把本 change
+   的「回合資料模型」MODIFIED 區塊改以 M14 的 delta 版本為基礎重新複製、再疊加 `winner`
+   擴增**（本 change 的區塊現已含 M14 的三項內容）。
+   **殘留約束**：MODIFIED 區塊是整段覆寫語意，兩個 change 的區塊互為對方的超集／子集，
+   因此 **archive 順序必須是 M14 先、M15 後**。若順序顛倒，M14 的區塊（不含 `"draw"`）
+   會覆寫掉 M15 已寫入主 spec 的 `winner` 三值化。此為 archive 階段的操作約束，
+   不影響本 change 的 apply，記錄於此供 coordinator 裁決。
+
+2-b. **【apply §1 新發現，需人類裁決，但不阻塞本 change 的 apply】M14 的「時間到」提示文案
+   與本 change 的產品規則直接矛盾**。M14 於 `nextjs-pickball/lib/matchmaker/labels.ts`
+   新增 `ROUND_TIMER_EXPIRED_MESSAGE = "時間到：領先者勝，平手請再打一球"`，且該字串是
+   M14 delta spec 的「計時器顯示與時間到提示」Requirement **逐字指定**的內文
+   （「MUST 改為顯示大字『時間到』與繁體中文提示文案『時間到：領先者勝，平手請再打一球』」）。
+   本 change 的核心正是**讓計時回合的平手可以直接送出**，因此該文案的後半句
+   「平手請再打一球」在 M15 上線後即為**過時的指示**——使用者會被提示去打延長球，
+   但系統其實已允許直接送出平局。
+   **本 change 的處置：不改**。理由：① 該 Requirement 屬 `match-stage` 的
+   「計時器顯示與時間到提示」，**未列在本 change proposal 的 Modified Capabilities**
+   （本 change 只 MODIFIED `match-stage` 的「手動輸入比分與送出」與「完成場次的視覺與資訊」
+   兩條），逕改屬 scope creep；② 文案由 M14 的 spec 逐字釘死，修改它必須同步改動 M14
+   **尚未 archive** 的 delta spec，會讓兩個 change 的 delta 互相汙染；③ 「時間到後是要再打
+   一球還是直接記平手」是**產品決策**而非實作細節——`prd.md` 第 15 章已否決「系統自動判斷
+   延長賽」，但沒有規定提示文案該怎麼寫。
+   **建議的後續**：由 coordinator 或人類決定是否另開一個小 change 把該文案改為
+   「時間到：領先者勝，平手可直接送出」之類的敘述；在那之前，M15 的功能本身完整可用，
+   只是畫面上的提示語與新行為不一致。
+
+3. **「平手」文案是否需要在 JPG／列印稿以外的方式強調（例如額外的顏色或圖示）**——本 change
    選擇與既有「勝」標籤同等視覺權重的純文字標籤（design Decision 5、7），未額外設計特殊
    配色。若使用者回饋「平手」在密集畫面中不夠醒目，屬後續 UI 微調，非本 change 阻塞項。
 
-3. **M14 若在 `RoundMatch` 或 `Round` 上引入了本 change 未預期的欄位（例如逐場獨立計時），
+4. **M14 若在 `RoundMatch` 或 `Round` 上引入了本 change 未預期的欄位（例如逐場獨立計時），
    是否需要重新評估「計時回合」的判定粒度是整輪還是逐場**——本 change 的 proposal 明確假設
    「整輪」（`round.timer`），若 M14 實際交付逐場計時，需回到「明確不做」一節重新確認
    「不做每場獨立計時」的排除是否仍然成立，或本 change 的判定條件需改為逐場檢查。
-   **傾向解決（未合併前不視為定案）**：M14 proposal.md 的「明確不做」一節明文「本輪所有
-   場地共用同一個倒數，不提供逐場地各自的計時器」，與本文件假設一致；apply §0 仍 MUST
-   以合併後的 `main` 確認此假設在 M14 實際 apply 完成後未被 Stage 1／Stage 2 審查推翻。
+   **【apply §1 已結案】**：M14 實際交付即為整輪層級（`timer` 掛在 `Round`，`RoundMatch`
+   無任何計時欄位），本 change 的判定粒度維持整輪，「不做每場獨立計時」的排除仍然成立。
+   詳見第 1 條的實測結論。
+
+5. **【apply Final Code Review 新發現，需人類裁決，不阻塞本 change】`player-stats` 會把平局
+   計為雙方各一敗場**。`nextjs-pickball/lib/matchmaker/player-stats.ts` 的
+   `tallyGamesAndResults` 對每一隊各做一次 `entry.winner === winnerKey` 判斷，相符記勝、
+   不符記敗；`winner` 為 `"draw"` 時兩隊的 `winnerKey`（`"teamA"`／`"teamB"`）皆不相符，
+   因此該場四位（或兩位）球員**全部 `losses += 1`**，勝率分母加一而分子不變，等同輸球，
+   並連帶影響 `/matchmaker/stats` 排行榜的「勝率 desc」排序。
+   **不是規格違反**：M11 的 `player-stats` spec 明文「相同記為勝場，不同記為敗場，
+   SHALL NOT 出現既非勝場亦非敗場的第三種計數」，現行實作逐字符合——但該條文寫作時
+   `winner` 還是二值列舉，`"draw"` 在當時不可能出現。
+   **本 change 的處置：不改**。理由：① `player-stats` 未列在本 change proposal 的
+   Modified Capabilities，逕改屬 scope creep；② 修正需同步改動 M11 **尚未 archive** 的
+   delta spec，與第 2-b 條的 M14 文案情況同構，會讓兩個 change 的 delta 互相汙染；
+   ③ 「平局在個人統計該算什麼」是**產品決策**而非實作細節。
+   **建議的後續**：由 coordinator 或人類決定平局在統計頁如何計數（維持計為敗場／新增第三種
+   計數並修改 M11 spec／只增 `gamesPlayed` 不增 `losses`），必要時另開一個小 change。
+   在那之前 M15 功能本身完整可用，僅統計頁的平局語意待定。

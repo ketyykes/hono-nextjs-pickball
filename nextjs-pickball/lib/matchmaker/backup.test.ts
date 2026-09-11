@@ -291,6 +291,43 @@ describe("backup", () => {
 		}
 	});
 
+	it("備份內回合或歷史含平局的 winner 為 draw 時仍通過驗證", () => {
+		// M15 matchmaker-timed-draw design Decision 5：backup.ts／transfer-types.ts
+		// 零程式碼修改，"draw" 透過 RoundSchema／MatchHistoryEntrySchema 的擴增
+		// 自動傳導到 BackupSchema——此測試是這個結構性假設的機械證據，寫入當下即綠
+		// （regression guard，非新行為）。
+		const drawMatch: Round["matches"][number] = {
+			id: "match-draw",
+			courtNumber: 2,
+			format: "singles",
+			teams: [
+				{ playerIds: ["p1"], rating: 5 },
+				{ playerIds: ["p2"], rating: 5 },
+			],
+			status: "completed",
+			scores: { teamA: 11, teamB: 11 },
+			winner: "draw",
+			completedAt: "2026-08-16T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 5, after: 5 },
+				{ playerId: "p2", before: 5, after: 5 },
+			],
+		};
+		const snapshot = makeSnapshot({
+			currentRound: makeRound({ matches: [drawMatch] }),
+			history: [makeHistoryEntry({ matchId: "match-draw-history", winner: "draw" })],
+		});
+		const backup = buildBackup(snapshot, { exportedAt: "2026-08-23T01:02:03.000Z" });
+
+		const result = parseBackup(JSON.stringify(backup));
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.backup.currentRound?.matches[0]?.winner).toBe("draw");
+			expect(result.backup.history[0]?.winner).toBe("draw");
+		}
+	});
+
 	it("JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯", () => {
 		let result: ReturnType<typeof parseBackup> | undefined;
 

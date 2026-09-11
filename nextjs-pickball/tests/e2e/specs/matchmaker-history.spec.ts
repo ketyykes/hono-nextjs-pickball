@@ -106,7 +106,7 @@ interface EntryFixtureOptions {
 	courtNumber?: number;
 	scoreA?: number;
 	scoreB?: number;
-	winner?: "teamA" | "teamB";
+	winner?: "teamA" | "teamB" | "draw";
 	doublesComposition?: DoublesComposition;
 }
 
@@ -375,6 +375,69 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		const card = page.getByTestId(`history-record-${matchId}`);
 		await expect(card.getByText("4.20")).toBeVisible();
 		await expect(card.getByText("4.35")).toBeVisible();
+	});
+
+	test("平局紀錄顯示平手而非任一隊勝方", async ({ page }) => {
+		const drawMatchId = "e2e-history-draw-1";
+		// 對照組一：一般勝負紀錄，證明平手標籤只在 winner === "draw" 時才出現
+		// （若實作誤把平手標籤改成無條件渲染，本筆會轉紅）。
+		const winMatchId = "e2e-history-draw-control-win";
+		// 對照組二：比分刻意與平局那筆相同（11:11）但 winner 為 teamA，證明畫面依據
+		// entry.winner 欄位而非比分是否相等來判斷平局（若實作改成用比分推導平局，
+		// 本筆會誤顯示「平手」而轉紅）。
+		const tiedScoreButWinMatchId = "e2e-history-draw-control-tied-score";
+		// 球員姓名刻意不含「平手」「勝」等字樣，否則 getByText／toContainText 會同時命中
+		// 姓名本身而讓斷言恆真（比照本檔「8.2 全部欄位」test 對雙打組成標示的既有慣例）。
+		await seedHistory(page, [
+			buildEntry({
+				matchId: drawMatchId,
+				playedAt: isoToday(9),
+				teamA: [player("p-draw-a", "回合平局員A")],
+				teamB: [player("p-draw-b", "回合平局員B")],
+				scoreA: 11,
+				scoreB: 11,
+				winner: "draw",
+			}),
+			buildEntry({
+				matchId: winMatchId,
+				playedAt: isoToday(8),
+				teamA: [player("p-draw-control-win-a", "對照組隊員A")],
+				teamB: [player("p-draw-control-win-b", "對照組隊員B")],
+				scoreA: 11,
+				scoreB: 5,
+				winner: "teamA",
+			}),
+			buildEntry({
+				matchId: tiedScoreButWinMatchId,
+				playedAt: isoToday(7),
+				teamA: [player("p-draw-control-tied-a", "比分同分對照員A")],
+				teamB: [player("p-draw-control-tied-b", "比分同分對照員B")],
+				scoreA: 11,
+				scoreB: 11,
+				winner: "teamA",
+			}),
+		]);
+
+		await page.goto(HISTORY_PAGE);
+
+		const drawCard = page.getByTestId(`history-record-${drawMatchId}`);
+		await expect(drawCard).toBeVisible();
+		// 兩隊皆顯示「平手」、皆查不到「勝」標籤，以各自隊伍區塊的 data-testid 為作用域，
+		// 雙隊都驗（比照既有「勝」標籤兩處各自渲染的視覺權重）。
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-a`)).toContainText("平手");
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-a`)).not.toContainText("勝");
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-b`)).toContainText("平手");
+		await expect(drawCard.getByTestId(`history-record-${drawMatchId}-team-b`)).not.toContainText("勝");
+
+		const winCard = page.getByTestId(`history-record-${winMatchId}`);
+		await expect(winCard.getByTestId(`history-record-${winMatchId}-team-a`)).toContainText("勝");
+		await expect(winCard).not.toContainText("平手");
+
+		const tiedScoreCard = page.getByTestId(`history-record-${tiedScoreButWinMatchId}`);
+		await expect(tiedScoreCard.getByTestId(`history-record-${tiedScoreButWinMatchId}-team-a`)).toContainText(
+			"勝",
+		);
+		await expect(tiedScoreCard).not.toContainText("平手");
 	});
 
 	test("跨月週時本月顯示空狀態而非錯誤", async ({ page }) => {
