@@ -15,19 +15,19 @@
 > 各 change 的 `environment.md` 已改為宣告主 repo 路徑，schema 的 Step 0 cwd 檢查因此直接通過。
 > 代價：**只有一個工作樹**，leader 執行期間 coordinator 不得改動 repo 內任何檔案（含本檔），否則會污染 leader 的 `git status`。
 
-## 狀態快照（最後更新 2026-09-11，M15 全部 task 完成、待合併）
+## 狀態快照（最後更新 2026-09-11，**M10～M15 六棒全數合併完成**，待 verify／archive）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `a858b59`（feat：合併 M14 matchmaker-round-timer，M15 尚未合併） |
+| `main` HEAD | `da1fa35`（feat：合併 M15 matchmaker-timed-draw，六棒全數合併完成） |
 | propose | 六個 change 的八份 artifact 皆已產出，各自過兩輪審查＋一輪交叉檢查，`openspec validate --strict` 全過（已於 M10 commit 一併進 `main`）。 |
 | M10 | **已合併**（`change/matchmaker-stage-gaps` → `main`，分支已刪） |
 | M11 | **已合併**（`change/matchmaker-player-stats` → `main`，分支已刪，53 個 commit） |
 | M12 | **已合併**（`change/matchmaker-scoreboard-team-labels` → `main`，分支已刪，19 個 commit） |
 | M13 | **已合併**（`change/matchmaker-player-swap` → `main`，分支已刪，30 個 commit。前一個 session 於 §6 暫停，本 session 接手完成 §6～§7 並合併） |
 | M14 | **已合併**（`change/matchmaker-round-timer` → `main`，分支已刪，70 個 commit。前一 session 電腦當機中斷於 §13.8；本 session 接手，機器負載正常（load average 2.4）時重跑全套 E2E 拿到乾淨全綠，派 opus leader 做 Final Code Review APPROVED 後合併，詳見下方「M14 完成紀錄」） |
-| M15 | **tasks.md 52/52 全勾，Final Code Review APPROVED，coordinator 獨立驗證中，尚未合併**——`change/matchmaker-timed-draw` 分支，46 個 commit，HEAD `62bc770`。中途經歷關機暫停（已恢復）與帳號整週 rate limit 中斷（2026-09-11 04:00 Asia/Taipei 重置後由新 leader 接手完成 §9～§10）。詳見下方「M15 完成紀錄」，含 leader 提出的 4 項裁決事項與 coordinator 的裁定 |
-| 工作位置 | 主 repo，分支 `change/matchmaker-timed-draw`，工作樹乾淨。合併後依標準流程刪分支、更新本檔，接著全部六棒一起跑 `/opsx:verify`／`/opsx:archive`（**archive 順序 MUST 為 M14 先、M15 後**，兩者皆 MODIFIED `round-lifecycle`「回合資料模型」，顛倒會讓 M14 的區塊覆寫掉 M15 的 `winner` 三值化） |
+| M15 | **已合併**（`change/matchmaker-timed-draw` → `main`，分支已刪，46 個 commit）。中途經歷關機暫停（已恢復）與帳號整週 rate limit 中斷（2026-09-11 04:00 Asia/Taipei 重置後由新 leader 接手完成 §9～§10），Final Code Review APPROVED，coordinator 獨立驗證（含隔離重跑確認 E2E 唯二失敗為既有 quiz.spec.ts webkit／mobile-safari 雜訊）後合併。詳見下方「M15 完成紀錄」，含 leader 提出的 4 項裁決事項（其中 2 項待六棒 archive 後另議） |
+| 工作位置 | 主 repo `main` 分支，工作樹乾淨。**六個 change 全數合併，下一步是依「全部合併後」一節跑 `/opsx:verify` 與 `/opsx:archive`**（archive 順序 MUST 為 M10→M11→M12→M13→M14→M15，尤其 M14 必須先於 M15，兩者皆 MODIFIED `round-lifecycle`「回合資料模型」，顛倒會讓 M14 的區塊覆寫掉 M15 的 `winner` 三值化） |
 
 ### M13 執行紀錄（2026-09-06～09-07，跨兩個 session）
 
@@ -365,6 +365,36 @@ tasks.md 52/52 全勾，分支總計 46 個 commit，HEAD `62bc770`。
 4. **本檔 M15 狀態過時**：leader 依指示未改動本檔，coordinator 已在本次更新中一併刷新
    （狀態快照、本節、下方 Pipeline 表）。
 
+**coordinator 獨立驗證與合併**：分支／工作樹／相依 diff／commit 數核對通過；`tsc` exit 0；
+`lint` 0 errors／3 warnings；`pnpm test` 前端 73/757、後端 4/16 全綠；
+`openspec validate matchmaker-timed-draw --strict` valid；六份 delta spec 皆無重複標題。
+獨立重跑全套 E2E：**622 passed／2 failed／21 skipped，13.8 分鐘**，失敗為
+`quiz.spec.ts:49` 在 `[webkit]`／`[mobile-safari]`——**與 M10～M13 記錄過的同一失敗家族**，
+quiz 頁面與本 change 零關聯（leader 那輪的 diff 檢查已確認零觸及 quiz 相關檔案）。
+隔離重跑該檔案在這兩個 project：**8 passed／0 failed**，確認為既有環境雜訊、非本 change 迴歸。
+`git merge --no-ff change/matchmaker-timed-draw` → `main`，24 檔、+1015/-99 行，
+合併 commit `da1fa35`。合併後複驗 `pnpm -r exec tsc --noEmit` exit 0、`pnpm test` 前端 73/757、
+後端 4/16 全綠，無迴歸。刪分支 `change/matchmaker-timed-draw`。
+
+**本批 M10～M15 六棒至此全數合併完成。** 下一步依「全部合併後」一節，依序對六個 change
+跑 `/opsx:verify` 與 `/opsx:archive`（**M14 必須先於 M15**），最後跑
+`DO_NOT_TRACK=1 openspec validate --all --strict` 與主 spec 零重複標題檢查。
+
+### `main` 品質基線（M15 合併後，coordinator 於 `da1fa35` 獨立實測）
+
+```
+前端單元   73 檔 / 757 測試 passed   （M14 後為 73 檔 / 737 測試，+0 檔 / +20 測試）
+後端單元   4 檔 / 16 測試 passed     （不變）
+tsc        pnpm -r exec tsc --noEmit → exit 0
+lint       0 errors / 3 warnings（hooks/ 下三支既存檔的 no-unused-vars，非本批造成）
+E2E        624 passed / 21 skipped / 0 failed（隔離重跑確認，全套跑時 2 個 quiz.spec.ts
+           webkit／mobile-safari 為既有雜訊），--workers=1，指令用
+           `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（見教訓 #20）
+相依       零新增（package.json／pnpm-lock.yaml 全程未變動）
+```
+
+**本批 M10～M15 六個 change 全數合併完畢。**
+
 ## Pipeline 總覽
 
 ```
@@ -400,7 +430,7 @@ main@3fa2d22
 | M12 | matchmaker-scoreboard-team-labels | 計分板顯示綁定場次的球員姓名與隊色 | 19 commit | §1～§5 五組 | 1 棒 | change/matchmaker-scoreboard-team-labels（已刪） | main @ `e8e97cf` | **已合併**（`ea71e08`） |
 | M13 | matchmaker-player-swap | 臨時換人（場上 ↔ 休息名單） | 30 commit | §1～§7 七組 | 1 棒（跨兩個 session） | change/matchmaker-player-swap（已刪） | M12 已合併 | **已合併**（`e6a4713`） |
 | M14 | matchmaker-round-timer | 輪次計時器（倒數、時間到提示） | 70 commit | §1～§13 十三組 | 1 棒（跨兩個 session，中間因當機交接） | change/matchmaker-round-timer（已刪） | M13 已合併 | **已合併**（`a858b59`） |
-| M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | 46 commit | §1～§10 十組（52 task） | 1 棒（跨多個 session，兩度暫停） | change/matchmaker-timed-draw | M14 已合併 | tasks.md 52/52、Final Code Review APPROVED，**待合併**（見「M15 完成紀錄」） |
+| M15 | matchmaker-timed-draw | 計時制平局（S=0.5、歷史與匯出的平手表示） | 46 commit | §1～§10 十組（52 task） | 1 棒（跨多個 session，兩度暫停） | change/matchmaker-timed-draw（已刪） | M14 已合併 | **已合併**（`da1fa35`） |
 
 > `quick-rating-spec-backfill`（0／6，純規格回填）**不在本批範圍**。它只動
 > `components/matchmaker/PlayerForm.test.tsx`（新增）與 `tests/e2e/specs/player-roster.spec.ts`，
