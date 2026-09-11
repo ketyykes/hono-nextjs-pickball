@@ -2,7 +2,7 @@
 // toCsv，本模組完全不知道那些規則的存在（design.md Decision 1）。
 
 import { toCsv } from "./csv";
-import { DOUBLES_COMPOSITION_LABEL, FORMAT_LABEL, TEAM_LABELS } from "./labels";
+import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "./labels";
 import type { MatchHistoryEntry } from "./history";
 
 /**
@@ -125,8 +125,12 @@ const HISTORY_CSV_COLUMNS: ReadonlyArray<{
 		getValue: ({ entry }) => `${entry.scoreA}${SCORE_SEPARATOR}${entry.scoreB}`,
 	},
 	{
+		// 三分支窮舉 winner 的全部合法值（M15 matchmaker-timed-draw）：teamA／teamB
+		// 各自輸出對應隊名，"draw" MUST 輸出 DRAW_LABEL，SHALL NOT 用二元判斷把
+		// "draw" 靜默誤判為任一隊獲勝。
 		header: "勝方",
-		getValue: ({ entry }) => (entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]),
+		getValue: ({ entry }) =>
+			entry.winner === "teamA" ? TEAM_LABELS[0] : entry.winner === "teamB" ? TEAM_LABELS[1] : DRAW_LABEL,
 	},
 	{
 		// 賽前／賽後分數的球員順序 MUST 與「第一隊球員」「第二隊球員」欄一致
