@@ -20,6 +20,11 @@ matchmaker 區段（`/matchmaker` 與 `/matchmaker/players`）SHALL 共用同一
 依 `nextjs-pickball/CLAUDE.md` 的分層規範，元件的行為邏輯須下放到可單元測試的層級
 （既有先例為 `lib/scoreboard/radio-navigation.ts`）。
 
+本 change 新增第五個分頁「統計」（`/matchmaker/stats`），同樣掛載於同一個區段外框並顯示於
+區段導覽，分頁清單與 active 判定沿用既有 `matchmakerSectionTabs()` 的推導方式
+（`MATCHMAKER_SECTION_HREFS`／`MATCHMAKER_SECTION_LABELS` 各新增一筆），SHALL NOT 另立
+第二套判定邏輯。
+
 #### Scenario: 對戰頁可經路由開啟
 
 - **WHEN** 使用者開啟 `/matchmaker`
@@ -38,7 +43,11 @@ matchmaker 區段（`/matchmaker` 與 `/matchmaker/players`）SHALL 共用同一
 - **THEN** 依序導向 `/matchmaker/players` 與 `/matchmaker`，兩頁皆顯示區段導覽
 - **驗收**：`nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，test 名稱「區段導覽可在對戰頁與參賽者名單頁之間來回切換」
 
----
+#### Scenario: 統計分頁納入區段導覽並可點擊進入
+
+- **WHEN** 於對戰頁點擊區段導覽的「統計」
+- **THEN** 導向 `/matchmaker/stats`，且該分頁標示為 `aria-current="page"`
+- **驗收**：`nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，test 名稱「可由對戰頁的區段導覽點擊進入統計頁」
 
 ### Requirement: 本輪設定控制項的預設值與範圍
 
