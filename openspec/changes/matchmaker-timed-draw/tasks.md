@@ -138,10 +138,10 @@ Depends on: §4
 
 Depends on: §4, §2
 
-- [ ] 9.1 RED: 於 `nextjs-pickball/lib/matchmaker/history-csv.test.ts` 新增 it「平局歷史的勝方欄輸出平手而非任一隊隊名」：一筆 `winner: "draw"` 的歷史紀錄匯出 CSV → 斷言該列「勝方」欄逐字為「平手」。確認紅燈（既有 `entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]` 會把 `"draw"` 誤判為 `TEAM_LABELS[1]`）並貼出輸出
-- [ ] 9.2 GREEN: 於 `history-csv.ts` 匯入 `DRAW_LABEL`；把「勝方」欄的 `getValue` 由二元三元運算改為三分支：`entry.winner === "teamA" ? TEAM_LABELS[0] : entry.winner === "teamB" ? TEAM_LABELS[1] : DRAW_LABEL`
-- [ ] 9.3 RED: 於 `nextjs-pickball/lib/matchmaker/backup.test.ts` 新增 it「備份內回合或歷史含平局的 winner 為 draw 時仍通過驗證」：以 `buildBackup` 產生的快照中，`currentRound.matches` 或 `history` 有一筆 `winner: "draw"`，序列化後餵給 `parseBackup` → 斷言回傳成功結果，該筆 `winner` 於還原後仍為 `"draw"`。**依 design Decision 5，此測試寫入當下預期即綠**（`backup.ts` 零程式碼修改，`BackupSchema` 透過 §2／§4 的 schema 擴增自動生效）——若確實為綠，MUST 誠實標註為 regression guard 並直接進入 REFACTOR，SHALL NOT 為了製造紅燈而先破壞 `backup.ts`
-- [ ] 9.4 REFACTOR: 執行 `git diff nextjs-pickball/lib/matchmaker/backup.ts nextjs-pickball/lib/matchmaker/transfer-types.ts` 確認為空，把這個結果記在本項後方作為 design Decision 5 的機械證據；確認 `history-csv.ts` 的「勝方」欄三分支窮舉 `winner` 全部合法值，且 `DRAW_LABEL` 未在本檔重複寫死
+- [x] 9.1 RED: 於 `nextjs-pickball/lib/matchmaker/history-csv.test.ts` 新增 it「平局歷史的勝方欄輸出平手而非任一隊隊名」：一筆 `winner: "draw"` 的歷史紀錄匯出 CSV → 斷言該列「勝方」欄逐字為「平手」。確認紅燈（既有 `entry.winner === "teamA" ? TEAM_LABELS[0] : TEAM_LABELS[1]` 會把 `"draw"` 誤判為 `TEAM_LABELS[1]`）並貼出輸出。**已確認紅燈**：`expected '第二隊' to be '平手'`（commit `50fdb36`）
+- [x] 9.2 GREEN: 於 `history-csv.ts` 匯入 `DRAW_LABEL`；把「勝方」欄的 `getValue` 由二元三元運算改為三分支：`entry.winner === "teamA" ? TEAM_LABELS[0] : entry.winner === "teamB" ? TEAM_LABELS[1] : DRAW_LABEL`。16/16 測試通過（commit `8f30657`）
+- [x] 9.3 RED: 於 `nextjs-pickball/lib/matchmaker/backup.test.ts` 新增 it「備份內回合或歷史含平局的 winner 為 draw 時仍通過驗證」：以 `buildBackup` 產生的快照中，`currentRound.matches` 或 `history` 有一筆 `winner: "draw"`，序列化後餵給 `parseBackup` → 斷言回傳成功結果，該筆 `winner` 於還原後仍為 `"draw"`。**依 design Decision 5，此測試寫入當下預期即綠**（`backup.ts` 零程式碼修改，`BackupSchema` 透過 §2／§4 的 schema 擴增自動生效）——若確實為綠，MUST 誠實標註為 regression guard 並直接進入 REFACTOR，SHALL NOT 為了製造紅燈而先破壞 `backup.ts`。**實測寫入當下即綠**（16/16 通過），已誠實標註為 regression guard（commit `2387377`）
+- [x] 9.4 REFACTOR: 執行 `git diff nextjs-pickball/lib/matchmaker/backup.ts nextjs-pickball/lib/matchmaker/transfer-types.ts` 確認為空，把這個結果記在本項後方作為 design Decision 5 的機械證據；確認 `history-csv.ts` 的「勝方」欄三分支窮舉 `winner` 全部合法值，且 `DRAW_LABEL` 未在本檔重複寫死。**機械證據**：`git diff main -- backup.ts transfer-types.ts` 與 `git diff -- backup.ts transfer-types.ts`（無 ref，對比 HEAD）皆為空輸出，確認 backup.ts／transfer-types.ts 相對 main 與工作區皆零改動；`history-csv.ts` 全檔僅一處使用 `DRAW_LABEL`（無重複寫死「平手」字面量），三分支窮舉 `"teamA" | "teamB" | "draw"` 全部合法值。無程式碼變動，本項無 refactor commit
 
 ## 10. 收尾驗證
 
