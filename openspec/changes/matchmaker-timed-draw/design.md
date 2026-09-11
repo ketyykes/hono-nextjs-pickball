@@ -416,3 +416,20 @@ Final Review F-5 收斂後）才剛統一的檔案——本 change 若在四個�
    **【apply §1 已結案】**：M14 實際交付即為整輪層級（`timer` 掛在 `Round`，`RoundMatch`
    無任何計時欄位），本 change 的判定粒度維持整輪，「不做每場獨立計時」的排除仍然成立。
    詳見第 1 條的實測結論。
+
+5. **【apply Final Code Review 新發現，需人類裁決，不阻塞本 change】`player-stats` 會把平局
+   計為雙方各一敗場**。`nextjs-pickball/lib/matchmaker/player-stats.ts` 的
+   `tallyGamesAndResults` 對每一隊各做一次 `entry.winner === winnerKey` 判斷，相符記勝、
+   不符記敗；`winner` 為 `"draw"` 時兩隊的 `winnerKey`（`"teamA"`／`"teamB"`）皆不相符，
+   因此該場四位（或兩位）球員**全部 `losses += 1`**，勝率分母加一而分子不變，等同輸球，
+   並連帶影響 `/matchmaker/stats` 排行榜的「勝率 desc」排序。
+   **不是規格違反**：M11 的 `player-stats` spec 明文「相同記為勝場，不同記為敗場，
+   SHALL NOT 出現既非勝場亦非敗場的第三種計數」，現行實作逐字符合——但該條文寫作時
+   `winner` 還是二值列舉，`"draw"` 在當時不可能出現。
+   **本 change 的處置：不改**。理由：① `player-stats` 未列在本 change proposal 的
+   Modified Capabilities，逕改屬 scope creep；② 修正需同步改動 M11 **尚未 archive** 的
+   delta spec，與第 2-b 條的 M14 文案情況同構，會讓兩個 change 的 delta 互相汙染；
+   ③ 「平局在個人統計該算什麼」是**產品決策**而非實作細節。
+   **建議的後續**：由 coordinator 或人類決定平局在統計頁如何計數（維持計為敗場／新增第三種
+   計數並修改 M11 spec／只增 `gamesPlayed` 不增 `losses`），必要時另開一個小 change。
+   在那之前 M15 功能本身完整可用，僅統計頁的平局語意待定。
