@@ -268,11 +268,18 @@ E2E        619 passed / 21 skipped / 0 failed，--workers=1，10.9 分鐘（skip
 **第一次中斷（使用者關機，已恢復）**：§1～§5 共 24 個 commit 完成，最後乾淨 commit `e9f4eef`。
 使用者原本要關機，後來改為「請繼續」，coordinator session 未真的中斷，leader 持續跑完 §6～§8。
 
-**第二次中斷（使用者 rate limit 將盡，本次暫停）**：**分支 `change/matchmaker-timed-draw`，
+**第二次中斷（使用者 rate limit 將盡，暫停時記錄）**：分支 `change/matchmaker-timed-draw`，
 §1～§8 共 38 個 commit 已完成且 commit（tasks.md 35/52 已勾），最後乾淨 commit 為 `da66fea`
-（`docs(openspec): tasks.md 勾選 §8 歷史頁平手顯示三項（M15）`）。** coordinator 記錄本段時工作樹乾淨，
-但 leader 仍在背景跑（很可能已進入或即將進入 §9），**rate limit 生效後 leader 與其派出的 subagent
-會如何收尾未知**，下一個 session 開工前務必先核對工作樹實際狀態，不要假設停在 `da66fea`。
+（`docs(openspec): tasks.md 勾選 §8 歷史頁平手顯示三項（M15）`）。coordinator 記錄本段時工作樹乾淨，
+leader 當時仍在背景跑（見下方第三次中斷的實際結果）。
+
+**第三次中斷（2026-09-11，帳號整週 rate limit 用罄，重置時間 04:00 Asia/Taipei）**：
+opus leader 與其派出的 §8 Stage 1 subagent 皆因 `HTTP 429 weekly limit` 被 API 強制終止
+（不是 leader 自行收尾；回報裡「已跑完 §8」是終止前的最後一句話）。coordinator 獨立核對：
+`git log --oneline main..HEAD | wc -l` 為 39（38 個實作 commit ＋ 1 個本檔 docs commit
+`460a827`），`git status --porcelain` 乾淨——**與 rate limit 發生前記錄的狀態完全一致，
+沒有工作遺失**。**下一個 session 若還在 04:00 Asia/Taipei 之前重新派 leader，只會立刻再被
+429 擋下**；04:00 之後直接從下方「下一個 session 接手步驟」續做 §9，不需要額外復原動作。
 
 - **已完成群組**（§1～§8，皆已 commit，tasks.md 已勾）：
   - §1 前置確認：把 design.md 對 M14 `round.timer` 欄位的假設與合併後 `main` 實際核對過，
