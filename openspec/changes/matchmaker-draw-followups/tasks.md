@@ -89,8 +89,14 @@
       其餘記敗場；`computePlayerStats` 的組裝物件補 `draws: stat.draws`。
       **不動** `winRateOf` 與 `comparePlayerStatsForRanking`（Stage 1 會機械確認這兩者的
       `git diff` 為空）
-- [ ] 2.3 GREEN（收束）：修正 §1.4 盤點出的其餘 `PlayerStat` 建構點（測試 helper 等），
+- [x] 2.3 GREEN（收束）：修正 §1.4 盤點出的其餘 `PlayerStat` 建構點（測試 helper 等），
       讓 `pnpm --filter ./nextjs-pickball exec tsc --noEmit` 通過
+      → §2 Implementer 完成 1/2/3 點（`player-stats.ts` 內部）後，coordinator 的派工指示
+      誤將第 4 點（`PlayerStatsTable.test.tsx` 的 `buildStat`）劃為「不要動」，導致 `tsc`
+      在主分支上實際維持紅燈（違反本項與 execution-plan「tsc 在每一組結束時都 MUST 是綠的」）。
+      由 Stop hook 攔下後修正：coordinator 直接補上 `buildStat` 的 `draws: 0` 預設值
+      （commit `e39e86f`），僅補齊型別、不動任何既有斷言內容，`tsc --noEmit` 與
+      `PlayerStatsTable.test.tsx` 既有 10 個測試皆已確認通過。
 - [ ] 2.4 REFACTOR：檢查 `tallyGamesAndResults` 的三分支是否讀得順（避免巢狀三元，
       全域規範要求改用 if/else）；在和局分支旁補一行註解，說明**為何和局仍計入
       `gamesPlayed`**（design Decision 1），SHALL NOT 重述函式名
