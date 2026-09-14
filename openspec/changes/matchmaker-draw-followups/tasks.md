@@ -159,22 +159,22 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
 > **與 §2／§3 無相依**，但仍依序執行（共用單一工作樹）。
 > **本組不動 `RoundTimerBanner.tsx`**——它渲染的是常數本身。
 
-- [ ] 4.1 RED：在 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx` 新增 it
+- [x] 4.1 RED：在 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx` 新增 it
       **「時間到提示文案說明同分可直接送出平手而非再打一球」**。計時到期後取
       `role="alert"` 區塊內的文字，斷言**含**「同分」與「平手」、**不含**「再打一球」。
       斷言用語意片段而非整句逐字（design Decision 6）。實跑單檔並貼出紅燈輸出
       （預期失敗於現行文案含「再打一球」）
-- [ ] 4.2 GREEN：`nextjs-pickball/lib/matchmaker/labels.ts` 的
+- [x] 4.2 GREEN：`nextjs-pickball/lib/matchmaker/labels.ts` 的
       `ROUND_TIMER_EXPIRED_MESSAGE` 改為 **「時間到：領先者勝，同分可直接送出平手」**。
       保留「時間到：」前綴；SHALL NOT 以樣板字串拼接 `DRAW_LABEL`；常數名稱與匯出位置不變
-- [ ] 4.3 同步更新該常數上方的 JSDoc 註解：目前寫「M14 matchmaker-round-timer change，
+- [x] 4.3 同步更新該常數上方的 JSDoc 註解：目前寫「M14 matchmaker-round-timer change，
       spec『計時器顯示與時間到提示』逐字指定」，MUST 補記本次修訂的**理由**
       （M15 之後計時回合的同分可直接送出並記為平手，舊文案的「再打一球」是錯誤指示），
       SHALL NOT 自行編一個 M 編號（派工單必帶 e）
-- [ ] 4.4 實跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/round-timer.spec.ts`
+- [x] 4.4 實跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/round-timer.spec.ts`
       確認既有 E2E 不受文案改動影響（proposal Impact 宣稱此檔零修改，這裡是該宣稱的驗證）
-- [ ] 4.5 REFACTOR：無壞味道可註記 skipped
-- [ ] 4.6 Mutation 自測（派工單必帶 a）：把 `ROUND_TIMER_EXPIRED_MESSAGE` 改回舊文案
+- [x] 4.5 REFACTOR：無壞味道可註記 skipped
+- [x] 4.6 Mutation 自測（派工單必帶 a）：把 `ROUND_TIMER_EXPIRED_MESSAGE` 改回舊文案
       「時間到：領先者勝，平手請再打一球」，確認 4.1 的測試轉紅；回報結果
 
 ## 5. 收尾驗證
