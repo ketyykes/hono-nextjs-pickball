@@ -240,4 +240,18 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
       → 兩份 delta spec 皆「無重複」。
 - [x] 5.9 `DO_NOT_TRACK=1 openspec validate matchmaker-draw-followups --strict` 通過
       → `Change 'matchmaker-draw-followups' is valid`。
-- [ ] 5.10 Final Code Reviewer（opus）跑完 execution-plan 的 checklist，回報結果
+- [x] 5.10 Final Code Reviewer（opus）跑完 execution-plan 的 checklist，回報結果
+      → **PASS**。逐項確認：無第三個未處理 `"draw"` 的二元判斷、舊文案在實作與 delta spec
+      中已絕跡（主 spec 未同步屬預期）、`git diff --stat` 範圍與 proposal 逐項吻合、
+      `wins + losses + draws === gamesPlayed` 一致且無雙重計數、§2/§3 的欄位對應順序正確、
+      17 個 commit 逐一檢視無範圍外污染。獨立重跑 `tsc`／`lint`／`test` 三指令全數通過。
+      一項非阻斷觀察：`PlayerStatsTable.test.tsx` 新 fixture 的 `gamesPlayed` 未與
+      `wins+losses+draws` 對齊，但該不變量由 `player-stats.test.ts` 守住，呈現層測試
+      未斷言 `gamesPlayed`，不構成缺陷。
+
+## 全部完成
+
+36/36 task 完成。§1 前置確認、§2 player-stats 和局計數（Stage 1／2 PASS）、
+§3 PlayerStatsTable 勝負和欄（Stage 1／2 PASS）、§4 到期提示文案（Stage 1／2 PASS）、
+§5 收尾驗證（tsc／lint／test／E2E／機械盤點／openspec validate／Final Review 皆 PASS）。
+可進入 verify／archive。
