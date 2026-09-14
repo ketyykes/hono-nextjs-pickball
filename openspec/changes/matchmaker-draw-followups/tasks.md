@@ -76,14 +76,14 @@
 > Risks「`draws` 是新必填欄位」。
 > **本組不動 `PlayerStatsTable.tsx`**——呈現是 §3 的範圍。
 
-- [ ] 2.1 RED：在 `nextjs-pickball/lib/matchmaker/player-stats.test.ts` 新增 it
+- [x] 2.1 RED：在 `nextjs-pickball/lib/matchmaker/player-stats.test.ts` 新增 it
       **「平局紀錄計為和局而非雙方各一敗場」**。兩位球員對戰兩場，一場 `winner: "teamA"`、
       一場 `winner: "draw"`；斷言勝方 `gamesPlayed: 2`／`wins: 1`／`losses: 0`／`draws: 1`／
       `winRate` 為 `1/2`，敗方 `gamesPlayed: 2`／`wins: 0`／`losses: 1`／`draws: 1`。
       **雙方都要斷言**（test-plan「Why first」：只看單邊會漏掉半套實作）。
       實跑 `pnpm --filter ./nextjs-pickball test --run lib/matchmaker/player-stats.test.ts`
       並貼出紅燈輸出（預期失敗於 `draws` 不存在，以及 `losses` 為 1／2）
-- [ ] 2.2 GREEN：`PlayerStat` 與 `MutableStat` 新增 `draws: number`；`buildRosterUnion` 的
+- [x] 2.2 GREEN：`PlayerStat` 與 `MutableStat` 新增 `draws: number`；`buildRosterUnion` 的
       **兩個**建構分支（名單分支、歷史分支）各補 `draws: 0`；`tallyGamesAndResults` 由二分
       改三分——`entry.winner === winnerKey` 記勝場、`entry.winner === "draw"` 記和局、
       其餘記敗場；`computePlayerStats` 的組裝物件補 `draws: stat.draws`。
@@ -97,11 +97,22 @@
       由 Stop hook 攔下後修正：coordinator 直接補上 `buildStat` 的 `draws: 0` 預設值
       （commit `e39e86f`），僅補齊型別、不動任何既有斷言內容，`tsc --noEmit` 與
       `PlayerStatsTable.test.tsx` 既有 10 個測試皆已確認通過。
-- [ ] 2.4 REFACTOR：檢查 `tallyGamesAndResults` 的三分支是否讀得順（避免巢狀三元，
+- [x] 2.4 REFACTOR：檢查 `tallyGamesAndResults` 的三分支是否讀得順（避免巢狀三元，
       全域規範要求改用 if/else）；在和局分支旁補一行註解，說明**為何和局仍計入
       `gamesPlayed`**（design Decision 1），SHALL NOT 重述函式名
-- [ ] 2.5 Mutation 自測（派工單必帶 a）：把和局分支改回 `stat.losses += 1`，確認 2.1 的測試
+      → 已是 if/else if/else，無巢狀三元；註解已交代 Decision 1 理由，無壞味道，
+      Stage 2 確認無需額外 commit（一個小 nit：理由可更貼近 `gamesPlayed += 1`
+      該行，非必要，留待未來）。
+- [x] 2.5 Mutation 自測（派工單必帶 a）：把和局分支改回 `stat.losses += 1`，確認 2.1 的測試
       轉紅；回報「幾次／改了什麼／是否轉紅」
+      → Implementer 自測 1 次已轉紅；Stage 2 獨立複測（拿掉和局分支）同樣轉紅
+      （`16 passed` → `1 failed / 15 passed`，`losses` 斷言 0 vs 1），複測後已還原。
+
+**§2 審查結論**：Stage 1 PASS（規格符合、勝率與排序零改動、無 scope creep）、
+Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、無新相依）。
+非阻斷觀察兩項留給未來：① `winner: "teamB"` 目前僅間接覆蓋；② `tallyGamesAndResults`
+的 catch-all `else` 若未來 enum 再擴充需留意（與 `history-csv.ts`／`export-scene.ts`
+既有慣例一致，本次不改）。
 
 ## 3. `PlayerStatsTable.tsx`：勝負欄擴為勝負和欄
 
