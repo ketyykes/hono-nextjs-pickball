@@ -53,15 +53,22 @@ function trackConsoleIssues(page: Page): string[] {
 // 而非直接操作 number input，避免各瀏覽器對 type="color" / type="number" 的
 // fill 行為差異），其餘欄位（性別、雙色漸層）留用預設值後送出。
 //
+// presetLabel：選填參數，指定強度分數按鈕文字。預設值為「新手 1.00」，與既有
+// 呼叫端無異；若要快速測試非預設強度，可傳入「中階 3.00」等其他預設值。
+//
 // 用 exact: true 且限定在頁首範圍外的按鈕文字精確比對「新增參賽者」——EmptyRoster
 // 的入口按鈕文字是「新增第一位參賽者」，不會誤中；Dialog 內的送出鈕文字同樣是
 // 「新增參賽者」，但透過 dialog locator 的子樹範圍即可與頁首鈕區隔開來。
-async function addPlayerViaDialog(page: Page, name: string): Promise<void> {
+async function addPlayerViaDialog(
+	page: Page,
+	name: string,
+	presetLabel = "新手 1.00",
+): Promise<void> {
 	await page.getByRole("button", { name: "新增參賽者", exact: true }).click();
 	const dialog = page.getByRole("dialog", { name: "新增參賽者" });
 	await expect(dialog).toBeVisible();
 	await dialog.getByLabel("姓名").fill(name);
-	await dialog.getByRole("button", { name: "新手 1.00" }).click();
+	await dialog.getByRole("button", { name: presetLabel }).click();
 	await dialog.getByRole("button", { name: "新增參賽者", exact: true }).click();
 	await expect(dialog).toBeHidden();
 }
@@ -187,6 +194,22 @@ test.describe("/matchmaker/players 參賽者名單", () => {
 			STORAGE_KEY,
 		);
 		expect(storedAfter).toBe(storedBefore);
+
+		expect(
+			consoleIssues,
+			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
+		).toEqual([]);
+	});
+
+	// 5. 以快速分數新增的參賽者，卡片顯示對應強度
+	test("以快速分數新增的參賽者，卡片顯示對應強度", async ({ page }) => {
+		const consoleIssues = trackConsoleIssues(page);
+
+		await page.goto(PLAYERS_PAGE);
+		await addPlayerViaDialog(page, "小強", "中階 3.00");
+
+		await expect(page.getByText("小強", { exact: true })).toBeVisible();
+		await expect(page.getByText("強度 3.00")).toBeVisible();
 
 		expect(
 			consoleIssues,

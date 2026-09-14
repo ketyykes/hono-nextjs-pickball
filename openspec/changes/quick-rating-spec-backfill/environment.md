@@ -27,8 +27,8 @@ pnpm test
 
 | 欄位 | 值 |
 |---|---|
-| **Baseline tests** | 尚未執行——由 apply Step 0 建立 worktree 時執行並回填（格式：`PASS`／`FAIL` + 一行結果摘要，例如 `PASS — 前端 Vitest N passed、後端 Vitest M passed`） |
-| **Initial commit hash** | 尚未執行——由 apply Step 0 建立 worktree 時以 `git rev-parse HEAD` 取得並回填 |
+| **Baseline tests** | `PASS` — 前端 Vitest 73 files / 757 tests passed、後端 Vitest 4 files / 16 tests passed（2026-09-12，無需重跑即綠，沙箱未出現 EPERM） |
+| **Initial commit hash** | `091c0387712ea1adf4d65aae03f1b19c4e495985`（`main` HEAD） |
 | **Worktree path** | `/Users/m2_24gb/Desktop/project/pickball-worktrees/quick-rating-spec-backfill` |
 
 ## Teardown

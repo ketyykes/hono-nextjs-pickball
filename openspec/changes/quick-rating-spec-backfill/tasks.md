@@ -55,16 +55,20 @@
 > - 若元件在 happy-dom 掛載即拋錯（Radix `Select` 相關），把最小 stub 寫在**本測試檔內**並加繁中註解，
 >   **不要**改 `tests/setup.ts`（design Risks 第 1 項）。
 
-- [ ] 1.1 RED: 新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`，寫入兩個 it：
+- [x] 1.1 RED: 新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`，寫入兩個 it：
   - 「表單提供新手 1.00、中階 3.00、高階 5.00 三顆快速帶入按鈕」——以 `mode="add"` 掛載，依可及名稱查得三顆按鈕「新手 1.00」「中階 3.00」「高階 5.00」，三者皆存在
   - 「點擊快速帶入按鈕後強度分數欄位填入該級別的兩位小數分數」——點「中階 3.00」後 `getByLabelText("強度分數")` 的 `value` 為 `"3.00"`；續點「高階 5.00」→ `"5.00"`；再點「新手 1.00」→ `"1.00"`（驗證後點者**覆蓋**前值）
   跑單檔並**如實貼出實測輸出**。⚠️ **預期直接綠燈（regression guard）**，請照實記錄，不得偽造紅燈
-- [ ] 1.2 GREEN: 確認 `PlayerForm.tsx` 既有的 `RATING_PRESETS`（三組 `{ label, value }`）與 `onClick={() => setRatingText(preset.value.toFixed(2))}` 已滿足 1.1 的兩個 it，**預期為 no-op**。若 1.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若 1.1 出現紅燈，依 delta spec 的「三顆按鈕齊備」與「以兩位小數填入、後點者覆蓋」兩個 Scenario 做**最小**修正，並記錄實際落差
-- [ ] 1.3 RED: 於同檔補兩個 it：
+  **`regression guard` — 實測**：`pnpm --filter ./nextjs-pickball test --run components/matchmaker/PlayerForm.test.tsx` → `Test Files 1 passed (1)` / `Tests 4 passed (4)`（本檔一次寫入全部 4 個 it，含 1.3 的兩個；此列僅記前兩個 it 的驗收）。Stage 1／Stage 2 審查皆 APPROVE，`PlayerForm.tsx` 確認 0 行 diff
+- [x] 1.2 GREEN: 確認 `PlayerForm.tsx` 既有的 `RATING_PRESETS`（三組 `{ label, value }`）與 `onClick={() => setRatingText(preset.value.toFixed(2))}` 已滿足 1.1 的兩個 it，**預期為 no-op**。若 1.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若 1.1 出現紅燈，依 delta spec 的「三顆按鈕齊備」與「以兩位小數填入、後點者覆蓋」兩個 Scenario 做**最小**修正，並記錄實際落差
+  **`skipped`**——1.1 實測全綠，無需修正 `PlayerForm.tsx`
+- [x] 1.3 RED: 於同檔補兩個 it：
   - 「快速帶入後仍可手動改為 1.00～8.00 範圍內的兩位小數分數並送出」——點「新手 1.00」→ `clear()` 強度分數欄位 → `type("4.25")` → 填入姓名 → 點送出鈕 → 斷言 `onSubmit` 收到的物件 `rating` 為 `4.25`（且不等於 `1`）
   - 「快速帶入按鈕不會觸發表單送出」——**姓名留白**，只點「高階 5.00」→ 斷言 `onSubmit` 的呼叫次數為 `0`，且畫面上 `role="alert"` 的錯誤區塊**不存在**（`queryByRole("alert")` 為 `null`）
   跑單檔並**如實貼出實測輸出**。⚠️ **預期直接綠燈（regression guard）**，請照實記錄，不得偽造紅燈
-- [ ] 1.4 GREEN: 確認 `PlayerForm.tsx` 既有的 `ratingText` 字串 state（受控 `Input`，使用者可繼續編輯）與快速帶入按鈕的 `type="button"` 已滿足 1.3 的兩個 it，**預期為 no-op**。若 1.3 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，依 delta spec 的「快速帶入後仍可手動輸入任意合法分數」與「快速帶入按鈕不觸發表單送出」兩個 Scenario 做**最小**修正，並記錄實際落差
+  **`regression guard` — 實測**：同上一次執行，`Tests 4 passed (4)` 含這兩個 it。Stage 2 審查另外驗證了 `user.clear()` 是必要斷言（拿掉會讓 `rating` 誤算成 `1.00425` 並轉紅）；`type="button"` 拿掉會讓「快速帶入按鈕不會觸發表單送出」轉紅（`components/ui/button.tsx` 無預設 `type`，退回 `submit`）
+- [x] 1.4 GREEN: 確認 `PlayerForm.tsx` 既有的 `ratingText` 字串 state（受控 `Input`，使用者可繼續編輯）與快速帶入按鈕的 `type="button"` 已滿足 1.3 的兩個 it，**預期為 no-op**。若 1.3 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，依 delta spec 的「快速帶入後仍可手動輸入任意合法分數」與「快速帶入按鈕不觸發表單送出」兩個 Scenario 做**最小**修正，並記錄實際落差
+  **`skipped`**——1.3 實測全綠，無需修正 `PlayerForm.tsx`
 
 ## 2. 名單頁端到端驗收（e2e）
 
@@ -83,8 +87,11 @@ Depends on: §1
 > 卡片的強度顯示格式為 `{性別} · 強度 {rating.toFixed(2)}`（見 `PlayerCard.tsx`），
 > 斷言用 `page.getByText("強度 3.00")` 這類子字串比對即可。
 
-- [ ] 2.1 RED: 於 `tests/e2e/specs/player-roster.spec.ts` 追加 test「以快速分數新增的參賽者，卡片顯示對應強度」——`goto` `/matchmaker/players` → 開新增 Dialog → 填姓名 → 點「中階 3.00」→ 送出 → 斷言名單出現該姓名且可見文字含「強度 3.00」，並斷言 `consoleIssues` 為空。同時把 helper 的 `presetLabel` 選填參數加上。跑單檔 e2e 並**如實貼出實測輸出**。⚠️ **預期直接綠燈（regression guard）**，請照實記錄，不得偽造紅燈
-- [ ] 2.2 GREEN: 確認 `/matchmaker/players` 既有流程（`PlayerForm` 快速帶入 → `useRosterStore.addPlayer` → `PlayerCard` 顯示 `rating.toFixed(2)`）已滿足 2.1，**預期為 no-op**。若 2.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，先確認是否為 dev server／service binding 的環境問題（見 `environment.md` 的注意事項與 root `CLAUDE.md` 的 port 診斷順序），排除環境因素後才依 delta spec 的「於名單頁以快速分數新增參賽者」Scenario 做最小修正
+- [x] 2.1 RED: 於 `tests/e2e/specs/player-roster.spec.ts` 追加 test「以快速分數新增的參賽者，卡片顯示對應強度」——`goto` `/matchmaker/players` → 開新增 Dialog → 填姓名 → 點「中階 3.00」→ 送出 → 斷言名單出現該姓名且可見文字含「強度 3.00」，並斷言 `consoleIssues` 為空。同時把 helper 的 `presetLabel` 選填參數加上。跑單檔 e2e 並**如實貼出實測輸出**。⚠️ **預期直接綠燈（regression guard）**，請照實記錄，不得偽造紅燈
+  **`regression guard` — 實測**：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/player-roster.spec.ts` → `25 passed (55.8s)`（5 test × 5 browser project，含既有 4 個 test 皆維持綠燈）。Stage 1／Stage 2 審查皆 APPROVE，既有 4 個呼叫端一字未改，`git diff` 範圍乾淨
+  **守備範圍誠實記錄**（Stage 2 發現）：此 E2E **測不到** `toFixed(2)` 被改成 `String(value)` 的 mutation——`Number("3")` 與 `Number("3.00")` 相同，存進 store 的是數字 `3`，`PlayerCard` 顯示時本就會重新 `.toFixed(2)` 補成 `3.00`，畫面看不出差異。這個 mutation 由 1.1 的單元測試守備（直接讀 input 顯示值），E2E 守的是「端到端資料流」（按鈕映射到分數是否正確、有沒有真的存進名單）
+- [x] 2.2 GREEN: 確認 `/matchmaker/players` 既有流程（`PlayerForm` 快速帶入 → `useRosterStore.addPlayer` → `PlayerCard` 顯示 `rating.toFixed(2)`）已滿足 2.1，**預期為 no-op**。若 2.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，先確認是否為 dev server／service binding 的環境問題（見 `environment.md` 的注意事項與 root `CLAUDE.md` 的 port 診斷順序），排除環境因素後才依 delta spec 的「於名單頁以快速分數新增參賽者」Scenario 做最小修正
+  **`skipped`**——2.1 實測全綠，無需修正任何產品程式碼
 
 ## REFACTOR
 
