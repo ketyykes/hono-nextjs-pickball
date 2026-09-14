@@ -78,7 +78,7 @@ describe("PlayerStatsTable", () => {
 			"球員",
 			"目前強度",
 			"出場數",
-			"勝負",
+			"勝負和",
 			"勝率",
 			"強度淨變化",
 			"最常搭檔",
@@ -123,7 +123,8 @@ describe("PlayerStatsTable", () => {
 
 		expect(cellTexts[2]).toBe("3.50");
 		expect(cellTexts[3]).toBe("10");
-		expect(cellTexts[4]).toBe("6 - 4");
+		// draws 未覆寫，沿用 buildStat 預設值 0：勝負和欄三個數字恆常顯示（design Decision 4）。
+		expect(cellTexts[4]).toBe("6 - 4 - 0");
 		expect(cellTexts[5]).toBe("60%");
 		expect(cellTexts[6]).toBe("+0.42");
 		// 常搭檔／常對手兩欄都要有消費端呈現，不是算了卻不顯示的暗資料（design Decision 6）。

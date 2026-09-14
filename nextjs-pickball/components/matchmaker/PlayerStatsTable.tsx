@@ -51,7 +51,7 @@ export function PlayerStatsTable({ stats }: PlayerStatsTableProps) {
 					<TableHead>球員</TableHead>
 					<TableHead>目前強度</TableHead>
 					<TableHead>出場數</TableHead>
-					<TableHead>勝負</TableHead>
+					<TableHead>勝負和</TableHead>
 					<TableHead>勝率</TableHead>
 					<TableHead>強度淨變化</TableHead>
 					<TableHead>最常搭檔</TableHead>
@@ -86,7 +86,7 @@ export function PlayerStatsTable({ stats }: PlayerStatsTableProps) {
 							<TableCell>{stat.currentRating.toFixed(2)}</TableCell>
 							<TableCell>{stat.gamesPlayed}</TableCell>
 							<TableCell>
-								{stat.wins} - {stat.losses}
+								{stat.wins} - {stat.losses} - {stat.draws}
 							</TableCell>
 							<TableCell>{Math.round(stat.winRate * 100)}%</TableCell>
 							<TableCell>{formatRatingDelta(stat.ratingDelta)}</TableCell>
