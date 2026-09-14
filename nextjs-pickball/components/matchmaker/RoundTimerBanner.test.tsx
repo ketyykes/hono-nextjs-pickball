@@ -57,6 +57,30 @@ describe("RoundTimerBanner", () => {
 		expect(within(alert).getByText(ROUND_TIMER_EXPIRED_MESSAGE)).not.toBeNull();
 	});
 
+	// M15 之後計時回合的同分可直接送出並記為平手，舊文案的「平手請再打一球」是錯誤指示
+	// （會讓最終送出的比分不再是時間到當下的比分）。斷言用語意片段而非整句逐字比對，
+	// 是為了不讓下次微調用字時整條測試失效，同時仍能擋住「改回含『再打一球』舊文案」這個退化。
+	it("時間到提示文案說明同分可直接送出平手而非再打一球", () => {
+		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
+		const timer: RoundTimer = {
+			durationMinutes: 15,
+			startedAt: "2026-09-07T00:00:00.000Z",
+		};
+
+		render(<RoundTimerBanner timer={timer} />);
+
+		act(() => {
+			vi.advanceTimersByTime(15 * 60 * 1000);
+		});
+
+		const alert = screen.getByRole("alert");
+		const alertText = alert.textContent ?? "";
+
+		expect(alertText).toContain("同分");
+		expect(alertText).toContain("平手");
+		expect(alertText).not.toContain("再打一球");
+	});
+
 	it("時間到時播放提示音，同一次到期不因重新渲染而重複播放", () => {
 		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
 		const timer: RoundTimer = {
