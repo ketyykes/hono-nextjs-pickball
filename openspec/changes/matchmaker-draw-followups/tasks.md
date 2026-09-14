@@ -159,30 +159,31 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
 > **與 §2／§3 無相依**，但仍依序執行（共用單一工作樹）。
 > **本組不動 `RoundTimerBanner.tsx`**——它渲染的是常數本身。
 
-- [ ] 4.1 RED：在 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx` 新增 it
+- [x] 4.1 RED：在 `nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx` 新增 it
       **「時間到提示文案說明同分可直接送出平手而非再打一球」**。計時到期後取
       `role="alert"` 區塊內的文字，斷言**含**「同分」與「平手」、**不含**「再打一球」。
       斷言用語意片段而非整句逐字（design Decision 6）。實跑單檔並貼出紅燈輸出
       （預期失敗於現行文案含「再打一球」）
-      → Implementer 已完成（commit `5535313`），**checkbox 待 Stage 1／Stage 2 皆 PASS 後
-      再由 coordinator 勾選**——Implementer 自行勾選過此區塊，coordinator 已改回未勾選，
-      統一比照 §2／§3 的紀律（checkbox 代表「已審查通過」，不是「Implementer 自稱完成」）。
-- [ ] 4.2 GREEN：`nextjs-pickball/lib/matchmaker/labels.ts` 的
+- [x] 4.2 GREEN：`nextjs-pickball/lib/matchmaker/labels.ts` 的
       `ROUND_TIMER_EXPIRED_MESSAGE` 改為 **「時間到：領先者勝，同分可直接送出平手」**。
       保留「時間到：」前綴；SHALL NOT 以樣板字串拼接 `DRAW_LABEL`；常數名稱與匯出位置不變
-      → Implementer 已完成（commit `95fc533`），待審查。
-- [ ] 4.3 同步更新該常數上方的 JSDoc 註解：目前寫「M14 matchmaker-round-timer change，
+- [x] 4.3 同步更新該常數上方的 JSDoc 註解：目前寫「M14 matchmaker-round-timer change，
       spec『計時器顯示與時間到提示』逐字指定」，MUST 補記本次修訂的**理由**
       （M15 之後計時回合的同分可直接送出並記為平手，舊文案的「再打一球」是錯誤指示），
       SHALL NOT 自行編一個 M 編號（派工單必帶 e）
-      → Implementer 已完成（同 commit `95fc533`），待審查。
-- [ ] 4.4 實跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/round-timer.spec.ts`
+- [x] 4.4 實跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/round-timer.spec.ts`
       確認既有 E2E 不受文案改動影響（proposal Impact 宣稱此檔零修改，這裡是該宣稱的驗證）
-      → Implementer 已實跑：10 passed（5 browser × 2 test），檔案零修改，待審查覆核。
-- [ ] 4.5 REFACTOR：無壞味道可註記 skipped
-      → Implementer 標註 skipped，待 Stage 2 覆核。
-- [ ] 4.6 Mutation 自測（派工單必帶 a）：把 `ROUND_TIMER_EXPIRED_MESSAGE` 改回舊文案
+      → 10 passed（5 browser × 2 test），檔案零修改。
+- [x] 4.5 REFACTOR：無壞味道可註記 skipped
+- [x] 4.6 Mutation 自測（派工單必帶 a）：把 `ROUND_TIMER_EXPIRED_MESSAGE` 改回舊文案
       「時間到：領先者勝，平手請再打一球」，確認 4.1 的測試轉紅；回報結果
+      → Implementer 自測與 Stage 1／Stage 2 各自獨立複測皆轉紅，既有恆真斷言 it 確認仍綠
+      （驗證了 Decision 6 的關切：新 it 不是同一種恆真斷言）。
+
+**§4 審查結論**：Stage 1 PASS（文案逐字正確、前綴保留、未拼接 `DRAW_LABEL`、既有恆真 it
+未被動、無 scope creep）、Stage 2 PASS（mutation 證實新 it 非恆真斷言、JSDoc 交代理由且
+出處正確、`RoundTimerBanner.tsx` 零改動、E2E `round-timer.spec.ts` 鎖定「時間到」大字節點
+不受影響）。無阻斷項。
 
 ## 5. 收尾驗證
 
