@@ -19,6 +19,7 @@ export interface PlayerStat {
 	gamesPlayed: number;
 	wins: number;
 	losses: number;
+	draws: number;
 	winRate: number;
 	ratingDelta: number;
 	mostFrequentPartner: string | null;
@@ -49,6 +50,7 @@ interface MutableStat {
 	gamesPlayed: number;
 	wins: number;
 	losses: number;
+	draws: number;
 	ratingDelta: number;
 }
 
@@ -250,6 +252,7 @@ function buildRosterUnion(
 			gamesPlayed: 0,
 			wins: 0,
 			losses: 0,
+			draws: 0,
 			ratingDelta: 0,
 		});
 	}
@@ -270,6 +273,7 @@ function buildRosterUnion(
 					gamesPlayed: 0,
 					wins: 0,
 					losses: 0,
+					draws: 0,
 					ratingDelta: 0,
 				});
 			}
@@ -280,9 +284,10 @@ function buildRosterUnion(
 }
 
 /**
- * 依歷史紀錄逐筆加總出場數、勝場與敗場：該球員所屬隊伍與 `winner` 相同記勝場，
- * 不同記敗場（spec：SHALL NOT 出現第三種計數）。只累加到 `stats` 內另外配置的
- * MutableStat 物件，SHALL NOT 修改 `history` 本身或其中任何物件。
+ * 依歷史紀錄逐筆加總出場數、勝場、敗場與和局：該球員所屬隊伍與 `winner` 相同記勝場、
+ * `winner` 為 `"draw"` 記和局、其餘記敗場——三者互斥且窮盡（spec：勝場 + 敗場 + 和局
+ * MUST 等於出場數）。只累加到 `stats` 內另外配置的 MutableStat 物件，SHALL NOT 修改
+ * `history` 本身或其中任何物件。
  */
 function tallyGamesAndResults(
 	stats: ReadonlyMap<string, MutableStat>,
@@ -303,6 +308,10 @@ function tallyGamesAndResults(
 				stat.gamesPlayed += 1;
 				if (entry.winner === winnerKey) {
 					stat.wins += 1;
+				} else if (entry.winner === "draw") {
+					// 和局是打過的一場，仍計入 gamesPlayed（design Decision 1），
+					// 但 SHALL NOT 落入敗場，否則雙方會被誤記各一場敗場。
+					stat.draws += 1;
 				} else {
 					stat.losses += 1;
 				}
@@ -389,6 +398,7 @@ export function computePlayerStats(
 		gamesPlayed: stat.gamesPlayed,
 		wins: stat.wins,
 		losses: stat.losses,
+		draws: stat.draws,
 		winRate: winRateOf(stat.wins, stat.gamesPlayed),
 		ratingDelta: stat.ratingDelta,
 		mostFrequentPartner: pickMostFrequentName(partnerTally.get(stat.id) ?? new Map(), nameById),
