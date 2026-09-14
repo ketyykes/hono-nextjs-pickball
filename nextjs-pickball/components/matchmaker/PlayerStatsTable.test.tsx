@@ -196,6 +196,28 @@ describe("PlayerStatsTable", () => {
 		expect(winRateOf("p2")).toBe("33%");
 	});
 
+	it("勝負和欄依序顯示勝場敗場與和局三個數字", () => {
+		const stat = buildStat({ wins: 2, losses: 1, draws: 1 });
+		render(<PlayerStatsTable stats={[stat]} />);
+
+		const row = screen.getByTestId(`player-stat-row-${stat.id}`);
+		const winLossDrawText = within(row).getAllByRole("cell")[4].textContent ?? "";
+
+		// 用逐一往後搜尋數字出現位置確認「依序」，而非只斷言三個數字都存在——
+		// 否則「順序被打亂」的變異也會通過（design Decision 4：三個數字恆常顯示且順序固定）。
+		const indexOfWins = winLossDrawText.indexOf("2");
+		const indexOfLosses = winLossDrawText.indexOf("1", indexOfWins + 1);
+		const indexOfDraws = winLossDrawText.indexOf("1", indexOfLosses + 1);
+		expect(indexOfWins).toBeGreaterThanOrEqual(0);
+		expect(indexOfLosses).toBeGreaterThan(indexOfWins);
+		expect(indexOfDraws).toBeGreaterThan(indexOfLosses);
+
+		// 標題必須同步改名為「勝負和」，子字串比對（既有 E2E）無法承擔這條證明責任
+		// （design Decision 6）。
+		const headerTexts = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
+		expect(headerTexts[4]).toBe("勝負和");
+	});
+
 	it("表格具備可存取名稱", () => {
 		render(<PlayerStatsTable stats={[buildStat()]} />);
 
