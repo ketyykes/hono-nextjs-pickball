@@ -199,7 +199,14 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
       `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`。
       跑完立刻清掉自己起的 process（派工單必帶 g）。已知環境雜訊（`quiz.spec.ts` 在
       `webkit`／`mobile-safari` 偶發失敗）MUST 以單檔隔離重跑確認，SHALL NOT 直接當成迴歸
-      → 見下方獨立紀錄（背景執行，跑完後回填）。
+      → 627 passed／2 failed／21 skipped（全套約 11.8 分鐘）。失敗兩項皆為
+      `player-stats.spec.ts:543`「瀏覽統計頁不改動任何持久化資料」在 `webkit`／
+      `mobile-safari`，失敗點是 `beforeEach` 的首頁 `page.goto("/")` 逾時（與本 change
+      的邏輯無關，屬全套跑 11.8 分鐘後的資源競爭雜訊，非 tasks.md 預告的 `quiz.spec.ts`
+      案例但同一種環境雜訊模式）。依規則單檔隔離重跑
+      （`playwright test --project=webkit --project=mobile-safari player-stats.spec.ts -g "瀏覽統計頁不改動任何持久化資料"`）：
+      **2 passed**，確認非迴歸。跑完 port :3005／:8787 與相關 process 皆已自動釋放，
+      無殘留。
 - [x] 5.5 機械盤點一：重跑
       `grep -rn 'winner === \|winner !== ' nextjs-pickball --include="*.ts" --include="*.tsx" | grep -v '\.test\.'`，
       確認 production 程式碼中不再有未處理 `"draw"` 的二元判斷
