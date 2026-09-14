@@ -796,8 +796,15 @@ MUST 有文字隊伍標籤（例如「第一隊」／「第二隊」），球員
 
 倒數期間的畫面更新 SHALL NOT 使用 `aria-live`——每秒宣讀一次剩餘秒數對螢幕報讀器使用者是
 干擾而非幫助。時間到（剩餘秒數為 `0`）時 MUST 改為顯示大字「時間到」與繁體中文提示文案
-「時間到：領先者勝，平手請再打一球」（`nextjs-pickball/lib/matchmaker/labels.ts` 的具名
+「時間到：領先者勝，同分可直接送出平手」（`nextjs-pickball/lib/matchmaker/labels.ts` 的具名
 常數 `ROUND_TIMER_EXPIRED_MESSAGE`），並 MUST 以 `role="alert"` 呈現使讀屏能即時播報。
+
+該提示文案 MUST 與 `round-lifecycle` 目前實際接受的送出行為一致：計時回合的同分**可以直接
+送出並永久記為平手**，因此文案 SHALL NOT 要求主持人再加賽（例如「平手請再打一球」）——
+再打一球會讓最終送出的比分不再是時間到當下的比分，與計時制的意義相反。文案開頭的
+「時間到：」前綴 MUST 保留，既有 E2E 以該子字串定位此區塊。文案中的「平手」二字是句子的一
+部分，SHALL NOT 以樣板字串拼接 `DRAW_LABEL`——`DRAW_LABEL` 的語意是「某一場的結果標籤」，
+與本句的敘述用字不是同一件事，綁在一起會讓其中一邊改字時意外波及另一邊。
 
 時間到的瞬間 MUST 播放一段由 Web Audio API 產生的短提示音，實作為例外層純瀏覽器 API 呼叫
 `nextjs-pickball/lib/matchmaker/round-timer-sound.ts`（無分支決策，比照
@@ -844,6 +851,13 @@ MUST 有文字隊伍標籤（例如「第一隊」／「第二隊」），球員
 - **WHEN** 檢視倒數顯示
 - **THEN** 出現帶 `role="alert"` 的「時間到」大字與 `ROUND_TIMER_EXPIRED_MESSAGE` 文字
 - **驗收**：`nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx`，it 名稱「時間到時顯示帶 role alert 的時間到大字與繁體中文提示文案」
+
+#### Scenario: 時間到提示文案說明同分可直接送出平手而非再打一球
+
+- **GIVEN** `timer` 已開始，且經過的時間達到 `durationMinutes`
+- **WHEN** 讀取 `role="alert"` 區塊內的提示文案文字
+- **THEN** 文字含「同分」與「平手」，且不含「再打一球」
+- **驗收**：`nextjs-pickball/components/matchmaker/RoundTimerBanner.test.tsx`，it 名稱「時間到提示文案說明同分可直接送出平手而非再打一球」
 
 #### Scenario: 時間到播放提示音且同一次到期只播放一次
 
