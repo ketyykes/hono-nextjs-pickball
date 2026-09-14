@@ -160,6 +160,41 @@ describe("computePlayerStats", () => {
 		expect(alice?.onRoster).toBe(true);
 	});
 
+	it("平局紀錄計為和局而非雙方各一敗場", () => {
+		const players = [makePlayer({ id: "p1", name: "Alice" }), makePlayer({ id: "p2", name: "Bob" })];
+		const history = [
+			makeEntry({
+				matchId: "m1",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				winner: "teamA",
+			}),
+			makeEntry({
+				matchId: "m2",
+				teamA: makeTeam({ players: [makeHistoryPlayer({ id: "p1", name: "Alice" })] }),
+				teamB: makeTeam({ players: [makeHistoryPlayer({ id: "p2", name: "Bob" })] }),
+				winner: "draw",
+			}),
+		];
+
+		const result = computePlayerStats(history, players);
+
+		const alice = result.find((stat) => stat.id === "p1");
+		expect(alice?.gamesPlayed).toBe(2);
+		expect(alice?.wins).toBe(1);
+		expect(alice?.losses).toBe(0);
+		expect(alice?.draws).toBe(1);
+		expect(alice?.winRate).toBeCloseTo(1 / 2);
+
+		// 只斷言勝方會漏掉「只修了其中一隊的判斷」這種半套實作（test-plan「Why first」），
+		// 敗方同樣要驗證出場數、敗場與和局。
+		const bob = result.find((stat) => stat.id === "p2");
+		expect(bob?.gamesPlayed).toBe(2);
+		expect(bob?.wins).toBe(0);
+		expect(bob?.losses).toBe(1);
+		expect(bob?.draws).toBe(1);
+	});
+
 	it("出場數為零時勝率為零而非 NaN", () => {
 		const players = [makePlayer({ id: "p1", name: "Alice" })];
 
