@@ -50,6 +50,21 @@
 - **AND** 畫面 SHALL NOT 出現任何驗證錯誤訊息
 - **驗收**：`nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`，it 名稱「快速帶入按鈕不會觸發表單送出」
 
+#### Scenario: 快速帶入後手動改為超出範圍的分數時驗證失敗
+
+- **GIVEN** 已填入姓名，並點擊「高階 5.00」使欄位為 `"5.00"`
+- **WHEN** 將欄位改為 `8.01` 並送出表單
+- **THEN** 表單未被送出（送出處理常式未被呼叫），且畫面出現錯誤提示區塊
+- **AND** 強度分數欄位的值仍為 `"8.01"`，SHALL NOT 被夾回 `8.00`，也 SHALL NOT 被改回 `5.00`
+- **驗收**：`nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`，it 名稱「快速帶入後手動改為超出範圍的分數時驗證失敗且不夾值」
+
+#### Scenario: 編輯模式同樣提供快速帶入按鈕
+
+- **WHEN** 以強度為 `4.37` 的既有參賽者開啟編輯參賽者表單
+- **THEN** 強度分數欄位預填為 `"4.37"`，旁邊同樣出現可及名稱為「新手 1.00」、「中階 3.00」、「高階 5.00」的三顆按鈕
+- **AND** 點擊「中階 3.00」後欄位的值為 `"3.00"`，覆蓋原本的 `"4.37"`
+- **驗收**：`nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`，it 名稱「編輯模式同樣提供三顆快速帶入按鈕並可覆蓋既有分數」
+
 #### Scenario: 於名單頁以快速分數新增參賽者
 
 - **GIVEN** 於 `/matchmaker/players` 開啟新增參賽者 Dialog 並填入姓名

@@ -1,4 +1,4 @@
-> ## ⚠️ 讀這段再開始：本 change 的 6 個 task 全部預期綠燈
+> ## ⚠️ 讀這段再開始：本 change 的 8 個 task 全部預期綠燈
 >
 > `prd.md` 4.1.3 的快速分數**早在 M1 就實作完成**（`nextjs-pickball/components/matchmaker/PlayerForm.tsx`
 > 的 `RATING_PRESETS`），只是從未寫進 spec、也從未被任何測試斷言。因此下列每個 `RED:` task
@@ -93,8 +93,36 @@ Depends on: §1
 - [x] 2.2 GREEN: 確認 `/matchmaker/players` 既有流程（`PlayerForm` 快速帶入 → `useRosterStore.addPlayer` → `PlayerCard` 顯示 `rating.toFixed(2)`）已滿足 2.1，**預期為 no-op**。若 2.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，先確認是否為 dev server／service binding 的環境問題（見 `environment.md` 的注意事項與 root `CLAUDE.md` 的 port 診斷順序），排除環境因素後才依 delta spec 的「於名單頁以快速分數新增參賽者」Scenario 做最小修正
   **`skipped`**——2.1 實測全綠，無需修正任何產品程式碼
 
+## 3. 補充 Scenario：超出範圍與編輯模式（unit）
+
+Depends on: §1
+
+> 來源：2026-09-14 `/opsx:verify` 的兩項 SUGGESTION——Requirement 內文已寫明「超出範圍時驗證失敗，
+> SHALL NOT 靜默夾值」與「新增**與編輯**參賽者的表單」，但原本 5 個 Scenario 都沒有對應驗收。
+>
+> 兩個 it **追加**到既有的 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`（同一個 `describe`），
+> §1 的「共通約定」全數適用，另加：
+> - 沿用檔內既有的 `createDefaultProps()`，**不要**另造第二份 props fixture；編輯模式所需的
+>   `initialPlayer` 在該 it 內以 `mode: "edit"` 覆寫即可。`Player` 型別欄位為
+>   `id`／`name`／`gender`／`colorFrom`／`colorTo`／`rating`／`restCount`／`gamesPlayed`／`isActive`／`createdAt`
+>   （`createdAt` 須為 ISO datetime 字串），型別匯入用 `import type`。
+> - 超出範圍的 it **不斷言錯誤訊息文案**，只斷言 `role="alert"` 存在（文案屬「參賽者資料模型」的轉譯規則）。
+> - 既有 4 個 it 一字不改。
+
+- [x] 3.1 RED: 於同檔追加兩個 it：
+  - 「快速帶入後手動改為超出範圍的分數時驗證失敗且不夾值」——填入姓名 → 點「高階 5.00」→ `clear()` 強度分數欄位 → `type("8.01")` → 點送出鈕 → 斷言 `onSubmit` 呼叫次數為 `0`、`queryByRole("alert")` **不為** `null`、強度分數欄位 `value` 仍為 `"8.01"`
+  - 「編輯模式同樣提供三顆快速帶入按鈕並可覆蓋既有分數」——以 `mode="edit"` 與 `rating: 4.37` 的 `initialPlayer` 掛載 → 斷言強度分數欄位 `value` 為 `"4.37"`、三顆按鈕「新手 1.00」「中階 3.00」「高階 5.00」皆存在 → 點「中階 3.00」→ `value` 為 `"3.00"`
+  跑單檔並**如實貼出實測輸出**。⚠️ **預期直接綠燈（regression guard）**，請照實記錄，不得偽造紅燈
+  **`regression guard` — 實測**：`pnpm --filter ./nextjs-pickball test --run components/matchmaker/PlayerForm.test.tsx` → `Test Files 1 passed (1)` / `Tests 6 passed (6)`（既有 4 個 + 本 task 2 個，寫入當下即綠）。Stage 1 APPROVE；Stage 2 首輪退回兩項風格衝突（`createdAt` 改固定字面值、多行 `render(` 補尾逗號）與一行過長註解，修正後通過。`PlayerForm.tsx` 對 HEAD 0 行 diff
+  **守備範圍**（Stage 2 推理驗證，未做 mutation check）：送出時把 `rating` 夾進 1～8 → `onSubmit` 被呼叫且無 `role="alert"`，前兩條斷言轉紅；輸入時夾值或送出失敗還原成 `"5.00"` → 欄位值斷言轉紅；按鈕只在 `mode === "add"` 渲染 → 編輯模式 it 查按鈕即拋錯；編輯模式 `onClick` 失效 → 欄位停在 `"4.37"` 轉紅。happy-dom 對 `type="number"` 只做 NaN sanitize、不依 `min`／`max` 夾值（`HTMLInputElementValueSanitizer.js`），`"8.01"` 斷言測的是元件狀態而非 happy-dom 行為
+- [x] 3.2 GREEN: 確認 `PlayerForm.tsx` 既有的 `handleSubmit`（`PlayerFormSchema.safeParse` 失敗即 `setErrors` 並 `return`，不改寫 `ratingText`）與不分 `mode` 渲染的 `RATING_PRESETS` 已滿足 3.1 的兩個 it，**預期為 no-op**。若 3.1 實測全綠，本行標註 `skipped` 並貼上綠燈輸出；若出現紅燈，依 delta spec 的「快速帶入後手動改為超出範圍的分數時驗證失敗」與「編輯模式同樣提供快速帶入按鈕」兩個 Scenario 做**最小**修正，並記錄實際落差
+  **`skipped`**——3.1 實測全綠，無需修正 `PlayerForm.tsx`
+
+> **§3 的 Final Review（2026-09-14）**：APPROVE。前端全套 `Test Files 74 passed (74)`／`Tests 763 passed (763)`、`pnpm -r exec tsc --noEmit` exit 0、`lint` 0 errors。
+> **本輪刻意不重跑 E2E 與後端測試**：`git diff 23096f1` 對 `nextjs-pickball/tests`／`app`／`lib`／`hooks`／`PlayerForm.tsx`／`PlayerCard.tsx` 為 0 行，E2E 已於 2.1 實測 `25 passed`；後端相對 `091c038` 為 0 行 diff。
+
 ## REFACTOR
 
-**全數 skipped，理由：本 change 不新增任何產品程式碼**（`PlayerForm.tsx` 唯讀、預期 0 行 diff），沒有可重構的實作。測試檔本身的重複（render helper、props fixture）在 1.3 寫入第二批 it 時就地共用同一份，不另立 REFACTOR task——這一點由 execution-plan 的 Stage 2 checklist「測試資料由單一 fixture／helper 產生」把關。
+**全數 skipped，理由：本 change 不新增任何產品程式碼**（`PlayerForm.tsx` 唯讀、預期 0 行 diff），沒有可重構的實作。測試檔本身的重複（render helper、props fixture）在 1.3 寫入第二批 it、3.1 寫入第三批 it 時就地共用同一份，不另立 REFACTOR task——這一點由 execution-plan 的 Stage 2 checklist「測試資料由單一 fixture／helper 產生」把關。
 
 若 apply 過程中因「RED 實測意外紅燈」而實際修改了 `PlayerForm.tsx`，請在此節補一個 REFACTOR task 並走 Stage 2 審查。

@@ -52,18 +52,18 @@ E2E 則補上「常數確實被接到真實頁面」這一層（Decision 3）。
 
 ### Decision 3：紅燈規則的誠實處理——全數標為 regression guard，嚴禁 mutation check
 
-本 change 的 5 個測試在寫入當下**預期全部直接綠燈**，因為它們描述的行為早在 M1 就實作完成。依 root `CLAUDE.md`：
+本 change 的 7 個測試在寫入當下**預期全部直接綠燈**，因為它們描述的行為早在 M1 就實作完成。依 root `CLAUDE.md`：
 
 > **紅燈要是真的**。若某項行為早已實作，先寫測試會直接綠燈 —— 那是 regression guard 不是 TDD，請在 tasks.md 誠實標註，**不要用 mutation check（改斷言看紅再改回）偽造紅燈**。
 
 因此本 change 的處理方式為：
 
-- **test-plan.md 的 `Why first` 欄**：5 列全部寫 `regression guard`，並附一句說明它守的是哪一種改壞方式。
+- **test-plan.md 的 `Why first` 欄**：7 列全部寫 `regression guard`，並附一句說明它守的是哪一種改壞方式。
 - **tasks.md**：保留 schema 強制的 `RED:` / `GREEN:` 前綴（schema 的 Mandatory structure 明文要求，不自創前綴），但在每個 RED task 的內文明確寫「**預期直接綠燈（regression guard），如實記錄實測輸出**」，並在檔頭放一段總說明。
 - **GREEN task 的定位改為「確認既有實作已滿足規格」**，預期為 no-op；task 內文明寫「若 RED 實測為綠，本 task 標註 `skipped` 並貼出綠燈輸出，**不要**為了讓這一行有東西可寫而重構無關程式碼」。
 - **若 RED 實測意外為紅燈**，代表實作與本 delta 有出入。此時**以 delta 為準**修正 `PlayerForm.tsx`（此時 GREEN 是真的 GREEN），並在 tasks 該行記錄實際落差——那也意味著 proposal 的「產品程式碼 0 行 diff」預期需要更新。
 
-「明知會綠還是要寫」的價值，在 proposal 的 Why 已量化：目前把 `RATING_PRESETS` 砍成兩組、把 `toFixed(2)` 改成 `String()`、把 `type="button"` 拿掉，整套測試都照樣全綠。這 5 個測試把那三種改法各自變成一次紅燈。
+「明知會綠還是要寫」的價值，在 proposal 的 Why 已量化：目前把 `RATING_PRESETS` 砍成兩組、把 `toFixed(2)` 改成 `String()`、把 `type="button"` 拿掉，整套測試都照樣全綠。這 7 個測試把那三種改法各自變成一次紅燈，並另外擋下「送出時把超界分數夾進 1～8」與「快速帶入只在新增模式出現」兩種改法（2026-09-14 verify 的 SUGGESTION 補上）。
 
 **替代方案**：(a) 用 mutation check 製造紅燈（改斷言 → 看紅 → 改回）—— 明文禁止，且它證明的是「測試會失敗」而非「實作是對的」，兩者不是同一件事；(b) 先把 `RATING_PRESETS` 刪掉、看到紅燈、再把它加回來 —— 同樣是偽造：那是把已通過的實作暫時破壞來表演流程，且中途的 commit 會讓 `main` 上出現一個功能壞掉的狀態；(c) 不寫測試、只補 spec（`seo-metadata-spec-backfill` 當時的作法）—— 否決：那個 change 的對象是 `export const metadata`（靜態物件，改壞了 build 就會有型別錯誤），本 change 的對象是有互動行為的元件，且**現況是零覆蓋**，只補 spec 等於留下一條沒有任何機制保護的規格。
 
@@ -89,7 +89,7 @@ E2E 則補上「常數確實被接到真實頁面」這一層（Decision 3）。
 
 - **[`PlayerForm` 內含 Radix `Select`，happy-dom 可能缺 `ResizeObserver`／`hasPointerCapture` 而導致掛載即失敗]** → 本 change 的測試**不開啟下拉**，Radix 的 Popper 與相關 API 只在開啟時才會被觸及，預期不會踩到。若實測掛載即拋錯，緩解方式是**在 `PlayerForm.test.tsx` 檔內**補最小 stub（例如 `globalThis.ResizeObserver = class { observe(){} unobserve(){} disconnect(){} }`）並註明原因，**不要**改 `tests/setup.ts`——那是全域測試基礎建設，動它會影響所有既有測試檔，超出本 change 的範圍。
 
-- **[全部 5 個測試都是 regression guard，流程上「沒有真紅燈」]** → 這是本 change 的性質使然，不是偷工。緩解方式是**把它寫在紙上**：test-plan 的 `Why first` 欄逐列標註、tasks 檔頭與各 RED task 內文標註、execution-plan 給 subagent 的 contract 內含「紅燈誠實條款」，讓 apply 階段的 Implementer 與兩位 Reviewer 都拿到同一份說明，不會有人以為自己該去「弄出紅燈」。
+- **[全部 7 個測試都是 regression guard，流程上「沒有真紅燈」]** → 這是本 change 的性質使然，不是偷工。緩解方式是**把它寫在紙上**：test-plan 的 `Why first` 欄逐列標註、tasks 檔頭與各 RED task 內文標註、execution-plan 給 subagent 的 contract 內含「紅燈誠實條款」，讓 apply 階段的 Implementer 與兩位 Reviewer 都拿到同一份說明，不會有人以為自己該去「弄出紅燈」。
 
 - **[「產品程式碼 0 行 diff」可能被 Implementer 當成「可以順手改一點」]** → execution-plan 的「不給」清單明列 `PlayerForm.tsx` 為**唯讀**，Final Code Reviewer 的 checklist 含一條 `git diff --stat` 確認：只有 `PlayerForm.test.tsx`（新增）與 `player-roster.spec.ts`（修改）兩個檔案。
 
@@ -105,5 +105,5 @@ E2E 則補上「常數確實被接到真實頁面」這一層（Decision 3）。
 
 ## Open Questions
 
-- **是否應在編輯模式下也顯示快速帶入按鈕？** 現況是顯示（`RATING_PRESETS` 的渲染不分 `mode`），本 delta 的 Requirement 沿用現況寫成「新增與編輯參賽者的表單」。若日後認為編輯既有球員時不該出現粗略級距（會覆蓋掉評分引擎算出的精確分數，例如 `4.37` 被一鍵蓋成 `3.00`），需另開 change 調整——屆時是**行為變更**，不是回填。
+- **是否應在編輯模式下也顯示快速帶入按鈕？** 現況是顯示（`RATING_PRESETS` 的渲染不分 `mode`），本 delta 的 Requirement 沿用現況寫成「新增與編輯參賽者的表單」。若日後認為編輯既有球員時不該出現粗略級距（會覆蓋掉評分引擎算出的精確分數，例如 `4.37` 被一鍵蓋成 `3.00`），需另開 change 調整——屆時是**行為變更**，不是回填。現況已由 Scenario「編輯模式同樣提供快速帶入按鈕」與對應 it 鎖住，調整時須 MODIFY 本 Requirement 並同步改寫該 it。
 - **快速分數與 M3 評分引擎的關係**：M3（`matchmaker-rating-engine`）之後 `rating` 會由 `updateRatings` 自動更新，快速分數僅作為**初始估值**的輸入捷徑。`prd.md` 6.4.7 的手動覆蓋由 `updatePlayer` 提供，兩者不衝突。本 change 不預先為此加任何限制。

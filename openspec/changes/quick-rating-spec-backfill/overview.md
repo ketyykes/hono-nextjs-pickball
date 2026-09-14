@@ -2,9 +2,9 @@
 
 ## Scope
 
-`prd.md` 4.1.3 的「新手 1.00／中階 3.00／高階 5.00」快速分數**早就做好了**（`PlayerForm.tsx` 的 `RATING_PRESETS`），但 `openspec/specs/player-roster/spec.md` 完全沒提它，`components/matchmaker/` 也一個測試檔都沒有。本 change 只做兩件事：把這條行為補進 `player-roster` 主 spec，並補 5 個 regression guard 測試，讓「改壞了會有測試轉紅」成立。**不新增功能、產品程式碼預期 0 行 diff。**
+`prd.md` 4.1.3 的「新手 1.00／中階 3.00／高階 5.00」快速分數**早就做好了**（`PlayerForm.tsx` 的 `RATING_PRESETS`），但 `openspec/specs/player-roster/spec.md` 完全沒提它，`components/matchmaker/` 也一個測試檔都沒有。本 change 只做兩件事：把這條行為補進 `player-roster` 主 spec，並補 7 個 regression guard 測試，讓「改壞了會有測試轉紅」成立。**不新增功能、產品程式碼預期 0 行 diff。**
 
-**規模判定：small。** 影響 1 個 capability（`player-roster`）、tasks 6 項（≤ 8）、無新依賴（`@testing-library/user-event` 已在 devDependencies）、無架構變更——四項條件同時成立，無任何一項命中 medium。
+**規模判定：small。** 影響 1 個 capability（`player-roster`）、tasks 8 項（≤ 8）、無新依賴（`@testing-library/user-event` 已在 devDependencies）、無架構變更——四項條件同時成立，無任何一項命中 medium。
 
 各條件式區塊的判定：
 
@@ -20,7 +20,7 @@
 ## What Changes
 
 - `player-roster` 新增 **1 條 ADDED Requirement**「快速帶入強度分數」：三個級別與分數、點擊後以兩位小數填入、填入後仍可手動改為 1.00～8.00 內任意兩位小數、按鈕不得觸發表單送出、三組級別由單一常數渲染。
-- 新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`（4 個 unit regression guard）。
+- 新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`（6 個 unit regression guard）。
 - 於既有 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts` 追加 1 個 e2e test；helper 加一個選填參數，既有 4 個 test 呼叫端不變。
 - **不 MODIFY 任何既有 Requirement**、不動 `PlayerForm.tsx`、不動 `lib/`／`hooks/`／`app/`、不新增 npm 套件。
 
@@ -51,9 +51,9 @@
         |
         v
   specs/player-roster/spec.md   8 條 Requirement
-        + 快速帶入強度分數 (ADDED, 5 個 Scenario)
+        + 快速帶入強度分數 (ADDED, 7 個 Scenario)
         |
-        +--> PlayerForm.test.tsx      4 個 unit  (新增檔案)
+        +--> PlayerForm.test.tsx      6 個 unit  (新增檔案)
         +--> player-roster.spec.ts    1 個 e2e   (既有檔追加)
         |
         v
@@ -62,7 +62,7 @@
 
 ## UI Mockups
 
-下面畫的是**現況**（本 change 不改介面），用途是把 delta spec 的四個 unit Scenario 對應到畫面上的哪一塊，供 apply 階段寫測試時對照。範圍限於新增參賽者 Dialog 中「強度分數」那一段，姓名／性別／漸層三段以 `(...)` 省略。
+下面畫的是**現況**（本 change 不改介面），用途是把 delta spec 的 Scenario 1～4 對應到畫面上的哪一塊，供 apply 階段寫測試時對照（Scenario 5「超出範圍驗證失敗」的畫面即 State 3 輸入 `8.01` 後送出、頂端出現錯誤區塊；Scenario 6「編輯模式」的畫面即 State 1 換成編輯 Dialog 且欄位預填既有分數，兩者不另畫）。範圍限於新增參賽者 Dialog 中「強度分數」那一段，姓名／性別／漸層三段以 `(...)` 省略。
 
 ```
 === State 1: 開啟新增參賽者 Dialog, 強度分數尚未填 ===

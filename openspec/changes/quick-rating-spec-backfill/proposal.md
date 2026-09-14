@@ -24,7 +24,7 @@
 ## What Changes
 
 - **`player-roster` 新增一條 Requirement「快速帶入強度分數」**（ADDED，非 MODIFIED）：三個級別與分數、點擊後以兩位小數填入強度分數欄位、填入後仍可手動改為 1.00～8.00 內任意兩位小數、按鈕不得觸發表單送出、三組級別由單一常數渲染。
-- **新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`**：4 個 regression guard 單元測試。這是 `components/matchmaker/` 的**第一個**測試檔，也是本 repo 第一個帶互動（click／type）的元件測試。
+- **新增 `nextjs-pickball/components/matchmaker/PlayerForm.test.tsx`**：6 個 regression guard 單元測試。這是 `components/matchmaker/` 的**第一個**測試檔，也是本 repo 第一個帶互動（click／type）的元件測試。
 - **於既有 `nextjs-pickball/tests/e2e/specs/player-roster.spec.ts` 補 1 個 E2E test**，讓 `prd.md` 13.2 的該項驗收有端到端證據；既有 helper `addPlayerViaDialog` 加一個**選填**參數，既有 4 個 test 的呼叫方式不變。
 - **產品程式碼預期 diff 為 0 行**。若實作與本 delta 有任何出入，以 delta 為準修正實作並如實記錄（見 design「Decision 3」）。
 
