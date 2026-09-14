@@ -19,6 +19,7 @@ function buildStat(overrides: Partial<PlayerStat> = {}): PlayerStat {
 		gamesPlayed: 10,
 		wins: 6,
 		losses: 4,
+		draws: 0,
 		winRate: 0.6,
 		ratingDelta: 0.42,
 		mostFrequentPartner: "陳小華",
