@@ -121,24 +121,35 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
 > 子字串比對無法承擔改名的證明責任）、Risks「390px 溢出」與「子字串比對會遮蔽退化」。
 > **相依 §2**：`draws` 欄位必須先存在。
 
-- [ ] 3.1 RED：在 `nextjs-pickball/components/matchmaker/PlayerStatsTable.test.tsx` 新增 it
+- [x] 3.1 RED：在 `nextjs-pickball/components/matchmaker/PlayerStatsTable.test.tsx` 新增 it
       **「勝負和欄依序顯示勝場敗場與和局三個數字」**。渲染一列 `wins: 2`／`losses: 1`／
       `draws: 1` 的 `PlayerStat`；斷言該列的勝負和欄文字依序含 `2`、`1`、`1`，**且**表格
       標題列的該欄名稱為「勝負和」。實跑單檔並貼出紅燈輸出
-- [ ] 3.2 GREEN：第五個 `<TableHead>` 由「勝負」改為「勝負和」；該欄內容由
+- [x] 3.2 GREEN：第五個 `<TableHead>` 由「勝負」改為「勝負和」；該欄內容由
       `{stat.wins} - {stat.losses}` 改為 `{stat.wins} - {stat.losses} - {stat.draws}`。
       三個數字**恆常顯示**，SHALL NOT 加「和局為 0 就不顯示」的條件渲染（Decision 4）
-- [ ] 3.3 實跑既有 E2E Scenario「排行榜表格於支援寬度下限不造成整頁橫向溢出」：
+      → 連動更新兩處既有測試斷言值（九欄標題陣列、`各欄位如實顯示球員統計資料` 的
+      `cellTexts[4]`），Stage 1／Stage 2 皆確認屬機械性同步、非 scope creep。
+- [x] 3.3 實跑既有 E2E Scenario「排行榜表格於支援寬度下限不造成整頁橫向溢出」：
       `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/player-stats.spec.ts`。
       **溢出即依 execution-plan Escalation 處理**（先縮內距或字級，SHALL NOT 改回兩個數字）
-- [ ] 3.4 更新 `nextjs-pickball/tests/e2e/specs/player-stats.spec.ts` 九項欄名陣列中的
+      → 40 passed（5 browser project × 8 test），無溢出，無需 escalation。
+- [x] 3.4 更新 `nextjs-pickball/tests/e2e/specs/player-stats.spec.ts` 九項欄名陣列中的
       「勝負」為「勝負和」，其餘八項與其他斷言逐字不變。
       ⚠️ **regression guard（加入即綠）**：既有斷言為 `toContainText` 子字串比對，改前改後
       皆通過，**SHALL NOT 宣稱這裡有紅燈**。改它的理由是讓清單記載現行欄名而非過時欄名
-- [ ] 3.5 REFACTOR：確認呈現層沒有混入計算（例如在元件內重算和局），分隔號樣式與既有
+      → 已完成，Stage 1 確認 diff 僅此一行、其餘八項與斷言逐字未變。
+- [x] 3.5 REFACTOR：確認呈現層沒有混入計算（例如在元件內重算和局），分隔號樣式與既有
       `2 - 1` 一致
-- [ ] 3.6 Mutation 自測（派工單必帶 a）：① 標題改回「勝負」；② 第三個數字改成 `{0}`。
+      → 零分支、`{a} - {b} - {c}` 沿用既有 JSX 寫法，無壞味道，Stage 2 確認 skipped。
+- [x] 3.6 Mutation 自測（派工單必帶 a）：① 標題改回「勝負」；② 第三個數字改成 `{0}`。
       兩者 MUST 各自讓 3.1 的測試轉紅；回報結果
+      → Implementer 自測與 Stage 2 獨立複測皆兩項轉紅。
+
+**§3 審查結論**：Stage 1 PASS、Stage 2 PASS。非阻斷建議：新 it 以 `indexOf` 鏈斷言
+「依序」，但 `losses`／`draws` 測資皆為 `1` 時該鏈本身無法區分兩者對調——Stage 2 實測證明
+對調會被隔壁的「各欄位如實顯示球員統計資料」it 抓到，套件整體覆蓋無缺口，故不構成 FAIL，
+留待未來若touch本檔可考慮改用三個相異值直接 `toBe` 比對，本次不強制修改。
 
 ## 4. `labels.ts`：到期提示文案
 
