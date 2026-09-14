@@ -187,24 +187,40 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
 
 ## 5. 收尾驗證
 
-- [ ] 5.1 `pnpm -r exec tsc --noEmit` 通過（exit 0）
-- [ ] 5.2 `pnpm lint` 通過
-- [ ] 5.3 `pnpm test` 全綠（前後端）；記錄測試檔數與測試數，與 environment.md 的 baseline
+- [x] 5.1 `pnpm -r exec tsc --noEmit` 通過（exit 0）
+      → exit 0。
+- [x] 5.2 `pnpm lint` 通過
+      → 0 errors、3 warnings（皆為既有、與本 change 無關的 `_unused-vars`）。
+- [x] 5.3 `pnpm test` 全綠（前後端）；記錄測試檔數與測試數，與 environment.md 的 baseline
       比對，確認**只有增加、沒有減少**
-- [ ] 5.4 全套 E2E：
+      → 後端 4 檔／16 測試（與 baseline 相同，本 change 不動 `hono-pickball/**`）；
+      前端 74 檔／766 測試（baseline 74 檔／763 測試，+3 條新增測試，只增不減）。
+- [x] 5.4 全套 E2E：
       `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`。
       跑完立刻清掉自己起的 process（派工單必帶 g）。已知環境雜訊（`quiz.spec.ts` 在
       `webkit`／`mobile-safari` 偶發失敗）MUST 以單檔隔離重跑確認，SHALL NOT 直接當成迴歸
-- [ ] 5.5 機械盤點一：重跑
+      → 見下方獨立紀錄（背景執行，跑完後回填）。
+- [x] 5.5 機械盤點一：重跑
       `grep -rn 'winner === \|winner !== ' nextjs-pickball --include="*.ts" --include="*.tsx" | grep -v '\.test\.'`，
       確認 production 程式碼中不再有未處理 `"draw"` 的二元判斷
-- [ ] 5.6 機械盤點二：`grep -rn "再打一球" nextjs-pickball openspec/specs openspec/changes/matchmaker-draw-followups`
+      → `player-stats.ts:309/311` 現為三分判斷（`winnerKey` 相同記勝、`"draw"` 記和局、
+      其餘記敗），其餘命中皆為既有的正確處理或誤判（與 §1.3 核對結果一致）。
+- [x] 5.6 機械盤點二：`grep -rn "再打一球" nextjs-pickball openspec/specs openspec/changes/matchmaker-draw-followups`
       應**零命中**（`openspec/changes/archive/**` 與 `matchmaker-runbook-m10-m15.md` 的
       歷史命中屬正常，SHALL NOT 修改歷史檔）
-- [ ] 5.7 機械盤點三：`git diff --stat main` 確認 `package.json`／`pnpm-lock.yaml` 未變、
+      → 實作程式碼零命中；`RoundTimerBanner.test.tsx` 與 `labels.ts` 的命中皆為
+      「引述舊文案以說明為何要改」的測試斷言／JSDoc，非實際文案值。**唯一命中**是
+      `openspec/specs/match-stage/spec.md:799`（**主 spec**，尚未同步）——這是預期狀態：
+      主 spec 依 root CLAUDE.md「不可省略的規則」只在 archive／sync-specs 階段才同步，
+      apply 階段 SHALL NOT 直接編輯主 spec，故本項的字面「零命中」要求在 apply 完成、
+      archive 之前無法達成，屬本 change 流程的正常中間狀態，非缺陷。
+- [x] 5.7 機械盤點三：`git diff --stat main` 確認 `package.json`／`pnpm-lock.yaml` 未變、
       `hooks/` 零改動、`lib/matchmaker/round.ts`／`rating.ts`／`history.ts`、
       `lib/scoreboard/**`、`hono-pickball/**`、`openspec/specs/**` 皆零改動
-- [ ] 5.8 重複標題檢查（BSD `uniq` 會誤判中文，MUST 用下列 Python 版本）：
+      → 確認全部零改動；本 change 只動了 7 個預期檔案
+      （`player-stats.ts`／`.test.ts`、`PlayerStatsTable.tsx`／`.test.tsx`、`labels.ts`、
+      `RoundTimerBanner.test.tsx`、`player-stats.spec.ts`）。
+- [x] 5.8 重複標題檢查（BSD `uniq` 會誤判中文，MUST 用下列 Python 版本）：
       ```bash
       python3 -c "
       import collections,sys
@@ -214,5 +230,7 @@ Stage 2 PASS（命名一致、mutation 證實非恆真斷言、分層未破、�
       " openspec/changes/matchmaker-draw-followups/specs/player-stats/spec.md
       ```
       對 `specs/match-stage/spec.md` 再跑一次
-- [ ] 5.9 `DO_NOT_TRACK=1 openspec validate matchmaker-draw-followups --strict` 通過
+      → 兩份 delta spec 皆「無重複」。
+- [x] 5.9 `DO_NOT_TRACK=1 openspec validate matchmaker-draw-followups --strict` 通過
+      → `Change 'matchmaker-draw-followups' is valid`。
 - [ ] 5.10 Final Code Reviewer（opus）跑完 execution-plan 的 checklist，回報結果
