@@ -60,7 +60,8 @@ test.describe("SiteNavbar 窄螢幕呈現", () => {
 		await page.setViewportSize(NARROW);
 		await page.goto("/");
 
-		for (const label of ["首頁", "完整體驗", "計分板", "測驗"]) {
+		// 只取前四條：本 test 是「對戰分配」加入前的 regression guard，第 5 條由下一個 test 驗。
+		for (const label of NAV_LABELS.slice(0, 4)) {
 			await expect(
 				page.getByRole("link", { name: label, exact: true }),
 			).toBeVisible();
