@@ -124,4 +124,18 @@ test.describe("SiteNavbar 窄螢幕呈現", () => {
 			expect(height).toBeLessThanOrEqual(wideHeights[label] + 4);
 		}
 	});
+
+	// 斷點用 max-[375px]（width < 375px），375px 本身不隱藏；
+	// 這裡釘住邊界是 `<` 而非 `<=`。
+	test("小於 375px 時隱藏 logo、375px 起恢復", async ({ page }) => {
+		const logo = page.locator("header > div > a").first();
+
+		await page.setViewportSize(TINY);
+		await page.goto("/");
+		await expect(logo).toBeHidden();
+
+		await page.setViewportSize({ width: 375, height: TINY.height });
+		await expect(logo).toBeVisible();
+		await expect(page.locator("header").getByText("匹克球指南")).toBeHidden();
+	});
 });
