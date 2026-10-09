@@ -18,16 +18,25 @@
 ## 2. 窄螢幕導航呈現（site-navbar）
 Depends on: §1
 
-- [ ] 2.1 RED: write test `320px 下五個導航連結完整落在視口內`（預期修正前「對戰分配」`toBeInViewport({ ratio: 1 })` 失敗）
-- [ ] 2.2 GREEN: `SiteNavbar.tsx` 加上 `max-[375px]:hidden`（logo）、`max-[375px]:px-3`（容器）、`max-[375px]:px-1.5`（連結）
-- [ ] 2.3 RED: write test `小於 375px 時隱藏 logo、375px 起恢復`（若 2.2 已使其加入即綠，MUST 標註為 regression guard 並說明：logo 隱藏是 2.2 讓 2.1 轉綠的必要手段，無法拆開）
-- [ ] 2.4 GREEN: 若 2.3 為真紅燈，補上使其轉綠的最小實作；否則註記 n/a
-- [ ] 2.5 REFACTOR: 同步更新 `SiteNavbar.tsx` 內「窄螢幕：收合 logo 文字」那段註解，說明 < 375px 的額外讓出規則（無其他壞味道則 skipped）
+- [x] 2.1 RED: write test `320px 下五個導航連結完整落在視口內`（預期修正前「對戰分配」`toBeInViewport({ ratio: 1 })` 失敗）
+      → 真紅燈（91faad1）：`toBeInViewport()` failed，「對戰分配」viewport ratio 0.6389；1 failed / 5 passed
+- [x] 2.2 GREEN: `SiteNavbar.tsx` 加上 `max-[375px]:hidden`（logo）、`max-[375px]:px-3`（容器）、`max-[375px]:px-1.5`（連結）
+      → 94e5902，6 passed
+- [x] 2.3 RED: write test `小於 375px 時隱藏 logo、375px 起恢復`（若 2.2 已使其加入即綠，MUST 標註為 regression guard 並說明：logo 隱藏是 2.2 讓 2.1 轉綠的必要手段，無法拆開）
+      → **regression guard（加入即綠）**（93bc8bf）：logo 隱藏是 2.2 讓 2.1 轉綠的必要手段，無法拆開；未偽造紅燈。價值在釘住 375px 邊界（Tailwind 4.3.0 實編為 `@media (width < 375px)`）
+- [x] 2.4 GREEN: 若 2.3 為真紅燈，補上使其轉綠的最小實作；否則註記 n/a
+      → n/a（2.3 非真紅燈）
+- [x] 2.5 REFACTOR: 同步更新 `SiteNavbar.tsx` 內「窄螢幕：收合 logo 文字」那段註解，說明 < 375px 的額外讓出規則（無其他壞味道則 skipped）
+      → a72e818 更新註解；Stage 2 nit 修正於 7402cd7（class 排列一致、移除會過時的實測數字）
 
 ## 3. 收尾驗證
 Depends on: §2
 
-- [ ] 3.1 `navbar-rwd.spec.ts` 全檔 chromium 全綠（含既有 390px test，證明 ≥ 375px 零差異）
-- [ ] 3.2 `pnpm lint`、`pnpm typecheck`、`pnpm test:web` 全綠
-- [ ] 3.3 320／375／390px 各截一張 header 圖目視確認，附於回報
-- [ ] 3.4 `git diff main --stat` 只含 `SiteNavbar.tsx`、`navbar-rwd.spec.ts` 與本 change 資料夾
+- [x] 3.1 `navbar-rwd.spec.ts` 全檔 chromium 全綠（含既有 390px test，證明 ≥ 375px 零差異）
+      → chromium 7 passed
+- [x] 3.2 `pnpm lint`、`pnpm typecheck`、`pnpm test:web` 全綠
+      → lint exit 0、typecheck exit 0、前端 74 檔 766 測試全綠
+- [x] 3.3 320／375／390px 各截一張 header 圖目視確認，附於回報
+      → 320px：logo 隱藏、五連結完整可見；375px：🏓 恢復、五連結完整可見；390px 與修正前一致
+- [x] 3.4 `git diff main --stat` 只含 `SiteNavbar.tsx`、`navbar-rwd.spec.ts` 與本 change 資料夾
+      → 只含 `SiteNavbar.tsx`、`navbar-rwd.spec.ts` 與本 change 資料夾
