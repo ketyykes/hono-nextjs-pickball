@@ -18,6 +18,8 @@ test.describe("SiteNavbar 窄螢幕呈現", () => {
 
 	const NARROW = { width: 390, height: 844 }; // iPhone 12
 	const WIDE = { width: 1280, height: 800 };
+	const TINY = { width: 320, height: 700 }; // iPhone SE 1 代等級的最窄視口
+	const NAV_LABELS = ["首頁", "完整體驗", "計分板", "測驗", "對戰分配"];
 
 	async function measure(page: import("@playwright/test").Page) {
 		return page.locator("header > div").evaluate((el) => {
@@ -95,5 +97,31 @@ test.describe("SiteNavbar 窄螢幕呈現", () => {
 
 		await page.setViewportSize(NARROW);
 		await expect(page.locator("header").getByText("匹克球指南")).toBeHidden();
+	});
+
+	// toBeVisible() 不檢查元素是否被切出視口（右緣超出仍算 visible），
+	// 所以必須用 ratio: 1 才抓得到「對戰分配」被推出 320px 視口外。
+	test("320px 下五個導航連結完整落在視口內", async ({ page }) => {
+		await page.setViewportSize(WIDE);
+		await page.goto("/");
+		const wideHeights: Record<string, number> = {};
+		for (const label of NAV_LABELS) {
+			wideHeights[label] = await page
+				.getByRole("link", { name: label, exact: true })
+				.evaluate((el) => el.getBoundingClientRect().height);
+		}
+
+		await page.setViewportSize(TINY);
+
+		for (const label of NAV_LABELS) {
+			const link = page.getByRole("link", { name: label, exact: true });
+			await expect(link).toBeInViewport({ ratio: 1 });
+
+			// 不換行：換行會讓高度倍增；容許 4px 誤差。
+			const height = await link.evaluate(
+				(el) => el.getBoundingClientRect().height,
+			);
+			expect(height).toBeLessThanOrEqual(wideHeights[label] + 4);
+		}
 	});
 });
