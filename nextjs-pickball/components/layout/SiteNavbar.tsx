@@ -41,7 +41,7 @@ export function SiteNavbar() {
 		>
 			{/* 窄螢幕：收合 logo 文字並縮小間距，讓 5 個連結維持單行。
 			    視口 < 375px（max-[375px]，不含 375）再多讓一層：整個 logo 隱藏、
-			    容器 px-3、連結 px-1.5；實測 320px 下只靠 sm 以下收合仍差約 42px。
+			    容器 px-3、連結 px-1.5——320px 下只靠 sm 以下的收合，仍會把最後一個連結推出視口。
 			    首頁連結與 logo 同路由，隱藏 logo 不會少一個入口。
 			    不做漢堡選單——只有 5 個連結，藏起來等於替每次導航多加一次點擊。 */}
 			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-3 px-4 max-[375px]:px-3 sm:gap-6 sm:px-6">
@@ -49,7 +49,7 @@ export function SiteNavbar() {
 					href="/"
 					transitionTypes={["nav-back"]}
 					className={cn(
-						"font-outfit shrink-0 text-sm font-extrabold max-[375px]:hidden tracking-[2px] whitespace-nowrap uppercase",
+						"font-outfit shrink-0 text-sm font-extrabold tracking-[2px] whitespace-nowrap uppercase max-[375px]:hidden",
 						solid ? "text-slate-900" : "text-white",
 					)}
 				>
