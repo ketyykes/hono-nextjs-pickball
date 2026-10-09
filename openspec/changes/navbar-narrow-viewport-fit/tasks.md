@@ -10,9 +10,10 @@
 
 ## 1. 前置確認（不寫任何產品程式碼）
 
-- [ ] 1.1 確認 cwd 為 environment.md 宣告的路徑、分支為 `change/navbar-narrow-viewport-fit`，baseline `pnpm test` 全綠；回填 environment.md 的 Verification
-- [ ] 1.2 讀 `nextjs-pickball/components/layout/SiteNavbar.tsx`，確認容器 `px-4 sm:px-6`、`gap-3 sm:gap-6`、連結 `px-2 sm:px-3`、logo 為 header 內第一個 `<a>`，與 design Context 一致；不一致則停下回報
-- [ ] 1.3 確認 `navbar-rwd.spec.ts` 既有五條 test 在 chromium 全綠（baseline）
+- [x] 1.1 確認 cwd 為 environment.md 宣告的路徑、分支為 `change/navbar-narrow-viewport-fit`，baseline `pnpm test` 全綠；回填 environment.md 的 Verification
+- [x] 1.2 讀 `nextjs-pickball/components/layout/SiteNavbar.tsx`，確認容器 `px-4 sm:px-6`、`gap-3 sm:gap-6`、連結 `px-2 sm:px-3`、logo 為 header 內第一個 `<a>`，與 design Context 一致；不一致則停下回報
+      → 確認屬實：容器 `gap-3 px-4 sm:gap-6 sm:px-6`、連結 `px-2 ... sm:px-3`、logo 為 header 內第一個 `<a>`
+- [x] 1.3 確認 `navbar-rwd.spec.ts` 既有五條 test 在 chromium 全綠（baseline）
 
 ## 2. 窄螢幕導航呈現（site-navbar）
 Depends on: §1

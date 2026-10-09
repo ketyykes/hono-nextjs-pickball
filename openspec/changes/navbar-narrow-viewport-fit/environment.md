@@ -19,8 +19,8 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: 待 apply §1.1 回填
-- **Initial commit hash**: 待 apply §1.1 回填
+- **Baseline tests**: PASS — 2026-10-09 實測 `pnpm test` 全綠：後端 4 檔 16 測試、前端 74 檔 766 測試；`navbar-rwd.spec.ts` chromium 5/5 通過
+- **Initial commit hash**: `a79572659c22f02054a29fa8ee0e0c0231e85eb7`（本分支起點，含本 change artifacts 的 commit；parent 為 `main` @ `8a112c0`）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（本次不開 worktree）
 
 ## Teardown
