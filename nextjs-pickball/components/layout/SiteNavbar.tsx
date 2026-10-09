@@ -41,12 +41,12 @@ export function SiteNavbar() {
 		>
 			{/* 窄螢幕：收合 logo 文字並縮小間距，讓 5 個連結維持單行。
 			    不做漢堡選單——只有 5 個連結，藏起來等於替每次導航多加一次點擊。 */}
-			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-3 px-4 sm:gap-6 sm:px-6">
+			<div className="mx-auto flex h-full max-w-[1200px] items-center gap-3 px-4 max-[375px]:px-3 sm:gap-6 sm:px-6">
 				<Link
 					href="/"
 					transitionTypes={["nav-back"]}
 					className={cn(
-						"font-outfit shrink-0 text-sm font-extrabold tracking-[2px] whitespace-nowrap uppercase",
+						"font-outfit shrink-0 text-sm font-extrabold max-[375px]:hidden tracking-[2px] whitespace-nowrap uppercase",
 						solid ? "text-slate-900" : "text-white",
 					)}
 				>
@@ -61,7 +61,7 @@ export function SiteNavbar() {
 								href={link.href}
 								transitionTypes={[link.href === "/" ? "nav-back" : "nav-forward"]}
 								className={cn(
-									"rounded-md px-2 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-3",
+									"rounded-md px-2 py-2 text-sm font-medium whitespace-nowrap transition-colors max-[375px]:px-1.5 sm:px-3",
 									solid
 										? "text-muted-foreground hover:text-slate-900"
 										: "text-white/70 hover:text-white",
