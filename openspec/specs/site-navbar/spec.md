@@ -114,6 +114,20 @@ SiteNavbar SHALL 在所有斷點維持 5 個導航連結全部可見，SHALL NOT
 窄螢幕的空間 SHALL 由下列方式讓出：logo 文字（「匹克球指南」）於 `sm` 斷點以下收合、只保留
 🏓 圖示；容器間距由 `gap-6 px-6` 縮為 `gap-3 px-4`；連結水平內距由 `px-3` 縮為 `px-2`。
 
+視口寬度 **< 375px** 時 SHALL 再讓出一層空間：logo 整個隱藏（含 🏓 圖示）；容器水平內距由
+`px-4` 縮為 `px-3`；連結水平內距由 `px-2` 縮為 `px-1.5`。實作 MUST 以 Tailwind 的
+`max-[375px]:` variant 表達（對應 `@media (width < 375px)`），SHALL NOT 以 JS 量測視口寬度。
+視口寬度 ≥ 375px 時 SHALL 維持上一段的呈現，零差異。
+
+> **為什麼是隱藏 logo 而不是先縮短文案**：上方引言的「先縮短連結文案」是針對 390px **換行**
+> 的預案；本層處理的是 < 375px 的**橫向切出視口**（2026-10-09 實測：導航列內容需約 362px，
+> 320px 時「對戰分配」右緣落在 346px）。logo 與「首頁」連結指向同一路由，隱藏它不損失任何
+> 導航能力；縮短文案則會讓同一條連結在不同寬度下名稱不一致。兩案經使用者選定前者
+> （change `navbar-narrow-viewport-fit` 的 design）。
+>
+> **為什麼 375px**：375px（iPhone SE 2／3、iPhone mini）以上 362px 的內容放得下，
+> 且既有 390px 的 Scenario 全數落在 ≥ 375px 側而不受影響。
+
 logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Requirement 的核心** ——
 實測發現真正的破口不是橫向溢出，而是文字在固定 `h-14`（56px）的 bar 內斷成兩行。
 
@@ -155,6 +169,24 @@ logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Require
 - ⚠️ **此條為輔助斷言，不可單獨作為驗收**：header 是 flex 容器，子元素會被壓縮到剛好填滿寬度，
   因此該等式在修正前後皆恆成立，驗不出換行問題
 - **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「窄螢幕下導航列內容不橫向溢出」
+
+#### Scenario: 320px 下五個導航連結完整落在視口內
+
+- **GIVEN** viewport 寬度為 320px
+- **WHEN** 開啟任一路由
+- **THEN** 「首頁」「完整體驗」「計分板」「測驗」「對戰分配」五個連結皆**完整**落在視口內（不只是 visible，左右邊緣皆不被切出視口）
+- **THEN** 五個連結的高度不高於寬螢幕（1280px）下的高度（容許 4px 字型度量誤差），即不換行
+- ⚠️ 斷言 MUST 使用 Playwright 的 `toBeInViewport({ ratio: 1 })`：`toBeVisible()` 不檢查元素是否被切出視口，修正前「對戰分配」右緣在 346px 時它依然通過——這正是本缺陷未被既有 390px 測試抓到的原因
+- **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「320px 下五個導航連結完整落在視口內」
+
+#### Scenario: 小於 375px 時隱藏 logo、375px 起恢復
+
+- **GIVEN** viewport 寬度為 320px
+- **WHEN** 開啟任一路由
+- **THEN** header 內的 logo 連結為 hidden
+- **WHEN** viewport 寬度改為 375px
+- **THEN** logo 連結恢復為 visible（只顯示 🏓，「匹克球指南」文字仍依 `sm` 斷點 hidden）
+- **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「小於 375px 時隱藏 logo、375px 起恢復」
 
 ### Requirement: 專注模式下隱藏
 
