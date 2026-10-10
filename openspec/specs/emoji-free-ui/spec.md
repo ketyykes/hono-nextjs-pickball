@@ -1,51 +1,9 @@
 # emoji-free-ui Specification
 
 ## Purpose
-規範介面上不使用 emoji：會出現在畫面上的文字（字串、樣板字串、JSX 文字）不含 emoji 或 emoji 類符號，註解與文件等文字敘述則允許。取代 emoji 的圖示依用途選擇來源——通用記號用 `lucide-react`，球場與品牌專屬圖形自繪於 `nextjs-pickball/components/icons/`。由 change `remove-emoji`（2026-10-10）建立。
+規範介面上不使用 emoji：會出現在畫面上的文字（字串、樣板字串、JSX 文字）不含 emoji 或 emoji 類符號，國旗與註解、文件等文字敘述則允許。原本是 emoji 的位置一律改以圖示呈現（不留純文字），圖示依用途選擇來源——通用圖形用 `lucide-react`，球場與品牌專屬圖形自繪於 `nextjs-pickball/components/icons/`。由 change `remove-emoji` 建立、`emoji-spots-icons` 修訂（2026-10-10）。
 
 ## Requirements
-
-### Requirement: 介面文字不含 emoji
-
-`nextjs-pickball/` 下 `app/`、`components/`、`data/`、`lib/`、`hooks/` 的 `.ts`／`.tsx`（不含 `*.test.*` 與 `*.spec.*`）中，**會出現在介面上的文字** SHALL NOT 含 emoji 或 emoji 類符號。「介面文字」定義為下列 AST 節點：字串常值（`StringLiteral`）、樣板字串的各段文字（`NoSubstitutionTemplateLiteral`、`TemplateHead`／`TemplateMiddle`／`TemplateTail`）與 JSX 文字（`JsxText`）。比對 pattern SHALL 為：
-
-```
-/\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u
-```
-
-`\p{Emoji_Presentation}` 涵蓋 🏓🏆💡 等預設以彩色呈現的 emoji 與國旗（區域指示符號）；`\uFE0F` 捕捉以變體選擇器強制彩色的字元（如 ⚠️）；`[✕✓★]` 補上介面中曾當作圖示使用、但不屬上述兩類的符號。`→`、`↔`、`×`、`–`、`©` 等排版符號不在範圍內。
-
-**文字敘述允許 emoji**：程式碼註解（`//`、`/* */`、JSX 中的 `{/* */}`）不屬介面文字，SHALL NOT 列入檢查 —— 例如註解中的 `⚠️`、描述 tour 犯規印章的「✕ 犯規」皆保留原文。openspec 規格與文件同理，不受本 Requirement 限制。
-
-判定 MUST 以 TypeScript 編譯器 API（`typescript` 套件，已是既有相依）解析 AST 後走訪上述節點，SHALL NOT 以逐行 regex 搭配「略過 `//` 開頭的行」之類的啟發式 —— 後者會漏掉區塊註解與 JSX 註解，也會誤放行字串中出現的 `//`。測試檔不在掃描範圍（測試名稱與斷言可能需要描述歷史行為）。
-
-本 Requirement 只規範 emoji，SHALL NOT 作為調整配色、字型、版面或動畫的依據 —— 介面除了 emoji 所在位置，其餘呈現 MUST 與變更前一致。
-
-#### Scenario: 介面文字掃描無 emoji
-
-- **WHEN** 以 AST 走訪五個目錄下的非測試 `.ts`／`.tsx`，對每個介面文字節點套用上述 pattern
-- **THEN** 命中清單（`檔案:行號`）為空陣列
-- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「app、components、data、lib、hooks 的介面文字不含 emoji 或 emoji 類符號」
-
-#### Scenario: 註解中的 emoji 不視為違規
-
-- **GIVEN** 一段原始碼片段，emoji 只出現在 `//` 行註解、`/* */` 區塊註解與 JSX 的 `{/* */}` 註解中（例如 `// ⚠️ 注意`、`{/* 「✕ 犯規」印章 */}`）
-- **WHEN** 以掃描函式檢查該片段
-- **THEN** 命中清單為空陣列
-- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「註解中的 emoji 不視為違規」
-
-#### Scenario: 字串、樣板字串與 JSX 文字中的 emoji 會被攔下
-
-- **GIVEN** 一段原始碼片段，在第 1 行字串常值、第 2 行樣板字串、第 3 行 JSX 文字各含一個 emoji 類符號，且同一片段另有一行 `const url = "https://x"; // ⚠️`
-- **WHEN** 以掃描函式檢查該片段
-- **THEN** 命中清單恰為第 1、2、3 行，含 `https://` 的那一行不命中
-- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「字串、樣板字串與 JSX 文字中的 emoji 會被攔下」
-
-#### Scenario: 品牌產地以純文字呈現
-
-- **WHEN** 讀取 `nextjs-pickball/data/guide/brands.ts` 匯出的每筆品牌資料的 `origin`
-- **THEN** 不含區域指示符號（U+1F1E6–U+1F1FF），且以國家或地區名稱開頭（例如「美國・愛達荷州」「台灣本土品牌」）
-- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「品牌產地不含國旗且以國家或地區名稱開頭」
 
 ### Requirement: 圖示來源依用途選擇，自繪符號集中於 components/icons
 
@@ -98,16 +56,67 @@
 - **THEN** `<svg>` 根元素的 class 含 `size-6`
 - **驗收**：`nextjs-pickball/components/icons/icons.test.tsx`，it 名稱「className 會傳遞到 svg 根元素」
 
-### Requirement: emoji 所在位置改以符號或純文字呈現
+### Requirement: 介面文字不含 emoji，國旗除外
 
-原本使用 emoji 的介面位置 SHALL 依下列對應改寫，各位置周邊的配色、字級與版面 MUST 維持原樣：
+`nextjs-pickball/` 下 `app/`、`components/`、`data/`、`lib/`、`hooks/` 的 `.ts`／`.tsx`（不含 `*.test.*` 與 `*.spec.*`）中，**會出現在介面上的文字** SHALL NOT 含 emoji 或 emoji 類符號。「介面文字」定義為下列 AST 節點：字串常值（`StringLiteral`）、樣板字串的各段文字（`NoSubstitutionTemplateLiteral`、`TemplateHead`／`TemplateMiddle`／`TemplateTail`）與 JSX 文字（`JsxText`）。比對 pattern SHALL 為：
+
+```
+/\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u
+```
+
+`\p{Emoji_Presentation}` 涵蓋 🏓🏆💡 等預設以彩色呈現的 emoji 與國旗（區域指示符號）；`\uFE0F` 捕捉以變體選擇器強制彩色的字元（如 ⚠️）；`[✕✓★]` 補上介面中曾當作圖示使用、但不屬上述兩類的符號。`→`、`↔`、`×`、`–`、`©` 等排版符號不在範圍內。
+
+**國旗允許 emoji**：國旗（兩個區域指示符號 U+1F1E6–U+1F1FF 組成的序列）是品牌產地的資訊本身，SHALL 允許以 emoji 呈現；判定時 MUST 先移除成對的區域指示符號再套用上述 pattern。落單的區域指示符號不屬國旗，仍視為違規。
+
+**文字敘述允許 emoji**：程式碼註解（`//`、`/* */`、JSX 中的 `{/* */}`）不屬介面文字，SHALL NOT 列入檢查 —— 例如註解中的 `⚠️`、描述 tour 犯規印章的「✕ 犯規」皆保留原文。openspec 規格與文件同理，不受本 Requirement 限制。
+
+判定 MUST 以 TypeScript 編譯器 API（`typescript` 套件，已是既有相依）解析 AST 後走訪上述節點，SHALL NOT 以逐行 regex 搭配「略過 `//` 開頭的行」之類的啟發式 —— 後者會漏掉區塊註解與 JSX 註解，也會誤放行字串中出現的 `//`。測試檔不在掃描範圍（測試名稱與斷言可能需要描述歷史行為）。
+
+本 Requirement 只規範 emoji，SHALL NOT 作為調整配色、字型、版面或動畫的依據 —— 介面除了 emoji 所在位置，其餘呈現 MUST 與變更前一致。
+
+#### Scenario: 介面文字掃描無 emoji
+
+- **WHEN** 以 AST 走訪五個目錄下的非測試 `.ts`／`.tsx`，對每個介面文字節點套用上述 pattern
+- **THEN** 命中清單（`檔案:行號`）為空陣列
+- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「app、components、data、lib、hooks 的介面文字不含 emoji 或 emoji 類符號」
+
+#### Scenario: 註解中的 emoji 不視為違規
+
+- **GIVEN** 一段原始碼片段，emoji 只出現在 `//` 行註解、`/* */` 區塊註解與 JSX 的 `{/* */}` 註解中（例如 `// ⚠️ 注意`、`{/* 「✕ 犯規」印章 */}`）
+- **WHEN** 以掃描函式檢查該片段
+- **THEN** 命中清單為空陣列
+- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「註解中的 emoji 不視為違規」
+
+#### Scenario: 字串、樣板字串與 JSX 文字中的 emoji 會被攔下
+
+- **GIVEN** 一段原始碼片段，在第 1 行字串常值、第 2 行樣板字串、第 3 行 JSX 文字各含一個 emoji 類符號，且同一片段另有一行 `const url = "https://x"; // ⚠️`
+- **WHEN** 以掃描函式檢查該片段
+- **THEN** 命中清單恰為第 1、2、3 行，含 `https://` 的那一行不命中
+- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「字串、樣板字串與 JSX 文字中的 emoji 會被攔下」
+
+#### Scenario: 國旗 emoji 不視為違規
+
+- **GIVEN** 一段原始碼片段，第 1 行字串常值為 `"🇺🇸 美國・加州"`，第 2 行 JSX 文字為 `🇹🇼 台灣本土品牌`，第 3 行字串常值只含一個落單的區域指示符號
+- **WHEN** 以掃描函式檢查該片段
+- **THEN** 命中清單恰為第 3 行
+- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「國旗 emoji 不視為違規，落單的區域指示符號仍會被攔下」
+
+#### Scenario: 品牌產地保留國旗 emoji
+
+- **WHEN** 讀取 `nextjs-pickball/data/guide/brands.ts` 匯出的每筆品牌資料的 `origin`
+- **THEN** 以「國旗 emoji＋空白＋國家或地區名稱」開頭（例如「🇺🇸 美國・愛達荷州」「🇹🇼 台灣本土品牌」）
+- **驗收**：`nextjs-pickball/app/emojiFree.test.ts`，it 名稱「品牌產地以國旗 emoji 加國家或地區名稱開頭」
+
+### Requirement: emoji 所在位置改以圖示呈現
+
+原本使用 emoji 的介面位置 SHALL 一律改以圖示呈現，SHALL NOT 只刪除 emoji 而留下純文字；依下列對應改寫，各位置周邊的配色、字級與版面 MUST 維持原樣：
 
 - `components/layout/SiteNavbar.tsx` 的 logo：🏓 → `LogoMark`，「匹克球指南」文字與斷點收合行為不變
 - `components/guide/Conclusion.tsx` 三張卡：🏓🔄🍳 → `ServeDiagonalIcon`、`DoubleBounceIcon`、`KitchenZoneIcon`
 - `components/guide/shared/MythRow.tsx`：「常見迷思 ✕」「正確規則 ✓」→ 標籤文字「常見迷思」「正確規則」各搭配 lucide 的 `X`／`Check`，圖示顏色沿用該標籤原本的文字色
 - `components/guide/shared/PriceStars.tsx`：每顆 ★ 字元 → lucide 的 `Star`，以 `fill-current` 填滿成實心星形；實心星 `text-amber-400`、空心星 `text-foreground/20`、`data-star` 屬性與 `aria-label` 不變
-- `components/quiz/ResultScreen.tsx` 鼓勵文字：去掉結尾的 🏆💪📖，句子本身不變
-- `components/scoreboard/GameOverDialog.tsx` 標題：去掉 🏆，只留「我方獲勝」／「對方獲勝」
+- `components/quiz/ResultScreen.tsx` 鼓勵文字：結尾的 🏆💪📖 → 依分數區間分別改為 lucide `Trophy`、`BicepsFlexed`、`BookOpen`，置於句尾原本 emoji 的位置；句子本身不變
+- `components/scoreboard/GameOverDialog.tsx` 標題：開頭的 🏆 → lucide `Trophy`，置於「我方獲勝」／「對方獲勝」之前
 - `components/scoreboard/OrientationHint.tsx`：💡 → `RotateToLandscapeIcon`，文字「建議橫向使用，體驗更好」不變
 
 #### Scenario: navbar logo 以 LogoMark 呈現
@@ -135,18 +144,18 @@
 - **THEN** 每個元素內含一個 `<svg>`，其 class 含 `lucide-star`；渲染結果不含 ★
 - **驗收**：`nextjs-pickball/components/guide/shared/PriceStars.test.tsx`，it 名稱「每顆星以 lucide Star 圖示呈現而非 ★ 字元」
 
-#### Scenario: 測驗結果鼓勵文字不含 emoji
+#### Scenario: 測驗結果鼓勵文字搭配對應圖示
 
 - **WHEN** 分別以答對 9／10、6／10、2／10 渲染 `ResultScreen`
-- **THEN** 依序顯示「太強了！你已經是規則達人了」「不錯！再練習幾次就能完全掌握規則」「繼續加油，回去再讀一次指南吧！」，文字不含 emoji
-- **驗收**：`nextjs-pickball/components/quiz/ResultScreen.test.tsx`，it 名稱「三個分數區間的鼓勵文字皆為純文字」
+- **THEN** 依序顯示「太強了！你已經是規則達人了」「不錯！再練習幾次就能完全掌握規則」「繼續加油，回去再讀一次指南吧！」，文字不含 emoji；同一段落內各含一個 `<svg>`，class 依序含 `lucide-trophy`、`lucide-biceps-flexed`、`lucide-book-open`
+- **驗收**：`nextjs-pickball/components/quiz/ResultScreen.test.tsx`，it 名稱「三個分數區間的鼓勵文字各搭配對應的 lucide 圖示」
 
-#### Scenario: 比賽結束對話框標題為純文字
+#### Scenario: 比賽結束對話框標題搭配獎盃圖示
 
 - **GIVEN** 計分板狀態為 `finished`，勝方為我方
 - **WHEN** 渲染 `GameOverDialog`
-- **THEN** 對話框標題的文字內容恰為「我方獲勝」
-- **驗收**：`nextjs-pickball/components/scoreboard/GameOverDialog.test.tsx`，it 名稱「獲勝標題為純文字不含獎盃 emoji」
+- **THEN** 對話框標題的文字內容恰為「我方獲勝」（不含 emoji），且標題內含一個 class 含 `lucide-trophy` 的 `<svg>`
+- **驗收**：`nextjs-pickball/components/scoreboard/GameOverDialog.test.tsx`，it 名稱「獲勝標題以 lucide 獎盃圖示搭配勝方文字」
 
 #### Scenario: 橫向提示以符號取代燈泡
 
