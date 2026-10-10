@@ -1,6 +1,6 @@
 "use client";
 
-import { StarIcon } from "@/components/icons";
+import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PriceStarsProps {
@@ -40,7 +40,7 @@ export function PriceStars({ stars, className }: PriceStarsProps) {
 							isFilled ? "text-amber-400" : "text-foreground/20",
 						)}
 					>
-						<StarIcon className="size-[1em]" />
+						<Star className="size-[1em] fill-current" />
 					</span>
 				);
 			})}

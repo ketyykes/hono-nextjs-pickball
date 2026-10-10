@@ -3,13 +3,10 @@ import type { ComponentType } from "react";
 import { describe, expect, it } from "vitest";
 import {
 	DoubleBounceIcon,
-	FactMarkIcon,
 	KitchenZoneIcon,
 	LogoMark,
-	MythMarkIcon,
 	RotateToLandscapeIcon,
 	ServeDiagonalIcon,
-	StarIcon,
 } from "./index";
 
 interface SymbolEntry {
@@ -22,9 +19,6 @@ const SYMBOLS: SymbolEntry[] = [
 	{ name: "ServeDiagonalIcon", Component: ServeDiagonalIcon },
 	{ name: "DoubleBounceIcon", Component: DoubleBounceIcon },
 	{ name: "KitchenZoneIcon", Component: KitchenZoneIcon },
-	{ name: "MythMarkIcon", Component: MythMarkIcon },
-	{ name: "FactMarkIcon", Component: FactMarkIcon },
-	{ name: "StarIcon", Component: StarIcon },
 	{ name: "RotateToLandscapeIcon", Component: RotateToLandscapeIcon },
 ];
 

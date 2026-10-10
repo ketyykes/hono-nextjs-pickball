@@ -1,6 +1,7 @@
 "use client";
 
-import { FactMarkIcon, MythMarkIcon } from "@/components/icons";
+import { Check, X } from "lucide-react";
+
 import { Card } from "@/components/ui/card";
 
 interface MythRowProps {
@@ -15,14 +16,14 @@ export function MythRow({ myth, fact }: MythRowProps) {
 			<div className="border-l-4 border-l-orange-500 bg-orange-50 px-6 py-5 text-[0.9rem] leading-relaxed text-foreground/85">
 				<div className="mb-1 flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-orange-500">
 					常見迷思
-					<MythMarkIcon className="size-3" />
+					<X className="size-3" strokeWidth={3} />
 				</div>
 				{myth}
 			</div>
 			<div className="border-l-4 border-l-emerald-700 bg-emerald-50 px-6 py-5 text-[0.9rem] leading-relaxed text-foreground/85">
 				<div className="mb-1 flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-emerald-700">
 					正確規則
-					<FactMarkIcon className="size-3" />
+					<Check className="size-3" strokeWidth={3} />
 				</div>
 				{fact}
 			</div>
