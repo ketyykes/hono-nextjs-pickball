@@ -1,5 +1,6 @@
 "use client";
 
+import { StarIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 interface PriceStarsProps {
@@ -13,7 +14,7 @@ const MAX_STARS = 10;
 
 // 以 1~10 顆星取代實際金額，星數語意由 aria-label 提供給輔助科技。
 //
-// ⚠️ 呼叫端若要用 className 覆蓋字級（如 `text-lg`），必須一併帶上 `leading-none`：
+// 注意：呼叫端若要用 className 覆蓋字級（如 `text-lg`），必須一併帶上 `leading-none`：
 // twMerge 把所有 text-{size} 與 leading-* 歸為同一衝突群組並套用「後者覆蓋前者」
 // （刻意設計，因 Tailwind 的 text-{size} 本身即可連帶設定 line-height），而 className
 // 會被 cn() append 在最後，因此傳入任何 text-* 都會把下方的 leading-none 一併吃掉，
@@ -40,7 +41,7 @@ export function PriceStars({ stars, className }: PriceStarsProps) {
 						data-star={isFilled ? "filled" : "empty"}
 						className={isFilled ? "text-amber-400" : "text-foreground/20"}
 					>
-						★
+						<StarIcon className="size-[1em]" />
 					</span>
 				);
 			})}
