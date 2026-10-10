@@ -19,10 +19,10 @@ Depends on: §1
 ## 3. 符號元件
 Depends on: §1
 
-- [ ] 3.1 RED: write test `每個符號元件預設渲染對輔助科技隱藏的單一 svg`（`components/icons/icons.test.tsx`）
-- [ ] 3.2 RED: write test `符號元件只使用 currentColor 且不含漸層`
-- [ ] 3.3 RED: write test `className 會傳遞到 svg 根元素`
-- [ ] 3.4 GREEN: 建立 `components/icons/IconSvg.tsx` 與 8 個符號元件（參考 `git show change/site-editorial-redesign:nextjs-pickball/components/icons/<檔名>` 的路徑，改為靜態、只用 currentColor；`StarIcon` 為新圖形）及 `index.ts` 匯出
+- [x] 3.1 RED: write test `每個符號元件預設渲染對輔助科技隱藏的單一 svg`（`components/icons/icons.test.tsx`）
+- [x] 3.2 RED: write test `符號元件只使用 currentColor 且不含漸層`
+- [x] 3.3 RED: write test `className 會傳遞到 svg 根元素`
+- [x] 3.4 GREEN: 建立 `components/icons/IconSvg.tsx` 與 8 個符號元件（參考 `git show change/site-editorial-redesign:nextjs-pickball/components/icons/<檔名>` 的路徑，改為靜態、只用 currentColor；`StarIcon` 為新圖形）及 `index.ts` 匯出
 
 ## 4. 套用到介面
 Depends on: §3
