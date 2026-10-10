@@ -78,7 +78,7 @@ export const TILE_ROW_HEIGHT = 88;
  * 幾何的唯一真相來源在本檔（matchmaker-visual-export tasks §7 Minor-4），scene-canvas.ts
  * 只能引用、SHALL NOT 自行持有一份。
  *
- * 注意：隱含假設：本常數為 2 隱含 `stage-layout.ts` 的 `buildCourtTiles` 只會輸出
+ * 注意（隱含假設）：本常數為 2 隱含 `stage-layout.ts` 的 `buildCourtTiles` 只會輸出
  * `column ∈ {0, 1}`——若該檔日後改為輸出兩欄以外的 column 值，本常數與依賴它的
  * 版面計算（scene-canvas.ts 的 columnWidth 切分）都需要同步檢視。
  */

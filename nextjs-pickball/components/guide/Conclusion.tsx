@@ -54,7 +54,7 @@ export function Conclusion() {
 								key={card.title}
 								className="rounded-2xl border border-white/10 bg-white/[0.06] p-6 text-center"
 							>
-								<div className="mb-2 flex justify-center text-lime-400">
+								<div className="mb-2 flex h-9 items-center justify-center text-lime-400">
 									<Icon className="size-8" />
 								</div>
 								<div className="mb-1 text-[0.95rem] font-bold text-white">
