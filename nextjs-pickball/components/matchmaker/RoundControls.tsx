@@ -153,7 +153,7 @@ export function RoundControls({
 	// 不計時的入口（round.ts 的 setTimerDuration 只接受 10／15／20），而本元件 SHALL NOT
 	// 自行改寫回合物件，因此回合已存在時選到「不計時」只能不作為。
 	//
-	// ⚠️ 下面那行 `if (durationMinutes === null) return;` 是**暫行處置，不是漏實作**：
+	// 注意：下面那行 `if (durationMinutes === null) return;` 是**暫行處置，不是漏實作**：
 	// 「本輪已產生後能否改回不計時」在 M14 是已知缺口、已升級給人類裁決，尚未定案。
 	// 目前的使用者可見後果是「不計時」這顆 radio 看起來可按、按下去卻毫無反應也不解釋
 	// （aria-checked 不變），這正是待裁決的部分——補 round-lifecycle 的 clearTimer 入口、

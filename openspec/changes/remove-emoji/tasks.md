@@ -51,8 +51,8 @@ Depends on: §4
 ## 6. 註解改寫與守門轉綠
 Depends on: §2, §4
 
-- [ ] 6.1 RED: 確認 2.1 守門測試目前只剩註解命中（`RoundControls.tsx`、`export-scene.ts`、`roster.ts`、`scoreboard-binding.ts` 的 ⚠️；`KitchenViolationStage.tsx`、`kitchenScene.ts` 的「✕ 犯規」）
-- [ ] 6.2 GREEN: 註解 `⚠️` 改「注意：」、「✕ 犯規」改「打叉犯規」；2.1 轉綠
+- [x] 6.1 RED: 確認 2.1 守門測試目前只剩註解命中（`RoundControls.tsx`、`export-scene.ts`、`roster.ts`、`scoreboard-binding.ts` 的 ⚠️；`KitchenViolationStage.tsx`、`kitchenScene.ts` 的「✕ 犯規」）
+- [x] 6.2 GREEN: 註解 `⚠️` 改「注意：」、「✕ 犯規」改「打叉犯規」；2.1 轉綠
 
 ## 7. 收尾驗證
 Depends on: §5, §6

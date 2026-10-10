@@ -7,7 +7,7 @@
 //   0.42–0.52 球拍由預備後引角度加速揮向來球
 //   0.52      撞擊瞬間：球貼拍面壓扁、畫面震動、紅色衝擊波、廚房區閃紅
 //   0.58–0.78 慢動作揭示：幽靈球沿虛線延伸至「本來會落地」的空心落點標記
-//   0.72–0.86 「✕ 犯規」印章砸下定格
+//   0.72–0.86 「打叉犯規」印章砸下定格
 // easeOut 讓 0.52 前的飛行在前 0.35s 內快速完成，其後近 1s 皆為慢動作揭示。
 
 export interface BallPose {
@@ -260,7 +260,7 @@ export function vignetteOpacity(p: number): number {
 	return 0.4 * (1 - windowProgress(p, [0.56, 0.66]));
 }
 
-// 「✕ 犯規」印章：由大而小砸下（快速收斂）後定格
+// 「打叉犯規」印章：由大而小砸下（快速收斂）後定格
 export function stampPose(p: number): StampPose {
 	const s = windowProgress(p, STAMP_WINDOW);
 	const settle = 1 - s;
