@@ -4,7 +4,7 @@ import { GameOverDialog } from "./GameOverDialog";
 import { createInitialState } from "@/lib/scoreboard/reducer";
 
 describe("GameOverDialog", () => {
-	it("獲勝標題為純文字不含獎盃 emoji", () => {
+	it("獲勝標題以 lucide 獎盃圖示搭配勝方文字", () => {
 		const state = {
 			...createInitialState(),
 			status: "finished" as const,
@@ -14,8 +14,10 @@ describe("GameOverDialog", () => {
 
 		render(<GameOverDialog state={state} onPlayAgain={vi.fn()} />);
 
-		expect(screen.getByRole("heading", { name: "我方獲勝" }).textContent).toBe(
-			"我方獲勝",
-		);
+		const heading = screen.getByRole("heading", { name: "我方獲勝" });
+		expect(heading.textContent).toBe("我方獲勝");
+		const svg = heading.querySelector("svg");
+		expect(svg).not.toBeNull();
+		expect(svg?.getAttribute("class")).toContain("lucide-trophy");
 	});
 });
