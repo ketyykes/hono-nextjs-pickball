@@ -22,8 +22,8 @@ pnpm test
 
 ## Verification
 
-- **Baseline tests**: （待 apply 開工時實跑後填入）
-- **Initial commit hash**: （待 artifacts commit 後填入；parent 為 `change/remove-emoji` @ `172071d`）
+- **Baseline tests**: PASS — 2026-10-10 實測 `pnpm test` 全綠：後端 4 檔 16 測試、前端 81 檔 782 測試
+- **Initial commit hash**: `2d82e57`（含本 change artifacts；parent 為 `change/remove-emoji` @ `172071d`）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（本次不開 worktree）
 
 ## Teardown
