@@ -7,7 +7,7 @@
 
 ## 1. 開工確認
 
-- [ ] 1.1 確認目前分支為 `change/remove-emoji`、工作樹乾淨；實跑 `pnpm test` 記錄 baseline，填入 environment.md 的 Verification
+- [x] 1.1 確認目前分支為 `change/remove-emoji`、工作樹乾淨；實跑 `pnpm test` 記錄 baseline，填入 environment.md 的 Verification
 
 ## 2. 守門測試
 Depends on: §1
