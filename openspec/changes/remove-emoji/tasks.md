@@ -27,8 +27,8 @@ Depends on: §1
 ## 4. 套用到介面
 Depends on: §3
 
-- [ ] 4.1 RED: write test `logo 以 LogoMark 符號呈現而非 emoji`（`components/layout/SiteNavbar.test.tsx`）
-- [ ] 4.2 GREEN: `SiteNavbar` logo 改用 `LogoMark`（`size-4`，對齊 `text-sm` 行高）
+- [x] 4.1 RED: write test `logo 以 LogoMark 符號呈現而非 emoji`（`components/layout/SiteNavbar.test.tsx`）
+- [x] 4.2 GREEN: `SiteNavbar` logo 改用 `LogoMark`（`size-4`，對齊 `text-sm` 行高）
 - [ ] 4.3 RED: write test `三張結論卡各以一個自繪符號取代 emoji`（`components/guide/Conclusion.test.tsx`）
 - [ ] 4.4 GREEN: `Conclusion` 三張卡改用三個符號，放在 `text-lime-400` 容器內，卡片其餘 class 不變
 - [ ] 4.5 RED: write test `迷思與正確規則標籤以符號取代叉勾字元`（`components/guide/shared/MythRow.test.tsx`）

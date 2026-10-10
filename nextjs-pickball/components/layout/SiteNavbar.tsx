@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogoMark } from "@/components/icons";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
 import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
@@ -49,11 +50,12 @@ export function SiteNavbar() {
 					href="/"
 					transitionTypes={["nav-back"]}
 					className={cn(
-						"font-outfit shrink-0 text-sm font-extrabold tracking-[2px] whitespace-nowrap uppercase max-[375px]:hidden",
+						"font-outfit inline-flex shrink-0 items-center gap-1.5 text-sm font-extrabold tracking-[2px] whitespace-nowrap uppercase max-[375px]:hidden",
 						solid ? "text-slate-900" : "text-white",
 					)}
 				>
-					🏓<span className="hidden sm:inline"> 匹克球指南</span>
+					<LogoMark className="size-4" />
+					<span className="hidden sm:inline">匹克球指南</span>
 				</Link>
 				<nav className="ml-auto flex items-center gap-0.5 sm:gap-1">
 					{NAV_LINKS.map((link) => {
