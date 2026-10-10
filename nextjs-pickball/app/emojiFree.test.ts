@@ -137,10 +137,18 @@ describe("emoji-free 守門", () => {
 		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([1, 2, 5]);
 	});
 
-	it("品牌產地不含國旗且以國家或地區名稱開頭", () => {
+	it("國旗 emoji 不視為違規，落單的區域指示符號仍會被攔下", () => {
+		const source = [
+			"const a = \"🇺🇸 美國・加州\";",
+			"const View = () => <p>🇹🇼 台灣本土品牌</p>;",
+			"const c = \"\\u{1F1FA}\";",
+		].join("\n");
+		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([3]);
+	});
+
+	it("品牌產地以國旗 emoji 加國家或地區名稱開頭", () => {
 		for (const brand of brands) {
-			expect(brand.origin).not.toMatch(/[\u{1F1E6}-\u{1F1FF}]/u);
-			expect(brand.origin).toMatch(/^(美國|德國|奧地利|台灣)/);
+			expect(brand.origin).toMatch(/^[\u{1F1E6}-\u{1F1FF}]{2} (美國|德國|奧地利|台灣)/u);
 		}
 	});
 });
