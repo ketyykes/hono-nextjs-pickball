@@ -13,14 +13,14 @@ export function MythRow({ myth, fact }: MythRowProps) {
 	return (
 		<Card className="grid grid-cols-1 gap-0 overflow-hidden rounded-xl border-0 p-0 shadow-sm md:grid-cols-2">
 			<div className="border-l-4 border-l-orange-500 bg-orange-50 px-6 py-5 text-[0.9rem] leading-relaxed text-foreground/85">
-				<div className="mb-1 inline-flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-orange-500">
+				<div className="mb-1 flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-orange-500">
 					常見迷思
 					<MythMarkIcon className="size-3" />
 				</div>
 				{myth}
 			</div>
 			<div className="border-l-4 border-l-emerald-700 bg-emerald-50 px-6 py-5 text-[0.9rem] leading-relaxed text-foreground/85">
-				<div className="mb-1 inline-flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-emerald-700">
+				<div className="mb-1 flex items-center gap-1 font-outfit text-[0.65rem] font-bold uppercase tracking-[2px] text-emerald-700">
 					正確規則
 					<FactMarkIcon className="size-3" />
 				</div>
