@@ -52,7 +52,7 @@
 
 ### Decision 4: 守門測試掃整個原始碼，註解也算
 
-**Choice**: `app/emojiFree.test.ts` 以 Node `fs` 遞迴讀取 `app/`、`components/`、`data/`、`lib/`、`hooks/` 下非測試的 `.ts`／`.tsx`，逐行比對 `/\p{Emoji_Presentation}|️|[✕✓★]/u`，命中就列出 `檔案:行號`。註解裡的 `⚠️` 改成「注意：」，tour 註解的「✕ 犯規」改成「打叉犯規」。
+**Choice**: `app/emojiFree.test.ts` 以 Node `fs` 遞迴讀取 `app/`、`components/`、`data/`、`lib/`、`hooks/` 下非測試的 `.ts`／`.tsx`，逐行比對 `/\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u`，命中就列出 `檔案:行號`。註解裡的 `⚠️` 改成「注意：」，tour 註解的「✕ 犯規」改成「打叉犯規」。
 
 **Rationale**: 要分辨字串和註解就得做語法解析，為了 10 行註解不值得；改寫後的意思也沒變。
 
