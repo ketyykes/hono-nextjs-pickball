@@ -230,11 +230,11 @@
 
 - **WHEN** `window.matchMedia("(orientation: landscape)").matches === false`
 - **THEN** 兩隊面板上下排（flex-col），上方顯示「建議橫向使用」提示橫幅
-- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「直式 viewport 顯示「💡 建議橫向使用」提示橫幅」
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「直式 viewport 顯示「建議橫向使用」提示橫幅」
 
 #### Scenario: 提示橫幅可關閉
 
-- **WHEN** 使用者按下提示橫幅的 ✕ 關閉按鈕
+- **WHEN** 使用者按下提示橫幅的關閉按鈕（`X` 圖示，accessible name「關閉提示」）
 - **THEN** 橫幅消失，`sessionStorage["scoreboard:hint-dismissed"]` 設為 "1"；分頁存活期間不再顯示
 - **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard.spec.ts`，test 名稱「直式提示橫幅可關閉並記入 sessionStorage」
 

@@ -112,9 +112,9 @@ SiteNavbar SHALL 在所有斷點維持 5 個導航連結全部可見，SHALL NOT
 > 「窄螢幕下對戰分配連結亦可見」一條。兩條合起來即為「5 個全部可見」。
 
 窄螢幕的空間 SHALL 由下列方式讓出：logo 文字（「匹克球指南」）於 `sm` 斷點以下收合、只保留
-🏓 圖示；容器間距由 `gap-6 px-6` 縮為 `gap-3 px-4`；連結水平內距由 `px-3` 縮為 `px-2`。
+`LogoMark` 符號；容器間距由 `gap-6 px-6` 縮為 `gap-3 px-4`；連結水平內距由 `px-3` 縮為 `px-2`。
 
-視口寬度 **< 375px** 時 SHALL 再讓出一層空間：logo 整個隱藏（含 🏓 圖示）；容器水平內距由
+視口寬度 **< 375px** 時 SHALL 再讓出一層空間：logo 整個隱藏（含 `LogoMark` 符號）；容器水平內距由
 `px-4` 縮為 `px-3`；連結水平內距由 `px-2` 縮為 `px-1.5`。實作 MUST 以 Tailwind 的
 `max-[375px]:` variant 表達（對應 `@media (width < 375px)`），SHALL NOT 以 JS 量測視口寬度。
 視口寬度 ≥ 375px 時 SHALL 維持上一段的呈現，零差異。
@@ -156,9 +156,9 @@ logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Require
 #### Scenario: logo 文字依斷點收合
 
 - **WHEN** viewport 寬度 ≥ 640px（`sm`）
-- **THEN** logo 顯示「🏓 匹克球指南」
+- **THEN** logo 顯示 `LogoMark` 符號與「匹克球指南」
 - **WHEN** viewport 寬度 < 640px
-- **THEN** logo 只顯示 🏓，「匹克球指南」文字為 hidden
+- **THEN** logo 只顯示 `LogoMark` 符號，「匹克球指南」文字為 hidden
 - **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「寬螢幕顯示 logo 文字，窄螢幕收合只留圖示」
 
 #### Scenario: 窄螢幕下不橫向溢出
@@ -185,7 +185,7 @@ logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Require
 - **WHEN** 開啟任一路由
 - **THEN** header 內的 logo 連結為 hidden
 - **WHEN** viewport 寬度改為 375px
-- **THEN** logo 連結恢復為 visible（只顯示 🏓，「匹克球指南」文字仍依 `sm` 斷點 hidden）
+- **THEN** logo 連結恢復為 visible（只顯示 `LogoMark` 符號，「匹克球指南」文字仍依 `sm` 斷點 hidden）
 - **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「小於 375px 時隱藏 logo、375px 起恢復」
 
 ### Requirement: 專注模式下隱藏
