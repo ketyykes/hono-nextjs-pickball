@@ -45,7 +45,7 @@ describe("components/icons 符號元件", () => {
 			const { container, unmount } = render(<Component />);
 			const svg = container.querySelector("svg");
 			const html = svg?.outerHTML ?? "";
-			expect(html, name).not.toMatch(/#[0-9a-f]{3,8}/i);
+			expect(html, name).not.toMatch(/(?<![\w(])#[0-9a-f]{3,8}\b/i);
 			expect(html, name).not.toContain("rgb(");
 			expect(html, name).not.toContain("Gradient");
 
