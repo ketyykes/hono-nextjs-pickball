@@ -5,7 +5,7 @@ interface IconSvgProps extends IconProps {
 	children: ReactNode;
 }
 
-// 五個符號共用的 svg 根：線稿風格（線寬 1.5、圓頭圓角）、對輔助科技隱藏。
+// 自繪符號共用的 svg 根：線稿風格（線寬 1.5、圓頭圓角）、對輔助科技隱藏。
 // 顏色一律取 currentColor，由呼叫端以文字色決定。
 export function IconSvg({ className, children }: IconSvgProps) {
 	return (

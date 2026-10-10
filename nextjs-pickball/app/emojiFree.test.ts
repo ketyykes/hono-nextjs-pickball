@@ -18,12 +18,13 @@ const SCAN_DIRS = ["app", "components", "data", "lib", "hooks"];
 // 三個分支：
 // 1. \p{Emoji_Presentation}：預設以彩色呈現的 emoji，含國旗（區域指示符號）。
 // 2. \uFE0F：變體選擇器，捕捉「文字符號 + 強制彩色」的組合（例如警告符號後面接的那個字元）。
-// 3. [\u2715\u2713\u2605]：預設為文字呈現、但本專案已改用 SVG 取代的叉、勾、星符號。
-const EMOJI_PATTERN = /\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u;
+// 3. [\u2715\u2713\u2605]：預設為文字呈現、但本專案已改用 lucide 圖示取代的叉、勾、星符號。
+const EMOJI_PATTERN = /\p{Emoji_Presentation}|\uFE0F|[\u2715\u2713\u2605]/u;
 
 /**
  * 找出原始碼中「介面文字」含 emoji 的行號（1-based，去重並由小到大排序）。
  * 介面文字 = 字串常值、樣板字串各段、JSX 文字；註解不是 AST 節點，自然不會被檢查。
+ * 已知限制：JSX 文字中的 HTML entity（如 `&#x2713;`）不會被解碼，因此攔不到。
  * @param source 原始碼內容
  * @param fileName 檔名，副檔名為 .tsx 時才會以 JSX 語法解析
  */
@@ -121,6 +122,19 @@ describe("emoji-free 守門", () => {
 			"const url = \"https://x\"; // ⚠️",
 		].join("\n");
 		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([1, 2, 3]);
+	});
+
+	it("跳脫序列、JSX 屬性與跨行 JSX 文字中的 emoji 也會被攔下", () => {
+		const source = [
+			"const t = \"\\u{1F3C6}\";",
+			"const A = () => <div title=\"✓\">x</div>;",
+			"const B = () => (",
+			"\t<p>",
+			"\t\t💡 提示",
+			"\t</p>",
+			");",
+		].join("\n");
+		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([1, 2, 5]);
 	});
 
 	it("品牌產地不含國旗且以國家或地區名稱開頭", () => {
