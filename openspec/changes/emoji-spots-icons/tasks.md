@@ -12,17 +12,17 @@
 ## 2. 國旗例外
 Depends on: §1
 
-- [ ] 2.1 RED: write test `國旗 emoji 不視為違規，落單的區域指示符號仍會被攔下`（`app/emojiFree.test.ts`）
-- [ ] 2.2 RED: write test `品牌產地以國旗 emoji 加國家或地區名稱開頭`（取代舊 it「品牌產地不含國旗且以國家或地區名稱開頭」）
-- [ ] 2.3 GREEN: 掃描函式套用 pattern 前移除成對的區域指示符號；`git checkout main -- nextjs-pickball/data/guide/brands.ts` 還原國旗；既有守門 it 維持綠燈（regression guard）
+- [x] 2.1 RED: write test `國旗 emoji 不視為違規，落單的區域指示符號仍會被攔下`（`app/emojiFree.test.ts`）
+- [x] 2.2 RED: write test `品牌產地以國旗 emoji 加國家或地區名稱開頭`（取代舊 it「品牌產地不含國旗且以國家或地區名稱開頭」）
+- [x] 2.3 GREEN: 掃描函式套用 pattern 前移除成對的區域指示符號；`git checkout main -- nextjs-pickball/data/guide/brands.ts` 還原國旗；既有守門 it 維持綠燈（regression guard）
 
 ## 3. 純文字處補圖示
 Depends on: §1
 
-- [ ] 3.1 RED: write test `三個分數區間的鼓勵文字各搭配對應的 lucide 圖示`（取代 `ResultScreen.test.tsx` 舊 it）
-- [ ] 3.2 GREEN: `ResultScreen` 依分數區間回傳文字與 lucide 圖示（`Trophy`／`BicepsFlexed`／`BookOpen`），圖示放句尾、`size-5`
-- [ ] 3.3 RED: write test `獲勝標題以 lucide 獎盃圖示搭配勝方文字`（取代 `GameOverDialog.test.tsx` 舊 it）
-- [ ] 3.4 GREEN: `GameOverDialog` 標題前加 lucide `Trophy`（`size-5`），對齊維持手機置中、sm 以上靠左
+- [x] 3.1 RED: write test `三個分數區間的鼓勵文字各搭配對應的 lucide 圖示`（取代 `ResultScreen.test.tsx` 舊 it）
+- [x] 3.2 GREEN: `ResultScreen` 依分數區間回傳文字與 lucide 圖示（`Trophy`／`BicepsFlexed`／`BookOpen`），圖示放句尾、`size-5`
+- [x] 3.3 RED: write test `獲勝標題以 lucide 獎盃圖示搭配勝方文字`（取代 `GameOverDialog.test.tsx` 舊 it）
+- [x] 3.4 GREEN: `GameOverDialog` 標題前加 lucide `Trophy`（`size-5`），對齊維持手機置中、sm 以上靠左
 
 ## 4. 收尾驗證
 Depends on: §2, §3
