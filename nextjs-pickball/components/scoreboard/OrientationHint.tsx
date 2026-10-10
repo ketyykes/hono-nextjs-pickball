@@ -3,6 +3,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
+import { RotateToLandscapeIcon } from "@/components/icons";
 import { X } from "lucide-react";
 
 const DISMISS_KEY = "scoreboard:hint-dismissed";
@@ -47,7 +48,10 @@ export function OrientationHint({ visible }: OrientationHintProps) {
 			role="status"
 			className="flex items-center justify-between gap-2 border-b border-lime-500/20 bg-lime-500/10 px-4 py-2 text-sm"
 		>
-			<span>💡 建議橫向使用，體驗更好</span>
+			<span className="inline-flex items-center gap-1.5">
+				<RotateToLandscapeIcon className="size-4" />
+				建議橫向使用，體驗更好
+			</span>
 			<Button variant="ghost" size="icon" aria-label="關閉提示" onClick={dismiss}>
 				<X className="size-4" />
 			</Button>
