@@ -1,24 +1,32 @@
 "use client";
 
+import type { ComponentType } from "react";
+import {
+	DoubleBounceIcon,
+	KitchenZoneIcon,
+	ServeDiagonalIcon,
+	type IconProps,
+} from "@/components/icons";
+
 interface ConclusionCard {
-	icon: string;
+	icon: ComponentType<IconProps>;
 	title: string;
 	text: string;
 }
 
 const conclusionCards: readonly ConclusionCard[] = [
 	{
-		icon: "🏓",
+		icon: ServeDiagonalIcon,
 		title: "下手發球打對角",
 		text: "只有一次機會，新手可以用落地發球降低難度",
 	},
 	{
-		icon: "🔄",
+		icon: DoubleBounceIcon,
 		title: "前兩拍必須落地",
 		text: "雙彈跳規則消除發球搶攻優勢",
 	},
 	{
-		icon: "🍳",
+		icon: KitchenZoneIcon,
 		title: "廚房裡不能截擊",
 		text: "可以進去，但不能在裡面凌空打球",
 	},
@@ -39,20 +47,25 @@ export function Conclusion() {
 				</p>
 
 				<div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
-					{conclusionCards.map((card) => (
-						<div
-							key={card.title}
-							className="rounded-2xl border border-white/10 bg-white/[0.06] p-6 text-center"
-						>
-							<div className="mb-2 text-3xl">{card.icon}</div>
-							<div className="mb-1 text-[0.95rem] font-bold text-white">
-								{card.title}
+					{conclusionCards.map((card) => {
+						const Icon = card.icon;
+						return (
+							<div
+								key={card.title}
+								className="rounded-2xl border border-white/10 bg-white/[0.06] p-6 text-center"
+							>
+								<div className="mb-2 flex justify-center text-lime-400">
+									<Icon className="size-8" />
+								</div>
+								<div className="mb-1 text-[0.95rem] font-bold text-white">
+									{card.title}
+								</div>
+								<div className="text-[0.82rem] leading-relaxed text-white/60">
+									{card.text}
+								</div>
 							</div>
-							<div className="text-[0.82rem] leading-relaxed text-white/60">
-								{card.text}
-							</div>
-						</div>
-					))}
+						);
+					})}
 				</div>
 			</div>
 		</section>
