@@ -98,3 +98,4 @@ type: project
 - **最終結論**：本輪 APPROVE，無 High／Blocking，2 個 Medium（PriceStars.tsx 潛伏 className 覆蓋風險、spec.md 缺少新測試對應的 Scenario）與數個 Low（comment 因果描述過窄、320x568 已知會破版但在契約外、tablet-portrait 密度可再優化的 follow-up）。
 
 **How to apply:**
+- **2026-10-10 更新（remove-emoji f7357e1）**：PriceStars 每顆星改為 `inline-flex` span 包 `size-[1em]` 的 StarIcon，列高改由 svg 的 1em 決定、與 line-height 脫鉤；上述「className 傳 text-* 會吃掉 leading-none」的潛伏風險已**不再影響列高**，元件內同名警告註解因此過時（已在該次審查建議刪除或改寫）。
