@@ -1,7 +1,7 @@
 // app/emojiFree.test.ts
 //
 // 守門測試：app、components、data、lib、hooks 中「會出現在介面上的文字」不得含 emoji 或 emoji 類符號，
-// 品牌產地字串不得含國旗。介面文字指字串常值、樣板字串各段與 JSX 文字；
+// 但成對的區域指示符號（國旗）為例外，落單的區域指示符號仍會被攔下。介面文字指字串常值、樣板字串各段與 JSX 文字；
 // 程式碼註解（//、/* */、JSX 的 {/* */}）不屬介面文字，允許出現 emoji。
 // 判定以 TypeScript 編譯器 API 解析 AST，不用逐行 regex，才能正確區分註解與字串。
 // 路徑以 process.cwd() 為基準（vitest root 即本 workspace）：
@@ -16,10 +16,17 @@ import { brands } from "@/data/guide/brands";
 const WORKSPACE_ROOT = process.cwd();
 const SCAN_DIRS = ["app", "components", "data", "lib", "hooks"];
 // 三個分支：
-// 1. \p{Emoji_Presentation}：預設以彩色呈現的 emoji，含國旗（區域指示符號）。
+// 1. \p{Emoji_Presentation}：預設以彩色呈現的 emoji，含區域指示符號；成對的國旗會先由 hasEmoji 移除，不受此限。
 // 2. \uFE0F：變體選擇器，捕捉「文字符號 + 強制彩色」的組合（例如警告符號後面接的那個字元）。
 // 3. [\u2715\u2713\u2605]：預設為文字呈現、但本專案已改用 lucide 圖示取代的叉、勾、星符號。
 const EMOJI_PATTERN = /\p{Emoji_Presentation}|\uFE0F|[\u2715\u2713\u2605]/u;
+
+const FLAG_PATTERN = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
+
+/** 判斷文字是否含 emoji；先移除成對的區域指示符號（國旗），落單者仍會命中。 */
+function hasEmoji(text: string): boolean {
+	return EMOJI_PATTERN.test(text.replace(FLAG_PATTERN, ""));
+}
 
 /**
  * 找出原始碼中「介面文字」含 emoji 的行號（1-based，去重並由小到大排序）。
@@ -51,13 +58,13 @@ function findEmojiInUiText(source: string, fileName: string): number[] {
 		const rawLines = source.slice(start, node.end).split("\n");
 		let found = false;
 		rawLines.forEach((rawLine, offset) => {
-			if (EMOJI_PATTERN.test(rawLine)) {
+			if (hasEmoji(rawLine)) {
 				lineSet.add(startLine + offset);
 				found = true;
 			}
 		});
 		// 原始碼用跳脫序列（如 "\u2713"）寫 emoji 時，逐行比對不到，改回報節點起始行
-		if (!found && EMOJI_PATTERN.test((node as ts.LiteralLikeNode).text)) {
+		if (!found && hasEmoji((node as ts.LiteralLikeNode).text)) {
 			lineSet.add(startLine);
 		}
 	}
