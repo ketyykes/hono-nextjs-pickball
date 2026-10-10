@@ -8,8 +8,8 @@
 
 ## Goals
 
-- 介面與原始碼（含註解）不再出現 emoji 與 ✕✓★ 這類圖示字元
-- 每個 emoji 都有語意對等的替代：有意義的圖示改成自繪 SVG，純裝飾的直接拿掉
+- 介面上不再出現 emoji 與 ✕✓★ 這類圖示字元；註解與文件等文字敘述允許 emoji
+- 每個 emoji 都有語意對等的替代：有意義的圖示依用途改成 lucide 圖示或自繪 SVG，純裝飾的直接拿掉
 - 加一條守門測試，之後再出現 emoji 就擋下
 
 ## Non-Goals
@@ -31,15 +31,17 @@
 - 沿用改版分支的 `var(--ball)` 強調色：`main` 沒有這個 token，加了就等於開始改配色，超出範圍
 - 符號接受 `accentColor` prop：只有雙色圖才需要，目前沒有非用不可的雙色圖，屬於提前設計
 
-### Decision 2: 從改版分支借圖形路徑，但重寫元件
+### Decision 2: 圖示來源依用途選擇：通用記號用 lucide，專屬圖形自繪
 
-**Choice**: 參考 `change/site-editorial-redesign` 分支 `components/icons/*.tsx` 的 SVG 路徑（以 `git show` 讀取），在本分支重寫成靜態、只用 `currentColor` 的元件；共用的 `<svg>` 外殼抽成 `IconSvg`（設好 `aria-hidden`、`focusable`、`viewBox`、`className` 傳遞）。`StarIcon` 為新圖形。
+**Choice**: 叉、勾、星用 `lucide-react` 的 `X`、`Check`、`Star`（星以 `fill-current` 填成實心）；logo、結論三卡、手機轉向自繪於 `components/icons/`。自繪圖形參考 `change/site-editorial-redesign` 分支 `components/icons/*.tsx` 的 SVG 路徑（以 `git show` 讀取），重寫成靜態、只用 `currentColor` 的元件，共用的 `<svg>` 外殼抽成 `IconSvg`。
 
-**Rationale**: 圖形本身使用者看過、沒有意見；要拿掉的是動畫和 token 依賴。
+**Rationale**: 使用者指示「依情況選擇」SVG、套件圖示或 AI 產圖。通用記號在 lucide 已有成熟繪製，專案的按鈕圖示（計分板關閉鈕 `X`、Undo、重置等）本來就用 lucide，換過去風格一致，也少維護三個元件；lucide 沒有球場、兩跳、廚房區、手機轉向這類主題圖形，這些才值得自繪。
 
 **Alternatives considered**:
-- `git checkout <branch> -- components/icons`：會一起帶進 motion 動畫與 `--ball`，之後還得逐檔拆掉，反而更亂
-- 改用 lucide 圖示（已安裝）：lucide 沒有球場、兩跳、廚房區這類主題圖形，而且通用圖示正是使用者說的「AI 感」來源之一
+- 全部自繪：叉勾星自己畫沒有比 lucide 好，只是多維護三個元件（本 change 第一版即如此，依使用者回饋調整）
+- 能用 lucide 的都用（結論卡改 `MoveDiagonal`、`Repeat`、`Ban`）：通用圖示表達不出球場規則，語意變弱
+- AI 產生的點陣圖（Codex 產圖）：無法跟隨 `currentColor`，在深色結論卡與淺色 navbar 間要準備多份；檔案也比向量圖示重。留待日後做精緻版 logo 或插圖時評估
+- `git checkout <branch> -- components/icons`：會一起帶進 motion 動畫與 `--ball`，之後還得逐檔拆掉
 
 ### Decision 3: 測驗結果與獲勝對話框改純文字
 
@@ -50,15 +52,16 @@
 **Alternatives considered**:
 - 換成自繪獎盃 SVG：多一個元件卻沒增加資訊
 
-### Decision 4: 守門測試掃整個原始碼，註解也算
+### Decision 4: 守門測試只檢查介面文字，以 TypeScript AST 判定
 
-**Choice**: `app/emojiFree.test.ts` 以 Node `fs` 遞迴讀取 `app/`、`components/`、`data/`、`lib/`、`hooks/` 下非測試的 `.ts`／`.tsx`，逐行比對 `/\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u`，命中就列出 `檔案:行號`。註解裡的 `⚠️` 改成「注意：」，tour 註解的「✕ 犯規」改成「打叉犯規」。
+**Choice**: `app/emojiFree.test.ts` 以 Node `fs` 遞迴讀取 `app/`、`components/`、`data/`、`lib/`、`hooks/` 下非測試的 `.ts`／`.tsx`，用 `typescript` 的 `createSourceFile` 解析後走訪 `StringLiteral`、樣板字串各段與 `JsxText` 節點，對節點文字套用 `/\p{Emoji_Presentation}|\uFE0F|[✕✓★]/u`，命中就列出 `檔案:行號`。註解不是 AST 節點，自然不在檢查範圍。掃描邏輯抽成同檔內的函式，另以原始碼片段直接測它（註解放行、字串攔下）。
 
-**Rationale**: 要分辨字串和註解就得做語法解析，為了 10 行註解不值得；改寫後的意思也沒變。
+**Rationale**: 使用者指示文字敘述（如註解裡的 ⚠️）允許 emoji。`typescript` 已是既有相依，`createSourceFile` 不需要型別檢查、速度快；AST 能正確區分註解、字串與 JSX 文字，不必寫容易出錯的啟發式。
 
 **Alternatives considered**:
-- 只掃 JSX 文字與字串常值：需要 TypeScript AST，測試本身會比要守的東西還複雜
-- 白名單排除註解行：`//` 判斷會漏掉 JSX 註解與區塊註解，規則不可靠
+- 逐行 regex、連註解一起掃（本 change 第一版）：逼得註解要改寫，違反使用者「文字敘述允許 emoji」的指示
+- 逐行 regex、略過 `//` 開頭的行：會漏掉區塊註解與 JSX 註解，也無法處理 `const url = "https://x"; // ⚠️` 這種同一行有字串又有註解的情況
+- `ts.createScanner` 逐 token 掃描：單獨的 scanner 不知道 JSX 語境，無法正確切出 `JsxText`
 
 ## Risks / Trade-offs
 

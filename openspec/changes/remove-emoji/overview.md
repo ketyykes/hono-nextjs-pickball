@@ -14,10 +14,10 @@
 
 ## What Changes
 
-- 新增 8 個靜態 SVG 符號元件，只用 `currentColor`
+- 圖示依用途選擇：叉／勾／星用 lucide，logo、結論三卡、轉向提示用 5 個自繪靜態 SVG（只用 `currentColor`）
 - 7 處 emoji 換成符號或拿掉；品牌產地拿掉國旗
-- 10 行註解的 ⚠️／✕ 改寫成文字
-- 新增 emoji 守門測試
+- 註解等文字敘述允許 emoji，維持原文
+- 新增 emoji 守門測試（以 TypeScript AST 只檢查字串與 JSX 文字）
 
 變更前後對照：
 
@@ -35,8 +35,8 @@ navbar     🏓 匹克球指南
 === After ===
 navbar     <LogoMark> 匹克球指南
 結論卡     <ServeDiagonal> / <DoubleBounce> / <KitchenZone>
-迷思列     常見迷思 <叉> / 正確規則 <勾>
-價位       <Star>x10  (svg，顏色與 aria-label 不變)
+迷思列     常見迷思 <lucide X> / 正確規則 <lucide Check>
+價位       <lucide Star>x10  (顏色與 aria-label 不變)
 測驗結果   ...規則達人了
 獲勝框     我方獲勝
 橫向提示   <RotateToLandscape> 建議橫向使用，體驗更好
@@ -87,13 +87,14 @@ components/icons/
     ├─ ServeDiagonalIcon ─┐
     ├─ DoubleBounceIcon ──┼───► guide/Conclusion
     ├─ KitchenZoneIcon ───┘
-    ├─ MythMarkIcon ──┬───────► guide/shared/MythRow
-    ├─ FactMarkIcon ──┘
-    ├─ StarIcon ──────────────► guide/shared/PriceStars
     └─ RotateToLandscapeIcon ─► scoreboard/OrientationHint
+
+lucide-react: X / Check ──► guide/shared/MythRow
+              Star ──────► guide/shared/PriceStars
 
 純文字 (無符號): quiz/ResultScreen, scoreboard/GameOverDialog,
                  data/guide/brands.ts
 
-app/emojiFree.test.ts ──fs 讀檔──► app/ components/ data/ lib/ hooks/
+app/emojiFree.test.ts ──fs 讀檔 + TS AST──► app/ components/ data/ lib/ hooks/
+  (只檢查 StringLiteral / 樣板字串 / JsxText，註解不檢查)
 ```

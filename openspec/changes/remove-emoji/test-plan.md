@@ -2,18 +2,22 @@
 
 ## emoji-free-ui
 
-### Requirement: 原始碼不含 emoji
+### Requirement: 介面文字不含 emoji
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| `app、components、data、lib、hooks 的原始碼不含 emoji 或 emoji 類符號` | 原始碼掃描無 emoji | 掃描五個目錄的非測試 `.ts`／`.tsx` → 命中清單為 `[]`（目前會列出約 30 行，真紅燈） | golden path；是整個 change 的完成判準，先寫出來當進度表 | unit |
+| `app、components、data、lib、hooks 的原始碼不含 emoji 或 emoji 類符號` | （第一版，已由下一列取代） | 逐行掃描含註解 → `[]` | 第一版 golden path | unit |
+| `app、components、data、lib、hooks 的介面文字不含 emoji 或 emoji 類符號` | 介面文字掃描無 emoji | AST 走訪五個目錄非測試檔的字串／樣板字串／JsxText → 命中 `[]`；註解還原為 ⚠️／✕ 後仍為 `[]` | 第二版改名，搭配註解還原作為回歸防線 | unit |
+| `註解中的 emoji 不視為違規` | 註解中的 emoji 不視為違規 | 片段只在 `//`、`/* */`、`{/* */}` 註解含 emoji → 命中 `[]`（掃描函式尚不存在／逐行版會命中，真紅燈） | 使用者回饋的核心行為 | unit |
+| `字串、樣板字串與 JSX 文字中的 emoji 會被攔下` | 字串、樣板字串與 JSX 文字中的 emoji 會被攔下 | 片段第 1–3 行分別在字串、樣板字串、JSX 文字含 emoji，另一行為 `"https://x"; // ⚠️` → 命中恰為第 1、2、3 行 | 確保放寬註解後守門仍有效 | unit |
 | `品牌產地不含國旗且以國家或地區名稱開頭` | 品牌產地以純文字呈現 | `brands` 每筆 `origin` → 不含 U+1F1E6–U+1F1FF，且符合 `/^(美國\|德國\|奧地利\|台灣)/`（目前以國旗開頭，真紅燈） | 資料層替換的直接驗收 | unit |
 
-### Requirement: 自繪符號元件集中於 components/icons
+### Requirement: 圖示來源依用途選擇，自繪符號集中於 components/icons
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| `每個符號元件預設渲染對輔助科技隱藏的單一 svg` | 每個符號元件預設對輔助科技隱藏 | 渲染 8 個元件 → 各自 `querySelectorAll("svg").length === 1`，且 `aria-hidden="true"`、`focusable="false"`（模組尚不存在，真紅燈） | golden path；後續所有替換都依賴這組元件 | unit |
+| `自繪符號只涵蓋球場與品牌專屬圖形` | 自繪符號只涵蓋專屬圖形 | `Object.keys(await import("./index"))` 排序後 → 恰為 5 個專屬符號名稱（目前 8 個，真紅燈） | 使用者回饋：通用記號改用 lucide | unit |
+| `每個符號元件預設渲染對輔助科技隱藏的單一 svg` | 每個符號元件預設對輔助科技隱藏 | 渲染 5 個元件（第一版為 8 個） → 各自 `querySelectorAll("svg").length === 1`，且 `aria-hidden="true"`、`focusable="false"`（模組尚不存在，真紅燈） | golden path；後續所有替換都依賴這組元件 | unit |
 | `符號元件只使用 currentColor 且不含漸層` | 符號元件只用 currentColor 且不含漸層 | 每個元件 outerHTML → 不含 `#[0-9a-f]{3,8}`、`rgb(`、`Gradient`；所有 `stroke`／`fill` 屬性值 ∈ {`currentColor`, `none`} | 保證不會偷改配色 | unit |
 | `className 會傳遞到 svg 根元素` | className 傳遞到 svg 根元素 | `className="size-6"` → `svg.classList.contains("size-6")` | 呼叫端靠 className 控制尺寸 | unit |
 
@@ -23,8 +27,8 @@
 |-----------|----------|-----------|-----------|------|
 | `logo 以 LogoMark 符號呈現而非 emoji` | navbar logo 以 LogoMark 呈現 | 渲染 `SiteNavbar` → logo 連結（`href="/"` 且非 nav 內連結）含 1 個 `svg`，`textContent` 不含 🏓，含「匹克球指南」 | 全站每頁都看得到的位置 | unit |
 | `三張結論卡各以一個自繪符號取代 emoji` | 結論三張卡各有一個符號 | 渲染 `Conclusion` → 依三個標題找到卡片，每張 `svg` 數 === 1，`textContent` 不含 🏓🔄🍳 | golden path | unit |
-| `迷思與正確規則標籤以符號取代叉勾字元` | 迷思列標籤以符號表示叉與勾 | 渲染 `MythRow` → 「常見迷思」「正確規則」標籤元素各含 1 個 `svg`；整體 `textContent` 不含 ✕✓ | golden path | unit |
-| `每顆星以 svg 符號呈現而非 ★ 字元` | 價位星以 svg 呈現 | `stars={4}` → 10 個 `[data-star]` 各含 1 個 `svg`；`textContent` 不含 ★ | 既有 4 條 PriceStars 測試照舊作為 regression guard，這條是新行為 | unit |
+| `迷思與正確規則標籤以 lucide 叉勾圖示取代字元` | 迷思列標籤以 lucide 圖示表示叉與勾 | 渲染 `MythRow` → 兩標籤元素各含 1 個 `svg`，class 分別含 `lucide-x`、`lucide-check`；整體 `textContent` 不含 ✕✓（自繪版無 lucide class，真紅燈；取代第一版的「迷思與正確規則標籤以符號取代叉勾字元」） | 使用者回饋：通用記號改用 lucide | unit |
+| `每顆星以 lucide Star 圖示呈現而非 ★ 字元` | 價位星以 lucide Star 呈現 | `stars={4}` → 10 個 `[data-star]` 各含 1 個 `svg` 且 class 含 `lucide-star`；`textContent` 不含 ★（自繪版無 lucide class，真紅燈；取代第一版的「每顆星以 svg 符號呈現而非 ★ 字元」） | 既有 4 條 PriceStars 測試照舊作為 regression guard | unit |
 | `三個分數區間的鼓勵文字皆為純文字` | 測驗結果鼓勵文字不含 emoji | `correctCount` 9／6／2、`total` 10 → 分別出現三句完整句子（不含 emoji 的精確文字比對） | 文案變更的直接驗收 | unit |
 | `獲勝標題為純文字不含獎盃 emoji` | 比賽結束對話框標題為純文字 | `finished` + 勝方 us → `getByRole("heading")` 或 dialog title 文字 === 「我方獲勝」 | 文案變更的直接驗收 | unit |
 | `提示橫幅以轉向符號取代燈泡 emoji` | 橫向提示以符號取代燈泡 | `visible` → `role="status"` 內含文字「建議橫向使用，體驗更好」、不含 💡，且關閉按鈕以外有 1 個 `aria-hidden` 的 `svg` | golden path | unit |

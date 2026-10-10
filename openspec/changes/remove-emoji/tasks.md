@@ -65,3 +65,21 @@ Depends on: §5, §6
 > 收尾紀錄（2026-10-10）：`pnpm lint` exit 0、`pnpm typecheck` exit 0、`pnpm test` 後端 16／前端 778 全綠；
 > chromium E2E 全套 132 passed；`git diff main...HEAD` 禁區檔案零變更；Final Code Reviewer PASS。
 > 7.4 截圖（首頁 navbar、結論卡、迷思列、價位星、`/scoreboard` 直式提示與獲勝框）目視確認配色與原本一致。
+
+## 8. 依使用者回饋調整：文字敘述允許 emoji、圖示來源依用途選擇
+Depends on: §7
+
+> 2026-10-10 使用者回饋：①文字敘述（如註解中的 ⚠️）允許 emoji；②取代 emoji 時依情況選擇自繪 SVG、套件圖示或 AI 產圖。
+> 經確認：註解還原為原文；叉、勾、星改用 lucide，logo、結論三卡、橫向提示維持自繪，本次不用 AI 產圖。
+
+- [ ] 8.1 RED: write test `註解中的 emoji 不視為違規`（`app/emojiFree.test.ts`，呼叫尚不存在的掃描函式）
+- [ ] 8.2 RED: write test `字串、樣板字串與 JSX 文字中的 emoji 會被攔下`
+- [ ] 8.3 GREEN: 以 `typescript` 的 `createSourceFile` 實作掃描函式（只走訪 StringLiteral、樣板字串各段、JsxText），守門 it 改名為 `app、components、data、lib、hooks 的介面文字不含 emoji 或 emoji 類符號` 並改用該函式
+- [ ] 8.4 RED: regression guard（非 TDD）— 把 §6.2 與 c695884 改寫過的 9 行註解還原為原文（`RoundControls.tsx`、`export-scene.ts`、`roster.ts`、`scoreboard-binding.ts` 的 `⚠️`；`KitchenViolationStage.tsx`、`kitchenScene.ts` 的「✕ 犯規」），確認 8.3 的守門仍綠。`PriceStars.tsx` 的舊警告註解已因改用 svg 而失效、被新說明取代，不還原
+- [ ] 8.5 GREEN: 無需實作（守門綠燈即完成）
+- [ ] 8.6 RED: write test `自繪符號只涵蓋球場與品牌專屬圖形`（`components/icons/icons.test.tsx`）
+- [ ] 8.7 RED: write test `迷思與正確規則標籤以 lucide 叉勾圖示取代字元`（取代 `MythRow.test.tsx` 的第一版 it）
+- [ ] 8.8 RED: write test `每顆星以 lucide Star 圖示呈現而非 ★ 字元`（取代 `PriceStars.test.tsx` 的第一版 it）
+- [ ] 8.9 GREEN: `MythRow` 改用 lucide `X`／`Check`、`PriceStars` 改用 lucide `Star`（`fill-current`）；刪除 `MythMarkIcon`、`FactMarkIcon`、`StarIcon` 與其匯出，`icons.test.tsx` 的元件清單同步為 5 個；若 `IconSvg` 的 `variant`／`strokeWidth` 已無使用者則一併移除
+- [ ] 8.10 收尾：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全綠；chromium E2E 全套全綠；截圖確認迷思列與價位星
+
