@@ -27,5 +27,10 @@ Depends on: §1
 ## 4. 收尾驗證
 Depends on: §2, §3
 
-- [ ] 4.1 實跑 `pnpm lint`、`pnpm typecheck`、`pnpm test` 全綠；chromium E2E 的 `quiz`、`scoreboard`、`scoreboard-binding` spec 全綠
-- [ ] 4.2 起 dev server 截圖 `/quiz` 結果頁三個分數區間、`/scoreboard` 獲勝對話框（390px 與 1280px）、首頁品牌卡國旗，目視確認；看完依 PID 關閉
+- [x] 4.1 實跑 `pnpm lint`、`pnpm typecheck`、`pnpm test` 全綠；chromium E2E 的 `quiz`、`scoreboard`、`scoreboard-binding` spec 全綠
+- [x] 4.2 起 dev server 截圖 `/quiz` 結果頁三個分數區間、`/scoreboard` 獲勝對話框（390px 與 1280px）、首頁品牌卡國旗，目視確認；看完依 PID 關閉
+
+> 收尾紀錄（2026-10-10）：`pnpm lint`、`pnpm typecheck` exit 0；`pnpm test` 後端 16／前端 783 全綠；chromium E2E `quiz`、`scoreboard`、`scoreboard-binding` 41 passed；
+> Stage 1／Stage 2 皆 PASS（採納建議：lucide class 斷言改用 `classList.contains`）。截圖確認：`/quiz` 5/10 結果句尾 BicepsFlexed、
+> 獲勝對話框 390px 置中與 1280px 靠左的 Trophy＋「我方獲勝」、首頁品牌卡國旗 emoji 均正常。
+
