@@ -32,13 +32,14 @@ describe("PriceStars", () => {
 		expect(screen.getByRole("img", { name: "價位 1／10 顆星" })).toBeTruthy();
 	});
 
-	it("每顆星以 svg 符號呈現而非 ★ 字元", () => {
+	it("每顆星以 lucide Star 圖示呈現而非 ★ 字元", () => {
 		const { container } = render(<PriceStars stars={4} />);
 
 		const stars = container.querySelectorAll("[data-star]");
 		expect(stars.length).toBe(10);
 		for (const star of stars) {
 			expect(star.querySelectorAll("svg").length).toBe(1);
+			expect(star.querySelector("svg")?.classList.contains("lucide-star")).toBe(true);
 		}
 		expect(container.textContent).not.toContain("\u2605");
 	});

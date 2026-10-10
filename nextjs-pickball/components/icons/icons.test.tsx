@@ -71,4 +71,15 @@ describe("components/icons 符號元件", () => {
 			unmount();
 		}
 	});
+
+	it("自繪符號只涵蓋球場與品牌專屬圖形", async () => {
+		const exported = Object.keys(await import("./index")).sort();
+		expect(exported).toEqual([
+			"DoubleBounceIcon",
+			"KitchenZoneIcon",
+			"LogoMark",
+			"RotateToLandscapeIcon",
+			"ServeDiagonalIcon",
+		]);
+	});
 });
