@@ -28,7 +28,7 @@ export function PriceStars({ stars, className }: PriceStarsProps) {
 			role="img"
 			aria-label={`價位 ${clamped}／10 顆星`}
 			className={cn(
-				"inline-flex items-center whitespace-nowrap text-[0.8rem] leading-none tracking-[1px]",
+				"inline-flex items-center whitespace-nowrap text-[0.8rem] leading-none gap-px",
 				className,
 			)}
 		>
@@ -39,7 +39,10 @@ export function PriceStars({ stars, className }: PriceStarsProps) {
 						key={index}
 						aria-hidden="true"
 						data-star={isFilled ? "filled" : "empty"}
-						className={isFilled ? "text-amber-400" : "text-foreground/20"}
+						className={cn(
+							"inline-flex",
+							isFilled ? "text-amber-400" : "text-foreground/20",
+						)}
 					>
 						<StarIcon className="size-[1em]" />
 					</span>
