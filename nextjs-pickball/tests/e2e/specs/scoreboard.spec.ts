@@ -27,7 +27,7 @@ test.describe("/scoreboard 計分器", () => {
 		await expect(page.getByText("對方", { exact: true })).toBeVisible();
 	});
 
-	test("我方連贏 11 球觸發 GameOverDialog 顯示「🏆 我方獲勝」與「11 – 0」", async ({
+	test("我方連贏 11 球觸發 GameOverDialog 顯示「我方獲勝」與「11 – 0」", async ({
 		page,
 	}) => {
 		await page.goto("/scoreboard");
@@ -172,7 +172,7 @@ test.describe("/scoreboard 計分器", () => {
 		await expect(page.getByRole("combobox", { name: "比賽形式" })).toBeVisible();
 	});
 
-	test("直式 viewport 顯示「💡 建議橫向使用」提示橫幅", async ({ page }) => {
+	test("直式 viewport 顯示「建議橫向使用」提示橫幅", async ({ page }) => {
 		// 進頁前先清 sessionStorage 避免「關閉提示」狀態殘留
 		await page.addInitScript(() => {
 			window.sessionStorage.clear();

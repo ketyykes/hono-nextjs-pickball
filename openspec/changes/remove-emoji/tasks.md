@@ -45,8 +45,8 @@ Depends on: §3
 ## 5. E2E 名稱同步
 Depends on: §4
 
-- [ ] 5.1 RED: regression guard（非 TDD）— `tests/e2e/specs/scoreboard.spec.ts` 兩個 test 改名去掉 💡、🏆，斷言不變；與 `navbar-rwd.spec.ts` 一起以 chromium 實跑確認綠燈
-- [ ] 5.2 GREEN: 無需實作（E2E 綠燈即完成；若 navbar 高度基準失敗，回 4.2 調整符號尺寸）
+- [x] 5.1 RED: regression guard（非 TDD）— `tests/e2e/specs/scoreboard.spec.ts` 兩個 test 改名去掉 💡、🏆，斷言不變；與 `navbar-rwd.spec.ts` 一起以 chromium 實跑確認綠燈
+- [x] 5.2 GREEN: 無需實作（E2E 綠燈即完成；若 navbar 高度基準失敗，回 4.2 調整符號尺寸）
 
 ## 6. 註解改寫與守門轉綠
 Depends on: §2, §4
