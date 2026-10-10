@@ -63,7 +63,7 @@
 ## Risks / Trade-offs
 
 - [Risk] E2E 依文字找元素，拿掉 emoji 後 accessible name 改變 → Mitigation：既有 E2E 都用 `/我方獲勝/`、`hasText: "建議橫向使用"` 這類部分比對，實測不受影響；只有兩個 test 名稱含 emoji，需要改名（scoreboard 主 spec 的驗收錨點同步改）
-- [Risk] PriceStars 從字元改成 SVG 後尺寸與間距不同，星列看起來變寬或變窄 → Mitigation：`StarIcon` 以 `size-[1em]` 跟著原本的 `text-[0.8rem]` 縮放，保留 `tracking-[1px]` 對應的間距；apply 時以 E2E 截圖目視確認
+- [Risk] PriceStars 從字元改成 SVG 後尺寸與間距不同，星列看起來變寬或變窄 → Mitigation：`StarIcon` 以 `size-[1em]` 跟著原本的 `text-[0.8rem]` 縮放；`tracking-[1px]` 對 svg 無效，改以外層 `gap-px` 補回 1px 星距，每顆星的 span 設 `inline-flex` 避免基線下方空隙；apply 時以截圖目視確認
 - [Risk] navbar logo 改成 SVG 後，「logo 與導航連結皆不換行」的高度基準改變 → Mitigation：符號以 `size-4` 對齊 `text-sm` 行高，既有 navbar-rwd E2E 會量測高度並擋下
 
 ## Migration Plan

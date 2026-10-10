@@ -57,7 +57,11 @@ Depends on: §2, §4
 ## 7. 收尾驗證
 Depends on: §5, §6
 
-- [ ] 7.1 實跑 `pnpm lint`、`pnpm typecheck`、`pnpm test`，全綠
-- [ ] 7.2 實跑 chromium E2E：`navbar-rwd`、`scoreboard`、`scoreboard-binding`、`quiz`、首頁相關 spec，全綠
-- [ ] 7.3 `git diff main --stat` 確認未動 `app/globals.css`、`app/layout.tsx`、`public/icon.svg`、`components/ui/**`、`package.json`、`pnpm-lock.yaml`
-- [ ] 7.4 起 dev server 截圖首頁（結論卡、迷思列、價位星、navbar）、`/quiz` 結果、`/scoreboard` 直式提示與獲勝框，目視確認配色與原本一致；看完依 PID 關閉
+- [x] 7.1 實跑 `pnpm lint`、`pnpm typecheck`、`pnpm test`，全綠
+- [x] 7.2 實跑 chromium E2E：`navbar-rwd`、`scoreboard`、`scoreboard-binding`、`quiz`、首頁相關 spec，全綠
+- [x] 7.3 `git diff main --stat` 確認未動 `app/globals.css`、`app/layout.tsx`、`public/icon.svg`、`components/ui/**`、`package.json`、`pnpm-lock.yaml`
+- [x] 7.4 起 dev server 截圖首頁（結論卡、迷思列、價位星、navbar）、`/quiz` 結果、`/scoreboard` 直式提示與獲勝框，目視確認配色與原本一致；看完依 PID 關閉
+
+> 收尾紀錄（2026-10-10）：`pnpm lint` exit 0、`pnpm typecheck` exit 0、`pnpm test` 後端 16／前端 778 全綠；
+> chromium E2E 全套 132 passed；`git diff main...HEAD` 禁區檔案零變更；Final Code Reviewer PASS。
+> 7.4 截圖（首頁 navbar、結論卡、迷思列、價位星、`/scoreboard` 直式提示與獲勝框）目視確認配色與原本一致。
