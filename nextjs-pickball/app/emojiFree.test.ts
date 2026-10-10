@@ -50,6 +50,26 @@ describe("emoji-free 守門", () => {
 		expect(hits).toEqual([]);
 	});
 
+	it("註解中的 emoji 不視為違規", () => {
+		const source = [
+			"// ⚠️ 注意",
+			"/* ✕ 犯規 */",
+			"const label = \"犯規\";",
+			"export const View = () => <div>{/* 「✕ 犯規」印章 */}犯規</div>;",
+		].join("\n");
+		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([]);
+	});
+
+	it("字串、樣板字串與 JSX 文字中的 emoji 會被攔下", () => {
+		const source = [
+			"const a = \"🏓 匹克球\";",
+			"const b = `共 ${count} 項 ✓`;",
+			"const View = () => <p>💡 提示</p>;",
+			"const url = \"https://x\"; // ⚠️",
+		].join("\n");
+		expect(findEmojiInUiText(source, "fixture.tsx")).toEqual([1, 2, 3]);
+	});
+
 	it("品牌產地不含國旗且以國家或地區名稱開頭", () => {
 		for (const brand of brands) {
 			expect(brand.origin).not.toMatch(/[\u{1F1E6}-\u{1F1FF}]/u);
