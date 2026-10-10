@@ -24,7 +24,7 @@ const PLACEHOLDER_COLOR_TO = "#4B5563";
  * pickTextColor 依 colorFrom／colorTo 算好存入，scoreboard 端只讀不算，藉此維持
  * lib/scoreboard/ 不 import lib/matchmaker/ 的單向相依（design Decision 1）。
  *
- * 注意：與 components/matchmaker/CourtCard.tsx、lib/matchmaker/round.ts 內同名的
+ * ⚠️ 與 components/matchmaker/CourtCard.tsx、lib/matchmaker/round.ts 內同名的
  * `resolveTeamPlayers`（兩者皆「查無此人就跳過」）行為相反，這是 design Decision 3
  * 明文接受的不一致：對戰頁色塊的 row／column 是離散格位，缺一格比多一格佔位更貼近
  * 版面推導的資料形狀；計分板面板沒有這層版面約束，少一筆反而會讓雙打看起來像單打。

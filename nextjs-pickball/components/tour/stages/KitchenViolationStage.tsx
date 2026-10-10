@@ -80,7 +80,7 @@ function ImpactRingView({
 
 // stage 4：廚房違規。側視場景敘事：球員站在廚房警戒區內 → 來球快速平飛越網 →
 // 球拍在「球落地前」凌空攔截（撞擊震動 + 紅色衝擊波 + 廚房區閃紅）→
-// 慢動作揭示幽靈軌跡與「本來會落地」的空心落點 → 「打叉犯規」印章砸下定格。
+// 慢動作揭示幽靈軌跡與「本來會落地」的空心落點 → 「✕ 犯規」印章砸下定格。
 // 座標由 kitchenScene.ts 純函式計算，經 motion 的 x / y / rotate / scale style 驅動；
 // 球拍繞握把底端旋轉，以 originX / originY 明確指定旋轉軸心（同 ClosingStage 的做法）。
 // z-order 原則：警戒紅 flash 只染背景區塊層，球員、球拍與球維持清晰。
@@ -119,7 +119,7 @@ export function KitchenViolationStage() {
 	const flashOpacity = useTransform(source, (p) => kitchenFlashOpacity(p));
 	const vignette = useTransform(source, (p) => vignetteOpacity(p));
 
-	// 「打叉犯規」印章
+	// 「✕ 犯規」印章
 	const stampScale = useTransform(source, (p) => stampPose(p).scale);
 	const stampOpacity = useTransform(source, (p) => stampPose(p).opacity);
 
@@ -439,7 +439,7 @@ export function KitchenViolationStage() {
 							/>
 						</motion.g>
 
-						{/* 「打叉犯規」印章：由大而小砸下定格 */}
+						{/* 「✕ 犯規」印章：由大而小砸下定格 */}
 						<g transform="translate(240 78) rotate(-8)">
 							<motion.g
 								style={{

@@ -32,7 +32,7 @@ export interface AddPlayerContext {
 /**
  * 依指定 id 更新參賽者的部分欄位；id／createdAt 不可透過 patch 變更。
  *
- * 注意：`updatePlayer` 是**覆寫**語意，不是累加語意：`patch.restCount`／`patch.gamesPlayed`
+ * ⚠️ `updatePlayer` 是**覆寫**語意，不是累加語意：`patch.restCount`／`patch.gamesPlayed`
  * 等欄位會直接取代既有值，而非疊加。M2（分配演算法）／M4（評分更新）若要遞增這類
  * 累計欄位，呼叫端必須自行讀出既有值再算出新值（例如 `{ restCount: player.restCount + 1 }`），
  * 否則等於用常數蓋掉既有累計值。若這類遞增呼叫散落多處，屆時應改為新增專門的
