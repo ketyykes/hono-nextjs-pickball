@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { Trophy } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -44,7 +45,10 @@ export function GameOverDialog({ state, onPlayAgain }: GameOverDialogProps) {
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>{winnerLabel}</DialogTitle>
+					<DialogTitle className="flex items-center justify-center gap-2 sm:justify-start">
+						<Trophy className="size-5" />
+						{winnerLabel}
+					</DialogTitle>
 					<DialogDescription>
 						{state.scores.us} – {state.scores.them}
 					</DialogDescription>
