@@ -128,4 +128,18 @@ describe("SiteNavbar", () => {
 			expect(link.className.split(/\s+/)).toContain("whitespace-nowrap");
 		}
 	});
+
+	it("logo 以 LogoMark 符號呈現而非 emoji", () => {
+		render(<SiteNavbar />);
+
+		const nav = screen.getByRole("navigation");
+		const logo = screen
+			.getAllByRole("link")
+			.find((link) => link.getAttribute("href") === "/" && !nav.contains(link));
+
+		expect(logo).toBeTruthy();
+		expect(logo!.querySelectorAll("svg").length).toBe(1);
+		expect(logo!.textContent).not.toContain("\u{1F3D3}");
+		expect(logo!.textContent).toContain("匹克球指南");
+	});
 });
