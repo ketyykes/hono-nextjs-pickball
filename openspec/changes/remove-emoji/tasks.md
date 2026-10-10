@@ -31,8 +31,8 @@ Depends on: §3
 - [x] 4.2 GREEN: `SiteNavbar` logo 改用 `LogoMark`（`size-4`，對齊 `text-sm` 行高）
 - [x] 4.3 RED: write test `三張結論卡各以一個自繪符號取代 emoji`（`components/guide/Conclusion.test.tsx`）
 - [x] 4.4 GREEN: `Conclusion` 三張卡改用三個符號，放在 `text-lime-400` 容器內，卡片其餘 class 不變
-- [ ] 4.5 RED: write test `迷思與正確規則標籤以符號取代叉勾字元`（`components/guide/shared/MythRow.test.tsx`）
-- [ ] 4.6 GREEN: `MythRow` 標籤改為文字＋`MythMarkIcon`／`FactMarkIcon`，顏色沿用標籤原本的 `text-orange-500`／`text-emerald-700`
+- [x] 4.5 RED: write test `迷思與正確規則標籤以符號取代叉勾字元`（`components/guide/shared/MythRow.test.tsx`）
+- [x] 4.6 GREEN: `MythRow` 標籤改為文字＋`MythMarkIcon`／`FactMarkIcon`，顏色沿用標籤原本的 `text-orange-500`／`text-emerald-700`
 - [ ] 4.7 RED: write test `每顆星以 svg 符號呈現而非 ★ 字元`（`components/guide/shared/PriceStars.test.tsx`；既有 4 條為 regression guard）
 - [ ] 4.8 GREEN: `PriceStars` 每顆星改用 `StarIcon`（`size-[1em]`），`data-star`、顏色 class 與 `aria-label` 不變；註解的 `⚠️` 改「注意：」
 - [ ] 4.9 RED: write test `三個分數區間的鼓勵文字皆為純文字`（`components/quiz/ResultScreen.test.tsx`）
