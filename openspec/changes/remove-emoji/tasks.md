@@ -87,3 +87,4 @@ Depends on: §7
 > chromium E2E 全套 132 passed；§8 Stage 1／Stage 2 皆 PASS。截圖確認迷思列 lucide 叉勾；價位星原有 2px 描邊與 20% 透明填色疊出深色外框，
 > 改為 `strokeWidth={0}` 純填色，與原本 ★ 字元的平塗外觀一致。
 
+> verify 補跑（2026-10-10）：scoreboard「核心按鈕不得被其他元素遮蔽」驗收要求 mobile-safari，補跑 `scoreboard.spec.ts`＋`navbar-rwd.spec.ts` 於 `--project=mobile-safari`：17 passed、7 skipped（navbar-rwd 既有的 `test.skip` 只在桌面 chromium 執行，非本 change 引入）。
