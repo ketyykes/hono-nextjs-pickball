@@ -37,8 +37,8 @@ Depends on: §3
 - [x] 4.8 GREEN: `PriceStars` 每顆星改用 `StarIcon`（`size-[1em]`），`data-star`、顏色 class 與 `aria-label` 不變；註解的 `⚠️` 改「注意：」
 - [x] 4.9 RED: write test `三個分數區間的鼓勵文字皆為純文字`（`components/quiz/ResultScreen.test.tsx`）
 - [x] 4.10 GREEN: `ResultScreen` 三句鼓勵文字去掉結尾 emoji
-- [ ] 4.11 RED: write test `獲勝標題為純文字不含獎盃 emoji`（`components/scoreboard/GameOverDialog.test.tsx`）
-- [ ] 4.12 GREEN: `GameOverDialog` 標題去掉 🏆
+- [x] 4.11 RED: write test `獲勝標題為純文字不含獎盃 emoji`（`components/scoreboard/GameOverDialog.test.tsx`）
+- [x] 4.12 GREEN: `GameOverDialog` 標題去掉 🏆
 - [ ] 4.13 RED: write test `提示橫幅以轉向符號取代燈泡 emoji`（`components/scoreboard/OrientationHint.test.tsx`）
 - [ ] 4.14 GREEN: `OrientationHint` 💡 改為 `RotateToLandscapeIcon`
 

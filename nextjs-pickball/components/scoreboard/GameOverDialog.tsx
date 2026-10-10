@@ -44,7 +44,7 @@ export function GameOverDialog({ state, onPlayAgain }: GameOverDialogProps) {
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>🏆 {winnerLabel}</DialogTitle>
+					<DialogTitle>{winnerLabel}</DialogTitle>
 					<DialogDescription>
 						{state.scores.us} – {state.scores.them}
 					</DialogDescription>
