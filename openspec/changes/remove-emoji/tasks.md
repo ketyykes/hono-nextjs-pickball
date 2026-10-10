@@ -81,5 +81,9 @@ Depends on: §7
 - [x] 8.7 RED: write test `迷思與正確規則標籤以 lucide 叉勾圖示取代字元`（取代 `MythRow.test.tsx` 的第一版 it）
 - [x] 8.8 RED: write test `每顆星以 lucide Star 圖示呈現而非 ★ 字元`（取代 `PriceStars.test.tsx` 的第一版 it）
 - [x] 8.9 GREEN: `MythRow` 改用 lucide `X`／`Check`、`PriceStars` 改用 lucide `Star`（`fill-current`）；刪除 `MythMarkIcon`、`FactMarkIcon`、`StarIcon` 與其匯出，`icons.test.tsx` 的元件清單同步為 5 個；若 `IconSvg` 的 `variant`／`strokeWidth` 已無使用者則一併移除
-- [ ] 8.10 收尾：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全綠；chromium E2E 全套全綠；截圖確認迷思列與價位星
+- [x] 8.10 收尾：`pnpm lint`、`pnpm typecheck`、`pnpm test` 全綠；chromium E2E 全套全綠；截圖確認迷思列與價位星
+
+> §8 收尾紀錄（2026-10-10）：`pnpm lint`、`pnpm typecheck` exit 0；`pnpm test` 後端 16／前端 781 全綠（後續補 1 條 regression guard）；
+> chromium E2E 全套 132 passed；§8 Stage 1／Stage 2 皆 PASS。截圖確認迷思列 lucide 叉勾；價位星原有 2px 描邊與 20% 透明填色疊出深色外框，
+> 改為 `strokeWidth={0}` 純填色，與原本 ★ 字元的平塗外觀一致。
 

@@ -40,7 +40,7 @@ export function PriceStars({ stars, className }: PriceStarsProps) {
 							isFilled ? "text-amber-400" : "text-foreground/20",
 						)}
 					>
-						<Star className="size-[1em] fill-current" />
+						<Star className="size-[1em] fill-current" strokeWidth={0} />
 					</span>
 				);
 			})}
