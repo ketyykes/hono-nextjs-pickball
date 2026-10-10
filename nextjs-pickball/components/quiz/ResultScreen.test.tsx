@@ -16,7 +16,7 @@ describe("ResultScreen", () => {
 			const paragraph = screen.getByText(text, { exact: true });
 			const svgs = paragraph.querySelectorAll("svg");
 			expect(svgs).toHaveLength(1);
-			expect(svgs[0].getAttribute("class")).toContain(iconClass);
+			expect(svgs[0].classList.contains(iconClass)).toBe(true);
 			unmount();
 		}
 	});

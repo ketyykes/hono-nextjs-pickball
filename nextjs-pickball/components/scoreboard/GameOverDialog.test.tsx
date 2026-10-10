@@ -18,6 +18,6 @@ describe("GameOverDialog", () => {
 		expect(heading.textContent).toBe("我方獲勝");
 		const svg = heading.querySelector("svg");
 		expect(svg).not.toBeNull();
-		expect(svg?.getAttribute("class")).toContain("lucide-trophy");
+		expect(svg?.classList.contains("lucide-trophy")).toBe(true);
 	});
 });
