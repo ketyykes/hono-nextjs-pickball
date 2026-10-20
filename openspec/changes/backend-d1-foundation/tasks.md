@@ -78,10 +78,12 @@ Depends on: §4
 - [x] 5.3 驗收（指令）C2：刪除 `hono-pickball/.wrangler/state` 後 `pnpm --filter ./hono-pickball db:migrate:local` exit 0，`wrangler d1 execute DB --local --env local --command "SELECT name FROM sqlite_master WHERE type='table'"` 列出四張表；同時比對本機 sqlite 檔路徑與 2.6 啟動的 `wrangler dev` 是否同一份（design Open Questions 1），不一致則依 Decision 1 改填非 UUID 字面值並重跑 2.5、2.6、3.2
   - 刪除 `.wrangler/state` 後 `db:migrate:local` 套用 `0000_auth_core.sql`（10 commands、✅），重跑 exit 0；`d1 execute` 列出 `account`、`session`、`user`、`verification`（另有 `d1_migrations`、`sqlite_sequence`、`_cf_METADATA`）。
   - Open Question 1 結論：migrate 後 D1 目錄僅有 `e7352547...abf4d.sqlite`（與 `metadata.sqlite`）；`wrangler dev --env local --port 8790` health 200、binding 顯示 `env.DB (hono-pickball-local) D1 Database local` 後，`d1/` 下**未新增任何 sqlite 檔**（僅多出無關的 `cache/` 下 metadata.sqlite），判定為同一份，Decision 1 的省略 `database_id` 作法成立，無須改填字面值。已停止 process，`lsof -i :8790` 無輸出。
+  - leader 獨立複驗（2026-10-21）：`db:migrate:local` exit 0、`d1 execute` exit 0 並列出四張表。
 - [x] 5.4 驗收（指令）C3：`pnpm --filter ./hono-pickball db:generate` 回報無變更、`git status --porcelain -- hono-pickball/drizzle` 為空
   - `db:generate` 輸出 `No schema changes, nothing to migrate`；`git status --porcelain -- hono-pickball/drizzle` 為空。
 - [x] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／25 測試＝既有 16＋本 change 9（含 3.5 補的 2 個、4.4 補的 1 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
   - `pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck`（兩段）exit 0；前端 lint 0 errors（3 warnings，既有）；`pnpm test` exit 0：後端 6 檔／25 測試、前端 81 檔／783 測試；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`（4 增 2 刪）。
+  - leader 獨立複驗（2026-10-21）：`pnpm --filter ./nextjs-pickball lint` exit 0（0 errors, 3 warnings）。
 - [x] 5.6 驗收（指令）：完整 E2E 回歸 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留 process）——`dev` script 改走 `--env local` 後 `webServer` 啟動的後端必須讓既有 E2E 全數原樣通過；結果（passed／skipped／failed）寫在本 task 後方
   - 前後 `lsof`／`ps` 無殘留 process。`playwright test --workers=1` exit 0：**633 passed、27 skipped、0 failed**（27.7 分鐘；`api-health.spec.ts` 在其中通過）。webServer 後端指令為 `pnpm --filter hono-pickball dev`，即 `wrangler dev --env local`。log：`/tmp/b1-e2e.log`。
 - [x] 5.7 `DO_NOT_TRACK=1 openspec validate backend-d1-foundation --strict` 通過
