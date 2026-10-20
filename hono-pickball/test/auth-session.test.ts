@@ -1,5 +1,5 @@
 import { env, exports } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
 import { buildTestAccountSeedSql } from "../src/db/seed/test-account";
 
@@ -99,12 +99,20 @@ describe("GET /api/session", () => {
 		const brokenEnv = { ...env, DB: throwingDb };
 		const init = { headers: { Cookie: cookie } };
 
-		const res = await app.request("/api/session", init, brokenEnv);
+		// spec 要求降級時以 console.error 記錄；同時避免測試輸出被預期內的錯誤洗版
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const res = await app.request("/api/session", init, brokenEnv);
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({ authEnabled: true, user: null });
+			// better-auth 自己也會 console.error，所以要認本路由的訊息，不能只看有沒有被呼叫
+			expect(spy.mock.calls.some(([message]) => typeof message === "string" && message.includes("查詢 session 失敗"))).toBe(true);
+		} finally {
+			spy.mockRestore();
+		}
+
 		// 同一個替身 env 與 cookie 打受保護端點：降級只屬於探針，授權路徑不得吞錯
 		const meRes = await app.request("/api/me", init, brokenEnv);
-
-		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ authEnabled: true, user: null });
 		expect(meRes.status).toBe(500);
 	});
 });
