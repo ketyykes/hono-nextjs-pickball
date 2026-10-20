@@ -262,3 +262,8 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 7. **§4 Stage 2 審查：getDb「帶入 schema」無測試覆蓋**（2026-10-21）。現有寫入讀回 it 只用 query builder，`drizzle(env.DB)`／`{ schema: {} }` 變異存活。
    leader 裁定比照 3.5：新增 task 4.4 與 test-plan 一列（relational query 讀回，覆蓋測試、非 RED），§5.5 後端預期數改為 6 檔／25 測試。
    殘留限制：只帶部分資料表（例如 `{ schema: { user } }`）測不出來；`import * as schema` 在結構上保證帶入全部，不另逐表探測。
+8. **Open Question 1 結論（§5.3 實測，2026-10-21）：同一份**。刪除 `.wrangler/state` 後 `db:migrate:local` 只產生一個 D1 sqlite
+   （`d1/miniflare-D1DatabaseObject/<hash>.sqlite`）；之後 `wrangler dev --env local` 啟動、health 200，`d1/` 下未多出任何 sqlite 檔。
+   省略 `database_id` 可行，不需改填 `"local-hono-pickball"`。Open Question 2 結論見 tasks 2.4（`--env-file` 確實忽略 `.dev.vars`）；
+   Open Question 3 結論見 tasks 5.6（E2E 633 passed／27 skipped／0 failed，`dev` 走 `--env local` 不影響既有 E2E；本 change 未動任何前端／E2E 檔，
+   skipped 數由 main 的程式碼決定）。
