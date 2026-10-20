@@ -244,3 +244,13 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
   - ③ `/drizzle-team/drizzle-orm-docs`：sqlite 最小設定為 `{ dialect: "sqlite", schema }`；`driver: "d1-http"` 只用於 `push`／`migrate`／`pull`／`studio`，
     與 Decision 3 一致。
 - **1.5 C8 前置**：`lsof -i :3005 -i :8787 -i :8790` 無輸出（exit 1），無殘留 dev server。
+
+### apply §2 審查衍生事項（2026-10-21）
+
+4. **`ENVIRONMENT` 型別為必填 `string`，但遠端實際為 `undefined`**：`--env-file .dev.vars.example` 讓 wrangler 把範例檔的鍵產生為必填型別
+   （`__BaseEnv_CloudflareBindings`、`Cloudflare.LocalEnv`、`NodeJS.ProcessEnv` 皆是）。這是 Decision 2 未預見的副作用；B1 不讀 `ENVIRONMENT`，
+   不影響本棒行為。型別檔是產生物不可手改、`secrets.required` 已被否決、自範例檔移除會違反 C7，故**交由 B2 處理**：B2 讀取時 MUST 只用
+   `env.ENVIRONMENT === "development"` 這種等值比較（缺值自然為 false，預設安全），必要時在讀取點把型別收窄為 `string | undefined`。
+5. **CF Dashboard 側風險**：若 Workers Builds 的 build 環境被設了 `CLOUDFLARE_ENV=local`（或 deploy command 帶 `--env local`），部署會改讀沒有
+   `database_id` 的 `env.local`，可能觸發遠端 automatic provisioning。repo 內無法防範，§5.1 改寫 `hono-pickball/CLAUDE.md` 時加註「Dashboard 不得設定
+   `CLOUDFLARE_ENV`／`--env`」。
