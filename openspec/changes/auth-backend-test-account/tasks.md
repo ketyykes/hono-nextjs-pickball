@@ -68,9 +68,11 @@ Depends on: §4
   - 無 regression guard：6 條皆為真紅燈
   - §4 審查補強（非 RED，另開 `test:` commit 6fe82bc）：seed 跳脫 it 的 email 改為 `o'neil-seed@example.com`（寫入即綠）；`account_id`／`provider_id` 斷言併入「重複 seed」it（見上，該段在紅燈前即通過，因 seed 實作本就正確，屬補強性質）
 - [x] 5.2 GREEN: `hono-pickball/src/index.ts` 以 `app.on(["GET", "POST"], "/api/auth/*", …)` 掛 better-auth handler（每請求 `createAuth`，存於 `c.var.auth`）。Hono 的 `Variables` 型別一併宣告
-  - 綠燈：後端 9 檔／38 測試全綠（32＋seed 2 新增＋sign-in 4 新增 − 既有 1 重複計入前後差；實測 `Test Files 9 passed, Tests 38 passed`，auth-gating 尚未新增）；typecheck 兩段 exit 0
+  - 綠燈：後端 9 檔／38 測試全綠（`Test Files 9 passed, Tests 38 passed`（32＋seed 2＋sign-in 4））；typecheck 兩段 exit 0
   - `/api/health`、`/api/cookie-check` 零改動
-- [ ] 5.3 RED: 新增 `hono-pickball/test/auth-gating.test.ts`，寫入 it「ENVIRONMENT 缺值時 sign-in 回 404 且不發 cookie」「ENVIRONMENT 為 production 時 sign-in 回 404 且不發 cookie」「停用且無 DB binding 時 auth 路由與 /api/me 皆回 404」（`app.request` 注入覆寫 env）。確認紅燈並逐條貼出實際 status（預期：前兩者因 `emailAndPassword.enabled=false` 回非 404 的 4xx；第三者的 `/api/auth/get-session` 因 `getDb` 拋錯回 500）
+- [x] 5.3 RED: 新增 `hono-pickball/test/auth-gating.test.ts`，寫入 it「ENVIRONMENT 缺值時 sign-in 回 404 且不發 cookie」「ENVIRONMENT 為 production 時 sign-in 回 404 且不發 cookie」「停用且無 DB binding 時 auth 路由與 /api/me 皆回 404」（`app.request` 注入覆寫 env）。確認紅燈並逐條貼出實際 status（預期：前兩者因 `emailAndPassword.enabled=false` 回非 404 的 4xx；第三者的 `/api/auth/get-session` 因 `getDb` 拋錯回 500）
+  - 紅燈（3 條全紅）：ENVIRONMENT 缺值 expected 400 to be 404（`emailAndPassword.enabled=false` 回 400）；ENVIRONMENT 為 production expected 400 to be 404；停用且無 DB 時 `/api/auth/get-session` expected 500 to be 404（`getDb` 拋錯）。`Tests 3 failed`
+  - regression guard 註記：第三條 it 的 `/api/me` 部分在 `/api/me` 尚未存在時即為 404（會是綠的），整條 it 的紅燈僅來自 `/api/auth/get-session` 的 500；`/api/me` 的真實保護待 §6 掛上後由 6.3 確認
 - [ ] 5.4 GREEN: 新增 gate middleware（`isLocalAuthEnabled` 為 false 時 `c.notFound()`，不呼叫 `createAuth`），掛在 `/api/auth/*`；`/api/me` 於 §6 一併掛上
 - [ ] 5.5 REFACTOR: 確認 `createAuth` 每請求只建立一次（gate 之後、handler 共用 `c.var.auth`）；無壞味道則註記 skipped
 
