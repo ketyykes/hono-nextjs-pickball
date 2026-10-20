@@ -57,6 +57,7 @@ Depends on: §3
   - 補強：明文密碼被跳脫後不等於原字串，故斷言加上「不含跳脫後的密碼」才殺得掉『寫入明文』變異
   - 存活（本組 it 無法覆蓋，預定由 §5 登入／重複 seed it 覆蓋）：拿掉 DELETE、provider_id、account.account_id、email_verified、時間戳、DELETE 的 email 未跳脫
   - REFACTOR：skipped（無壞味道）
+  - Stage 2 審查更正存活歸屬：`DELETE` 改為刪全部 user 只有 §6「A 的 cookie 只能取得 A 而非 B」（先後 seed A、B）殺得掉；INSERT 少 `;` 在測試路徑（`env.DB.exec` 逐行執行）殺不掉，由 §8 C4（`wrangler d1 execute --file`）把關；`account_id = userId` 與 email 的單引號跳脫無既有 it 覆蓋，§5 以斷言補強（見 §5 子項）。流程備註：4.2 的 feat commit 夾帶 2 行測試補強，理想上應為獨立 `test:` commit
 
 ## 5. /api/auth/* 掛載、登入、註冊與 gate
 
