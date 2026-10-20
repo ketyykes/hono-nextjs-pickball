@@ -19,7 +19,15 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc", environment: "local" },
-      miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+      // 固定 binding 值一律由此注入測試專用假值，測試結果不依賴開發者本機的 .dev.vars。
+      miniflare: {
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          ENVIRONMENT: "development",
+          BETTER_AUTH_SECRET: "test-only-secret-not-for-production-0000",
+          BETTER_AUTH_URL: "http://localhost:3005",
+        },
+      },
     }),
   ],
   test: {

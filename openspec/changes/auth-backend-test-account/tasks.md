@@ -34,7 +34,8 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 設定層：`.dev.vars.example` 補 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL=http://localhost:3005`、`TEST_ACCOUNT_EMAIL`、`TEST_ACCOUNT_PASSWORD`、`TEST_ACCOUNT_NAME`（示意值＋用途註解）；跑 `pnpm --filter ./hono-pickball cf-typegen` 更新 `worker-configuration.d.ts`；`vitest.config.ts` 的 `miniflare.bindings` 加入 `ENVIRONMENT: "development"`、`BETTER_AUTH_SECRET: "test-only-secret-not-for-production-0000"`、`BETTER_AUTH_URL: "http://localhost:3005"`（design Decision 6）
+- [x] 3.1 設定層：`.dev.vars.example` 補 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL=http://localhost:3005`、`TEST_ACCOUNT_EMAIL`、`TEST_ACCOUNT_PASSWORD`、`TEST_ACCOUNT_NAME`（示意值＋用途註解）；跑 `pnpm --filter ./hono-pickball cf-typegen` 更新 `worker-configuration.d.ts`；`vitest.config.ts` 的 `miniflare.bindings` 加入 `ENVIRONMENT: "development"`、`BETTER_AUTH_SECRET: "test-only-secret-not-for-production-0000"`、`BETTER_AUTH_URL: "http://localhost:3005"`（design Decision 6）
+  - 實測：pool 會載入 `.dev.vars`（輸出 "Using secrets defined in .dev.vars"），但 `miniflare.bindings` 蓋過它：一次性探針確認 `env.BETTER_AUTH_SECRET`、`env.BETTER_AUTH_URL` 為測試假值（探針未 commit）；既有套件 26 測試全綠
 - [ ] 3.2 RED: 於 `auth-config.test.ts` 加入五個 it：「缺少 BETTER_AUTH_SECRET 時 createAuth 拋錯」「缺少 BETTER_AUTH_URL 時 createAuth 拋錯」「baseURL 與 trustedOrigins 皆取自 BETTER_AUTH_URL」「emailAndPassword 只在 development 啟用且一律禁止註冊」「Google provider 只在 client id 與 secret 皆存在時註冊」。確認紅燈
 - [ ] 3.3 GREEN: 新增 `hono-pickball/src/auth/create-auth.ts` 的 `createAuth(env)`（design Decision 1、3、4）：`getDb(env)`＋`drizzleAdapter(db, { provider: "sqlite", schema, transaction: false })`、`baseURL`／`trustedOrigins`／`secret`、缺值拋錯、`emailAndPassword: { enabled: isLocalAuthEnabled(env), disableSignUp: true }`、條件式 `socialProviders.google`
 - [ ] 3.4 REFACTOR: 確認 `createAuth` 不在模組層讀 env、沒有預設 secret 的 fallback；無壞味道則註記 skipped
