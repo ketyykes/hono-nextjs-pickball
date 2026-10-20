@@ -109,4 +109,54 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 			await countRows(db, "SELECT COUNT(*) AS n FROM account WHERE user_id = ?", userId),
 		).toBe(0);
 	});
+
+	// 以下兩個 it 為覆蓋測試（寫入即綠，非 RED）：補齊設定層約束與新表的讀寫覆蓋義務。
+	it("session.token 重複時插入失敗", async () => {
+		const db = getTestDb();
+		await insertUser(db, "token-user-1", "token@example.com");
+		const insertSession = (id: string) =>
+			db
+				.prepare(
+					"INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+				)
+				.bind(id, NOW + 1000, "dup-token-1", NOW, NOW, "token-user-1")
+				.run();
+
+		await insertSession("token-session-1");
+		await expect(insertSession("token-session-2")).rejects.toThrow(/UNIQUE/);
+
+		expect(
+			await countRows(
+				db,
+				"SELECT COUNT(*) AS n FROM session WHERE token = ?",
+				"dup-token-1",
+			),
+		).toBe(1);
+	});
+
+	it("verification 資料表可寫入並讀回", async () => {
+		const db = getTestDb();
+		await db
+			.prepare(
+				"INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind("verification-1", "verify@example.com", "verify-value-1", NOW + 5000, NOW + 1, NOW + 2)
+			.run();
+
+		const row = await db
+			.prepare(
+				"SELECT id, identifier, value, expires_at, created_at, updated_at FROM verification WHERE id = ?",
+			)
+			.bind("verification-1")
+			.first();
+
+		expect(row).toEqual({
+			id: "verification-1",
+			identifier: "verify@example.com",
+			value: "verify-value-1",
+			expires_at: NOW + 5000,
+			created_at: NOW + 1,
+			updated_at: NOW + 2,
+		});
+	});
 });
