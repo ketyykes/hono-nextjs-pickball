@@ -130,8 +130,13 @@ Depends on: §7
 
 Depends on: §8
 
-- [ ] 9.1 E2E（regression guard）: 新增 `nextjs-pickball/tests/e2e/helpers/test-account.ts`（`readTestAccount()` 解析 `../hono-pickball/.dev.vars`，缺值回 `null`；`ensureTestAccountSeeded()` 依序執行 `pnpm --filter ./hono-pickball db:migrate:local` 與 `db:seed:local`）與 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts`（只跑 chromium；`beforeAll` seed；缺帳密 `test.skip` 並寫明缺哪個變數），寫入 test「經 proxy 登入後 session cookie 落在前端 origin 並可取得 /api/me」「經 proxy 呼叫 /api/session 未登入時回 200 與 user null」。後端行為已由 §5～§7 的 integration 測試以真紅燈驅動，本 E2E 驗證的是既有 proxy 的穿透能力，寫入即綠——**如實標註為 regression guard**，SHALL NOT 以 stash 回退後端程式碼或改斷言製造紅燈。指令：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/auth-proxy.spec.ts`（前後清殘留 process）
-- [ ] 9.2 確認 `nextjs-pickball` 的 `tsc --noEmit` 與 `pnpm --filter ./nextjs-pickball lint` 對新增的兩個檔案皆無錯誤
+- [x] 9.1 E2E（regression guard）: 新增 `nextjs-pickball/tests/e2e/helpers/test-account.ts`（`readTestAccount()` 解析 `../hono-pickball/.dev.vars`，缺值回 `null`；`ensureTestAccountSeeded()` 依序執行 `pnpm --filter ./hono-pickball db:migrate:local` 與 `db:seed:local`）與 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts`（只跑 chromium；`beforeAll` seed；缺帳密 `test.skip` 並寫明缺哪個變數），寫入 test「經 proxy 登入後 session cookie 落在前端 origin 並可取得 /api/me」「經 proxy 呼叫 /api/session 未登入時回 200 與 user null」。後端行為已由 §5～§7 的 integration 測試以真紅燈驅動，本 E2E 驗證的是既有 proxy 的穿透能力，寫入即綠——**如實標註為 regression guard**，SHALL NOT 以 stash 回退後端程式碼或改斷言製造紅燈。指令：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/auth-proxy.spec.ts`（前後清殘留 process）
+  - 性質：**regression guard**（後端行為已由 §5～§7 integration 測試真紅燈驅動，本 E2E 寫入即綠；未回退後端、未改斷言製造紅燈）
+  - 鑑別力檢查（確認測試會失敗，非偽造紅燈）：暫時把測試檔內預期 email 改成錯值，chromium 跑一次 → 1 failed（Expected 錯值／Received 實際 email）、/api/session 1 passed；已還原
+  - 結果：`playwright test --workers=1 tests/e2e/specs/auth-proxy.spec.ts` → 4 passed（chromium、mobile-chrome 各 2）、6 skipped（firefox／webkit／mobile-safari），非因缺帳密而 skip；前後無殘留 process，:3005／:8787 無 listener
+  - 實作備註：helper 用 `__dirname`（Playwright 以 CJS 載入 TS）；另匯出 `readTestAccountResult()` 回報缺少的變數名，`readTestAccount()` 缺值回 `null`；`ensureTestAccountSeeded()` 以 `pnpm --dir <hono 絕對路徑>` 執行，不依賴 cwd
+- [x] 9.2 確認 `nextjs-pickball` 的 `tsc --noEmit` 與 `pnpm --filter ./nextjs-pickball lint` 對新增的兩個檔案皆無錯誤
+  - 前端 `tsc --noEmit` exit 0；`lint` exit 0（0 errors，3 個既有 warning，皆不在新增檔案）
 
 ## 10. 文件同步與總驗收
 
