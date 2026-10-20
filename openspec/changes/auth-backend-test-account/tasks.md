@@ -80,6 +80,7 @@ Depends on: §4
   - mutation（14 次，另含 1 對照，三重落地檢查皆通過、每次還原後 `git diff` 乾淨）：gate 拿掉（轉紅：gating 3 條）；gate 只擋 POST（轉紅：無 DB 的 get-session）；gate 放到 `createAuth` 之後（轉紅：無 DB 的 get-session 500）；`transaction: true`（轉紅：註冊端點）；`disableSignUp: false`（轉紅）；`enabled: false`（轉紅：sign-in 200／401 與 seed 登入）；`enabled: true`（轉紅：createAuth 設定 it）；seed 拿掉 DELETE、`provider_id` 改 `'email'`、`password` 寫 NULL、`account_id` 用另一個 uuid、email 未跳脫（DELETE／INSERT）皆轉紅；等價變異 `return next()` 維持綠
   - 存活：`provider: "pg"`（登入與註冊流程皆通過，drizzle adapter 在此用途下行為與 sqlite 無可觀察差異，視為等價，未硬造測試）
   - 狀態碼分支：200（gate 拿掉／enabled false）、400（disableSignUp false／gate 前的 enabled 行為）、401（enabled false 時 sign-in 變 400）、404（gate 拿掉）各至少一個變異轉紅
+  - Stage 2 審查補登：`app.on` 只收 POST **存活**——停用時 GET 本來就 404，啟用時沒有測試以 GET 進 better-auth handler；spec 未規範啟用時 GET 的行為，前端改用 `/api/session`（Decision 5），Google callback 屬 G1，**接受存活**。`isLocalAuthEnabled` 改 `!== "production"` 轉紅 4 條。`provider: "pg"` 經審查讀 adapter 原始碼裁定為現行設定下的等價變異（差異只在 `ilike`、`supportsUUIDs`、JSON／陣列欄位，皆未觸發）；日後若加入會做不分大小寫搜尋的 plugin 或 JSON 欄位須重新評估。`src/index.ts` 中「同請求的後續 middleware 與 handler 共用」的註解目前不準確（`c.set` 在最終 handler），由 §6 抽出共用 middleware 時一併修正
 
 ## 6. requireSession 與 GET /api/me
 
