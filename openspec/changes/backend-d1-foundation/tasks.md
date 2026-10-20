@@ -29,11 +29,11 @@ Depends on: §1
 
 - [x] 2.1 設定層：新增 `hono-pickball/.dev.vars.example`（`ENVIRONMENT=development`＋說明註解：只在本機啟用、遠端缺值即停用、`.dev.vars` 不入版控）
 - [x] 2.2 設定層：`hono-pickball/package.json` 的 `cf-typegen` 改為 `wrangler types --env-interface CloudflareBindings --env-file .dev.vars.example`；`dev` 改為 `wrangler dev --env local`；新增 `db:generate`（`drizzle-kit generate`）與 `db:migrate:local`（`wrangler d1 migrations apply DB --local --env local`）。**本 task MUST 先於 2.3 commit**（design Decision 2「注意順序」）
-- [ ] 2.3 設定層：`hono-pickball/wrangler.jsonc` 新增 `env.local`（`name: "hono-pickball"`、`d1_databases: [{ binding: "DB", database_name: "hono-pickball-local", migrations_dir: "drizzle" }]`，**不填 `database_id`**），top-level 不動；移除舊的 D1 註解範例並改寫為「D1 只在 env.local，正式環境於 G1 宣告」的說明。hook 自動重跑 `cf-typegen`，連同 `worker-configuration.d.ts` 一併 commit
+- [x] 2.3 設定層：`hono-pickball/wrangler.jsonc` 新增 `env.local`（`name: "hono-pickball"`、`d1_databases: [{ binding: "DB", database_name: "hono-pickball-local", migrations_dir: "drizzle" }]`，**不填 `database_id`**），top-level 不動；移除舊的 D1 註解範例並改寫為「D1 只在 env.local，正式環境於 G1 宣告」的說明。hook 自動重跑 `cf-typegen`，連同 `worker-configuration.d.ts` 一併 commit
 - [ ] 2.4 驗收（指令）C4：確認 `worker-configuration.d.ts` 含 `DB?: D1Database`；暫時建立內容含 `ENVIRONMENT=development`、`SOME_LOCAL_ONLY=x` 的 `.dev.vars` 跑 `cf-typegen`，`git diff --exit-code -- hono-pickball/worker-configuration.d.ts` 為 0；刪除暫存 `.dev.vars` 再跑一次仍為 0。若不為 0，依 design Open Questions 2 處理並記錄
 - [ ] 2.5 驗收（指令）C1：`pnpm --filter ./hono-pickball build` exit 0，dry-run 輸出的 binding 清單不含 `DB`
 - [ ] 2.6 驗收（指令）C8：`pnpm --filter ./hono-pickball exec wrangler dev --env local --port 8790` 啟動（背景），輸出的 worker 名稱為 `hono-pickball`、`curl -s -o /dev/null -w "%{http_code}" http://localhost:8790/api/health` 為 200；完成後立刻停止該 process 並以 `lsof -i :8790` 確認釋放。名稱帶 `-local` 後綴則依 execution-plan Escalation 停止
-- [ ] 2.7 設定層：新增 `hono-pickball/drizzle.config.ts`（`dialect: "sqlite"`、`schema: "./src/db/schema.ts"`、`out: "./drizzle"`，不設 `driver`／`dbCredentials`）
+- [x] 2.7 設定層：新增 `hono-pickball/drizzle.config.ts`（`dialect: "sqlite"`、`schema: "./src/db/schema.ts"`、`out: "./drizzle"`，不設 `driver`／`dbCredentials`）
 
 ## 3. D1 測試夾具與 auth 核心資料表
 
