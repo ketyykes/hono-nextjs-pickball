@@ -172,3 +172,36 @@ helper 讓 B3 的 Playwright `globalSetup`（runbook D6）直接重用，不寫�
 2. S1 的 `preview` 模式下前端 origin 與埠號（OpenNext preview 預設可能與後端 `wrangler dev` 的 8787 衝突）；本 change 以
    `BETTER_AUTH_URL` 變數化因應，實際值由 S1 決定，**不屬本 change 驗收**。
 3. `wrangler d1 execute --local` 與執行中的 `wrangler dev` 是否共用且即時可見同一份資料（Risks 第 1 條）。
+
+### apply §1 查證紀錄（2026-10-21）
+
+- **1.1 baseline**：後端為 6 檔／**25** 測試（B1 apply 時新增 3.5、4.4 兩條覆蓋測試），非 tasks 1.1 所寫的 22。
+  因此 tasks 10.4 的後端預期改為 12 檔／**50** 測試（25＋本 change 25）。
+- **1.2 對齊 B1：一致，無差異**。`env.local` 宣告 `DB`（worker 名稱維持 `hono-pickball`）；`getDb(env: Pick<CloudflareBindings, "DB">)`
+  缺 `DB` 拋錯；`CloudflareBindings` 的 `DB` 為可選（`DB?: D1Database`）、`ENVIRONMENT` 為必填 `string`（B1 Open Question 4，
+  只能以 `=== "development"` 判斷）；四張表欄位與 better-auth 1.6 一致（1.5 實測 adapter 可直接註冊、登入）；
+  `TEST_MIGRATIONS` 經 `miniflare.bindings` 注入、`test/apply-migrations.ts` 套用。主 spec `dev-workflow`「後端測試在 workerd runtime 中執行」
+  與本 change delta 的差異**只有**本 change 新增的「app.request 例外」段落與 Scenario，delta 已以主 spec 為底，無須重套。
+- **1.3 本機套件：與 design 相同**。`better-auth@1.6.15`、`@better-auth/drizzle-adapter@1.6.15`；`better-auth/package.json` exports 含 `./crypto`，
+  `dist/crypto/index.d.mts` 匯出 `hashPassword`／`verifyPassword`；adapter `index.d.mts` 匯出 `drizzleAdapter`、`transaction?: boolean`；
+  Node `v22.22.1`、`process.features.typescript === "strip"`、`process.loadEnvFile` 為 function。
+- **1.4 Context7（`/better-auth/better-auth/v1.6.23`）：與 Decision 1～5 無衝突**。
+  ① `integrations/hono.mdx`：`app.on(["POST","GET"], "/api/auth/*", (c) => auth.handler(c.req.raw))`、`auth.api.getSession({ headers: c.req.raw.headers })`，
+  與 Decision 1／5 一致（官方 middleware 掛 `"*"`，本 change 刻意只掛在需要的路由，已記於 Decision 5）。
+  ② `api/routes/sign-up.ts`：`!enabled || disableSignUp` → `APIError("BAD_REQUEST", EMAIL_PASSWORD_SIGN_UP_DISABLED)`。
+  ③ `cookies/index.ts` `createCookieGetter`：`Secure` 判定順序與 Decision 4 所述相同；預設 `sameSite: "lax"`、`path: "/"`、`httpOnly: true`。
+  ④ `auth/base.ts`：靜態 `baseURL` 時不從請求推導；`trustedOrigins` 每請求以 `getTrustedOrigins(options, request)` 解析。
+  ⑤ `concepts/database.mdx`：官方 D1 範例為模組層 `env.DB`（Decision 1 已說明不採用）；adapter `transaction` 預設 `false`，本 change 明確設 `false`。
+  另：官方 installation 以 `better-auth/adapters/drizzle` 匯入 adapter；本 change 依 proposal 使用已安裝的 `@better-auth/drizzle-adapter`，兩者同一實作。
+- **1.5 實測（一次性 probe 測試檔與暫時路由，皆未 commit、已還原）**：
+  - **Open Question 1 結論：sign-up 停用回 `400`**，body `{"message":"Email and password sign up is not enabled","code":"EMAIL_PASSWORD_SIGN_UP_DISABLED"}`。
+    delta spec 無須修正。
+  - 附帶觀察：錯誤密碼與不存在帳號皆回 `401` `{"message":"Invalid email or password","code":"INVALID_EMAIL_OR_PASSWORD"}`（body 相同，
+    「帳號不存在與密碼錯誤回應相同」預期為 regression guard）；成功登入的 `Set-Cookie` 為
+    `better-auth.session_token=…; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax`（無 `Secure`）；
+    `emailAndPassword.enabled=false` 時 sign-in 回 `400 EMAIL_PASSWORD_DISABLED`（5.3 前兩條 it 的紅燈預期即此值）。
+  - ⚠️ **未帶 `Origin` 的 sign-in POST 也回 200**（請求不帶 cookie 時 better-auth 不做 origin 檢查）。spec「請求 MUST 帶有屬於 trustedOrigins 的 Origin」
+    是對呼叫端的要求而非伺服端的強制行為；本 change 測試一律帶 `Origin`，不新增「缺 Origin 被拒」的斷言（那不是 better-auth 1.6 的行為）。
+  - **Open Question 3 結論：立即可見**。以 `wrangler dev --env local --port 8790` 起後端（暫時加一條讀 `user` 計數的路由），
+    `wrangler d1 execute DB --local --env local --command "INSERT …"` 後同一個執行中的 dev 立即讀到 1 筆，`DELETE` 後立即讀回 0 筆。
+    E2E helper 可在 `webServer` 已啟動後再 seed，不需重啟後端。dev 停止後 `lsof -i :8790` 無輸出。

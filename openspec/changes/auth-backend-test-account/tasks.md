@@ -15,11 +15,12 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/auth-backend-test-account`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；`pnpm test` baseline（後端應為 B1 後的 6 檔／22 測試），回填 environment.md 並 commit
-- [ ] 1.2 對齊 B1 實際落地：讀 `hono-pickball/{wrangler.jsonc, vitest.config.ts, src/db/client.ts, src/db/schema.ts, test/apply-migrations.ts, test/env.d.ts, CLAUDE.md}` 與 B1 archive 的 design.md Open Questions，確認 `env.local`、`getDb` 簽章、四張表欄位、`TEST_MIGRATIONS` 夾具與本 design Context 一致；差異記入本 design.md Open Questions；另比對主 spec `openspec/specs/dev-workflow/spec.md` 的「後端測試在 workerd runtime 中執行」與本 change delta 中同名 MODIFIED Requirement 的 B1 部分，若不同，以主 spec 為底重新套用本 change 新增的「app.request 例外」段落與 Scenario 並 commit
-- [ ] 1.3 本機套件查證：`better-auth` 為 1.6.x、`better-auth/crypto` 匯出 `hashPassword`／`verifyPassword`；`@better-auth/drizzle-adapter` 匯出 `drizzleAdapter` 且有 `transaction` 選項；`node -e "console.log(process.features.typescript)"` 為 `strip`
-- [ ] 1.4 Context7 查證（MUST）：`/better-auth/better-auth/v1.6.23`（或與已安裝版本最接近的版本 ID）查 ① Hono 整合（`app.on(["GET","POST"], "/api/auth/*")`、`auth.api.getSession({ headers })`）② `emailAndPassword.disableSignUp` 與 sign-up 停用時的錯誤 ③ cookie 預設屬性與 `useSecureCookies` 判定 ④ `trustedOrigins`／`baseURL` ⑤ D1／Cloudflare Workers 的建立方式；與 design Decision 1～5 的差異記入 Open Questions（附 library ID）
-- [ ] 1.5 實測 design Open Questions 1、3：以一次性腳本（不 commit）確認 sign-up 停用的實際狀態碼；確認 `wrangler d1 execute --local --env local` 寫入後，**執行中**的 `wrangler dev --env local` 能否立即讀到（以 `--port 8790` 起一個後端，查完立刻停止並確認釋放）。結果寫入 Open Questions；狀態碼若非 400，依 design Risks 第 4 條修正 delta spec
+- [x] 1.1 確認分支 `change/auth-backend-test-account`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；`pnpm test` baseline（後端應為 B1 後的 6 檔／22 測試），回填 environment.md 並 commit
+- [x] 1.2 對齊 B1 實際落地：讀 `hono-pickball/{wrangler.jsonc, vitest.config.ts, src/db/client.ts, src/db/schema.ts, test/apply-migrations.ts, test/env.d.ts, CLAUDE.md}` 與 B1 archive 的 design.md Open Questions，確認 `env.local`、`getDb` 簽章、四張表欄位、`TEST_MIGRATIONS` 夾具與本 design Context 一致；差異記入本 design.md Open Questions；另比對主 spec `openspec/specs/dev-workflow/spec.md` 的「後端測試在 workerd runtime 中執行」與本 change delta 中同名 MODIFIED Requirement 的 B1 部分，若不同，以主 spec 為底重新套用本 change 新增的「app.request 例外」段落與 Scenario 並 commit
+- [x] 1.3 本機套件查證：`better-auth` 為 1.6.x、`better-auth/crypto` 匯出 `hashPassword`／`verifyPassword`；`@better-auth/drizzle-adapter` 匯出 `drizzleAdapter` 且有 `transaction` 選項；`node -e "console.log(process.features.typescript)"` 為 `strip`
+- [x] 1.4 Context7 查證（MUST）：`/better-auth/better-auth/v1.6.23`（或與已安裝版本最接近的版本 ID）查 ① Hono 整合（`app.on(["GET","POST"], "/api/auth/*")`、`auth.api.getSession({ headers })`）② `emailAndPassword.disableSignUp` 與 sign-up 停用時的錯誤 ③ cookie 預設屬性與 `useSecureCookies` 判定 ④ `trustedOrigins`／`baseURL` ⑤ D1／Cloudflare Workers 的建立方式；與 design Decision 1～5 的差異記入 Open Questions（附 library ID）
+- [x] 1.5 實測 design Open Questions 1、3：以一次性腳本（不 commit）確認 sign-up 停用的實際狀態碼；確認 `wrangler d1 execute --local --env local` 寫入後，**執行中**的 `wrangler dev --env local` 能否立即讀到（以 `--port 8790` 起一個後端，查完立刻停止並確認釋放）。結果寫入 Open Questions；狀態碼若非 400，依 design Risks 第 4 條修正 delta spec
+  - 結果：§1 全部紀錄見 design.md「apply §1 查證紀錄」。baseline 後端實為 6 檔／25（非 22）；sign-up 停用實測 400；d1 execute --local 對執行中 dev 立即可見；delta spec 無須修正
 
 ## 2. 本機登入啟用條件
 
@@ -94,6 +95,6 @@ Depends on: §9
 - [ ] 10.1 設定層（文件）：改寫 `hono-pickball/CLAUDE.md`：① 路由約定補 `/api/auth/*`、`/api/me`、`/api/session` 與停用時的 404／200 行為 ② 依賴注意：better-auth、`@better-auth/drizzle-adapter` 已被匯入，解除複審（`@hono/zod-validator`、`zod`、`date-fns` 仍未使用，複審期限保留給它們）；註明不升級到 1.7 的理由 ③ 測試慣例：gating 測試以 `app.request(path, init, env)` 注入 env 的例外、POST 帶 `Origin`、測試 env 由 `vitest.config.ts` 注入 ④ 本機登入準備步驟（`.dev.vars` → `db:migrate:local` → `db:seed:local`）
 - [ ] 10.2 驗收（指令）C6：有／無 `.dev.vars` 各跑一次 `pnpm --filter ./hono-pickball test`，兩次全綠且通過數相同
 - [ ] 10.3 驗收（指令）C1、C2：`pnpm --filter ./hono-pickball build` exit 0；`pnpm --filter ./hono-pickball typecheck` 兩段 exit 0
-- [ ] 10.4 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 12 檔／47 測試＝B1 後 22＋本 change 25；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
+- [ ] 10.4 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 12 檔／50 測試＝B1 後 25＋本 change 25（§1.1 實測 baseline 為 25，原寫 22／47）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
 - [ ] 10.5 驗收（指令）：完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（`.dev.vars` 齊備）——既有 E2E 全數原樣通過，`auth-proxy.spec.ts` 在 chromium 2 passed；結果寫在本 task 後方
 - [ ] 10.6 `DO_NOT_TRACK=1 openspec validate auth-backend-test-account --strict` 通過
