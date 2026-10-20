@@ -50,6 +50,7 @@ Depends on: §2
   - skipped：註解皆只寫「為什麼」，無壞味道，無改動。
 - [x] 3.4 驗收（指令）C5：`pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0（`test/env.d.ts` 與 `D1Migration` 匯入在第二段生效）
   - `pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0。
+- [ ] 3.5 覆蓋（設定層約束，非 RED）：§3 Stage 2 審查以 mutation 發現 spec 覆蓋義務缺口——`session.token` unique 無測試（移除後存活）、`verification` 表無寫入讀回。於 `hono-pickball/test/d1-schema.test.ts` 新增 it「session.token 重複時插入失敗」「verification 資料表可寫入並讀回」（test-plan 已同步新增兩列）；寫入即綠，MUST 如實標註為覆蓋測試／regression guard，SHALL NOT 偽造紅燈；交件前以 mutation（移除 `session_token_unique`、移除 verification 的 `value` NOT NULL 以外的等價對照）證明有鑑別力
 
 ## 4. getDb：D1 存取入口
 
@@ -67,6 +68,6 @@ Depends on: §4
 - [ ] 5.2 驗收（指令）C6、C7：逐條核對 `hono-pickball/CLAUDE.md` 與 `.dev.vars.example`、`wrangler.jsonc`，結果寫在本 task 後方
 - [ ] 5.3 驗收（指令）C2：刪除 `hono-pickball/.wrangler/state` 後 `pnpm --filter ./hono-pickball db:migrate:local` exit 0，`wrangler d1 execute DB --local --env local --command "SELECT name FROM sqlite_master WHERE type='table'"` 列出四張表；同時比對本機 sqlite 檔路徑與 2.6 啟動的 `wrangler dev` 是否同一份（design Open Questions 1），不一致則依 Decision 1 改填非 UUID 字面值並重跑 2.5、2.6、3.2
 - [ ] 5.4 驗收（指令）C3：`pnpm --filter ./hono-pickball db:generate` 回報無變更、`git status --porcelain -- hono-pickball/drizzle` 為空
-- [ ] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／22 測試＝既有 16＋本 change 6；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
+- [ ] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／24 測試＝既有 16＋本 change 8（含 3.5 補的 2 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
 - [ ] 5.6 驗收（指令）：完整 E2E 回歸 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留 process）——`dev` script 改走 `--env local` 後 `webServer` 啟動的後端必須讓既有 E2E 全數原樣通過；結果（passed／skipped／failed）寫在本 task 後方
 - [ ] 5.7 `DO_NOT_TRACK=1 openspec validate backend-d1-foundation --strict` 通過

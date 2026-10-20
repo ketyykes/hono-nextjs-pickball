@@ -29,6 +29,8 @@
 | auth 核心四張資料表皆已由 migration 建立 | migration 套用後四張表皆存在 | `SELECT name FROM sqlite_master WHERE type='table'` → 含 `user`／`session`／`account`／`verification` | golden path：夾具＋migration 管線是否接通的第一個訊號；寫入時 migration 不存在 → 真紅燈 | integration |
 | user.email 重複時插入失敗 | user.email 不可重複 | 先插入 `a@example.com`，再插入同 email → reject（訊息含 `UNIQUE`）；`COUNT(*)` 仍為 1 | edge case：設定層約束的覆蓋義務（Decision 6）；B2 的 seed 與登入依賴 email 唯一 | integration |
 | 刪除使用者時其 session 與 account 一併刪除 | 刪除使用者時連帶刪除其 session 與 account | 建立 user＋session＋account → 刪除 user → 兩表中該 `userId` 的筆數皆為 0 | edge case：cascade 漏寫不會有任何其他訊號，會留下孤兒憑證；同時驗證 D1 的 foreign key 實際生效 | integration |
+| session.token 重複時插入失敗 | （覆蓋義務，無獨立 Scenario；dev-workflow「D1 schema 與 migration SQL 屬設定層」要求每個約束各有測試） | 同一位 user 插入兩筆相同 token 的 session → 第二筆 reject（訊息含 `UNIQUE`）；該 token 的 `COUNT(*)` 仍為 1 | §3 Stage 2 審查以 mutation 發現 `session_token_unique` 移除後全綠存活；token 是 session 查找鍵。寫入即綠，屬覆蓋測試（非 RED） | integration |
+| verification 資料表可寫入並讀回 | （覆蓋義務，無獨立 Scenario；「每新增一張資料表 MUST 有測試證明可經 migration 建立並被寫入讀回」） | 插入 `{ id, identifier, value, expires_at, created_at, updated_at }` 後以 id 查回 → 各欄位與寫入值相同 | §3 Stage 2 審查發現 verification 只有「存在」測試、無任何寫入讀回。寫入即綠，屬覆蓋測試（非 RED） | integration |
 
 ## dev-workflow
 

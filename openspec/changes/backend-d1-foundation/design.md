@@ -254,3 +254,8 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 5. **CF Dashboard 側風險**：若 Workers Builds 的 build 環境被設了 `CLOUDFLARE_ENV=local`（或 deploy command 帶 `--env local`），部署會改讀沒有
    `database_id` 的 `env.local`，可能觸發遠端 automatic provisioning。repo 內無法防範，§5.1 改寫 `hono-pickball/CLAUDE.md` 時加註「Dashboard 不得設定
    `CLOUDFLARE_ENV`／`--env`」。
+
+6. **§3 Stage 2 審查：spec 覆蓋義務與 test-plan 不一致**（2026-10-21）。dev-workflow「D1 schema 與 migration SQL 屬設定層」要求每個約束各有測試、
+   每張新表要寫入讀回，但 test-plan 原本只列 `user.email` unique 與兩條 cascade。mutation 顯示 `session_token_unique` 移除後存活、`verification`
+   無寫入讀回。leader 裁定：以 spec 為準，新增 task 3.5 與 test-plan 兩列（覆蓋測試，非 RED），§5.5 後端預期數改為 6 檔／24 測試。
+   未覆蓋但不補者：PK、NOT NULL、default、純效能索引（spec 的約束清單只列 unique／FK／cascade；FK 本身由 cascade 測試間接證明）。
