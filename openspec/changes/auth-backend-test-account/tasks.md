@@ -73,7 +73,8 @@ Depends on: §4
 - [x] 5.3 RED: 新增 `hono-pickball/test/auth-gating.test.ts`，寫入 it「ENVIRONMENT 缺值時 sign-in 回 404 且不發 cookie」「ENVIRONMENT 為 production 時 sign-in 回 404 且不發 cookie」「停用且無 DB binding 時 auth 路由與 /api/me 皆回 404」（`app.request` 注入覆寫 env）。確認紅燈並逐條貼出實際 status（預期：前兩者因 `emailAndPassword.enabled=false` 回非 404 的 4xx；第三者的 `/api/auth/get-session` 因 `getDb` 拋錯回 500）
   - 紅燈（3 條全紅）：ENVIRONMENT 缺值 expected 400 to be 404（`emailAndPassword.enabled=false` 回 400）；ENVIRONMENT 為 production expected 400 to be 404；停用且無 DB 時 `/api/auth/get-session` expected 500 to be 404（`getDb` 拋錯）。`Tests 3 failed`
   - regression guard 註記：第三條 it 的 `/api/me` 部分在 `/api/me` 尚未存在時即為 404（會是綠的），整條 it 的紅燈僅來自 `/api/auth/get-session` 的 500；`/api/me` 的真實保護待 §6 掛上後由 6.3 確認
-- [ ] 5.4 GREEN: 新增 gate middleware（`isLocalAuthEnabled` 為 false 時 `c.notFound()`，不呼叫 `createAuth`），掛在 `/api/auth/*`；`/api/me` 於 §6 一併掛上
+- [x] 5.4 GREEN: 新增 gate middleware（`isLocalAuthEnabled` 為 false 時 `c.notFound()`，不呼叫 `createAuth`），掛在 `/api/auth/*`；`/api/me` 於 §6 一併掛上
+  - 綠燈：後端 10 檔／41 測試全綠；typecheck 兩段 exit 0；`/api/me` 留待 §6 掛 gate
 - [ ] 5.5 REFACTOR: 確認 `createAuth` 每請求只建立一次（gate 之後、handler 共用 `c.var.auth`）；無壞味道則註記 skipped
 
 ## 6. requireSession 與 GET /api/me

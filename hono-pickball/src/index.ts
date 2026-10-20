@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { createAuth } from './auth/create-auth'
+import { isLocalAuthEnabled } from './auth/local-auth'
 
 const app = new Hono<{
   Bindings: CloudflareBindings
@@ -37,6 +38,15 @@ app.get('/api/cookie-check', (c) => {
     // 第一次呼叫為 null；第二次呼叫若帶回上次的值，代表 cookie 來回穿透成功
     receivedPreviousValue: previousValue ?? null,
   })
+})
+
+// gate 必須在 createAuth 之前：停用時不建立 auth 實例、不觸碰 D1（正式部署沒有 DB binding），
+// 回應與未定義路由相同的 404
+app.use('/api/auth/*', async (c, next) => {
+  if (!isLocalAuthEnabled(c.env)) {
+    return c.notFound()
+  }
+  await next()
 })
 
 // better-auth 的 handler 自行處理 /api/auth/* 底下的所有路徑；
