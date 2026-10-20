@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
+import { createMiddleware } from 'hono/factory'
 import { createAuth } from './auth/create-auth'
 import { isLocalAuthEnabled } from './auth/local-auth'
+import { toPublicUser } from './auth/public-user'
+import { requireSession, type AuthAppEnv } from './auth/require-session'
 
-const app = new Hono<{
-  Bindings: CloudflareBindings
-  Variables: { auth: ReturnType<typeof createAuth> }
-}>()
+const app = new Hono<AuthAppEnv>()
 
 // 刻意不定義 root path：對外 API 一律掛在 /api/* 之下（前端 catch-all proxy 只轉發 /api/*），
 // 因此 GET / 回 404 是預期行為，不代表部署失敗。
@@ -41,20 +41,23 @@ app.get('/api/cookie-check', (c) => {
 })
 
 // gate 必須在 createAuth 之前：停用時不建立 auth 實例、不觸碰 D1（正式部署沒有 DB binding），
-// 回應與未定義路由相同的 404
-app.use('/api/auth/*', async (c, next) => {
+// 回應與未定義路由相同的 404。通過後每個請求只建立一次 auth 並存於 context，
+// 後續的 handler 與 requireSession 一律讀 c.var.auth。
+const localAuth = createMiddleware<AuthAppEnv>(async (c, next) => {
   if (!isLocalAuthEnabled(c.env)) {
     return c.notFound()
   }
+  c.set('auth', createAuth(c.env))
   await next()
 })
 
-// better-auth 的 handler 自行處理 /api/auth/* 底下的所有路徑；
-// 每個請求依 env 建立 auth 實例並存於 context，同請求的後續 middleware 與 handler 共用
-app.on(['GET', 'POST'], '/api/auth/*', (c) => {
-  const auth = createAuth(c.env)
-  c.set('auth', auth)
-  return auth.handler(c.req.raw)
+app.use('/api/auth/*', localAuth)
+
+// better-auth 的 handler 自行處理 /api/auth/* 底下的所有路徑
+app.on(['GET', 'POST'], '/api/auth/*', (c) => c.var.auth.handler(c.req.raw))
+
+app.get('/api/me', localAuth, requireSession, (c) => {
+  return c.json({ user: toPublicUser(c.var.user) })
 })
 
 export default app
