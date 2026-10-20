@@ -75,7 +75,11 @@ Depends on: §4
   - regression guard 註記：第三條 it 的 `/api/me` 部分在 `/api/me` 尚未存在時即為 404（會是綠的），整條 it 的紅燈僅來自 `/api/auth/get-session` 的 500；`/api/me` 的真實保護待 §6 掛上後由 6.3 確認
 - [x] 5.4 GREEN: 新增 gate middleware（`isLocalAuthEnabled` 為 false 時 `c.notFound()`，不呼叫 `createAuth`），掛在 `/api/auth/*`；`/api/me` 於 §6 一併掛上
   - 綠燈：後端 10 檔／41 測試全綠；typecheck 兩段 exit 0；`/api/me` 留待 §6 掛 gate
-- [ ] 5.5 REFACTOR: 確認 `createAuth` 每請求只建立一次（gate 之後、handler 共用 `c.var.auth`）；無壞味道則註記 skipped
+- [x] 5.5 REFACTOR: 確認 `createAuth` 每請求只建立一次（gate 之後、handler 共用 `c.var.auth`）；無壞味道則註記 skipped
+  - skipped：gate 通過後 `createAuth` 於 `/api/auth/*` handler 內只建立一次並 `c.set('auth', …)`，無壞味道；`/api/me` 的 auth 共用留待 §6
+  - mutation（14 次，另含 1 對照，三重落地檢查皆通過、每次還原後 `git diff` 乾淨）：gate 拿掉（轉紅：gating 3 條）；gate 只擋 POST（轉紅：無 DB 的 get-session）；gate 放到 `createAuth` 之後（轉紅：無 DB 的 get-session 500）；`transaction: true`（轉紅：註冊端點）；`disableSignUp: false`（轉紅）；`enabled: false`（轉紅：sign-in 200／401 與 seed 登入）；`enabled: true`（轉紅：createAuth 設定 it）；seed 拿掉 DELETE、`provider_id` 改 `'email'`、`password` 寫 NULL、`account_id` 用另一個 uuid、email 未跳脫（DELETE／INSERT）皆轉紅；等價變異 `return next()` 維持綠
+  - 存活：`provider: "pg"`（登入與註冊流程皆通過，drizzle adapter 在此用途下行為與 sqlite 無可觀察差異，視為等價，未硬造測試）
+  - 狀態碼分支：200（gate 拿掉／enabled false）、400（disableSignUp false／gate 前的 enabled 行為）、401（enabled false 時 sign-in 變 400）、404（gate 拿掉）各至少一個變異轉紅
 
 ## 6. requireSession 與 GET /api/me
 
