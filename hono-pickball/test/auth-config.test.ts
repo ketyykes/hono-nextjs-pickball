@@ -25,9 +25,11 @@ describe("createAuth", () => {
 	});
 
 	it("baseURL 與 trustedOrigins 皆取自 BETTER_AUTH_URL", () => {
-		const auth = createAuth({ ...env, BETTER_AUTH_URL: "http://localhost:3005" });
-		expect(auth.options.baseURL).toBe("http://localhost:3005");
-		expect(auth.options.trustedOrigins).toEqual(["http://localhost:3005"]);
+		// 覆寫值刻意異於 vitest binding，才擋得住把實作寫死成 binding 值
+		const auth = createAuth({ ...env, BETTER_AUTH_URL: "http://other.test:4321", BETTER_AUTH_SECRET: "probe-secret-for-assertion" });
+		expect(auth.options.baseURL).toBe("http://other.test:4321");
+		expect(auth.options.trustedOrigins).toEqual(["http://other.test:4321"]);
+		expect(auth.options.secret).toBe("probe-secret-for-assertion");
 	});
 
 	it("emailAndPassword 只在 development 啟用且一律禁止註冊", () => {
@@ -51,6 +53,6 @@ describe("createAuth", () => {
 		expect(onlySecret.options.socialProviders?.google).toBeUndefined();
 
 		const both = createAuth({ ...env, GOOGLE_CLIENT_ID: "fake-client-id", GOOGLE_CLIENT_SECRET: "fake-client-secret" });
-		expect(both.options.socialProviders?.google).toBeDefined();
+		expect(both.options.socialProviders?.google).toMatchObject({ clientId: "fake-client-id", clientSecret: "fake-client-secret" });
 	});
 });

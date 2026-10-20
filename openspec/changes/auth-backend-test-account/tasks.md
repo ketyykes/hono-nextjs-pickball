@@ -42,6 +42,8 @@ Depends on: §2
   - 綠燈：auth-config.test.ts 6 passed；後端全套 31 passed；typecheck exit 0
 - [x] 3.4 REFACTOR: 確認 `createAuth` 不在模組層讀 env、沒有預設 secret 的 fallback；無壞味道則註記 skipped
   - skipped（無壞味道）：createAuth 不在模組層讀 env，無預設 secret fallback；mutation 發現 Google 條件只查 secret 的變異存活，已於 Google it 補「只有 secret」組合後轉紅
+  - Stage 2 mutation 補洞：M11（secret 取自 URL）、M16／M16b（baseURL／trustedOrigins 寫死）、M19（Google clientId／clientSecret 對調）；測試改用異於 binding 的 URL、斷言 `options.secret`、Google 改 `toMatchObject`，重跑四個變異皆轉紅
+  - 限制：`transaction: true`、`provider: "pg"`（M12／M13）在單元層測不到，交由 §5 登入整合測試在真 D1 上覆蓋
 
 ## 4. 測試帳號 seed SQL（純函式）
 
