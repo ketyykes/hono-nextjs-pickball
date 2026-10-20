@@ -1,0 +1,6 @@
+# 本機開發用環境變數範例。複製為 .dev.vars 後使用（.dev.vars 已 gitignore，不入版控）。
+# cf-typegen 讀取本檔產生型別，因此型別只由 repo 內容決定，不受各機器 .dev.vars 影響。
+# 值只放示意值或空值，禁止放真實密碼或 secret。
+
+# 只在本機啟用的開發旗標；遠端環境沒有 .dev.vars，缺值即代表非開發環境（wrangler.jsonc 不得以 vars 設定）。
+ENVIRONMENT=development

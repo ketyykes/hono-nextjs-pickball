@@ -21,6 +21,7 @@
 |-----------|----------|-----------|-----------|------|
 | getDb 回傳的實例可寫入並讀回 user 資料列 | 取得的實例可寫入並讀回資料 | `getDb(env)` 插入 `{ id, name, email }` 後以 email 查詢 → 讀回列的 `id`／`name`／`email` 與寫入值相同 | golden path：runbook 驗收「一條測試真的寫入並讀回 D1」的本體；`client.ts` 不存在時為真紅燈（模組解析失敗） | integration |
 | DB binding 不存在時 getDb 立即拋出含 DB 字樣的錯誤 | DB binding 不存在時立即拋錯 | `getDb({ ...env, DB: undefined })` → throw，`message` 含 `DB` | edge case：正式部署沒有 `DB`，這是唯一能在取得實例當下暴露 misconfiguration 的防線 | integration |
+| getDb 回傳的實例帶入 schema，可用 relational query 讀回 user | （覆蓋義務：Requirement 本文「帶入 `src/db/schema.ts` 全部資料表定義」） | 插入一筆 user 後以 `db.query.user.findFirst({ where: ... email })` 讀回 → `id` 與寫入值相同 | §4 Stage 2 審查以 mutation 發現 `drizzle(env.DB)`／`{ schema: {} }` 存活；B2 adapter 與 relational query 依賴 schema。寫入即綠，屬覆蓋測試（非 RED） | integration |
 
 ### Requirement: auth 核心資料表由 migration 建立
 
@@ -29,6 +30,8 @@
 | auth 核心四張資料表皆已由 migration 建立 | migration 套用後四張表皆存在 | `SELECT name FROM sqlite_master WHERE type='table'` → 含 `user`／`session`／`account`／`verification` | golden path：夾具＋migration 管線是否接通的第一個訊號；寫入時 migration 不存在 → 真紅燈 | integration |
 | user.email 重複時插入失敗 | user.email 不可重複 | 先插入 `a@example.com`，再插入同 email → reject（訊息含 `UNIQUE`）；`COUNT(*)` 仍為 1 | edge case：設定層約束的覆蓋義務（Decision 6）；B2 的 seed 與登入依賴 email 唯一 | integration |
 | 刪除使用者時其 session 與 account 一併刪除 | 刪除使用者時連帶刪除其 session 與 account | 建立 user＋session＋account → 刪除 user → 兩表中該 `userId` 的筆數皆為 0 | edge case：cascade 漏寫不會有任何其他訊號，會留下孤兒憑證；同時驗證 D1 的 foreign key 實際生效 | integration |
+| session.token 重複時插入失敗 | （覆蓋義務，無獨立 Scenario；dev-workflow「D1 schema 與 migration SQL 屬設定層」要求每個約束各有測試） | 同一位 user 插入兩筆相同 token 的 session → 第二筆 reject（訊息含 `UNIQUE`）；該 token 的 `COUNT(*)` 仍為 1 | §3 Stage 2 審查以 mutation 發現 `session_token_unique` 移除後全綠存活；token 是 session 查找鍵。寫入即綠，屬覆蓋測試（非 RED） | integration |
+| verification 資料表可寫入並讀回 | （覆蓋義務，無獨立 Scenario；「每新增一張資料表 MUST 有測試證明可經 migration 建立並被寫入讀回」） | 插入 `{ id, identifier, value, expires_at, created_at, updated_at }` 後以 id 查回 → 各欄位與寫入值相同 | §3 Stage 2 審查發現 verification 只有「存在」測試、無任何寫入讀回。寫入即綠，屬覆蓋測試（非 RED） | integration |
 
 ## dev-workflow
 

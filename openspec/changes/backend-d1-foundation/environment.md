@@ -25,8 +25,8 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0（tasks 1.1）實測回填。runbook 記載 M15 時後端為 4 檔／16 測試。
-- **Initial commit hash**: 待 apply Step 0 回填（`change/backend-d1-foundation` 分出時的 `main` HEAD）。
+- **Baseline tests**: 2026-10-21 apply Step 0 實測（`pnpm test`）：前端 81 檔／783 測試全綠；後端 4 檔／16 測試全綠。`pnpm install` 後 lockfile 零變動、`git status --porcelain` 為空。
+- **Initial commit hash**: `d2b99afee3da5ff48c8daf609095f0f7d26d7684`（`change/backend-d1-foundation` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

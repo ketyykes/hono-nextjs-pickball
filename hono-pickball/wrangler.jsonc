@@ -8,29 +8,23 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
+  },
+  // D1 只宣告在 env.local：Workers Builds 執行不帶 --env 的 wrangler deploy，只讀 top-level，
+  // 因此誤 push 不會在遠端建立或綁定任何 D1。正式環境的 D1 於 G1 才建立並宣告，
+  // 屆時禁止填 placeholder UUID（會讓遠端部署直接失敗）。
+  "env": {
+    "local": {
+      // 具名環境預設會把 worker 命名為 hono-pickball-local，
+      // 前端 HONO_API -> hono-pickball 的 service binding 就找不到目標，故明確覆寫
+      "name": "hono-pickball",
+      // 刻意不填 database_id，避免出現看似真實的 ID
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "hono-pickball-local",
+          "migrations_dir": "drizzle"
+        }
+      ]
+    }
   }
-  // 之後實作會員／揪團功能時再以 `wrangler d1 create hono-pickball-db` 建立真實資料庫，
-  // 將產生的 UUID 填回 database_id（placeholder 值會讓遠端部署直接失敗）：
-  // "d1_databases": [
-  //   {
-  //     "binding": "DB",
-  //     "database_name": "hono-pickball-db",
-  //     "database_id": "<wrangler d1 create 產生的 UUID>"
-  //   }
-  // ],
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "MY_BUCKET",
-  //     "bucket_name": "my-bucket"
-  //   }
-  // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // }
 }
