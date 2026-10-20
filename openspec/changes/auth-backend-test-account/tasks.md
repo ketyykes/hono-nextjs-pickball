@@ -94,6 +94,7 @@ Depends on: §5
   - 結論：`auth-gating.test.ts` 3/3 綠。5.3 時 `/api/me` 尚未存在，該部分本來就 404，屬 regression guard；gate 掛上後才有保護力——變異「`/api/me` 拿掉 gate」使第三條 it 轉紅（無 DB 時 `c.var.auth` 未設定而 500），證明它此時真正在守
 - [x] 6.4 REFACTOR: 投影 `{ id, email, name }` 若在 §7 也需要，抽成單一具名函式（於 §7 完成後回頭執行亦可，註明）；無壞味道則註記 skipped
   - 已在 6.2 GREEN 一併抽出 `toPublicUser`（§7 直接重用，7.3 再確認唯一性），故無獨立 refactor commit；其餘無壞味道，skipped
+  - Stage 2 審查（opus）：APPROVED。存活 3 個：`requireSession` 加 try/catch 降級成 401 或 `next()`（M7a／M7b，design Decision 5「授權路徑不得吞錯」無對應 it；M7a 交 §7「session 查詢拋錯時仍回 200 與 user null」同時斷言 `/api/me` 回 500 補強——test-plan 該列明定「同時證明降級只在探針」；M7b 對 `/api/me` 實質等價）、同一請求建立兩次 auth（M12，結構性約束，以 `grep -rn "createAuth(" src` 只命中 `localAuth` 把關）。非阻擋建議（留給 Wave 2）：`localAuth` 移到 `src/auth/` 以便拆檔重用；`AuthAppEnv` 的 `user`／`session` 宣告為非 optional，未掛 middleware 的路由讀取時型別不會報錯
 
 ## 7. GET /api/session 狀態探針
 
