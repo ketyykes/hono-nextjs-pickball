@@ -2,12 +2,14 @@
   "name": "hono-pickball",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env local",
     "test": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
     "build": "tsc --noEmit && wrangler deploy --dry-run",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings --env-file .dev.vars.example",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --env local"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.14",
