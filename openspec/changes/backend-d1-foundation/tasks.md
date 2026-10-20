@@ -63,6 +63,7 @@ Depends on: §3
   - GREEN commit `f9168d7`。單檔 `Test Files 1 passed、Tests 2 passed`；完整後端 6 檔／24 測試全綠；`typecheck`（兩段）與 `build` exit 0。
 - [x] 4.3 REFACTOR: 確認 `src/**` 中 `drizzle(` 只出現在 `client.ts`；型別參數只要求 `DB`（`Pick<CloudflareBindings, "DB">`），不綁整個 env；無壞味道則註記 skipped
   - skipped（無壞味道）。`grep -rn "drizzle(" hono-pickball/src` 只有 `src/db/client.ts:12`；參數型別為 `Pick<CloudflareBindings, "DB">`；無 `!` 非空斷言（僅 `!env.DB` 否定判斷）。
+- [ ] 4.4 覆蓋（非 RED）：§4 Stage 2 審查以 mutation 發現「帶入 schema」無測試（`drizzle(env.DB)`、`{ schema: {} }` 存活）。於 `hono-pickball/test/db-client.test.ts` 新增 it「getDb 回傳的實例帶入 schema，可用 relational query 讀回 user」（test-plan 已同步新增一列）；寫入即綠，MUST 如實標註為覆蓋測試，SHALL NOT 偽造紅燈；交件前以上述兩條 mutation 證明轉紅
 
 ## 5. 文件同步與總驗收
 
@@ -72,6 +73,6 @@ Depends on: §4
 - [ ] 5.2 驗收（指令）C6、C7：逐條核對 `hono-pickball/CLAUDE.md` 與 `.dev.vars.example`、`wrangler.jsonc`，結果寫在本 task 後方
 - [ ] 5.3 驗收（指令）C2：刪除 `hono-pickball/.wrangler/state` 後 `pnpm --filter ./hono-pickball db:migrate:local` exit 0，`wrangler d1 execute DB --local --env local --command "SELECT name FROM sqlite_master WHERE type='table'"` 列出四張表；同時比對本機 sqlite 檔路徑與 2.6 啟動的 `wrangler dev` 是否同一份（design Open Questions 1），不一致則依 Decision 1 改填非 UUID 字面值並重跑 2.5、2.6、3.2
 - [ ] 5.4 驗收（指令）C3：`pnpm --filter ./hono-pickball db:generate` 回報無變更、`git status --porcelain -- hono-pickball/drizzle` 為空
-- [ ] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／24 測試＝既有 16＋本 change 8（含 3.5 補的 2 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
+- [ ] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／25 測試＝既有 16＋本 change 9（含 3.5 補的 2 個、4.4 補的 1 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
 - [ ] 5.6 驗收（指令）：完整 E2E 回歸 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留 process）——`dev` script 改走 `--env local` 後 `webServer` 啟動的後端必須讓既有 E2E 全數原樣通過；結果（passed／skipped／failed）寫在本 task 後方
 - [ ] 5.7 `DO_NOT_TRACK=1 openspec validate backend-d1-foundation --strict` 通過

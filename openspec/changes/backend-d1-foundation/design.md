@@ -259,3 +259,6 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
    每張新表要寫入讀回，但 test-plan 原本只列 `user.email` unique 與兩條 cascade。mutation 顯示 `session_token_unique` 移除後存活、`verification`
    無寫入讀回。leader 裁定：以 spec 為準，新增 task 3.5 與 test-plan 兩列（覆蓋測試，非 RED），§5.5 後端預期數改為 6 檔／24 測試。
    未覆蓋但不補者：PK、NOT NULL、default、純效能索引（spec 的約束清單只列 unique／FK／cascade；FK 本身由 cascade 測試間接證明）。
+7. **§4 Stage 2 審查：getDb「帶入 schema」無測試覆蓋**（2026-10-21）。現有寫入讀回 it 只用 query builder，`drizzle(env.DB)`／`{ schema: {} }` 變異存活。
+   leader 裁定比照 3.5：新增 task 4.4 與 test-plan 一列（relational query 讀回，覆蓋測試、非 RED），§5.5 後端預期數改為 6 檔／25 測試。
+   殘留限制：只帶部分資料表（例如 `{ schema: { user } }`）測不出來；`import * as schema` 在結構上保證帶入全部，不另逐表探測。

@@ -21,6 +21,7 @@
 |-----------|----------|-----------|-----------|------|
 | getDb 回傳的實例可寫入並讀回 user 資料列 | 取得的實例可寫入並讀回資料 | `getDb(env)` 插入 `{ id, name, email }` 後以 email 查詢 → 讀回列的 `id`／`name`／`email` 與寫入值相同 | golden path：runbook 驗收「一條測試真的寫入並讀回 D1」的本體；`client.ts` 不存在時為真紅燈（模組解析失敗） | integration |
 | DB binding 不存在時 getDb 立即拋出含 DB 字樣的錯誤 | DB binding 不存在時立即拋錯 | `getDb({ ...env, DB: undefined })` → throw，`message` 含 `DB` | edge case：正式部署沒有 `DB`，這是唯一能在取得實例當下暴露 misconfiguration 的防線 | integration |
+| getDb 回傳的實例帶入 schema，可用 relational query 讀回 user | （覆蓋義務：Requirement 本文「帶入 `src/db/schema.ts` 全部資料表定義」） | 插入一筆 user 後以 `db.query.user.findFirst({ where: ... email })` 讀回 → `id` 與寫入值相同 | §4 Stage 2 審查以 mutation 發現 `drizzle(env.DB)`／`{ schema: {} }` 存活；B2 adapter 與 relational query 依賴 schema。寫入即綠，屬覆蓋測試（非 RED） | integration |
 
 ### Requirement: auth 核心資料表由 migration 建立
 
