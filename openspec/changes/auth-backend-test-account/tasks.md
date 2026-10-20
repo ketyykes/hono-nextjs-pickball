@@ -49,7 +49,8 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED: 新增 `hono-pickball/test/seed-test-account.test.ts`，寫入 it「seed SQL 不含明文密碼且正確跳脫單引號」（直接以 `env.DB` 套用 SQL 並讀回 `user.name`）。確認紅燈（模組不存在）
+- [x] 4.1 RED: 新增 `hono-pickball/test/seed-test-account.test.ts`，寫入 it「seed SQL 不含明文密碼且正確跳脫單引號」（直接以 `env.DB` 套用 SQL 並讀回 `user.name`）。確認紅燈（模組不存在）
+  - 紅燈：`Error: Cannot find module '../src/db/seed/test-account' imported from .../test/seed-test-account.test.ts`，`Test Files 1 failed`，no tests（模組不存在，真紅燈）
 - [ ] 4.2 GREEN: 新增 `hono-pickball/src/db/seed/test-account.ts` 的 `buildTestAccountSeedSql({ email, password, name, now })`（design Decision 7：每行一個 `;` 結尾敘述、先 DELETE 同 email、`hashPassword` 雜湊、單引號跳脫、只 import 套件且型別用 `import type`）
 
 ## 5. /api/auth/* 掛載、登入、註冊與 gate
