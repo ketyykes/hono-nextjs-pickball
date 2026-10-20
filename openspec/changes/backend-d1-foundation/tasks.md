@@ -42,10 +42,14 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED: 新增 `hono-pickball/test/d1-schema.test.ts`，寫入四個 it：「測試用 D1 已套用 TEST_MIGRATIONS 的全部 migration」「auth 核心四張資料表皆已由 migration 建立」「user.email 重複時插入失敗」「刪除使用者時其 session 與 account 一併刪除」。`env` 自 `cloudflare:workers` 匯入，測試內以 `env.DB.prepare(...)` 直接下 SQL（不經 `getDb`，避免與 §4 耦合）。跑單檔確認紅燈（預期：`env.DB`／`TEST_MIGRATIONS` 不存在或表不存在）並貼出輸出
-- [ ] 3.2 GREEN（設定層＋測試基礎建設）: `vitest.config.ts` 依 design Decision 7 加入 `readD1Migrations`、`wrangler.environment: "local"`、`miniflare.bindings.TEST_MIGRATIONS`、`setupFiles`；新增 `test/apply-migrations.ts`、`test/env.d.ts`（`TEST_MIGRATIONS: D1Migration[]`）；新增 `src/db/schema.ts`（design Decision 5 的四張表與索引、cascade）；執行 `pnpm --filter ./hono-pickball db:generate --name auth_core` 產生 `drizzle/0000_auth_core.sql` 與 `drizzle/meta/`（不手改）。跑單檔至綠，並跑完整 `pnpm --filter ./hono-pickball test` 確認既有 16 測試不變
-- [ ] 3.3 REFACTOR: 檢查 `vitest.config.ts` 與 setup 檔的註解只寫「為什麼」（storage 以測試檔隔離、`env` 來源、為何不手寫建表）；無壞味道則註記 skipped
-- [ ] 3.4 驗收（指令）C5：`pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0（`test/env.d.ts` 與 `D1Migration` 匯入在第二段生效）
+- [x] 3.1 RED: 新增 `hono-pickball/test/d1-schema.test.ts`，寫入四個 it：「測試用 D1 已套用 TEST_MIGRATIONS 的全部 migration」「auth 核心四張資料表皆已由 migration 建立」「user.email 重複時插入失敗」「刪除使用者時其 session 與 account 一併刪除」。`env` 自 `cloudflare:workers` 匯入，測試內以 `env.DB.prepare(...)` 直接下 SQL（不經 `getDb`，避免與 §4 耦合）。跑單檔確認紅燈（預期：`env.DB`／`TEST_MIGRATIONS` 不存在或表不存在）並貼出輸出
+  - RED commit `081d874`（`test(hono): 新增 d1-schema 測試`）。單檔紅燈：4 failed (4)，原因 `Error: env.DB 不存在：測試夾具未帶入 env.local 的 D1 binding`（`test/d1-schema.test.ts:13`），為真紅燈。
+- [x] 3.2 GREEN（設定層＋測試基礎建設）: `vitest.config.ts` 依 design Decision 7 加入 `readD1Migrations`、`wrangler.environment: "local"`、`miniflare.bindings.TEST_MIGRATIONS`、`setupFiles`；新增 `test/apply-migrations.ts`、`test/env.d.ts`（`TEST_MIGRATIONS: D1Migration[]`）；新增 `src/db/schema.ts`（design Decision 5 的四張表與索引、cascade）；執行 `pnpm --filter ./hono-pickball db:generate --name auth_core` 產生 `drizzle/0000_auth_core.sql` 與 `drizzle/meta/`（不手改）。跑單檔至綠，並跑完整 `pnpm --filter ./hono-pickball test` 確認既有 16 測試不變
+  - commit `3fdcda3`。單檔 4 passed (4)；完整 `pnpm --filter ./hono-pickball test`：5 檔／20 測試全綠（既有 16 不變）；`build` exit 0。`drizzle/0000_auth_core.sql` 與 `drizzle/meta/` 由 `db:generate --name auth_core` 產生、未手改。
+- [x] 3.3 REFACTOR: 檢查 `vitest.config.ts` 與 setup 檔的註解只寫「為什麼」（storage 以測試檔隔離、`env` 來源、為何不手寫建表）；無壞味道則註記 skipped
+  - skipped：註解皆只寫「為什麼」，無壞味道，無改動。
+- [x] 3.4 驗收（指令）C5：`pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0（`test/env.d.ts` 與 `D1Migration` 匯入在第二段生效）
+  - `pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0。
 
 ## 4. getDb：D1 存取入口
 
