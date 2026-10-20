@@ -57,9 +57,12 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED: 新增 `hono-pickball/test/db-client.test.ts`，寫入兩個 it：「getDb 回傳的實例可寫入並讀回 user 資料列」「DB binding 不存在時 getDb 立即拋出含 DB 字樣的錯誤」。確認紅燈（`src/db/client.ts` 不存在）並貼出輸出
-- [ ] 4.2 GREEN: 新增 `hono-pickball/src/db/client.ts` 的 `getDb(env)`（design Decision 4）：缺 `DB` 拋錯、否則回傳 `drizzle(env.DB, { schema })`。跑單檔至綠
-- [ ] 4.3 REFACTOR: 確認 `src/**` 中 `drizzle(` 只出現在 `client.ts`；型別參數只要求 `DB`（`Pick<CloudflareBindings, "DB">`），不綁整個 env；無壞味道則註記 skipped
+- [x] 4.1 RED: 新增 `hono-pickball/test/db-client.test.ts`，寫入兩個 it：「getDb 回傳的實例可寫入並讀回 user 資料列」「DB binding 不存在時 getDb 立即拋出含 DB 字樣的錯誤」。確認紅燈（`src/db/client.ts` 不存在）並貼出輸出
+  - RED commit `50cccd8`。紅燈：`Error: Cannot find module '../src/db/client' imported from .../test/db-client.test.ts`，整檔 `(0 test)` 失敗（真紅燈）。機械複驗：`git show 50cccd8^:hono-pickball/src/db/client.ts` 失敗（`exists on disk, but not in '50cccd8^'`）。
+- [x] 4.2 GREEN: 新增 `hono-pickball/src/db/client.ts` 的 `getDb(env)`（design Decision 4）：缺 `DB` 拋錯、否則回傳 `drizzle(env.DB, { schema })`。跑單檔至綠
+  - GREEN commit `f9168d7`。單檔 `Test Files 1 passed、Tests 2 passed`；完整後端 6 檔／24 測試全綠；`typecheck`（兩段）與 `build` exit 0。
+- [x] 4.3 REFACTOR: 確認 `src/**` 中 `drizzle(` 只出現在 `client.ts`；型別參數只要求 `DB`（`Pick<CloudflareBindings, "DB">`），不綁整個 env；無壞味道則註記 skipped
+  - skipped（無壞味道）。`grep -rn "drizzle(" hono-pickball/src` 只有 `src/db/client.ts:12`；參數型別為 `Pick<CloudflareBindings, "DB">`；無 `!` 非空斷言（僅 `!env.DB` 否定判斷）。
 
 ## 5. 文件同步與總驗收
 
