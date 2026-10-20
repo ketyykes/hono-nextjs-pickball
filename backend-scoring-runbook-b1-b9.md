@@ -11,15 +11,15 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-21，**runbook 建立，尚未 propose 任何 change**）
+## 狀態快照（最後更新 2026-10-21，**B1 已合併，進行中**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `1e5e517`（chore(openspec): archive emoji-spots-icons） |
+| `main` HEAD | `a7866f5`（B1 合併） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1（B1～B3）已 propose（`7c3ab72`）；Wave 2 待 S1 通過後 |
-| apply | 未開始 |
+| apply | B1 已合併（`a7866f5`）；下一棒 B2 |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -125,7 +125,7 @@ main@1e5e517
 
 | # | change id | 內容 | 預估 | branch | 狀態 |
 |---|---|---|---|---|---|
-| B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | 未 propose |
+| B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | **已合併 `a7866f5`**（28 tasks；後端 6 檔／25；E2E 633/27/0） |
 | B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | 已 propose，未 apply |
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | 已 propose，未 apply |
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 未 propose |
@@ -483,6 +483,12 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   4. D6「每 spec 清空使用者資料」延到 Wave 2 第一個有使用者資料表的 change。
 - `hono-pickball/.dev.vars` 已由 coordinator 於 2026-10-21 建立（gitignored、隨機 secret／密碼；欄位：`ENVIRONMENT`、`BETTER_AUTH_SECRET`、
   `BETTER_AUTH_URL`、`TEST_ACCOUNT_EMAIL`／`PASSWORD`／`NAME`）。
+
+### B1 合併紀錄（2026-10-21）
+- coordinator 獨立驗證：tsc／後端 typecheck exit 0；lint 0 errors／3 warnings；前端 81／783、後端 6／25；`db:migrate:local` OK；
+  build dry-run OK（`No bindings found.`）；E2E 633 passed／27 skipped／0 failed（20.8m）；RED commit `081d874`、`50cccd8` 複驗為真。
+- 遺留給 G1：Workers Builds 若設 `CLOUDFLARE_ENV=local` 或 deploy 帶 `--env` 會讀到無 `database_id` 的 `env.local` 而可能遠端自動建 D1——須人工確認 Dashboard。
+- 給 B2：`ENVIRONMENT` 型別被產為必填 `string`（遠端實為 undefined），只能用 `=== "development"` 判斷。
 
 <Wave 2 propose 後填>
 
