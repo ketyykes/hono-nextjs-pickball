@@ -60,4 +60,27 @@ app.get('/api/me', localAuth, requireSession, (c) => {
   return c.json({ user: toPublicUser(c.var.user) })
 })
 
+// 狀態探針永遠回 200：前端每頁都會呼叫，4xx 會被瀏覽器記為 console 錯誤。
+// 因此刻意不掛 localAuth（停用時要回 200 而非 404），停用分支也不建立 auth、不碰 D1。
+// 本端點只回報狀態，不可作為授權依據；需要授權的路由一律用 requireSession。
+app.get('/api/session', async (c) => {
+  if (!isLocalAuthEnabled(c.env)) {
+    return c.json({ authEnabled: false, user: null })
+  }
+
+  // 只包住 session 查詢：最常見的失敗是本機尚未 migration 卻帶著舊 cookie，
+  // 此時訪客 UI 必須照常可用。降級只存在於探針，requireSession 遇到例外仍照常 500。
+  try {
+    const auth = createAuth(c.env)
+    const result = await auth.api.getSession({ headers: c.req.raw.headers })
+    return c.json({
+      authEnabled: true,
+      user: result ? toPublicUser(result.user) : null,
+    })
+  } catch (error) {
+    console.error('查詢 session 失敗，降級為未登入', error)
+    return c.json({ authEnabled: true, user: null })
+  }
+})
+
 export default app
