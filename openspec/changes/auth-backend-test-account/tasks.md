@@ -115,13 +115,16 @@ Depends on: §7
 
 - [x] 8.1 設定層：新增 `hono-pickball/scripts/seed-test-account.ts`（design Decision 7：`process.loadEnvFile(".dev.vars")`、檢查三個變數、寫 `.wrangler/tmp/seed-test-account.sql`、`pnpm exec wrangler d1 execute DB --local --env local --file …`、`finally` 刪暫存檔）；`package.json` 新增 `"db:seed:local": "node scripts/seed-test-account.ts"`。腳本本身是 I/O 膠水，邏輯已由 §4／§5 的測試覆蓋，以下列指令驗收
   - 完成（commit febd390）：`scripts/seed-test-account.ts` 以 `import.meta.dirname` 推導路徑，缺 `.dev.vars` 或缺變數即 exit 1；`finally` 刪暫存檔；`pnpm typecheck` 兩段 exit 0（scripts/ 不在 tsconfig include，由 Node 實跑驗證）
+  - Stage 2 修正：loadEnvFile → parseEnv（與 design Decision 7 字面不同，理由：loadEnvFile 不覆寫 shell 已 export 的變數，會 seed 錯帳號並使缺變數檢查失效，偏離 spec「從 .dev.vars 讀取」；parseEnv 只回傳物件、不寫入 process.env，BETTER_AUTH_SECRET 也不會注入 wrangler 子行程）；暫存檔改 mode 0o600；wrangler 失敗時 console.error 後設 exitCode=1
 - [x] 8.2 驗收（指令）C3：`grep` 確認無 `--remote`、有 `--local` 與 `--env local`
   - C3 實測：`grep -n -- "--remote" scripts/seed-test-account.ts` 無輸出（rc=1）；`grep -n -- "--local"` 命中第 49 行，同一呼叫含 `"--env", "local"`
 - [x] 8.3 驗收（指令）C5：暫時移除 `.dev.vars` 的 `TEST_ACCOUNT_PASSWORD` → `db:seed:local` exit 非 0 且輸出含該變數名 → 還原
   - C5 實測：移除 `TEST_ACCOUNT_PASSWORD` 後 `db:seed:local` exit 1，輸出「缺少環境變數 TEST_ACCOUNT_PASSWORD」，輸出無 wrangler 字樣（未呼叫）；已還原且 `cmp` 與備份逐位元組相同
+  - Stage 2 修正後重跑：shell 先 export `TEST_ACCOUNT_PASSWORD=from-shell-fake`、`.dev.vars` 缺該變數 → exit 1、輸出含 `TEST_ACCOUNT_PASSWORD`、未呼叫 wrangler；`cmp` 仍相同
   - 變異（手動）：拿掉檢查迴圈後輸出變為 `buildTestAccountSeedSql` 的 TypeError 堆疊、不含變數名，證明 C5 驗收有鑑別力；已還原
 - [x] 8.4 驗收（指令）C4：`.dev.vars` 齊備 → `db:migrate:local` → `db:seed:local` → `wrangler dev --env local`（預設 8787，先確認無殘留 process）→ curl 登入回 200 → 停止後端並確認 8787 釋放
   - C4 實測：`.dev.vars` 齊備 → `db:migrate:local` exit 0 → `db:seed:local` exit 0（暫存檔已刪）→ `pnpm dev` 啟動後以 `<TEST_ACCOUNT_EMAIL>` 登入 `POST /api/auth/sign-in/email`（Origin: http://localhost:3005）回 200；停止後 :3005／:8787／:8790 無殘留
+  - Stage 2 修正後重跑：seed exit 0，`test ! -e .wrangler/tmp/seed-test-account.sql` 成立（暫存檔已刪）；登入 200；C3 重跑 `--remote` 無輸出、`--local` 與 `--env local` 同一呼叫；停止後 8787 釋放、殘留 0
 
 ## 9. E2E：session cookie 經 proxy 穿透
 
