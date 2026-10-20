@@ -51,7 +51,12 @@ Depends on: §3
 
 - [x] 4.1 RED: 新增 `hono-pickball/test/seed-test-account.test.ts`，寫入 it「seed SQL 不含明文密碼且正確跳脫單引號」（直接以 `env.DB` 套用 SQL 並讀回 `user.name`）。確認紅燈（模組不存在）
   - 紅燈：`Error: Cannot find module '../src/db/seed/test-account' imported from .../test/seed-test-account.test.ts`，`Test Files 1 failed`，no tests（模組不存在，真紅燈）
-- [ ] 4.2 GREEN: 新增 `hono-pickball/src/db/seed/test-account.ts` 的 `buildTestAccountSeedSql({ email, password, name, now })`（design Decision 7：每行一個 `;` 結尾敘述、先 DELETE 同 email、`hashPassword` 雜湊、單引號跳脫、只 import 套件且型別用 `import type`）
+- [x] 4.2 GREEN: 新增 `hono-pickball/src/db/seed/test-account.ts` 的 `buildTestAccountSeedSql({ email, password, name, now })`（design Decision 7：每行一個 `;` 結尾敘述、先 DELETE 同 email、`hashPassword` 雜湊、單引號跳脫、只 import 套件且型別用 `import type`）
+  - 綠燈：`seed-test-account.test.ts` 1 passed；Node type stripping 實測可載入並執行（輸出不含明文）
+  - mutation（12 次，另含 1 對照）：拿掉單引號跳脫、寫入明文密碼、user.email／name／account.user_id 寫錯皆轉紅；等價變異維持綠
+  - 補強：明文密碼被跳脫後不等於原字串，故斷言加上「不含跳脫後的密碼」才殺得掉『寫入明文』變異
+  - 存活（本組 it 無法覆蓋，預定由 §5 登入／重複 seed it 覆蓋）：拿掉 DELETE、provider_id、account.account_id、email_verified、時間戳、DELETE 的 email 未跳脫
+  - REFACTOR：skipped（無壞味道）
 
 ## 5. /api/auth/* 掛載、登入、註冊與 gate
 

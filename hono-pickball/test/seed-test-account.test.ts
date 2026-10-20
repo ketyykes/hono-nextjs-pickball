@@ -19,6 +19,8 @@ describe("buildTestAccountSeedSql", () => {
 		});
 
 		expect(sql).not.toContain(password);
+		// 明文被跳脫後會變成 p@ss''word，只比對原字串會漏掉這種外洩。
+		expect(sql).not.toContain(password.replaceAll("'", "''"));
 
 		await env.DB.exec(sql);
 		const row = await env.DB
