@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
+import { createAuth } from './auth/create-auth'
 
-const app = new Hono<{ Bindings: CloudflareBindings }>()
+const app = new Hono<{
+  Bindings: CloudflareBindings
+  Variables: { auth: ReturnType<typeof createAuth> }
+}>()
 
 // 刻意不定義 root path：對外 API 一律掛在 /api/* 之下（前端 catch-all proxy 只轉發 /api/*），
 // 因此 GET / 回 404 是預期行為，不代表部署失敗。
@@ -33,6 +37,14 @@ app.get('/api/cookie-check', (c) => {
     // 第一次呼叫為 null；第二次呼叫若帶回上次的值，代表 cookie 來回穿透成功
     receivedPreviousValue: previousValue ?? null,
   })
+})
+
+// better-auth 的 handler 自行處理 /api/auth/* 底下的所有路徑；
+// 每個請求依 env 建立 auth 實例並存於 context，同請求的後續 middleware 與 handler 共用
+app.on(['GET', 'POST'], '/api/auth/*', (c) => {
+  const auth = createAuth(c.env)
+  c.set('auth', auth)
+  return auth.handler(c.req.raw)
 })
 
 export default app
