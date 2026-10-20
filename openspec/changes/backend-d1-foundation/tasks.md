@@ -50,7 +50,8 @@ Depends on: §2
   - skipped：註解皆只寫「為什麼」，無壞味道，無改動。
 - [x] 3.4 驗收（指令）C5：`pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0（`test/env.d.ts` 與 `D1Migration` 匯入在第二段生效）
   - `pnpm --filter ./hono-pickball typecheck` 兩段皆 exit 0。
-- [ ] 3.5 覆蓋（設定層約束，非 RED）：§3 Stage 2 審查以 mutation 發現 spec 覆蓋義務缺口——`session.token` unique 無測試（移除後存活）、`verification` 表無寫入讀回。於 `hono-pickball/test/d1-schema.test.ts` 新增 it「session.token 重複時插入失敗」「verification 資料表可寫入並讀回」（test-plan 已同步新增兩列）；寫入即綠，MUST 如實標註為覆蓋測試／regression guard，SHALL NOT 偽造紅燈；交件前以 mutation（移除 `session_token_unique`、移除 verification 的 `value` NOT NULL 以外的等價對照）證明有鑑別力
+- [x] 3.5 覆蓋（設定層約束，非 RED）：§3 Stage 2 審查以 mutation 發現 spec 覆蓋義務缺口——`session.token` unique 無測試（移除後存活）、`verification` 表無寫入讀回。於 `hono-pickball/test/d1-schema.test.ts` 新增 it「session.token 重複時插入失敗」「verification 資料表可寫入並讀回」（test-plan 已同步新增兩列）；寫入即綠，MUST 如實標註為覆蓋測試／regression guard，SHALL NOT 偽造紅燈；交件前以 mutation（移除 `session_token_unique`、移除 verification 的 `value` NOT NULL 以外的等價對照）證明有鑑別力
+  - commit `6d189d9`。覆蓋測試，寫入即綠（非 RED）。mutation：移除 `session_token_unique` 轉紅（token it）；verification 段落縮排 tab 改空格（等價對照）維持綠；verification `value` 欄改名 `val` 轉紅（讀回 it）。單檔 6 passed；完整後端 5 檔／22 測試全綠；typecheck 兩段 exit 0。
 
 ## 4. getDb：D1 存取入口
 
