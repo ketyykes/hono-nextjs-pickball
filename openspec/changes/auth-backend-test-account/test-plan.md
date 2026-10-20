@@ -51,7 +51,7 @@
 |-----------|----------|-----------|-----------|------|
 | 缺少 BETTER_AUTH_SECRET 時 createAuth 拋錯 | 缺少 BETTER_AUTH_SECRET 時拒絕建立 | `createAuth({ ...env, BETTER_AUTH_SECRET: undefined })` → throw，訊息含 `BETTER_AUTH_SECRET` | edge case：防止以 better-auth 預設 secret 運作 | integration |
 | 缺少 BETTER_AUTH_URL 時 createAuth 拋錯 | 缺少 BETTER_AUTH_URL 時拒絕建立 | 同上，訊息含 `BETTER_AUTH_URL` | edge case：缺 baseURL 時 origin 檢查與 cookie 判斷皆不可預期 | integration |
-| baseURL 與 trustedOrigins 皆取自 BETTER_AUTH_URL | baseURL 與 trustedOrigins 取自 BETTER_AUTH_URL | `createAuth(env).options.baseURL === "http://localhost:3005"`、`trustedOrigins` 深度等於 `["http://localhost:3005"]` | golden path：CSRF 與 cookie 屬性都由此決定 | integration |
+| baseURL 與 trustedOrigins 皆取自 BETTER_AUTH_URL | baseURL 與 trustedOrigins 取自 BETTER_AUTH_URL | 以與 vitest binding 不同的值（例 `"http://other.test:4321"`）覆寫 `BETTER_AUTH_URL` → `options.baseURL` 等於該值、`trustedOrigins` 深度等於 `[該值]`；同 it 覆寫 `BETTER_AUTH_SECRET` → `options.secret` 等於該值（apply §3 Stage 2 補強：與 binding 同值時寫死的實作測不出） | golden path：CSRF 與 cookie 屬性都由此決定 | integration |
 | emailAndPassword 只在 development 啟用且一律禁止註冊 | emailAndPassword 隨 isLocalAuthEnabled 開關且禁止註冊 | development → `enabled===true`；缺值 → `false`；兩者 `disableSignUp===true` | edge case：第二道防線，gate 被移除時仍關閉 | integration |
 | Google provider 只在 client id 與 secret 皆存在時註冊 | Google 只在兩個變數皆存在時註冊 | 三種組合 → 只有兩者皆有時 `options.socialProviders.google` 存在 | edge case：預留結構不得在缺一值時半啟用 | integration |
 
