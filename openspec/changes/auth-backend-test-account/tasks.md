@@ -26,8 +26,9 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 新增 `hono-pickball/test/auth-config.test.ts`，寫入 it「isLocalAuthEnabled 只在 ENVIRONMENT 恰為 development 時為真」。確認紅燈（模組不存在）並貼出輸出
-- [ ] 2.2 GREEN: 新增 `hono-pickball/src/auth/local-auth.ts` 的 `isLocalAuthEnabled(env)`（嚴格相等 `"development"`）
+- [x] 2.1 RED: 新增 `hono-pickball/test/auth-config.test.ts`，寫入 it「isLocalAuthEnabled 只在 ENVIRONMENT 恰為 development 時為真」。確認紅燈（模組不存在）並貼出輸出
+  - 紅燈：`Error: Cannot find module '../src/auth/local-auth'`，Test Files 1 failed（可用 `git show 1499425:hono-pickball/test/auth-config.test.ts` 與 `git show 1499425^:hono-pickball/src/auth/local-auth.ts` 複驗：後者不存在）
+- [x] 2.2 GREEN: 新增 `hono-pickball/src/auth/local-auth.ts` 的 `isLocalAuthEnabled(env)`（嚴格相等 `"development"`）
 
 ## 3. createAuth 與測試 env 注入
 
