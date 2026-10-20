@@ -47,6 +47,9 @@ describe("createAuth", () => {
 		const onlyId = createAuth({ ...env, GOOGLE_CLIENT_ID: "fake-client-id" });
 		expect(onlyId.options.socialProviders?.google).toBeUndefined();
 
+		const onlySecret = createAuth({ ...env, GOOGLE_CLIENT_SECRET: "fake-client-secret" });
+		expect(onlySecret.options.socialProviders?.google).toBeUndefined();
+
 		const both = createAuth({ ...env, GOOGLE_CLIENT_ID: "fake-client-id", GOOGLE_CLIENT_SECRET: "fake-client-secret" });
 		expect(both.options.socialProviders?.google).toBeDefined();
 	});

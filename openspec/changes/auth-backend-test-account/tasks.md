@@ -40,7 +40,8 @@ Depends on: §2
   - 紅燈：`Error: Cannot find module '../src/auth/create-auth' imported from .../test/auth-config.test.ts`，`Test Files 1 failed`、`no tests`（模組不存在）
 - [x] 3.3 GREEN: 新增 `hono-pickball/src/auth/create-auth.ts` 的 `createAuth(env)`（design Decision 1、3、4）：`getDb(env)`＋`drizzleAdapter(db, { provider: "sqlite", schema, transaction: false })`、`baseURL`／`trustedOrigins`／`secret`、缺值拋錯、`emailAndPassword: { enabled: isLocalAuthEnabled(env), disableSignUp: true }`、條件式 `socialProviders.google`
   - 綠燈：auth-config.test.ts 6 passed；後端全套 31 passed；typecheck exit 0
-- [ ] 3.4 REFACTOR: 確認 `createAuth` 不在模組層讀 env、沒有預設 secret 的 fallback；無壞味道則註記 skipped
+- [x] 3.4 REFACTOR: 確認 `createAuth` 不在模組層讀 env、沒有預設 secret 的 fallback；無壞味道則註記 skipped
+  - skipped（無壞味道）：createAuth 不在模組層讀 env，無預設 secret fallback；mutation 發現 Google 條件只查 secret 的變異存活，已於 Google it 補「只有 secret」組合後轉紅
 
 ## 4. 測試帳號 seed SQL（純函式）
 
