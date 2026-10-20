@@ -107,6 +107,7 @@ Depends on: §6
 - [x] 7.3 REFACTOR: 與 6.4 合併檢查投影函式唯一性；確認降級邏輯只存在於本路由、`requireSession` 不吞例外
   - skipped（無壞味道）：`grep -rn "toPublicUser" src` 僅 `/api/me` 與 `/api/session` 兩處呼叫、定義唯一於 `public-user.ts`；`catch` 只存在於 `/api/session`，`requireSession` 無 try/catch（M9 變異使 /api/me 降級 401 時，「session 查詢拋錯」it 的 `/api/me` 500 斷言轉紅）；`createAuth(` 仍僅 `localAuth` 與 `/api/session` 啟用分支各一處
   - mutation（自跑 19 次，詳見回報）：存活 2 個——啟用分支重複建立 createAuth、移除 console.error，皆為結構／日誌約束，行為測試無法觀察
+  - Stage 2 補強：原存活變異「移除 console.error」已殺——「session 查詢拋錯」it 以 `vi.spyOn(console, "error")`（try/finally `mockRestore`）斷言有一次呼叫的訊息含「查詢 session 失敗」。注意 better-auth 自己也會 console.error，只斷言 `toHaveBeenCalled` 時該變異仍綠（實測），故改認本路由訊息；變異轉紅，對照組（訊息後半改字）維持綠。另修正 index.ts 註解為「包住 auth 建立與 session 查詢」。僅剩「重複 createAuth」存活（結構約束）
 
 ## 8. seed 腳本與 db:seed:local
 
