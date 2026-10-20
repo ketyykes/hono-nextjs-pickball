@@ -86,10 +86,14 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 RED: 新增 `hono-pickball/test/auth-me.test.ts`，寫入 it「未登入呼叫 /api/me 回 401」「偽造的 session cookie 呼叫 /api/me 回 401」「登入後 /api/me 回本人的 id、email 與 name」「A 的 cookie 只能取得 A 而非 B 的資料」「登出後原 session cookie 呼叫 /api/me 回 401」。確認紅燈（路由不存在 → 404）
-- [ ] 6.2 GREEN: 新增 `hono-pickball/src/auth/require-session.ts` 的 `requireSession`（無 session → 401 `{ error: "UNAUTHORIZED" }`；有則 `c.set("user")`／`c.set("session")`）；`index.ts` 掛 `GET /api/me`（gate → requireSession → 投影 `{ id, email, name }`）
-- [ ] 6.3 確認（regression guard 檢查）：重跑 `auth-gating.test.ts`，第三條 it 的 `/api/me` 部分在 gate 掛上後維持 404；若 5.3 時該部分已綠，於此註明其性質
-- [ ] 6.4 REFACTOR: 投影 `{ id, email, name }` 若在 §7 也需要，抽成單一具名函式（於 §7 完成後回頭執行亦可，註明）；無壞味道則註記 skipped
+- [x] 6.1 RED: 新增 `hono-pickball/test/auth-me.test.ts`，寫入 it「未登入呼叫 /api/me 回 401」「偽造的 session cookie 呼叫 /api/me 回 401」「登入後 /api/me 回本人的 id、email 與 name」「A 的 cookie 只能取得 A 而非 B 的資料」「登出後原 session cookie 呼叫 /api/me 回 401」。確認紅燈（路由不存在 → 404）
+  - 紅燈（commit a096c4e）：5 failed。前四條 `expected 404 to be 401/200`；「登出後…」在登入後的前置檢查 `expected 404 to be 200` 即失敗（路由不存在），尚未走到 sign-out 之後的 401 斷言
+- [x] 6.2 GREEN: 新增 `hono-pickball/src/auth/require-session.ts` 的 `requireSession`（無 session → 401 `{ error: "UNAUTHORIZED" }`；有則 `c.set("user")`／`c.set("session")`）；`index.ts` 掛 `GET /api/me`（gate → requireSession → 投影 `{ id, email, name }`）
+  - 實作偏離之處：依 leader 指示，把 gate＋`createAuth`＋`c.set('auth')` 抽成共用 middleware `localAuth`，同掛 `/api/auth/*` 與 `/api/me`；handler 與 `requireSession` 皆讀 `c.var.auth`（每請求只建一次）。`Variables` 補 `user`／`session`（型別取自 `auth.$Infer.Session`，定義於 `require-session.ts` 的 `AuthAppEnv`）。投影一併於此抽成 `src/auth/public-user.ts` 的 `toPublicUser`（見 6.4）。後端 11 檔／46 測試全綠，typecheck 兩段 exit 0（commit 7d12d10）
+- [x] 6.3 確認（regression guard 檢查）：重跑 `auth-gating.test.ts`，第三條 it 的 `/api/me` 部分在 gate 掛上後維持 404；若 5.3 時該部分已綠，於此註明其性質
+  - 結論：`auth-gating.test.ts` 3/3 綠。5.3 時 `/api/me` 尚未存在，該部分本來就 404，屬 regression guard；gate 掛上後才有保護力——變異「`/api/me` 拿掉 gate」使第三條 it 轉紅（無 DB 時 `c.var.auth` 未設定而 500），證明它此時真正在守
+- [x] 6.4 REFACTOR: 投影 `{ id, email, name }` 若在 §7 也需要，抽成單一具名函式（於 §7 完成後回頭執行亦可，註明）；無壞味道則註記 skipped
+  - 已在 6.2 GREEN 一併抽出 `toPublicUser`（§7 直接重用，7.3 再確認唯一性），故無獨立 refactor commit；其餘無壞味道，skipped
 
 ## 7. GET /api/session 狀態探針
 
