@@ -63,7 +63,8 @@ Depends on: §3
   - GREEN commit `f9168d7`。單檔 `Test Files 1 passed、Tests 2 passed`；完整後端 6 檔／24 測試全綠；`typecheck`（兩段）與 `build` exit 0。
 - [x] 4.3 REFACTOR: 確認 `src/**` 中 `drizzle(` 只出現在 `client.ts`；型別參數只要求 `DB`（`Pick<CloudflareBindings, "DB">`），不綁整個 env；無壞味道則註記 skipped
   - skipped（無壞味道）。`grep -rn "drizzle(" hono-pickball/src` 只有 `src/db/client.ts:12`；參數型別為 `Pick<CloudflareBindings, "DB">`；無 `!` 非空斷言（僅 `!env.DB` 否定判斷）。
-- [ ] 4.4 覆蓋（非 RED）：§4 Stage 2 審查以 mutation 發現「帶入 schema」無測試（`drizzle(env.DB)`、`{ schema: {} }` 存活）。於 `hono-pickball/test/db-client.test.ts` 新增 it「getDb 回傳的實例帶入 schema，可用 relational query 讀回 user」（test-plan 已同步新增一列）；寫入即綠，MUST 如實標註為覆蓋測試，SHALL NOT 偽造紅燈；交件前以上述兩條 mutation 證明轉紅
+- [x] 4.4 覆蓋（非 RED）：§4 Stage 2 審查以 mutation 發現「帶入 schema」無測試（`drizzle(env.DB)`、`{ schema: {} }` 存活）。於 `hono-pickball/test/db-client.test.ts` 新增 it「getDb 回傳的實例帶入 schema，可用 relational query 讀回 user」（test-plan 已同步新增一列）；寫入即綠，MUST 如實標註為覆蓋測試，SHALL NOT 偽造紅燈；交件前以上述兩條 mutation 證明轉紅
+  - commit `dcb3eb1`。覆蓋測試，寫入即綠（非 RED）。mutation：`drizzle(env.DB)` 轉紅、`{ schema: {} }` 轉紅（皆 `TypeError: Cannot read properties of undefined (reading 'findFirst')`）；等價對照 `{ schema: { ...schema } }` 維持綠。單檔 3 測試、完整後端 6 檔／25 測試全綠，typecheck 兩段 exit 0。
 
 ## 5. 文件同步與總驗收
 
