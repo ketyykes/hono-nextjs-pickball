@@ -12,7 +12,7 @@ describe("buildTestAccountSeedSql", () => {
 		}
 		const password = "p@ss'word";
 		const sql = await buildTestAccountSeedSql({
-			email: "seed-quote@example.com",
+			email: "o'neil-seed@example.com",
 			password,
 			name: "O'Neil",
 			now: new Date(1_700_000_000_000),
@@ -25,7 +25,7 @@ describe("buildTestAccountSeedSql", () => {
 		await env.DB.exec(sql);
 		const row = await env.DB
 			.prepare("SELECT name FROM user WHERE email = ?")
-			.bind("seed-quote@example.com")
+			.bind("o'neil-seed@example.com")
 			.first<{ name: string }>();
 		expect(row?.name).toBe("O'Neil");
 	});
