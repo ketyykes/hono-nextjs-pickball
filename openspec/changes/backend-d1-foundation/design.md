@@ -219,3 +219,28 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 2. `wrangler types --env-file .dev.vars.example` 是否確實忽略 `.dev.vars`？（§2 實測；若否，改為 Decision 2 的替代方案並記錄）
 3. Playwright `webServer` 的 `pnpm --filter hono-pickball dev` 會隨 `dev` script 改走 `--env local`；B1 不跑 E2E 以外的新流程，
    但 §5 的完整 E2E 回歸 MUST 確認 `api-health.spec.ts` 等既有測試不受影響。
+
+### apply §1 查證紀錄（2026-10-21）
+
+- **1.2 對齊 main：已確認**。`wrangler.jsonc` top-level 無 D1（D1 僅為註解範例）、無 `vars`；`package.json` scripts 與 Context 描述一致
+  （`dev: wrangler dev`、`cf-typegen` 未帶 `--env-file`）；`vitest.config.ts` 只有 `cloudflareTest({ wrangler: { configPath } })`；
+  `test/` 4 檔共 16 個 it，皆用 `exports.default.fetch` 慣例；`src/index.ts` 為 `new Hono<{ Bindings: CloudflareBindings }>()`。
+  現行 `worker-configuration.d.ts` 的 `__BaseEnv_CloudflareBindings` 為空介面——本機 `.dev.vars` 已含 B2 用鍵，但該檔是在 `.dev.vars`
+  建立前產生，故尚未漂移（Decision 2 要預防的正是下次重跑時的漂移）。
+- **1.3 本機套件：已確認，與 design 相同**。`@cloudflare/vitest-pool-workers@0.16.13`（`dist/pool/index.d.mts` 第 106、132 行自套件根匯出
+  `readD1Migrations`；`exports` 只有 `.`、`./types`、`./codemods/vitest-v3-to-v4`，無 `./config`；`WorkersConfig.wrangler.environment` 選項存在）；
+  `types/cloudflare-test.d.ts` 第 130 行宣告 `applyD1Migrations`，未標 deprecated（deprecated 只在第 3、11 行的 `env`／`SELF`）；
+  `drizzle-kit@0.31.10`（`bin.cjs` 含 `_journal.json` 邏輯，平面版面）；`drizzle-orm@0.45.2`；`better-auth@1.6.15`；`wrangler@4.99.0`
+  （`config-schema.json` 的 `database_id` 描述為「not required」）。
+- **1.4 Context7 查證**：
+  - ① `/cloudflare/workers-sdk`：`applyD1Migrations(db, migrations, migrationsTableName = "d1_migrations")` 自 `cloudflare:test` 匯入、跳過已套用者，
+    與 Decision 7 一致；d1 fixture README 記載「migrations 在 `vitest.config.mts` 讀取、以 `test/apply-migrations.ts` setup 檔套用」，一致。
+    上游套件已更名 `@cloudflare/vitest-plugin`（本批不跟進，與 design 相同）。
+  - ② `/llmstxt/developers_cloudflare_workers_llms-full_txt`：**有一處文件內部矛盾**——「Bindings > D1 databases」段把 `database_id` 標為 `required`，
+    但同來源「Automatic provisioning」段明載省略 ID 時 `wrangler dev` 建立本機資源、Dashboard（GitHub）部署會**在遠端建立**資源。
+    本機 4.99 schema 標「not required」。以本機套件＋§2 實測（C1 dry-run、C8 啟動、5.3 C2）為準；Decision 1 不變。
+    具名環境：文件寫「each environment creates a distinct Worker named `{name}-{env}`」、bindings 與 vars 不繼承——與 Decision 1 的覆寫 `name` 理由一致，
+    覆寫是否生效以 C8 實測為準。`migrations_pattern` 預設 `migrations/*.sql`，可用於 drizzle 巢狀版面——與 Decision 3 一致。
+  - ③ `/drizzle-team/drizzle-orm-docs`：sqlite 最小設定為 `{ dialect: "sqlite", schema }`；`driver: "d1-http"` 只用於 `push`／`migrate`／`pull`／`studio`，
+    與 Decision 3 一致。
+- **1.5 C8 前置**：`lsof -i :3005 -i :8787 -i :8790` 無輸出（exit 1），無殘留 dev server。

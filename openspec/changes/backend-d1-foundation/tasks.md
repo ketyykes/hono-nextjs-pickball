@@ -18,10 +18,10 @@
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
 - [x] 1.1 確認 `git branch --show-current` 為 `change/backend-d1-foundation`、`git status --porcelain` 為空；`pnpm install` 後 lockfile 零變動；跑 `pnpm test` 取得 baseline（後端應為 4 檔／16 測試），回填 environment.md 的 Verification 並 commit
-- [ ] 1.2 對齊 main：讀 `hono-pickball/{wrangler.jsonc, package.json, vitest.config.ts, tsconfig.json, test/tsconfig.json, src/index.ts, CLAUDE.md}` 與 `test/*.test.ts`，確認與 design Context 描述一致（無 D1、16 測試、`exports.default.fetch` 慣例）；不一致處記入 design.md Open Questions
-- [ ] 1.3 本機套件查證：確認 `node_modules/@cloudflare/vitest-pool-workers` 為 0.16.13 且套件根匯出 `readD1Migrations`（`dist/pool/index.d.mts`）、`types/cloudflare-test.d.ts` 宣告 `applyD1Migrations` 且未標 deprecated；`drizzle-kit` 為 0.31.10（平面版面）；`better-auth` 為 1.6.x；`wrangler` 為 4.99.x。結果記入 design.md Open Questions（與 design 相同則記「已確認」）
-- [ ] 1.4 Context7 查證（MUST，不憑記憶）：`resolve-library-id` → `query-docs`，至少查 ① `/cloudflare/workers-sdk` 的 vitest D1 migration 範例（`readD1Migrations`／`applyD1Migrations`／`env` 來源）② Workers 文件的 D1 binding `database_id` 是否必填、automatic provisioning、具名環境命名規則 ③ `/drizzle-team/drizzle-orm-docs` 的 sqlite `drizzle.config.ts` 與 `generate`。與 design Decision 1、3、7 的差異記入 Open Questions（附 library ID）
-- [ ] 1.5 驗收（指令）C8 前置：確認無其他 dev server（`lsof -i :3005 -i :8787 -i :8790` 為空，否則依派工單必帶 i 處理）。此步只記錄現況，C8 本身於 §2 完成 wrangler 設定後執行
+- [x] 1.2 對齊 main：讀 `hono-pickball/{wrangler.jsonc, package.json, vitest.config.ts, tsconfig.json, test/tsconfig.json, src/index.ts, CLAUDE.md}` 與 `test/*.test.ts`，確認與 design Context 描述一致（無 D1、16 測試、`exports.default.fetch` 慣例）；不一致處記入 design.md Open Questions
+- [x] 1.3 本機套件查證：確認 `node_modules/@cloudflare/vitest-pool-workers` 為 0.16.13 且套件根匯出 `readD1Migrations`（`dist/pool/index.d.mts`）、`types/cloudflare-test.d.ts` 宣告 `applyD1Migrations` 且未標 deprecated；`drizzle-kit` 為 0.31.10（平面版面）；`better-auth` 為 1.6.x；`wrangler` 為 4.99.x。結果記入 design.md Open Questions（與 design 相同則記「已確認」）
+- [x] 1.4 Context7 查證（MUST，不憑記憶）：`resolve-library-id` → `query-docs`，至少查 ① `/cloudflare/workers-sdk` 的 vitest D1 migration 範例（`readD1Migrations`／`applyD1Migrations`／`env` 來源）② Workers 文件的 D1 binding `database_id` 是否必填、automatic provisioning、具名環境命名規則 ③ `/drizzle-team/drizzle-orm-docs` 的 sqlite `drizzle.config.ts` 與 `generate`。與 design Decision 1、3、7 的差異記入 Open Questions（附 library ID）
+- [x] 1.5 驗收（指令）C8 前置：確認無其他 dev server（`lsof -i :3005 -i :8787 -i :8790` 為空，否則依派工單必帶 i 處理）。此步只記錄現況，C8 本身於 §2 完成 wrangler 設定後執行
 
 ## 2. 本機 D1 環境設定（設定層）
 
