@@ -70,10 +70,19 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 設定層（文件）：改寫 `hono-pickball/CLAUDE.md`：① 「wrangler.jsonc 要點」的 D1 段落改為「D1 只在 `env.local`；top-level 不得宣告，正式 D1 於 G1 以真實 UUID 宣告」② 常用指令補 `db:generate`、`db:migrate:local`，`dev` 註明走 `--env local` ③ 依賴注意：`drizzle-orm` 已被 `src/db/**` 匯入、解除其 2026-11-12 複審，其餘（better-auth 等）待 B2 ④ 測試慣例：`env` 自 `cloudflare:workers` 取得（`cloudflare:test` 的 `env`／`SELF` 仍禁用）、D1 夾具與「storage 以測試檔隔離」⑤ 新增「D1 schema 與 migration SQL 屬設定層」段落（含覆蓋義務）⑥ 範圍例外段落（matchmaker LocalStorage-only）**不動**（B5／B6 才改）
-- [ ] 5.2 驗收（指令）C6、C7：逐條核對 `hono-pickball/CLAUDE.md` 與 `.dev.vars.example`、`wrangler.jsonc`，結果寫在本 task 後方
-- [ ] 5.3 驗收（指令）C2：刪除 `hono-pickball/.wrangler/state` 後 `pnpm --filter ./hono-pickball db:migrate:local` exit 0，`wrangler d1 execute DB --local --env local --command "SELECT name FROM sqlite_master WHERE type='table'"` 列出四張表；同時比對本機 sqlite 檔路徑與 2.6 啟動的 `wrangler dev` 是否同一份（design Open Questions 1），不一致則依 Decision 1 改填非 UUID 字面值並重跑 2.5、2.6、3.2
-- [ ] 5.4 驗收（指令）C3：`pnpm --filter ./hono-pickball db:generate` 回報無變更、`git status --porcelain -- hono-pickball/drizzle` 為空
-- [ ] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／25 測試＝既有 16＋本 change 9（含 3.5 補的 2 個、4.4 補的 1 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
-- [ ] 5.6 驗收（指令）：完整 E2E 回歸 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留 process）——`dev` script 改走 `--env local` 後 `webServer` 啟動的後端必須讓既有 E2E 全數原樣通過；結果（passed／skipped／failed）寫在本 task 後方
-- [ ] 5.7 `DO_NOT_TRACK=1 openspec validate backend-d1-foundation --strict` 通過
+- [x] 5.1 設定層（文件）：改寫 `hono-pickball/CLAUDE.md`：① 「wrangler.jsonc 要點」的 D1 段落改為「D1 只在 `env.local`；top-level 不得宣告，正式 D1 於 G1 以真實 UUID 宣告」② 常用指令補 `db:generate`、`db:migrate:local`，`dev` 註明走 `--env local` ③ 依賴注意：`drizzle-orm` 已被 `src/db/**` 匯入、解除其 2026-11-12 複審，其餘（better-auth 等）待 B2 ④ 測試慣例：`env` 自 `cloudflare:workers` 取得（`cloudflare:test` 的 `env`／`SELF` 仍禁用）、D1 夾具與「storage 以測試檔隔離」⑤ 新增「D1 schema 與 migration SQL 屬設定層」段落（含覆蓋義務）⑥ 範圍例外段落（matchmaker LocalStorage-only）**不動**（B5／B6 才改）
+  - 已於 `4446a0c` 完成；⑥ 範圍例外段落未動，另加 Dashboard 不得設定 `CLOUDFLARE_ENV`／`--env` 警告與 `ENVIRONMENT` 等值比較提醒。
+- [x] 5.2 驗收（指令）C6、C7：逐條核對 `hono-pickball/CLAUDE.md` 與 `.dev.vars.example`、`wrangler.jsonc`，結果寫在本 task 後方
+  - C6：`hono-pickball/CLAUDE.md` 有「D1 schema 與 migration SQL 屬設定層」段落，寫明免紅燈與覆蓋義務（每張表與每個約束須有 D1 讀寫測試）。
+  - C7：`.dev.vars.example` 含 `ENVIRONMENT=development` 與說明註解；`wrangler.jsonc` 以 `grep -n vars` 無任何輸出（連註解也無），top-level 與 `env.local` 皆無 `vars` 鍵。
+- [x] 5.3 驗收（指令）C2：刪除 `hono-pickball/.wrangler/state` 後 `pnpm --filter ./hono-pickball db:migrate:local` exit 0，`wrangler d1 execute DB --local --env local --command "SELECT name FROM sqlite_master WHERE type='table'"` 列出四張表；同時比對本機 sqlite 檔路徑與 2.6 啟動的 `wrangler dev` 是否同一份（design Open Questions 1），不一致則依 Decision 1 改填非 UUID 字面值並重跑 2.5、2.6、3.2
+  - 刪除 `.wrangler/state` 後 `db:migrate:local` 套用 `0000_auth_core.sql`（10 commands、✅），重跑 exit 0；`d1 execute` 列出 `account`、`session`、`user`、`verification`（另有 `d1_migrations`、`sqlite_sequence`、`_cf_METADATA`）。
+  - Open Question 1 結論：migrate 後 D1 目錄僅有 `e7352547...abf4d.sqlite`（與 `metadata.sqlite`）；`wrangler dev --env local --port 8790` health 200、binding 顯示 `env.DB (hono-pickball-local) D1 Database local` 後，`d1/` 下**未新增任何 sqlite 檔**（僅多出無關的 `cache/` 下 metadata.sqlite），判定為同一份，Decision 1 的省略 `database_id` 作法成立，無須改填字面值。已停止 process，`lsof -i :8790` 無輸出。
+- [x] 5.4 驗收（指令）C3：`pnpm --filter ./hono-pickball db:generate` 回報無變更、`git status --porcelain -- hono-pickball/drizzle` 為空
+  - `db:generate` 輸出 `No schema changes, nothing to migrate`；`git status --porcelain -- hono-pickball/drizzle` 為空。
+- [x] 5.5 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 6 檔／25 測試＝既有 16＋本 change 9（含 3.5 補的 2 個、4.4 補的 1 個覆蓋測試）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
+  - `pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck`（兩段）exit 0；前端 lint 0 errors（3 warnings，既有）；`pnpm test` exit 0：後端 6 檔／25 測試、前端 81 檔／783 測試；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`（4 增 2 刪）。
+- [x] 5.6 驗收（指令）：完整 E2E 回歸 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留 process）——`dev` script 改走 `--env local` 後 `webServer` 啟動的後端必須讓既有 E2E 全數原樣通過；結果（passed／skipped／failed）寫在本 task 後方
+  - 前後 `lsof`／`ps` 無殘留 process。`playwright test --workers=1` exit 0：**633 passed、27 skipped、0 failed**（27.7 分鐘；`api-health.spec.ts` 在其中通過）。webServer 後端指令為 `pnpm --filter hono-pickball dev`，即 `wrangler dev --env local`。log：`/tmp/b1-e2e.log`。
+- [x] 5.7 `DO_NOT_TRACK=1 openspec validate backend-d1-foundation --strict` 通過
+  - 於 repo root 執行 `DO_NOT_TRACK=1 npx openspec validate backend-d1-foundation --strict`：`Change 'backend-d1-foundation' is valid`，exit 0。
