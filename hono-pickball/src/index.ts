@@ -68,7 +68,7 @@ app.get('/api/session', async (c) => {
     return c.json({ authEnabled: false, user: null })
   }
 
-  // 只包住 session 查詢：最常見的失敗是本機尚未 migration 卻帶著舊 cookie，
+  // 包住 auth 建立與 session 查詢：最常見的失敗是本機尚未 migration 卻帶著舊 cookie，
   // 此時訪客 UI 必須照常可用。降級只存在於探針，requireSession 遇到例外仍照常 500。
   try {
     const auth = createAuth(c.env)
