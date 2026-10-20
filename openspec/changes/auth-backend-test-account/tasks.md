@@ -100,7 +100,8 @@ Depends on: §5
 
 Depends on: §6
 
-- [ ] 7.1 RED: 新增 `hono-pickball/test/auth-session.test.ts`，寫入 it「停用且無 DB 時回 200 與 authEnabled false」「啟用但未登入時回 200 與 user null」「登入後回 200 與目前使用者的 id、email 與 name」「session 查詢拋錯時仍回 200 與 user null」。確認紅燈（路由不存在 → 404）
+- [x] 7.1 RED: 新增 `hono-pickball/test/auth-session.test.ts`，寫入 it「停用且無 DB 時回 200 與 authEnabled false」「啟用但未登入時回 200 與 user null」「登入後回 200 與目前使用者的 id、email 與 name」「session 查詢拋錯時仍回 200 與 user null」。確認紅燈（路由不存在 → 404）
+  - 紅燈：4 failed／4，四條皆 `expected 404 to be 200`（路由不存在）。第四條 it 另以同一替身 env＋同一個（真實登入取得、簽章正確的）cookie 呼叫 `GET /api/me` 並斷言 500：該斷言在 RED 時 `/api/me` 已存在，預期當下即為 500，屬 regression guard（leader 追加，用以殺掉「`requireSession` 加 try/catch」變異）；整條 it 的紅燈僅來自 `/api/session` 404
 - [ ] 7.2 GREEN: `index.ts` 掛 `GET /api/session`（design Decision 5：停用不建 auth；啟用時 `getSession` 投影；例外 `console.error` 後回 `user: null`）。**不**掛 gate
 - [ ] 7.3 REFACTOR: 與 6.4 合併檢查投影函式唯一性；確認降級邏輯只存在於本路由、`requireSession` 不吞例外
 
