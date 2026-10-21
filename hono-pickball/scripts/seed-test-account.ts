@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 import { buildTestAccountSeedSql } from "../src/db/seed/test-account.ts";
@@ -8,7 +8,6 @@ import { buildTestAccountSeedSql } from "../src/db/seed/test-account.ts";
 const projectRoot = join(import.meta.dirname, "..");
 const devVarsPath = join(projectRoot, ".dev.vars");
 const tmpDir = join(projectRoot, ".wrangler", "tmp");
-const sqlPath = join(tmpDir, "seed-test-account.sql");
 
 const requiredVars = [
   "TEST_ACCOUNT_EMAIL",
@@ -42,10 +41,13 @@ const sql = await buildTestAccountSeedSql({
 });
 
 mkdirSync(tmpDir, { recursive: true });
+// 每次呼叫用唯一目錄，避免並行執行時互相刪除對方的暫存檔
+const runDir = mkdtempSync(join(tmpDir, "seed-"));
+const sqlPath = join(runDir, "seed-test-account.sql");
 writeFileSync(sqlPath, sql, { mode: 0o600 });
 
 try {
-  // 暫存檔含密碼雜湊，無論成敗都必須刪除，因此放在 finally
+  // 暫存目錄含密碼雜湊，無論成敗都必須刪除，因此放在 finally
   execFileSync(
     "pnpm",
     ["exec", "wrangler", "d1", "execute", "DB", "--local", "--env", "local", "--file", sqlPath],
@@ -55,5 +57,5 @@ try {
   console.error("[seed-test-account] wrangler 執行失敗", error);
   process.exitCode = 1;
 } finally {
-  rmSync(sqlPath, { force: true });
+  rmSync(runDir, { recursive: true, force: true });
 }
