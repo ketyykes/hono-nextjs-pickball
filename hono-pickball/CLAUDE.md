@@ -12,11 +12,22 @@
 - `pnpm dev` — `wrangler dev --env local`（http://localhost:8787）；走 `--env local` 才有本機 D1 binding（`DB`）
 - `pnpm db:generate` — `drizzle-kit generate`，由 `src/db/schema.ts` 產生 `drizzle/` 下的 migration；commit 前執行必須不產生新檔案（schema 與 migration 不得漂移）
 - `pnpm db:migrate:local` — `wrangler d1 migrations apply DB --local --env local`；首次 clone 或 `drizzle/` 變更後執行一次。**任何指令都不得帶 `--remote`**，遠端 D1 的建立與 migration 屬後續 G1
+- `pnpm db:seed:local` — `node scripts/seed-test-account.ts`（Node 22 內建 type stripping，不需 `tsx`）；把 `.dev.vars` 的 `TEST_ACCOUNT_*` 寫入本機 D1。只讀 `.dev.vars`（以 `parseEnv` 解析，shell 已 export 的同名變數不影響）、只寫本機 D1（`--local --env local`），**不得帶 `--remote`**；重複執行會先刪除同 email 的 user（cascade 刪其 session）再重建。可在 `wrangler dev` 執行中跑，結果立即可見
 - `pnpm test` — Vitest（在真正的 workerd runtime 中執行）；單檔用 `pnpm --filter ./hono-pickball test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）
 - `pnpm typecheck` — `tsc --noEmit` + `tsc --noEmit -p test/tsconfig.json`（**兩段都要**：workspace tsconfig 的 include 不含 test/，root 的 `pnpm typecheck` 與 Stop hook 也都查不到 test/ 的型別）
 - `pnpm build` — `tsc --noEmit && wrangler deploy --dry-run`；兩段互補：前者抓型別但抓不到打包錯，後者走真 esbuild 打包並驗證 wrangler.jsonc 但不做型別檢查
 - `pnpm run deploy` — `wrangler deploy --minify` 手動部署（注意：`deploy` 與 pnpm 內建指令撞名，必須加 `run`）；**正式部署走 CF Dashboard Workers Builds（Git 整合），平常不手動 deploy**
 - `pnpm cf-typegen` — 重新產生 `CloudflareBindings` 型別（`worker-configuration.d.ts`）；改 `wrangler.jsonc` 後 root `.claude/settings.json` 的 PostToolUse hook 會自動重跑，不必手動；此指令讀 `.dev.vars.example`（不是各機的 `.dev.vars`），所以產出不受個人環境影響
+
+## 本機登入準備
+
+首次 clone 或換機器後，依序：
+
+1. `cp .dev.vars.example .dev.vars`，補齊 `ENVIRONMENT`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`（`http://localhost:3005`）、`TEST_ACCOUNT_EMAIL`、`TEST_ACCOUNT_PASSWORD`、`TEST_ACCOUNT_NAME`；`.dev.vars.example` 只放示意值，**真實帳密與 secret 不得寫入任何會 commit 的檔案**
+2. `pnpm db:migrate:local`
+3. `pnpm db:seed:local`
+
+`ENVIRONMENT` 不是 `"development"` 時 auth 整組停用（見「路由約定」），所以缺 `.dev.vars` 的環境無法登入是預期行為。
 
 ## wrangler.jsonc 要點
 
@@ -42,7 +53,9 @@
 - **D1 夾具**：`vitest.config.ts` 以 `readD1Migrations` 讀 `drizzle/`，經 `miniflare.bindings.TEST_MIGRATIONS` 注入，`wrangler.environment` 設 `"local"` 取得 `DB`，`setupFiles` 的 `test/apply-migrations.ts` 以 `applyD1Migrations` 套用。測試**不得手寫 `CREATE TABLE`**，一律走 migration
 - **storage 以測試檔隔離**（本版已無 `isolatedStorage`）：同一測試檔內的 it 共用同一份 D1 資料，測試須自行使用不互相衝突的資料
 - `DB` 在型別上為可選，測試／setup 以 `if (!env.DB) throw ...` 處理，不用 `!`
-- `.dev.vars` 會被 vitest pool 讀取（輸出可見 `Using secrets defined in .dev.vars`）；目前測試不讀任何 var
+- vitest pool 會讀 `.dev.vars`（輸出可見 `Using secrets defined in .dev.vars`），但 `vitest.config.ts` 的 `miniflare.bindings` 注入了 `ENVIRONMENT`、`BETTER_AUTH_SECRET`（假值）、`BETTER_AUTH_URL`，且實測注入值優先於 `.dev.vars`；測試結果不依賴 `.dev.vars`（有／無該檔各跑一次，通過數相同，C6 已驗證）
+- **gating／替身情境的例外**：預設走 `exports.default.fetch()`，但要驗證停用（`ENVIRONMENT` 非 `"development"`）或替換 env 時，改用 `app.request(path, init, { ...env, 覆寫 })` 注入 env，因為 `exports` 無法逐次覆寫 binding
+- 測試或 curl 呼叫 `POST /api/auth/*` 必須帶 `Origin`（屬於 trustedOrigins）；經前端 proxy 不帶會回 403
 - 測試檔頂部要 `import "../src/index"`，`src/` 改動時才會自動重跑
 - 刻意不開 `globals`：一律顯式 `import { describe, it, expect } from "vitest"`，避免 workerd 全域污染
 - ⚠️ 在受限沙箱中跑會噴 `listen EPERM: operation not permitted 127.0.0.1` —— 是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
@@ -52,6 +65,10 @@
 
 - 對外 API **一律掛在 `/api/*` 之下**——Next.js 端的 catch-all proxy（`app/api/[[...route]]/route.ts`）只轉發 `/api/*`，掛在其他路徑的端點前端打不到
 - **root path（`GET /`）刻意不定義，回 404 是預期行為**，不代表部署失敗。原本的 `Hello Hono!` 樣板已於 change `backend-cleanup-and-tdd-enablement` 移除（驗收：`test/routing.test.ts`）
+- **auth 與 session 端點**（better-auth 1.6，email／password，註冊停用）：
+  - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`ENVIRONMENT` 非 `"development"`）回 404，不建立 auth、不碰 D1**
+  - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
+  - 經 proxy／curl 打 `POST /api/auth/*` 須帶 `Origin`（不帶回 403）
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；未來 better-auth 依賴此行為）
@@ -59,7 +76,8 @@
 ## 依賴注意
 
 - `drizzle-orm` 已被 `src/db/**` 匯入，**不再受下述複審限制**；`drizzle-kit`（devDependencies，CLI 工具本該如此）已由 `db:generate` 使用
-- `better-auth`、`@better-auth/drizzle-adapter`、`@hono/zod-validator`、`zod`、`date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝（B2 起接上）
+- `better-auth`、`@better-auth/drizzle-adapter` 已被 `src/auth/**` 匯入，**不再受下述複審限制**。**不升級到 better-auth 1.7**：其 `account.issuer` 為 breaking schema 變更（B1 design Decision 5），升級須另開 change 處理 migration
+- `@hono/zod-validator`、`zod`、`date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝
 - **保留而非移除的理由**：`wrangler deploy --dry-run` 實測產物為 gzip **16.91 KiB**，離 CF Free plan 的 3 MiB 上限餘裕極大；體積沒有壓力時，移除的收益低於日後重裝的摩擦
-- **複審期限：2026-11-12**。屆時若上述未匯入的套件仍未被 `src/**` 匯入，開 change 移除（決策 D5）
+- **複審期限：2026-11-12**。屆時若這三個未匯入的套件仍未被 `src/**` 匯入，開 change 移除（決策 D5）
 - `@cloudflare/vitest-pool-workers` 與 `vitest` 不屬上述範圍——已於 change `backend-cleanup-and-tdd-enablement` 實際啟用
