@@ -5,7 +5,7 @@
 `nextjs-pickball/playwright.config.ts` SHALL 設定 `globalSetup: "./tests/e2e/global-setup.ts"`。Playwright 先啟動 `webServer`
 再執行 `globalSetup`，因此 setup 內可以呼叫前端 origin。`global-setup.ts` MUST：
 
-1. 以 B2 的 `tests/e2e/helpers/test-account.ts` 的 `readTestAccount()` 讀取測試帳密；回傳 `null`（`.dev.vars` 缺帳密）時，
+1. 以 B2 的 `tests/e2e/helpers/test-account.ts` 讀取測試帳密（`readTestAccount()`，或需要列出缺少的變數名稱時用 `readTestAccountResult()`）；缺帳密時，
    刪除舊的 storage state 檔（若存在）、以 `console.warn` 說明缺少的變數後直接結束，SHALL NOT 讓整個 E2E 失敗——既有訪客 E2E 不依賴登入。
 2. 否則呼叫 `ensureTestAccountSeeded()`（本機 migration＋seed），再以 Playwright `request.newContext({ baseURL: "http://localhost:3005" })`
    帶 `Origin: http://localhost:3005` 對 `/api/auth/sign-in/email` 登入，成功後 `storageState({ path: "tests/e2e/.auth/test-account.json" })`。

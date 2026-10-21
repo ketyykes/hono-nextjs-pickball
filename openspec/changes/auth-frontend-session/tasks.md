@@ -95,7 +95,7 @@ Depends on: §5
 - [x] 6.4 驗收（指令）C3：storage state 檔存在、含 session cookie、`git status --porcelain` 不列出
 - [x] 6.5 驗收（指令）C4：停掉所有 dev server、暫時移除 `.dev.vars`，跑 `api-health.spec.ts`＋`auth-session.spec.ts`：exit 0、api-health 通過、auth-session 全 skipped 且原因含 `TEST_ACCOUNT_`；還原 `.dev.vars` 並停掉 server（`reuseExistingServer` 會沿用舊 server，因此前後都要確認 3005／8787 無殘留）
 - [x] 6.6 驗收（指令）C5：`playwright.config.ts` 五個 project 與 top-level `use` 無 `storageState`
-  - §6 紀錄（Implementer 自述；**§6 的 Stage 1／Stage 2 審查尚未執行**，等人類裁決 6.3 後再做）：
+  - §6 紀錄（Implementer 自述；**§6 的 Stage 1／Stage 2 審查尚未執行**，等人類裁決 6.3 後再做——已於裁決後完成且皆 PASS，見 6.11 紀錄）：
     6.1 `352b513`（`.gitignore`、`globalSetup`、`tests/e2e/global-setup.ts`、`tests/e2e/helpers/storage-state.ts`；依 B2 移交，
     `auth-proxy.spec.ts` 移除 `beforeAll` 的 seed 呼叫，斷言與 skip 零變動，chromium 2 passed／8 skipped）；6.2 `2783a4c`。
     6.2 前五條為 **regression guard**（首次執行即綠；firefox 有負載造成的逾時，隔離重跑通過，spec 內因此加 60 秒 test timeout 與導航後 15 秒 `toHaveURL`）；

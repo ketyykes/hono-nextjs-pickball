@@ -58,4 +58,5 @@ runbook B3：B2（`auth-backend-test-account`）已讓後端能以本機測試�
   無 `.dev.vars` 的環境（含正式站）`authEnabled` 為 false，navbar 與現在完全相同。
 - **E2E**：開發者本機有 `.dev.vars` 時，所有既有 E2E 的 navbar 會多出「登入」圖示——**窄螢幕排版餘裕是本 change 最大風險**
   （390px 下現有餘裕約 28px，見 design Risks），既有 `navbar-rwd.spec.ts` 必須在 `.dev.vars` 齊備的狀態下原樣通過。
+  **2026-10-21 裁決後**：入口於 `< sm`（640px）隱藏，窄螢幕改由 `/login` 登入登出，因此只有 viewport ≥ 640px 的 project 會多出圖示（實測 390px 餘裕為 32px，見 design Open Questions 第 8、12 條）。
 - **相依**：無新增。
