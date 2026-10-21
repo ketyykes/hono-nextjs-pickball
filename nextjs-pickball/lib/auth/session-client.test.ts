@@ -29,6 +29,9 @@ describe("fetchSession", () => {
 		});
 		expect(mock).toHaveBeenCalledTimes(1);
 		expect((mock.mock.calls[0] as unknown[])[0]).toBe("/api/session");
+		// 未傳 init 時 fetch 預設為 GET；明確斷言是為了擋住日後誤加其他 method
+		const init = (mock.mock.calls[0] as unknown[])[1] as RequestInit | undefined;
+		expect(init?.method ?? "GET").toBe("GET");
 
 		stubFetch(async () => jsonResponse({ authEnabled: true, user: null }));
 		await expect(fetchSession()).resolves.toEqual({
