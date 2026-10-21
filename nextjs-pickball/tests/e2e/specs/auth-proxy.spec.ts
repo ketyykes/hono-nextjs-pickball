@@ -6,20 +6,25 @@ import {
 
 // 驗證 better-auth 的 session cookie 經 Next.js proxy → service binding → Hono 原樣穿透。
 // 只用 request fixture、不開頁面；通路與瀏覽器無關，只需在 chromium 執行一次。
-// mobile-chrome 的 browserName 也是 chromium，需另行排除，否則多個 worker 會並行 seed 互相干擾。
+// mobile-chrome 的 browserName 也是 chromium，需另行排除，否則多個 worker 會並行 seed 互相干擾；
+// isMobile 是 test 層 fixture，describe 層與 beforeAll 前無法使用，故在 beforeAll 以 project 名稱判斷。
 // 依賴 hono-pickball/.dev.vars 的測試帳密與本機 D1。
 test.describe("auth proxy 穿透", () => {
 	// serial 讓兩條 test 同一 worker，beforeAll 只 seed 一次（seed 會重建 user，並行會讓 session 失效）
 	test.describe.configure({ mode: "serial" });
 
 	test.skip(
-		({ browserName, isMobile }) => browserName !== "chromium" || isMobile,
+		({ browserName }) => browserName !== "chromium",
 		"auth 通路測試只需在 chromium 執行一次",
 	);
 
 	const accountResult = readTestAccountResult();
 
-	test.beforeAll(() => {
+	test.beforeAll((_fixtures, testInfo) => {
+		test.skip(
+			testInfo.project.name !== "chromium",
+			"auth 通路測試只需在 chromium 執行一次",
+		);
 		if (accountResult.ok) {
 			ensureTestAccountSeeded();
 		}
