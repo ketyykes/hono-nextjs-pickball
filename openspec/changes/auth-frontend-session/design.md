@@ -174,3 +174,28 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
    - 對 Open Questions 1 候選方案的數值評估（僅供人類裁決，本 change 不自行選）：(a) 放到 logo 原位置：320px 下仍需 28＋12 = 40px > 18px，**一樣放不下**；
      (b) 不影響寬度；(c) `< 375px` 隱藏入口：320 可過，但 375px（iPhone SE 2/3、mini 等級）仍超出 11px，需把斷點一併納入考量。
    - 依 tasks 6.3，§6 的窄螢幕 E2E 預期在 320px 失敗；屆時依 Escalation 停止並升級，附截圖。§2～§5 與排版無關，先行實作。
+
+### apply 進度與升級事項（2026-10-21，leader 停止於 tasks 6.3）
+
+9. **⛔ 窄螢幕擠不下——需人類裁決（tasks 6.3／Escalation「窄螢幕擠不下」）**。
+   - E2E 實測（`.dev.vars` 齊備，`auth-session.spec.ts`「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」）：**320px 失敗**，
+     「登入」圖示連結 `toBeInViewport({ ratio: 1 })` 實得 0.643，左／右緣 302／330（視口 320，超出 10px）；chromium 與 mobile-chrome 皆同。
+     **390px 通過**（右緣 386，距邊 4px，已吃掉容器右內距 12px）。375px（spec 未要求，但為 iPhone SE 2／3、mini 寬度）右緣 386，超出 11px。
+     五個導航連結在 320／375／390 皆仍完整在視口內、不換行；既有 `navbar-rwd.spec.ts` 在 `.dev.vars` 齊備時 chromium、mobile-chrome 7/7 通過。
+   - 證據：失敗截圖、video、error-context 在 `/tmp/b3-e2e-evidence/`（repo 外、未 commit）；§1 的量測見本節第 8 條。
+   - 根因：320px 下內容寬 296、五連結固有寬 278，餘裕 18px；入口需 28px（16 圖示＋`px-1.5`）＋容器 `gap-3` 12px＝40px。
+   - 候選方案（第 1 條原列，加上數值評估；本 change 不自行選）：
+     (a) `< 375px` 時入口改放 logo 原位置——數值上仍需 28＋12＝40px > 18px，**單獨採用放不下**；
+     (b) 不影響寬度，不解決本問題；
+     (c) `< 375px` 時隱藏入口、改由 `/login` 頁提供登出——320 可過，但 375px 仍超出 11px，斷點需一併改為例如 `< 390px`（`max-[390px]`）；
+     另一可能方向（需人類決定，涉及修改既有 spec 條款）：`< 375px` 時入口與連結共用更小的間距（例如縮小容器 `gap`），但這會改動既有 navbar 的 className／spec「窄螢幕導航呈現」。
+   - 裁決後需要：依決定修改 delta spec／design（若改條款）、修改 `AccountEntry`／`SiteNavbar` 並以 TDD 驗證、重跑 §6 E2E，接著執行 §6 Stage 1／Stage 2、§7 與 Final Code Review。
+10. **目前進度**：§1～§5 全部完成且通過兩階段審查；§6 的 6.1、6.2、6.4、6.5、6.6 已完成（Implementer 自述，**§6 兩階段審查尚未執行**），6.3 觸發停止；§7 未開始。
+    前端單元測試現為 87 檔／820（基線 81／783；新增 6 檔，it 數多於 tasks 7.3 預期的 22 條，差額為 regression guard 與 §3 競態修正，各組紀錄見 tasks.md）。
+    §7.4 完整 E2E 將有 2 個已知失敗（chromium、mobile-chrome 的窄螢幕 test），在裁決前不執行；另 firefox 在高負載機器上單條登入 test 需 20～40 秒，跑完整 E2E 時需留意。
+11. **與 design 不同之處（已實作）**：
+    - store 改用遞增 `requestId`、不共用進行中請求（§3 Stage 2：共用會使「初始請求在途時登入後 refresh」拿到舊結果）。
+    - 內距／配色抽到 `components/layout/navItemStyles.ts`（tasks 4.5 寫「同檔」，因 SiteNavbar import AccountEntry，同檔會循環依賴）。
+    - 登入連結加 `transitionTypes={["nav-forward"]}` 與 navbar 其他連結一致。
+    - `/login` metadata 為 `robots: { index: false, follow: false }`（比照 `/health`）。
+    - B2 移交：`auth-proxy.spec.ts` 的 seed 移至 globalSetup（tasks 標頭未列此例外，屬 coordinator 明令）。

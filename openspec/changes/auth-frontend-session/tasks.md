@@ -85,12 +85,24 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 例外層：`nextjs-pickball/.gitignore` 加 `/tests/e2e/.auth/`；新增 `nextjs-pickball/tests/e2e/global-setup.ts`（`dev-workflow`「E2E 登入夾具」1～2 點：重用 B2 helper、缺帳密時 warn＋刪舊 state＋結束、登入失敗 throw）；`playwright.config.ts` 加 `globalSetup`，**不動**五個 project 與 top-level `use`。storage state 路徑以設定檔目錄解析（`path.join(import.meta.dirname ?? __dirname, …)` 等價寫法），spec 與 setup 共用同一個常數
-- [ ] 6.2 E2E（預期多為 regression guard）: 新增 `nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，寫入 test「未登入時 navbar 顯示登入入口並可前往登入頁」「以測試帳號登入後 navbar 顯示登出」「帳號或密碼錯誤時登入頁顯示錯誤訊息」「重整後仍維持登入」「登出後 navbar 回到登入入口」「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」（最後一條只跑 chromium；storage state 不存在時整檔 `test.skip` 並寫明原因；登入／登出流程用新 context）。行為已由 §2～§5 的單元／integration 測試以真紅燈驅動，本檔寫入時多數 test 會直接綠——**如實逐條標註**哪些是 regression guard、哪些首次執行為紅（及其原因）；**SHALL NOT** 以回退產品程式碼或改斷言製造紅燈。指令：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/auth-session.spec.ts`（前後清殘留 process）
+- [x] 6.1 例外層：`nextjs-pickball/.gitignore` 加 `/tests/e2e/.auth/`；新增 `nextjs-pickball/tests/e2e/global-setup.ts`（`dev-workflow`「E2E 登入夾具」1～2 點：重用 B2 helper、缺帳密時 warn＋刪舊 state＋結束、登入失敗 throw）；`playwright.config.ts` 加 `globalSetup`，**不動**五個 project 與 top-level `use`。storage state 路徑以設定檔目錄解析（`path.join(import.meta.dirname ?? __dirname, …)` 等價寫法），spec 與 setup 共用同一個常數
+- [x] 6.2 E2E（預期多為 regression guard）: 新增 `nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，寫入 test「未登入時 navbar 顯示登入入口並可前往登入頁」「以測試帳號登入後 navbar 顯示登出」「帳號或密碼錯誤時登入頁顯示錯誤訊息」「重整後仍維持登入」「登出後 navbar 回到登入入口」「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」（最後一條只跑 chromium；storage state 不存在時整檔 `test.skip` 並寫明原因；登入／登出流程用新 context）。行為已由 §2～§5 的單元／integration 測試以真紅燈驅動，本檔寫入時多數 test 會直接綠——**如實逐條標註**哪些是 regression guard、哪些首次執行為紅（及其原因）；**SHALL NOT** 以回退產品程式碼或改斷言製造紅燈。指令：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/auth-session.spec.ts`（前後清殘留 process）
 - [ ] 6.3 窄螢幕判定：若「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」失敗，或既有 `navbar-rwd.spec.ts` 在 `.dev.vars` 齊備時失敗——**停止並依 execution-plan Escalation 升級**，附 1.5 的量測與失敗截圖，SHALL NOT 自行改動既有連結、文案或斷點
-- [ ] 6.4 驗收（指令）C3：storage state 檔存在、含 session cookie、`git status --porcelain` 不列出
-- [ ] 6.5 驗收（指令）C4：停掉所有 dev server、暫時移除 `.dev.vars`，跑 `api-health.spec.ts`＋`auth-session.spec.ts`：exit 0、api-health 通過、auth-session 全 skipped 且原因含 `TEST_ACCOUNT_`；還原 `.dev.vars` 並停掉 server（`reuseExistingServer` 會沿用舊 server，因此前後都要確認 3005／8787 無殘留）
-- [ ] 6.6 驗收（指令）C5：`playwright.config.ts` 五個 project 與 top-level `use` 無 `storageState`
+  - **⛔ 2026-10-21 觸發，未勾選，已停止並升級 coordinator／人類裁決**（詳見 design.md Open Questions 第 9 條）。
+    `auth-session.spec.ts`「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」在 chromium 與 mobile-chrome 皆於 **320px** 失敗：
+    `header` 內「登入」連結 `toBeInViewport({ ratio: 1 })` 實得 ratio 0.643（左／右緣 302／330，超出視口 10px）；390px 通過（右緣 386，距邊 4px）。
+    既有 `navbar-rwd.spec.ts` 在 `.dev.vars` 齊備時 chromium、mobile-chrome 皆 7/7 通過（五個導航連結本身未被擠出）。
+    產品程式碼、連結、文案、斷點、className 均未改動。
+- [x] 6.4 驗收（指令）C3：storage state 檔存在、含 session cookie、`git status --porcelain` 不列出
+- [x] 6.5 驗收（指令）C4：停掉所有 dev server、暫時移除 `.dev.vars`，跑 `api-health.spec.ts`＋`auth-session.spec.ts`：exit 0、api-health 通過、auth-session 全 skipped 且原因含 `TEST_ACCOUNT_`；還原 `.dev.vars` 並停掉 server（`reuseExistingServer` 會沿用舊 server，因此前後都要確認 3005／8787 無殘留）
+- [x] 6.6 驗收（指令）C5：`playwright.config.ts` 五個 project 與 top-level `use` 無 `storageState`
+  - §6 紀錄（Implementer 自述；**§6 的 Stage 1／Stage 2 審查尚未執行**，等人類裁決 6.3 後再做）：
+    6.1 `352b513`（`.gitignore`、`globalSetup`、`tests/e2e/global-setup.ts`、`tests/e2e/helpers/storage-state.ts`；依 B2 移交，
+    `auth-proxy.spec.ts` 移除 `beforeAll` 的 seed 呼叫，斷言與 skip 零變動，chromium 2 passed／8 skipped）；6.2 `2783a4c`。
+    6.2 前五條為 **regression guard**（首次執行即綠；firefox 有負載造成的逾時，隔離重跑通過，spec 內因此加 60 秒 test timeout 與導航後 15 秒 `toHaveURL`）；
+    窄螢幕一條為真紅（即 6.3）。另依 Stage 2（§4）建議加入「入口右緣 ≥ 對戰分配右緣」位置斷言。
+    C3：state 檔存在、只含 `better-auth.session_token`、被 `.gitignore` 忽略。C4：移除 `.dev.vars` 後 api-health 4 passed、auth-session 30 條全 skipped（原因含 `TEST_ACCOUNT_`）、
+    exit 0、舊 state 被刪；還原後 `cmp` 位元相同；前後 3005／8787 無殘留。C5：五個 project 與 top-level `use` 無 `storageState`。
 
 ## 7. 文件同步與總驗收
 
