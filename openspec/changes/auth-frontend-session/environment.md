@@ -26,8 +26,11 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0（tasks 1.1）實測回填。預期後端為 B2 後的 12 檔／47 測試；前端以實測為準。
-- **Initial commit hash**: 待 apply Step 0 回填（`change/auth-frontend-session` 分出時的 `main` HEAD）。
+- **Baseline tests**（2026-10-21 apply Step 0 實測，`pnpm test`）：前端 81 檔／783 測試全綠；後端 12 檔／**50** 測試全綠
+  （原預期 47，B2 合併時的實際數為 50，以實測為準）。`pnpm install` 後 lockfile 零變動；`db:migrate:local`「No migrations to apply」、
+  `db:seed:local` 成功。`pnpm -r exec tsc --noEmit` exit 0、`pnpm --filter ./hono-pickball typecheck` exit 0、
+  `pnpm --filter ./nextjs-pickball lint` 0 errors／3 warnings（lint 基線）。
+- **Initial commit hash**: `19d922bd63eddfd02b7d5e3093be39ffd6928932`（`change/auth-frontend-session` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

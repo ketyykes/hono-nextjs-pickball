@@ -56,7 +56,8 @@ export function readTestAccount(): TestAccount | null {
 /**
  * 依序對本機 D1 執行 migrate 與 seed。
  * wrangler dev 執行中寫入同一份本機 sqlite 會立即可見（B2 §1 實測），不必重啟後端。
- * 不支援多 worker 並行呼叫（如 --repeat-each）：重複 seed 會撞 SQLITE_BUSY，跨 spec 統一 seed 交 B3 globalSetup。
+ * 只由 globalSetup 呼叫（執行一次）：seed 會重建 user 並連帶刪除 session，spec 自行呼叫會讓已存的 storage state 失效，
+ * 多 worker 並行呼叫也會撞 SQLITE_BUSY。
  */
 export function ensureTestAccountSeeded(): void {
 	for (const script of ["db:migrate:local", "db:seed:local"]) {

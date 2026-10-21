@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Playwright E2E 測試配置
 export default defineConfig({
   testDir: "./tests/e2e/specs",
+  // 在 webServer 啟動後執行：seed 測試帳號並產生登入用 storage state（缺帳密時略過）
+  globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

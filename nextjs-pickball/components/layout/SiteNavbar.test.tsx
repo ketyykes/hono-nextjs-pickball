@@ -5,6 +5,11 @@ vi.mock("@/hooks/useScrolledPast", () => ({
 	useScrolledPast: vi.fn(() => false),
 }));
 
+// AccountEntry 讀 session store，happy-dom 下會真的 fetch；以 loading 隔離，既有斷言不受影響。
+vi.mock("@/hooks/useSession", () => ({
+	useSession: () => ({ status: "loading", refresh: async () => {} }),
+}));
+
 vi.mock("next/navigation", () => ({
 	usePathname: vi.fn(() => "/"),
 }));

@@ -70,7 +70,9 @@
 
 **Alternatives considered**：
 - 使用者頭像＋下拉選單：需要新增 shadcn `dropdown-menu`（`radix-ui` 已在相依內，但元件檔要新增），且頭像也要佔寬度。G1 再議。
-- 帳號入口只在 `sm` 以上顯示：手機是計分板的主要使用情境（場邊），Wave 2 起手機必須能登入登出。不選。
+- 帳號入口只在 `sm` 以上顯示：手機是計分板的主要使用情境（場邊），Wave 2 起手機必須能登入登出。原本不選；
+  **2026-10-21 人類裁決改採**（實測 320／375px 擠不下，見 Open Questions 第 9 條）：`< sm` 時以 `hidden sm:inline-flex` 隱藏入口，
+  窄螢幕的登入登出改由 `/login` 頁提供（已登入時該頁顯示「登出」按鈕）；行動裝置的登入入口記為 G1 待辦。
 - 放在 matchmaker 區段導覽或各頁：違反 runbook「navbar 顯示」。不選。
 - **若實測仍擠不下**：本 change SHALL NOT 自行隱藏連結、改文案或改漢堡選單（`site-navbar` 既有立場），升級給人類，候選方案見 Open Questions 1。
 
@@ -128,7 +130,96 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
 
 ## Open Questions
 
-1. 若 §6 的窄螢幕 E2E 失敗，候選方案（需人類裁決，本 change 不自行選）：(a) 帳號入口在 `< 375px` 時改放到 logo 原本的位置（logo 已隱藏）；
+1. **【已裁決 2026-10-21，見第 9 條】** 若 §6 的窄螢幕 E2E 失敗，候選方案（需人類裁決，本 change 不自行選）：(a) 帳號入口在 `< 375px` 時改放到 logo 原本的位置（logo 已隱藏）；
    (b) 已登入狀態改為只在 `sm` 以上顯示 `title` 以外的視覺提示；(c) 接受在 `< 375px` 時隱藏入口、改由 `/login` 頁提供登出。
 2. G1 加入 Google 登入時，是否改用官方 `createAuthClient`（`signIn.social` 的重導流程）——屆時需處理 Decision 1 所述的 4xx console 問題。
 3. 登入成功導向固定為 `/`；Wave 2 若需要「登入後回到原頁」（例如從計分板進入登入），再加 `?next=` 參數（本 change 不做）。
+
+### apply §1 查證紀錄（2026-10-21）
+
+4. **1.1 baseline**：前端 81 檔／783、後端 12 檔／**50**（tasks 1.1 寫 47，B2 合併時實際為 50）；lint 0 errors／3 warnings。
+   因此 7.3 的後端預期為 12 檔／50 不變；前端預期 87 檔／805。
+5. **1.2 對齊 B2：回應契約與本 design Context 一致**（`/api/session` 永遠 200、停用時 `{authEnabled:false,user:null}`、
+   啟用但查詢例外時降級為 `user:null`；`/api/auth/*` 停用時 `c.notFound()` 404；錯誤帳密 401）。差異與移交：
+   - helper 實際匯出 `readTestAccount(): TestAccount | null`、`readTestAccountResult()`（`{ok:false, missing}` 可寫明缺哪個變數）、
+     `ensureTestAccountSeeded()`；helper 以 `__dirname` 解析路徑（Playwright 以 CJS 載入 TS）。global-setup 的 warn／spec 的 skip 原因
+     改用 `readTestAccountResult().missing` 才能寫出缺的變數名（spec 要求原因含 `TEST_ACCOUNT_`）。
+   - B2 Open Question 3 已實測：`d1 execute --local` 對執行中的 wrangler dev 立即可見 → **seed 時機不需調整**（globalSetup 在 webServer 後 seed 即可）。
+   - **B2 移交（coordinator 指示 MUST）**：seed 會 DELETE 同 email user 並 cascade 刪 session，globalSetup 存 storageState 後若有 spec 再 seed，
+     共用 state 即失效。故 §6 範圍**擴大**：`tests/e2e/specs/auth-proxy.spec.ts` 的 `beforeAll` seed 呼叫移除、改依賴 globalSetup
+     （該檔斷言零變動），helper 註解同步。此項超出 tasks 標頭「唯一允許碰的既有測試檔是 `SiteNavbar.test.tsx`」，屬 coordinator 明令的例外。
+   - 經 proxy 的 sign-in 不帶 `Origin` 回 403：globalSetup 的 API 登入必須帶 `Origin: http://localhost:3005`（與 delta spec 一致）。
+6. **1.3 前端現況**：與 design 一致。`lucide-react` 匯出 `LogIn`／`LogOut`；shadcn `button`／`input`／`label` 皆在；`@testing-library/user-event` 已安裝；
+   `@playwright/test` 實裝 **1.60.0**（design 寫 1.59）。`SiteNavbar.test.tsx` 的 `afterEach` 用 `vi.resetAllMocks()`——新增的 `useSession` mock
+   須在 reset 後仍回 loading（用一般 arrow function 或 `vi.fn` 皆可，Vitest 4 的 reset 會還原為工廠實作）。
+7. **1.4 Context7**：
+   - `/better-auth/better-auth/v1.6.23`（`concepts/client.mdx`、`reference/faq.mdx`、`authentication/email-password.mdx`）：`createAuthClient` from
+     `better-auth/react`、`useSession()` 回 `{ data, isPending, error, refetch }`、`signOut()` 打 `POST /sign-out`；FAQ 仍建議避免在 `layout.tsx` 用 `useSession`。
+     **與 Decision 1 無差異**。
+   - `/microsoft/playwright/v1.59.0`（`test-global-setup-teardown-js.md`、`auth.md`、`api-testing-js.md`）與 `packages/playwright/src/runner/tasks.ts`：
+     順序 removeOutputDirs → plugin setup（webServer）→ globalSetup，globalSetup 可直接呼叫 webServer；`test.use({ storageState })` 取用、
+     `{ cookies: [], origins: [] }` 重置；`request.newContext()` 的 `storageState()` 可匯出 cookie。**與 Decision 5 無差異**。
+   - `/websites/react_dev_reference`（`useSyncExternalStore`）：`getServerSnapshot` 用於伺服器 render **與 hydration**，client 與 server 必須一致；
+     `getSnapshot` 未變更時須回傳同一參考。**與 Decision 1、Risks 第 5 條一致**。
+8. **1.5 窄螢幕量測（`.dev.vars` 齊備、前後端 dev、chromium headless、未改程式碼）**——**320px 與 375px 擠不下，390px 勉強放得下**：
+   - 目前餘裕（header 內層容器內容寬度 − logo − gap − nav 固有寬度）：**320px：18px**（內容寬 296、logo 隱藏、nav 278）；
+     **390px：32px**（內容寬 358、logo 16＋gap 12、nav 298）；1280px：680px。
+   - 以 DOM 注入模擬 Decision 3 的入口（`inline-flex`、`py-2`、`px-1.5`／`px-2`、16px 圖示、`shrink-0`，接在 `<nav>` 後、受容器 `gap-3` 影響）：
+     | 視口 | 入口左／右緣 | 完整在視口內 | 容器 scrollWidth／clientWidth | 五連結 |
+     |---|---|---|---|---|
+     | 320 | 302／**330** | **否（超出 10px）** | 330／320 | 皆在視口內、高 36 |
+     | 375 | 354／**386** | **否（超出 11px）** | 386／375 | 皆在視口內 |
+     | 390 | 354／386 | 是（距右緣 4px，已吃掉容器右內距 12px） | 390／390 | 皆在視口內 |
+     | 414 | 366／398 | 是 | 414／414 | 皆在視口內 |
+   - 入口需要的寬度：320px 下 28px（圖示 16＋px-1.5）＋ gap 12 = 40px > 餘裕 18px；390px 下 32＋12 = 44px > 32px 的「內容寬餘裕」，
+     靠溢出到容器右內距才放得下。
+   - 對 Open Questions 1 候選方案的數值評估（僅供人類裁決，本 change 不自行選）：(a) 放到 logo 原位置：320px 下仍需 28＋12 = 40px > 18px，**一樣放不下**；
+     (b) 不影響寬度；(c) `< 375px` 隱藏入口：320 可過，但 375px（iPhone SE 2/3、mini 等級）仍超出 11px，需把斷點一併納入考量。
+   - 依 tasks 6.3，§6 的窄螢幕 E2E 預期在 320px 失敗；屆時依 Escalation 停止並升級，附截圖。§2～§5 與排版無關，先行實作。
+
+### apply 進度與升級事項（2026-10-21，leader 停止於 tasks 6.3）
+
+9. **窄螢幕擠不下——已於 2026-10-21 由 coordinator 裁決（使用者以 /goal 授權）**。裁決前的事實紀錄如下：
+   - E2E 實測（`.dev.vars` 齊備，`auth-session.spec.ts`「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」）：**320px 失敗**，
+     「登入」圖示連結 `toBeInViewport({ ratio: 1 })` 實得 0.643，左／右緣 302／330（視口 320，超出 10px）；chromium 與 mobile-chrome 皆同。
+     **390px 通過**（右緣 386，距邊 4px，已吃掉容器右內距 12px）。375px（spec 未要求，但為 iPhone SE 2／3、mini 寬度）右緣 386，超出 11px。
+     五個導航連結在 320／375／390 皆仍完整在視口內、不換行；既有 `navbar-rwd.spec.ts` 在 `.dev.vars` 齊備時 chromium、mobile-chrome 7/7 通過。
+   - 證據：失敗截圖、video、error-context 在 `/tmp/b3-e2e-evidence/`（repo 外、未 commit）；§1 的量測見本節第 8 條。
+   - 根因：320px 下內容寬 296、五連結固有寬 278，餘裕 18px；入口需 28px（16 圖示＋`px-1.5`）＋容器 `gap-3` 12px＝40px。
+   - 候選方案（第 1 條原列，加上數值評估；本 change 不自行選）：
+     (a) `< 375px` 時入口改放 logo 原位置——數值上仍需 28＋12＝40px > 18px，**單獨採用放不下**；
+     (b) 不影響寬度，不解決本問題；
+     (c) `< 375px` 時隱藏入口、改由 `/login` 頁提供登出——320 可過，但 375px 仍超出 11px，斷點需一併改為例如 `< 390px`（`max-[390px]`）；
+     另一可能方向（需人類決定，涉及修改既有 spec 條款）：`< 375px` 時入口與連結共用更小的間距（例如縮小容器 `gap`），但這會改動既有 navbar 的 className／spec「窄螢幕導航呈現」。
+   - 裁決後需要：依決定修改 delta spec／design（若改條款）、修改 `AccountEntry`／`SiteNavbar` 並以 TDD 驗證、重跑 §6 E2E，接著執行 §6 Stage 1／Stage 2、§7 與 Final Code Review。
+10. **目前進度**：§1～§5 全部完成且通過兩階段審查；§6 的 6.1、6.2、6.4、6.5、6.6 已完成（Implementer 自述，**§6 兩階段審查尚未執行**），6.3 觸發停止；§7 未開始。
+    前端單元測試現為 87 檔／820（基線 81／783；新增 6 檔，it 數多於 tasks 7.3 預期的 22 條，差額為 regression guard 與 §3 競態修正，各組紀錄見 tasks.md）。
+    §7.4 完整 E2E 將有 2 個已知失敗（chromium、mobile-chrome 的窄螢幕 test），在裁決前不執行；另 firefox 在高負載機器上單條登入 test 需 20～40 秒，跑完整 E2E 時需留意。
+11. **與 design 不同之處（已實作）**：
+    - store 改用遞增 `requestId`、不共用進行中請求（§3 Stage 2：共用會使「初始請求在途時登入後 refresh」拿到舊結果）。
+    - 內距／配色抽到 `components/layout/navItemStyles.ts`（tasks 4.5 寫「同檔」，因 SiteNavbar import AccountEntry，同檔會循環依賴）。
+    - 登入連結加 `transitionTypes={["nav-forward"]}` 與 navbar 其他連結一致。
+    - `/login` metadata 為 `robots: { index: false, follow: false }`（比照 `/health`）。
+    - B2 移交：`auth-proxy.spec.ts` 的 seed 移至 globalSetup（tasks 標頭未列此例外，屬 coordinator 明令）。
+
+### 第 9 條的裁決（2026-10-21，coordinator；使用者以 /goal 授權不再逐條詢問）
+
+12. 採方案 (c) 的變體：
+    - 帳號入口在 `< sm`（Tailwind 預設 640px）時隱藏（`hidden sm:inline-flex`），`>= sm` 顯示。理由：五個導航連結的既有窄螢幕呈現零變更、
+      不調 gap、不改既有 className；框架標準斷點比自訂 390px 穩定（390px 只剩 4px 餘裕）。
+    - 窄螢幕下的登入／登出改由直接造訪 `/login` 提供；`/login` 在已登入時補上「登出」按鈕（原設計只有「已登入：<name>」與回首頁連結）。
+    - **G1 待辦：行動裝置的登入入口**——G1 改 Google 登入時重新設計（例如使用者選單／頭像，或行動版的其他入口），本 change 不處理。
+    - 窄螢幕 E2E 以 `browserName` 判斷，chromium 與 mobile-chrome 皆執行，保留。
+    - 規格同步：delta `site-navbar`（新增 `< sm` 隱藏條款、Scenario「帳號入口於 sm 以下隱藏」，窄螢幕 E2E Scenario 改寫為「窄螢幕下隱藏帳號入口且不影響既有導航連結」，
+      navbar 相關 E2E Scenario 加上 viewport >= 640px 前提）、delta `auth`（已登入時登入頁提供登出、新增 Scenario「已登入時可於登入頁登出」
+      「窄螢幕下經由登入頁登入與登出」）、test-plan 對應列、tasks 6.3 改寫並新增 6.7～6.11。
+13. 第 10 條「目前進度」與第 11 條「與 design 不同之處」維持原紀錄；裁決後的實作結果記於 tasks.md 6.7～6.11 與 §7。
+14. **§7.4 回歸與修正（2026-10-21）**：完整 E2E 有 6 條既有 webkit／mobile-safari test 因 console 守衛失敗（隔離重跑仍失敗），訊息為
+    `Fetch API cannot load http://localhost:3005/api/session due to access control checks.`。實測：`goto`／`reload` 先觸發 `beforeunload`，
+    hydration 之後才呼叫 fetch，WebKit 拒絕這種「導覽開始後才發出」的一般 fetch，並由瀏覽器自行記 console 錯誤（JS 端只收到 `TypeError: Load failed`，
+    `fetchSession` 有接住，但 console 已輸出）。評估過 `pagehide`／`beforeunload` 時 abort（事件觸發時請求尚未發出，無效）與 `beforeunload` 旗標
+    （dev 模式 store 模組可能晚於事件求值，仍有殘留），採 `fetch("/api/session", { keepalive: true })`（實測 0 則錯誤）。
+    修正 `2f9db09`（真紅）→ `23fdfaa`；`51b446a`／`f8c2258` 為否決方案的測試與其 revert（保留紀錄）。delta `auth` 已補對應條款與 Scenario。
+    出處：WebKit Bugzilla 178701（該訊息籠統、常掩蓋真因），行為以實測為準。
+    補註（Stage 2 PASS）：Playwright 實際以 `pageerror` 事件回報此訊息；只在前端冷啟動（hydration 晚於導覽）時穩定重現，暖機 server 上不易重現。
+    獨立驗證：無 keepalive 時 4 支 spec 於 webkit／mobile-safari 7 failed，有 keepalive 時 78 passed／0 failed。
