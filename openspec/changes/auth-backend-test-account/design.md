@@ -205,3 +205,24 @@ helper 讓 B3 的 Playwright `globalSetup`（runbook D6）直接重用，不寫�
   - **Open Question 3 結論：立即可見**。以 `wrangler dev --env local --port 8790` 起後端（暫時加一條讀 `user` 計數的路由），
     `wrangler d1 execute DB --local --env local --command "INSERT …"` 後同一個執行中的 dev 立即讀到 1 筆，`DELETE` 後立即讀回 0 筆。
     E2E helper 可在 `webServer` 已啟動後再 seed，不需重啟後端。dev 停止後 `lsof -i :8790` 無輸出。
+
+### apply §2～§9 與 design 的差異及移交事項（2026-10-21）
+
+4. **Decision 1 的落地形式**：gate 與 `createAuth` 合併為 `src/index.ts` 內的共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`），
+   同掛 `/api/auth/*` 與 `/api/me`；better-auth handler 與 `requireSession` 皆讀 `c.var.auth`。`/api/session` 不掛它，啟用分支自行建立一次，
+   且 try 範圍包含 `createAuth`（建立期例外也降級為 `user: null`，比 spec 保守）。「每請求只建立一次」無黑箱測試可觀察，
+   以 `grep -rn "createAuth(" hono-pickball/src` 只命中這兩處把關。Wave 2 建議：`localAuth` 移到 `src/auth/` 以便拆檔重用；
+   `AuthAppEnv` 的 `user`／`session` 宣告為非 optional，未掛 middleware 的路由讀取時型別不會報錯。
+5. **Decision 7 的偏離：seed 腳本改用 `parseEnv(readFileSync(".dev.vars"))`**，不用 `process.loadEnvFile`。後者不覆寫 shell 已 export 的同名變數，
+   會 seed 到錯的帳號、使缺變數檢查失效（§8 Stage 2 實測），也會把 `BETTER_AUTH_SECRET` 注入 wrangler 子行程。暫存 SQL 改放
+   `mkdtempSync` 產生的唯一目錄（0600），`finally` 刪整個目錄，避免並行呼叫互刪。E2E helper 以同一方式解析 `.dev.vars`。
+6. **經 proxy 的 sign-in 必須帶 `Origin`**：§1 直接呼叫 handler 時不帶 `Origin` 仍回 200，但 §9 Stage 2 實測經前端 proxy 不帶 `Origin` 時回 **403**
+   （better-auth origin 檢查）。B3 的瀏覽器同源 POST 會自動帶上，無影響；E2E 與 curl 驗收須明確帶 `Origin`。
+7. **E2E 並行限制（交 B3）**：`auth-proxy.spec.ts` 只在 project `chromium` 執行，`describe.configure({ mode: "serial" })`，並在 `beforeAll` 以
+   `testInfo.project.name` skip，確保一次執行只 seed 一次。`--repeat-each` 等讓同一 spec 分散到多個 worker 的方式會並行 seed（`SQLITE_BUSY`），不支援。
+   **B3 MUST 把 seed 統一移到 Playwright `globalSetup`**：seed 會 `DELETE` 同 email 的 user 並 cascade 刪除其 session，
+   若 B3 在 `globalSetup` 登入並存 `storageState`，之後任何 spec 再 seed 都會讓該 session 失效（401）。
+8. **`provider: "pg"` 變異存活**：§5 Stage 2 讀 adapter 原始碼裁定為現行設定下的等價變異（差異僅 `ilike`、`supportsUUIDs`、JSON／陣列欄位，皆未觸發）；
+   日後加入會做不分大小寫搜尋的 plugin 或 JSON 欄位時須重新評估。
+9. **Escalation 紀錄**：§9 被同一 Stage 2 reviewer 連續退回 3 次（並行 seed 競態 → `isMobile` 在 beforeAll 前無法判定 → tasks.md 未揭露中間壞 commit
+   `f884d4b`），第 3 次為文件缺陷，依 Escalation 升 opus 重派補記錄後核准。§3、§5（文件補登）、§8 各退回 1 次後核准。
