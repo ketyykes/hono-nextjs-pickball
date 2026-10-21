@@ -132,3 +132,45 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
    (b) 已登入狀態改為只在 `sm` 以上顯示 `title` 以外的視覺提示；(c) 接受在 `< 375px` 時隱藏入口、改由 `/login` 頁提供登出。
 2. G1 加入 Google 登入時，是否改用官方 `createAuthClient`（`signIn.social` 的重導流程）——屆時需處理 Decision 1 所述的 4xx console 問題。
 3. 登入成功導向固定為 `/`；Wave 2 若需要「登入後回到原頁」（例如從計分板進入登入），再加 `?next=` 參數（本 change 不做）。
+
+### apply §1 查證紀錄（2026-10-21）
+
+4. **1.1 baseline**：前端 81 檔／783、後端 12 檔／**50**（tasks 1.1 寫 47，B2 合併時實際為 50）；lint 0 errors／3 warnings。
+   因此 7.3 的後端預期為 12 檔／50 不變；前端預期 87 檔／805。
+5. **1.2 對齊 B2：回應契約與本 design Context 一致**（`/api/session` 永遠 200、停用時 `{authEnabled:false,user:null}`、
+   啟用但查詢例外時降級為 `user:null`；`/api/auth/*` 停用時 `c.notFound()` 404；錯誤帳密 401）。差異與移交：
+   - helper 實際匯出 `readTestAccount(): TestAccount | null`、`readTestAccountResult()`（`{ok:false, missing}` 可寫明缺哪個變數）、
+     `ensureTestAccountSeeded()`；helper 以 `__dirname` 解析路徑（Playwright 以 CJS 載入 TS）。global-setup 的 warn／spec 的 skip 原因
+     改用 `readTestAccountResult().missing` 才能寫出缺的變數名（spec 要求原因含 `TEST_ACCOUNT_`）。
+   - B2 Open Question 3 已實測：`d1 execute --local` 對執行中的 wrangler dev 立即可見 → **seed 時機不需調整**（globalSetup 在 webServer 後 seed 即可）。
+   - **B2 移交（coordinator 指示 MUST）**：seed 會 DELETE 同 email user 並 cascade 刪 session，globalSetup 存 storageState 後若有 spec 再 seed，
+     共用 state 即失效。故 §6 範圍**擴大**：`tests/e2e/specs/auth-proxy.spec.ts` 的 `beforeAll` seed 呼叫移除、改依賴 globalSetup
+     （該檔斷言零變動），helper 註解同步。此項超出 tasks 標頭「唯一允許碰的既有測試檔是 `SiteNavbar.test.tsx`」，屬 coordinator 明令的例外。
+   - 經 proxy 的 sign-in 不帶 `Origin` 回 403：globalSetup 的 API 登入必須帶 `Origin: http://localhost:3005`（與 delta spec 一致）。
+6. **1.3 前端現況**：與 design 一致。`lucide-react` 匯出 `LogIn`／`LogOut`；shadcn `button`／`input`／`label` 皆在；`@testing-library/user-event` 已安裝；
+   `@playwright/test` 實裝 **1.60.0**（design 寫 1.59）。`SiteNavbar.test.tsx` 的 `afterEach` 用 `vi.resetAllMocks()`——新增的 `useSession` mock
+   須在 reset 後仍回 loading（用一般 arrow function 或 `vi.fn` 皆可，Vitest 4 的 reset 會還原為工廠實作）。
+7. **1.4 Context7**：
+   - `/better-auth/better-auth/v1.6.23`（`concepts/client.mdx`、`reference/faq.mdx`、`authentication/email-password.mdx`）：`createAuthClient` from
+     `better-auth/react`、`useSession()` 回 `{ data, isPending, error, refetch }`、`signOut()` 打 `POST /sign-out`；FAQ 仍建議避免在 `layout.tsx` 用 `useSession`。
+     **與 Decision 1 無差異**。
+   - `/microsoft/playwright/v1.59.0`（`test-global-setup-teardown-js.md`、`auth.md`、`api-testing-js.md`）與 `packages/playwright/src/runner/tasks.ts`：
+     順序 removeOutputDirs → plugin setup（webServer）→ globalSetup，globalSetup 可直接呼叫 webServer；`test.use({ storageState })` 取用、
+     `{ cookies: [], origins: [] }` 重置；`request.newContext()` 的 `storageState()` 可匯出 cookie。**與 Decision 5 無差異**。
+   - `/websites/react_dev_reference`（`useSyncExternalStore`）：`getServerSnapshot` 用於伺服器 render **與 hydration**，client 與 server 必須一致；
+     `getSnapshot` 未變更時須回傳同一參考。**與 Decision 1、Risks 第 5 條一致**。
+8. **1.5 窄螢幕量測（`.dev.vars` 齊備、前後端 dev、chromium headless、未改程式碼）**——**320px 與 375px 擠不下，390px 勉強放得下**：
+   - 目前餘裕（header 內層容器內容寬度 − logo − gap − nav 固有寬度）：**320px：18px**（內容寬 296、logo 隱藏、nav 278）；
+     **390px：32px**（內容寬 358、logo 16＋gap 12、nav 298）；1280px：680px。
+   - 以 DOM 注入模擬 Decision 3 的入口（`inline-flex`、`py-2`、`px-1.5`／`px-2`、16px 圖示、`shrink-0`，接在 `<nav>` 後、受容器 `gap-3` 影響）：
+     | 視口 | 入口左／右緣 | 完整在視口內 | 容器 scrollWidth／clientWidth | 五連結 |
+     |---|---|---|---|---|
+     | 320 | 302／**330** | **否（超出 10px）** | 330／320 | 皆在視口內、高 36 |
+     | 375 | 354／**386** | **否（超出 11px）** | 386／375 | 皆在視口內 |
+     | 390 | 354／386 | 是（距右緣 4px，已吃掉容器右內距 12px） | 390／390 | 皆在視口內 |
+     | 414 | 366／398 | 是 | 414／414 | 皆在視口內 |
+   - 入口需要的寬度：320px 下 28px（圖示 16＋px-1.5）＋ gap 12 = 40px > 餘裕 18px；390px 下 32＋12 = 44px > 32px 的「內容寬餘裕」，
+     靠溢出到容器右內距才放得下。
+   - 對 Open Questions 1 候選方案的數值評估（僅供人類裁決，本 change 不自行選）：(a) 放到 logo 原位置：320px 下仍需 28＋12 = 40px > 18px，**一樣放不下**；
+     (b) 不影響寬度；(c) `< 375px` 隱藏入口：320 可過，但 375px（iPhone SE 2/3、mini 等級）仍超出 11px，需把斷點一併納入考量。
+   - 依 tasks 6.3，§6 的窄螢幕 E2E 預期在 320px 失敗；屆時依 Escalation 停止並升級，附截圖。§2～§5 與排版無關，先行實作。
