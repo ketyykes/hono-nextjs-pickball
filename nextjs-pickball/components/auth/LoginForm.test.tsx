@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/hooks/useSession", () => ({
@@ -120,6 +120,17 @@ describe("LoginForm", () => {
 		expect(email.getAttribute("type")).toBe("email");
 		expect(password.getAttribute("type")).toBe("password");
 		expect(password.getAttribute("autocomplete")).toBe("current-password");
+	});
+
+	it("送出表單時阻止瀏覽器預設送出", async () => {
+		// 預設送出會以 GET 把帳密放進網址，必須由元件攔下
+		mockLoggedOut();
+		mockSignIn.mockResolvedValue({ ok: false, reason: "failed" });
+		const { container } = render(<LoginForm />);
+		const form = container.querySelector("form") as HTMLFormElement;
+		const notPrevented = fireEvent.submit(form);
+		expect(notPrevented).toBe(false);
+		await screen.findByRole("alert");
 	});
 
 	it("帳密錯誤時顯示帳號或密碼錯誤並清空密碼", async () => {
