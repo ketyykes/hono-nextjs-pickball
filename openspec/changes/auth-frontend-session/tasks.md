@@ -24,9 +24,10 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED: 新增 `nextjs-pickball/lib/auth/session-client.test.ts`，寫入 it「fetchSession 於 200 且形狀正確時回傳 authEnabled 與 user」「fetchSession 於非 200、形狀不符或網路錯誤時回傳未啟用且不拋錯」「signInWithEmail 以 JSON POST 至 /api/auth/sign-in/email」「signInWithEmail 依狀態碼回傳 ok、invalid-credentials、unavailable 或 failed」「signOut 以 POST 呼叫 /api/auth/sign-out 並回傳是否成功」（`vi.stubGlobal("fetch", …)`）。確認紅燈（模組不存在）
-- [ ] 2.2 GREEN: 新增 `nextjs-pickball/lib/auth/session-client.ts`（三個函式、`SessionState` 型別、形狀驗證；皆不 throw）
-- [ ] 2.3 REFACTOR: 形狀驗證比照 `lib/health.ts` 的 `isValidPayload` 寫法；無壞味道則註記 skipped
+- [x] 2.1 RED: 新增 `nextjs-pickball/lib/auth/session-client.test.ts`，寫入 it「fetchSession 於 200 且形狀正確時回傳 authEnabled 與 user」「fetchSession 於非 200、形狀不符或網路錯誤時回傳未啟用且不拋錯」「signInWithEmail 以 JSON POST 至 /api/auth/sign-in/email」「signInWithEmail 依狀態碼回傳 ok、invalid-credentials、unavailable 或 failed」「signOut 以 POST 呼叫 /api/auth/sign-out 並回傳是否成功」（`vi.stubGlobal("fetch", …)`）。確認紅燈（模組不存在）
+- [x] 2.2 GREEN: 新增 `nextjs-pickball/lib/auth/session-client.ts`（三個函式、`SessionState` 型別、形狀驗證；皆不 throw）
+- [x] 2.3 REFACTOR: 形狀驗證比照 `lib/health.ts` 的 `isValidPayload` 寫法；無壞味道則註記 skipped
+  - 2.1 紅燈 `3cf7648`（模組不存在，`git show 3cf7648^:…/session-client.ts` 複驗不存在）；2.2 `bdda3ab`；2.3 **skipped**（GREEN 已比照 `isValidPayload` 寫法，Stage 2 同意）。Stage 1／Stage 2 PASS；Stage 2 建議補 fetchSession method 斷言，已於 `05955f6` 補上（**regression guard**，寫入即綠）。
 
 ## 3. session store 與 useSession
 
