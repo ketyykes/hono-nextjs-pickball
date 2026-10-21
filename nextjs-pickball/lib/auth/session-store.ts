@@ -55,6 +55,8 @@ export function getServerSnapshot(): SessionSnapshot {
 	return LOADING;
 }
 
+// 回傳的 promise 在「這次」請求完成時 resolve；若期間又有更新的請求，
+// 快照以最新那次為準，因此 await 之後讀到的未必是這次的結果
 export function refresh(): Promise<void> {
 	return load();
 }
