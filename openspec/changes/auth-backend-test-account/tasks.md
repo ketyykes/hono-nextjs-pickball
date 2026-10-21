@@ -136,6 +136,7 @@ Depends on: §8
   - 結果：`playwright test --workers=1 tests/e2e/specs/auth-proxy.spec.ts` → 4 passed（chromium、mobile-chrome 各 2）、6 skipped（firefox／webkit／mobile-safari），非因缺帳密而 skip；前後無殘留 process，:3005／:8787 無 listener
   - Stage 2 修正（第 1 次退回）：預設 workers 下 mobile-chrome 與 `--repeat-each` 會讓多個 worker 並行 seed（暫存檔互刪、`SQLITE_BUSY`、user 被重建使 session 失效）。修正：spec 以 `isMobile` 排除 mobile-chrome 並 `mode: "serial"`；seed 腳本暫存檔改 `mkdtempSync` 唯一目錄；Origin 加「為什麼」註解；email 斷言不外洩測試 email
   - Stage 2 修正驗證：`--workers=1 --project=chromium` 2 passed；預設 workers 全 5 個 project 連跑兩次皆 chromium 2 passed、其餘 skipped；前端 tsc／lint、後端 typecheck 皆 exit 0，後端 12 檔 50 測試通過；`.wrangler/tmp` 無殘留 seed 目錄
+  - Stage 2 修正（第 2 次退回）：describe 層 skip 誤用 test 層 fixture `isMobile`，導致 5 個 project 的 beforeAll 皆 seed 而並行 `SQLITE_BUSY`。改為 describe 層只判 `browserName`，`beforeAll` 內以 `testInfo.project.name !== "chromium"` 呼叫 `test.skip`（排除 mobile-chrome）。驗證：暫加 log 確認預設 workers、5 個 project 只 seed 1 次（驗完移除）；預設 workers 連跑 3 次皆 chromium 2 passed、8 skipped；`--workers=1 --project=chromium` 2 passed
   - 並行限制：`--repeat-each` 等使同一 spec 分散到多個 worker 的執行方式會並行 seed 而失敗（SQLITE_BUSY），不支援；跨 spec 統一 seed 交 B3 Playwright `globalSetup`。一般 `playwright test`（5 個 project）下 chromium 限定＋serial 保證單 worker、seed 一次
   - 實作備註：helper 用 `__dirname`（Playwright 以 CJS 載入 TS）；另匯出 `readTestAccountResult()` 回報缺少的變數名，`readTestAccount()` 缺值回 `null`；`ensureTestAccountSeeded()` 以 `pnpm --dir <hono 絕對路徑>` 執行，不依賴 cwd
 - [x] 9.2 確認 `nextjs-pickball` 的 `tsc --noEmit` 與 `pnpm --filter ./nextjs-pickball lint` 對新增的兩個檔案皆無錯誤
