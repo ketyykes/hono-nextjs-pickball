@@ -11,15 +11,15 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-21，**B1～B3 已合併，進行中**）
+## 狀態快照（最後更新 2026-10-21，**Wave 1 完成、S1 通過，進入 Wave 2 propose**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `e08e3cb`（B3 合併） |
+| `main` HEAD | `d1a7303`（B3 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1（B1～B3）已 propose（`7c3ab72`）；Wave 2 待 S1 通過後 |
-| apply | B1 `a7866f5`、B2 `8cdfa53`、B3 `e08e3cb` 已合併；下一步 B3 archive → S1 |
+| apply | Wave 1（B1～B3）已合併並 archive；**S1 通過（2026-10-22）**；下一步 Wave 2 propose |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -190,6 +190,17 @@ main@1e5e517
 3. `pnpm --filter ./nextjs-pickball preview`（workerd runtime）重複第 2 步，確認 cookie 經 proxy 穿透。
 4. 拿掉 `.dev.vars` 的 `ENVIRONMENT` 重啟，確認 email 登入不可用、前端不顯示登入入口。
 5. 結果寫回本檔。**不過不開 Wave 2**。
+
+**S1 結果（2026-10-22，coordinator 實測，全部通過）**
+1. local D1 備份移開後從零 `db:migrate:local`（`0000_auth_core.sql` ✅）＋`db:seed:local`：`user` 1 筆（測試帳號）、`account` 1 筆。
+2. `pnpm dev`（:3005 經 proxy）：訪客 `/api/session` → `{"authEnabled":true,"user":null}`、`/api/me` 401；錯誤密碼 401；
+   登入 200 並取得 1 個 `session_token` cookie；`/api/me`、`/api/session` 回測試帳號；再次請求仍 200；sign-up 400；sign-out 200；登出後 `/api/me` 401。
+3. `opennextjs-cloudflare preview --port 8788`（workerd）＋後端 `dev:api`（`BETTER_AUTH_URL` 暫改 `http://localhost:8788`，事後還原並 `cmp` 確認）：
+   API 流程結果與第 2 步完全相同；另以真實 chromium 走 navbar「登入」→ `/login` 表單 → navbar 出現「登出」→ reload 仍登入 → 登出回到登入入口，console error 0。
+4. 移除 `.dev.vars` 的 `ENVIRONMENT` 重啟後端：`/api/session` → `authEnabled:false`；`/api/me`、`/api/auth/sign-in/email` 皆 404；
+   preview 首頁 navbar 登入連結 0、登出按鈕 0，console error 0。（「設成其他值」由 B2 單元測試涵蓋。）
+- 附註：sign-in 送**格式錯誤的 JSON** 時 better-auth 回 500（非 400）；屬函式庫行為、非安全問題，記錄供 G1 參考。
+- preview 的前端埠號定案：`--port 8788`，此時 `BETTER_AUTH_URL` 必須同步改成 8788。
 
 ### B4 pickball-core-package（依 D1 裁決，以下假設 (a)）
 
