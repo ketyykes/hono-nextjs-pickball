@@ -98,21 +98,68 @@ describe("session-store", () => {
 		expect(getSnapshot()).toBe(getSnapshot());
 	});
 
-	it("第一次請求進行中呼叫 refresh 會共用同一次請求", async () => {
-		let resolve: (value: { authEnabled: boolean; user: null }) => void = () => {};
-		mockedFetchSession.mockReturnValue(
-			new Promise((r) => {
-				resolve = r;
-			}),
-		);
+	it("進行中呼叫 refresh 會重新請求，且以最後一次結果為準", async () => {
+		type State = { authEnabled: boolean; user: typeof USER | null };
+		let resolveA: (value: State) => void = () => {};
+		let resolveB: (value: State) => void = () => {};
+		mockedFetchSession
+			.mockReturnValueOnce(
+				new Promise<State>((r) => {
+					resolveA = r;
+				}),
+			)
+			.mockReturnValueOnce(
+				new Promise<State>((r) => {
+					resolveB = r;
+				}),
+			);
 
 		subscribe(vi.fn());
 		const pending = refresh();
-		expect(mockedFetchSession).toHaveBeenCalledTimes(1);
+		expect(mockedFetchSession).toHaveBeenCalledTimes(2);
 
-		resolve({ authEnabled: true, user: null });
+		// 亂序到達：較新的請求 B 先完成，較舊的 A 後到不得蓋掉 B
+		resolveB({ authEnabled: true, user: USER });
 		await pending;
-		expect(getSnapshot().status).toBe("ready");
+		resolveA({ authEnabled: true, user: null });
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(getSnapshot()).toEqual({
+			status: "ready",
+			authEnabled: true,
+			user: USER,
+		});
+	});
+
+	it("進行中呼叫 refresh 時，依序到達的結果同樣以後發請求為準", async () => {
+		type State = { authEnabled: boolean; user: typeof USER | null };
+		let resolveA: (value: State) => void = () => {};
+		let resolveB: (value: State) => void = () => {};
+		mockedFetchSession
+			.mockReturnValueOnce(
+				new Promise<State>((r) => {
+					resolveA = r;
+				}),
+			)
+			.mockReturnValueOnce(
+				new Promise<State>((r) => {
+					resolveB = r;
+				}),
+			);
+
+		subscribe(vi.fn());
+		const pending = refresh();
+
+		resolveA({ authEnabled: true, user: null });
+		resolveB({ authEnabled: true, user: USER });
+		await pending;
+
+		expect(getSnapshot()).toEqual({
+			status: "ready",
+			authEnabled: true,
+			user: USER,
+		});
 	});
 
 	it("模組剛載入時為 loading，第一次訂閱才請求", async () => {
