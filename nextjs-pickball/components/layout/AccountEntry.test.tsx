@@ -113,4 +113,16 @@ describe("AccountEntry", () => {
 			"shrink-0",
 		);
 	});
+
+	it("登出請求失敗時仍重新取得 session", async () => {
+		const refresh = mockLoggedIn();
+		mockSignOut.mockResolvedValue(false);
+		render(<AccountEntry solid={true} />);
+
+		await userEvent.click(screen.getByRole("button", { name: "登出" }));
+
+		// 失敗時也要 refresh，UI 才會回到伺服器真實的登入狀態。
+		expect(mockSignOut).toHaveBeenCalledTimes(1);
+		expect(refresh).toHaveBeenCalledTimes(1);
+	});
 });
