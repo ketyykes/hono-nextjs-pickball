@@ -11,15 +11,15 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-21，**B1 已合併，進行中**）
+## 狀態快照（最後更新 2026-10-21，**B1、B2 已合併，進行中**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `a7866f5`（B1 合併） |
+| `main` HEAD | `8cdfa53`（B2 合併） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1（B1～B3）已 propose（`7c3ab72`）；Wave 2 待 S1 通過後 |
-| apply | B1 已合併（`a7866f5`）；下一棒 B2 |
+| apply | B1 `a7866f5`、B2 `8cdfa53` 已合併；下一棒 B3 |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -126,7 +126,7 @@ main@1e5e517
 | # | change id | 內容 | 預估 | branch | 狀態 |
 |---|---|---|---|---|---|
 | B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | **已合併 `a7866f5`**（28 tasks；後端 6 檔／25；E2E 633/27/0） |
-| B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | 已 propose，未 apply |
+| B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | **已合併 `8cdfa53`**（37 tasks；後端 12 檔／50；E2E 635/35/0） |
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | 已 propose，未 apply |
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 未 propose |
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 未 propose |
@@ -489,6 +489,15 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   build dry-run OK（`No bindings found.`）；E2E 633 passed／27 skipped／0 failed（20.8m）；RED commit `081d874`、`50cccd8` 複驗為真。
 - 遺留給 G1：Workers Builds 若設 `CLOUDFLARE_ENV=local` 或 deploy 帶 `--env` 會讀到無 `database_id` 的 `env.local` 而可能遠端自動建 D1——須人工確認 Dashboard。
 - 給 B2：`ENVIRONMENT` 型別被產為必填 `string`（遠端實為 undefined），只能用 `=== "development"` 判斷。
+
+### B2 合併紀錄（2026-10-21）
+- coordinator 獨立驗證：tsc／後端 typecheck exit 0；lint 0／3；前端 81／783、後端 12／50；build dry-run OK；RED `c877512`、`a096c4e` 複驗為真。
+- E2E 全套：629 passed／35 skipped／6 failed（load average 最高 181）；6 條（firefox data-transfer×2、player-stats console、visual-export 網路請求、
+  webkit roster 空白狀態、mobile-chrome tour skip）**隔離重跑 6/6 passed** → 判定負載雜訊。leader 自跑為 635/35/0。skipped 由 27 增為 35＝新 `auth-proxy.spec.ts` 只跑 chromium（+2 pass、+8 skip）。
+- 查證：`d1 execute --local` 寫入對執行中 `wrangler dev` **立即可見**。經前端 proxy 的 sign-in 不帶 `Origin` 回 403。
+- **給 B3**：seed 會 DELETE 同 email user 並 cascade 刪 session → seed 必須統一移到 Playwright `globalSetup`（在存 storageState 之前）；不支援跨 worker 並行 seed（SQLITE_BUSY）。
+- 給 Wave 2：`localAuth` middleware 建議移到 `src/auth/`；`AuthAppEnv` 的 user／session 型別非 optional，未掛 middleware 的路由讀取不會報型別錯。
+- commit footer：自 B2 合併起 session 系統提示給了 `Claude-Session: https://claude.ai/code/session_01NzuJP5v7c6dK6fVXxFPy3b`，依本檔慣例 1 改用此值。
 
 <Wave 2 propose 後填>
 
