@@ -147,9 +147,15 @@ Depends on: §8
 
 Depends on: §9
 
-- [ ] 10.1 設定層（文件）：改寫 `hono-pickball/CLAUDE.md`：① 路由約定補 `/api/auth/*`、`/api/me`、`/api/session` 與停用時的 404／200 行為 ② 依賴注意：better-auth、`@better-auth/drizzle-adapter` 已被匯入，解除複審（`@hono/zod-validator`、`zod`、`date-fns` 仍未使用，複審期限保留給它們）；註明不升級到 1.7 的理由 ③ 測試慣例：gating 測試以 `app.request(path, init, env)` 注入 env 的例外、POST 帶 `Origin`、測試 env 由 `vitest.config.ts` 注入 ④ 本機登入準備步驟（`.dev.vars` → `db:migrate:local` → `db:seed:local`）
-- [ ] 10.2 驗收（指令）C6：有／無 `.dev.vars` 各跑一次 `pnpm --filter ./hono-pickball test`，兩次全綠且通過數相同
-- [ ] 10.3 驗收（指令）C1、C2：`pnpm --filter ./hono-pickball build` exit 0；`pnpm --filter ./hono-pickball typecheck` 兩段 exit 0
-- [ ] 10.4 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 12 檔／50 測試＝B1 後 25＋本 change 25（§1.1 實測 baseline 為 25，原寫 22／47）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
-- [ ] 10.5 驗收（指令）：完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（`.dev.vars` 齊備）——既有 E2E 全數原樣通過，`auth-proxy.spec.ts` 在 chromium 2 passed；結果寫在本 task 後方
-- [ ] 10.6 `DO_NOT_TRACK=1 openspec validate auth-backend-test-account --strict` 通過
+- [x] 10.1 設定層（文件）：改寫 `hono-pickball/CLAUDE.md`：① 路由約定補 `/api/auth/*`、`/api/me`、`/api/session` 與停用時的 404／200 行為 ② 依賴注意：better-auth、`@better-auth/drizzle-adapter` 已被匯入，解除複審（`@hono/zod-validator`、`zod`、`date-fns` 仍未使用，複審期限保留給它們）；註明不升級到 1.7 的理由 ③ 測試慣例：gating 測試以 `app.request(path, init, env)` 注入 env 的例外、POST 帶 `Origin`、測試 env 由 `vitest.config.ts` 注入 ④ 本機登入準備步驟（`.dev.vars` → `db:migrate:local` → `db:seed:local`）
+  - 完成（commit 6b316f2 ＋ 本次驗收 commit 補 bundle 體積）：路由約定、依賴注意（不升 1.7 的理由）、測試慣例、本機登入準備、`db:seed:local` 均已寫入 `hono-pickball/CLAUDE.md`；另把過時的 gzip 16.91 KiB 更新為實測 340.66 KiB。
+- [x] 10.2 驗收（指令）C6：有／無 `.dev.vars` 各跑一次 `pnpm --filter ./hono-pickball test`，兩次全綠且通過數相同
+  - C6 實測：有 `.dev.vars`：12 檔／50 測試全綠 exit 0；移開後：12 檔／50 測試全綠 exit 0（兩次通過數相同）。還原後 `cmp` 與備份逐位元組相同（CMP_OK），備份已刪。
+- [x] 10.3 驗收（指令）C1、C2：`pnpm --filter ./hono-pickball build` exit 0；`pnpm --filter ./hono-pickball typecheck` 兩段 exit 0
+  - C1 `pnpm --filter ./hono-pickball build` exit 0（`wrangler deploy --dry-run`，Total Upload 1978.04 KiB / gzip 340.66 KiB）；C2 `typecheck` 兩段 exit 0。
+- [x] 10.4 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 12 檔／50 測試＝B1 後 25＋本 change 25（§1.1 實測 baseline 為 25，原寫 22／47）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
+  - `pnpm -r exec tsc --noEmit` exit 0；前端 lint 0 errors（3 warnings，既有）exit 0；`pnpm test` exit 0：前端 81 檔／783 測試、後端 12 檔／50 測試；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`（2 insertions, 1 deletion）。
+- [x] 10.5 驗收（指令）：完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（`.dev.vars` 齊備）——既有 E2E 全數原樣通過，`auth-proxy.spec.ts` 在 chromium 2 passed；結果寫在本 task 後方
+  - 完整 E2E `playwright test --workers=1`：**635 passed／35 skipped／0 failed**（15.5 分鐘，exit 0）；`auth-proxy.spec.ts` 僅 chromium 執行。前後殘留檢查（lsof／ps）皆無輸出。
+- [x] 10.6 `DO_NOT_TRACK=1 openspec validate auth-backend-test-account --strict` 通過
+  - `openspec validate auth-backend-test-account --strict`：Change 'auth-backend-test-account' is valid。
