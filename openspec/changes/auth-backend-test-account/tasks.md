@@ -156,6 +156,6 @@ Depends on: §9
 - [x] 10.4 驗收（指令）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors；`pnpm test` 全綠（後端 12 檔／50 測試＝B1 後 25＋本 change 25（§1.1 實測 baseline 為 25，原寫 22／47）；前端數不減）；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`
   - `pnpm -r exec tsc --noEmit` exit 0；前端 lint 0 errors（3 warnings，既有）exit 0；`pnpm test` exit 0：前端 81 檔／783 測試、後端 12 檔／50 測試；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 只有 `hono-pickball/package.json`（2 insertions, 1 deletion）。
 - [x] 10.5 驗收（指令）：完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（`.dev.vars` 齊備）——既有 E2E 全數原樣通過，`auth-proxy.spec.ts` 在 chromium 2 passed；結果寫在本 task 後方
-  - 完整 E2E `playwright test --workers=1`：**635 passed／35 skipped／0 failed**（15.5 分鐘，exit 0）；`auth-proxy.spec.ts` 僅 chromium 執行。前後殘留檢查（lsof／ps）皆無輸出。
+  - 完整 E2E `playwright test --workers=1`：**635 passed／35 skipped／0 failed**（15.5 分鐘，exit 0）；`auth-proxy.spec.ts` 僅 chromium 執行（2 passed／8 skipped：由總數推得，635＝B1 時 633＋本 spec 2，skipped 27＋8；§9 單檔實跑亦為 chromium 2 passed、8 skipped）。前後殘留檢查（lsof／ps）皆無輸出。
 - [x] 10.6 `DO_NOT_TRACK=1 openspec validate auth-backend-test-account --strict` 通過
   - `openspec validate auth-backend-test-account --strict`：Change 'auth-backend-test-account' is valid。

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含未來的 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
+本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
 
 > ⚠️ 範圍例外：matchmaker（對戰分配機）依 root `prd.md` 明定為 **LocalStorage-only 純前端功能**，
 > 引擎與名單邏輯**刻意**放在 `nextjs-pickball/lib/matchmaker/` —— 那不是待搬進來的「後端邏輯」。
@@ -55,7 +55,7 @@
 - `DB` 在型別上為可選，測試／setup 以 `if (!env.DB) throw ...` 處理，不用 `!`
 - vitest pool 會讀 `.dev.vars`（輸出可見 `Using secrets defined in .dev.vars`），但 `vitest.config.ts` 的 `miniflare.bindings` 注入了 `ENVIRONMENT`、`BETTER_AUTH_SECRET`（假值）、`BETTER_AUTH_URL`，且實測注入值優先於 `.dev.vars`；測試結果不依賴 `.dev.vars`（有／無該檔各跑一次，通過數相同，C6 已驗證）
 - **gating／替身情境的例外**：預設走 `exports.default.fetch()`，但要驗證停用（`ENVIRONMENT` 非 `"development"`）或替換 env 時，改用 `app.request(path, init, { ...env, 覆寫 })` 注入 env，因為 `exports` 無法逐次覆寫 binding
-- 測試或 curl 呼叫 `POST /api/auth/*` 必須帶 `Origin`（屬於 trustedOrigins）；經前端 proxy 不帶會回 403
+- 測試或 curl 呼叫 `POST /api/auth/*` 一律帶 `Origin`（屬於 trustedOrigins）：經前端 proxy 不帶會回 403；直打後端且不帶 cookie 時 better-auth 不檢查 Origin，不帶也會過，但不要依賴這個差異
 - 測試檔頂部要 `import "../src/index"`，`src/` 改動時才會自動重跑
 - 刻意不開 `globals`：一律顯式 `import { describe, it, expect } from "vitest"`，避免 workerd 全域污染
 - ⚠️ 在受限沙箱中跑會噴 `listen EPERM: operation not permitted 127.0.0.1` —— 是 miniflare 需要開 localhost server 被擋，**不是設定錯誤**，放行後重跑即可
@@ -68,10 +68,9 @@
 - **auth 與 session 端點**（better-auth 1.6，email／password，註冊停用）：
   - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`ENVIRONMENT` 非 `"development"`）回 404，不建立 auth、不碰 D1**
   - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
-  - 經 proxy／curl 打 `POST /api/auth/*` 須帶 `Origin`（不帶回 403）
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
-  - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；未來 better-auth 依賴此行為）
+  - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
 
 ## 依賴注意
 
