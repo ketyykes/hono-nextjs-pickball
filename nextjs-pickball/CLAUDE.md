@@ -43,6 +43,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   頁面本身零 store setter 呼叫。細節見該 change 的 design.md Open Questions 第 1-c 條
 - 上述**五頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料／統計」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
   **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
+- `/login` — 本機測試帳號登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在 `< sm`（640px）隱藏（`hidden sm:inline-flex`），窄螢幕的登入／登出改由直接造訪 `/login` 提供；行動裝置登入入口為 G1 待辦
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 
 matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單、回合、比分都存瀏覽器，不上傳後端）——引擎放前端是刻意決策，不是待搬的後端邏輯。
@@ -65,20 +66,25 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
 - **E2E（Playwright，`tests/e2e/specs/`）**：Chromium、Firefox、WebKit、Mobile Chrome、Mobile Safari 五個 project
   - `webServer` 有**兩組**：先起 hono-pickball（:8787），再起 Next.js（:3005）。service binding 需前後端同時運行，缺一則 `/api/*` 相關 E2E 必失敗
   - `baseURL: http://localhost:3005`、`testIdAttribute: data-testid`
+  - **E2E 登入夾具**：`playwright.config.ts` 的 `globalSetup`（`tests/e2e/global-setup.ts`）在 webServer 啟動後執行 migrate＋seed，再以 API 登入並存成 `tests/e2e/.auth/test-account.json`（已 gitignore）。**seed 只在 globalSetup 做，spec 不得自行 seed**：seed 會刪除同 email 的 user 並 cascade 刪除 session，使已存的 storage state 失效
+    - 需要登入態的 spec 以 `test.use({ storageState })` 取用；登入／登出流程用新 context，**不得對共用 state 登出**
+    - 缺 `hono-pickball/.dev.vars` 的 `TEST_ACCOUNT_*` 或 `ENVIRONMENT=development` 時，globalSetup 會刪除舊 state 並 warn，auth spec 整檔 skip
+    - state 路徑與 skip 原因的單一來源是 `tests/e2e/helpers/storage-state.ts`
 
 ### 目錄約定
 
 以下路徑皆相對 `nextjs-pickball/`：
 
 - `app/` — 各路由進入點（見「架構總覽」）＋ `layout.tsx`、`globals.css`
-- `components/` — 依功能分子目錄：`ui/`（shadcn）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（SiteNavbar）、`matchmaker/`、`quiz/`、`scoreboard/`、`tour/`
+- `components/` — 依功能分子目錄：`ui/`（shadcn）、`auth/`（`LoginForm`）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（`SiteNavbar`、`AccountEntry`、`navItemStyles`——SiteNavbar 連結與 AccountEntry 共用內距與配色）、`matchmaker/`、`quiz/`、`scoreboard/`、`tour/`
   - `guide/HeroTourCta` 是 **server component 例外**（其餘 guide 元件皆標 `"use client"`）；其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 依 capability 分組。跨 capability 歸屬清單的**單一來源**是 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement——**任何** capability 新增 hook 時，其 change 須一併更新該清單（歷史上曾漏更新導致規格失真）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
   - quiz：`useQuiz`；player-roster：`useRosterStore`；round-lifecycle：`useRoundStore`、`useRoundTimer`
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
-- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）
+  - auth：`useSession`
+- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔
 
