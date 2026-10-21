@@ -11,7 +11,8 @@ const LOADING: SessionSnapshot = { status: "loading" };
 
 let snapshot: SessionSnapshot = LOADING;
 let started = false;
-let inflight: Promise<void> | null = null;
+// 遞增的請求編號：只有最新一次請求的回應能更新快照
+let requestId = 0;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -21,14 +22,16 @@ function notify(): void {
 }
 
 function load(): Promise<void> {
-	// 進行中的請求共用，避免 navbar 與登入頁同時掛載時重複請求
-	if (inflight) return inflight;
-	inflight = fetchSession().then((state) => {
+	// 不共用進行中的請求：初始請求在途時登入再 refresh，共用會拿到登入前的舊結果。
+	// 重複請求由 started 旗標擋下，不需要靠共用。
+	requestId += 1;
+	const id = requestId;
+	return fetchSession().then((state) => {
+		// 已有更新的請求，丟棄這份過時的回應（可能亂序到達）
+		if (id !== requestId) return;
 		snapshot = { status: "ready", authEnabled: state.authEnabled, user: state.user };
-		inflight = null;
 		notify();
 	});
-	return inflight;
 }
 
 export function subscribe(listener: () => void): () => void {
@@ -60,6 +63,6 @@ export function refresh(): Promise<void> {
 export function resetSessionStoreForTests(): void {
 	snapshot = LOADING;
 	started = false;
-	inflight = null;
+	requestId = 0;
 	listeners.clear();
 }
