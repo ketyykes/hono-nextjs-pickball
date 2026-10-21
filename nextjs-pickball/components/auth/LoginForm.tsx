@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { useSession } from "@/hooks/useSession";
 import { signInWithEmail } from "@/lib/auth/session-client";
 
+const MESSAGE_UNAVAILABLE = "此環境未開放登入";
+const MESSAGE_INVALID_CREDENTIALS = "帳號或密碼錯誤";
+const MESSAGE_FAILED = "登入失敗，請稍後再試";
+
 export function LoginForm() {
 	const session = useSession();
 	const router = useRouter();
@@ -23,7 +27,7 @@ export function LoginForm() {
 	}
 
 	if (!session.authEnabled) {
-		return <p>此環境未開放登入</p>;
+		return <p>{MESSAGE_UNAVAILABLE}</p>;
 	}
 
 	if (session.user !== null) {
@@ -52,12 +56,12 @@ export function LoginForm() {
 			return;
 		}
 		if (result.reason === "invalid-credentials") {
-			setErrorMessage("帳號或密碼錯誤");
+			setErrorMessage(MESSAGE_INVALID_CREDENTIALS);
 			setPassword("");
 		} else if (result.reason === "unavailable") {
-			setErrorMessage("此環境未開放登入");
+			setErrorMessage(MESSAGE_UNAVAILABLE);
 		} else {
-			setErrorMessage("登入失敗，請稍後再試");
+			setErrorMessage(MESSAGE_FAILED);
 		}
 		setPending(false);
 	}
