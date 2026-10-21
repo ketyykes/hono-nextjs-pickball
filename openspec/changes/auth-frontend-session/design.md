@@ -70,7 +70,9 @@
 
 **Alternatives considered**：
 - 使用者頭像＋下拉選單：需要新增 shadcn `dropdown-menu`（`radix-ui` 已在相依內，但元件檔要新增），且頭像也要佔寬度。G1 再議。
-- 帳號入口只在 `sm` 以上顯示：手機是計分板的主要使用情境（場邊），Wave 2 起手機必須能登入登出。不選。
+- 帳號入口只在 `sm` 以上顯示：手機是計分板的主要使用情境（場邊），Wave 2 起手機必須能登入登出。原本不選；
+  **2026-10-21 人類裁決改採**（實測 320／375px 擠不下，見 Open Questions 第 9 條）：`< sm` 時以 `hidden sm:inline-flex` 隱藏入口，
+  窄螢幕的登入登出改由 `/login` 頁提供（已登入時該頁顯示「登出」按鈕）；行動裝置的登入入口記為 G1 待辦。
 - 放在 matchmaker 區段導覽或各頁：違反 runbook「navbar 顯示」。不選。
 - **若實測仍擠不下**：本 change SHALL NOT 自行隱藏連結、改文案或改漢堡選單（`site-navbar` 既有立場），升級給人類，候選方案見 Open Questions 1。
 
@@ -128,7 +130,7 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
 
 ## Open Questions
 
-1. 若 §6 的窄螢幕 E2E 失敗，候選方案（需人類裁決，本 change 不自行選）：(a) 帳號入口在 `< 375px` 時改放到 logo 原本的位置（logo 已隱藏）；
+1. **【已裁決 2026-10-21，見第 9 條】** 若 §6 的窄螢幕 E2E 失敗，候選方案（需人類裁決，本 change 不自行選）：(a) 帳號入口在 `< 375px` 時改放到 logo 原本的位置（logo 已隱藏）；
    (b) 已登入狀態改為只在 `sm` 以上顯示 `title` 以外的視覺提示；(c) 接受在 `< 375px` 時隱藏入口、改由 `/login` 頁提供登出。
 2. G1 加入 Google 登入時，是否改用官方 `createAuthClient`（`signIn.social` 的重導流程）——屆時需處理 Decision 1 所述的 4xx console 問題。
 3. 登入成功導向固定為 `/`；Wave 2 若需要「登入後回到原頁」（例如從計分板進入登入），再加 `?next=` 參數（本 change 不做）。
@@ -177,7 +179,7 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
 
 ### apply 進度與升級事項（2026-10-21，leader 停止於 tasks 6.3）
 
-9. **⛔ 窄螢幕擠不下——需人類裁決（tasks 6.3／Escalation「窄螢幕擠不下」）**。
+9. **窄螢幕擠不下——已於 2026-10-21 由 coordinator 裁決（使用者以 /goal 授權）**。裁決前的事實紀錄如下：
    - E2E 實測（`.dev.vars` 齊備，`auth-session.spec.ts`「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」）：**320px 失敗**，
      「登入」圖示連結 `toBeInViewport({ ratio: 1 })` 實得 0.643，左／右緣 302／330（視口 320，超出 10px）；chromium 與 mobile-chrome 皆同。
      **390px 通過**（右緣 386，距邊 4px，已吃掉容器右內距 12px）。375px（spec 未要求，但為 iPhone SE 2／3、mini 寬度）右緣 386，超出 11px。
@@ -199,3 +201,16 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
     - 登入連結加 `transitionTypes={["nav-forward"]}` 與 navbar 其他連結一致。
     - `/login` metadata 為 `robots: { index: false, follow: false }`（比照 `/health`）。
     - B2 移交：`auth-proxy.spec.ts` 的 seed 移至 globalSetup（tasks 標頭未列此例外，屬 coordinator 明令）。
+
+### 第 9 條的裁決（2026-10-21，coordinator；使用者以 /goal 授權不再逐條詢問）
+
+12. 採方案 (c) 的變體：
+    - 帳號入口在 `< sm`（Tailwind 預設 640px）時隱藏（`hidden sm:inline-flex`），`>= sm` 顯示。理由：五個導航連結的既有窄螢幕呈現零變更、
+      不調 gap、不改既有 className；框架標準斷點比自訂 390px 穩定（390px 只剩 4px 餘裕）。
+    - 窄螢幕下的登入／登出改由直接造訪 `/login` 提供；`/login` 在已登入時補上「登出」按鈕（原設計只有「已登入：<name>」與回首頁連結）。
+    - **G1 待辦：行動裝置的登入入口**——G1 改 Google 登入時重新設計（例如使用者選單／頭像，或行動版的其他入口），本 change 不處理。
+    - 窄螢幕 E2E 以 `browserName` 判斷，chromium 與 mobile-chrome 皆執行，保留。
+    - 規格同步：delta `site-navbar`（新增 `< sm` 隱藏條款、Scenario「帳號入口於 sm 以下隱藏」，窄螢幕 E2E Scenario 改寫為「窄螢幕下隱藏帳號入口且不影響既有導航連結」，
+      navbar 相關 E2E Scenario 加上 viewport >= 640px 前提）、delta `auth`（已登入時登入頁提供登出、新增 Scenario「已登入時可於登入頁登出」
+      「窄螢幕下經由登入頁登入與登出」）、test-plan 對應列、tasks 6.3 改寫並新增 6.7～6.11。
+13. 第 10 條「目前進度」與第 11 條「與 design 不同之處」維持原紀錄；裁決後的實作結果記於 tasks.md 6.7～6.11 與 §7。

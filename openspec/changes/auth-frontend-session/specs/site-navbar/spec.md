@@ -12,8 +12,13 @@
 帳號入口 SHALL NOT 列入 `NAV_LINKS`，`/login` 亦 SHALL NOT 列入（`NAV_LINKS` 僅含公開內容路由的既有約束不變）。
 入口元素 MUST 套用 `whitespace-nowrap` 與 `shrink-0`，圖示 MUST 為 `aria-hidden`，可及名稱由 `aria-label` 提供（`emoji-free-ui`：通用記號用 `lucide-react`）。
 
-「窄螢幕導航呈現」Requirement 的五個連結可見性與不換行條款 SHALL 在帳號入口**出現時**同樣成立；入口本身在 320px 與 390px 下 MUST 完整落在視口內。
-若無法同時滿足，SHALL NOT 以隱藏任何既有導航連結、縮短連結文案或改為漢堡選單自行解決——升級給人類裁決（見 design Risks）。
+視口寬度 **< `sm`（640px）** 時帳號入口 MUST 隱藏（以 Tailwind 的 `hidden sm:inline-flex` 表達，SHALL NOT 以 JS 量測視口寬度），`>= sm` 時顯示。
+窄螢幕下的登入與登出改由直接造訪 `/login` 提供（見 `auth`「本機測試帳號登入頁」）。
+「窄螢幕導航呈現」Requirement 的五個連結呈現（可見性、不換行、320px 完整落在視口內、`< 375px` 隱藏 logo）與其 className **零變更**。
+
+> **為什麼窄螢幕隱藏入口**（2026-10-21 人類裁決，design Open Questions 第 9 條）：實測 320px 下入口超出視口 10px、375px 超出 11px、
+> 390px 只剩 4px；要塞進去就得改動既有五個連結的間距或內距。框架標準斷點 `sm` 比自訂 390px 穩定。
+> 行動裝置的登入入口記為 G1 待辦（G1 改為 Google 登入時重新設計），本 change 不處理。
 
 專注模式（`html.sb-focus`）下入口隨 header 一起隱藏，不需額外處理。
 
@@ -23,6 +28,13 @@
 - **WHEN** 渲染 `AccountEntry`
 - **THEN** 兩種情況的 container 皆為空（無任何子元素）
 - **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「載入中或未啟用時不渲染任何元素」
+
+#### Scenario: 帳號入口於 sm 以下隱藏
+
+- **GIVEN** `useSession` 分別回傳啟用且未登入、已登入
+- **WHEN** 渲染 `AccountEntry`
+- **THEN** 登入連結與登出按鈕的 class 皆含 `hidden` 與 `sm:inline-flex`
+- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「登入連結與登出按鈕在 sm 以下隱藏」
 
 #### Scenario: 未登入時顯示登入連結
 
@@ -47,14 +59,15 @@
 
 #### Scenario: 未登入時 navbar 顯示登入入口並可前往登入頁
 
-- **GIVEN** 前後端 dev server 皆已啟動、`.dev.vars` 齊備，瀏覽器為訪客
+- **GIVEN** 前後端 dev server 皆已啟動、`.dev.vars` 齊備，瀏覽器為訪客，viewport 寬度 >= 640px
 - **WHEN** 開啟 `/` 並點擊 navbar 的「登入」
 - **THEN** 導向 `/login` 並顯示「電子郵件」欄位
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「未登入時 navbar 顯示登入入口並可前往登入頁」
 
-#### Scenario: 窄螢幕下帳號入口不擠出既有導航連結
+#### Scenario: 窄螢幕下隱藏帳號入口且不影響既有導航連結
 
-- **GIVEN** `.dev.vars` 齊備，瀏覽器為訪客（帳號入口為「登入」連結）
-- **WHEN** viewport 分別為 320px 與 390px
-- **THEN** 「登入」連結與「首頁」「完整體驗」「計分板」「測驗」「對戰分配」五個連結皆以 `toBeInViewport({ ratio: 1 })` 完整落在視口內，且五個連結高度不高於 1280px 下的高度＋4px
-- **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」
+- **GIVEN** `.dev.vars` 齊備，瀏覽器為訪客（啟用且未登入）
+- **WHEN** viewport 分別為 320px、375px、390px，再改為 640px 與 1280px
+- **THEN** 前三種寬度下 header 內「登入」連結為 hidden，「首頁」「完整體驗」「計分板」「測驗」「對戰分配」五個連結皆以 `toBeInViewport({ ratio: 1 })` 完整落在視口內，且高度不高於 1280px 下的高度＋4px；
+  640px 與 1280px 下「登入」連結可見、完整落在視口內，且右緣不小於「對戰分配」右緣（位於 `<nav>` 之後）
+- **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」

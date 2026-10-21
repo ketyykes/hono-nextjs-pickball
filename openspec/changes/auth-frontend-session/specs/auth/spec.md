@@ -100,7 +100,8 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 
 - `loading`：不顯示表單（避免閃現）。
 - `authEnabled === false`：顯示「此環境未開放登入」，SHALL NOT 顯示任何輸入欄位。
-- 已登入：顯示「已登入：<name>」與回首頁的連結，不顯示表單。
+- 已登入：顯示「已登入：<name>」、回首頁的連結與「登出」按鈕，不顯示表單。點擊「登出」後呼叫 `signOut()`，再呼叫 store 的 `refresh()`，停留在 `/login`
+  （窄螢幕下 navbar 不顯示帳號入口，登出由本頁提供，見 `site-navbar`「navbar 顯示帳號入口」）。
 - 啟用且未登入：顯示「電子郵件」「密碼」兩個欄位與「登入」按鈕。送出期間按鈕 MUST 為 disabled。
   - 成功 → 呼叫 store 的 `refresh()` 後以 `router.replace("/")` 導向首頁；
   - `invalid-credentials` → 顯示「帳號或密碼錯誤」，保留 email、清空密碼；
@@ -136,6 +137,13 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 - **THEN** 可見文字「已登入：測試員」與指向 `/` 的連結，不存在密碼欄位
 - **驗收**：`nextjs-pickball/components/auth/LoginForm.test.tsx`，it 名稱「已登入時顯示已登入訊息且不顯示表單」
 
+#### Scenario: 已登入時可於登入頁登出
+
+- **GIVEN** `useSession` 回傳已登入，`signOut` 回傳 `true`
+- **WHEN** 渲染 `LoginForm` 並點擊「登出」按鈕
+- **THEN** `signOut` 被呼叫一次，之後 store 的 `refresh` 被呼叫一次；`router.replace` 未被呼叫
+- **驗收**：`nextjs-pickball/components/auth/LoginForm.test.tsx`，it 名稱「已登入時於登入頁點擊登出後呼叫 signOut 並重新取得 session」
+
 #### Scenario: 登入成功後導向首頁
 
 - **GIVEN** 啟用且未登入，`signInWithEmail` 回 `{ ok: true }`
@@ -166,7 +174,7 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 
 #### Scenario: 以測試帳號經由登入頁登入
 
-- **GIVEN** 前後端 dev server 皆已啟動，`.dev.vars` 齊備，測試帳號已 seed，瀏覽器為訪客
+- **GIVEN** 前後端 dev server 皆已啟動，`.dev.vars` 齊備，測試帳號已 seed，瀏覽器為訪客，viewport 寬度 >= 640px
 - **WHEN** 開啟 `/login`，填入測試帳號並按「登入」
 - **THEN** 導向 `/`，navbar 出現名稱為「登出」的按鈕
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「以測試帳號登入後 navbar 顯示登出」
@@ -180,14 +188,21 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 
 #### Scenario: 重整後仍維持登入
 
-- **GIVEN** 以 `globalSetup` 產生的 `storageState` 開啟頁面（已登入）
+- **GIVEN** 以 `globalSetup` 產生的 `storageState` 開啟頁面（已登入），viewport 寬度 >= 640px
 - **WHEN** 開啟 `/` 後重新整理
 - **THEN** 重整前後 navbar 皆顯示「登出」按鈕
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「重整後仍維持登入」
 
 #### Scenario: 登出後回到訪客
 
-- **GIVEN** 以登入頁登入（獨立的新 session，不使用共用 `storageState`）
+- **GIVEN** 以登入頁登入（獨立的新 session，不使用共用 `storageState`），viewport 寬度 >= 640px
 - **WHEN** 按 navbar 的「登出」
 - **THEN** navbar 改為顯示「登入」連結；重新整理後仍為「登入」
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「登出後 navbar 回到登入入口」
+
+#### Scenario: 窄螢幕下經由登入頁登入與登出
+
+- **GIVEN** 前後端 dev server 皆已啟動，`.dev.vars` 齊備，瀏覽器為訪客（獨立的新 session），viewport 寬度 390px
+- **WHEN** 開啟 `/login` 以測試帳號登入；再開啟 `/login` 按「登出」
+- **THEN** 登入後導向 `/` 且 navbar 不顯示帳號入口；回到 `/login` 時顯示「已登入：<name>」與「登出」按鈕；登出後顯示「電子郵件」欄位，重新整理後仍為登入表單
+- **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下可經由登入頁登入與登出」

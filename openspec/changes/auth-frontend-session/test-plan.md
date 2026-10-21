@@ -48,6 +48,7 @@
 | 載入中不顯示表單也不顯示未開放訊息 | 載入中不顯示表單也不顯示未開放訊息 | loading → 無密碼欄位、無「此環境未開放登入」 | edge case：避免載入瞬間閃現錯誤訊息或表單 | integration |
 | 未啟用時顯示此環境未開放登入且不顯示表單 | 未啟用時不顯示表單 | 文字可見；`queryAllByRole("textbox")` 為空、無 `input[type=password]` | edge case：正式站情境 | integration |
 | 已登入時顯示已登入訊息且不顯示表單 | 已登入時不顯示表單 | 「已登入：測試員」可見；連結 href `/`；無密碼欄位 | edge case | integration |
+| 已登入時於登入頁點擊登出後呼叫 signOut 並重新取得 session | 已登入時可於登入頁登出 | 點「登出」→ `signOut` 1 次，之後 `refresh` 1 次（呼叫順序）；`replace` 未呼叫 | golden path：窄螢幕下唯一的登出途徑（2026-10-21 裁決） | integration |
 | 送出正確帳密後重新取得 session 並導向首頁 | 登入成功後導向首頁 | `user.type` 兩欄＋點「登入」→ `signInWithEmail` 以輸入值被呼叫、`refresh` 被呼叫、`router.replace("/")` | golden path | integration |
 | 帳密錯誤時顯示帳號或密碼錯誤並清空密碼 | 帳密錯誤時顯示錯誤並清空密碼 | `role=alert` 文字相符；email 欄保留、密碼欄空；`replace` 未呼叫 | edge case | integration |
 | unavailable 與 failed 分別顯示對應訊息 | 其他失敗顯示對應訊息 | 兩次送出 → 兩種文字 | edge case：每個失敗分支各一 | integration |
@@ -56,6 +57,7 @@
 | 帳號或密碼錯誤時登入頁顯示錯誤訊息 | 錯誤密碼在登入頁顯示錯誤 | 錯誤密碼 → URL 仍為 `/login`，「帳號或密碼錯誤」可見 | edge case（端到端） | e2e |
 | 重整後仍維持登入 | 重整後仍維持登入 | `storageState` → `/` 見「登出」→ `reload()` → 仍見「登出」 | golden path：runbook 驗收「重整後仍登入」 | e2e |
 | 登出後 navbar 回到登入入口 | 登出後回到訪客 | 新 context UI 登入 → 點「登出」→ 見「登入」連結 → `reload()` 仍為「登入」 | golden path：runbook 驗收「登出」；reload 證明 session 真的被撤銷而非只改 UI | e2e |
+| 窄螢幕下可經由登入頁登入與登出 | 窄螢幕下經由登入頁登入與登出 | 390px 新 context：`/login` 登入 → `/` 且 header 無可見帳號入口 → `/login` 見「已登入：」與「登出」→ 點登出 → 「電子郵件」可見 → `reload()` 仍為表單 | golden path：窄螢幕的登入登出途徑（2026-10-21 裁決） | e2e |
 
 ## site-navbar
 
@@ -64,11 +66,12 @@
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
 | 載入中或未啟用時不渲染任何元素 | 載入中或未啟用時不渲染 | 兩種 mock 狀態 → `container.childElementCount === 0` | golden path（訪客零迴歸）：正式站情境 | integration |
+| 登入連結與登出按鈕在 sm 以下隱藏 | 帳號入口於 sm 以下隱藏 | 訪客與已登入兩種 mock → 元素 class 含 `hidden` 與 `sm:inline-flex` | edge case：窄螢幕不擠出既有連結（2026-10-21 裁決） | integration |
 | 啟用且未登入時顯示指向 /login 的登入連結 | 未登入時顯示登入連結 | 名稱「登入」的 link、href、`whitespace-nowrap`、`svg[aria-hidden=true]` | golden path | integration |
 | 已登入時顯示登出按鈕且 title 含使用者名稱 | 已登入時顯示登出按鈕 | 名稱「登出」的 button、`title` 相符、`whitespace-nowrap`；無「登入」連結 | golden path | integration |
 | 點擊登出後呼叫 signOut 並重新取得 session | 點擊登出後重新取得 session | `signOut` 1 次，之後 `refresh` 1 次（以呼叫順序斷言） | golden path：登出不刷新會留下過期的登出鈕 | integration |
 | 未登入時 navbar 顯示登入入口並可前往登入頁 | 未登入時 navbar 顯示登入入口並可前往登入頁 | 訪客 `/` → 點「登入」→ URL `/login`、「電子郵件」欄可見 | golden path（端到端） | e2e |
-| 窄螢幕下帳號入口與五個導航連結皆完整落在視口內 | 窄螢幕下帳號入口不擠出既有導航連結 | 1280 量五連結高度 → 320、390 兩寬度下「登入」與五連結 `toBeInViewport({ratio:1})`，五連結高度 ≤ 寬螢幕＋4（只跑 chromium，比照 `navbar-rwd.spec.ts`） | edge case：本 change 最大風險（Risks 第 1 條） | e2e |
+| 窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內 | 窄螢幕下隱藏帳號入口且不影響既有導航連結 | 1280 量五連結高度 → 320、375、390 下 header「登入」hidden、五連結 `toBeInViewport({ratio:1})` 且高度 ≤ 寬螢幕＋4 → 640、1280 下「登入」可見、`toBeInViewport({ratio:1})`、右緣 ≥「對戰分配」右緣（以 `browserName` 只跑 chromium 引擎，比照 `navbar-rwd.spec.ts`） | edge case：本 change 最大風險（Risks 第 1 條，2026-10-21 裁決後改寫） | e2e |
 
 ## pickleball-guide-page
 
@@ -90,7 +93,7 @@
 | 編號 | 對應 Scenario | 指令／動作 | 通過條件 |
 |------|---------------|-----------|----------|
 | C1 | （型別與 lint） | `pnpm -r exec tsc --noEmit`；`pnpm --filter ./nextjs-pickball lint` | exit 0；0 errors、warning 不多於基線 |
-| C2 | （訪客零迴歸） | `.dev.vars` 齊備下完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1` | 既有 test 全數原樣通過；`auth-session.spec.ts` 除「窄螢幕…」在非 chromium project 的預期 skip 外全數 passed，沒有任何因缺帳密而 skip 的 test |
+| C2 | （訪客零迴歸） | `.dev.vars` 齊備下完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1` | 既有 test 全數原樣通過；`auth-session.spec.ts` 除「窄螢幕…」在非 chromium 引擎的預期 skip 外全數 passed，沒有任何因缺帳密而 skip 的 test |
 | C3 | 帳密齊備時產生 storage state | 跑 `auth-session.spec.ts` 後檢查 `tests/e2e/.auth/test-account.json` 與 `git status --porcelain` | 檔案存在、含 session cookie；git 不列出 |
 | C4 | 缺帳密時既有 E2E 照常執行、登入 spec 明確 skip | 停掉所有 dev server、暫時移除 `.dev.vars`，跑 `api-health.spec.ts`＋`auth-session.spec.ts`，結束後還原並停掉 server | exit 0；api-health 通過；auth-session 全 skipped、原因含 `TEST_ACCOUNT_` |
 | C5 | 既有 project 維持訪客 | 閱讀 `playwright.config.ts` | 五個 project 與 top-level `use` 皆無 `storageState` |
