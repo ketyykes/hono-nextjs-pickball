@@ -93,6 +93,17 @@ describe("fetchSession", () => {
 			await expect(fetchSession()).resolves.toEqual(DISABLED);
 		}
 	});
+
+	// 整頁導覽開始後才發出的一般 fetch 會被 WebKit 擋下並記成 console 錯誤；
+	// keepalive 請求不受導覽影響，訪客換頁時才不會多出錯誤訊息。
+	it("fetchSession 以 keepalive 發出請求", async () => {
+		const mock = stubFetch(async () =>
+			jsonResponse({ authEnabled: true, user: null }),
+		);
+		await fetchSession();
+		const init = (mock.mock.calls[0] as unknown[])[1] as RequestInit | undefined;
+		expect(init?.keepalive).toBe(true);
+	});
 });
 
 describe("signInWithEmail", () => {
