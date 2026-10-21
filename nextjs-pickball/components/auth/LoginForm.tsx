@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/hooks/useSession";
-import { signInWithEmail } from "@/lib/auth/session-client";
+import { signInWithEmail, signOut } from "@/lib/auth/session-client";
 
 const MESSAGE_UNAVAILABLE = "此環境未開放登入";
 const MESSAGE_INVALID_CREDENTIALS = "帳號或密碼錯誤";
@@ -31,13 +31,24 @@ export function LoginForm() {
 	}
 
 	if (session.user !== null) {
+		// 窄螢幕 navbar 不顯示帳號入口，登出只能在此頁；停留原頁，refresh 後自然回到表單。
+		async function handleSignOut() {
+			await signOut();
+			await session.refresh();
+		}
+
 		return (
-			<p>
-				已登入：{session.user.name}{" "}
-				<Link href="/" className="underline">
-					回首頁
-				</Link>
-			</p>
+			<div className="flex flex-col items-start gap-4">
+				<p>
+					已登入：{session.user.name}{" "}
+					<Link href="/" className="underline">
+						回首頁
+					</Link>
+				</p>
+				<Button type="button" variant="outline" onClick={handleSignOut}>
+					登出
+				</Button>
+			</div>
 		);
 	}
 
