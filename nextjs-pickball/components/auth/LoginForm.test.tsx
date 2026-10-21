@@ -8,6 +8,7 @@ vi.mock("@/hooks/useSession", () => ({
 
 vi.mock("@/lib/auth/session-client", () => ({
 	signInWithEmail: vi.fn(),
+	signOut: vi.fn(),
 }));
 
 const mockReplace = vi.fn();
@@ -16,11 +17,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { useSession } from "@/hooks/useSession";
-import { signInWithEmail } from "@/lib/auth/session-client";
+import { signInWithEmail, signOut } from "@/lib/auth/session-client";
 import { LoginForm } from "./LoginForm";
 
 const mockUseSession = vi.mocked(useSession);
 const mockSignIn = vi.mocked(signInWithEmail);
+const mockSignOut = vi.mocked(signOut);
 
 function mockLoggedOut(refresh = vi.fn(async () => {})) {
 	mockUseSession.mockReturnValue({
@@ -76,6 +78,28 @@ describe("LoginForm", () => {
 		expect(screen.getByRole("link").getAttribute("href")).toBe("/");
 		expect(container.querySelector("input[type=password]")).toBeNull();
 		expect(screen.queryAllByRole("textbox")).toEqual([]);
+	});
+
+	it("已登入時於登入頁點擊登出後呼叫 signOut 並重新取得 session", async () => {
+		const refresh = vi.fn(async () => {});
+		mockUseSession.mockReturnValue({
+			status: "ready",
+			authEnabled: true,
+			user: { id: "u1", email: "t@example.com", name: "測試員" },
+			refresh,
+		});
+		mockSignOut.mockResolvedValue(true);
+		render(<LoginForm />);
+
+		await userEvent.click(screen.getByRole("button", { name: "登出" }));
+
+		expect(mockSignOut).toHaveBeenCalledTimes(1);
+		expect(refresh).toHaveBeenCalledTimes(1);
+		// 登出後須先清掉伺服器 session，再重新取得，否則會讀到舊登入態。
+		expect(mockSignOut.mock.invocationCallOrder[0]).toBeLessThan(
+			refresh.mock.invocationCallOrder[0],
+		);
+		expect(mockReplace).not.toHaveBeenCalled();
 	});
 
 	it("送出正確帳密後重新取得 session 並導向首頁", async () => {
