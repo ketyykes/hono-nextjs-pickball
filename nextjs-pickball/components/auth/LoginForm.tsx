@@ -43,9 +43,6 @@ export function LoginForm() {
 
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		if (pending) {
-			return;
-		}
 		setPending(true);
 		setErrorMessage(null);
 		const result = await signInWithEmail(email, password);
