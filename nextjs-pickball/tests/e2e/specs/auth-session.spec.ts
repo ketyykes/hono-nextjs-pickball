@@ -6,8 +6,9 @@ import { readTestAccount } from "../helpers/test-account";
 
 const NAV_LABELS = ["首頁", "完整體驗", "計分板", "測驗", "對戰分配"];
 const WIDE = { width: 1280, height: 800 };
-// 先量 390 再量 320：320 預期較早失敗時，390 的結果仍能先被驗證
-const NARROW_WIDTHS = [390, 320];
+// 帳號入口 < sm（640px）隱藏；以下寬度驗證隱藏，640 以上驗證顯示。
+const HIDDEN_WIDTHS = [320, 375, 390];
+const VISIBLE_WIDTHS = [640, 1280];
 const NAVIGATION_TIMEOUT = 15_000;
 
 // 登入／登出流程一律在新 context 走登入頁取得獨立 session，
@@ -35,6 +36,8 @@ test.describe("auth session", () => {
 	test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);
 	// dev server 首次編譯路由、firefox 載入偏慢，預設 30 秒在負載高的機器上不足
 	test.describe.configure({ timeout: 60_000 });
+	// 預設 mobile-chrome 的視口 < 640px 會隱藏帳號入口；依賴 navbar 入口的 test 固定寬螢幕。
+	test.use({ viewport: WIDE });
 
 	test.describe("訪客", () => {
 		test.use({ storageState: guestState });
@@ -69,7 +72,7 @@ test.describe("auth session", () => {
 			await expect(loginLink).toBeVisible();
 		});
 
-		test("窄螢幕下帳號入口與五個導航連結皆完整落在視口內", async ({
+		test("窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內", async ({
 			page,
 			browserName,
 		}) => {
@@ -88,9 +91,9 @@ test.describe("auth session", () => {
 				);
 			}
 
-			for (const width of NARROW_WIDTHS) {
+			for (const width of HIDDEN_WIDTHS) {
 				await page.setViewportSize({ width, height: 700 });
-				await expect(loginLink).toBeInViewport({ ratio: 1 });
+				await expect(loginLink).toBeHidden();
 				for (const label of NAV_LABELS) {
 					await expect(navLink(label)).toBeInViewport({ ratio: 1 });
 					const height = await navLink(label).evaluate(
@@ -98,7 +101,12 @@ test.describe("auth session", () => {
 					);
 					expect(height).toBeLessThanOrEqual(wideHeights[label] + 4);
 				}
+			}
 
+			for (const width of VISIBLE_WIDTHS) {
+				await page.setViewportSize({ width, height: 700 });
+				await expect(loginLink).toBeVisible();
+				await expect(loginLink).toBeInViewport({ ratio: 1 });
 				// 入口須在 <nav> 之後（位於最右），驗證接線位置
 				const loginBox = await loginLink.boundingBox();
 				const matchmakerBox = await navLink("對戰分配").boundingBox();
@@ -108,6 +116,27 @@ test.describe("auth session", () => {
 					matchmakerBox!.x + matchmakerBox!.width,
 				);
 			}
+		});
+	});
+
+	test.describe("窄螢幕訪客", () => {
+		test.use({ storageState: guestState, viewport: { width: 390, height: 800 } });
+
+		test("窄螢幕下可經由登入頁登入與登出", async ({ page }) => {
+			await loginViaUi(page);
+			await expect(page).toHaveURL("/", { timeout: NAVIGATION_TIMEOUT });
+			await expect(
+				page.locator("header").getByRole("link", { name: "登入" }),
+			).toBeHidden();
+			await expect(page.locator("header").getByRole("button", { name: "登出" })).toBeHidden();
+
+			await page.goto("/login");
+			await expect(page.getByText("已登入：")).toBeVisible();
+			await page.getByRole("button", { name: "登出" }).click();
+			await expect(page.getByLabel("電子郵件")).toBeVisible();
+			// reload 證明 session 真的被撤銷，而非只改 UI
+			await page.reload();
+			await expect(page.getByLabel("電子郵件")).toBeVisible();
 		});
 	});
 
