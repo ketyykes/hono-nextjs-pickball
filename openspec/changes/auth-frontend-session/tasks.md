@@ -87,7 +87,7 @@ Depends on: §5
 
 - [x] 6.1 例外層：`nextjs-pickball/.gitignore` 加 `/tests/e2e/.auth/`；新增 `nextjs-pickball/tests/e2e/global-setup.ts`（`dev-workflow`「E2E 登入夾具」1～2 點：重用 B2 helper、缺帳密時 warn＋刪舊 state＋結束、登入失敗 throw）；`playwright.config.ts` 加 `globalSetup`，**不動**五個 project 與 top-level `use`。storage state 路徑以設定檔目錄解析（`path.join(import.meta.dirname ?? __dirname, …)` 等價寫法），spec 與 setup 共用同一個常數
 - [x] 6.2 E2E（預期多為 regression guard）: 新增 `nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，寫入 test「未登入時 navbar 顯示登入入口並可前往登入頁」「以測試帳號登入後 navbar 顯示登出」「帳號或密碼錯誤時登入頁顯示錯誤訊息」「重整後仍維持登入」「登出後 navbar 回到登入入口」「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」（最後一條只跑 chromium；storage state 不存在時整檔 `test.skip` 並寫明原因；登入／登出流程用新 context）。行為已由 §2～§5 的單元／integration 測試以真紅燈驅動，本檔寫入時多數 test 會直接綠——**如實逐條標註**哪些是 regression guard、哪些首次執行為紅（及其原因）；**SHALL NOT** 以回退產品程式碼或改斷言製造紅燈。指令：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 tests/e2e/specs/auth-session.spec.ts`（前後清殘留 process）
-- [ ] 6.3 窄螢幕判定（2026-10-21 裁決後改寫）：`< sm`（640px）隱藏帳號入口、窄螢幕由 `/login` 登入登出（design Open Questions 第 9、12 條）。
+- [x] 6.3 窄螢幕判定（2026-10-21 裁決後改寫）：`< sm`（640px）隱藏帳號入口、窄螢幕由 `/login` 登入登出（design Open Questions 第 9、12 條）。
   驗收：6.7～6.11 完成後，`auth-session.spec.ts`「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」在 chromium 與 mobile-chrome 通過
   （320／375／390 入口 hidden 且五連結完整、640／1280 入口可見且在 `<nav>` 之後），既有 `navbar-rwd.spec.ts` 在 `.dev.vars` 齊備時原樣通過
   - 裁決前紀錄：原 test「窄螢幕下帳號入口與五個導航連結皆完整落在視口內」在 chromium 與 mobile-chrome 皆於 **320px** 失敗
@@ -105,14 +105,21 @@ Depends on: §5
 
 ### 6.3 裁決的實作（2026-10-21 新增）
 
-- [ ] 6.7 RED: `AccountEntry.test.tsx` 新增 it「登入連結與登出按鈕在 sm 以下隱藏」（class 含 `hidden` 與 `sm:inline-flex`）。確認紅燈
-- [ ] 6.8 GREEN: `AccountEntry.tsx` 入口改為 `hidden sm:inline-flex`（取代 `inline-flex`；`shrink-0`、`whitespace-nowrap`、內距與配色不變）；SiteNavbar 與既有連結 className 零變更
-- [ ] 6.9 RED: `LoginForm.test.tsx` 新增 it「已登入時於登入頁點擊登出後呼叫 signOut 並重新取得 session」。確認紅燈
-- [ ] 6.10 GREEN: `LoginForm.tsx` 已登入狀態加「登出」按鈕（`signOut()` 後 `refresh()`，不導向）
-- [ ] 6.11 E2E（例外層）: `auth-session.spec.ts`——窄螢幕 test 改名並改寫為「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」（320／375／390 hidden、五連結完整；640／1280 可見、右緣 ≥ 對戰分配）；
+- [x] 6.7 RED: `AccountEntry.test.tsx` 新增 it「登入連結與登出按鈕在 sm 以下隱藏」（class 含 `hidden` 與 `sm:inline-flex`）。確認紅燈
+- [x] 6.8 GREEN: `AccountEntry.tsx` 入口改為 `hidden sm:inline-flex`（取代 `inline-flex`；`shrink-0`、`whitespace-nowrap`、內距與配色不變）；SiteNavbar 與既有連結 className 零變更
+- [x] 6.9 RED: `LoginForm.test.tsx` 新增 it「已登入時於登入頁點擊登出後呼叫 signOut 並重新取得 session」。確認紅燈
+- [x] 6.10 GREEN: `LoginForm.tsx` 已登入狀態加「登出」按鈕（`signOut()` 後 `refresh()`，不導向）
+- [x] 6.11 E2E（例外層）: `auth-session.spec.ts`——窄螢幕 test 改名並改寫為「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」（320／375／390 hidden、五連結完整；640／1280 可見、右緣 ≥ 對戰分配）；
   依賴 navbar 入口的 test（未登入時…、以測試帳號登入後…、重整後…、登出後…）以 `test.use({ viewport: { width: 1280, height: 800 } })` 固定寬螢幕；
   新增「窄螢幕下可經由登入頁登入與登出」（390px、新 context）。新斷言先在 6.8／6.10 之前的程式碼上看到紅燈（或如實標註 regression guard）；
   跑 `auth-session.spec.ts`＋`navbar-rwd.spec.ts`＋`auth-proxy.spec.ts`
+  - 紀錄：6.7 `058464a`（真紅：class 無 `hidden`）→ 6.8 `dbdd2b6`；6.9 `87a3f18`（真紅：無「登出」按鈕）→ 6.10 `33d5d92`；
+    6.11 `4f578f4`（於 GREEN 前實跑，窄螢幕兩條新斷言 `toBeHidden failed` 為真紅）、`ddee0aa`（LoginForm 新增登出按鈕後，登出 E2E 改限定 header 並先等導向 `/`）。
+  - §6 Stage 1 PASS；**Stage 2 第 1 輪退回**：goto／reload 後等待 hydration＋`/api/session` 的斷言只用預設 5 秒 expect timeout，
+    高負載下 firefox reload 後入口出現需 2～8 秒（兩次執行各 1 條失敗、隔離重跑皆過）。修正 `1ecf0b9`：`SESSION_TIMEOUT = 15_000`＋`expect.configure`，
+    只改 timeout、斷言不變（依 design Risks 2 上報此新逾時）。第 2 輪 PASS：全 5 project 32 passed／3 skipped／0 failed；
+    加壓（`--workers=4 --repeat-each=2`）64 passed／0 failed，同條件下把逾時改回 5 秒會出現 2 條逾時。
+    6.3 驗收：「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」chromium、mobile-chrome 通過；navbar-rwd 原樣通過。
 
 ## 7. 文件同步與總驗收
 
