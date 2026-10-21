@@ -60,6 +60,8 @@ next-env.d.ts
 /test-results/
 /playwright/.cache/
 /blob-report/
+# storage state 內含 session token
+/tests/e2e/.auth/
 .playwright-cli/
 
 # design prototype (design reference, not source)
