@@ -132,6 +132,21 @@ describe("AccountEntry", () => {
 		);
 	});
 
+	it("登入連結與登出按鈕在 sm 以下隱藏", () => {
+		mockLoggedOut();
+		const loggedOut = render(<AccountEntry solid={true} />);
+		const linkClass = screen.getByRole("link", { name: "登入" }).className;
+		expect(linkClass).toContain("hidden");
+		expect(linkClass).toContain("sm:inline-flex");
+		loggedOut.unmount();
+
+		mockLoggedIn();
+		render(<AccountEntry solid={true} />);
+		const buttonClass = screen.getByRole("button", { name: "登出" }).className;
+		expect(buttonClass).toContain("hidden");
+		expect(buttonClass).toContain("sm:inline-flex");
+	});
+
 	it("登出請求失敗時仍重新取得 session", async () => {
 		const refresh = mockLoggedIn();
 		mockSignOut.mockResolvedValue(false);
