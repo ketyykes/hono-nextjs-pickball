@@ -98,4 +98,19 @@ describe("AccountEntry", () => {
 		expect(refresh).toHaveBeenCalledTimes(1);
 		expect(order).toEqual(["signOut", "refresh"]);
 	});
+
+	it("登入連結與登出按鈕皆套用 shrink-0", () => {
+		mockLoggedOut();
+		const loggedOut = render(<AccountEntry solid={true} />);
+		expect(screen.getByRole("link", { name: "登入" }).className).toContain(
+			"shrink-0",
+		);
+		loggedOut.unmount();
+
+		mockLoggedIn();
+		render(<AccountEntry solid={true} />);
+		expect(screen.getByRole("button", { name: "登出" }).className).toContain(
+			"shrink-0",
+		);
+	});
 });
