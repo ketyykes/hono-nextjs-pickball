@@ -115,6 +115,46 @@ describe("session-store", () => {
 		expect(getSnapshot().status).toBe("ready");
 	});
 
+	it("模組剛載入時為 loading，第一次訂閱才請求", async () => {
+		// 不呼叫 reset：直接驗證宣告處的初始值，否則 beforeEach 的 reset 會遮蔽它
+		vi.resetModules();
+		const freshClient = await import("./session-client");
+		const freshStore = await import("./session-store");
+		const freshFetch = vi.mocked(freshClient.fetchSession);
+		freshFetch.mockResolvedValue({ authEnabled: true, user: null });
+
+		expect(freshStore.getSnapshot()).toEqual({ status: "loading" });
+		expect(freshFetch).toHaveBeenCalledTimes(0);
+
+		freshStore.subscribe(vi.fn());
+		expect(freshFetch).toHaveBeenCalledTimes(1);
+		await vi.waitFor(() => {
+			expect(freshStore.getSnapshot().status).toBe("ready");
+		});
+	});
+
+	it("authEnabled 為 false 時快照如實反映", async () => {
+		mockedFetchSession.mockResolvedValue({ authEnabled: false, user: null });
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		expect(getSnapshot()).toEqual({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+		});
+	});
+
+	it("ready 之後新增訂閱者不再發請求", async () => {
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		subscribe(vi.fn());
+		expect(mockedFetchSession).toHaveBeenCalledTimes(1);
+	});
+
 	it("getServerSnapshot 在 store 已為 ready 後仍固定為 loading", async () => {
 		subscribe(vi.fn());
 		await vi.waitFor(() => {
