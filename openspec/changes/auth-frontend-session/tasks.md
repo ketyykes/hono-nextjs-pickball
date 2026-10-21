@@ -33,13 +33,21 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED: 新增 `nextjs-pickball/lib/auth/session-store.test.ts`，寫入 it「初始為 loading，第一次訂閱後取得 session 並轉為 ready」「請求完成前的多個訂閱者只觸發一次請求」「refresh 重新取得 session 並通知所有訂閱者」（以 `vi.mock("./session-client")` 或 store 的測試注入點替換 `fetchSession`，每個 it 前重設 store）。確認紅燈
-- [ ] 3.2 GREEN: 新增 `nextjs-pickball/lib/auth/session-store.ts`（`subscribe`、`getSnapshot`、`getServerSnapshot`、`refresh`；第一次訂閱才請求、進行中請求共用）
-- [ ] 3.3 RED: 新增 `nextjs-pickball/hooks/useSession.test.ts`，寫入 it「useSession 回傳 store 快照並隨 refresh 更新」「伺服器端 render 時 useSession 為 loading 且不發請求」。確認紅燈（hook 不存在）
-- [ ] 3.4 GREEN: 新增 `nextjs-pickball/hooks/useSession.ts`（`useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)`，回傳快照＋`refresh`）
-- [ ] 3.5 RED（既有守衛）：跑 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `useSession` 未列入主 spec 而**真的轉紅**，貼出輸出
-- [ ] 3.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子（結尾為「`useSession` → auth）。」）原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（M14 `4b99156` 前例）；commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useSession（B3 §3）`。重跑 3.5 轉綠。archive 時此段 MODIFIED 應為 no-op
-- [ ] 3.7 REFACTOR: 確認 store 沒有在模組載入時發請求；無壞味道則註記 skipped
+- [x] 3.1 RED: 新增 `nextjs-pickball/lib/auth/session-store.test.ts`，寫入 it「初始為 loading，第一次訂閱後取得 session 並轉為 ready」「請求完成前的多個訂閱者只觸發一次請求」「refresh 重新取得 session 並通知所有訂閱者」（以 `vi.mock("./session-client")` 或 store 的測試注入點替換 `fetchSession`，每個 it 前重設 store）。確認紅燈
+- [x] 3.2 GREEN: 新增 `nextjs-pickball/lib/auth/session-store.ts`（`subscribe`、`getSnapshot`、`getServerSnapshot`、`refresh`；第一次訂閱才請求、進行中請求共用）
+- [x] 3.3 RED: 新增 `nextjs-pickball/hooks/useSession.test.ts`，寫入 it「useSession 回傳 store 快照並隨 refresh 更新」「伺服器端 render 時 useSession 為 loading 且不發請求」。確認紅燈（hook 不存在）
+- [x] 3.4 GREEN: 新增 `nextjs-pickball/hooks/useSession.ts`（`useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)`，回傳快照＋`refresh`）
+- [x] 3.5 RED（既有守衛）：跑 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `useSession` 未列入主 spec 而**真的轉紅**，貼出輸出
+- [x] 3.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子（結尾為「`useSession` → auth）。」）原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（M14 `4b99156` 前例）；commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useSession（B3 §3）`。重跑 3.5 轉綠。archive 時此段 MODIFIED 應為 no-op
+- [x] 3.7 REFACTOR: 確認 store 沒有在模組載入時發請求；無壞味道則註記 skipped
+  - 紀錄：3.1 `1969131`（紅：模組不存在）→ 3.2 `f131b8c`；3.3 `b6ea559`（紅：hook 不存在）→ 3.4 `fd41541`；3.5 於 `fd41541` 後實跑真紅
+    （`expected [ 'useSession' ] to deeply equal []`）；3.6 `d5141d8` 只動主 spec 一句，3.5 轉綠；3.7 **skipped**（只在第一次 subscribe 才請求，有測試守住）。
+  - 補強 it（**regression guard**，寫入即綠）：`d895e56`（取消訂閱、getSnapshot 穩定參考、getServerSnapshot 在 ready 後仍 loading、SSR 在 ready 後仍 loading 等）、
+    `823cceb`（模組初值、authEnabled false、ready 後新訂閱者不再請求；Stage 2 第 1 輪必修 1～3）。
+  - **Stage 2 第 1 輪退回**：除測試缺口外，指出 inflight 共用使「初始請求在途時 refresh 拿到登入前舊結果」的競態（spec「refresh MUST 重新呼叫 fetchSession」）。
+    以 TDD 修正：`8f26126`（真紅：改寫本 change 自己在 `d895e56` 新增的「共用同一次請求」it）→ `f7263f2`（改用遞增 requestId，以最新請求為準）。
+    第 2 輪 Stage 2 PASS；建議的 refresh 語意註解已補（`516a5a1`）。
+  - 測試數與 7.3 原預期不同：session-store **11** 個 it（預期 3）、useSession **3** 個（預期 2），差額皆為上述 regression guard／競態修正。
 
 ## 4. AccountEntry 與 navbar
 
