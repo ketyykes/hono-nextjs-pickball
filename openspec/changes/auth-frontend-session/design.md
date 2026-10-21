@@ -221,3 +221,5 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
     （dev 模式 store 模組可能晚於事件求值，仍有殘留），採 `fetch("/api/session", { keepalive: true })`（實測 0 則錯誤）。
     修正 `2f9db09`（真紅）→ `23fdfaa`；`51b446a`／`f8c2258` 為否決方案的測試與其 revert（保留紀錄）。delta `auth` 已補對應條款與 Scenario。
     出處：WebKit Bugzilla 178701（該訊息籠統、常掩蓋真因），行為以實測為準。
+    補註（Stage 2 PASS）：Playwright 實際以 `pageerror` 事件回報此訊息；只在前端冷啟動（hydration 晚於導覽）時穩定重現，暖機 server 上不易重現。
+    獨立驗證：無 keepalive 時 4 支 spec 於 webkit／mobile-safari 7 failed，有 keepalive 時 78 passed／0 failed。
