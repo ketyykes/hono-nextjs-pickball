@@ -14,7 +14,7 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/auth-frontend-session`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 與 `db:seed:local` 成功；`pnpm test` baseline（前端檔數／測試數、後端應為 B2 後的 12 檔／47 測試），回填 environment.md 並 commit
+- [x] 1.1 確認分支 `change/auth-frontend-session`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 與 `db:seed:local` 成功；`pnpm test` baseline（前端檔數／測試數、後端應為 B2 後的 12 檔／47 測試），回填 environment.md 並 commit
 - [ ] 1.2 對齊 B2 實際落地：讀 `hono-pickball/src/index.ts`（`/api/session`、`/api/auth/*`、`/api/me` 的實際回應形狀與狀態碼）、`nextjs-pickball/tests/e2e/helpers/test-account.ts`（實際匯出簽章）、B2 archive 的 design.md Open Questions（特別是 sign-up 狀態碼、`wrangler d1 execute --local` 與執行中 dev 的可見性）。與本 design Context 不同處記入 Open Questions；若「執行中的 dev 讀不到新 seed」，依 design Risks 第 3 條調整 §6 的 seed 時機並記錄
 - [ ] 1.3 對齊前端現況：讀 `components/layout/SiteNavbar.tsx`／`.test.tsx`、`tests/e2e/specs/navbar-rwd.spec.ts`、`playwright.config.ts`、`app/health/page.test.ts`（metadata 測試範本）、`components/ui/{button,input,label}.tsx`；確認 `lucide-react` 匯出 `LogIn`／`LogOut`
 - [ ] 1.4 Context7 查證（MUST）：① `/better-auth/better-auth`（與已安裝版本最接近的版本 ID）的 React client（`createAuthClient`、`useSession`、`signOut`）與 FAQ 對 layout 使用 `useSession` 的建議 ② `/microsoft/playwright` 的 `globalSetup` 與 webServer 執行順序、`storageState`、`test.use` 重置 ③ `/facebook/react`（或 `/reactjs/react.dev`）的 `useSyncExternalStore` 與 `getServerSnapshot`。與 design Decision 1、5 的差異記入 Open Questions（附 library ID）
