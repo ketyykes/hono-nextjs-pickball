@@ -4,3 +4,14 @@
 
 # 只在本機啟用的開發旗標；遠端環境沒有 .dev.vars，缺值即代表非開發環境（wrangler.jsonc 不得以 vars 設定）。
 ENVIRONMENT=development
+
+# better-auth 簽章用 secret；示意值，請自行產生隨機字串（例如 openssl rand -base64 32）。
+BETTER_AUTH_SECRET=change-me-to-a-random-string
+
+# 前端 origin；better-auth 的 baseURL 與 trustedOrigins 皆取自此值（service binding 不改寫 host）。
+BETTER_AUTH_URL=http://localhost:3005
+
+# 本機測試帳號，由 seed 指令建立並用於本機登入；示意值，請在 .dev.vars 填自己的值。
+TEST_ACCOUNT_EMAIL=tester@example.com
+TEST_ACCOUNT_PASSWORD=change-me
+TEST_ACCOUNT_NAME=Local Tester

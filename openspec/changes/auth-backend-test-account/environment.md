@@ -26,8 +26,8 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**: 待 apply Step 0（tasks 1.1）實測回填。預期後端為 B1 後的 6 檔／22 測試。
-- **Initial commit hash**: 待 apply Step 0 回填（`change/auth-backend-test-account` 分出時的 `main` HEAD）。
+- **Baseline tests**（2026-10-21 實測，`pnpm test`）：前端 81 檔／783 passed；後端 6 檔／25 passed（B1 apply 期間補了 3.5、4.4 兩條覆蓋測試，故非原預期的 22）。`pnpm install` 後 lockfile 零變動；`db:migrate:local` 回報 No migrations to apply。
+- **Initial commit hash**: `30723a8`（`change/auth-backend-test-account` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

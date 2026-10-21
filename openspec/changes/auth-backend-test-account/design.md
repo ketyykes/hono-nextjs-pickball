@@ -172,3 +172,57 @@ helper 讓 B3 的 Playwright `globalSetup`（runbook D6）直接重用，不寫�
 2. S1 的 `preview` 模式下前端 origin 與埠號（OpenNext preview 預設可能與後端 `wrangler dev` 的 8787 衝突）；本 change 以
    `BETTER_AUTH_URL` 變數化因應，實際值由 S1 決定，**不屬本 change 驗收**。
 3. `wrangler d1 execute --local` 與執行中的 `wrangler dev` 是否共用且即時可見同一份資料（Risks 第 1 條）。
+
+### apply §1 查證紀錄（2026-10-21）
+
+- **1.1 baseline**：後端為 6 檔／**25** 測試（B1 apply 時新增 3.5、4.4 兩條覆蓋測試），非 tasks 1.1 所寫的 22。
+  因此 tasks 10.4 的後端預期改為 12 檔／**50** 測試（25＋本 change 25）。
+- **1.2 對齊 B1：一致，無差異**。`env.local` 宣告 `DB`（worker 名稱維持 `hono-pickball`）；`getDb(env: Pick<CloudflareBindings, "DB">)`
+  缺 `DB` 拋錯；`CloudflareBindings` 的 `DB` 為可選（`DB?: D1Database`）、`ENVIRONMENT` 為必填 `string`（B1 Open Question 4，
+  只能以 `=== "development"` 判斷）；四張表欄位與 better-auth 1.6 一致（1.5 實測 adapter 可直接註冊、登入）；
+  `TEST_MIGRATIONS` 經 `miniflare.bindings` 注入、`test/apply-migrations.ts` 套用。主 spec `dev-workflow`「後端測試在 workerd runtime 中執行」
+  與本 change delta 的差異**只有**本 change 新增的「app.request 例外」段落與 Scenario，delta 已以主 spec 為底，無須重套。
+- **1.3 本機套件：與 design 相同**。`better-auth@1.6.15`、`@better-auth/drizzle-adapter@1.6.15`；`better-auth/package.json` exports 含 `./crypto`，
+  `dist/crypto/index.d.mts` 匯出 `hashPassword`／`verifyPassword`；adapter `index.d.mts` 匯出 `drizzleAdapter`、`transaction?: boolean`；
+  Node `v22.22.1`、`process.features.typescript === "strip"`、`process.loadEnvFile` 為 function。
+- **1.4 Context7（`/better-auth/better-auth/v1.6.23`）：與 Decision 1～5 無衝突**。
+  ① `integrations/hono.mdx`：`app.on(["POST","GET"], "/api/auth/*", (c) => auth.handler(c.req.raw))`、`auth.api.getSession({ headers: c.req.raw.headers })`，
+  與 Decision 1／5 一致（官方 middleware 掛 `"*"`，本 change 刻意只掛在需要的路由，已記於 Decision 5）。
+  ② `api/routes/sign-up.ts`：`!enabled || disableSignUp` → `APIError("BAD_REQUEST", EMAIL_PASSWORD_SIGN_UP_DISABLED)`。
+  ③ `cookies/index.ts` `createCookieGetter`：`Secure` 判定順序與 Decision 4 所述相同；預設 `sameSite: "lax"`、`path: "/"`、`httpOnly: true`。
+  ④ `auth/base.ts`：靜態 `baseURL` 時不從請求推導；`trustedOrigins` 每請求以 `getTrustedOrigins(options, request)` 解析。
+  ⑤ `concepts/database.mdx`：官方 D1 範例為模組層 `env.DB`（Decision 1 已說明不採用）；adapter `transaction` 預設 `false`，本 change 明確設 `false`。
+  另：官方 installation 以 `better-auth/adapters/drizzle` 匯入 adapter；本 change 依 proposal 使用已安裝的 `@better-auth/drizzle-adapter`，兩者同一實作。
+- **1.5 實測（一次性 probe 測試檔與暫時路由，皆未 commit、已還原）**：
+  - **Open Question 1 結論：sign-up 停用回 `400`**，body `{"message":"Email and password sign up is not enabled","code":"EMAIL_PASSWORD_SIGN_UP_DISABLED"}`。
+    delta spec 無須修正。
+  - 附帶觀察：錯誤密碼與不存在帳號皆回 `401` `{"message":"Invalid email or password","code":"INVALID_EMAIL_OR_PASSWORD"}`（body 相同，
+    「帳號不存在與密碼錯誤回應相同」預期為 regression guard）；成功登入的 `Set-Cookie` 為
+    `better-auth.session_token=…; Max-Age=604800; Path=/; HttpOnly; SameSite=Lax`（無 `Secure`）；
+    `emailAndPassword.enabled=false` 時 sign-in 回 `400 EMAIL_PASSWORD_DISABLED`（5.3 前兩條 it 的紅燈預期即此值）。
+  - ⚠️ **未帶 `Origin` 的 sign-in POST 也回 200**（請求不帶 cookie 時 better-auth 不做 origin 檢查）。spec「請求 MUST 帶有屬於 trustedOrigins 的 Origin」
+    是對呼叫端的要求而非伺服端的強制行為；本 change 測試一律帶 `Origin`，不新增「缺 Origin 被拒」的斷言（那不是 better-auth 1.6 的行為）。
+  - **Open Question 3 結論：立即可見**。以 `wrangler dev --env local --port 8790` 起後端（暫時加一條讀 `user` 計數的路由），
+    `wrangler d1 execute DB --local --env local --command "INSERT …"` 後同一個執行中的 dev 立即讀到 1 筆，`DELETE` 後立即讀回 0 筆。
+    E2E helper 可在 `webServer` 已啟動後再 seed，不需重啟後端。dev 停止後 `lsof -i :8790` 無輸出。
+
+### apply §2～§9 與 design 的差異及移交事項（2026-10-21）
+
+4. **Decision 1 的落地形式**：gate 與 `createAuth` 合併為 `src/index.ts` 內的共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`），
+   同掛 `/api/auth/*` 與 `/api/me`；better-auth handler 與 `requireSession` 皆讀 `c.var.auth`。`/api/session` 不掛它，啟用分支自行建立一次，
+   且 try 範圍包含 `createAuth`（建立期例外也降級為 `user: null`，比 spec 保守）。「每請求只建立一次」無黑箱測試可觀察，
+   以 `grep -rn "createAuth(" hono-pickball/src` 只命中這兩處把關。Wave 2 建議：`localAuth` 移到 `src/auth/` 以便拆檔重用；
+   `AuthAppEnv` 的 `user`／`session` 宣告為非 optional，未掛 middleware 的路由讀取時型別不會報錯。
+5. **Decision 7 的偏離：seed 腳本改用 `parseEnv(readFileSync(".dev.vars"))`**，不用 `process.loadEnvFile`。後者不覆寫 shell 已 export 的同名變數，
+   會 seed 到錯的帳號、使缺變數檢查失效（§8 Stage 2 實測），也會把 `BETTER_AUTH_SECRET` 注入 wrangler 子行程。暫存 SQL 改放
+   `mkdtempSync` 產生的唯一目錄（0600），`finally` 刪整個目錄，避免並行呼叫互刪。E2E helper 以同一方式解析 `.dev.vars`。
+6. **經 proxy 的 sign-in 必須帶 `Origin`**：§1 直接呼叫 handler 時不帶 `Origin` 仍回 200，但 §9 Stage 2 實測經前端 proxy 不帶 `Origin` 時回 **403**
+   （better-auth origin 檢查）。B3 的瀏覽器同源 POST 會自動帶上，無影響；E2E 與 curl 驗收須明確帶 `Origin`。
+7. **E2E 並行限制（交 B3）**：`auth-proxy.spec.ts` 只在 project `chromium` 執行，`describe.configure({ mode: "serial" })`，並在 `beforeAll` 以
+   `testInfo.project.name` skip，確保一次執行只 seed 一次。`--repeat-each` 等讓同一 spec 分散到多個 worker 的方式會並行 seed（`SQLITE_BUSY`），不支援。
+   **B3 MUST 把 seed 統一移到 Playwright `globalSetup`**：seed 會 `DELETE` 同 email 的 user 並 cascade 刪除其 session，
+   若 B3 在 `globalSetup` 登入並存 `storageState`，之後任何 spec 再 seed 都會讓該 session 失效（401）。
+8. **`provider: "pg"` 變異存活**：§5 Stage 2 讀 adapter 原始碼裁定為現行設定下的等價變異（差異僅 `ilike`、`supportsUUIDs`、JSON／陣列欄位，皆未觸發）；
+   日後加入會做不分大小寫搜尋的 plugin 或 JSON 欄位時須重新評估。
+9. **Escalation 紀錄**：§9 被同一 Stage 2 reviewer 連續退回 3 次（並行 seed 競態 → `isMobile` 在 beforeAll 前無法判定 → tasks.md 未揭露中間壞 commit
+   `f884d4b`），第 3 次為文件缺陷，依 Escalation 升 opus 重派補記錄後核准。§3、§5（文件補登）、§8 各退回 1 次後核准。
