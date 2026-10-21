@@ -53,11 +53,18 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED: 新增 `nextjs-pickball/components/layout/AccountEntry.test.tsx`（mock `@/hooks/useSession` 與 `@/lib/auth/session-client`），寫入 it「載入中或未啟用時不渲染任何元素」「啟用且未登入時顯示指向 /login 的登入連結」「已登入時顯示登出按鈕且 title 含使用者名稱」「點擊登出後呼叫 signOut 並重新取得 session」。確認紅燈
-- [ ] 4.2 GREEN: 新增 `nextjs-pickball/components/layout/AccountEntry.tsx`（design Decision 3：`LogIn`／`LogOut` 圖示、`aria-label`、`title`、`whitespace-nowrap shrink-0`、與導航連結相同的內距階梯與 solid／透明配色規則）
-- [ ] 4.3 例外層（接線）：`SiteNavbar.tsx` 在 `<nav>` 之後渲染 `<AccountEntry solid={solid} />`（或等價的配色傳遞方式）；不改動 `NAV_LINKS` 與既有 className
-- [ ] 4.4 既有測試隔離：`SiteNavbar.test.tsx` 頂部新增 `vi.mock("@/hooks/useSession", …)`（回傳 loading），**不改任何既有 it**；跑該檔確認既有 it 全數原樣通過（`git diff` 只有新增的 mock 區塊）
-- [ ] 4.5 REFACTOR: 配色判斷若與 `SiteNavbar` 的連結配色重複，抽成同檔共用的具名函式或常數；無壞味道則註記 skipped
+- [x] 4.1 RED: 新增 `nextjs-pickball/components/layout/AccountEntry.test.tsx`（mock `@/hooks/useSession` 與 `@/lib/auth/session-client`），寫入 it「載入中或未啟用時不渲染任何元素」「啟用且未登入時顯示指向 /login 的登入連結」「已登入時顯示登出按鈕且 title 含使用者名稱」「點擊登出後呼叫 signOut 並重新取得 session」。確認紅燈
+- [x] 4.2 GREEN: 新增 `nextjs-pickball/components/layout/AccountEntry.tsx`（design Decision 3：`LogIn`／`LogOut` 圖示、`aria-label`、`title`、`whitespace-nowrap shrink-0`、與導航連結相同的內距階梯與 solid／透明配色規則）
+- [x] 4.3 例外層（接線）：`SiteNavbar.tsx` 在 `<nav>` 之後渲染 `<AccountEntry solid={solid} />`（或等價的配色傳遞方式）；不改動 `NAV_LINKS` 與既有 className
+- [x] 4.4 既有測試隔離：`SiteNavbar.test.tsx` 頂部新增 `vi.mock("@/hooks/useSession", …)`（回傳 loading），**不改任何既有 it**；跑該檔確認既有 it 全數原樣通過（`git diff` 只有新增的 mock 區塊）
+- [x] 4.5 REFACTOR: 配色判斷若與 `SiteNavbar` 的連結配色重複，抽成同檔共用的具名函式或常數；無壞味道則註記 skipped
+  - 紀錄：4.1 `a0d5318`（紅：模組不存在）→ 4.2 `8b30379`；4.3 `8ffd41f`（只加 import 與 `<AccountEntry solid={solid} />`）；4.4 `4829242`（只新增 5 行 mock）。
+  - **Stage 2 第 1 輪退回**：4.5 不得 skipped（AccountEntry 第二次寫死連結配色與內距）。修正 `244567a`：抽出 `components/layout/navItemStyles.ts`
+    （`NAV_ITEM_BASE`、`navItemTone`）。**與 tasks 字面「同檔」不同**：SiteNavbar 已 import AccountEntry，放同檔會循環依賴，故用獨立模組；
+    Stage 2 以 `cn()` 重建比對 SiteNavbar 連結 4 種組合與 AccountEntry 2 種組合的 class 逐字相同。
+  - 補強：`09928dd`（shrink-0 斷言）、`0f86ba9`（signOut 失敗仍 refresh）皆 **regression guard**；`3e535cd`（真紅）→ `ee70f6d`：登入連結補 `transitionTypes={["nav-forward"]}`
+    與 navbar 其他連結一致（測試檔以 `vi.mock("next/link")` 暴露該 prop）。AccountEntry.test 共 **7** 個 it（7.3 原預期 4）。第 2 輪 Stage 2 PASS。
+  - 已知未覆蓋：接線位置（在 `<nav>` 之後）無單元測試（4.3 屬例外層），由 §6 E2E 驗收。
 
 ## 5. 登入頁
 
