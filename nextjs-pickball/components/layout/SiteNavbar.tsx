@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/icons";
 import { AccountEntry } from "@/components/layout/AccountEntry";
+import { NAV_ITEM_BASE, navItemTone } from "@/components/layout/navItemStyles";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
 import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
@@ -67,10 +68,8 @@ export function SiteNavbar() {
 								href={link.href}
 								transitionTypes={[link.href === "/" ? "nav-back" : "nav-forward"]}
 								className={cn(
-									"rounded-md px-2 py-2 text-sm font-medium whitespace-nowrap transition-colors max-[375px]:px-1.5 sm:px-3",
-									solid
-										? "text-muted-foreground hover:text-slate-900"
-										: "text-white/70 hover:text-white",
+									NAV_ITEM_BASE,
+									navItemTone(solid),
 									active && (solid ? "text-slate-900" : "text-white"),
 								)}
 							>

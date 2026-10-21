@@ -2,6 +2,7 @@
 
 import { LogIn, LogOut } from "lucide-react";
 import Link from "next/link";
+import { NAV_ITEM_BASE, navItemTone } from "@/components/layout/navItemStyles";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth/session-client";
 import { cn } from "@/lib/utils";
@@ -21,10 +22,9 @@ export function AccountEntry({ solid }: AccountEntryProps) {
 	}
 
 	const className = cn(
-		"inline-flex shrink-0 items-center rounded-md px-2 py-2 text-sm font-medium whitespace-nowrap transition-colors max-[375px]:px-1.5 sm:px-3",
-		solid
-			? "text-muted-foreground hover:text-slate-900"
-			: "text-white/70 hover:text-white",
+		"inline-flex shrink-0 items-center",
+		NAV_ITEM_BASE,
+		navItemTone(solid),
 	);
 
 	if (session.user === null) {
