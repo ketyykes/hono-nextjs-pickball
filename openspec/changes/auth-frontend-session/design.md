@@ -214,3 +214,10 @@ store 的測試以注入假的 `fetchSession`（store 提供僅供測試的重�
       navbar 相關 E2E Scenario 加上 viewport >= 640px 前提）、delta `auth`（已登入時登入頁提供登出、新增 Scenario「已登入時可於登入頁登出」
       「窄螢幕下經由登入頁登入與登出」）、test-plan 對應列、tasks 6.3 改寫並新增 6.7～6.11。
 13. 第 10 條「目前進度」與第 11 條「與 design 不同之處」維持原紀錄；裁決後的實作結果記於 tasks.md 6.7～6.11 與 §7。
+14. **§7.4 回歸與修正（2026-10-21）**：完整 E2E 有 6 條既有 webkit／mobile-safari test 因 console 守衛失敗（隔離重跑仍失敗），訊息為
+    `Fetch API cannot load http://localhost:3005/api/session due to access control checks.`。實測：`goto`／`reload` 先觸發 `beforeunload`，
+    hydration 之後才呼叫 fetch，WebKit 拒絕這種「導覽開始後才發出」的一般 fetch，並由瀏覽器自行記 console 錯誤（JS 端只收到 `TypeError: Load failed`，
+    `fetchSession` 有接住，但 console 已輸出）。評估過 `pagehide`／`beforeunload` 時 abort（事件觸發時請求尚未發出，無效）與 `beforeunload` 旗標
+    （dev 模式 store 模組可能晚於事件求值，仍有殘留），採 `fetch("/api/session", { keepalive: true })`（實測 0 則錯誤）。
+    修正 `2f9db09`（真紅）→ `23fdfaa`；`51b446a`／`f8c2258` 為否決方案的測試與其 revert（保留紀錄）。delta `auth` 已補對應條款與 Scenario。
+    出處：WebKit Bugzilla 178701（該訊息籠統、常掩蓋真因），行為以實測為準。

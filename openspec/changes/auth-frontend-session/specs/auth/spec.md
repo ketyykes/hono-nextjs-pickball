@@ -7,6 +7,10 @@
 **任何其他情況**（非 200、JSON 解析失敗、形狀不符、網路錯誤）MUST 回傳 `{ authEnabled: false, user: null }` 且 SHALL NOT throw——
 登入狀態取不到時一律當作「未啟用」，訪客介面維持現狀（fail-closed）。
 
+請求 MUST 以 `keepalive: true` 發出：WebKit 會拒絕「整頁導覽開始後才發出」的一般 fetch，並由瀏覽器自行輸出 console 錯誤
+（`Fetch API cannot load … due to access control checks`，不是 JS 例外，try/catch 擋不住），使既有 E2E 的 console 守衛失敗；
+`keepalive` 請求不受此限制。回應處理與 fail-closed 規則不變。
+
 前端 SHALL NOT 讀取或依賴 session cookie 的名稱或內容（HttpOnly，且 G1 改用 https 後名稱會變成 `__Secure-` 前綴）。
 前端 SHALL NOT 以 build-time 環境變數判斷是否顯示登入入口——唯一訊號是 `authEnabled`。
 
@@ -15,6 +19,13 @@
 - **WHEN** `/api/session` 回 200 與 `{ "authEnabled": true, "user": { "id": "u1", "email": "a@example.com", "name": "A" } }`
 - **THEN** `fetchSession()` 回傳同一個物件內容
 - **驗收**：`nextjs-pickball/lib/auth/session-client.test.ts`，it 名稱「fetchSession 於 200 且形狀正確時回傳 authEnabled 與 user」
+
+#### Scenario: session 請求以 keepalive 發出
+
+- **WHEN** 呼叫 `fetchSession()`
+- **THEN** `fetch` 以 `/api/session` 與 `keepalive: true` 被呼叫
+- **驗收**：`nextjs-pickball/lib/auth/session-client.test.ts`，it 名稱「fetchSession 以 keepalive 發出請求」；
+  端到端以既有 webkit／mobile-safari E2E 的 console 守衛（`player-roster`、`match-stage`、`round-timer`、`visual-export`）在 `.dev.vars` 齊備時通過為證
 
 #### Scenario: 任何失敗都降級為未啟用
 

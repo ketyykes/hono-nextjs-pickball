@@ -20,6 +20,7 @@
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
 | fetchSession 於 200 且形狀正確時回傳 authEnabled 與 user | 回應正確時原樣回傳 | 假 fetch 回 200＋已登入 JSON → 回傳深度相等 | golden path；模組不存在時真紅燈 | unit |
+| fetchSession 以 keepalive 發出請求 | session 請求以 keepalive 發出 | fetch 第二參數 `keepalive === true` | edge case：WebKit 換頁時的 console 錯誤使既有 E2E 守衛失敗（§7.4 發現） | unit |
 | fetchSession 於非 200、形狀不符或網路錯誤時回傳未啟用且不拋錯 | 任何失敗都降級為未啟用 | 500／非 JSON／`authEnabled:"yes"`／fetch reject 四種 → 皆 `{ authEnabled:false, user:null }`，不 reject | edge case：fail-closed 是訪客零迴歸的保證（Decision 2） | unit |
 
 ### Requirement: 前端登入與登出的請求契約
