@@ -134,6 +134,8 @@ Depends on: §8
   - 性質：**regression guard**（後端行為已由 §5～§7 integration 測試真紅燈驅動，本 E2E 寫入即綠；未回退後端、未改斷言製造紅燈）
   - 鑑別力檢查（確認測試會失敗，非偽造紅燈）：暫時把測試檔內預期 email 改成錯值，chromium 跑一次 → 1 failed（Expected 錯值／Received 實際 email）、/api/session 1 passed；已還原
   - 結果：`playwright test --workers=1 tests/e2e/specs/auth-proxy.spec.ts` → 4 passed（chromium、mobile-chrome 各 2）、6 skipped（firefox／webkit／mobile-safari），非因缺帳密而 skip；前後無殘留 process，:3005／:8787 無 listener
+  - Stage 2 修正（第 1 次退回）：預設 workers 下 mobile-chrome 與 `--repeat-each` 會讓多個 worker 並行 seed（暫存檔互刪、`SQLITE_BUSY`、user 被重建使 session 失效）。修正：spec 以 `isMobile` 排除 mobile-chrome 並 `mode: "serial"`；seed 腳本暫存檔改 `mkdtempSync` 唯一目錄；`ensureTestAccountSeeded()` 以 runner pid 為 key 的 mkdir 鎖，同一次 Playwright 執行只 seed 一次（`--repeat-each` 會分到不同 worker，僅 serial 不足）；Origin 加「為什麼」註解；email 斷言不外洩測試 email
+  - Stage 2 修正驗證：`--workers=1 --project=chromium` 2 passed；預設 workers `--project=chromium --project=mobile-chrome --repeat-each=4` 連跑兩次皆 8 passed／8 skipped（mobile-chrome 全 skip）；前端 tsc／lint、後端 typecheck 皆 exit 0，後端 12 檔 50 測試通過；`.wrangler/tmp` 無殘留 seed 目錄
   - 實作備註：helper 用 `__dirname`（Playwright 以 CJS 載入 TS）；另匯出 `readTestAccountResult()` 回報缺少的變數名，`readTestAccount()` 缺值回 `null`；`ensureTestAccountSeeded()` 以 `pnpm --dir <hono 絕對路徑>` 執行，不依賴 cwd
 - [x] 9.2 確認 `nextjs-pickball` 的 `tsc --noEmit` 與 `pnpm --filter ./nextjs-pickball lint` 對新增的兩個檔案皆無錯誤
   - 前端 `tsc --noEmit` exit 0；`lint` exit 0（0 errors，3 個既有 warning，皆不在新增檔案）
