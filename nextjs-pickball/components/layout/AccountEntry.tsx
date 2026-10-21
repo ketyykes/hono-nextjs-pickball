@@ -12,7 +12,8 @@ interface AccountEntryProps {
 	solid: boolean;
 }
 
-// 窄螢幕下 navbar 餘裕只有約 28px，只能是單一圖示；名稱放 aria-label／title 不佔寬度。
+// < sm 隱藏：320px 實測入口會把視口撐出 10px，窄螢幕改由 /login 登入登出。
+// 圖示化、名稱放 aria-label／title 不佔寬度。
 export function AccountEntry({ solid }: AccountEntryProps) {
 	const session = useSession();
 
@@ -22,7 +23,7 @@ export function AccountEntry({ solid }: AccountEntryProps) {
 	}
 
 	const className = cn(
-		"inline-flex shrink-0 items-center",
+		"hidden shrink-0 items-center sm:inline-flex",
 		NAV_ITEM_BASE,
 		navItemTone(solid),
 	);
