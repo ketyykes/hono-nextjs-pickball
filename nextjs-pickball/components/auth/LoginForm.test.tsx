@@ -93,6 +93,35 @@ describe("LoginForm", () => {
 		);
 	});
 
+	it("送出正確帳密後 refresh 完成前不導向首頁", async () => {
+		let resolveRefresh: () => void = () => {};
+		const refresh = mockLoggedOut(
+			vi.fn(
+				() =>
+					new Promise<void>((resolve) => {
+						resolveRefresh = resolve;
+					}),
+			),
+		);
+		mockSignIn.mockResolvedValue({ ok: true });
+		render(<LoginForm />);
+		await fillAndSubmit();
+		await waitFor(() => expect(refresh).toHaveBeenCalled());
+		expect(mockReplace).not.toHaveBeenCalled();
+		resolveRefresh();
+		await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/"));
+	});
+
+	it("表單欄位型別與 autocomplete 供瀏覽器與 E2E 辨識", () => {
+		mockLoggedOut();
+		render(<LoginForm />);
+		const email = screen.getByLabelText("電子郵件");
+		const password = screen.getByLabelText("密碼");
+		expect(email.getAttribute("type")).toBe("email");
+		expect(password.getAttribute("type")).toBe("password");
+		expect(password.getAttribute("autocomplete")).toBe("current-password");
+	});
+
 	it("帳密錯誤時顯示帳號或密碼錯誤並清空密碼", async () => {
 		mockLoggedOut();
 		mockSignIn.mockResolvedValue({ ok: false, reason: "invalid-credentials" });
