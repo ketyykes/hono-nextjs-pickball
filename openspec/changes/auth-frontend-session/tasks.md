@@ -125,8 +125,25 @@ Depends on: §5
 
 Depends on: §6
 
-- [ ] 7.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`：架構總覽補 `/login`（本機測試帳號登入頁，不在 navbar 的 `NAV_LINKS`，由帳號圖示進入）；目錄約定的 hooks 歸屬補 `auth：useSession`、`lib/` 補 `auth/`；測試架構補 E2E 登入夾具（`globalSetup`、`.auth/`、缺 `.dev.vars` 時 skip）；**不動**「matchmaker 為 LocalStorage-only」敘述（B5／B6 才改）
-- [ ] 7.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors 且 warning 不多於基線
-- [ ] 7.3 驗收（指令）：`pnpm test` 全綠；前端檔數／測試數 = 基線＋本 change 新增（6 檔、22 測試：session-client 5、session-store 3、useSession 2、AccountEntry 4、page 1、LoginForm 7，再加既有 hooksInventory 不變）；後端不變；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 為空
+- [x] 7.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`：架構總覽補 `/login`（本機測試帳號登入頁，不在 navbar 的 `NAV_LINKS`，由帳號圖示進入）；目錄約定的 hooks 歸屬補 `auth：useSession`、`lib/` 補 `auth/`；測試架構補 E2E 登入夾具（`globalSetup`、`.auth/`、缺 `.dev.vars` 時 skip）；**不動**「matchmaker 為 LocalStorage-only」敘述（B5／B6 才改）
+  - `18a2d3f`：前端 CLAUDE.md 補 `/login`（含 `< sm` 隱藏入口、窄螢幕改由 `/login`、G1 待辦）、`components/auth/`、`layout/` 的 AccountEntry／navItemStyles、hooks 歸屬 `auth：useSession`、`lib/auth/`、E2E 登入夾具；matchmaker LocalStorage-only 敘述未動。
+- [x] 7.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./nextjs-pickball lint` 0 errors 且 warning 不多於基線
+  - `pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；lint 0 errors／3 warnings（與基線相同，皆既有檔）。
+- [x] 7.3 驗收（指令）：`pnpm test` 全綠；前端檔數／測試數 = 基線＋本 change 新增（6 檔、22 測試：session-client 5、session-store 3、useSession 2、AccountEntry 4、page 1、LoginForm 7，再加既有 hooksInventory 不變）；後端不變；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 為空
+  - 前端 87 檔／823（基線 81／783：新增 6 檔、40 個 it——session-client 6、session-store 11、useSession 3、AccountEntry 8、page 1、LoginForm 11；
+    多於原預期 22 的部分為各組 Stage 2 要求的 regression guard、§3 競態修正、6.3 裁決與 §7.4 keepalive 修正）；hooksInventory 2 不變、SiteNavbar.test 只加 mock；
+    後端 12 檔／50 不變；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 為空。
 - [ ] 7.4 驗收（指令）C2：`.dev.vars` 齊備下完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留）：既有 test 全數原樣通過（passed／skipped 數與基線相同，另加 B2 的 auth-proxy 與本 change 的 auth-session）；結果寫在本 task 後方。失敗不得自行判定為雜訊
-- [ ] 7.5 `DO_NOT_TRACK=1 openspec validate auth-frontend-session --strict` 通過
+  - **⛔ 未勾選，待 coordinator 裁定**。第 1 次（`18a2d3f`，45.3 分鐘，高負載）：655 passed／38 skipped／12 failed——
+    6 條 webkit／mobile-safari 既有 test 因 console 守衛抓到 `Fetch API cannot load …/api/session due to access control checks.`（本 change 回歸，隔離重跑仍失敗）
+    → 以 keepalive 修正（design Open Questions 第 14 條）；6 條 firefox 逾時（伴隨大量 Turbopack ChunkLoadError），隔離重跑皆過、修正後 3 支 spec 整支重跑 52/52。
+  - 第 2 次（`dadc225`，14.8 分鐘，load 約 3）：**663 passed／38 skipped／4 failed**（總數 705＝預期 667＋38；auth-session 32 passed／3 skipped，無缺帳密 skip）。
+    4 條皆為 `beforeEach` 的 `page.goto("/")` 等 load 逾時、截圖全白：[webkit]／[mobile-safari] `player-stats.spec.ts:243`「完全沒有歷史紀錄時顯示引導型空狀態」、
+    `visual-export.spec.ts:476`「匯出 JPG 後目前回合與本機資料保持不變」；**隔離重跑 4 條全過**，依檔案順序重跑亦全過。
+    調查：兩個 WebKit project 的失敗分別落在該 project 第 63 與第 127 個執行的 test（間隔 64）；以與專案無關的 python 靜態伺服器＋獨立 Playwright config
+    連開 80 個 context，webkit／mobile-safari 皆在第 64 個 context 卡住、chromium 80/80 通過；拿掉 keepalive 或 AccountEntry 亦同。
+    推論為本機 Playwright WebKit（1.60／webkit-2359，macOS 26.6.2）單一 browser 實例的環境問題，本 change 每個 project 多 7 條 test 使執行數跨過 64；
+    但當天稍早 mobile-safari 曾連跑 74 條未卡，屬未定論。未修改任何測試或設定。
+  - 另：layout chunk 的 `ChunkLoadError`（不在既有守衛白名單）於高負載下偶發；A／B 實驗否證「/login 首次編譯」假設，低負載下現況與移除 AccountEntry 皆 0/30，判斷為負載相關競態，未修正。
+- [x] 7.5 `DO_NOT_TRACK=1 openspec validate auth-frontend-session --strict` 通過
+  - `Change 'auth-frontend-session' is valid`（`dadc225` 後再跑一次亦通過）。
