@@ -133,8 +133,12 @@ Depends on: §6
   - 前端 87 檔／823（基線 81／783：新增 6 檔、40 個 it——session-client 6、session-store 11、useSession 3、AccountEntry 8、page 1、LoginForm 11；
     多於原預期 22 的部分為各組 Stage 2 要求的 regression guard、§3 競態修正、6.3 裁決與 §7.4 keepalive 修正）；hooksInventory 2 不變、SiteNavbar.test 只加 mock；
     後端 12 檔／50 不變；`git diff main --stat -- pnpm-lock.yaml '**/package.json'` 為空。
-- [ ] 7.4 驗收（指令）C2：`.dev.vars` 齊備下完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留）：既有 test 全數原樣通過（passed／skipped 數與基線相同，另加 B2 的 auth-proxy 與本 change 的 auth-session）；結果寫在本 task 後方。失敗不得自行判定為雜訊
-  - **⛔ 未勾選，待 coordinator 裁定**。第 1 次（`18a2d3f`，45.3 分鐘，高負載）：655 passed／38 skipped／12 failed——
+- [x] 7.4 驗收（指令）C2：`.dev.vars` 齊備下完整 E2E `pnpm --filter ./nextjs-pickball exec playwright test --workers=1`（前後清殘留）：既有 test 全數原樣通過（passed／skipped 數與基線相同，另加 B2 的 auth-proxy 與本 change 的 auth-session）；結果寫在本 task 後方。失敗不得自行判定為雜訊
+  - **coordinator 裁定（2026-10-22）：通過**。第 2 次的 4 條 WebKit 逾時判定為本機 Playwright WebKit 單一 browser 超過 64 個 context 即卡住的環境限制（與本 change 無關，見下方第 2 次調查）。
+    裁定依據：load 約 2～4 下依 project 分開執行（webkit／mobile-safari 各以 `--shard=i/3` 分三份，使單一 browser 的 context 數 < 64）：
+    chromium 141 passed；firefox 129 passed／12 skipped；mobile-chrome 139 passed／2 skipped；webkit 129 passed／12 skipped；mobile-safari 129 passed／12 skipped
+    → **合計 667 passed／38 skipped／0 failed（705）**，與預期一致。
+  - 原紀錄（leader）：第 1 次（`18a2d3f`，45.3 分鐘，高負載）：655 passed／38 skipped／12 failed——
     6 條 webkit／mobile-safari 既有 test 因 console 守衛抓到 `Fetch API cannot load …/api/session due to access control checks.`（本 change 回歸，隔離重跑仍失敗）
     → 以 keepalive 修正（design Open Questions 第 14 條）；6 條 firefox 逾時（伴隨大量 Turbopack ChunkLoadError），隔離重跑皆過、修正後 3 支 spec 整支重跑 52/52。
   - 第 2 次（`dadc225`，14.8 分鐘，load 約 3）：**663 passed／38 skipped／4 failed**（總數 705＝預期 667＋38；auth-session 32 passed／3 skipped，無缺帳密 skip）。
