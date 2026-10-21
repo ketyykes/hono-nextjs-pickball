@@ -41,7 +41,9 @@ function isValidPayload(value: unknown): value is SessionState {
 // 取不到狀態一律視為「未啟用」（fail-closed），訪客介面才不會因後端異常出現半套登入 UI。
 export async function fetchSession(): Promise<SessionState> {
 	try {
-		const res = await fetch("/api/session");
+		// keepalive：hydration 晚於 beforeunload 時（快速整頁換頁），WebKit 會擋下一般 fetch
+		// 並輸出 console 錯誤，catch 擋不住；keepalive 請求不受導覽中止。
+		const res = await fetch("/api/session", { keepalive: true });
 		if (!res.ok) return DISABLED;
 		const payload: unknown = await res.json();
 		if (!isValidPayload(payload)) return DISABLED;
