@@ -6,10 +6,14 @@ import {
 
 // 驗證 better-auth 的 session cookie 經 Next.js proxy → service binding → Hono 原樣穿透。
 // 只用 request fixture、不開頁面；通路與瀏覽器無關，只需在 chromium 執行一次。
+// mobile-chrome 的 browserName 也是 chromium，需另行排除，否則多個 worker 會並行 seed 互相干擾。
 // 依賴 hono-pickball/.dev.vars 的測試帳密與本機 D1。
 test.describe("auth proxy 穿透", () => {
+	// serial 讓兩條 test 同一 worker，beforeAll 只 seed 一次（seed 會重建 user，並行會讓 session 失效）
+	test.describe.configure({ mode: "serial" });
+
 	test.skip(
-		({ browserName }) => browserName !== "chromium",
+		({ browserName, isMobile }) => browserName !== "chromium" || isMobile,
 		"auth 通路測試只需在 chromium 執行一次",
 	);
 
@@ -33,6 +37,8 @@ test.describe("auth proxy 穿透", () => {
 		const { account } = accountResult;
 
 		const signIn = await request.post("/api/auth/sign-in/email", {
+			// better-auth 會檢查 Origin，不帶時經 proxy 會回 403；此 header 模擬瀏覽器同源請求，
+			// 並驗證 proxy 原樣轉發 Origin
 			headers: { Origin: "http://localhost:3005" },
 			data: { email: account.email, password: account.password },
 		});
@@ -52,7 +58,10 @@ test.describe("auth proxy 穿透", () => {
 		const me = await request.get("/api/me");
 		expect(me.status()).toBe(200);
 		const body = await me.json();
-		expect(body.user.email).toBe(account.email);
+		expect(
+			body.user.email === account.email,
+			"user.email 與測試帳號不符",
+		).toBe(true);
 	});
 
 	test("經 proxy 呼叫 /api/session 未登入時回 200 與 user null", async ({

@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -22,6 +30,9 @@ const requiredVars = [
 // 以 helper 檔位置推導，避免依賴執行時的 cwd（Playwright 以 CJS 載入 TS，故用 __dirname）
 const honoRoot = join(__dirname, "..", "..", "..", "..", "hono-pickball");
 const devVarsPath = join(honoRoot, ".dev.vars");
+
+const staleMs = 10 * 60 * 1000;
+const waitTimeoutMs = 120 * 1000;
 
 /**
  * 讀取 hono-pickball/.dev.vars 的測試帳密。
@@ -56,9 +67,44 @@ export function readTestAccount(): TestAccount | null {
 /**
  * 依序對本機 D1 執行 migrate 與 seed。
  * wrangler dev 執行中寫入同一份本機 sqlite 會立即可見（B2 §1 實測），不必重啟後端。
+ *
+ * 每次 Playwright 執行（同一個 runner 行程）只 seed 一次：多個 worker 並行時，
+ * 重複 seed 會讓 migrate 撞 SQLITE_BUSY，且 seed 會重建 user 使其他 worker 的 session 失效。
+ * 以 runner 的 pid 為 key，用 mkdir 的原子性選出負責 seed 的 worker，其餘等待其完成。
  */
 export function ensureTestAccountSeeded(): void {
-	for (const script of ["db:migrate:local", "db:seed:local"]) {
-		execFileSync("pnpm", ["--dir", honoRoot, script], { stdio: "pipe" });
+	const lockDir = join(tmpdir(), `pickball-e2e-seed-${process.ppid}`);
+	const doneFile = join(lockDir, "done");
+	const failedFile = join(lockDir, "failed");
+
+	// 前次執行遺留的同 pid 目錄視為過期（pid 可能被重用）
+	if (existsSync(lockDir) && Date.now() - statSync(lockDir).mtimeMs > staleMs) {
+		rmSync(lockDir, { recursive: true, force: true });
+	}
+
+	try {
+		mkdirSync(lockDir);
+	} catch {
+		const deadline = Date.now() + waitTimeoutMs;
+		while (!existsSync(doneFile)) {
+			if (existsSync(failedFile)) {
+				throw new Error("另一個 worker 的測試帳號 seed 失敗");
+			}
+			if (Date.now() > deadline) {
+				throw new Error("等待測試帳號 seed 逾時");
+			}
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+		}
+		return;
+	}
+
+	try {
+		for (const script of ["db:migrate:local", "db:seed:local"]) {
+			execFileSync("pnpm", ["--dir", honoRoot, script], { stdio: "pipe" });
+		}
+		writeFileSync(doneFile, "");
+	} catch (error) {
+		writeFileSync(failedFile, "");
+		throw error;
 	}
 }
