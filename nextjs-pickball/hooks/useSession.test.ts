@@ -8,7 +8,7 @@ vi.mock("@/lib/auth/session-client", () => ({
 }));
 
 import { fetchSession } from "@/lib/auth/session-client";
-import { resetSessionStoreForTests } from "@/lib/auth/session-store";
+import { getSnapshot, resetSessionStoreForTests, subscribe } from "@/lib/auth/session-store";
 import { useSession } from "./useSession";
 
 const mockedFetchSession = vi.mocked(fetchSession);
@@ -54,5 +54,18 @@ describe("useSession", () => {
 
 		expect(html).toContain("loading");
 		expect(mockedFetchSession).not.toHaveBeenCalled();
+	});
+
+	it("store 已為 ready 時伺服器端 render 仍為 loading", async () => {
+		subscribe(vi.fn());
+		await waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		function Probe() {
+			const session = useSession();
+			return createElement("span", null, session.status);
+		}
+
+		expect(renderToString(createElement(Probe))).toContain("loading");
 	});
 });

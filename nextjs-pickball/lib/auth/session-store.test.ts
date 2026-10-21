@@ -6,6 +6,7 @@ vi.mock("./session-client", () => ({
 
 import { fetchSession } from "./session-client";
 import {
+	getServerSnapshot,
 	getSnapshot,
 	refresh,
 	resetSessionStoreForTests,
@@ -95,5 +96,30 @@ describe("session-store", () => {
 			expect(getSnapshot().status).toBe("ready");
 		});
 		expect(getSnapshot()).toBe(getSnapshot());
+	});
+
+	it("第一次請求進行中呼叫 refresh 會共用同一次請求", async () => {
+		let resolve: (value: { authEnabled: boolean; user: null }) => void = () => {};
+		mockedFetchSession.mockReturnValue(
+			new Promise((r) => {
+				resolve = r;
+			}),
+		);
+
+		subscribe(vi.fn());
+		const pending = refresh();
+		expect(mockedFetchSession).toHaveBeenCalledTimes(1);
+
+		resolve({ authEnabled: true, user: null });
+		await pending;
+		expect(getSnapshot().status).toBe("ready");
+	});
+
+	it("getServerSnapshot 在 store 已為 ready 後仍固定為 loading", async () => {
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		expect(getServerSnapshot()).toEqual({ status: "loading" });
 	});
 });
