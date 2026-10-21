@@ -20,7 +20,8 @@ test.describe("auth proxy 穿透", () => {
 
 	const accountResult = readTestAccountResult();
 
-	test.beforeAll((_fixtures, testInfo) => {
+	// Playwright 要求第一個參數必須是解構樣式，即使不使用任何 fixture
+	test.beforeAll(({}, testInfo) => {
 		test.skip(
 			testInfo.project.name !== "chromium",
 			"auth 通路測試只需在 chromium 執行一次",
