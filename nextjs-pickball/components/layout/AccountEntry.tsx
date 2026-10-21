@@ -29,7 +29,12 @@ export function AccountEntry({ solid }: AccountEntryProps) {
 
 	if (session.user === null) {
 		return (
-			<Link href="/login" aria-label="登入" className={className}>
+			<Link
+				href="/login"
+				transitionTypes={["nav-forward"]}
+				aria-label="登入"
+				className={className}
+			>
 				<LogIn className="size-4" aria-hidden="true" />
 			</Link>
 		);
