@@ -28,7 +28,7 @@ describe("fetchSession", () => {
 			user: USER,
 		});
 		expect(mock).toHaveBeenCalledTimes(1);
-		expect(mock.mock.calls[0][0]).toBe("/api/session");
+		expect((mock.mock.calls[0] as unknown[])[0]).toBe("/api/session");
 
 		stubFetch(async () => jsonResponse({ authEnabled: true, user: null }));
 		await expect(fetchSession()).resolves.toEqual({
