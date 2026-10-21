@@ -11,15 +11,15 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-21，**B1、B2 已合併，進行中**）
+## 狀態快照（最後更新 2026-10-21，**B1～B3 已合併，進行中**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `8cdfa53`（B2 合併） |
+| `main` HEAD | `e08e3cb`（B3 合併） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1（B1～B3）已 propose（`7c3ab72`）；Wave 2 待 S1 通過後 |
-| apply | B1 `a7866f5`、B2 `8cdfa53` 已合併；下一棒 B3 |
+| apply | B1 `a7866f5`、B2 `8cdfa53`、B3 `e08e3cb` 已合併；下一步 B3 archive → S1 |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -127,7 +127,7 @@ main@1e5e517
 |---|---|---|---|---|---|
 | B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | **已合併 `a7866f5`**（28 tasks；後端 6 檔／25；E2E 633/27/0） |
 | B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | **已合併 `8cdfa53`**（37 tasks；後端 12 檔／50；E2E 635/35/0） |
-| B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | 已 propose，未 apply |
+| B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | **已合併 `e08e3cb`**（41 tasks；前端 87 檔／823；E2E 667/38/0） |
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 未 propose |
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 未 propose |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 未 propose |
@@ -332,7 +332,9 @@ G1 change 本身要處理：
    pnpm test                         # 前後端全綠，檔數／測試數 ≥ 前一棒
    pnpm --filter ./hono-pickball build       # tsc＋wrangler deploy --dry-run
    DO_NOT_TRACK=1 openspec validate <change-id> --strict
-   pnpm --filter ./nextjs-pickball exec playwright test --workers=1   # 不要用 test:e2e --（教訓 #6）
+   # E2E：依 project 分開跑，webkit／mobile-safari 再各分 3 份（教訓 #14；不要用 test:e2e --，教訓 #6）
+   for p in chromium firefox mobile-chrome; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p; done
+   for p in webkit mobile-safari; do for i in 1 2 3; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p --shard=$i/3; done; done
    ```
    tasks.md 勾選數與 `git log main..HEAD` 對得上；抽 2～3 個 RED commit 用 `git show <commit>^:<path>` 複驗。
    migration 指令的 database 參數以 B1 定案的寫法為準，定案後回填本步驟。
@@ -442,6 +444,10 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     要從「哪些測試會把該資料種進 localStorage／D1」盤點。本批的 D1 seed 與 E2E fixture 同理。
 11. **service binding 失敗先找重複的 dev server**（root `CLAUDE.md`），不要把 `~/.wrangler/registry` 不存在當根因。
 12. **macOS `uniq` 會誤判中文標題重複**：一律用 root `CLAUDE.md` 的 python 計數法。
+14. **本機 Playwright WebKit 單一 browser 超過 64 個 context 會卡住**（2026-10-22 B3 實證：靜態伺服器 80 context 重現，chromium 不受影響）。
+    WebKit 每 project 已 >64 條 test，**不分割跑全套必定在第 64 條後逾時**；且 `--shard` 是依「全部 project 的清單順序」切，
+    不加 `--project` 時最後一份幾乎全是 mobile-safari，照樣超標。驗收一律「依 project 分開、WebKit 兩個 project 各 `--shard=i/3`」。
+    另外 load average 高（>50）時 WebKit 會整批 `page.goto` 逾時，先看 `uptime` 再判定。
 13. **主 spec 不可直接編輯**；`hooksInventory.test.ts` 直接讀主 spec，新增 hook 時依 delta 走、
     archive 時核對為 no-op（M14 `4b99156` 前例）。
 
@@ -498,6 +504,14 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - **給 B3**：seed 會 DELETE 同 email user 並 cascade 刪 session → seed 必須統一移到 Playwright `globalSetup`（在存 storageState 之前）；不支援跨 worker 並行 seed（SQLITE_BUSY）。
 - 給 Wave 2：`localAuth` middleware 建議移到 `src/auth/`；`AuthAppEnv` 的 user／session 型別非 optional，未掛 middleware 的路由讀取不會報型別錯。
 - commit footer：自 B2 合併起 session 系統提示給了 `Claude-Session: https://claude.ai/code/session_01NzuJP5v7c6dK6fVXxFPy3b`，依本檔慣例 1 改用此值。
+
+### B3 合併紀錄（2026-10-22）
+- 窄螢幕裁決（coordinator，2026-10-21，依 `/goal` 授權）：帳號入口 `< sm`（640px）隱藏（`hidden sm:inline-flex`），窄螢幕經 `/login` 登入／登出；
+  **行動裝置登入入口列為 G1 待辦**。裁決前實測 320px 超出 10px、375px 超出 11px、390px 只剩 4px。
+- `fetchSession` 改用 `keepalive: true`：WebKit 換頁時會拒絕已開始卸載頁面發出的 fetch 並記 console error，觸發既有 spec 的 console 守衛。
+- session store refresh 改遞增 requestId（以最新請求為準）；seed 統一移到 Playwright `globalSetup`（B2 移交已完成）。
+- coordinator 獨立驗證：tsc／後端 typecheck 0；lint 0／3；前端 87／823、後端 12／50；E2E 依 project 分開 667 passed／38 skipped／0 failed。
+- 已知風險（未處理）：高負載下 dev 模式偶發 Turbopack `ChunkLoadError`（layout chunk），不在 console 守衛白名單，只出現於 dev。
 
 <Wave 2 propose 後填>
 
