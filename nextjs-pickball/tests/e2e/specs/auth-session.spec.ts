@@ -9,7 +9,11 @@ const WIDE = { width: 1280, height: 800 };
 // 帳號入口 < sm（640px）隱藏；以下寬度驗證隱藏，640 以上驗證顯示。
 const HIDDEN_WIDTHS = [320, 375, 390];
 const VISIBLE_WIDTHS = [640, 1280];
-const NAVIGATION_TIMEOUT = 15_000;
+// 帳號入口與登入頁已登入分支都要等 hydration 後 /api/session 回應才渲染；
+// 高負載時 reload 後實測 2～8 秒，預設 5 秒 expect timeout 不足。
+// 導向 URL 的等待（dev server 首次編譯路由）同樣使用此值。
+const SESSION_TIMEOUT = 15_000;
+const expectSession = expect.configure({ timeout: SESSION_TIMEOUT });
 
 // 登入／登出流程一律在新 context 走登入頁取得獨立 session，
 // 不對共用 storage state 的 session 登出，否則同批其他測試的登入態會失效。
@@ -46,14 +50,14 @@ test.describe("auth session", () => {
 			await page.goto("/");
 			await page.locator("header").getByRole("link", { name: "登入" }).click();
 			// dev server 首次編譯 /login 可能超過預設 5 秒
-			await expect(page).toHaveURL("/login", { timeout: NAVIGATION_TIMEOUT });
-			await expect(page.getByLabel("電子郵件")).toBeVisible();
+			await expect(page).toHaveURL("/login", { timeout: SESSION_TIMEOUT });
+			await expectSession(page.getByLabel("電子郵件")).toBeVisible();
 		});
 
 		test("以測試帳號登入後 navbar 顯示登出", async ({ page }) => {
 			await loginViaUi(page);
-			await expect(page).toHaveURL("/", { timeout: NAVIGATION_TIMEOUT });
-			await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
+			await expect(page).toHaveURL("/", { timeout: SESSION_TIMEOUT });
+			await expectSession(page.getByRole("button", { name: "登出" })).toBeVisible();
 		});
 
 		test("帳號或密碼錯誤時登入頁顯示錯誤訊息", async ({ page }) => {
@@ -65,13 +69,13 @@ test.describe("auth session", () => {
 		test("登出後 navbar 回到登入入口", async ({ page }) => {
 			await loginViaUi(page);
 			// 登入頁已登入時也有「登出」按鈕：須等導向首頁，並限定 header 內的入口，否則會同時比對到兩個。
-			await expect(page).toHaveURL("/", { timeout: NAVIGATION_TIMEOUT });
+			await expect(page).toHaveURL("/", { timeout: SESSION_TIMEOUT });
 			await page.locator("header").getByRole("button", { name: "登出" }).click();
 			const loginLink = page.locator("header").getByRole("link", { name: "登入" });
-			await expect(loginLink).toBeVisible();
+			await expectSession(loginLink).toBeVisible();
 			// reload 證明 session 真的被撤銷，而非只改 UI
 			await page.reload();
-			await expect(loginLink).toBeVisible();
+			await expectSession(loginLink).toBeVisible();
 		});
 
 		test("窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內", async ({
@@ -85,7 +89,7 @@ test.describe("auth session", () => {
 
 			await page.setViewportSize(WIDE);
 			await page.goto("/");
-			await expect(loginLink).toBeVisible();
+			await expectSession(loginLink).toBeVisible();
 			const wideHeights: Record<string, number> = {};
 			for (const label of NAV_LABELS) {
 				wideHeights[label] = await navLink(label).evaluate(
@@ -126,19 +130,19 @@ test.describe("auth session", () => {
 
 		test("窄螢幕下可經由登入頁登入與登出", async ({ page }) => {
 			await loginViaUi(page);
-			await expect(page).toHaveURL("/", { timeout: NAVIGATION_TIMEOUT });
+			await expect(page).toHaveURL("/", { timeout: SESSION_TIMEOUT });
 			await expect(
 				page.locator("header").getByRole("link", { name: "登入" }),
 			).toBeHidden();
 			await expect(page.locator("header").getByRole("button", { name: "登出" })).toBeHidden();
 
 			await page.goto("/login");
-			await expect(page.getByText("已登入：")).toBeVisible();
+			await expectSession(page.getByText("已登入：")).toBeVisible();
 			await page.getByRole("button", { name: "登出" }).click();
-			await expect(page.getByLabel("電子郵件")).toBeVisible();
+			await expectSession(page.getByLabel("電子郵件")).toBeVisible();
 			// reload 證明 session 真的被撤銷，而非只改 UI
 			await page.reload();
-			await expect(page.getByLabel("電子郵件")).toBeVisible();
+			await expectSession(page.getByLabel("電子郵件")).toBeVisible();
 		});
 	});
 
@@ -147,9 +151,9 @@ test.describe("auth session", () => {
 
 		test("重整後仍維持登入", async ({ page }) => {
 			await page.goto("/");
-			await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
+			await expectSession(page.getByRole("button", { name: "登出" })).toBeVisible();
 			await page.reload();
-			await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
+			await expectSession(page.getByRole("button", { name: "登出" })).toBeVisible();
 		});
 	});
 });
