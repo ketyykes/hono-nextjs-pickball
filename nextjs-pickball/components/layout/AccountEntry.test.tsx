@@ -10,6 +10,24 @@ vi.mock("@/lib/auth/session-client", () => ({
 	signOut: vi.fn(),
 }));
 
+// 真實 Link 不會把 transitionTypes 反映到 DOM；以 data 屬性暴露才能觀察。
+vi.mock("next/link", () => ({
+	default: ({
+		href,
+		transitionTypes,
+		children,
+		...rest
+	}: {
+		href: string;
+		transitionTypes?: string[];
+		children: React.ReactNode;
+	}) => (
+		<a href={href} data-transition-types={transitionTypes?.join(",")} {...rest}>
+			{children}
+		</a>
+	),
+}));
+
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth/session-client";
 import { AccountEntry } from "./AccountEntry";
@@ -124,5 +142,13 @@ describe("AccountEntry", () => {
 		// 失敗時也要 refresh，UI 才會回到伺服器真實的登入狀態。
 		expect(mockSignOut).toHaveBeenCalledTimes(1);
 		expect(refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it("登入連結與 navbar 其他前進連結一致，帶 nav-forward 轉場類型", () => {
+		mockLoggedOut();
+		render(<AccountEntry solid={true} />);
+
+		const link = screen.getByRole("link", { name: "登入" });
+		expect(link.getAttribute("data-transition-types")).toBe("nav-forward");
 	});
 });
