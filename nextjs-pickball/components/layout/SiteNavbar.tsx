@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/icons";
+import { AccountEntry } from "@/components/layout/AccountEntry";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
 import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,7 @@ export function SiteNavbar() {
 						);
 					})}
 				</nav>
+				<AccountEntry solid={solid} />
 			</div>
 		</header>
 	);
