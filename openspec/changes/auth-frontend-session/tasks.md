@@ -70,11 +70,16 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 RED: 新增 `nextjs-pickball/app/login/page.test.ts`，寫入 it「/login 匯出 metadata 且 robots.index 為 false」。確認紅燈
-- [ ] 5.2 GREEN（例外層）: 新增 `nextjs-pickball/app/login/page.tsx`（server component，匯出 `metadata`，渲染 `<LoginForm />`）——此時 `LoginForm` 尚不存在，先建立只回傳 `null` 的最小檔以讓 5.1 轉綠
-- [ ] 5.3 RED: 新增 `nextjs-pickball/components/auth/LoginForm.test.tsx`（mock `@/hooks/useSession`、`@/lib/auth/session-client`、`next/navigation`），寫入 it「載入中不顯示表單也不顯示未開放訊息」「未啟用時顯示此環境未開放登入且不顯示表單」「已登入時顯示已登入訊息且不顯示表單」「送出正確帳密後重新取得 session 並導向首頁」「帳密錯誤時顯示帳號或密碼錯誤並清空密碼」「unavailable 與 failed 分別顯示對應訊息」「送出期間登入按鈕為 disabled」。確認紅燈
-- [ ] 5.4 GREEN: 實作 `nextjs-pickball/components/auth/LoginForm.tsx`（design Decision 4；shadcn `Input`／`Label`／`Button`；錯誤 `role="alert"`；成功 `refresh()` 後 `router.replace("/")`）
-- [ ] 5.5 REFACTOR: 錯誤訊息文案集中為同檔具名常數；無壞味道則註記 skipped
+- [x] 5.1 RED: 新增 `nextjs-pickball/app/login/page.test.ts`，寫入 it「/login 匯出 metadata 且 robots.index 為 false」。確認紅燈
+- [x] 5.2 GREEN（例外層）: 新增 `nextjs-pickball/app/login/page.tsx`（server component，匯出 `metadata`，渲染 `<LoginForm />`）——此時 `LoginForm` 尚不存在，先建立只回傳 `null` 的最小檔以讓 5.1 轉綠
+- [x] 5.3 RED: 新增 `nextjs-pickball/components/auth/LoginForm.test.tsx`（mock `@/hooks/useSession`、`@/lib/auth/session-client`、`next/navigation`），寫入 it「載入中不顯示表單也不顯示未開放訊息」「未啟用時顯示此環境未開放登入且不顯示表單」「已登入時顯示已登入訊息且不顯示表單」「送出正確帳密後重新取得 session 並導向首頁」「帳密錯誤時顯示帳號或密碼錯誤並清空密碼」「unavailable 與 failed 分別顯示對應訊息」「送出期間登入按鈕為 disabled」。確認紅燈
+- [x] 5.4 GREEN: 實作 `nextjs-pickball/components/auth/LoginForm.tsx`（design Decision 4；shadcn `Input`／`Label`／`Button`；錯誤 `role="alert"`；成功 `refresh()` 後 `router.replace("/")`）
+- [x] 5.5 REFACTOR: 錯誤訊息文案集中為同檔具名常數；無壞味道則註記 skipped
+  - 紀錄：5.1 `024be20`（紅：`page.tsx` 不存在）→ 5.2 `d529e5c`（例外層，LoginForm 先為 null 佔位）；5.3 `6b19c80`：7 條中 6 條真紅，
+    「載入中不顯示表單也不顯示未開放訊息」在 null 佔位下寫入即綠，**regression guard**；5.4 `8107922`；5.5 `6318f25`（三個文案常數）。
+  - 補強（皆 **regression guard**）：`837a842`（refresh 完成前不導向、欄位 type／autocomplete）、`f6fd683`（送出時阻止瀏覽器預設送出，Stage 2 建議）。
+    `74661dd` 移除無作用的 pending 守衛（Stage 2 建議；重複送出由按鈕 disabled 防止）。Stage 1／Stage 2 一次 PASS。
+  - LoginForm.test 共 **10** 個 it（7.3 原預期 7）。
 
 ## 6. E2E 登入夾具與 auth-session.spec
 
