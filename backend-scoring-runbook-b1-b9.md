@@ -15,11 +15,11 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `b1dbff8`（B6 merge；archive 待做） |
+| `main` HEAD | `11a2dbf`（B6 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併（`b1dbff8`）；**下一棒 B7** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；**下一棒 B7** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -130,7 +130,7 @@ main@1e5e517
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | **已合併 `e08e3cb`**（41 tasks；前端 87 檔／823；E2E 667/38/0） |
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已合併 `27f0a26`、archive `d9d9d80` |
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f`、archive `fca0b95` |
-| B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8` |
+| B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8`、archive `11a2dbf` |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已 propose，未 apply |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
 | B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
@@ -576,7 +576,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   `MODIFIED "localStorage 持久化" omits scenario(s) the current spec still has: "登入但帶 matchId 時仍走本機分槽"`。
   B7 本意是以「登入且帶 matchId 時不寫入本機分槽」取代，tasks §1 對齊時要在 delta 明確處理該舊 Scenario（MODIFIED 全文不含即移除，需確認寫法）。
 
-### B6 紀錄（2026-10-23，合併 `b1dbff8`）
+### B6 紀錄（2026-10-23，合併 `b1dbff8`，archive `11a2dbf` → `2026-10-23-matchmaker-roster-backend`；改 `backend-database`／`data-transfer`／`player-roster`／`user-data-sync`）
 - 36 tasks（leader 新增 3.6）、56 commits＋coordinator `96d3c3f`（delta「LocalStorage 持久化」改為「雲端模式下使用者操作不改變 `matchmaker:roster:v1`；本機實作仍掛載並依逐筆降級規則回寫」，原句與實作不符）。
   leader 兩次被系統要求中途交回，都以 SendMessage 續跑成功（它會在背景審查員回報後自動恢復，不必重派）。
 - 測試：前端 95/895、後端 17/97、核心 3/6；lint 0/3；無新相依。E2E（coordinator 持鎖、load < 13）705 passed／38 skipped／0 failed（`user-data` 18）。
@@ -586,6 +586,13 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - **帶到 B7**：`reset()` 前未 `disposeAll()`，重置時若某參賽者 v0 PUT 正在重試，可能在雲端讓該參賽者復活。
 - **帶到 G1**：import 無筆數／body 大小上限、`PlayerSchema.id` 接受空字串；同 mount 換帳號閃一幀前帳號名單；B5 主 spec `scoreboard/spec.md` 約 135 行同樣宣稱雲端模式不讀寫本機 key（與實作不符，需另開 change 修正措辭）。
   低優先：import `sort_order` 併發可能重複、前端 PUT 回應 version 下限比後端寬、回應遺失重試出現假 conflict。
+- **B6 archive 後 validate 新失敗（各棒 §1 對齊時修 delta，把主 spec 新增的 Scenario 帶進 MODIFIED 區塊或明確取代）**：
+  - B7、B8：`player-roster` MODIFIED「重置名單與二次確認」缺「resetLocalMatchProgress 只清除本次活動的進度」。
+  - B9：`data-transfer` MODIFIED「登入時的資料工具頁」缺「登入時 JSON 還原停用」。
+  - （B7 另有 B5 留下的 `scoreboard`「localStorage 持久化」缺「登入但帶 matchId 時仍走本機分槽」。）
+- **主 spec 同名 Scenario（跨 Requirement，strict validate 不擋，但違反零重複慣例）**：`backend-database`「user_id 必須參照既有使用者」×2（B5／B6 各一）、
+  `player-roster`「刪除參賽者」×2（原有／B6）。主 spec 不可直接改；B7～B9 若 MODIFIED 到這些 Requirement 就順手改名，否則 B9 後以一個小 change 統一改名。
+  後續各棒 delta 的 Scenario 標題要加 Requirement 專屬前綴，避免再撞名。
 
 ## commit footer 慣例
 
