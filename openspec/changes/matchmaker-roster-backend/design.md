@@ -195,3 +195,8 @@
     ③ 重置在途時收到 401：reset 成功（204）的結果被 `stopped` 丟棄，伺服器已清空但畫面與本機進度不動（`6eb648c` 刻意守住，與 401 後切回本機一致）。
     非阻擋：401 之後與衝突重載期間不重新發佈狀態（停留在前值，選擇器會因 session refresh 切回本機）；saver 刪除成功後仍留在 Map 直到下一次 `disposeAll`；兩處不可達的 `undefined` 防衛。
     §7 須留意：雲端 loading／load-failed／重載中／重置中時 `updatePlayer` 靜默不做事，而 `useRoundStore` 的回合仍會前進（Risk 3 延伸），頁面以 `SyncStatusNotice` 取代內容來擋，E2E 確認。下一步 §6。
+12. （apply §6，2026-10-23）完成（`7fed3e3` RED、`df9b771` GREEN、`c4655c0` 夾具強化；Stage 2 收尾 `ed6a324` RED、`02c54bd` fix、`2a4255f` guard、`243c6e4` 文案、`803b7f8` docs）。Stage 1、Stage 2 皆 PASS（無必修）。前端 95 檔／893（收尾後 remote-transfer 單檔 8 個 it，全套於 §7 收尾重跑）。
+    偏離：匯入函式名為 `importRemoteRoster`（Decision 6 寫 `importRosterRemote`，非 spec 錨點）；`buildRemoteBackupSnapshot` 回 `{ ok: true, snapshot } | { ok: false, message }`；新增 export `REMOTE_TRANSFER_MESSAGES`（不動核心 `TRANSFER_MESSAGES`）。
+    額外行為（leader 授權）：預覽含錯誤列時不送任何請求、回 `previewHasErrors`；GET 後沒有可新增的列（只有標題列的 CSV）時不送 POST、視為成功（本機分支同一檔案亦為無害成功；否則後端 `min(1)` 回 400、提示「請稍後再試」卻永遠失敗）。
+    RED 流程瑕疵：6.1 紅燈在 shell 實際看到後，commit 因 zsh 錯誤晚於實作檔寫入磁碟才建立（RED commit 只含測試檔，`7fed3e3^` 無實作檔可複驗）。
+    非阻擋（留給後續）：`importConflict` 成因描述（實務上是重試同一批 id 撞號）不精確但建議動作正確；`importFailed` 涵蓋「已 commit 但回應遺失」，§7 重試時重新產生 id 可能整批重複匯入——元件層以 reload 確認名單後再匯入緩解。下一步 §7。
