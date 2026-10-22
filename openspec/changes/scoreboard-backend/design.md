@@ -214,3 +214,8 @@ runbook 已定「五個 key 全部要有後端版本」，本決策只是改變�
 10. （apply §6 非阻擋，交 B6）① 401 → `refresh()` 後 session 仍為登入（例如另一分頁換帳號）時 `enabled` 不切換、effect 不重跑，hook 會停在 `loading` 或 `saving` 且之後寫入被靜默丟棄；B6 照抄時應考慮以 user id 作為 effect 依賴或 401 後強制重載。
     ② 衝突重載期間 `versionRef` 仍為舊版本，重載中使用者動作會多一輪 409→重載（有界、自癒）；可於重載開始時設 null 省去。③ 無歷史時 UNDO 回傳同一 state 仍標 dirty，多送一次 PUT（無害）。
     ④ 雲端模式下本機 hook mount 時仍會把 `scoreboard:current:v1` 既有資料（經 zod 正規化）寫回原 key——Decision 5 已接受的取捨，使用者動作不寫入（有 it 守）。
+11. （apply §7）Stage 2 第一輪 FAIL：訪客 spec 的 `getByRole("status")` 計數 0 在直式 viewport 被既有 `OrientationHint`（亦為 `role="status"`）打破（mobile-safari／mobile-chrome 紅），已改為進頁前寫入 `scoreboard:hint-dismissed`（`bf98193`）；
+    並補「loading 取代計分畫面」的守護（在「雲端載入失敗時…」test 內先掛起 GET，`bea6b59`）。複審 PASS。
+    偏離：衝突 E2E 讓 A 得分兩次（spec 寫一次）——A 一分時 B 本機一分同為 1:1，無法區分「載入雲端」與「保留本機」。
+    取捨：疊加提示改為面板區頂端單行小字（`4cb5276`），375 以下直式會蓋住「我方 · 11 分制」標籤（不蓋按鈕與比分數字），衝突／拒絕狀態停留期間看不到該標籤；
+    `clearTestAccountUserData()` 失敗訊息不含 SQL／email／stderr（避免洩漏），排查需手動重跑 wrangler 指令。
