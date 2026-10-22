@@ -101,6 +101,37 @@
 
 **Rationale**：前端解析回應與後端驗證匯入請求用同一份（B5 Decision 9 的原則）。
 
+## apply §1 查證紀錄（2026-10-22，leader 執行）
+
+**1.2 對齊 B5 實際落地**（與本 design Context 無衝突，以下為實際簽章補充）：
+- `localAuth`（`src/auth/local-auth-middleware.ts`）為 `createMiddleware<AuthAppEnv>`；`requireSession` 無 session 回 `401 { error: "UNAUTHORIZED" }`、不 try/catch（getSession 例外 → 500）；
+  `SessionAppEnv` 的 `c.var.user.id` 為使用者 id。`getDb(c.env)` 為唯一 D1 入口。
+- `src/routes/scoreboard.ts`：`new Hono<SessionAppEnv>().use("*", localAuth, requireSession).onError(...)`，`zValidator("json", schema, hook)` 的 hook 回 `400 INVALID_BODY`；
+  `onError` 把 `HTTPException(400)`（JSON 語法錯誤）轉為 `INVALID_BODY`、其他 HTTPException 原樣、其餘 500（B5 OQ6）。
+- 核心套件 `api/versioned`（`versionedEnvelopeSchema`／`versionedWriteSchema`，版本為非負整數）、`api/errors`（`API_ERROR_CODES`）、`api/user-data-tables`（目前 `["scoreboard_current"]`）；
+  `CORE_MODULES` 目前 21 項（`packages/pickball-core/CLAUDE.md` 亦寫「目前 21 項」，§2 加模組後一併改為 22）。
+- 前端 `requestJson(method, path, { body?, schema })` 回 `ok`（204 時 `value: undefined`）／`conflict`／`unauthorized`／`rejected`／`failed`，永不 throw；
+  `createLatestWinsSaver({ send, onResult })` 事件為 `saving`／`saved`／`retrying`／`conflict`／`unauthorized`／`rejected`；`resolveStorageMode(snapshot)`；`useSession()` 回 snapshot＋`refresh`。
+- `useRemoteScoreboardStore` 回傳 tuple `[state, dispatch, syncStatus]`；名單 hook 依 spec 回傳物件（`UseRosterStoreResult`），兩者形態不同屬預期（名單已是物件形態的既有 API）。
+- `playwright.config.ts` 的 `user-data` project 為 `testDir: ./tests/e2e/user-data`、不設 project 層 storageState；`clearTestAccountUserData()` 以 `USER_DATA_TABLES` 逐表 DELETE，加表後自動涵蓋。
+- **MODIFIED Requirement 對齊**：`player-roster` 兩個、`data-transfer` 一個、`pickleball-guide-page` 一個，主 spec 原文與 delta 逐行比對後，delta 僅有本 change 的新增段落與 Scenario
+  （`pickleball-guide-page` 已含 B5 的 `useRemoteScoreboardStore`；`data-transfer` 主 spec 該 Requirement 末尾的 `---` 分隔線不在 delta 內，archive 時屬排版差異）。無需重新套用；
+  `openspec validate --strict` 通過。
+
+**1.3 Context7 查證**：
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/indexes-constraints`）：`sqliteTable(name, cols, (t) => [primaryKey({ columns: [t.userId, t.id] })])` 宣告複合主鍵——與 Decision 1 相同。
+- 同上（`sqlite/insert`「Insert into ... select」）：`` db.insert(t).select(qb | () => qb | sql`...`) `` 三種寫法皆支援；**upsert 子句存在時 SELECT 必須帶 WHERE**（否則 `ON` 有解析歧義）——
+  本案的 SELECT 本來就有 `WHERE user_id = ?`，符合。
+- 同上（`sqlite/batch-api`）：`db.batch([...])` 支援 D1，可含 insert／update／delete——與 Decision 2 相同。
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`d1/worker-api/d1-database#batch`）：「Batched statements are SQL transactions. If a statement in the sequence fails, … it aborts or rolls back the entire sequence」——與 Decision 2 相同。
+
+**1.4 一次性實測**（workerd＋drizzle-orm 0.45、暫時測試檔，未 commit）：
+- `db.batch([insert p4, insert p1(已存在), insert p5])` 拋 `D1_ERROR: UNIQUE constraint failed: …: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_PRIMARYKEY)`，之後表內只有 p1——**整批回滾成立**。
+- `sort_order` 子查詢（Open Questions 1 定案）：
+  `` db.insert(t).select(sql`select ${userId}, ${id}, ${JSON.stringify(data)}, coalesce(max(${t.sortOrder}), -1) + 1, 1, ${now.getTime()} from ${t} where ${t.userId} = ${userId}`).onConflictDoNothing().returning() ``
+  產生單一陳述式 `insert … select … where user_id = ? on conflict do nothing returning …`；新列回傳且 `data` 經 `mode: "json"` 解回物件；已存在時回 `[]`；該使用者無任何列時 `sort_order` 為 0。
+  **注意**：`select` 內的值不經欄位 mapping，`data` 必須自行 `JSON.stringify`、`updated_at` 以 `getTime()` 傳入。query builder 寫法（`` qb.select({ col: sql`…`.as("col") }) ``）亦可，產生等價 SQL。
+
 ## Risks / Trade-offs
 
 - [Risk] **過渡期**（B6 合併到 B7 合併之間）：登入時名單在雲端、回合與歷史在本機且與訪客共用同一組 key；登出後訪客會看到登入時產生的回合（球員 id 指向雲端名單），
@@ -128,3 +159,15 @@
 
 1. drizzle 對「`INSERT ... SELECT MAX(sort_order)+1 ... ON CONFLICT DO NOTHING RETURNING`」的表達方式（`insert().select()` 或 `sql` 原生片段），§1 實測後定案並記錄。
 2. 對戰頁與統計頁在雲端載入中以提示取代內容，是否影響 `useRoundStore` 的 hydrate 時序（它不依賴 `players`，預期無影響）——§7 E2E 驗證。
+3. （apply §1 定案 OQ1）採 `sql` 模板的 `insert().select()` 單一陳述式（見「apply §1 查證紀錄」1.4），不先讀再寫。
+4. （apply §1，B5 帶過來的待辦 1：後端測試補強）納入本 change §3，新增 task 3.6（regression guard，誠實標註）：
+   ① `test/user-data-tables.test.ts` 的 `NOT LIKE '_cf_%'` 改為 `NOT GLOB '_cf_*'`（`_` 在 LIKE 為單字元萬用字元；只改查詢字串、it 名稱與斷言不變——這是 tasks 檔頭「允許碰的既有測試檔」以外的唯一例外，經 coordinator 指示授權）；
+   ② `test/scoreboard-current.test.ts` **只新增** it：「PUT 忽略 query 與 body 中的 userId，一律寫入登入者本人」「getSession 拋出例外時回 500」「已有資料時 GET 回 200 與該筆資料」（B5 OQ7 ②③；不改既有 it）。
+   B6 的 `test/matchmaker-players.test.ts` 在 3.3 RED 時除 spec 的 15 個 it 外，另寫兩個守護 it：「不從 query 或 body 接受 userId」「getSession 拋出例外時回 500」（路由不存在時為 404 → 真紅）。
+5. （apply §1，B5 帶過來的待辦 2）`onError`（HTTPException(400) → `INVALID_BODY`）與 `zValidator` hook 抽到 `src/http/`，由 3.5 REFACTOR 執行，scoreboard 與 matchmaker 共用；B5 測試原樣通過。
+6. （apply §1，B5 帶過來的待辦 3：跨分頁換帳號，B5 OQ10 ①）**評估結論：本 change 不處理，列為 G1 前必修**。理由：
+   另一分頁以 B 登入會直接覆寫同一個 cookie，本分頁之後的請求以 B 的身分成功（不會 401），session store 也不會 refresh，因此「以 user id 作為 effect 依賴」在實務上不會觸發，只是看起來有防護。
+   對名單的實際影響有界：本分頁對 A 的參賽者送出的 PUT（version > 0）在 B 名下不存在 → 409 → 整份重載（此時載入的是 B 的名單，但畫面上的帳號仍顯示 A）；DELETE 對 B 為 no-op；
+   **新增（version 0 PUT）與 CSV 匯入會寫進 B**。計分板（B5，單筆）在版本號相同時會把 A 的比分覆寫進 B。
+   正解需要伺服器端驗證「前端以為的使用者」：例如前端在每個使用者資料請求帶 `X-Expected-User-Id`，後端與 `c.var.user.id` 不符時回 401（觸發 refresh），
+   或以 `storage` 事件／BroadcastChannel 跨分頁同步 session。兩者都跨 B5／B6 共用層（`requestJson`、`requireSession`），屬 G1 前必修，不在 B6 範圍內實作。

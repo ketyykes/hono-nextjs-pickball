@@ -16,16 +16,16 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/matchmaker-roster-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
+- [x] 1.1 確認分支 `change/matchmaker-roster-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
   `pnpm test` baseline（三個 workspace）、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md 並 commit
-- [ ] 1.2 對齊 B5 實際落地：`src/auth/local-auth-middleware.ts`、`src/auth/require-session.ts`、`src/routes/scoreboard.ts`、`src/scoreboard/repository.ts`、`test/helpers/session.ts`、
+- [x] 1.2 對齊 B5 實際落地：`src/auth/local-auth-middleware.ts`、`src/auth/require-session.ts`、`src/routes/scoreboard.ts`、`src/scoreboard/repository.ts`、`test/helpers/session.ts`、
   `test/user-data-tables.test.ts`、`packages/pickball-core/src/api/*`、`nextjs-pickball/lib/sync/*`、`hooks/useRemoteScoreboardStore.ts`、`components/sync/SyncStatusNotice.tsx`、
   `playwright.config.ts` 的 `user-data` project、`tests/e2e/helpers/user-data.ts`、B5 design Open Questions。實際簽章與本 design Context 不同處記入 Open Questions。
   比對本 change 的 MODIFIED Requirement 與目前主 spec（`player-roster` 兩個、`data-transfer` 一個、`pickleball-guide-page` 一個——後者 MUST 已含 B5 的 `useRemoteScoreboardStore`）；
   若主 spec 的原文與 delta 的原文部分不同，以主 spec 為底重新套用本 change 的增修並 commit
-- [ ] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/drizzle-team/drizzle-orm-docs`（複合主鍵 `primaryKey`、`insert().select()` 或 `sql` 子查詢、`db.batch` 於 D1）；
+- [x] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/drizzle-team/drizzle-orm-docs`（複合主鍵 `primaryKey`、`insert().select()` 或 `sql` 子查詢、`db.batch` 於 D1）；
   `/llmstxt/developers_cloudflare_d1_llms-full_txt`（batch 中某陳述式失敗時整批回滾）。與 design Decision 1、2 的差異記入 Open Questions
-- [ ] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行「`batch([insert 新 id, insert 既有 id])`」確認整批失敗且新 id 未寫入；以及 design Open Questions 1 的 `sort_order` 子查詢寫法。結果寫入 Open Questions
+- [x] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行「`batch([insert 新 id, insert 既有 id])`」確認整批失敗且新 id 未寫入；以及 design Open Questions 1 的 `sort_order` 子查詢寫法。結果寫入 Open Questions
 
 ## 2. 核心套件：名單 API 契約
 
@@ -43,10 +43,16 @@ Depends on: §2
 - [ ] 3.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `matchmakerPlayers`（複合主鍵）；`pnpm --filter ./hono-pickball db:generate --name matchmaker_players`（不手改）；再跑一次確認無新檔；
   核心套件 `USER_DATA_TABLES` 加 `matchmaker_players`；`db:migrate:local`；3.1 與守衛皆綠
 - [ ] 3.3 RED（TDD）：新增 `test/matchmaker-players.test.ts`，寫入 spec「參賽者雲端 API」的全部 15 個 it。確認紅燈並貼出輸出；
-  **「auth 停用…皆回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**
+  **「auth 停用…皆回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**。
+  另依 design Open Questions 4 加兩個守護 it（不在 spec 錨點內）：「不從 query 或 body 接受 userId」「getSession 拋出例外時回 500」（路由不存在時為 404 → 真紅）
 - [ ] 3.4 GREEN（TDD）：新增 `src/matchmaker/players-repository.ts`（design Decision 2 的 SQL）、`src/routes/matchmaker.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession)`、`zValidator` hook、path id 檢查）；
   `src/index.ts` 以 `app.route("/api/matchmaker", matchmakerRoutes)` 掛載。3.3 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
-- [ ] 3.5 REFACTOR：與 `src/scoreboard/repository.ts` 是否有可共用的版本化寫入片段（若抽出，B5 的測試 MUST 原樣通過）；無壞味道則註記 skipped
+- [ ] 3.5 REFACTOR：與 `src/scoreboard/repository.ts` 是否有可共用的版本化寫入片段（若抽出，B5 的測試 MUST 原樣通過）；無壞味道則註記 skipped。
+  **另（design Open Questions 5，B5 帶過來的待辦 2）**：把 sub-app 的 `onError`（`HTTPException(400)` → `INVALID_BODY`）與 `zValidator` 的 hook 抽到 `src/http/`，`scoreboard.ts` 與 `matchmaker.ts` 共用；純重構，B5 與 3.3 的測試原樣通過
+- [ ] 3.6 regression guard（design Open Questions 4，B5 帶過來的待辦 1；行為早已實作，加入即綠者如實標註，不偽造紅燈）：
+  ① `test/user-data-tables.test.ts` 的查詢字串 `NOT LIKE '_cf_%'` 改為 `NOT GLOB '_cf_*'`（只改查詢字串，it 名稱與斷言不變；coordinator 授權的唯一既有測試檔例外）；
+  ② `test/scoreboard-current.test.ts` **只新增** 三個 it：「PUT 忽略 query 與 body 中的 userId，一律寫入登入者本人」「getSession 拋出例外時回 500」「已有資料時 GET 回 200 與該筆資料」。
+  以 mutation 證明三者守得住（PUT 改讀 `?userId=`、`onError` 吞 500、GET 改回 201 等）
 
 ## 4. 前端：名單 API 包裝與本機進度清除
 
