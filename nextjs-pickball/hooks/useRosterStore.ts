@@ -11,6 +11,10 @@ import {
 import type { AddPlayerInput, UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import { readRoster, writeRoster, resetMatchmakerData } from "@/lib/matchmaker/storage";
 import type { Player } from "@pickball/core/matchmaker/types";
+import { useSession } from "@/hooks/useSession";
+import { useRemoteRosterStore } from "@/hooks/useRemoteRosterStore";
+import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import type { SyncStatus } from "@/lib/sync/sync-status";
 
 // 名單 store 的 state 形狀。
 // droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數（見 storage 的 Decision 3），
@@ -99,13 +103,18 @@ export interface UseRosterStoreResult {
 	removePlayer: (id: string) => void;
 	togglePlayerActive: (id: string) => void;
 	resetRoster: () => void;
+	/** 本機模式恆為 local；雲端模式反映載入與儲存狀態。 */
+	syncStatus: SyncStatus;
 }
+
+// 本機實作不知道同步狀態，由選擇器補上 local。
+type LocalRosterStoreResult = Omit<UseRosterStoreResult, "syncStatus">;
 
 // 整合 reducer 與 localStorage，比照 useScoreboardStore 的 write/read effect 順序與
 // hasHydratedRef 守門模式：write effect 放前面（mount 時 ref=false 故跳過）、
 // read/hydrate effect 放後面（讀取後視情況 dispatch HYDRATE，最後把 ref 設 true）。
 // 避免 read 前就被 write effect 用初始（空）state 覆蓋 localStorage 的競態。
-export function useRosterStore(): UseRosterStoreResult {
+export function useLocalRosterStore(): LocalRosterStoreResult {
 	const [state, dispatch] = useReducer(
 		rosterReducer,
 		undefined,
@@ -174,4 +183,15 @@ export function useRosterStore(): UseRosterStoreResult {
 		togglePlayerActive,
 		resetRoster,
 	};
+}
+
+// 儲存模式選擇器：本機 hook 在雲端模式下仍會 mount（hooks 規則不允許條件呼叫），
+// 它只會讀取並把同一份本機名單寫回，使用者動作一律走雲端 hook，不會改到本機名單。
+export function useRosterStore(): UseRosterStoreResult {
+	const session = useSession();
+	const local = useLocalRosterStore();
+	const isRemote = resolveStorageMode(session) === "remote";
+	const remote = useRemoteRosterStore({ enabled: isRemote, onUnauthorized: session.refresh });
+	if (isRemote) return remote;
+	return { ...local, syncStatus: "local" };
 }

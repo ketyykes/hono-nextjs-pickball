@@ -24,24 +24,13 @@ import {
 } from "@/lib/sync/latest-wins-saver";
 import type { SyncStatus } from "@/lib/sync/sync-status";
 import type { Player } from "@pickball/core/matchmaker/types";
+import type { UseRosterStoreResult } from "@/hooks/useRosterStore";
 
 export interface UseRemoteRosterStoreOptions {
 	/** false 時不發任何請求，且對外狀態恆為 local。 */
 	enabled: boolean;
 	/** GET／寫入收到 401 時呼叫；選擇器傳入 session 的 refresh。 */
 	onUnauthorized: () => void;
-}
-
-export interface UseRemoteRosterStoreResult {
-	players: Player[];
-	/** 雲端資料寫入前已由後端驗證，不會有被丟棄的損壞筆數，恆為 0。 */
-	droppedCount: number;
-	addPlayer: (input: AddPlayerInput) => void;
-	updatePlayer: (id: string, patch: UpdatePlayerPatch) => void;
-	removePlayer: (id: string) => void;
-	togglePlayerActive: (id: string) => void;
-	resetRoster: () => void;
-	syncStatus: SyncStatus;
 }
 
 type Payload = { op: "put"; player: Player } | { op: "delete" };
@@ -72,7 +61,7 @@ function deriveStatus(
 export function useRemoteRosterStore({
 	enabled,
 	onUnauthorized,
-}: UseRemoteRosterStoreOptions): UseRemoteRosterStoreResult {
+}: UseRemoteRosterStoreOptions): UseRosterStoreResult {
 	const [players, setPlayers] = useState<Player[]>([]);
 	// 用 reducer 取代 useState：effect 開頭要把狀態重設為 loading，dispatch 不會觸發
 	// react-hooks/set-state-in-effect（沿用 useRemoteScoreboardStore 的寫法）

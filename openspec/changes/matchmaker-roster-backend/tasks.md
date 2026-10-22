@@ -74,7 +74,7 @@ Depends on: §4
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteRosterStore（B6 §5）`。重跑 5.3 轉綠。archive 時此段 MODIFIED 應為 no-op
 - [x] 5.5 RED（TDD）：`hooks/useRosterStore.test.tsx` **只新增** `vi.mock("@/hooks/useSession", ...)` 區塊（預設本機快照）與三個 it：「已登入時改用雲端名單並回傳 syncStatus」
   「session 載入中或訪客時走本機且 syncStatus 為 local」「雲端模式下變更名單不寫入 matchmaker:roster:v1」。確認新 it 紅燈、既有 8 個 it 仍綠；先綠的斷言點名標註
-- [ ] 5.6 GREEN（TDD）：`hooks/useRosterStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRosterStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器 `useRosterStore`；`UseRosterStoreResult` 加 `syncStatus`
+- [x] 5.6 GREEN（TDD）：`hooks/useRosterStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRosterStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器 `useRosterStore`；`UseRosterStoreResult` 加 `syncStatus`
 - [ ] 5.7 REFACTOR：`useRemoteRosterStore` 與 `useRemoteScoreboardStore` 的重複（載入／衝突重載／401 處理）是否值得抽共用 hook——**只在兩者皆有測試守住時**才抽，抽出後 B5 的測試 MUST 原樣通過；否則註記 skipped 並說明理由
 
 ## 6. 前端：資料頁雲端分支
