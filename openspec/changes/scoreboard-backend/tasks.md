@@ -31,7 +31,7 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/versioned.test.ts`，it「versionedEnvelopeSchema 接受 data null 與非負整數 version」「versionedWriteSchema 拒絕 null data 與負數或非整數 version」。確認紅燈（模組不存在）
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/versioned.test.ts`，it「versionedEnvelopeSchema 接受 data null 與非負整數 version」「versionedWriteSchema 拒絕 null data 與負數或非整數 version」。確認紅燈（模組不存在）。紅燈：`test --run test/api/versioned.test.ts` 因 `src/api/versioned` 不存在而整檔失敗（typecheck 僅 TS2307）；兩個 it 皆為真紅燈，無 regression guard
 - [ ] 2.2 GREEN（TDD）：新增 `src/api/versioned.ts`、`src/api/errors.ts`（`API_ERROR_CODES`、`ApiErrorBody`）；`test/module-boundary.test.ts` 的 `CORE_MODULES` 加入兩項（B4 規則：清單與檔案一致）
 - [ ] 2.3 REFACTOR：無壞味道則註記 skipped
 
