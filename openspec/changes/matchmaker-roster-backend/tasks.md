@@ -49,7 +49,7 @@ Depends on: §2
   `src/index.ts` 以 `app.route("/api/matchmaker", matchmakerRoutes)` 掛載。3.3 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
 - [x] 3.5 REFACTOR：與 `src/scoreboard/repository.ts` 是否有可共用的版本化寫入片段（若抽出，B5 的測試 MUST 原樣通過）；無壞味道則註記 skipped。
   **另（design Open Questions 5，B5 帶過來的待辦 2）**：把 sub-app 的 `onError`（`HTTPException(400)` → `INVALID_BODY`）與 `zValidator` 的 hook 抽到 `src/http/`，`scoreboard.ts` 與 `matchmaker.ts` 共用；純重構，B5 與 3.3 的測試原樣通過
-- [ ] 3.6 regression guard（design Open Questions 4，B5 帶過來的待辦 1；行為早已實作，加入即綠者如實標註，不偽造紅燈）：
+- [x] 3.6 regression guard（design Open Questions 4，B5 帶過來的待辦 1；行為早已實作，加入即綠者如實標註，不偽造紅燈）：
   ① `test/user-data-tables.test.ts` 的查詢字串 `NOT LIKE '_cf_%'` 改為 `NOT GLOB '_cf_*'`（只改查詢字串，it 名稱與斷言不變；coordinator 授權的唯一既有測試檔例外）；
   ② `test/scoreboard-current.test.ts` **只新增** 三個 it：「PUT 忽略 query 與 body 中的 userId，一律寫入登入者本人」「getSession 拋出例外時回 500」「已有資料時 GET 回 200 與該筆資料」。
   以 mutation 證明三者守得住（PUT 改讀 `?userId=`、`onError` 吞 500、GET 改回 201 等）
