@@ -572,6 +572,10 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   （verify 另建議：sub-app 的 `onError`＋`zValidator` hook 抽到 `src/http/` 共用。）
   ② 跨分頁換帳號（OQ10 ①）：別的分頁換帳號後本分頁 `enabled` 不變，版本號相同時可能把 A 的比分寫進 B；auth 僅本機，風險低，B6 對齊時處理或明列為 G1 前必修。
 
+- **B7 delta 必修**：B5 archive 後 `openspec validate --all --strict` 對 `matchmaker-round-score-backend` 失敗——
+  `MODIFIED "localStorage 持久化" omits scenario(s) the current spec still has: "登入但帶 matchId 時仍走本機分槽"`。
+  B7 本意是以「登入且帶 matchId 時不寫入本機分槽」取代，tasks §1 對齊時要在 delta 明確處理該舊 Scenario（MODIFIED 全文不含即移除，需確認寫法）。
+
 ## commit footer 慣例
 
 每個 commit 結尾加一行 `Claude-Session: <值>`。值的來源只有兩種：
@@ -579,6 +583,3 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 2. 否則填 `CLAUDE_CODE_SESSION_ID`（例：`Claude-Session: 60458cf8-dddc-4a9b-be66-e355eaccfef0`）。
 
 不要自行編造 URL。leader 的派工單要把 coordinator 用的那一行原樣傳下去。
-- **B7 delta 必修**：B5 archive 後 `openspec validate --all --strict` 對 `matchmaker-round-score-backend` 失敗——
-  `MODIFIED "localStorage 持久化" omits scenario(s) the current spec still has: "登入但帶 matchId 時仍走本機分槽"`。
-  B7 本意是以「登入且帶 matchId 時不寫入本機分槽」取代，tasks §1 對齊時要在 delta 明確處理該舊 Scenario（MODIFIED 全文不含即移除，需確認寫法）。
