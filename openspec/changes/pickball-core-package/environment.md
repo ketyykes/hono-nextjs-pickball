@@ -26,8 +26,8 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**：（apply Step 0／tasks 1.1 回填）預期 B3 後前端 87 檔／823、後端 12 檔／50，全綠；lint 0 errors／3 warnings；`playwright test --list` 總數待記錄。
-- **Initial commit hash**：（apply Step 0 回填：`change/pickball-core-package` 分出時的 `main` HEAD）
+- **Baseline tests**（2026-10-22 apply Step 0 實測，`main`@`cc5c1c1`）：`pnpm install` 後 lockfile 零變動；`pnpm test` 前端 87 檔／823、後端 12 檔／50，全綠（exit 0）；`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm lint` 0 errors／3 warnings；`pnpm --filter ./nextjs-pickball exec playwright test --list` exit 0，`Total: 705 tests in 15 files`（＝667 passed＋38 skipped 基線）。
+- **Initial commit hash**：`cc5c1c14cd10fe571e7499ecc2bab6235f3ec936`（`change/pickball-core-package` 分出時的 `main` HEAD）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
