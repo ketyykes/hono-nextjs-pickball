@@ -9,6 +9,8 @@ hono-nextjs-pickball/     ← repo 與 root package 名稱
 ├─ nextjs-pickball/   ← 前端：Next.js 16 + React 19，經 OpenNext 部署為 Cloudflare Worker
 ├─ hono-pickball/     ← 後端：Hono API on Cloudflare Workers，所有後端邏輯都放這裡
 ├─ packages/pickball-core/ ← 前後端共用的純邏輯核心套件 `@pickball/core`（零瀏覽器 API、無建置產物）；細節見其 CLAUDE.md
+│                       被搬入的 18 個模組，其單元測試刻意留在 `nextjs-pickball/lib/{scoreboard,matchmaker}/*.test.ts` 原位
+│                       （既有 spec 的驗收錨點以測試檔路徑定位），不是漏搬
 ├─ openspec/          ← OpenSpec 規格與變更；schemas/ 為 GENERATED 檔案（見「OpenSpec 慣例」）
 ├─ docs/              ← 設計文件歷史紀錄（superpowers/、prd.md、matchmaker-runbook-m3-m9.md）；已被 openspec 取代者於頁首標註。
 │                       prd.md 為「對戰分配機」PRD（M1～M9 已完成並 archive，2026-09-03 歸檔至此）：
