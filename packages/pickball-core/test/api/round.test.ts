@@ -5,11 +5,12 @@ import {
   RoundGetResponseSchema,
   RoundPutRequestSchema,
   SubmitScoreRequestSchema,
+  MatchSlotPutRequestSchema,
   SubmitScoreResponseSchema,
 } from "../../src/api/round";
 import { createInitialState } from "../../src/scoreboard/reducer";
 
-/** 產生符合 ScoreboardState 的分槽資料；matchId 預設為字串。 */
+/** 產生分槽資料；matchId 由呼叫端指定，傳 null 時用來驗證會被拒絕。 */
 function makeSlot(matchId: string | null) {
   return { ...createInitialState(), matchId };
 }
@@ -135,6 +136,26 @@ describe("回合與分槽 API 契約", () => {
     expect(MatchSlotGetResponseSchema.safeParse({ data: null, version: 0 }).success).toBe(true);
     expect(MatchSlotGetResponseSchema.safeParse({ data: makeSlot("m1"), version: 2 }).success).toBe(true);
     expect(MatchSlotGetResponseSchema.safeParse({ data: makeSlot(null), version: 2 }).success).toBe(false);
+    // RoundPut 的 data 必須合 RoundSchema
+    expect(RoundPutRequestSchema.safeParse({ data: { roundNumber: 0 }, version: 0 }).success).toBe(false);
+    // 單筆分槽 PUT：data 不可為 null、matchId 必為字串、version 為非負整數
+    expect(MatchSlotPutRequestSchema.safeParse({ data: makeSlot("m1"), version: 0 }).success).toBe(true);
+    expect(MatchSlotPutRequestSchema.safeParse({ data: makeSlot(null), version: 0 }).success).toBe(false);
+    expect(MatchSlotPutRequestSchema.safeParse({ data: null, version: 0 }).success).toBe(false);
+    expect(MatchSlotPutRequestSchema.safeParse({ data: makeSlot("m1"), version: -1 }).success).toBe(false);
+    expect(MatchSlotPutRequestSchema.safeParse({ data: makeSlot("m1"), version: 1.5 }).success).toBe(false);
+    // 分槽必須是完整的 ScoreboardState：缺 matchId、mode 非法都失敗
+    const { matchId: _omitted, ...withoutMatchId } = makeSlot("m1");
+    expect(MatchSlotPutRequestSchema.safeParse({ data: withoutMatchId, version: 0 }).success).toBe(false);
+    expect(MatchSlotPutRequestSchema.safeParse({ data: { ...makeSlot("m1"), mode: "triples" }, version: 0 }).success).toBe(false);
+    // 清單中的 version 不可為小數
+    expect(MatchSlotListResponseSchema.safeParse({ items: [{ data: makeSlot("m1"), version: 1.5 }] }).success).toBe(false);
+  });
+
+  it("SubmitScoreRequestSchema 拒絕數字型別的 scoreB", () => {
+    expect(
+      SubmitScoreRequestSchema.safeParse({ scoreA: "11", scoreB: 7, roundVersion: 1 }).success,
+    ).toBe(false);
   });
 
   it("SubmitScoreResponseSchema 要求回合、被更新球員、歷史與觸界提示", () => {
@@ -149,6 +170,12 @@ describe("回合與分槽 API 契約", () => {
     expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ players: [{ data: makePlayer("a"), version: 0 }] })).success).toBe(false);
     expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ players: [{ data: { ...makePlayer("a"), rating: 99 }, version: 1 }] })).success).toBe(false);
     expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ historyEntry: { ...makeHistoryEntry(), scoreA: -1 } })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ round: { data: { roundNumber: 0 }, version: 2 } })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ round: { data: makeRound(), version: 1.5 } })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ players: [{ data: makePlayer("a"), version: 1.5 }] })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ boundaryHits: [{ playerId: 1, atUpperBound: false, atLowerBound: true }] })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ boundaryHits: [{ playerId: "a", atUpperBound: "no", atLowerBound: true }] })).success).toBe(false);
+    expect(SubmitScoreResponseSchema.safeParse(makeSubmitResponse({ boundaryHits: [{ playerId: "a", atUpperBound: false, atLowerBound: 1 }] })).success).toBe(false);
     for (const field of ["playerId", "atUpperBound", "atLowerBound"]) {
       const hit: Record<string, unknown> = { playerId: "a", atUpperBound: false, atLowerBound: true };
       delete hit[field];
