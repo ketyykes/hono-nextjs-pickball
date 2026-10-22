@@ -244,3 +244,7 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
 12. （coordinator 裁定，2026-10-23）① 派工單偏離 execution-plan「逐字貼進 prompt」：規則全文、tasks／test-plan 原文、必做變異清單直接貼在派工單內；spec／design／既有介面改由 `/tmp/b7tools/ticket.py <g>` 自 artifacts 機械擷取為
     `/tmp/b7tools/ticket-<g>-ref.md`，派工前確認檔案存在且非空，subagent 第一個動作 MUST 完整讀取並覆述標題；Stage 2 審查員另須自行讀 spec／design 原檔核對。**此偏離經 coordinator 同意**（理由：逐張全文貼入會耗盡 leader 脈絡）。
     ② scoreboard 以 REMOVED「localStorage 持久化」＋ADDED「本機模式的 localStorage 持久化」取代 MODIFIED：coordinator 接受。
+13. （apply §3 Stage 2 第一輪，2026-10-23）FAIL，唯一必修：`test/d1-batch-guard.test.ts` 缺「殘留守衛列」情境（守衛表已有該使用者一列時，守衛 INSERT 的 `sync_batch_guards.user_id` 主鍵衝突 MUST NOT 被 `isBatchGuardViolation` 分類為衝突、整批回滾），
+    使「比對字串只看 `sync_batch_guards`」「守衛改 `INSERT OR REPLACE`」「守衛加 `onConflictDoNothing`」「守衛表拿掉 user_id 主鍵」四個變異存活；實作本身正確，補 regression guard 即可（另加純函式斷言 `isBatchGuardViolation(new Error("UNIQUE constraint failed: sync_batch_guards.user_id")) === false`）。
+    非阻擋：新表 `data`／`played_at` 的 NOT NULL 無斷言；`batch-guard.ts:11` 註解易被 §5 誤讀（應寫成「比較在 SQL 內對目前資料執行，不可在 JS 端先判定再傳常數條件」）；讀回 it 在守衛表留下一列。
+    **下一步**：退回 §3 Implementer 補測試（regression guard，誠實標註）→ Stage 2 複審 → §4。工作樹乾淨（審查員已還原 0003 暫時變異）。
