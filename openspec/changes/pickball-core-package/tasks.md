@@ -54,10 +54,16 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `hono-pickball/test/pickball-core-import.test.ts`，it「workerd 中可匯入核心套件並以其 schema 驗證資料」。確認紅燈（後端未宣告相依 → 模組解析失敗）並貼出輸出
-- [ ] 3.2 GREEN（TDD）：`hono-pickball/package.json` 加 `"@pickball/core": "workspace:*"`；`pnpm install`。若 vitest-pool-workers 仍無法解析，依 1.3 查證結果最小調整 `hono-pickball/vitest.config.ts`
+- [x] 3.1 RED（TDD）：新增 `hono-pickball/test/pickball-core-import.test.ts`，it「workerd 中可匯入核心套件並以其 schema 驗證資料」。確認紅燈（後端未宣告相依 → 模組解析失敗）並貼出輸出
+- [x] 3.2 GREEN（TDD）：`hono-pickball/package.json` 加 `"@pickball/core": "workspace:*"`；`pnpm install`。若 vitest-pool-workers 仍無法解析，依 1.3 查證結果最小調整 `hono-pickball/vitest.config.ts`
   並記入 design.md Open Questions；**不得**修改 `hono-pickball/src/**`
-- [ ] 3.3 驗收（指令）C3：建立暫存入口 `hono-pickball/.core-bundle-check.ts`，以 `wrangler deploy --dry-run <入口> --outdir <mktemp -d>` 打包；exit 0 且輸出含 Total Upload；刪除暫存檔與目錄，`git status --porcelain` 不列出；結果寫在本 task 後方
+- [x] 3.3 驗收（指令）C3：建立暫存入口 `hono-pickball/.core-bundle-check.ts`，以 `wrangler deploy --dry-run <入口> --outdir <mktemp -d>` 打包；exit 0 且輸出含 Total Upload；刪除暫存檔與目錄，`git status --porcelain` 不列出；結果寫在本 task 後方
+  > **C3 結果（2026-10-22）**：暫存入口 `hono-pickball/.core-bundle-check.ts`（匯入 `@pickball/core/matchmaker/round` 的 `submitScore`、在 `fetch` 中引用、`export default { fetch }`）；
+  > `pnpm --dir <repo>/hono-pickball exec wrangler deploy --dry-run .core-bundle-check.ts --outdir <mktemp -d>` **exit 0**，輸出 `Total Upload: 567.97 KiB / gzip: 86.88 KiB`、`--dry-run: exiting now.`（未要求登入）。
+  > bundle（outdir 內隱藏檔 `.core-bundle-check.js`）含 `// ../packages/pickball-core/src/matchmaker/round.ts` 等來源註記與 `function submitScore(input) {`，無殘留 `@pickball/core` 指定字串——核心套件被打包而非 external。
+  > Implementer、Stage 1 各獨立重跑一次，結果相同；暫存檔與目錄已刪除，`git status --porcelain` 為空。
+  > 3.1 RED `0733f3a` 紅燈：`Error: Cannot find package '@pickball/core/scoreboard/reducer' imported from .../hono-pickball/test/pickball-core-import.test.ts`（`git show 0733f3a^:hono-pickball/package.json` 無此相依）。
+  > 3.2 GREEN `83ae867`：未調整 `vitest.config.ts`（vitest-pool-workers 直接解析 symlink 套件，與 Decision 1 預期一致）；後端 13 檔／51 綠。
 
 ## 4. 文件同步與總驗收
 
