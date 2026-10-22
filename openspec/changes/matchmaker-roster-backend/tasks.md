@@ -91,7 +91,7 @@ Depends on: §5
 
 Depends on: §6
 
-- [ ] 7.1 RED（E2E）：新增 `tests/e2e/user-data/roster-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 10 個 test。
+- [x] 7.1 RED（E2E）：新增 `tests/e2e/user-data/roster-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 10 個 test。
   執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/roster-sync.spec.ts`（前後清殘留 dev server），貼出輸出：
   依賴頁面接線者（`data-sync-status`、提示、資料頁分支）應為紅；**已由 §5 選擇器達成而先綠者逐一點名標 regression guard**
 - [ ] 7.2 GREEN（例外層：頁面與 I/O 樣板元件，以 7.1 驗收）：`app/matchmaker/{page,players/page,stats/page}.tsx` 依 spec 接上 `SyncStatusNotice` 與 `data-sync-status`（loading／load-failed 取代主要內容；所有 hooks 在 early return 前呼叫）；
