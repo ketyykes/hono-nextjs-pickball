@@ -200,3 +200,11 @@ runbook 已定「五個 key 全部要有後端版本」，本決策只是改變�
 3. CSRF 防線（JSON content-type＋`SameSite=Lax`＋不回 CORS 標頭）在正式網域（G1）需再複核，含 Google 登入後的 cookie 屬性。
 4. （apply §1）Decision 2～8 與 Context7／本機查證無差異；三個 MODIFIED Requirement 的主 spec 原文與 delta 一致，無需重新套用（見「apply §1 查證紀錄」）。
 5. （apply §1）`wrangler d1 execute --local --command` 多陳述式實測可行，`--json` 輸出可解析（見查證紀錄）。
+6. （apply §4 leader 裁定）spec「版本化讀寫契約」原文要求「body 不是 JSON → `400 { error: "INVALID_BODY" }`」，與 Decision 3 Rationale「JSON 語法錯誤由 Hono 拋純文字 400、spec 只承諾 400」不一致；以 spec 為準：
+   `src/routes/scoreboard.ts` 的 sub-app `onError` 將 `HTTPException(400)` 轉為 `INVALID_BODY`（實測 Hono 4.12 的 `app.route` 會套用 sub-app 的 `onError`），其他錯誤維持 Hono 預設；
+   「body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY」it 內加入第五種輸入（語法錯誤 JSON）。B6～B9 照抄 sub-app 形態時需一併帶上（§4 Stage 2 建議 B6 開工時把 `onError`＋`zValidator` hook 抽成 `src/http/` 共用）。
+7. （apply §3／§4 Stage 2 非阻擋建議，留後續）① `test/user-data-tables.test.ts` 的 `NOT LIKE '_cf_%'` 中 `_` 為單字元萬用字元，可改 `GLOB` 或 `ESCAPE`；
+   ② `scoreboard-current.test.ts` 未直接守「SHALL NOT 從 query／body 接受使用者 id」（PUT 改讀 `?userId=` 的變異存活）與「getSession 例外時回 500」（`onError` 吞 500 的變異存活；probe 實測現行實作回 500 正確）；
+   ③ GET 有資料的 it 未斷言 status 200。皆為測試加強，不影響現行行為，交 coordinator 決定是否在本 change 補。
+8. （apply §5）5.1 的 RED commit `bb6dd3e` 早於實際看到紅燈（實作檔當時未追蹤、不在 commit 內），Implementer 事後暫移實作重跑確認紅燈；`git show bb6dd3e^:nextjs-pickball/lib/sync/storage-mode.ts` 不存在，機械複驗成立。
+   §5 Stage 2 指出的 L14（失敗後以舊值覆蓋較新待送值）與 A12（回傳未經 schema 的 JSON）兩個存活變異已於 `12ae7e2` 補 regression guard 斷言。
