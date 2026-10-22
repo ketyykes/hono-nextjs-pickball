@@ -433,6 +433,35 @@ describe("/api/matchmaker 名單端點", () => {
 		expect(await listItems(cookie)).toEqual([]);
 	});
 
+	// regression guard（寫入即綠）：寫入與回傳的是驗證後的輸出，含 schema 補上的預設值。
+	it("省略 restCount 與 gamesPlayed 時以預設值 0 寫入並回傳", async () => {
+		const cookie = await seedAndSignIn("mp-defaults@example.com");
+		const withoutDefaults = (id: string) => {
+			const { restCount: _restCount, gamesPlayed: _gamesPlayed, ...rest } = makePlayer(id);
+			return rest;
+		};
+
+		const putRes = await request(cookie, "PUT", "/players/p1", { data: withoutDefaults("p1"), version: 0 });
+		const importRes = await request(cookie, "POST", "/players/import", {
+			players: [withoutDefaults("p2"), withoutDefaults("p3")],
+		});
+
+		expect(putRes.status).toBe(200);
+		expect(await putRes.json()).toEqual({ data: makePlayer("p1"), version: 1 });
+		expect(importRes.status).toBe(200);
+		expect(await importRes.json()).toEqual({
+			items: [
+				{ data: makePlayer("p2"), version: 1 },
+				{ data: makePlayer("p3"), version: 1 },
+			],
+		});
+		expect(await listItems(cookie)).toEqual([
+			{ data: makePlayer("p1"), version: 1 },
+			{ data: makePlayer("p2"), version: 1 },
+			{ data: makePlayer("p3"), version: 1 },
+		]);
+	});
+
 	it("重置刪除本人全部參賽者並回 204", async () => {
 		const cookie = await seedAndSignIn("mp-reset@example.com");
 		await importPlayers(cookie, [makePlayer("p1"), makePlayer("p2"), makePlayer("p3")]);
