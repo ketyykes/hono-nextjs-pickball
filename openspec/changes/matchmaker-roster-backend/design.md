@@ -152,6 +152,7 @@
 1. **場次分槽**（B5 Decision 1）：`scoreboard:matches:v1` 與回合一起上雲；`resetLocalMatchProgress()` 在 B7 後應只剩 history（B8 後刪除此函式）；`POST /api/matchmaker/reset` 的 batch 要加入回合與分槽表。
 2. **送出比分**：後端權威 batch 需更新 `matchmaker_players.data`（四人評分）＋寫回合＋寫歷史；版本條件不成立時讓 batch 失敗的寫法見 B5 Open Questions 1。
    B7 後 `useRoundStore` 在雲端模式不應再經 `updatePlayer` port 逐人 PUT 評分（避免與後端權威重複寫入）。
+   對戰頁回填 effect（`app/matchmaker/page.tsx`，deps 只有 `[round]`）應等名單就緒（`syncStatus` 非 loading／load-failed，並以「名單就緒」加入依賴讓載入後重跑），否則雲端載入期間回填會以空名單或訪客名單送分（OQ13）。
 3. **歷史**（B8）：只增不改，適合「多筆契約」去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 要同步。
 4. **B9**：登入態 JSON 還原目前停用（本 change「登入時的資料工具頁」）；B9 決定其去留。本機 `matchmaker:roster:v1` 在登入時刻意保留，作為匯入來源。
 
@@ -206,3 +207,9 @@
     OQ2 結論：頁面在雲端 loading 時以提示取代內容不影響 `useRoundStore` 的 hydrate 時序（hooks 皆在 early return 前呼叫）。
     既有問題（非 §7 引入，留 B7）：對戰頁回填 effect（`app/matchmaker/page.tsx` deps 只有 `[round]`）在雲端 loading 期間執行時 `players` 為空或為本機訪客名單，`submitScore` 回 `SCORING_FAILED`，名單載入後不重試，要等下次 round 變動才補送——不損毀資料但回填延遲。
     user-data E2E 18 個（scoreboard-sync 6、roster-sync 12）；訪客 chromium 既有 4 spec 42 passed。下一步 §8。
+14. （apply Final Code Review，2026-10-23）APPROVE WITH NITS，無必修；全套 95／895、17／97、3／6，user-data E2E 18 passed；抽查 9 個 RED commit 以 `git show <RED>^:` 複驗皆為真紅。
+    已於本 change 修正：`nextjs-pickball/CLAUDE.md` 改寫「雲端模式不讀寫本機名單」為實際行為；`hono-pickball/CLAUDE.md` 的 onError 指向 `src/http/invalid-body.ts`（OQ8 遺留）；OQ13 回填延遲寫入「交接給 B7～B9」第 2 點。
+    補揭露流程偏離：`20eaa2d`（5.2 GREEN）把 RED 測試「GET 或寫入回 401 時呼叫 onUnauthorized」的 `callsAfterUnauthorized` 由 4 改為 3——加嚴（401 後其他參賽者的待送值也不得送出，與該段註解一致），Implementer 回報時已說明為 RED 計數筆誤，但未寫進 tasks／design。
+    **待 coordinator 裁定**：delta spec `specs/player-roster/spec.md`「LocalStorage 持久化與逐筆降級」的「雲端模式下……SHALL NOT 讀取或寫入 `matchmaker:roster:v1`」與實作不符（本機 hook 仍掛載並讀取、正規化寫回；Decision 4 已知取捨），archive 後主 spec 會留下不實的 SHALL NOT。建議改為「雲端模式下使用者操作 SHALL NOT 改變該 key 的內容；本機實作仍會掛載，依既有逐筆降級規則讀取與回寫」。leader 未自行改 delta spec。B5 主 spec `openspec/specs/scoreboard/spec.md:135` 同類，轉 G1。
+    Final 對 OQ11／OQ13 的建議：①②③ 維持現狀（② 隨 B7 reset batch 消失），OQ13 轉 B7（已寫入交接）。
+    轉 B7／G1 的非阻擋項：重置期間重試中的 v0 PUT 可能讓參賽者在雲端「復活」（`reset()` 前未 `disposeAll()`，轉 B7）；import 無筆數／body 上限、`PlayerSchema.id` 接受空字串（API 層加 `.max()`／`bodyLimit`，轉 G1）；import 的 `sort_order` 可改為 batch 內逐條 insert-select 根除併發重複；前端 PUT 回應 version 下限比後端寬（從核心 export 共用 schema）；同一 mount 換帳號會閃一幀前帳號名單（G1 跨分頁換帳號一併處理）；回應遺失後重試出現假 conflict（契約非冪等的既有性質）。

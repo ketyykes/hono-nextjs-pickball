@@ -52,7 +52,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
 - 訪客（含 auth 停用、session 載入中）仍全走 LocalStorage
 - 登入後**參賽者名單**以雲端為準（B6：`/api/matchmaker/*`，選擇器 `useRosterStore` 依 `resolveStorageMode` 切換）
 - 回合、歷史、場次分槽仍在本機，待 B7、B8
-- 雲端模式不讀寫本機 `matchmaker:roster:v1`；該 key 保留訪客時期名單，作為 B9 匯入來源
+- 雲端模式下使用者操作不會改動本機 `matchmaker:roster:v1`（該 key 保留訪客時期名單，作為 B9 匯入來源）；但選擇器仍會掛載本機 hook（hooks 不可條件式呼叫），mount 時依既有逐筆降級規則讀取並寫回同一份名單
 - 後續 change 須知（詳見 openspec change `matchmaker-roster-backend` design「交接給 B7～B9」）：B7 後 `useRoundStore` 在雲端模式不應再經 `updatePlayer` port 逐人 PUT 評分（由後端權威 batch 寫入，避免重複寫入）；登入態 JSON 還原目前停用，B9 決定其去留
 
 ### shadcn/ui
