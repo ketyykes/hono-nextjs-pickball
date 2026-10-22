@@ -114,7 +114,7 @@ describe("useRemoteScoreboardStore", () => {
 
 	it("dispatch 後以目前 version PUT 新狀態，成功後沿用回應的 version", async () => {
 		enqueue(200, { data: stateWithScores(0, 0), version: 2 });
-		const { result, statusLog } = renderRemote({ enabled: true });
+		const { result, statusLog, unmount } = renderRemote({ enabled: true });
 		await waitFor(() => expect(result.current[2]).toBe("synced"));
 
 		const releaseFirst = enqueueDeferred();
@@ -137,12 +137,18 @@ describe("useRemoteScoreboardStore", () => {
 
 		// 失敗重試期間維持 retrying，不會被重送時的 saving 洗掉造成提示閃爍
 		enqueue(503);
-		enqueue(200, { data: stateWithScores(3, 0), version: 5 });
+		const releaseRetry = enqueueDeferred();
 		const logLengthBeforeRetry = statusLog.length;
 		act(() => {
 			result.current[1]({ type: "RALLY_WON", winner: "us" });
 		});
 		await waitFor(() => expect(result.current[2]).toBe("retrying"));
+		await waitFor(() => expect(putCalls()).toHaveLength(4), { timeout: 3000 });
+		// 重送在途期間仍是 retrying
+		expect(result.current[2]).toBe("retrying");
+		await act(async () => {
+			releaseRetry(200, { data: stateWithScores(3, 0), version: 5 });
+		});
 		await waitFor(() => expect(result.current[2]).toBe("synced"), { timeout: 3000 });
 		const duringRetry = statusLog.slice(logLengthBeforeRetry);
 		const firstRetrying = duringRetry.indexOf("retrying");
@@ -166,6 +172,19 @@ describe("useRemoteScoreboardStore", () => {
 			releaseAfterRejected(200, { data: stateWithScores(5, 0), version: 6 });
 		});
 		await waitFor(() => expect(result.current[2]).toBe("synced"));
+
+		// 卸載後等待中的重試不得再送出
+		enqueue(503);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[2]).toBe("retrying"));
+		const callsAtUnmount = fetchMock.mock.calls.length;
+		unmount();
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 1300));
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(callsAtUnmount);
 	});
 
 	it("PUT 回 409 時重新 GET 並以雲端狀態取代，狀態為 conflict", async () => {
@@ -207,6 +226,22 @@ describe("useRemoteScoreboardStore", () => {
 		});
 		await waitFor(() => expect(result.current[2]).toBe("conflict"));
 		expect(result.current[0]).toEqual(createInitialState());
+
+		// 衝突後重新 GET 也失敗：改為 load-failed，之後不得再以舊版本送出 PUT
+		enqueue(409);
+		enqueue(500);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[2]).toBe("load-failed"));
+		const putCountBefore = putCalls().length;
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		});
+		expect(putCalls()).toHaveLength(putCountBefore);
 	});
 
 	it("GET 失敗時狀態為 load-failed 且不送出任何 PUT", async () => {
