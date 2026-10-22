@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
@@ -50,7 +51,7 @@ function putVersions(): number[] {
 	return putCalls().map(([, init]) => JSON.parse(String(init?.body)).version as number);
 }
 
-function renderRemote(options: { enabled: boolean; onUnauthorized?: () => void }) {
+function renderRemote(options: { enabled: boolean; onUnauthorized?: () => void; strict?: boolean }) {
 	const onUnauthorized = options.onUnauthorized ?? vi.fn();
 	const statusLog: SyncStatus[] = [];
 	const rendered = renderHook(() => {
@@ -60,7 +61,7 @@ function renderRemote(options: { enabled: boolean; onUnauthorized?: () => void }
 		});
 		statusLog.push(value[2]);
 		return value;
-	});
+	}, options.strict ? { wrapper: StrictMode } : undefined);
 	return { ...rendered, statusLog, onUnauthorized };
 }
 
@@ -93,10 +94,13 @@ describe("useRemoteScoreboardStore", () => {
 	});
 
 	it("雲端無資料時維持初始狀態，第一次儲存帶 version 0", async () => {
+		// StrictMode 會重跑 effect：第一次的 GET 被忽略，第二次才算數，但 PUT 不得重複
 		enqueue(200, { data: null, version: 0 });
-		const { result } = renderRemote({ enabled: true });
+		enqueue(200, { data: null, version: 0 });
+		const { result } = renderRemote({ enabled: true, strict: true });
 		await waitFor(() => expect(result.current[2]).toBe("synced"));
 		expect(result.current[0]).toEqual(createInitialState());
+		expect(putCalls()).toHaveLength(0);
 
 		enqueue(200, { data: stateWithScores(1, 0), version: 1 });
 		act(() => {
@@ -145,6 +149,23 @@ describe("useRemoteScoreboardStore", () => {
 		const retryTail = duringRetry.slice(firstRetrying);
 		expect(retryTail.indexOf("saving")).toBe(-1);
 		expect(putVersions()).toEqual([2, 3, 4, 4]);
+
+		// 伺服器拒絕（4xx）後狀態為 rejected，下一次送出的 saving 期間不覆蓋它
+		enqueue(400);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[2]).toBe("rejected"));
+		const releaseAfterRejected = enqueueDeferred();
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(6));
+		expect(result.current[2]).toBe("rejected");
+		await act(async () => {
+			releaseAfterRejected(200, { data: stateWithScores(5, 0), version: 6 });
+		});
+		await waitFor(() => expect(result.current[2]).toBe("synced"));
 	});
 
 	it("PUT 回 409 時重新 GET 並以雲端狀態取代，狀態為 conflict", async () => {
@@ -177,6 +198,15 @@ describe("useRemoteScoreboardStore", () => {
 			releaseSecond(200, { data: stateWithScores(10, 9), version: 6 });
 		});
 		await waitFor(() => expect(result.current[2]).toBe("synced"));
+
+		// 衝突重載時雲端資料已不存在（data 為 null）：回到初始狀態，版本為 0
+		enqueue(409);
+		enqueue(200, { data: null, version: 0 });
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[2]).toBe("conflict"));
+		expect(result.current[0]).toEqual(createInitialState());
 	});
 
 	it("GET 失敗時狀態為 load-failed 且不送出任何 PUT", async () => {
