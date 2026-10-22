@@ -131,7 +131,7 @@
 
 ## scoreboard
 
-### Requirement: localStorage 持久化（MODIFIED）
+### Requirement: 本機模式的 localStorage 持久化（ADDED；以 REMOVED「localStorage 持久化」取代，見 design「apply §1 查證紀錄」）
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
@@ -156,7 +156,7 @@
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
 | （既有）確認重置／取消重置／重置只移除列舉的四個 key／resetRoster 失敗時名單不變並回報 rejected／登入時重置名單清空雲端名單並保留本機訪客名單 | 對應 Scenario | 原樣通過 | regression guard | unit |
-| resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板 | resetLocalMatchProgress 只清除本機歷史 | 只有歷史 key 被移除 | **改寫 B6 的 it**；舊實作多移除兩個 key → 紅 | unit |
+| resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板 | resetLocalMatchProgress 只清除本次活動的進度（沿用主 spec 標題、內容改寫） | 只有歷史 key 被移除 | **改寫 B6 的 it**；舊實作多移除兩個 key → 紅 | unit |
 | resetRoster 成功後清空名單並只清除本機歷史 | 登入時重置名單 | 只有歷史 key 被移除 | **改寫 B6 的 it**；同上 → 紅 | hook |
 | 登入時重置名單後雲端回合與分槽一併清除 | 登入時重置名單後對戰頁沒有回合 | 無場地卡；GET 為空 | reset batch 擴充的端到端證據 | e2e |
 

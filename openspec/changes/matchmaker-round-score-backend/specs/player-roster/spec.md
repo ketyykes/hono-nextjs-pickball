@@ -48,7 +48,7 @@ SHALL NOT 清除本機的 `matchmaker:roster:v1`、`matchmaker:round:v1` 與 `sc
 - **AND** `scoreboard:current:v1` **不受影響**
 - **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「重置只移除列舉的四個 key，不影響獨立計分板資料」
 
-#### Scenario: resetLocalMatchProgress 只清除本機歷史
+#### Scenario: resetLocalMatchProgress 只清除本次活動的進度
 
 - **GIVEN** LocalStorage 同時存在 `matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`、`scoreboard:matches:v1` 與 `scoreboard:current:v1`
 - **WHEN** 呼叫 `resetLocalMatchProgress()`
