@@ -110,6 +110,21 @@ describe("useRemoteScoreboardStore", () => {
 		expect(putVersions()).toEqual([0]);
 		const body = JSON.parse(String(putCalls()[0][1]?.body));
 		expect(body.data.scores).toEqual({ us: 1, them: 0 });
+
+		// 同一個 mount 內 enabled 切換後，新一輪 GET 回無資料時不得保留前一輪的比分
+		enqueue(200, { data: stateWithScores(3, 1), version: 2 });
+		enqueue(200, { data: null, version: 0 });
+		const reused = renderHook(
+			({ enabled }) => useRemoteScoreboardStore({ enabled, onUnauthorized: vi.fn() }),
+			{ initialProps: { enabled: true } },
+		);
+		await waitFor(() => expect(reused.result.current[0].scores).toEqual({ us: 3, them: 1 }));
+		await waitFor(() => expect(reused.result.current[2]).toBe("synced"));
+		reused.rerender({ enabled: false });
+		reused.rerender({ enabled: true });
+		await waitFor(() => expect(queue).toHaveLength(0));
+		await waitFor(() => expect(reused.result.current[2]).toBe("synced"));
+		expect(reused.result.current[0]).toEqual(createInitialState());
 	});
 
 	it("dispatch 後以目前 version PUT 新狀態，成功後沿用回應的 version", async () => {
