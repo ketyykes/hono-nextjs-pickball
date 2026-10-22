@@ -241,3 +241,6 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
 11. （apply 進度，leader 交回時）§3 Implementer 完成（`004050e` RED、`8014e1c` chore schema＋0003、`3ac0b3b` USER_DATA_TABLES、`b87454d` RED、`4137ee0` batch-guard.ts、`1c61c7b` guard；後端 18 檔／104）；
     Stage 1 PASS（非阻擋：`8014e1c` 在 chore commit 內修正 RED 測試的計數查詢缺陷、未放寬斷言；分槽 `$type` 為 `MatchSlot`）；leader 實跑 `db:generate` 無新檔。
     **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2（或取得其結論）後再開始 §4。§4～§11 未開始；§6～§10 的派工參考檔已以 `/tmp/b7tools/ticket.py <g>` 產生（非 repo 檔，需重建）。
+12. （coordinator 裁定，2026-10-23）① 派工單偏離 execution-plan「逐字貼進 prompt」：規則全文、tasks／test-plan 原文、必做變異清單直接貼在派工單內；spec／design／既有介面改由 `/tmp/b7tools/ticket.py <g>` 自 artifacts 機械擷取為
+    `/tmp/b7tools/ticket-<g>-ref.md`，派工前確認檔案存在且非空，subagent 第一個動作 MUST 完整讀取並覆述標題；Stage 2 審查員另須自行讀 spec／design 原檔核對。**此偏離經 coordinator 同意**（理由：逐張全文貼入會耗盡 leader 脈絡）。
+    ② scoreboard 以 REMOVED「localStorage 持久化」＋ADDED「本機模式的 localStorage 持久化」取代 MODIFIED：coordinator 接受。
