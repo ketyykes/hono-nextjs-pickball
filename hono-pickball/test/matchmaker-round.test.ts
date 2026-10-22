@@ -240,6 +240,36 @@ describe("/api/matchmaker/round", () => {
 		expect(await res.json()).toEqual({ data: next, version: 2 });
 	});
 
+	it("回合 PUT 比對已完成場次時不受 JSON 鍵順序影響", async () => {
+		const cookie = await seedAndSignIn("mr-key-order@example.com");
+		const userId = await userIdOf("mr-key-order@example.com");
+		// 資料庫內的已完成場次鍵順序與 schema 輸出相反（含巢狀物件與陣列內的物件）
+		const reverseKeys = (value: unknown): unknown => {
+			if (Array.isArray(value)) {
+				return value.map(reverseKeys);
+			}
+			if (typeof value === "object" && value !== null) {
+				return Object.fromEntries(
+					Object.entries(value)
+						.reverse()
+						.map(([key, inner]) => [key, reverseKeys(inner)]),
+				);
+			}
+			return value;
+		};
+		const stored = makeRound([makeMatch("m1"), makeMatch("m2", "completed")]);
+		await seedRound(userId, { ...stored, matches: [stored.matches[0], reverseKeys(stored.matches[1]) as never] });
+
+		const res = await request(cookie, "PUT", "/round", { data: makeRound([makeMatch("m1"), makeMatch("m2", "completed")]), version: 1 });
+		const edited = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m1"), makeMatch("m2", "completed", 15)]),
+			version: 2,
+		});
+
+		expect(res.status).toBe(200);
+		expect(edited.status).toBe(400);
+	});
+
 	it("回合 PUT 刪除不屬於新回合的分槽且衝突時分槽仍與雲端回合一致", async () => {
 		const cookie = await seedAndSignIn("mr-orphan@example.com");
 		const other = await seedAndSignIn("mr-orphan-other@example.com");
