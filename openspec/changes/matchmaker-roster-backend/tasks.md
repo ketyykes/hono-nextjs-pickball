@@ -67,7 +67,7 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 RED（TDD）：新增 `hooks/useRemoteRosterStore.test.tsx`，spec 中該檔的全部 11 個 it（「登入時名單以雲端為準」9 個＋「重置名單與二次確認」2 個）。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
+- [x] 5.1 RED（TDD）：新增 `hooks/useRemoteRosterStore.test.tsx`，spec 中該檔的全部 11 個 it（「登入時名單以雲端為準」9 個＋「重置名單與二次確認」2 個）。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
 - [ ] 5.2 GREEN（TDD）：新增 `hooks/useRemoteRosterStore.ts`（design Decision 3、5）
 - [ ] 5.3 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRosterStore` 未列入主 spec 而**真的轉紅**，貼出輸出
 - [ ] 5.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4 前例）；
