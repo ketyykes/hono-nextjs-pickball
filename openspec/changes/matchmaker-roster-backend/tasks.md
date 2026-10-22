@@ -38,7 +38,7 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（spec `backend-database` 錨點）。確認紅燈（表不存在）。
+- [x] 3.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（spec `backend-database` 錨點）。確認紅燈（表不存在）。
   另記錄：設定層 3.2 加表後，B5 的「USER_DATA_TABLES 恰為 auth 以外的所有資料表」會因清單未更新而**真的轉紅**（守衛生效的證據），貼出輸出
 - [ ] 3.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `matchmakerPlayers`（複合主鍵）；`pnpm --filter ./hono-pickball db:generate --name matchmaker_players`（不手改）；再跑一次確認無新檔；
   核心套件 `USER_DATA_TABLES` 加 `matchmaker_players`；`db:migrate:local`；3.1 與守衛皆綠

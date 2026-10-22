@@ -238,6 +238,82 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		).toBe(0);
 	});
 
+	// 以下四個 it 對應 matchmaker_players（B6 新增，複合主鍵 (user_id, id)）。
+	it("matchmaker_players 可由 migration 建立並寫入讀回", async () => {
+		const db = getTestDb();
+		await insertUser(db, "mp-rw-user", "mp-rw@example.com");
+		const data = JSON.stringify({ id: "p1", name: "小明" });
+		await db
+			.prepare(
+				"INSERT INTO matchmaker_players (user_id, id, data, sort_order, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind("mp-rw-user", "p1", data, 3, 2, NOW + 9)
+			.run();
+
+		const row = await db
+			.prepare("SELECT data, sort_order, version, updated_at FROM matchmaker_players WHERE user_id = ? AND id = ?")
+			.bind("mp-rw-user", "p1")
+			.first();
+
+		expect(row).toEqual({ data, sort_order: 3, version: 2, updated_at: NOW + 9 });
+	});
+
+	it("同一使用者的參賽者 id 不可重複，不同使用者可使用相同 id", async () => {
+		const db = getTestDb();
+		await insertUser(db, "mp-dup-a", "mp-dup-a@example.com");
+		await insertUser(db, "mp-dup-b", "mp-dup-b@example.com");
+		const insertRow = (userId: string) =>
+			db
+				.prepare(
+					"INSERT INTO matchmaker_players (user_id, id, data, sort_order, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+				)
+				.bind(userId, "p1", "{}", 0, 1, NOW)
+				.run();
+
+		await insertRow("mp-dup-a");
+		await expect(insertRow("mp-dup-a")).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
+		await insertRow("mp-dup-b");
+
+		expect(await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_players WHERE id = ?", "p1")).toBe(2);
+	});
+
+	it("matchmaker_players 的 user_id 必須參照既有使用者", async () => {
+		const db = getTestDb();
+		await expect(
+			db
+				.prepare(
+					"INSERT INTO matchmaker_players (user_id, id, data, sort_order, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+				)
+				.bind("mp-ghost-user", "p1", "{}", 0, 1, NOW)
+				.run(),
+		).rejects.toThrow(/FOREIGN KEY/);
+	});
+
+	it("刪除使用者時其 matchmaker_players 一併刪除", async () => {
+		const db = getTestDb();
+		const userId = "mp-cascade-user";
+		await insertUser(db, userId, "mp-cascade@example.com");
+		for (const id of ["p1", "p2"]) {
+			await db
+				.prepare(
+					"INSERT INTO matchmaker_players (user_id, id, data, sort_order, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+				)
+				.bind(userId, id, "{}", 0, 1, NOW)
+				.run();
+		}
+
+		// 先確認資料確實建立，避免刪除後的 0 是恆真
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_players WHERE user_id = ?", userId),
+		).toBe(2);
+
+		await db.prepare("DELETE FROM user WHERE id = ?").bind(userId).run();
+
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_players WHERE user_id = ?", userId),
+		).toBe(0);
+	});
+
 	// regression guard（寫入即綠）：補 scoreboard_current.data 的 NOT NULL 約束覆蓋。
 	it("scoreboard_current 的 data 不可為 NULL", async () => {
 		const db = getTestDb();
