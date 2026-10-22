@@ -1,0 +1,110 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import { requestJson } from "./api-client";
+
+const schema = z.object({ n: z.number() });
+
+function stubFetch(impl: () => Promise<Response>) {
+	const mock = vi.fn(impl);
+	vi.stubGlobal("fetch", mock);
+	return mock;
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+describe("requestJson", () => {
+	it("2xx 且回應符合 schema 時為 ok", async () => {
+		stubFetch(async () => jsonResponse({ n: 1 }));
+		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			kind: "ok",
+			value: { n: 1 },
+		});
+
+		// 204 不驗證，value 為 undefined
+		stubFetch(async () => new Response(null, { status: 204 }));
+		const result = await requestJson("PUT", "/api/x", {
+			body: { a: 1 },
+			schema,
+		});
+		expect(result).toEqual({ kind: "ok", value: undefined });
+	});
+
+	it("409 為 conflict、401 為 unauthorized", async () => {
+		stubFetch(async () => jsonResponse({ error: "x" }, 409));
+		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			kind: "conflict",
+		});
+
+		stubFetch(async () => jsonResponse({ error: "x" }, 401));
+		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			kind: "unauthorized",
+		});
+	});
+
+	it("其餘 4xx 為 rejected 並帶狀態碼", async () => {
+		for (const status of [400, 404]) {
+			stubFetch(async () => jsonResponse({ error: "x" }, status));
+			await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+				kind: "rejected",
+				status,
+			});
+		}
+	});
+
+	it("5xx、網路錯誤或回應不符 schema 時為 failed 且不 throw", async () => {
+		const failures: Array<() => Promise<Response>> = [
+			async () => jsonResponse({ error: "x" }, 500),
+			async () => {
+				throw new TypeError("network down");
+			},
+			async () =>
+				new Response("not json", {
+					status: 200,
+					headers: { "Content-Type": "text/plain" },
+				}),
+			async () => jsonResponse({ n: "not a number" }),
+		];
+
+		for (const failure of failures) {
+			stubFetch(failure);
+			await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+				kind: "failed",
+			});
+		}
+	});
+
+	it("GET 帶 keepalive，有 body 時帶 JSON content-type，皆為 same-origin 憑證", async () => {
+		const getMock = stubFetch(async () => jsonResponse({ n: 1 }));
+		await requestJson("GET", "/api/x", { schema });
+		const [getUrl, getInit] = getMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit,
+		];
+		expect(getUrl).toBe("/api/x");
+		expect(getInit.method).toBe("GET");
+		expect(getInit.keepalive).toBe(true);
+		expect(getInit.credentials).toBe("same-origin");
+		expect(getInit.body).toBeUndefined();
+
+		const putMock = stubFetch(async () => jsonResponse({ n: 1 }));
+		await requestJson("PUT", "/api/x", { body: { a: 1 }, schema });
+		const [, putInit] = putMock.mock.calls[0] as unknown as [string, RequestInit];
+		expect(putInit.method).toBe("PUT");
+		expect(putInit.credentials).toBe("same-origin");
+		expect(putInit.body).toBe(JSON.stringify({ a: 1 }));
+		expect(new Headers(putInit.headers).get("Content-Type")).toBe(
+			"application/json",
+		);
+		// body 可能很大，keepalive 有 64 KiB 上限，PUT 不得帶
+		expect(putInit.keepalive).not.toBe(true);
+	});
+});
