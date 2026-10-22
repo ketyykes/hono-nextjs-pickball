@@ -114,7 +114,8 @@ Depends on: §4、§5
   - 紅燈：新增 4 個 it 全紅（`result.current[3]` 為 undefined，選擇器尚不存在），既有 14 個 it 仍綠（Tests 4 failed｜14 passed｜18；tasks 寫 15，實際既有為 14）。「session 載入中或訪客時走本機」的本機行為斷言（寫入 current 槽、無請求）本就綠，屬 regression guard 性質，其 `syncStatus` 為 local 的斷言才是紅燈來源。只在檔頭新增 mock 區塊與 import（vitest import 多了 afterEach）
   「已登入且未帶 matchId 時改用雲端並回傳 syncStatus」「session 載入中或訪客時走本機且 syncStatus 為 local」「雲端模式下 dispatch 不寫入 scoreboard:current:v1」「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」。
   確認新 it 紅燈、既有 15 個 it 仍綠（mock 不改變既有行為），貼出輸出；「session 載入中或訪客時走本機」若因只檢查本機行為而先綠，須點名標 regression guard（其 `syncStatus` 斷言應為紅）
-- [ ] 6.6 GREEN（TDD）：`hooks/useScoreboardStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalScoreboardStore`（`git diff` 應只顯示函式名稱那一行與新增的選擇器），新增選擇器 `useScoreboardStore`（回傳第四個元素 `syncStatus`）
+- [x] 6.6 GREEN（TDD）：`hooks/useScoreboardStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalScoreboardStore`（`git diff` 應只顯示函式名稱那一行與新增的選擇器），新增選擇器 `useScoreboardStore`（回傳第四個元素 `syncStatus`）
+  - 綠燈：選擇器新增；`git diff` 對本機 hook 只見 `export function` → `function useLocalScoreboardStore` 一行與新增的 import／選擇器；兩檔 25 passed（既有 14＋選擇器 4＋雲端 7）
 - [ ] 6.7 REFACTOR：選擇器與雲端 hook 的介面是否足以讓 B6 照抄（`enabled`、`onUnauthorized`、`syncStatus`）；無壞味道則註記 skipped
 
 ## 7. E2E 夾具與計分板畫面接線
