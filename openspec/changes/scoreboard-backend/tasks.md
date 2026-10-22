@@ -69,7 +69,8 @@ Depends on: §3
 - [x] 4.3 GREEN（TDD）：新增 `src/scoreboard/repository.ts`（`getCurrent`、`putCurrent`；design Decision 3 的單一條件式 SQL）、`src/routes/scoreboard.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession)`、`zValidator` hook 回 `INVALID_BODY`、`matchId` 檢查）；
   `src/index.ts` 以 `app.route("/api/scoreboard", scoreboardRoutes)` 掛載。4.2 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
   - 實跑紀錄：`test/scoreboard-current.test.ts` 10/10 綠；`pnpm --filter ./hono-pickball typecheck` exit 0。JSON 語法錯誤：實測 Hono 的 `app.route` 會套用 sub-app 的 `onError`，故於 `scoreboardRoutes` 以 `onError` 將 `HTTPException(400)` 轉為 `{ error: "INVALID_BODY" }`，其餘錯誤維持 Hono 預設（HTTPException 回其 response、其他 500）
-- [ ] 4.4 REFACTOR：錯誤回應的建立是否重複（抽成 `src/http/errors.ts` 的小 helper 與否）；無壞味道則註記 skipped
+- [x] 4.4 REFACTOR：錯誤回應的建立是否重複（抽成 `src/http/errors.ts` 的小 helper 與否）；無壞味道則註記 skipped
+  - skipped：`INVALID_BODY` 回應僅在單一檔案出現三次一行式，抽 helper 只增加間接層；`UNAUTHORIZED`／`VERSION_CONFLICT` 各一處，無壞味道
 
 ## 5. 前端：同步基礎（`lib/sync/`）
 
