@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
+import { useSession } from "@/hooks/useSession";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
+import { buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
+import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // JSON 完整備份區塊（M8 §8.4／§8.9）：涵蓋匯出（Blob + <a download>）與匯入
 // （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
@@ -24,8 +27,26 @@ import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 // 不用字串比對 message 內容判斷類別。
 export function JsonBackupSection() {
 	const [message, setMessage] = useState<string | null>(null);
+	const isRemote = resolveStorageMode(useSession()) === "remote";
+
+	async function handleRemoteExport() {
+		const exportedAt = new Date().toISOString();
+		const result = await buildRemoteBackupSnapshot();
+		if (!result.ok) {
+			setMessage(result.message);
+			return;
+		}
+		setMessage(null);
+		const backup = buildBackup(result.snapshot, { exportedAt });
+		downloadTextFile(JSON.stringify(backup, null, 2), backupFileName(exportedAt), "application/json");
+	}
 
 	function handleExport() {
+		if (isRemote) {
+			void handleRemoteExport();
+			return;
+		}
+
 		const exportedAt = new Date().toISOString();
 		const backup = buildBackup(readSnapshot(), { exportedAt });
 		downloadTextFile(JSON.stringify(backup, null, 2), backupFileName(exportedAt), "application/json");
@@ -59,12 +80,19 @@ export function JsonBackupSection() {
 			</CardHeader>
 			<CardContent className="flex flex-wrap items-start gap-2">
 				<Button onClick={handleExport}>匯出 JSON</Button>
-				<FileTextPicker
-					label="選擇備份檔…"
-					accept="application/json"
-					testId="json-backup-import-input"
-					onFileText={handleImportText}
-				/>
+				{isRemote ? (
+					// 雲端名單不能被備份檔整份覆蓋，還原改由登出後的本機流程處理
+					<p className="w-full text-sm text-muted-foreground">
+						登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能
+					</p>
+				) : (
+					<FileTextPicker
+						label="選擇備份檔…"
+						accept="application/json"
+						testId="json-backup-import-input"
+						onFileText={handleImportText}
+					/>
+				)}
 				{message !== null && (
 					<p role="alert" className="w-full text-sm text-destructive">
 						{message}

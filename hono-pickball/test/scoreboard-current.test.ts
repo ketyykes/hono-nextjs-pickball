@@ -1,9 +1,9 @@
 import { env, exports } from "cloudflare:workers";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
-import { seedUser, signIn } from "./helpers/session";
+import { seedUser, signIn, userIdOf } from "./helpers/session";
 
 const origin = "http://localhost:3005";
 const url = `${origin}/api/scoreboard/current`;
@@ -184,5 +184,74 @@ describe("/api/scoreboard/current", () => {
 		expect(await res.json()).toEqual({ error: "INVALID_BODY" });
 		const getRes = await getCurrent(cookie);
 		expect(await getRes.json()).toEqual({ data: null, version: 0 });
+	});
+	// 以下三個 it 為 regression guard（行為早已實作，寫入即綠）。
+	it("PUT 忽略 query 與 body 中的 userId，一律寫入登入者本人", async () => {
+		const cookieA = await seedAndSignIn("sb-uid-a@example.com");
+		const cookieB = await seedAndSignIn("sb-uid-b@example.com");
+		const idA = await userIdOf("sb-uid-a@example.com");
+		const putA = await putCurrent(cookieA, { data: scoreState(9, 9), version: 0 });
+		expect(putA.status).toBe(200);
+		// GET 同樣不能被 query 的 userId 帶到別人的資料
+		const getWithQuery = await exports.default.fetch(
+			new Request(`${url}?userId=${idA}`, { headers: { Cookie: cookieB } }),
+		);
+		expect(await getWithQuery.json()).toEqual({ data: null, version: 0 });
+
+		const res = await exports.default.fetch(
+			new Request(`${url}?userId=${idA}`, {
+				method: "PUT",
+				headers: { Cookie: cookieB, "Content-Type": "application/json", Origin: origin },
+				body: JSON.stringify({ data: scoreState(2, 2), version: 0, userId: idA }),
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		expect(await (await getCurrent(cookieA)).json()).toEqual({ data: scoreState(9, 9), version: 1 });
+		expect(await (await getCurrent(cookieB)).json()).toEqual({ data: scoreState(2, 2), version: 1 });
+	});
+
+	it("getSession 拋出例外時回 500", async () => {
+		const cookie = await seedAndSignIn("sb-session-down@example.com");
+		const throwingDb = {
+			prepare() {
+				throw new Error("D1 查詢失敗（測試替身）");
+			},
+			batch() {
+				throw new Error("D1 查詢失敗（測試替身）");
+			},
+			exec() {
+				throw new Error("D1 查詢失敗（測試替身）");
+			},
+		} as unknown as D1Database;
+		const brokenEnv = { ...env, DB: throwingDb };
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const getRes = await app.request("/api/scoreboard/current", { headers: { Cookie: cookie } }, brokenEnv);
+			const putRes = await app.request(
+				"/api/scoreboard/current",
+				{
+					method: "PUT",
+					headers: { Cookie: cookie, "Content-Type": "application/json", Origin: origin },
+					body: JSON.stringify({ data: scoreState(1, 0), version: 0 }),
+				},
+				brokenEnv,
+			);
+
+			expect([getRes.status, putRes.status]).toEqual([500, 500]);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("已有資料時 GET 回 200 與該筆資料", async () => {
+		const cookie = await seedAndSignIn("sb-get-existing@example.com");
+		const put = await putCurrent(cookie, { data: scoreState(4, 6), version: 0 });
+		expect(put.status).toBe(200);
+
+		const res = await getCurrent(cookie);
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ data: scoreState(4, 6), version: 1 });
 	});
 });

@@ -101,6 +101,37 @@
 
 **Rationale**：前端解析回應與後端驗證匯入請求用同一份（B5 Decision 9 的原則）。
 
+## apply §1 查證紀錄（2026-10-22，leader 執行）
+
+**1.2 對齊 B5 實際落地**（與本 design Context 無衝突，以下為實際簽章補充）：
+- `localAuth`（`src/auth/local-auth-middleware.ts`）為 `createMiddleware<AuthAppEnv>`；`requireSession` 無 session 回 `401 { error: "UNAUTHORIZED" }`、不 try/catch（getSession 例外 → 500）；
+  `SessionAppEnv` 的 `c.var.user.id` 為使用者 id。`getDb(c.env)` 為唯一 D1 入口。
+- `src/routes/scoreboard.ts`：`new Hono<SessionAppEnv>().use("*", localAuth, requireSession).onError(...)`，`zValidator("json", schema, hook)` 的 hook 回 `400 INVALID_BODY`；
+  `onError` 把 `HTTPException(400)`（JSON 語法錯誤）轉為 `INVALID_BODY`、其他 HTTPException 原樣、其餘 500（B5 OQ6）。
+- 核心套件 `api/versioned`（`versionedEnvelopeSchema`／`versionedWriteSchema`，版本為非負整數）、`api/errors`（`API_ERROR_CODES`）、`api/user-data-tables`（目前 `["scoreboard_current"]`）；
+  `CORE_MODULES` 目前 21 項（`packages/pickball-core/CLAUDE.md` 亦寫「目前 21 項」，§2 加模組後一併改為 22）。
+- 前端 `requestJson(method, path, { body?, schema })` 回 `ok`（204 時 `value: undefined`）／`conflict`／`unauthorized`／`rejected`／`failed`，永不 throw；
+  `createLatestWinsSaver({ send, onResult })` 事件為 `saving`／`saved`／`retrying`／`conflict`／`unauthorized`／`rejected`；`resolveStorageMode(snapshot)`；`useSession()` 回 snapshot＋`refresh`。
+- `useRemoteScoreboardStore` 回傳 tuple `[state, dispatch, syncStatus]`；名單 hook 依 spec 回傳物件（`UseRosterStoreResult`），兩者形態不同屬預期（名單已是物件形態的既有 API）。
+- `playwright.config.ts` 的 `user-data` project 為 `testDir: ./tests/e2e/user-data`、不設 project 層 storageState；`clearTestAccountUserData()` 以 `USER_DATA_TABLES` 逐表 DELETE，加表後自動涵蓋。
+- **MODIFIED Requirement 對齊**：`player-roster` 兩個、`data-transfer` 一個、`pickleball-guide-page` 一個，主 spec 原文與 delta 逐行比對後，delta 僅有本 change 的新增段落與 Scenario
+  （`pickleball-guide-page` 已含 B5 的 `useRemoteScoreboardStore`；`data-transfer` 主 spec 該 Requirement 末尾的 `---` 分隔線不在 delta 內，archive 時屬排版差異）。無需重新套用；
+  `openspec validate --strict` 通過。
+
+**1.3 Context7 查證**：
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/indexes-constraints`）：`sqliteTable(name, cols, (t) => [primaryKey({ columns: [t.userId, t.id] })])` 宣告複合主鍵——與 Decision 1 相同。
+- 同上（`sqlite/insert`「Insert into ... select」）：`` db.insert(t).select(qb | () => qb | sql`...`) `` 三種寫法皆支援；**upsert 子句存在時 SELECT 必須帶 WHERE**（否則 `ON` 有解析歧義）——
+  本案的 SELECT 本來就有 `WHERE user_id = ?`，符合。
+- 同上（`sqlite/batch-api`）：`db.batch([...])` 支援 D1，可含 insert／update／delete——與 Decision 2 相同。
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`d1/worker-api/d1-database#batch`）：「Batched statements are SQL transactions. If a statement in the sequence fails, … it aborts or rolls back the entire sequence」——與 Decision 2 相同。
+
+**1.4 一次性實測**（workerd＋drizzle-orm 0.45、暫時測試檔，未 commit）：
+- `db.batch([insert p4, insert p1(已存在), insert p5])` 拋 `D1_ERROR: UNIQUE constraint failed: …: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_PRIMARYKEY)`，之後表內只有 p1——**整批回滾成立**。
+- `sort_order` 子查詢（Open Questions 1 定案）：
+  `` db.insert(t).select(sql`select ${userId}, ${id}, ${JSON.stringify(data)}, coalesce(max(${t.sortOrder}), -1) + 1, 1, ${now.getTime()} from ${t} where ${t.userId} = ${userId}`).onConflictDoNothing().returning() ``
+  產生單一陳述式 `insert … select … where user_id = ? on conflict do nothing returning …`；新列回傳且 `data` 經 `mode: "json"` 解回物件；已存在時回 `[]`；該使用者無任何列時 `sort_order` 為 0。
+  **注意**：`select` 內的值不經欄位 mapping，`data` 必須自行 `JSON.stringify`、`updated_at` 以 `getTime()` 傳入。query builder 寫法（`` qb.select({ col: sql`…`.as("col") }) ``）亦可，產生等價 SQL。
+
 ## Risks / Trade-offs
 
 - [Risk] **過渡期**（B6 合併到 B7 合併之間）：登入時名單在雲端、回合與歷史在本機且與訪客共用同一組 key；登出後訪客會看到登入時產生的回合（球員 id 指向雲端名單），
@@ -121,6 +152,7 @@
 1. **場次分槽**（B5 Decision 1）：`scoreboard:matches:v1` 與回合一起上雲；`resetLocalMatchProgress()` 在 B7 後應只剩 history（B8 後刪除此函式）；`POST /api/matchmaker/reset` 的 batch 要加入回合與分槽表。
 2. **送出比分**：後端權威 batch 需更新 `matchmaker_players.data`（四人評分）＋寫回合＋寫歷史；版本條件不成立時讓 batch 失敗的寫法見 B5 Open Questions 1。
    B7 後 `useRoundStore` 在雲端模式不應再經 `updatePlayer` port 逐人 PUT 評分（避免與後端權威重複寫入）。
+   對戰頁回填 effect（`app/matchmaker/page.tsx`，deps 只有 `[round]`）應等名單就緒（`syncStatus` 非 loading／load-failed，並以「名單就緒」加入依賴讓載入後重跑），否則雲端載入期間回填會以空名單或訪客名單送分（OQ13）。
 3. **歷史**（B8）：只增不改，適合「多筆契約」去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 要同步。
 4. **B9**：登入態 JSON 還原目前停用（本 change「登入時的資料工具頁」）；B9 決定其去留。本機 `matchmaker:roster:v1` 在登入時刻意保留，作為匯入來源。
 
@@ -128,3 +160,56 @@
 
 1. drizzle 對「`INSERT ... SELECT MAX(sort_order)+1 ... ON CONFLICT DO NOTHING RETURNING`」的表達方式（`insert().select()` 或 `sql` 原生片段），§1 實測後定案並記錄。
 2. 對戰頁與統計頁在雲端載入中以提示取代內容，是否影響 `useRoundStore` 的 hydrate 時序（它不依賴 `players`，預期無影響）——§7 E2E 驗證。
+3. （apply §1 定案 OQ1）採 `sql` 模板的 `insert().select()` 單一陳述式（見「apply §1 查證紀錄」1.4），不先讀再寫。
+4. （apply §1，B5 帶過來的待辦 1：後端測試補強）納入本 change §3，新增 task 3.6（regression guard，誠實標註）：
+   ① `test/user-data-tables.test.ts` 的 `NOT LIKE '_cf_%'` 改為 `NOT GLOB '_cf_*'`（`_` 在 LIKE 為單字元萬用字元；只改查詢字串、it 名稱與斷言不變——這是 tasks 檔頭「允許碰的既有測試檔」以外的唯一例外，經 coordinator 指示授權）；
+   ② `test/scoreboard-current.test.ts` **只新增** it：「PUT 忽略 query 與 body 中的 userId，一律寫入登入者本人」「getSession 拋出例外時回 500」「已有資料時 GET 回 200 與該筆資料」（B5 OQ7 ②③；不改既有 it）。
+   B6 的 `test/matchmaker-players.test.ts` 在 3.3 RED 時除 spec 的 15 個 it 外，另寫兩個守護 it：「不從 query 或 body 接受 userId」「getSession 拋出例外時回 500」（路由不存在時為 404 → 真紅）。
+5. （apply §1，B5 帶過來的待辦 2）`onError`（HTTPException(400) → `INVALID_BODY`）與 `zValidator` hook 抽到 `src/http/`，由 3.5 REFACTOR 執行，scoreboard 與 matchmaker 共用；B5 測試原樣通過。
+6. （apply §1，B5 帶過來的待辦 3：跨分頁換帳號，B5 OQ10 ①）**評估結論：本 change 不處理，列為 G1 前必修**。理由：
+   另一分頁以 B 登入會直接覆寫同一個 cookie，本分頁之後的請求以 B 的身分成功（不會 401），session store 也不會 refresh，因此「以 user id 作為 effect 依賴」在實務上不會觸發，只是看起來有防護。
+   對名單的實際影響有界：本分頁對 A 的參賽者送出的 PUT（version > 0）在 B 名下不存在 → 409 → 整份重載（此時載入的是 B 的名單，但畫面上的帳號仍顯示 A）；DELETE 對 B 為 no-op；
+   **新增（version 0 PUT）與 CSV 匯入會寫進 B**。計分板（B5，單筆）在版本號相同時會把 A 的比分覆寫進 B。
+   正解需要伺服器端驗證「前端以為的使用者」：例如前端在每個使用者資料請求帶 `X-Expected-User-Id`，後端與 `c.var.user.id` 不符時回 401（觸發 refresh），
+   或以 `storage` 事件／BroadcastChannel 跨分頁同步 session。兩者都跨 B5／B6 共用層（`requestJson`、`requireSession`），屬 G1 前必修，不在 B6 範圍內實作。
+   **coordinator 已同意（2026-10-23）**：列為 G1 前必修，本 change 不處理。3.6 修改 `user-data-tables.test.ts` 的授權例外亦經 coordinator 確認。
+7. （apply 進度，2026-10-23 leader 交回時）§1、§2 完成（§2 Stage 1 PASS、Stage 2 第一輪 FAIL→補 5 條 regression guard 斷言 `a4c3a8a`→複審 PASS）。
+   §3 Implementer 完成 3.1～3.6（`536d6ca..f52b59e`；後端 17 檔／95、`src/http/invalid-body.ts` 抽出 onError 與 zValidator hook），Stage 1 PASS；
+   **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2 或取得其結論後再開始 §4。Stage 1 非阻擋觀察：`isConstraintError` 的 `SQLITE_CONSTRAINT` 比對範圍比主鍵衝突寬（FK／NOT NULL 也會判成 409）。
+   §4～§8 未開始。
+8. （apply §3 Stage 2 第一輪，2026-10-23）FAIL：唯一必修為「寫入與回傳驗證後輸出（含預設值）」無測試守住（V1、V2、R23 存活），以 regression guard 補 it；
+   `isConstraintError` 依 Stage 2 建議與 coordinator 裁定收斂為只認主鍵／UNIQUE，以 TDD 補「非主鍵約束違規回 500 而非 409」。已退回 §3 Implementer 修正，待複審。
+   Stage 2 非阻擋建議（留 §8／後續）：`userDataOnError` 對非 400 HTTPException 的 `getResponse()` 分支無測試（B5 既有缺口）；`src/http/invalid-body.ts` 檔名偏窄；
+   `hono-pickball/CLAUDE.md` 路由約定應改指向 `src/http/invalid-body.ts`（8.1 處理）；`matchmaker_players` 各欄 NOT NULL 未個別測試（migration 為工具產生，風險低）。
+9. （apply §3 Stage 2 複審，2026-10-23）PASS（`dd4d60d` guard、`d6b957e` RED、`b5de2e1` fix；後端 17 檔／97）。非阻擋：`isConstraintError` 走 cause 鏈的部分無測試覆蓋（實測 D1 batch 主鍵衝突在最外層訊息即可比對），
+   新 it 註解「約束細節在 cause 內」與 batch 實測不符——留 §8／後續修註解或補 it。下一步 §4。
+10. （apply §4，2026-10-23）完成（`6a5f5f1`、`b01df1d` RED；`3ff0ea3` GREEN——4.2 與 4.4 合併為一個 feat commit，屬流程偏離；`1de7deb`、`82020ce` regression guard）。
+    Stage 1 PASS；Stage 2 第一輪 FAIL（passthrough 只斷言兩個包裝、SSR guard 空轉），補測試後複審 PASS。前端 93 檔／852（Implementer 全套 851＋複審後新增 1）。
+    非阻擋：`PUT_PLAYER_RESPONSE_SCHEMA` 的 version 為 nonnegative，比後端實際（≥1）寬；`removeItem` 拋例外的分支無測試（既有 `resetMatchmakerData` 同樣缺）。下一步 §5。
+11. （apply §5，2026-10-23）完成（`c9c6ec0`、`80c831c` RED；`20eaa2d`、`451634a` GREEN；`8b9d939` 主 spec 歸屬清單同步；`35629d3` guard；`2096238` 5.7 skipped；Stage 2 修正 `7ab38ea` RED＋guard、`d46b35c` fix、`6eb648c` guard）。
+    Stage 1 PASS；Stage 2 第一輪 FAIL（重置在途時 401 或衝突重載完成會重開操作——實跑重現多送 PUT；DELETE 錯誤路徑無測試），TDD 修正後複審 PASS。前端 94 檔／887。
+    實作偏離 Decision 3：未用 HYDRATE／UPSERT／REMOVE／RESET reducer，改以 `useState`＋`playersRef` 同步鏡像（變更操作需以最新名單同步算出新值再入佇列），同步狀態以 `useReducer` 彙總；可寫入由 phase／stopped／resetting／reloading 統一推導（`updateReady()`）。Stage 1 判為可接受。
+    5.5 先綠斷言：「session 載入中或訪客時走本機…」的本機 key 寫入與「無請求」斷言、「雲端模式下變更名單不寫入…」的 `toBeNull`，在舊實作下本就成立，被前面的 `syncStatus` 斷言先紅遮住（後者由 mutation 守住）。
+    **待 coordinator 裁定**：
+    ① 黏著狀態語意（REPRO-B）：p1 回 400 為 `rejected` 後，p2 儲存成功、全部閒置即回 `synced`，p1 被拒的變更從提示消失。現行解讀「下一次全部成功＝佇列全部閒置且最後一次成功」；更嚴格的作法是只讓「黏著之後才開始的儲存」清除。維持現狀。
+    ② 重置在途時卸載或停用（R10）：`cancelled` 使結果被忽略，伺服器可能已清空但本機回合／歷史／分槽不清。維持現狀。
+    ③ 重置在途時收到 401：reset 成功（204）的結果被 `stopped` 丟棄，伺服器已清空但畫面與本機進度不動（`6eb648c` 刻意守住，與 401 後切回本機一致）。
+    非阻擋：401 之後與衝突重載期間不重新發佈狀態（停留在前值，選擇器會因 session refresh 切回本機）；saver 刪除成功後仍留在 Map 直到下一次 `disposeAll`；兩處不可達的 `undefined` 防衛。
+    §7 須留意：雲端 loading／load-failed／重載中／重置中時 `updatePlayer` 靜默不做事，而 `useRoundStore` 的回合仍會前進（Risk 3 延伸），頁面以 `SyncStatusNotice` 取代內容來擋，E2E 確認。下一步 §6。
+12. （apply §6，2026-10-23）完成（`7fed3e3` RED、`df9b771` GREEN、`c4655c0` 夾具強化；Stage 2 收尾 `ed6a324` RED、`02c54bd` fix、`2a4255f` guard、`243c6e4` 文案、`803b7f8` docs）。Stage 1、Stage 2 皆 PASS（無必修）。前端 95 檔／893（收尾後 remote-transfer 單檔 8 個 it，全套於 §7 收尾重跑）。
+    偏離：匯入函式名為 `importRemoteRoster`（Decision 6 寫 `importRosterRemote`，非 spec 錨點）；`buildRemoteBackupSnapshot` 回 `{ ok: true, snapshot } | { ok: false, message }`；新增 export `REMOTE_TRANSFER_MESSAGES`（不動核心 `TRANSFER_MESSAGES`）。
+    額外行為（leader 授權）：預覽含錯誤列時不送任何請求、回 `previewHasErrors`；GET 後沒有可新增的列（只有標題列的 CSV）時不送 POST、視為成功（本機分支同一檔案亦為無害成功；否則後端 `min(1)` 回 400、提示「請稍後再試」卻永遠失敗）。
+    RED 流程瑕疵：6.1 紅燈在 shell 實際看到後，commit 因 zsh 錯誤晚於實作檔寫入磁碟才建立（RED commit 只含測試檔，`7fed3e3^` 無實作檔可複驗）。
+    非阻擋（留給後續）：`importConflict` 成因描述（實務上是重試同一批 id 撞號）不精確但建議動作正確；`importFailed` 涵蓋「已 commit 但回應遺失」，§7 重試時重新產生 id 可能整批重複匯入——元件層以 reload 確認名單後再匯入緩解。下一步 §7。
+13. （apply §7，2026-10-23）完成（`c5b86b0` RED，10 個 E2E 全紅於頁面接線；`1f6c7a2` GREEN，同 commit 修正 spec 自身 4 處寫法——選強度、改雙打、場地 selector、等 reload 的 load 事件，未放寬斷言；`3c809eb` 7.3 skipped；Stage 2 收尾 `3421e6f` guard＋RED、`78ed4c7` fix）。
+    Stage 1、Stage 2 皆 PASS（無必修）；Stage 2 持鎖連跑 roster-sync 3 輪 30/30，並以延遲後三個 PUT 的實驗證實「等第一個 PUT 再等 synced」可涵蓋四位評分 PUT（synced 要等全部佇列清空）。
+    Stage 2 收尾：補對戰頁／統計頁 load-failed 取代與訪客三頁不輸出 `data-sync-status` 的守護（新增 `tests/e2e/specs/matchmaker-local-mode.spec.ts`，會在全部訪客 project 執行）；雲端 CSV 匯入進行中停用確認鈕（雙擊會以新 UUID 附加兩批重複參賽者，TDD）。`JsonBackupSection` 雲端匯出未加防重複（雙擊只多下載一份，不動雲端資料）。
+    OQ2 結論：頁面在雲端 loading 時以提示取代內容不影響 `useRoundStore` 的 hydrate 時序（hooks 皆在 early return 前呼叫）。
+    既有問題（非 §7 引入，留 B7）：對戰頁回填 effect（`app/matchmaker/page.tsx` deps 只有 `[round]`）在雲端 loading 期間執行時 `players` 為空或為本機訪客名單，`submitScore` 回 `SCORING_FAILED`，名單載入後不重試，要等下次 round 變動才補送——不損毀資料但回填延遲。
+    user-data E2E 18 個（scoreboard-sync 6、roster-sync 12）；訪客 chromium 既有 4 spec 42 passed。下一步 §8。
+14. （apply Final Code Review，2026-10-23）APPROVE WITH NITS，無必修；全套 95／895、17／97、3／6，user-data E2E 18 passed；抽查 9 個 RED commit 以 `git show <RED>^:` 複驗皆為真紅。
+    已於本 change 修正：`nextjs-pickball/CLAUDE.md` 改寫「雲端模式不讀寫本機名單」為實際行為；`hono-pickball/CLAUDE.md` 的 onError 指向 `src/http/invalid-body.ts`（OQ8 遺留）；OQ13 回填延遲寫入「交接給 B7～B9」第 2 點。
+    補揭露流程偏離：`20eaa2d`（5.2 GREEN）把 RED 測試「GET 或寫入回 401 時呼叫 onUnauthorized」的 `callsAfterUnauthorized` 由 4 改為 3——加嚴（401 後其他參賽者的待送值也不得送出，與該段註解一致），Implementer 回報時已說明為 RED 計數筆誤，但未寫進 tasks／design。
+    **待 coordinator 裁定**：delta spec `specs/player-roster/spec.md`「LocalStorage 持久化與逐筆降級」的「雲端模式下……SHALL NOT 讀取或寫入 `matchmaker:roster:v1`」與實作不符（本機 hook 仍掛載並讀取、正規化寫回；Decision 4 已知取捨），archive 後主 spec 會留下不實的 SHALL NOT。建議改為「雲端模式下使用者操作 SHALL NOT 改變該 key 的內容；本機實作仍會掛載，依既有逐筆降級規則讀取與回寫」。leader 未自行改 delta spec。B5 主 spec `openspec/specs/scoreboard/spec.md:135` 同類，轉 G1。
+    Final 對 OQ11／OQ13 的建議：①②③ 維持現狀（② 隨 B7 reset batch 消失），OQ13 轉 B7（已寫入交接）。
+    轉 B7／G1 的非阻擋項：重置期間重試中的 v0 PUT 可能讓參賽者在雲端「復活」（`reset()` 前未 `disposeAll()`，轉 B7）；import 無筆數／body 上限、`PlayerSchema.id` 接受空字串（API 層加 `.max()`／`bodyLimit`，轉 G1）；import 的 `sort_order` 可改為 batch 內逐條 insert-select 根除併發重複；前端 PUT 回應 version 下限比後端寬（從核心 export 共用 schema）；同一 mount 換帳號會閃一幀前帳號名單（G1 跨分頁換帳號一併處理）；回應遺失後重試出現假 conflict（契約非冪等的既有性質）。

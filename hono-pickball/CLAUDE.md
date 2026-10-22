@@ -3,8 +3,9 @@
 本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
 
 > ⚠️ 範圍例外：計分板（`/scoreboard`）已部分上雲（B5：登入且未綁定場次時以雲端為準，路由見 `src/routes/scoreboard.ts`）；
-> matchmaker（對戰分配機）目前仍為 **LocalStorage-only 純前端功能**，引擎與名單邏輯放在
-> `nextjs-pickball/lib/matchmaker/`，**待 B6 上雲**，在那之前不是待搬進來的「後端邏輯」。
+> matchmaker（對戰分配機）的**參賽者名單已上雲**（B6：`src/routes/matchmaker.ts`，表 `matchmaker_players`）。
+> **回合、歷史、場次分槽仍為前端 LocalStorage**，待 B7、B8，在那之前不是待搬進來的「後端邏輯」；
+> 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
 
@@ -75,8 +76,16 @@
   - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
   - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
   - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
-  - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`（見 `src/routes/scoreboard.ts`），新 sub-app 照抄時一併帶上
+  - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`，共用實作為 `src/http/invalid-body.ts` 的 `userDataOnError`（搭配 zValidator 的 `invalidBodyHook`），新 sub-app 直接沿用、不要另寫
   - **授權覆蓋表**：每個端點須有三類測試——未登入 401、他人資料不可見／不可改、帳號停用 404
+- **matchmaker 名單 API**（B6，`src/routes/matchmaker.ts`、`src/matchmaker/players-repository.ts`）：
+  - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409）；`POST /reset`（batch 刪除）
+  - 掛 `localAuth, requireSession`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
+  - 多筆契約要點：複合主鍵 `(user_id, id)`；`sort_order = coalesce(max,-1)+1`；`GET` 依 `sort_order, rowid` 排序；只有主鍵衝突判 409，其他約束違規為 500（`isConstraintError` 只認 `SQLITE_CONSTRAINT_PRIMARYKEY` 與 `UNIQUE constraint failed`，並沿 cause 鏈查找）
+  - **後續 change 須知**（詳見 openspec change `matchmaker-roster-backend` design「交接給 B7～B9」）：
+    1. 場次分槽（`scoreboard:matches:v1`）隨回合一起上雲；`POST /api/matchmaker/reset` 的 batch 要加入回合與分槽表
+    2. 送出比分採後端權威 batch：更新 `matchmaker_players.data`（四人評分）、寫回合、寫歷史；版本條件不成立時讓 batch 失敗的寫法見 B5 Open Questions 1
+    3. 歷史（B8）只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 要同步
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）

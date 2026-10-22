@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
+import { useSession } from "@/hooks/useSession";
+import { importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
 import { readRoster } from "@/lib/matchmaker/storage";
 import { writeRosterPlayers } from "@/lib/matchmaker/transfer-storage";
+import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // 匯入分兩階段：選檔後先解析出預覽（可新增人數＋問題列），使用者確認後才寫入
 // （spec「參賽者 CSV 匯入的預覽、附加寫入與整份原子性」）。取消／關閉預覽不寫入任何資料。
@@ -33,6 +36,9 @@ type PreviewState =
 export function RosterCsvImportSection() {
 	const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
 	const [message, setMessage] = useState<string | null>(null);
+	// 雲端匯入先 GET 再 POST，往返期間若可重複點擊，每次都會產生新的 UUID 而附加重複參賽者
+	const [isImporting, setIsImporting] = useState(false);
+	const isRemote = resolveStorageMode(useSession()) === "remote";
 
 	function handleFileText(text: string) {
 		const parsed = parseRosterCsv(text);
@@ -47,8 +53,28 @@ export function RosterCsvImportSection() {
 		setPreview({ status: "idle" });
 	}
 
+	// 雲端分支：名單在雲端，不讀寫本機 roster；成功後比照本機分支 reload，頁面重載會重新 GET。
+	async function handleRemoteConfirm(parsed: Extract<ParseRosterCsvResult, { ok: true }>) {
+		const ids = parsed.rows.map(() => crypto.randomUUID());
+		const now = new Date().toISOString();
+		setIsImporting(true);
+		const imported = await importRemoteRoster(parsed, { ids, now });
+		if (!imported.ok) {
+			// 失敗時恢復可按；成功會 reload，不需要恢復
+			setIsImporting(false);
+			setMessage(imported.message);
+			return;
+		}
+		location.reload();
+	}
+
 	function handleConfirm() {
 		if (preview.status !== "ready" || preview.result.errors.length > 0) return;
+
+		if (isRemote) {
+			void handleRemoteConfirm(preview.result);
+			return;
+		}
 
 		const { players } = readRoster();
 		const ids = preview.result.rows.map(() => crypto.randomUUID());
@@ -84,7 +110,7 @@ export function RosterCsvImportSection() {
 						testId="roster-csv-import-input"
 						onFileText={handleFileText}
 					/>
-					<Button disabled={!canConfirm} onClick={handleConfirm}>
+					<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
 						確認匯入
 					</Button>
 					{preview.status !== "idle" && (

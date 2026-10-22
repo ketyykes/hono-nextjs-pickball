@@ -19,7 +19,7 @@
 
 ## 新增模組
 
-- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 21 項），否則邊界測試轉紅。
+- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 22 項），否則邊界測試轉紅。
 - 需要瀏覽器 I/O 的程式（localStorage、Blob 下載、canvas）留在前端，不進本套件。
 
 ## 測試

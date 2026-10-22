@@ -90,7 +90,7 @@
 重置後 SHALL NOT 把空名單寫回，否則剛移除的 key 會立即復活。此「跳過寫入」的意圖 MUST 保存在 **reducer state** 中，SHALL NOT 以一次性的 ref 旗標實作 —— React automatic batching 會把同一個 handler 內連續呼叫的 `resetRoster()` 與 `addPlayer()` 合併為單次 render，一次性旗標被重置設下後不會被後續 action 復位，該次寫入因此被整批跳過：記憶體中有新參賽者、LocalStorage 卻是空的，使用者此刻重新整理即**靜默遺失資料**。折進 state 後，批次內的多個 action 會依序 reduce，最後一個 action 的決定自然覆蓋前面的，不需另外處理批次合併。
 
 **儲存模式**：本 Requirement 規範**本機模式**（訪客、auth 停用、session 載入中）的名單持久化。雲端模式下名單改由「登入時名單以雲端為準」Requirement 規範，
-SHALL NOT 讀取或寫入 `matchmaker:roster:v1`（該 key 保留訪客時期的名單）。本機實作位於 `useRosterStore.ts` 內的 `useLocalRosterStore`，程式碼與本 change 前的 `useRosterStore` 相同。
+使用者在雲端模式下的操作 SHALL NOT 改變 `matchmaker:roster:v1` 的內容（該 key 保留訪客時期的名單）；本機實作在雲端模式下仍會掛載，依既有逐筆降級規則讀取並回寫該 key（不含使用者在雲端模式下的任何變更）。本機實作位於 `useRosterStore.ts` 內的 `useLocalRosterStore`，程式碼與本 change 前的 `useRosterStore` 相同。
 
 實作位於 `nextjs-pickball/lib/matchmaker/storage.ts` 與 `nextjs-pickball/hooks/useRosterStore.ts`。
 

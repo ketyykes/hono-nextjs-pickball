@@ -15,6 +15,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { nextAutoGradient } from "@/lib/matchmaker/roster";
 import type { Player } from "@pickball/core/matchmaker/types";
@@ -26,7 +27,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 // 與 EmptyRoster 的入口共用同一份 open 狀態；編輯 Dialog 的開關則由「目前正在編輯
 // 哪一位」（editingPlayer）決定，避免額外一顆 boolean 與 editingPlayer 脫鉤。
 export default function PlayersPage() {
-	const { players, droppedCount, addPlayer, updatePlayer, removePlayer, togglePlayerActive, resetRoster } =
+	const { players, droppedCount, addPlayer, updatePlayer, removePlayer, togglePlayerActive, resetRoster, syncStatus } =
 		useRosterStore();
 	const [isAddOpen, setIsAddOpen] = useState(false);
 	const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -49,8 +50,26 @@ export default function PlayersPage() {
 		setEditingPlayer(null);
 	}
 
+	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
+	if (syncStatus === "loading" || syncStatus === "load-failed") {
+		return (
+			<main
+				data-sync-status={syncStatus}
+				className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+			>
+				<SyncStatusNotice status={syncStatus} />
+			</main>
+		);
+	}
+
 	return (
-		<main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+		<main
+			// 本機模式為 undefined，React 不輸出屬性，訪客 DOM 不變
+			data-sync-status={syncStatus === "local" ? undefined : syncStatus}
+			className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+		>
+			<SyncStatusNotice status={syncStatus} />
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-bold">參賽者名單</h1>

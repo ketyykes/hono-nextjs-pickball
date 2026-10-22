@@ -9,6 +9,7 @@ import type { MatchStageSubmitError, MatchStageSwapError } from "@/components/ma
 import { PrintSheet } from "@/components/matchmaker/PrintSheet";
 import { RoundControls } from "@/components/matchmaker/RoundControls";
 import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
@@ -33,7 +34,7 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 // （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
-	const { players, updatePlayer } = useRosterStore();
+	const { players, updatePlayer, syncStatus } = useRosterStore();
 	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, setTimerDuration, startTimer, swapMatchPlayer } = useRoundStore({
 		players,
 		updatePlayer,
@@ -137,8 +138,26 @@ export default function MatchmakerPage() {
 		[round],
 	);
 
+	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
+	if (syncStatus === "loading" || syncStatus === "load-failed") {
+		return (
+			<main
+				data-sync-status={syncStatus}
+				className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+			>
+				<SyncStatusNotice status={syncStatus} />
+			</main>
+		);
+	}
+
 	return (
-		<main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+		<main
+			// 本機模式為 undefined，React 不輸出屬性，訪客 DOM 不變
+			data-sync-status={syncStatus === "local" ? undefined : syncStatus}
+			className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+		>
+			<SyncStatusNotice status={syncStatus} />
 			{/* §8：頁面標題區在列印時隱藏——PrintSheet 已自帶一個 <h1>{scene.title}</h1>，
 			    若不隱藏會讓紙本同頁出現兩個 <h1>（leader 裁決 1）。 */}
 			<div data-print="hide">
