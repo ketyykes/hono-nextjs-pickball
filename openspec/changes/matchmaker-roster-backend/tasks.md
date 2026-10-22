@@ -42,7 +42,7 @@ Depends on: §2
   另記錄：設定層 3.2 加表後，B5 的「USER_DATA_TABLES 恰為 auth 以外的所有資料表」會因清單未更新而**真的轉紅**（守衛生效的證據），貼出輸出
 - [x] 3.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `matchmakerPlayers`（複合主鍵）；`pnpm --filter ./hono-pickball db:generate --name matchmaker_players`（不手改）；再跑一次確認無新檔；
   核心套件 `USER_DATA_TABLES` 加 `matchmaker_players`；`db:migrate:local`；3.1 與守衛皆綠
-- [ ] 3.3 RED（TDD）：新增 `test/matchmaker-players.test.ts`，寫入 spec「參賽者雲端 API」的全部 15 個 it。確認紅燈並貼出輸出；
+- [x] 3.3 RED（TDD）：新增 `test/matchmaker-players.test.ts`，寫入 spec「參賽者雲端 API」的全部 15 個 it。確認紅燈並貼出輸出；
   **「auth 停用…皆回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**。
   另依 design Open Questions 4 加兩個守護 it（不在 spec 錨點內）：「不從 query 或 body 接受 userId」「getSession 拋出例外時回 500」（路由不存在時為 404 → 真紅）
 - [ ] 3.4 GREEN（TDD）：新增 `src/matchmaker/players-repository.ts`（design Decision 2 的 SQL）、`src/routes/matchmaker.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession)`、`zValidator` hook、path id 檢查）；
