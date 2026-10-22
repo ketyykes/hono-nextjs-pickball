@@ -91,6 +91,10 @@ export function useRemoteRosterStore({
 		// 舊一輪的 saver 由 disposeAll 釋放
 		let cancelled = false;
 		let stopped = false;
+		// 重置與衝突重載可能同時進行：可寫入只在兩者都結束、且已載入、未收到 401 時成立，
+		// 不能由任一邊的結束單獨重開，否則另一邊還在途時使用者動作會漏出去
+		let resetting = false;
+		let reloading = false;
 		let phase: LoadPhase = "loading";
 		let sticky: StickyStatus = null;
 		// 每次 disposeAll 加一：舊世代的在途 PUT 回來時不得把過期版本寫回新載入的 Map
@@ -101,6 +105,10 @@ export function useRemoteRosterStore({
 
 		readyRef.current = false;
 		setStatus("loading");
+
+		function updateReady(): void {
+			readyRef.current = phase === "ready" && !stopped && !resetting && !reloading;
+		}
 
 		function publish(): void {
 			if (cancelled) return;
@@ -118,7 +126,7 @@ export function useRemoteRosterStore({
 		function handleUnauthorized(): void {
 			if (stopped) return;
 			stopped = true;
-			readyRef.current = false;
+			updateReady();
 			disposeAll();
 			onUnauthorizedRef.current();
 		}
@@ -132,7 +140,8 @@ export function useRemoteRosterStore({
 			}
 			if (result.kind !== "ok" || result.value === undefined) {
 				phase = "load-failed";
-				readyRef.current = false;
+				reloading = false;
+				updateReady();
 				publish();
 				return;
 			}
@@ -143,13 +152,15 @@ export function useRemoteRosterStore({
 			replacePlayers(result.value.items.map((item) => item.data));
 			phase = "ready";
 			sticky = afterConflict ? "conflict" : null;
-			readyRef.current = true;
+			reloading = false;
+			updateReady();
 			publish();
 		}
 
 		function reloadAfterConflict(): void {
 			// 先關閉寫入並釋放所有佇列，重載期間的動作與其他筆的待送變更都不再送出
-			readyRef.current = false;
+			reloading = true;
+			updateReady();
 			disposeAll();
 			void load(true);
 		}
@@ -212,14 +223,17 @@ export function useRemoteRosterStore({
 
 		async function reset(): Promise<void> {
 			// 重置不可逆：不做樂觀更新，也不重試；進行中不接受其他動作
-			readyRef.current = false;
+			resetting = true;
+			updateReady();
 			const result = await resetRemoteMatchmaker();
-			if (cancelled) return;
+			// 重置在途時可能已收到 401（stopped）：此時不得再重開，也不再發布狀態
+			if (cancelled || stopped) return;
+			resetting = false;
 			if (result.kind === "ok") {
 				disposeAll();
 				replacePlayers([]);
 				sticky = null;
-				readyRef.current = true;
+				updateReady();
 				publish();
 				// 只清本次活動的本機進度，本機名單是訪客時期的資料，不能動
 				resetLocalMatchProgress();
@@ -229,7 +243,7 @@ export function useRemoteRosterStore({
 				handleUnauthorized();
 				return;
 			}
-			readyRef.current = true;
+			updateReady();
 			sticky = "rejected";
 			publish();
 		}

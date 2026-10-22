@@ -69,6 +69,7 @@ Depends on: §4
 
 - [x] 5.1 RED（TDD）：新增 `hooks/useRemoteRosterStore.test.tsx`，spec 中該檔的全部 11 個 it（「登入時名單以雲端為準」9 個＋「重置名單與二次確認」2 個）。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
 - [x] 5.2 GREEN（TDD）：新增 `hooks/useRemoteRosterStore.ts`（design Decision 3、5）
+  - Stage 2 修正：重置進行中不得被 401 或衝突重載重開操作（可寫入改由 phase／stopped／resetting／reloading 統一推導）；紅燈 7ab38ea，修正 GREEN 見 HEAD 的 `fix(web)` commit；同時補 DELETE 401／409、狀態彙總等 regression guard（7ab38ea）
 - [x] 5.3 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRosterStore` 未列入主 spec 而**真的轉紅**，貼出輸出
 - [x] 5.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4 前例）；
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteRosterStore（B6 §5）`。重跑 5.3 轉綠。archive 時此段 MODIFIED 應為 no-op
