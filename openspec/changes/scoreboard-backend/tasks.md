@@ -119,6 +119,7 @@ Depends on: §4、§5
 - [x] 6.7 REFACTOR：選擇器與雲端 hook 的介面是否足以讓 B6 照抄（`enabled`、`onUnauthorized`、`syncStatus`）；無壞味道則註記 skipped
   - REFACTOR skipped：雲端 hook 介面為 `useRemoteScoreboardStore({ enabled, onUnauthorized }) → [state, dispatch, syncStatus]`，選擇器回傳 `[state, dispatch, bindingStatus, syncStatus]`（雲端時 bindingStatus 為 standalone），B6 可照抄；無壞味道
   - Stage 2 必修（TDD）：同一 mount 內 `enabled` true→false→true 且新一輪 GET 回 `data: null` 時殘留前一輪比分。RED：既有錨點 it 內新增一段，實跑 `Expected scores {us:0,them:0} / Received {us:3,them:1}`（`useRemoteScoreboardStore.test.tsx:127`），1 failed｜6 passed；GREEN：`loadCurrent` 一律 `HYDRATE data ?? createInitialState()`
+  - Stage 2 補強（regression guard，斷言加進既有 it）：選擇器 401 呼叫 `session.refresh`、已登入 `useScoreboardStore("")` 走雲端、衝突重載 GET 在途期間不為 loading、StrictMode 過期 GET 不覆蓋；四條對應變異皆轉紅
 
 ## 7. E2E 夾具與計分板畫面接線
 
