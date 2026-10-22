@@ -69,21 +69,44 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 設定層（文件）：root `CLAUDE.md`（結構圖加 `packages/pickball-core/`；「Stop → tsc」段的 `pnpm-workspace.yaml` 改為三個 workspace；常用指令表 `pnpm test`／`pnpm build` 的敘述）；
+- [x] 4.1 設定層（文件）：root `CLAUDE.md`（結構圖加 `packages/pickball-core/`；「Stop → tsc」段的 `pnpm-workspace.yaml` 改為三個 workspace；常用指令表 `pnpm test`／`pnpm build` 的敘述）；
   root `AGENTS.md` 指標表加 `packages/pickball-core/CLAUDE.md`；root `README.md` 部署前檢查清單加「核心套件單元測試」一步（第 3 步之後）；
   `nextjs-pickball/CLAUDE.md`（`lib/` 目錄約定：18 個模組已移至核心套件、其測試留在原位；`transpilePackages`）；
   `hono-pickball/CLAUDE.md`（架構段：可匯入 `@pickball/core`；相依段：zod 由核心套件引入，B5 起 `src` 才使用）；
   新增 `packages/pickball-core/CLAUDE.md`（定位、零瀏覽器 API、`CORE_MODULES` 必須同步、測試位置、逐檔 ESLint hook 空跑無害）
-- [ ] 4.2 驗收（指令）C2：閱讀核心套件 tsconfig；`pnpm --filter ./packages/pickball-core typecheck`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck` 皆 exit 0
-- [ ] 4.3 驗收（指令）C9：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 4.4 驗收（指令）C1：`pnpm test` 三組統計皆出現；前端＝基線、後端＝基線＋1 檔／＋1、核心 1 檔／2；全綠
-- [ ] 4.5 驗收（指令）C4：`pnpm build`（三段皆出現、含 Total Upload）與 `pnpm --filter ./nextjs-pickball exec opennextjs-cloudflare build` 皆 exit 0
-- [ ] 4.6 驗收（指令）C5：`pnpm --filter ./nextjs-pickball exec playwright test --list` exit 0，總數＝1.1 基線
-- [ ] 4.7 驗收（指令）C6：rename 全為 R100；前端既有檔案的 diff 除 `next.config.ts`／`package.json` 外只有含 `from "` 的 import／export 行增刪；18 個舊路徑不存在、無 re-export 轉址殼；
+  > `7862165`＋Stage 1 退回修正 `62c553a`（root `CLAUDE.md` 補第三份「測試留原位」說明，Decision 3）＋Stage 2 退回修正 `e2943a2`（README 指令表與結構樹改為三個 workspace、`nextjs-pickball/CLAUDE.md` `lib/` 父層條列只列留在前端的模組、核心 `CLAUDE.md` 測試位置與兩層強制的實測說明、Stop hook 限制 ① 並列核心 `test/**`）。
+- [x] 4.2 驗收（指令）C2：閱讀核心套件 tsconfig；`pnpm --filter ./packages/pickball-core typecheck`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck` 皆 exit 0
+  > 核心 tsconfig `lib: ["ESNext"]`、`types: []`、`include: ["src"]`；核心 `typecheck`（兩段）、`pnpm -r exec tsc --noEmit`、`hono-pickball typecheck` 皆 exit 0。
+- [x] 4.3 驗收（指令）C9：`pnpm lint` 0 errors、warning 不多於基線
+  > `✖ 3 problems (0 errors, 3 warnings)`（與基線相同的 3 個 unused-vars）。
+- [x] 4.4 驗收（指令）C1：`pnpm test` 三組統計皆出現；前端＝基線、後端＝基線＋1 檔／＋1、核心 1 檔／2；全綠
+  > `pnpm test` exit 0：`packages/pickball-core` 1 檔／2、`nextjs-pickball` 87 檔／823（＝基線）、`hono-pickball` 13 檔／51（基線＋1／＋1）。
+- [x] 4.5 驗收（指令）C4：`pnpm build`（三段皆出現、含 Total Upload）與 `pnpm --filter ./nextjs-pickball exec opennextjs-cloudflare build` 皆 exit 0
+  > `pnpm build` exit 0：`packages/pickball-core build$ tsc --noEmit`、`hono-pickball build: Total Upload: 1978.04 KiB / gzip: 340.66 KiB`、`nextjs-pickball build: ✓ Compiled successfully`；`opennextjs-cloudflare build` 結尾 `OpenNext build complete.` exit 0。
+- [x] 4.6 驗收（指令）C5：`pnpm --filter ./nextjs-pickball exec playwright test --list` exit 0，總數＝1.1 基線
+  > exit 0，`Total: 705 tests in 15 files`（＝1.1 基線）。
+- [x] 4.7 驗收（指令）C6：rename 全為 R100；前端既有檔案的 diff 除 `next.config.ts`／`package.json` 外只有含 `from "` 的 import／export 行增刪；18 個舊路徑不存在、無 re-export 轉址殼；
   `git diff main --stat -- hono-pickball/src` 為空；對照表右欄與 `CORE_MODULES` 以腳本比對一致（`pickball-core`「對照表涵蓋所有被搬移的模組」）
-- [ ] 4.8 驗收（指令）：`pnpm --filter ./hono-pickball db:migrate:local` 輸出「No migrations to apply」（本 change 無 migration，確認未誤動 D1）
-- [ ] 4.9 驗收（指令）C7：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
+  > 18 列 R100；18 個舊路徑不存在；無 `export * from "@pickball/core` 殼；前端 M 檔（扣除 `next.config.ts`、`package.json`、文件 `nextjs-pickball/CLAUDE.md`）過濾 import／export from 行後無剩餘增刪；`hono-pickball/src` diff 為空；對照表右欄 18 項與 `CORE_MODULES` 排序後一致。
+- [x] 4.8 驗收（指令）：`pnpm --filter ./hono-pickball db:migrate:local` 輸出「No migrations to apply」（本 change 無 migration，確認未誤動 D1）
+  > `✅ No migrations to apply!`，exit 0。
+- [x] 4.9 驗收（指令）C7：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
   `for p in chromium firefox mobile-chrome; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p; done`；
   `for p in webkit mobile-safari; do for i in 1 2 3; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p --shard=$i/3; done; done`；
   合計 passed／skipped 與基線相同（B3 後 667／38）、0 failed。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 4.10 驗收（指令）C10：`DO_NOT_TRACK=1 openspec validate pickball-core-package --strict` 通過
+  > **C7 結果（2026-10-22，leader 執行；`.dev.vars` 齊備；前後 `lsof`／`ps` 皆無本 repo 殘留）**：
+  > | project | passed | skipped | failed | 開始時 load（1/5/15 分） |
+  > |---|---|---|---|---|
+  > | chromium | 141 | 0 | 0 | 15.55 17.51 17.88 |
+  > | firefox | 129 | 12 | 0 | 10.31 16.11 17.36 |
+  > | mobile-chrome | 139 | 2 | 0 | 25.25 17.96 17.47 |
+  > | webkit 1/3、2/3 | 42＋40 | 5＋7 | 0 | 15.64…／7.34… |
+  > | webkit 3/3（首跑） | 46 | 0 | **1** | 28.91 19.67 17.71 |
+  > | webkit 3/3（重跑，取得共用重運算鎖後） | 47 | 0 | 0 | 6.11 28.91 59.63 |
+  > | mobile-safari 1/3、2/3、3/3 | 42＋40＋47 | 5＋7＋0 | 0 | 28.59…／61.10…／257.06… |
+  > **合計（webkit 3/3 以重跑計）：667 passed／38 skipped／0 failed，與基線相同。**
+  > 首跑失敗：`scoreboard.spec.ts:187`「15 分制下連贏 11 球不觸發 GameOverDialog」（`toBeHidden` 收到 visible，即 15 分制設定未生效），同時段 dev server 記錄 `ChunkLoadError`（Turbopack HMR client chunk 載入失敗），當時機器另有其他工作造成高負載。
+  > 隔離重跑：該 it `--repeat-each=3` 3/3 passed（load 18.65）；整個 webkit 3/3 第一次重跑時 load 飆至 300（外部工作），另有 3 個不同 it 失敗且伴隨 `ChunkLoadError`，不採為結論；取得共用重運算鎖、load 6.11 下第二次重跑 47/47 passed。
+  > **判定交由 coordinator 裁定**（leader 未自行判定為雜訊）；證據：`/tmp/b4-e2e-run1/`（`summary.txt`、`webkit-3.log`、`isolate-webkit.log`、`webkit-3-rerun.log`、`webkit-3-rerun2.log`）。
+- [x] 4.10 驗收（指令）C10：`DO_NOT_TRACK=1 openspec validate pickball-core-package --strict` 通過
+  > `Change 'pickball-core-package' is valid`，exit 0。

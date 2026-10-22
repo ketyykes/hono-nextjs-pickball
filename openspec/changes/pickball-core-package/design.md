@@ -199,3 +199,9 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
 10. （apply §2 Stage 2 建議，不擋）前端（含測試與 E2E）註解約 20 處、被搬模組自身註解（如 `labels.ts` 第 1 行）仍寫舊路徑 `lib/matchmaker/...`／`lib/scoreboard/...`；
     依 Non-Goals 本 change 不改，路徑以 `pickball-core` 對照表解讀，留待後續 change 統一更新。另：`module-boundary.test.ts` 的 `export const CORE_MODULES` 目前無外部匯入者、
     `Reflect.get(globalThis, "window")` 可補一行註解說明 TS7017——皆屬可讀性建議，本 change 不動。
+11. （apply §4 執行方式）4.9 完整 E2E 由 leader 親自執行（execution-plan 原定整組由同一 Implementer 做完）：E2E 需長時間輪詢且失敗須由 coordinator 裁定，
+    交由 leader 持有較可靠；4.1～4.8、4.10 仍由 §4 Implementer 執行並經兩階段審查。E2E 首跑 webkit 3/3 的 1 個失敗與重跑紀錄見 tasks 4.9，待 coordinator 裁定。
+12. （apply §4 Stage 2 未採納建議，留後續）`.claude/hooks/stop-typecheck.sh` 檔頭註解與 `.claude/agents/code-reviewer-readonly.md` 仍寫「兩個 workspace」
+    （屬 `.claude/` 設定，不在 tasks 4.1 範圍）；核心套件沒有 `AGENTS.md` 入口；README 第 3 行「管理前後端」措辭未提核心套件。
+13. （apply §4 流程）coordinator 於 14:06 起規定 E2E／eslint／全套 vitest／build 須先取得 `/tmp/heavy-lock.sh` 共用鎖；規定送達前已派出的 §4 修正 Implementer
+    曾在未持鎖下跑一次 `pnpm lint`（約 14:08，當時鎖由 min4wd 持有）。之後的重運算皆依規定持鎖。
