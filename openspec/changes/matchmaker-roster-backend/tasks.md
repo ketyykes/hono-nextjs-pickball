@@ -69,8 +69,8 @@ Depends on: §4
 
 - [x] 5.1 RED（TDD）：新增 `hooks/useRemoteRosterStore.test.tsx`，spec 中該檔的全部 11 個 it（「登入時名單以雲端為準」9 個＋「重置名單與二次確認」2 個）。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
 - [x] 5.2 GREEN（TDD）：新增 `hooks/useRemoteRosterStore.ts`（design Decision 3、5）
-- [ ] 5.3 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRosterStore` 未列入主 spec 而**真的轉紅**，貼出輸出
-- [ ] 5.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4 前例）；
+- [x] 5.3 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRosterStore` 未列入主 spec 而**真的轉紅**，貼出輸出
+- [x] 5.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4 前例）；
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteRosterStore（B6 §5）`。重跑 5.3 轉綠。archive 時此段 MODIFIED 應為 no-op
 - [ ] 5.5 RED（TDD）：`hooks/useRosterStore.test.tsx` **只新增** `vi.mock("@/hooks/useSession", ...)` 區塊（預設本機快照）與三個 it：「已登入時改用雲端名單並回傳 syncStatus」
   「session 載入中或訪客時走本機且 syncStatus 為 local」「雲端模式下變更名單不寫入 matchmaker:roster:v1」。確認新 it 紅燈、既有 8 個 it 仍綠；先綠的斷言點名標註
