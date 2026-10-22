@@ -13,7 +13,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PlayerCard } from "@/components/matchmaker/PlayerCard";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 interface PlayerListProps {
 	players: Player[];

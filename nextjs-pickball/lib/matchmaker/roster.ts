@@ -4,7 +4,7 @@
 
 import { defaultGradient, paletteIndexOf, PALETTE_SIZE } from "./colors";
 import type { GradientPreset } from "./colors";
-import type { Gender, Player } from "./types";
+import type { Gender, Player } from "@pickball/core/matchmaker/types";
 
 /** 新增參賽者所需的輸入欄位。id／createdAt 由呼叫端另外注入，restCount／gamesPlayed 固定從 0 起算。 */
 export interface AddPlayerInput {

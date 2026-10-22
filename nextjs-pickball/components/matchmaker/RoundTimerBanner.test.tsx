@@ -2,8 +2,8 @@
 import { act, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoundTimerBanner } from "./RoundTimerBanner";
-import type { RoundTimer } from "@/lib/matchmaker/round-types";
-import { ROUND_TIMER_EXPIRED_MESSAGE } from "@/lib/matchmaker/labels";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
+import { ROUND_TIMER_EXPIRED_MESSAGE } from "@pickball/core/matchmaker/labels";
 
 // useRoundTimer 內部以 setInterval／Date 驅動倒數，本檔以 vi.useFakeTimers() 讓
 // 「經過 30 秒」等情境可預期地重現（比照 useRoundTimer.test.ts 既有寫法）。

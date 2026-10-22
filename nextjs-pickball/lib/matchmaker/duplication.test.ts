@@ -8,9 +8,9 @@ import {
 	countRepeats,
 	ratingSpread,
 	avoidRepeats,
-} from "./duplication";
-import type { DoublesComposition, Match, Team } from "./allocation-types";
-import type { Player } from "./types";
+} from "@pickball/core/matchmaker/duplication";
+import type { DoublesComposition, Match, Team } from "@pickball/core/matchmaker/allocation-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，與 pairing.test.ts／candidates.test.ts 同構，
 // 刻意不共用——duplication.test.ts 保持獨立、不依賴其他測試檔。

@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore, type ScoreboardBindingStatus } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
 import { MATCH_SLOTS_KEY, writeMatchSlot } from "@/lib/scoreboard/match-slots";
-import { createInitialState } from "@/lib/scoreboard/reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 
 describe("useScoreboardStore", () => {
 	beforeEach(() => {

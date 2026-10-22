@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { MatchHistoryEntry } from "./history";
-import type { DoublesComposition } from "./allocation-types";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import type { DoublesComposition } from "@pickball/core/matchmaker/allocation-types";
 import { parseCsv } from "./csv";
 import { historyCsvFileName, historyToCsv } from "./history-csv";
 

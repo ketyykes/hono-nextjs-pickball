@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { scoreboardReducer, createInitialState } from "./reducer";
-import type { ScoreboardState, TeamPlayers } from "./types";
+import { scoreboardReducer, createInitialState } from "@pickball/core/scoreboard/reducer";
+import type { ScoreboardState, TeamPlayers } from "@pickball/core/scoreboard/types";
 
 describe("createInitialState", () => {
 	it("預設為雙打、我方先發、0-0-2 起手", () => {

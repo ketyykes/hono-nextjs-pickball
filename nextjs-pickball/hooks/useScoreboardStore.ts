@@ -2,9 +2,9 @@
 "use client";
 
 import { useEffect, useReducer, useRef, type Dispatch } from "react";
-import { createInitialState, scoreboardReducer } from "@/lib/scoreboard/reducer";
+import { createInitialState, scoreboardReducer } from "@pickball/core/scoreboard/reducer";
 import { readScoreboard, writeScoreboard } from "@/lib/scoreboard/storage";
-import type { Action, ScoreboardState } from "@/lib/scoreboard/types";
+import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 
 // 對戰場次綁定狀態：
 // - standalone：未帶 matchId，沿用獨立計分板（scoreboard:current:v1）

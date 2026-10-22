@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { applyRosterImport, parseRosterCsv, ROSTER_CSV_HEADERS } from "./roster-csv";
 import { paletteIndexOf } from "./colors";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 標題列文字，欄位順序依 ROSTER_CSV_HEADERS 的既定順序。 */
 const HEADER_LINE = [

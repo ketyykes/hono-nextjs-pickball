@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { pickTextColor } from "@/lib/matchmaker/colors";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 const GENDER_LABEL: Record<Player["gender"], string> = {
 	male: "男",

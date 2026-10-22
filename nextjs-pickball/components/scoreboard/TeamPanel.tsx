@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ServeIndicator } from "@/components/scoreboard/ServeIndicator";
 import { cn } from "@/lib/utils";
-import type { ScoreboardState, Team } from "@/lib/scoreboard/types";
+import type { ScoreboardState, Team } from "@pickball/core/scoreboard/types";
 
 interface TeamPanelProps {
 	team: Team;

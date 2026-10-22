@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildBackup, backupFileName, parseBackup } from "./backup";
-import { BackupSchema, TRANSFER_MESSAGES } from "./transfer-types";
+import { BackupSchema, TRANSFER_MESSAGES } from "@pickball/core/matchmaker/transfer-types";
 import type { BackupSnapshot } from "./backup";
-import type { Player } from "./types";
-import type { Round } from "./round-types";
-import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round } from "@pickball/core/matchmaker/round-types";
+import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "@pickball/core/matchmaker/history";
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位（沿用 round-storage.test.ts 的樣板慣例）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

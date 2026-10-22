@@ -9,7 +9,7 @@ import { ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
 // 分槽 key 取自 match-slots.ts 的具名匯出（跨 capability 對外契約），
 // SHALL NOT 在本檔重複寫死字串——見 player-roster delta 的「單一來源」條款。
 import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

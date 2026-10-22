@@ -2,8 +2,8 @@
 // toCsv，本模組完全不知道那些規則的存在（design.md Decision 1）。
 
 import { toCsv } from "./csv";
-import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "./labels";
-import type { MatchHistoryEntry } from "./history";
+import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@pickball/core/matchmaker/labels";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 
 /**
  * 同一欄內多筆數值（球員姓名／分數）之間的分隔符。選用頓號而非逗號，是因為逗號已是

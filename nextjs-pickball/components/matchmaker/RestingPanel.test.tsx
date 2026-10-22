@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { RestingPanel } from "./RestingPanel";
 import { playerTileStyle } from "@/lib/matchmaker/tile-style";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，與 CourtCard.test.tsx 等同構，刻意不共用——本檔保持獨立、
 // 不依賴其他測試檔（比照既有測試檔慣例）。

@@ -1,15 +1,15 @@
 // 本輪設定的預設值與場地數夾值——純函式，元件內以 useState 管理狀態，
 // 刻意不做 useRoundSettings hook（design Decision 3）。
 
-import type { MatchFormat } from "./allocation-types";
+import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
 import {
 	DEFAULT_FORMAT,
 	DEFAULT_COURT_COUNT,
 	MIN_COURT_COUNT,
 	MAX_COURT_COUNT,
-} from "./allocation-types";
-import type { RoundTargetScore, RoundTimerDurationMinutes } from "./round-types";
-import { DEFAULT_TARGET_SCORE } from "./round-types";
+} from "@pickball/core/matchmaker/allocation-types";
+import type { RoundTargetScore, RoundTimerDurationMinutes } from "@pickball/core/matchmaker/round-types";
+import { DEFAULT_TARGET_SCORE } from "@pickball/core/matchmaker/round-types";
 
 /** 本輪設定：對戰方式、場地數、目標分數、計時長度。 */
 export interface RoundSettings {

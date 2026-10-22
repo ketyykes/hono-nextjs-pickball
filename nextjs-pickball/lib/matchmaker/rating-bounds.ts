@@ -2,7 +2,7 @@
 // 上下限值取自評分 capability 匯出的具名常數，SHALL NOT 在本檔另寫字面量
 // （design Open Questions 第 1 條：評分界限常數的來源）。
 
-import { RATING_MIN, RATING_MAX } from "./rating-types";
+import { RATING_MIN, RATING_MAX } from "@pickball/core/matchmaker/rating-types";
 
 /**
  * 強度分數的觸界狀態：以具名聯集表示觸頂、觸底、未觸界三態，

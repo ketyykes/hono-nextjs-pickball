@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { GameOverDialog } from "./GameOverDialog";
-import { createInitialState } from "@/lib/scoreboard/reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 
 describe("GameOverDialog", () => {
 	it("獲勝標題以 lucide 獎盃圖示搭配勝方文字", () => {

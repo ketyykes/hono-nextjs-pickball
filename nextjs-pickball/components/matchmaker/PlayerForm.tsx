@@ -14,8 +14,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { PlayerSchema } from "@/lib/matchmaker/types";
-import type { Gender, Player } from "@/lib/matchmaker/types";
+import { PlayerSchema } from "@pickball/core/matchmaker/types";
+import type { Gender, Player } from "@pickball/core/matchmaker/types";
 
 // 表單子集 schema：從 PlayerSchema 挑出本表單實際收集的欄位（姓名／性別／
 // 雙色漸層／強度分數），沿用同一份驗證規則（trim、hex 格式、1~8 範圍），

@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { ScoreboardState } from "@/lib/scoreboard/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 
 interface GameOverDialogProps {
 	state: ScoreboardState;

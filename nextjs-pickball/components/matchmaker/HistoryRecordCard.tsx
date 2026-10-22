@@ -4,8 +4,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@/lib/matchmaker/labels";
-import type { HistoryTeam, MatchHistoryEntry } from "@/lib/matchmaker/history";
+import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@pickball/core/matchmaker/labels";
+import type { HistoryTeam, MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 
 export interface HistoryRecordCardProps {
 	entry: MatchHistoryEntry;

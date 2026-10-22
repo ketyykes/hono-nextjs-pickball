@@ -5,9 +5,9 @@ import {
 	MatchStatusSchema,
 	TARGET_SCORE_OPTIONS,
 	RoundTimerDurationMinutesSchema,
-} from "./round-types";
-import type { Round, RoundMatch } from "./round-types";
-import { TargetScoreSchema } from "../scoreboard/types";
+} from "@pickball/core/matchmaker/round-types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import { TargetScoreSchema } from "@pickball/core/scoreboard/types";
 
 /** 建立一份合法的測試用 RoundMatch，可透過 overrides 覆寫特定欄位。 */
 function makeRoundMatch(overrides: Partial<RoundMatch> = {}): RoundMatch {

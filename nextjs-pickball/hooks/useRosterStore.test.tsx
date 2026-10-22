@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useRosterStore } from "./useRosterStore";
 import { STORAGE_KEY } from "@/lib/matchmaker/storage";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 建立一份合法的持久化 Player 資料，可透過 overrides 覆寫特定欄位。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

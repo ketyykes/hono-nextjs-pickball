@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { pickTextColor } from "@/lib/matchmaker/colors";
-import { PLAYER_NOT_ON_ROSTER_LABEL } from "@/lib/matchmaker/labels";
+import { PLAYER_NOT_ON_ROSTER_LABEL } from "@pickball/core/matchmaker/labels";
 import type { PlayerStat } from "@/lib/matchmaker/player-stats";
 
 // 測試用的預設球員統計：欄位齊全，個別 it 只覆寫需要變動的欄位。

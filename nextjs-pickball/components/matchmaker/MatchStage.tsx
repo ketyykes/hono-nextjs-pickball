@@ -4,8 +4,8 @@
 import { CourtCard } from "./CourtCard";
 import { EmptyMatches } from "./EmptyMatches";
 import { RestingPanel } from "./RestingPanel";
-import type { Player } from "@/lib/matchmaker/types";
-import type { Round } from "@/lib/matchmaker/round-types";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 /** 送出比分失敗時要顯示在哪一場地卡片上——nested 而非攤平：matchId 決定「哪一格」、

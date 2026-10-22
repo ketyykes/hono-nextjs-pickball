@@ -7,9 +7,9 @@
 import { parseCsv } from "./csv";
 import { addPlayer } from "./roster";
 import type { AddPlayerInput } from "./roster";
-import type { Gender, Player } from "./types";
-import { RATING_MIN, RATING_MAX } from "./rating-types";
-import { TRANSFER_MESSAGES } from "./transfer-types";
+import type { Gender, Player } from "@pickball/core/matchmaker/types";
+import { RATING_MIN, RATING_MAX } from "@pickball/core/matchmaker/rating-types";
+import { TRANSFER_MESSAGES } from "@pickball/core/matchmaker/transfer-types";
 
 /** CSV 的五個標題欄名稱（繁體中文），欄位對應依名稱而非位置。 */
 export const ROSTER_CSV_HEADERS = {

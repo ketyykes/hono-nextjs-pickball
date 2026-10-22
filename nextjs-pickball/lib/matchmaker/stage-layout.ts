@@ -3,8 +3,8 @@
 // 理由見 design Decision 4：上下分排 + 中央比分區才有球場感，對角配置需要讀者先知道
 // 「對角同色是一隊」這條額外規則，違反色彩不可作為唯一資訊來源的精神。
 
-import type { MatchFormat } from "./allocation-types";
-import type { Player } from "./types";
+import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** buildCourtTiles 單支隊伍所需的最小形狀，供 CourtTileSource 與 expandTeamToTiles 共用。 */
 export interface CourtTileTeamSource {

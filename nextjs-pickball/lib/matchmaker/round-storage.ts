@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { RoundSchema } from "./round-types";
-import { makeHistoryContainerSchema, MatchHistoryEntrySchema } from "./history";
+import { RoundSchema } from "@pickball/core/matchmaker/round-types";
+import { makeHistoryContainerSchema, MatchHistoryEntrySchema } from "@pickball/core/matchmaker/history";
 import { ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalStorage } from "./storage-keys";
-import type { Round } from "./round-types";
-import type { MatchHistoryEntry } from "./history";
+import type { Round } from "@pickball/core/matchmaker/round-types";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 
 /**
  * 讀 key → JSON.parse → 外層 schema 驗證的共用骨架。回合與歷史的降級策略在外層

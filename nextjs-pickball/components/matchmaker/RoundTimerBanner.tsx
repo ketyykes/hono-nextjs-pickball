@@ -5,8 +5,8 @@ import { useEffect, useRef } from "react";
 import { useRoundTimer } from "@/hooks/useRoundTimer";
 import { formatRemaining } from "@/lib/matchmaker/round-timer";
 import { playTimerExpiredChime } from "@/lib/matchmaker/round-timer-sound";
-import { ROUND_TIMER_EXPIRED_MESSAGE } from "@/lib/matchmaker/labels";
-import type { RoundTimer } from "@/lib/matchmaker/round-types";
+import { ROUND_TIMER_EXPIRED_MESSAGE } from "@pickball/core/matchmaker/labels";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 
 // 欄位不加 readonly（比照 components/matchmaker/ 既有介面，見 ExportActions.tsx）。
 export interface RoundTimerBannerProps {

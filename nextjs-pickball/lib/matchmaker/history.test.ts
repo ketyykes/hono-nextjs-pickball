@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { MatchHistoryEntrySchema, appendHistoryEntry } from "./history";
-import { PLAYERS_PER_MATCH } from "./allocation-types";
-import type { AssertFormatCovered, MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
-import type { Player } from "./types";
+import { MatchHistoryEntrySchema, appendHistoryEntry } from "@pickball/core/matchmaker/history";
+import { PLAYERS_PER_MATCH } from "@pickball/core/matchmaker/allocation-types";
+import type { AssertFormatCovered, MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "@pickball/core/matchmaker/history";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位（沿用 storage.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

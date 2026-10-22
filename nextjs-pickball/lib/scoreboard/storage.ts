@@ -1,5 +1,5 @@
-import { ScoreboardStateSchema } from "./types";
-import type { ScoreboardState } from "./types";
+import { ScoreboardStateSchema } from "@pickball/core/scoreboard/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { readMatchSlot, writeMatchSlot, clearMatchSlots } from "./match-slots";
 import { STORAGE_KEY, hasLocalStorage } from "./storage-keys";
 

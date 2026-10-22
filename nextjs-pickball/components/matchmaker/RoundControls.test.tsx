@@ -4,11 +4,11 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RoundControls } from "./RoundControls";
 import type { RoundControlsProps } from "./RoundControls";
-import { ROUND_TIMER_LOCKED_REASON } from "@/lib/matchmaker/labels";
+import { ROUND_TIMER_LOCKED_REASON } from "@pickball/core/matchmaker/labels";
 import { createRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
-import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
-import { createInitialState } from "@/lib/scoreboard/reducer";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 測試專用預設 props：settings 給合法初始值，其餘 callback 一律用 vi.fn()——

@@ -1,9 +1,9 @@
 // 匯出功能的組裝層：buildBackup()／backupFileName()（design Decision 1）。
 
-import type { Player } from "./types";
-import type { Round } from "./round-types";
-import type { MatchHistoryEntry } from "./history";
-import { BackupSchema, TRANSFER_MESSAGES, type Backup } from "./transfer-types";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round } from "@pickball/core/matchmaker/round-types";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import { BackupSchema, TRANSFER_MESSAGES, type Backup } from "@pickball/core/matchmaker/transfer-types";
 
 /**
  * 重複配對簽章的鍵集合：可能是記憶體表示法 ReadonlySet<string>（allocation-types.ts

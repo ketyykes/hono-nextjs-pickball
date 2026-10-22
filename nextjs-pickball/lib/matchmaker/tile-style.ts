@@ -11,7 +11,7 @@
 // 勝方、完成時間）顯示在色塊外的場次資訊列，不受此處的減弱影響。
 
 import { pickTextColor } from "./colors";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 呼叫 playerTileStyle 時，指定該場次是否已完成。 */
 export interface PlayerTileStyleOptions {

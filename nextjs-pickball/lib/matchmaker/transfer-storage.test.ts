@@ -6,14 +6,14 @@ import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./st
 // 會繼續綠燈但保護的是不存在的 key；跨模組 import 則會編譯失敗、強迫同步更新）。
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
-import { TRANSFER_MESSAGES } from "./transfer-types";
-import type { Backup } from "./transfer-types";
+import { TRANSFER_MESSAGES } from "@pickball/core/matchmaker/transfer-types";
+import type { Backup } from "@pickball/core/matchmaker/transfer-types";
 import { parseBackup } from "./backup";
 import { readRoster } from "./storage";
 import { readRound, readHistory } from "./round-storage";
-import type { Player } from "./types";
-import type { Round } from "./round-types";
-import type { MatchHistoryEntry, HistoryTeam } from "./history";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round } from "@pickball/core/matchmaker/round-types";
+import type { MatchHistoryEntry, HistoryTeam } from "@pickball/core/matchmaker/history";
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位（沿用 backup.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

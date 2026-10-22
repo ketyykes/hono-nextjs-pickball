@@ -2,7 +2,7 @@
 "use client";
 
 import { playerTileStyle } from "@/lib/matchmaker/tile-style";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 export interface RestingPanelProps {
 	resting: readonly Player[];

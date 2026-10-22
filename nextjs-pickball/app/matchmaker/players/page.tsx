@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { nextAutoGradient } from "@/lib/matchmaker/roster";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 參賽者名單頁。全站 navbar 的 matchmaker 入口指向對戰頁 /matchmaker（主畫面），
 // 不會同時掛第二條指到本頁的連結；本頁改由 matchmaker 區段內的區段導覽抵達。

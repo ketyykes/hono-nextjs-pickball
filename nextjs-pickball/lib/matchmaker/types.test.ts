@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PlayerSchema, RosterSchema } from "./types";
+import { PlayerSchema, RosterSchema } from "@pickball/core/matchmaker/types";
 
 describe("PlayerSchema", () => {
 	it("合法欄位通過驗證，restCount 與 gamesPlayed 未提供時補 0", () => {

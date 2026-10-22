@@ -8,11 +8,11 @@ import {
 	K_DECAY_GAMES,
 	type RatingPlayerInput,
 	type Side,
-} from "./rating-types";
-import { expectedScore, effectiveK, updateRatings } from "./rating";
-import { roundRating } from "./rating-math";
-import { PlayerSchema } from "./types";
-import type { Player } from "./types";
+} from "@pickball/core/matchmaker/rating-types";
+import { expectedScore, effectiveK, updateRatings } from "@pickball/core/matchmaker/rating";
+import { roundRating } from "@pickball/core/matchmaker/rating-math";
+import { PlayerSchema } from "@pickball/core/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試資料 fixture helper
 function makeRatingPlayer(

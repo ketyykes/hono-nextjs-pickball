@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Round, RoundMatch } from "./round-types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import {
 	buildMatchSlotSeed,
 	ensureMatchSlot,
@@ -11,12 +11,12 @@ import {
 } from "./scoreboard-binding";
 import { writeMatchSlot, readMatchSlot } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
-import { createInitialState } from "../scoreboard/reducer";
-import { submitScore } from "./round";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import { submitScore } from "@pickball/core/matchmaker/round";
 import { resetMatchmakerData } from "./storage";
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 import { pickTextColor } from "./colors";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試專用的最小合法 Round／RoundMatch 建構——逐欄手寫，不放寬型別（不使用 as any）。
 function makeRound(overrides: Partial<Round> = {}): Round {

@@ -7,7 +7,7 @@ import {
 	clearAllMatchSlots,
 	MATCH_SLOTS_KEY,
 } from "./match-slots";
-import { createInitialState } from "./reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 
 describe("match-slots", () => {
 	beforeEach(() => {

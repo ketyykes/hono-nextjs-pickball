@@ -5,7 +5,7 @@ import {
 	remainingSeconds as computeRemainingSeconds,
 	isExpired as computeIsExpired,
 } from "@/lib/matchmaker/round-timer";
-import type { RoundTimer } from "@/lib/matchmaker/round-types";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 
 interface UseRoundTimerResult {
 	remainingSeconds: number | null;

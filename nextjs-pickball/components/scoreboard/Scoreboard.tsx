@@ -15,7 +15,7 @@ import { OrientationHint } from "@/components/scoreboard/OrientationHint";
 import { GameOverDialog } from "@/components/scoreboard/GameOverDialog";
 import { MatchBindingNotice } from "@/components/scoreboard/MatchBindingNotice";
 import { cn } from "@/lib/utils";
-import type { ScoreboardState } from "@/lib/scoreboard/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 
 // 偵測 RALLY_WON 後 state 的轉換類型，回傳要顯示的 toast 訊息。
 // - 加分（既有分數動畫已夠）→ 不顯示

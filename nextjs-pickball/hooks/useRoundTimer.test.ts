@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRoundTimer } from "./useRoundTimer";
-import type { RoundTimer } from "@/lib/matchmaker/round-types";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 
 // useFakeTimers 同時假造 Date，這是本測試能以 setInterval 驅動又保持結果可預期的前提；
 // 必須在 beforeEach／afterEach 正確切換，否則會污染同檔或其他測試檔的計時行為。

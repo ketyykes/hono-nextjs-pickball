@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { countPlaying, selectPlaying, sortCandidates } from "./candidates";
-import { DEFAULT_COURT_COUNT, DEFAULT_FORMAT, MAX_COURT_COUNT, MIN_COURT_COUNT } from "./allocation-types";
-import type { Player } from "./types";
+import { countPlaying, selectPlaying, sortCandidates } from "@pickball/core/matchmaker/candidates";
+import { DEFAULT_COURT_COUNT, DEFAULT_FORMAT, MAX_COURT_COUNT, MIN_COURT_COUNT } from "@pickball/core/matchmaker/allocation-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，預設值皆為合法值，呼叫端可用 overrides 覆寫個別欄位。
 // 與 roster.test.ts 的 makePlayer 同構，刻意不共用——candidates.test.ts 保持獨立、不依賴其他測試檔。

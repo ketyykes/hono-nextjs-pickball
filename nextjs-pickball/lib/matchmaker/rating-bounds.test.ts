@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RATING_MIN, RATING_MAX } from "./rating-types";
+import { RATING_MIN, RATING_MAX } from "@pickball/core/matchmaker/rating-types";
 import { ratingBoundState } from "./rating-bounds";
 
 describe("ratingBoundState", () => {

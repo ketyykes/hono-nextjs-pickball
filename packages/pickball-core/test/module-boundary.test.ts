@@ -52,9 +52,9 @@ describe("核心套件模組邊界", () => {
   });
 
   it("每個核心模組可在沒有瀏覽器全域的 node 環境載入", async () => {
-    expect(globalThis.window).toBeUndefined();
-    expect(globalThis.document).toBeUndefined();
-    expect(globalThis.localStorage).toBeUndefined();
+    expect(Reflect.get(globalThis, "window")).toBeUndefined();
+    expect(Reflect.get(globalThis, "document")).toBeUndefined();
+    expect(Reflect.get(globalThis, "localStorage")).toBeUndefined();
 
     for (const moduleName of CORE_MODULES) {
       // 清單是執行期資料，Vite 無法靜態分析子目錄的動態匯入，需略過其預處理。

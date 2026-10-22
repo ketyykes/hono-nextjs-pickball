@@ -15,7 +15,7 @@ import {
 	SET_TIMER_DURATION_FAILURE_CODE,
 	START_TIMER_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
-} from "@/lib/matchmaker/round";
+} from "@pickball/core/matchmaker/round";
 import { clearDiscardedMatchSlots } from "@/lib/matchmaker/scoreboard-binding";
 import type {
 	CreateRoundInput,
@@ -26,12 +26,12 @@ import type {
 	SetTimerDurationResult,
 	StartTimerResult,
 	SwapMatchPlayerResult,
-} from "@/lib/matchmaker/round";
+} from "@pickball/core/matchmaker/round";
 import { readRound, writeRound, readHistory, writeHistory } from "@/lib/matchmaker/round-storage";
 import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
-import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
-import type { Round, RoundTargetScore, RoundTimerDurationMinutes } from "@/lib/matchmaker/round-types";
-import type { Player } from "@/lib/matchmaker/types";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import type { Round, RoundTargetScore, RoundTimerDurationMinutes } from "@pickball/core/matchmaker/round-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
 // 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate

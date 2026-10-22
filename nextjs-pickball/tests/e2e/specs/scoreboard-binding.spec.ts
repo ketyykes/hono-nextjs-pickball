@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type { TeamPlayers } from "@/lib/scoreboard/types";
+import type { TeamPlayers } from "@pickball/core/scoreboard/types";
 // pickTextColor 是純函式（不依賴瀏覽器 API），測試檔匯入以獨立算出預期前景色供斷言比對
 // 用，不違反 components/scoreboard/、lib/scoreboard/ 的單向相依限制（該限制只及於這兩個
 // 目錄本身，不含 tests/）。

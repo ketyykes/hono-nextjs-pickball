@@ -1,5 +1,5 @@
-import { ScoreboardStateSchema } from "./types";
-import type { ScoreboardState } from "./types";
+import { ScoreboardStateSchema } from "@pickball/core/scoreboard/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { MATCH_SLOTS_KEY, hasLocalStorage } from "./storage-keys";
 
 // re-export（非改名）：既有匯入點（match-slots.test.ts、useScoreboardStore.test.tsx 等）
