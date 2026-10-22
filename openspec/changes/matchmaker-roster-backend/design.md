@@ -182,3 +182,6 @@
    `hono-pickball/CLAUDE.md` 路由約定應改指向 `src/http/invalid-body.ts`（8.1 處理）；`matchmaker_players` 各欄 NOT NULL 未個別測試（migration 為工具產生，風險低）。
 9. （apply §3 Stage 2 複審，2026-10-23）PASS（`dd4d60d` guard、`d6b957e` RED、`b5de2e1` fix；後端 17 檔／97）。非阻擋：`isConstraintError` 走 cause 鏈的部分無測試覆蓋（實測 D1 batch 主鍵衝突在最外層訊息即可比對），
    新 it 註解「約束細節在 cause 內」與 batch 實測不符——留 §8／後續修註解或補 it。下一步 §4。
+10. （apply §4，2026-10-23）完成（`6a5f5f1`、`b01df1d` RED；`3ff0ea3` GREEN——4.2 與 4.4 合併為一個 feat commit，屬流程偏離；`1de7deb`、`82020ce` regression guard）。
+    Stage 1 PASS；Stage 2 第一輪 FAIL（passthrough 只斷言兩個包裝、SSR guard 空轉），補測試後複審 PASS。前端 93 檔／852（Implementer 全套 851＋複審後新增 1）。
+    非阻擋：`PUT_PLAYER_RESPONSE_SCHEMA` 的 version 為 nonnegative，比後端實際（≥1）寬；`removeItem` 拋例外的分支無測試（既有 `resetMatchmakerData` 同樣缺）。下一步 §5。
