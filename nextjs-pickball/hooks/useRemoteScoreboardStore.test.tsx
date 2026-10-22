@@ -95,10 +95,15 @@ describe("useRemoteScoreboardStore", () => {
 
 	it("雲端無資料時維持初始狀態，第一次儲存帶 version 0", async () => {
 		// StrictMode 會重跑 effect：第一次的 GET 被忽略，第二次才算數，但 PUT 不得重複
-		enqueue(200, { data: null, version: 0 });
+		const releaseStaleGet = enqueueDeferred();
 		enqueue(200, { data: null, version: 0 });
 		const { result } = renderRemote({ enabled: true, strict: true });
 		await waitFor(() => expect(result.current[2]).toBe("synced"));
+		// 第一次（已被取消）的 GET 較晚才回來：其 1:1 不得覆蓋第二次 data null 的結果
+		await act(async () => {
+			releaseStaleGet(200, { data: stateWithScores(1, 1), version: 1 });
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		});
 		expect(result.current[0]).toEqual(createInitialState());
 		expect(putCalls()).toHaveLength(0);
 
@@ -209,9 +214,18 @@ describe("useRemoteScoreboardStore", () => {
 		const syncedIndex = statusLog.indexOf("synced");
 
 		enqueue(409);
-		enqueue(200, { data: stateWithScores(9, 9), version: 5 });
+		const releaseReload = enqueueDeferred();
 		act(() => {
 			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		// 重載用的 GET 在途期間不可切到 loading（會取代計分畫面）
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		});
+		expect(result.current[2]).not.toBe("loading");
+		await act(async () => {
+			releaseReload(200, { data: stateWithScores(9, 9), version: 5 });
 		});
 		await waitFor(() => expect(result.current[2]).toBe("conflict"));
 		expect(result.current[0].scores).toEqual({ us: 9, them: 9 });

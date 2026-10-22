@@ -391,11 +391,14 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 
 	it("已登入且未帶 matchId 時改用雲端並回傳 syncStatus", async () => {
 		vi.mocked(useSession).mockReturnValue(loggedIn);
-		fetchMock.mockResolvedValue(
-			jsonResponse({
-				data: { ...createInitialState(), scores: { us: 4, them: 2 } },
-				version: 3,
-			}),
+		// 每次請求都要新的 Response（body 只能讀一次）
+		fetchMock.mockImplementation(() =>
+			Promise.resolve(
+				jsonResponse({
+					data: { ...createInitialState(), scores: { us: 4, them: 2 } },
+					version: 3,
+				}),
+			),
 		);
 
 		const { result } = renderHook(() => useScoreboardStore(null));
@@ -403,6 +406,21 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		await waitFor(() => expect(result.current[3]).toBe("synced"));
 		expect(result.current[0].scores).toEqual({ us: 4, them: 2 });
 		expect(result.current[2]).toBe("standalone");
+
+		// 空字串的 matchId 視為未綁定，同樣走雲端
+		fetchMock.mockClear();
+		const emptyId = renderHook(() => useScoreboardStore(""));
+		await waitFor(() => expect(emptyId.result.current[3]).toBe("synced"));
+		expect(scoreboardCalls().length).toBeGreaterThan(0);
+		emptyId.unmount();
+
+		// 雲端 GET 回 401 時，選擇器把 session.refresh 交給雲端 hook 呼叫
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });
+		fetchMock.mockReset();
+		fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 401 })));
+		renderHook(() => useScoreboardStore(null));
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
 	});
 
 	it("session 載入中或訪客時走本機且 syncStatus 為 local", () => {
