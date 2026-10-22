@@ -44,6 +44,10 @@ export async function importRemoteRoster(
 	const cloudPlayers: Player[] = existing.value.items.map((item) => item.data);
 	const appended = applyRosterImport(cloudPlayers, preview, context).slice(cloudPlayers.length);
 
+	// 沒有可新增的列（例如只有標題列的 CSV）時不送出：後端 min(1) 會拒絕空陣列，
+	// 使用者重試也永遠失敗；本機分支遇到同一份檔案是無害的成功，這裡保持一致。
+	if (appended.length === 0) return { ok: true };
+
 	const imported = await importRemotePlayers(appended);
 	if (imported.kind === "ok") return { ok: true };
 	if (imported.kind === "unauthorized") return { ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized };
