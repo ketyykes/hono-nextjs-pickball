@@ -208,3 +208,9 @@ runbook 已定「五個 key 全部要有後端版本」，本決策只是改變�
    ③ GET 有資料的 it 未斷言 status 200。皆為測試加強，不影響現行行為，交 coordinator 決定是否在本 change 補。
 8. （apply §5）5.1 的 RED commit `bb6dd3e` 早於實際看到紅燈（實作檔當時未追蹤、不在 commit 內），Implementer 事後暫移實作重跑確認紅燈；`git show bb6dd3e^:nextjs-pickball/lib/sync/storage-mode.ts` 不存在，機械複驗成立。
    §5 Stage 2 指出的 L14（失敗後以舊值覆蓋較新待送值）與 A12（回傳未經 schema 的 JSON）兩個存活變異已於 `12ae7e2` 補 regression guard 斷言。
+9. （apply §6）Stage 2 第一輪 FAIL：同一 mount 內 `enabled` true→false→true 且新一輪 GET 回 `data: null` 時保留前一輪比分（違反「data 為 null 時維持 `createInitialState()`」，可能把前一帳號比分寫上新帳號）；
+   已依 TDD 修正（RED `199578e`、fix `e718f67`：載入成功一律 `HYDRATE data ?? createInitialState()`），並補選擇器 401 呼叫 `refresh`、衝突重載不切 `loading`、StrictMode 過期 GET、`useScoreboardStore("")` 四條 regression guard（`d347fc3`）；複審 PASS。
+   test-plan／tasks 寫「既有 `useScoreboardStore.test.tsx` 15 個 it」為筆誤，基準實為 14 個（tasks 6.5 已註記）。
+10. （apply §6 非阻擋，交 B6）① 401 → `refresh()` 後 session 仍為登入（例如另一分頁換帳號）時 `enabled` 不切換、effect 不重跑，hook 會停在 `loading` 或 `saving` 且之後寫入被靜默丟棄；B6 照抄時應考慮以 user id 作為 effect 依賴或 401 後強制重載。
+    ② 衝突重載期間 `versionRef` 仍為舊版本，重載中使用者動作會多一輪 409→重載（有界、自癒）；可於重載開始時設 null 省去。③ 無歷史時 UNDO 回傳同一 state 仍標 dirty，多送一次 PUT（無害）。
+    ④ 雲端模式下本機 hook mount 時仍會把 `scoreboard:current:v1` 既有資料（經 zod 正規化）寫回原 key——Decision 5 已接受的取捨，使用者動作不寫入（有 it 守）。
