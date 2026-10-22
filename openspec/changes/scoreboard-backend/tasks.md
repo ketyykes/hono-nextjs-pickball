@@ -77,8 +77,10 @@ Depends on: §3
 
 Depends on: §2
 
-- [ ] 5.1 RED（TDD）：新增 `nextjs-pickball/lib/sync/storage-mode.test.ts`，it「只有 session 就緒、auth 啟用且有 user 時為 remote」。確認紅燈
-- [ ] 5.2 GREEN（TDD）：新增 `lib/sync/storage-mode.ts`
+- [x] 5.1 RED（TDD）：新增 `nextjs-pickball/lib/sync/storage-mode.test.ts`，it「只有 session 就緒、auth 啟用且有 user 時為 remote」。確認紅燈
+  - 紅燈（commit 8d 之後以暫移實作檔複驗）：`Failed to resolve import "./storage-mode"`，Test Files 1 failed／no tests。無 regression guard。
+- [x] 5.2 GREEN（TDD）：新增 `lib/sync/storage-mode.ts`
+  - 綠燈：1 passed。
 - [ ] 5.3 RED（TDD）：新增 `lib/sync/api-client.test.ts`，五個 it（spec「前端 API 請求的結果分類」錨點）。確認紅燈
 - [ ] 5.4 GREEN（TDD）：新增 `lib/sync/api-client.ts`（`requestJson`）
 - [ ] 5.5 RED（TDD）：新增 `lib/sync/latest-wins-saver.test.ts`，五個 it（spec「最新優先的雲端儲存與自動重試」錨點；`vi.useFakeTimers()`）。確認紅燈
