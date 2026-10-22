@@ -39,8 +39,9 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD，type）：新增 `hono-pickball/test/auth-env-types.test.ts`：一個以 `new Hono<AuthAppEnv>()` 宣告、未掛 `requireSession` 的 handler 讀 `c.var.user`（上一行 `// @ts-expect-error`），
+- [x] 3.1 RED（TDD，type）：新增 `hono-pickball/test/auth-env-types.test.ts`：一個以 `new Hono<AuthAppEnv>()` 宣告、未掛 `requireSession` 的 handler 讀 `c.var.user`（上一行 `// @ts-expect-error`），
   一個經 `requireSession` 的 handler 讀 `c.var.user.id`；檔內放一個執行期 it「auth 型別測試檔可載入」以免空檔。以 `pnpm --filter ./hono-pickball typecheck` 確認紅燈（`Unused '@ts-expect-error' directive`）並貼出輸出
+  - 紅燈紀錄：`typecheck` exit 2，`test/auth-env-types.test.ts(9,2): error TS2578: Unused '@ts-expect-error' directive.`（另有 TS2305：`SessionAppEnv` 尚不存在，屬功能不存在的紅燈原因）
 - [ ] 3.2 GREEN（TDD）：`src/auth/require-session.ts` 拆為 `AuthAppEnv`／`SessionAppEnv`，`requireSession` 改為 `createMiddleware<SessionAppEnv>`；typecheck exit 0；既有後端測試全綠（regression guard）
 - [ ] 3.3 REFACTOR（regression guard：既有 `auth-gating`／`auth-me`／`auth-session`／`auth-sign-in` 測試）：`localAuth` 自 `src/index.ts` 原樣搬到 `src/auth/local-auth-middleware.ts`（design Decision 2），`index.ts` 改為匯入；後端測試全綠、數量不變
 - [ ] 3.4 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（「scoreboard_current 可由 migration 建立並寫入讀回」「同一使用者在 scoreboard_current 只能有一列」「scoreboard_current 的 user_id 必須參照既有使用者」「刪除使用者時其 scoreboard_current 一併刪除」）；
