@@ -250,3 +250,7 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     **下一步**：退回 §3 Implementer 補測試（regression guard，誠實標註）→ Stage 2 複審 → §4。工作樹乾淨（審查員已還原 0003 暫時變異）。
 14. （apply §3 完成，2026-10-23）補件 69b543b（regression guard）、3ecbb60（註解）後 Stage 2 複審 **PASS**：上輪存活變異 #9／#25～#28／#35／#37／#43 全數轉紅，三條等價對照維持綠。
     §3 測試數：後端 d1-batch-guard 4、d1-schema 20、user-data-tables 2。保留到 §5 再決定：`guardedBatch` 包裝、`as never` fixture。**下一步**：派 §4 Implementer（sonnet）。
+15. （apply §4 進度，2026-10-23）Implementer（sonnet）DONE：465614b RED（只含測試檔，15 紅／3 先綠＝404、401、getSession 500 迴圈，標 regression guard）→ 5a6d744 GREEN → 65a1c55 勾選（4.3 skipped）→ b10965e／91028d2／d3fce67 自補 guard 與 refactor。
+    後端全套 20 檔／126 測試全綠，tsc／typecheck exit 0，無新相依。偏離：全套測試取鎖後 load 25 > 20 未等（結果全綠）。S6（`GET /slots` 拿掉 orderBy）判定為不可觀察的等價變異。
+    Stage 1（sonnet）**PASS**，非阻擋：tasks.md 4.1 未點名 regression guard（只在 commit 訊息）；`NOT IN (SELECT json_extract(...))` 遇 NULL id 會靜默不刪（schema 保證不會發生）。
+    Stage 2（opus）**審查進行中、尚未回報**（leader 被 harness 要求先交回）。**下一步**：等 Stage 2 結論；FAIL 則退回 §4 Implementer 補件並複審；PASS 後補 tasks.md 4.1 的 regression guard 點名（可併入）→ 派 §5。
