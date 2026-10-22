@@ -148,11 +148,10 @@ describe("storage", () => {
 	});
 
 	it("resetLocalMatchProgress 在沒有 localStorage 的環境（SSR）不拋例外", () => {
-		vi.stubGlobal("window", undefined);
-		try {
-			expect(() => resetLocalMatchProgress()).not.toThrow();
-		} finally {
-			vi.unstubAllGlobals();
-		}
+		vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+			throw new Error("localStorage 不可用（例如私密模式）");
+		});
+
+		expect(() => resetLocalMatchProgress()).not.toThrow();
 	});
 });

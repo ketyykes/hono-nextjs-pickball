@@ -74,6 +74,15 @@ describe("roster-api", () => {
 		expect(calls[4][2].schema).toBe(NO_CONTENT_SCHEMA);
 	});
 
+	it("PUT body 的 version 取自呼叫參數", async () => {
+		await putRemotePlayer(makePlayer("p-1"), 7);
+
+		expect(vi.mocked(requestJson).mock.calls[0][2].body).toEqual({
+			data: makePlayer("p-1"),
+			version: 7,
+		});
+	});
+
 	it("id 含特殊字元時路徑以 encodeURIComponent 編碼", async () => {
 		await putRemotePlayer(makePlayer("a/b c"), 1);
 		await deleteRemotePlayer("a/b c");
@@ -88,5 +97,8 @@ describe("roster-api", () => {
 		vi.mocked(requestJson).mockResolvedValue(result);
 		await expect(fetchRemotePlayers()).resolves.toBe(result);
 		await expect(resetRemoteMatchmaker()).resolves.toBe(result);
+		await expect(putRemotePlayer(makePlayer("p-1"), 1)).resolves.toBe(result);
+		await expect(deleteRemotePlayer("p-1")).resolves.toBe(result);
+		await expect(importRemotePlayers([makePlayer("p-1")])).resolves.toBe(result);
 	});
 });
