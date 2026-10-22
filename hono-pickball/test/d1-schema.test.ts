@@ -399,6 +399,9 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 				.bind(userId)
 				.first(),
 		).toEqual({ version: 1, updated_at: NOW + 5 });
+		// 守衛表平時恆為空：讀回後清掉本 it 寫入的列
+		await db.prepare("DELETE FROM sync_batch_guards WHERE user_id = ?").bind(userId).run();
+		expect(await countRows(db, "SELECT COUNT(*) AS n FROM sync_batch_guards WHERE user_id = ?", userId)).toBe(0);
 	});
 
 	it("回合每位使用者一筆，分槽與歷史的 match_id 只在同一使用者內唯一", async () => {
@@ -512,6 +515,22 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 				await countRows(db, `SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, userId),
 				`${table} 刪除後應為 0 列`,
 			).toBe(0);
+		}
+	});
+
+	// regression guard（寫入即綠）：補新表 NOT NULL 欄位的約束覆蓋。
+	it("回合、分槽、歷史的 data 與歷史的 played_at 不可為 NULL", async () => {
+		const db = getTestDb();
+		const userId = "b7-null-user";
+		await insertUser(db, userId, "b7-null@example.com");
+		const statements = [
+			["matchmaker_round.data", "INSERT INTO matchmaker_round (user_id, data, version, updated_at) VALUES (?, NULL, 1, ?)", [userId, NOW]],
+			["matchmaker_match_slots.data", "INSERT INTO matchmaker_match_slots (user_id, match_id, data, version, updated_at) VALUES (?, 'm1', NULL, 1, ?)", [userId, NOW]],
+			["matchmaker_history.data", "INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, 'm1', ?, NULL, 1, ?)", [userId, NOW, NOW]],
+			["matchmaker_history.played_at", "INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, 'm1', NULL, '{}', 1, ?)", [userId, NOW]],
+		] as const;
+		for (const [label, statement, params] of statements) {
+			await expect(db.prepare(statement).bind(...params).run(), label).rejects.toThrow(/NOT NULL/);
 		}
 	});
 });

@@ -115,7 +115,42 @@ describe("D1 整批守衛", () => {
 			cause: new Error("NOT NULL constraint failed: sync_batch_guards.version"),
 		});
 		expect(isBatchGuardViolation(wrapped)).toBe(true);
+		// 守衛表主鍵（殘留守衛列）衝突不是守衛條件失敗，不可被吞成版本衝突
+		expect(isBatchGuardViolation(new Error("UNIQUE constraint failed: sync_batch_guards.user_id"))).toBe(false);
 		// 其他表的 NOT NULL 違反不是守衛失敗
 		expect(isBatchGuardViolation(new Error("NOT NULL constraint failed: matchmaker_round.data"))).toBe(false);
+	});
+
+	// regression guard（寫入即綠）：守衛表殘留一列時，守衛 INSERT 會因主鍵衝突失敗，
+	// 該錯誤不是版本衝突，不可被分類為 409。
+	it("殘留守衛列造成的主鍵衝突不被分類為版本衝突且整批回滾", async () => {
+		const { insertBatchGuard, releaseBatchGuard, isBatchGuardViolation } = await import(
+			"../src/matchmaker/batch-guard"
+		);
+		const db = getDb(env);
+		const userId = "guard-stale-user";
+		await insertUser(userId);
+		await getTestDb()
+			.prepare("INSERT INTO sync_batch_guards (user_id, version, updated_at) VALUES (?, 1, ?)")
+			.bind(userId, NOW.getTime())
+			.run();
+
+		const failure = await db
+			.batch([
+				insertBatchGuard(db, userId, sql`1 = 1`, NOW),
+				db.insert(matchmakerRound).values({ userId, data: { matches: [] } as never, version: 1, updatedAt: NOW }),
+				releaseBatchGuard(db, userId),
+			])
+			.then(
+				() => undefined,
+				(error: unknown) => error ?? new Error("rejected with empty value"),
+			);
+
+		expect(failure).toBeDefined();
+		expect(String((failure as Error).message)).toMatch(/UNIQUE constraint failed: sync_batch_guards\.user_id/);
+		expect(isBatchGuardViolation(failure)).toBe(false);
+		expect(await countRows("matchmaker_round", userId)).toBe(0);
+		// 殘留列未被釋放陳述式刪除（整批已回滾）
+		expect(await countRows("sync_batch_guards", userId)).toBe(1);
 	});
 });
