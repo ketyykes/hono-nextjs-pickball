@@ -105,8 +105,10 @@ Depends on: §4、§5
   - 紅燈：`hooks/useRemoteScoreboardStore.test.tsx` 7 個 it，`Failed to resolve import "./useRemoteScoreboardStore"`（Test Files 1 failed、no tests），原因為功能尚不存在；七個皆非 regression guard（RED commit 855b90b）
 - [x] 6.2 GREEN（TDD）：新增 `hooks/useRemoteScoreboardStore.ts`（design Decision 5、6、7；`HYDRATE` 不寫回、衝突重載、401 呼叫 `onUnauthorized`）
   - 綠燈：單檔 7 passed。dirty 標記放在 reducer 狀態（HYDRATE 不標記），saver 於 effect 內建立並於 cleanup dispose（StrictMode 安全）；SyncStatus 映射依 Stage 2 建議（saving 不覆蓋 retrying／conflict／rejected；衝突重載不經 loading）
-- [ ] 6.3 RED（既有守衛）：跑 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `useRemoteScoreboardStore` 未列入主 spec 而**真的轉紅**，貼出輸出
-- [ ] 6.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 tasks 3.6、M14 `4b99156` 前例）；
+- [x] 6.3 RED（既有守衛）：跑 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `useRemoteScoreboardStore` 未列入主 spec 而**真的轉紅**，貼出輸出
+  - 紅燈（真）：032fab9（6.2 GREEN）之後、6.4 之前實跑，`hooks/hooksInventory.test.ts` 1 failed｜1 passed，`Expected [] / Received ["useRemoteScoreboardStore"]`（hooks/hooksInventory.test.ts:63）
+- [x] 6.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 tasks 3.6、M14 `4b99156` 前例）；
+  - 綠燈：主 spec 僅第 141 行一句加入 `useRemoteScoreboardStore`；守衛 2 passed
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteScoreboardStore（B5 §6）`。重跑 6.3 轉綠。archive 時此段 MODIFIED 應為 no-op
 - [ ] 6.5 RED（TDD）：`hooks/useScoreboardStore.test.tsx` **只新增**檔頭 `vi.mock("@/hooks/useSession", ...)` 區塊（預設回本機模式的快照；各新 it 以 `vi.mocked(...).mockReturnValue` 覆寫）與四個 it：
   「已登入且未帶 matchId 時改用雲端並回傳 syncStatus」「session 載入中或訪客時走本機且 syncStatus 為 local」「雲端模式下 dispatch 不寫入 scoreboard:current:v1」「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」。
