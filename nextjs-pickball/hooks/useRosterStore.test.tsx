@@ -227,6 +227,14 @@ describe("useRosterStore 儲存模式選擇器", () => {
 
 		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
 		expect(result.current.players.map((player) => player.id)).toEqual(["c1", "c2"]);
+
+		// 雲端 GET 回 401 時，選擇器把 session.refresh 交給雲端 hook 呼叫
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });
+		fetchMock.mockReset();
+		fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 401 })));
+		renderHook(() => useRosterStore());
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
 	});
 
 	it("session 載入中或訪客時走本機且 syncStatus 為 local", () => {

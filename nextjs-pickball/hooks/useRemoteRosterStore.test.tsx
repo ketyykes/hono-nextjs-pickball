@@ -631,12 +631,18 @@ describe("useRemoteRosterStore 補充守護", () => {
 		const { result } = renderRemote({ enabled: true });
 		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
 
+		// p2 的舊世代 PUT 在途，p1 的 PUT 回 409 觸發重載
+		const releaseOldP2 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "舊世代" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
 		enqueue(409);
 		const releaseReload = enqueueDeferred();
 		act(() => {
 			result.current.updatePlayer("p1", { name: "本機" });
 		});
-		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
 
 		// 重載在途：重載用的 GET 不切到 loading，使用者動作不送出
 		expect(result.current.syncStatus).not.toBe("loading");
@@ -644,7 +650,7 @@ describe("useRemoteRosterStore 補充守護", () => {
 			result.current.updatePlayer("p2", { name: "重載中" });
 		});
 		await settle();
-		expect(putCalls()).toHaveLength(1);
+		expect(putCalls()).toHaveLength(2);
 
 		await act(async () => {
 			releaseReload(200, listBody([[makePlayer("p1"), 5], [makePlayer("p2"), 7]]));
@@ -652,12 +658,19 @@ describe("useRemoteRosterStore 補充守護", () => {
 		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
 		expect(result.current.players.find((player) => player.id === "p2")?.name).toBe("球員p2");
 
+		// 舊世代的在途結果（version 4）晚於重載到達，不得蓋掉剛載入的 version 7
+		await act(async () => {
+			releaseOldP2(200, { data: makePlayer("p2", { name: "舊世代" }), version: 4 });
+		});
+		await settle();
+		expect(result.current.syncStatus).toBe("conflict");
+
 		const releaseSecond = enqueueDeferred();
 		act(() => {
 			result.current.updatePlayer("p2", { name: "重載後" });
 		});
-		await waitFor(() => expect(putCalls()).toHaveLength(2));
-		expect(putVersions()).toEqual([3, 7]);
+		await waitFor(() => expect(putCalls()).toHaveLength(3));
+		expect(putVersions()).toEqual([3, 3, 7]);
 		expect(result.current.syncStatus).toBe("conflict");
 		await act(async () => {
 			releaseSecond(200, { data: makePlayer("p2", { name: "重載後" }), version: 8 });
@@ -719,6 +732,8 @@ describe("useRemoteRosterStore 補充守護", () => {
 		rendered.rerender({ enabled: false });
 		expect(rendered.result.current.syncStatus).toBe("local");
 		rendered.rerender({ enabled: true });
+		// 新一輪載入開始時狀態要回到 loading，頁面才會以提示取代前一個帳號的名單
+		expect(rendered.result.current.syncStatus).toBe("loading");
 		await waitFor(() => expect(queue).toHaveLength(0));
 		await waitFor(() => expect(rendered.result.current.syncStatus).toBe("synced"));
 		expect(rendered.result.current.players).toEqual([]);
