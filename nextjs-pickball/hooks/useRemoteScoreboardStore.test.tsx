@@ -20,7 +20,7 @@ function jsonResponse(status: number, body: unknown): Response {
 
 /** 依呼叫順序回應；佇列用完代表測試沒預期到的請求，直接讓它失敗。 */
 let queue: Array<() => Promise<Response>>;
-const fetchMock = vi.fn((_path: string, _init?: RequestInit) => {
+const fetchMock = vi.fn<typeof fetch>(() => {
 	const next = queue.shift();
 	if (next === undefined) return Promise.reject(new Error("unexpected fetch"));
 	return next();

@@ -101,8 +101,10 @@ Depends on: §2
 
 Depends on: §4、§5
 
-- [ ] 6.1 RED（TDD）：新增 `hooks/useRemoteScoreboardStore.test.tsx`，七個 it（spec「登入時獨立計分板以雲端為準」中 `useRemoteScoreboardStore.test.tsx` 的錨點）。mock `fetch`（`vi.stubGlobal`）。確認紅燈
-- [ ] 6.2 GREEN（TDD）：新增 `hooks/useRemoteScoreboardStore.ts`（design Decision 5、6、7；`HYDRATE` 不寫回、衝突重載、401 呼叫 `onUnauthorized`）
+- [x] 6.1 RED（TDD）：新增 `hooks/useRemoteScoreboardStore.test.tsx`，七個 it（spec「登入時獨立計分板以雲端為準」中 `useRemoteScoreboardStore.test.tsx` 的錨點）。mock `fetch`（`vi.stubGlobal`）。確認紅燈
+  - 紅燈：`hooks/useRemoteScoreboardStore.test.tsx` 7 個 it，`Failed to resolve import "./useRemoteScoreboardStore"`（Test Files 1 failed、no tests），原因為功能尚不存在；七個皆非 regression guard（RED commit 855b90b）
+- [x] 6.2 GREEN（TDD）：新增 `hooks/useRemoteScoreboardStore.ts`（design Decision 5、6、7；`HYDRATE` 不寫回、衝突重載、401 呼叫 `onUnauthorized`）
+  - 綠燈：單檔 7 passed。dirty 標記放在 reducer 狀態（HYDRATE 不標記），saver 於 effect 內建立並於 cleanup dispose（StrictMode 安全）；SyncStatus 映射依 Stage 2 建議（saving 不覆蓋 retrying／conflict／rejected；衝突重載不經 loading）
 - [ ] 6.3 RED（既有守衛）：跑 `pnpm --filter ./nextjs-pickball test --run hooks/hooksInventory.test.ts`，確認「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」因 `useRemoteScoreboardStore` 未列入主 spec 而**真的轉紅**，貼出輸出
 - [ ] 6.4 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 tasks 3.6、M14 `4b99156` 前例）；
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteScoreboardStore（B5 §6）`。重跑 6.3 轉綠。archive 時此段 MODIFIED 應為 no-op
