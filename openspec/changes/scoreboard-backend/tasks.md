@@ -58,7 +58,8 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 設定層（測試基礎建設）：新增 `hono-pickball/test/helpers/session.ts`（`seedUser(email)`、`signIn(email)` 回 Cookie 字串、`userIdOf(email)`；沿用 `auth-me.test.ts` 的 `buildTestAccountSeedSql` 與 `Origin` 寫法）；既有測試檔不改
+- [x] 4.1 設定層（測試基礎建設）：新增 `hono-pickball/test/helpers/session.ts`（`seedUser(email)`、`signIn(email)` 回 Cookie 字串、`userIdOf(email)`；沿用 `auth-me.test.ts` 的 `buildTestAccountSeedSql` 與 `Origin` 寫法）；既有測試檔不改
+  - 實跑紀錄：新增 `test/helpers/session.ts`（`seedUser`／`signIn`／`userIdOf`）；既有測試檔未動；typecheck 於 4.2 一併驗證
 - [ ] 4.2 RED（TDD）：新增 `test/scoreboard-current.test.ts`，寫入 spec 錨點的全部 it：「auth 停用且無 DB binding 時 GET 與 PUT /api/scoreboard/current 皆回 404」「未登入呼叫 GET 與 PUT /api/scoreboard/current 皆回 401」
   「B 的 cookie 讀不到 A 的計分板且寫入不影響 A」「尚無資料時 GET 回 data null 與 version 0」「以 version 0 首次寫入成功並回 version 1」「以目前 version 寫入成功並遞增 version，GET 取回相同資料」
   「version 不符時回 409 VERSION_CONFLICT 且資料不變」「已有資料時以 version 0 寫入回 409」「body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY」「data.matchId 非 null 時回 400 INVALID_BODY」。
