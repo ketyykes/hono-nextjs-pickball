@@ -21,9 +21,18 @@ export function clearTestAccountUserData(): void {
 		(table) =>
 			`DELETE FROM ${table} WHERE user_id IN (SELECT id FROM user WHERE email = '${email}');`,
 	).join(" ");
-	execFileSync(
-		"pnpm",
-		["--dir", honoRoot, "exec", "wrangler", "d1", "execute", "DB", "--local", "--env", "local", "--command", sql],
-		{ stdio: "pipe" },
-	);
+	try {
+		execFileSync(
+			"pnpm",
+			["--dir", honoRoot, "exec", "wrangler", "d1", "execute", "DB", "--local", "--env", "local", "--command", sql],
+			{ stdio: "pipe" },
+		);
+	} catch (error) {
+		// Node 的錯誤訊息會帶完整指令（含 SQL 與測試帳號 email），所以只回報表名與 exit status
+		const status =
+			error instanceof Error && "status" in error ? String(error.status) : "unknown";
+		throw new Error(
+			`清空測試帳號使用者資料失敗（表：${USER_DATA_TABLES.join(", ")}；exit status：${status}）`,
+		);
+	}
 }

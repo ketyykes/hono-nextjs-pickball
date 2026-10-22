@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Route } from "@playwright/test";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { clearTestAccountUserData } from "../helpers/user-data";
 
@@ -8,6 +8,9 @@ import { clearTestAccountUserData } from "../helpers/user-data";
 
 const LS_KEY = "scoreboard:current:v1";
 const SYNCED = '[data-sync-status="synced"]';
+const CONFLICT = '[data-sync-status="conflict"]';
+const LOADING = '[data-sync-status="loading"]';
+const LOAD_FAILED = '[data-sync-status="load-failed"]';
 
 test.use({ storageState: storageStatePath });
 test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);
@@ -85,7 +88,7 @@ test.describe("/scoreboard 雲端同步", () => {
 			await expect(
 				pageB.getByText("資料已在其他裝置更新，已重新載入最新資料"),
 			).toBeVisible();
-			await expect(pageB.locator('[data-sync-status="conflict"]')).toBeVisible();
+			await expect(pageB.locator(CONFLICT)).toBeVisible();
 			await expect(pageB.getByLabel(/我方目前 2 分/)).toBeVisible();
 		} finally {
 			await contextB.close();
@@ -96,7 +99,7 @@ test.describe("/scoreboard 雲端同步", () => {
 		await page.goto("/scoreboard");
 		await expect(page.locator(SYNCED)).toBeVisible();
 
-		const handler = async (route: import("@playwright/test").Route) => {
+		const handler = async (route: Route) => {
 			if (route.request().method() === "PUT") {
 				await route.fulfill({ status: 503, body: "" });
 				return;
@@ -119,8 +122,14 @@ test.describe("/scoreboard 雲端同步", () => {
 	});
 
 	test("雲端載入失敗時顯示錯誤提示且不顯示計分畫面", async ({ page }) => {
+		// 先把 GET 掛起，才能觀察 loading 階段；放行後才回 500
+		let releaseGet: () => void = () => {};
+		const getGate = new Promise<void>((resolve) => {
+			releaseGet = resolve;
+		});
 		await page.route("**/api/scoreboard/current", async (route) => {
 			if (route.request().method() === "GET") {
+				await getGate;
 				await route.fulfill({ status: 500, body: "" });
 				return;
 			}
@@ -128,8 +137,13 @@ test.describe("/scoreboard 雲端同步", () => {
 		});
 
 		await page.goto("/scoreboard");
+		await expect(page.getByText("正在載入雲端資料…")).toBeVisible();
+		await expect(page.locator(LOADING)).toBeVisible();
+		await expect(page.getByRole("button", { name: /我方贏這一球/ })).toHaveCount(0);
+
+		releaseGet();
 		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
-		await expect(page.locator('[data-sync-status="load-failed"]')).toBeVisible();
+		await expect(page.locator(LOAD_FAILED)).toBeVisible();
 		await expect(page.getByRole("button", { name: /我方贏這一球/ })).toHaveCount(0);
 	});
 
