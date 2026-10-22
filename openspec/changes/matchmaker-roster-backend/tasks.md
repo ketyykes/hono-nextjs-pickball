@@ -31,8 +31,8 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/players.test.ts`，it「PlayerImportRequestSchema 要求至少一位且 id 不重複」「PlayerListResponseSchema 以 PlayerSchema 驗證每一筆」。確認紅燈
-- [ ] 2.2 GREEN（TDD）：新增 `src/api/players.ts`；`CORE_MODULES` 加一項
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/players.test.ts`，it「PlayerImportRequestSchema 要求至少一位且 id 不重複」「PlayerListResponseSchema 以 PlayerSchema 驗證每一筆」。確認紅燈
+- [x] 2.2 GREEN（TDD）：新增 `src/api/players.ts`；`CORE_MODULES` 加一項
 
 ## 3. 後端：資料表與名單 API
 

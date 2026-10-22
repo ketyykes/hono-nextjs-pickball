@@ -28,6 +28,7 @@ export const CORE_MODULES = [
   "api/versioned",
   "api/errors",
   "api/user-data-tables",
+  "api/players",
 ];
 
 const SRC_DIR = path.resolve(import.meta.dirname, "../src");
