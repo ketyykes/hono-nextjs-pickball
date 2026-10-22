@@ -49,8 +49,9 @@ Depends on: §2
 - [x] 3.4 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（「scoreboard_current 可由 migration 建立並寫入讀回」「同一使用者在 scoreboard_current 只能有一列」「scoreboard_current 的 user_id 必須參照既有使用者」「刪除使用者時其 scoreboard_current 一併刪除」）；
   新增 `test/user-data-tables.test.ts`（「USER_DATA_TABLES 恰為 auth 以外的所有資料表」「每張使用者資料表皆有 user_id、version 與 updated_at 且 user_id 參照 user 並 cascade」）。確認紅燈（表不存在／`@pickball/core/api/user-data-tables` 不存在）
   - 紅燈紀錄：`d1-schema.test.ts` 4 failed／6 passed（`D1_ERROR: no such table: scoreboard_current`；外鍵 it 為 `expected [Function] to throw error matching /FOREIGN KEY/ but got 'D1_ERROR: no such table...'`）；`user-data-tables.test.ts` 整檔 `Cannot find package '@pickball/core/api/user-data-tables'`。四個新 it 皆因功能不存在而紅，無先綠者
-- [ ] 3.5 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `scoreboardCurrent`（design Decision 4；`data` 以 `$type<ScoreboardState>()`）；`pnpm --filter ./hono-pickball db:generate --name scoreboard_current` 產生 `drizzle/0001_scoreboard_current.sql` 與 meta（不手改）；
+- [x] 3.5 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `scoreboardCurrent`（design Decision 4；`data` 以 `$type<ScoreboardState>()`）；`pnpm --filter ./hono-pickball db:generate --name scoreboard_current` 產生 `drizzle/0001_scoreboard_current.sql` 與 meta（不手改）；
   再跑一次 `db:generate` 確認無新檔；核心套件新增 `src/api/user-data-tables.ts`（`USER_DATA_TABLES = ["scoreboard_current"] as const`）並更新 `CORE_MODULES`；`db:migrate:local`；3.4 轉綠
+  - 實跑紀錄：`db:generate --name scoreboard_current` 產生 `0001_scoreboard_current.sql`；再跑一次 `db:generate` 為「No schema changes」；`db:migrate:local` 套用 0001；後端 15 檔／58 tests 全綠（3.4 的 6 個 it 轉綠）；核心 module-boundary 綠；三處 typecheck exit 0
 
 ## 4. 後端：計分板 API
 

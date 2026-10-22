@@ -27,6 +27,7 @@ export const CORE_MODULES = [
   "matchmaker/transfer-types",
   "api/versioned",
   "api/errors",
+  "api/user-data-tables",
 ];
 
 const SRC_DIR = path.resolve(import.meta.dirname, "../src");
