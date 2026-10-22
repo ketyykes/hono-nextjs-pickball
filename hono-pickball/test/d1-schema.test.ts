@@ -439,10 +439,22 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		await insertHistory("b7-pk-b");
 
 		expect(
-			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_match_slots WHERE match_id = ?", "m1"),
+			await countRows(
+				db,
+				"SELECT COUNT(*) AS n FROM matchmaker_match_slots WHERE user_id IN (?, ?) AND match_id = ?",
+				"b7-pk-a",
+				"b7-pk-b",
+				"m1",
+			),
 		).toBe(2);
 		expect(
-			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_history WHERE match_id = ?", "m1"),
+			await countRows(
+				db,
+				"SELECT COUNT(*) AS n FROM matchmaker_history WHERE user_id IN (?, ?) AND match_id = ?",
+				"b7-pk-a",
+				"b7-pk-b",
+				"m1",
+			),
 		).toBe(2);
 	});
 

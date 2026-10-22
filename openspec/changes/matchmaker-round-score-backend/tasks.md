@@ -45,7 +45,7 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（spec `backend-database` 錨點）。確認紅燈（表不存在）
+- [x] 3.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（spec `backend-database` 錨點）。確認紅燈（表不存在）
 - [ ] 3.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 加四張表；`pnpm --filter ./hono-pickball db:generate --name matchmaker_round_slots_history`（不手改）；再跑一次確認無新檔；`db:migrate:local`；3.1 綠。
   之後先跑 `test/user-data-tables.test.ts`，確認 B5 的「USER_DATA_TABLES 恰為 auth 以外的所有資料表」**真的轉紅**（清單未更新）並貼出輸出；再於核心套件 `USER_DATA_TABLES` 加四張表，守衛轉綠
 - [ ] 3.3 RED（TDD）：新增 `test/d1-batch-guard.test.ts`，spec `user-data-sync`「後端多表寫入以單一 batch 與整批守衛完成」的三個 it。確認紅燈並貼出輸出；
