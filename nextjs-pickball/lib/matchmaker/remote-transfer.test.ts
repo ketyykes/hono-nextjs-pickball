@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import { defaultGradient } from "./colors";
 import { applyRosterImport, parseRosterCsv } from "./roster-csv";
 import type { ParseRosterCsvResult } from "./roster-csv";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "./storage-keys";
@@ -84,7 +85,12 @@ function parseOk(text: string): OkPreview {
 
 const CSV_THREE_ROWS = "名稱,性別,強度分數\nCarol,女,4\nDave,男,5\nErin,女,6";
 const CONTEXT = { ids: ["new-1", "new-2", "new-3"], now: "2026-09-01T00:00:00.000Z" };
-const CLOUD_PLAYERS = [makePlayer({ id: "c1", name: "Cloud1" }), makePlayer({ id: "c2", name: "Cloud2" })];
+// 雲端兩位佔用調色盤第 0、1 組：自動配色依雲端名單判斷時，新增者必須從第 2 組起，
+// 若誤以空名單計算就會與雲端既有者撞色。
+const CLOUD_PLAYERS = [
+	makePlayer({ id: "c1", name: "Cloud1", ...defaultGradient(0) }),
+	makePlayer({ id: "c2", name: "Cloud2", ...defaultGradient(1) }),
+];
 
 describe("remote-transfer", () => {
 	afterEach(() => {
@@ -117,6 +123,10 @@ describe("remote-transfer", () => {
 		// 配色依雲端名單判斷：期望值直接取 applyRosterImport 以雲端名單計算的新增段
 		const expected = applyRosterImport(CLOUD_PLAYERS, preview, CONTEXT).slice(CLOUD_PLAYERS.length);
 		expect(body.players).toEqual(expected);
+		const cloudColors = CLOUD_PLAYERS.map((p) => `${p.colorFrom}|${p.colorTo}`);
+		for (const added of body.players) {
+			expect(cloudColors).not.toContain(`${added.colorFrom}|${added.colorTo}`);
+		}
 		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBe(localBefore);
 	});
 
