@@ -15,11 +15,11 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `f8a821f`（B5 merge；archive 待做） |
+| `main` HEAD | `fca0b95`（B5 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併（`f8a821f`）；**下一棒 B6** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；**下一棒 B6** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -129,7 +129,7 @@ main@1e5e517
 | B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | **已合併 `8cdfa53`**（37 tasks；後端 12 檔／50；E2E 635/35/0） |
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | **已合併 `e08e3cb`**（41 tasks；前端 87 檔／823；E2E 667/38/0） |
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已合併 `27f0a26`、archive `d9d9d80` |
-| B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f` |
+| B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f`、archive `fca0b95` |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已 propose，未 apply |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已 propose，未 apply |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
@@ -560,7 +560,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - 待後續 change：`scoreboard.spec.ts:187` 點選後補 `aria-checked` 斷言；`stop-typecheck.sh` 檔頭與 `code-reviewer-readonly.md` 仍寫「兩個 workspace」、
   核心套件無 `AGENTS.md`；`emojiFree.test.ts` 掃描範圍擴及核心套件（`labels.ts`）。G1 第 5 點：Workers Builds 能否解析 workspace 相依（遠端驗證）。
 
-### B5 紀錄（2026-10-22，合併 `f8a821f`）
+### B5 紀錄（2026-10-22，合併 `f8a821f`，archive `fca0b95` → `2026-10-22-scoreboard-backend`；新主 spec `user-data-sync`，改 `backend-database`／`scoreboard`／`dev-workflow`）
 - 45/45 tasks、52 commits＋coordinator docs `a3c1edf`（核心 CLAUDE.md `CORE_MODULES` 21 項、README E2E 6 個 project）。中途遇 API rate limit 中斷，SendMessage 續跑成功。
 - 測試：前端 92/846、後端 16/69、核心 2/4；lint 0/3；無新相依。E2E（coordinator 持鎖、load < 7 自跑）678 passed／38 skipped／0 failed（既有 5 project 各 +1 訪客 spec，`user-data` 6）。
   load 低時整輪約 12 分鐘。E2E log 中的 `[Better Auth]: Invalid password` 是錯誤密碼測試的預期輸出。
@@ -569,6 +569,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   訪客面板容器多一個 `relative` class（畫面無差，接受）。
 - **待使用者確認（UX）**：同步提示在 375px 以下直式畫面會蓋住「我方 · 11 分制」標籤（不蓋按鈕與比分）。
 - **帶到 B6 的待辦**：① 後端測試補強（OQ7）：`NOT LIKE '_cf_%'` 的 `_` 是萬用字元、不接受 query／body 帶 `userId` 的守護、`getSession` 例外回 500 的守護、GET 斷言 200。
+  （verify 另建議：sub-app 的 `onError`＋`zValidator` hook 抽到 `src/http/` 共用。）
   ② 跨分頁換帳號（OQ10 ①）：別的分頁換帳號後本分頁 `enabled` 不變，版本號相同時可能把 A 的比分寫進 B；auth 僅本機，風險低，B6 對齊時處理或明列為 G1 前必修。
 
 ## commit footer 慣例
@@ -578,3 +579,6 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 2. 否則填 `CLAUDE_CODE_SESSION_ID`（例：`Claude-Session: 60458cf8-dddc-4a9b-be66-e355eaccfef0`）。
 
 不要自行編造 URL。leader 的派工單要把 coordinator 用的那一行原樣傳下去。
+- **B7 delta 必修**：B5 archive 後 `openspec validate --all --strict` 對 `matchmaker-round-score-backend` 失敗——
+  `MODIFIED "localStorage 持久化" omits scenario(s) the current spec still has: "登入但帶 matchId 時仍走本機分槽"`。
+  B7 本意是以「登入且帶 matchId 時不寫入本機分槽」取代，tasks §1 對齊時要在 delta 明確處理該舊 Scenario（MODIFIED 全文不含即移除，需確認寫法）。
