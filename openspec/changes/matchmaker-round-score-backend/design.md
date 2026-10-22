@@ -176,9 +176,63 @@
    歷史主鍵使重複的 `matchId` 整批失敗。
 3. 本 change 不新增錯誤碼；B9 若需要區分「雲端已有資料」，以 409 搭配前端文案處理即可。
 
+## apply §1 查證紀錄（2026-10-23）
+
+**1.1 環境**：見 environment.md Verification（baseline 95／895、17／97、3／6；lockfile 零變動）。
+
+**1.2 對齊 main**：B4～B6 落地簽章與本 design Context 一致——核心 `submitScore({ round, players, matchId, rawScoreA, rawScoreB, now })`、
+失敗碼 `empty-field`／`invalid-number`／`negative-score`／`tie`／`already-completed`（`VALIDATE_SCORE_FAILURE_CODE`）與 `match-not-found`／`scoring-failed`（`SUBMIT_SCORE_FAILURE_CODE`）；
+`ScoreboardStateSchema`（`scoreboard/types`）、`RoundSchema`（`matchmaker/round-types`）、`MatchHistoryEntrySchema`（`matchmaker/history`）；`USER_DATA_TABLES` 目前兩張；`CORE_MODULES` 位於 `test/module-boundary.test.ts`。
+後端 `src/routes/matchmaker.ts` 的 sub-app 已 `.use("*", localAuth, requireSession).onError(userDataOnError)`；`invalidBodyHook` 在 `src/http/invalid-body.ts`。
+前端 `useRoundStore({ players, updatePlayer })`、`RETRY_DELAYS_MS`（`lib/sync/latest-wins-saver.ts` 具名匯出）。
+MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外無差異（B5／B6 archive 未另行調整原文）；下列兩處為 validate 錯誤的修正：
+- `scoreboard`「localStorage 持久化」：OpenSpec 1.9 的 `findMissingCurrentScenarios` 使 MODIFIED **不可能**丟棄主 spec 既有 Scenario（validate 與 archive 皆擋；RENAMED 後的 MODIFIED 仍比對改名前的區塊），
+  而 B5 的「登入但帶 matchId 時仍走本機分槽」標題本身與 B7 行為矛盾，無法沿用。改為 **REMOVED「localStorage 持久化」＋ADDED「本機模式的 localStorage 持久化」**（本文與其餘 11 個 Scenario 逐字保留）。
+  以暫存目錄模擬 archive 驗證：套用成功、主 spec 無重複標題；代價是該 Requirement 移到 scoreboard 主 spec 末尾。
+- `player-roster`「重置名單與二次確認」：B7 delta 把 B6 的 Scenario 改名為「resetLocalMatchProgress 只清除本機歷史」→ 沿用主 spec 標題「resetLocalMatchProgress 只清除本次活動的進度」、內容改寫（標題語意仍成立）。
+- `round-lifecycle`「回合與歷史的持久化與損壞降級」末尾補回主 spec 原有的 `---`（否則 archive 會吃掉分隔線）。
+- 既有跨 Requirement 同名 Scenario（`player-roster`「刪除參賽者」、`backend-database`「user_id 必須參照既有使用者」）：前者剛好在本 change MODIFIED 的「登入時名單以雲端為準」內，
+  但實測改名會觸發同一個「omits scenario」錯誤（validate 失敗），**無法在 MODIFIED 內順手改名**；要改只能 REMOVED＋ADDED 整個 Requirement，代價過大，維持原狀。本 change 新增的 Scenario 標題皆在各主 spec 內唯一（模擬 archive 後逐標題計數確認）。
+
+**1.3 Context7 查證**：
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`d1/worker-api/d1-database#batch`）：「Batched statements are SQL transactions. If a statement in the sequence fails, then an error is returned for that specific statement, and it aborts or rolls back the entire sequence」——與 Decision 2 一致。
+  limits：「Queries per Worker invocation：1000（Paid）／50（Free）」；「Batch limits：Limits for individual queries … apply to each individual statement contained within a batch」——**batch 內每條陳述式是否各計一個 query 仍未明說**，
+  保守以逐條計：送出比分約 2 次讀取＋6～9 條 batch 陳述式＋session 驗證的查詢，遠低於 50。本機 miniflare 不強制此上限，無法實測。`json_each(value, path)`／`json_extract` 有文件（`sql-api/query-json`），與 Decision 4、5 一致。
+- `/websites/sqlite_docs`：`lang_createtable.html` §4.1「if a constraint definition does not include a conflict-clause, the default conflict resolution algorithm is ABORT」；
+  `lang_conflict.html` ABORT 只回退**當前陳述式**並保留同一 transaction 先前的變更——整批回滾來自 D1 batch 的語意，不是 SQLite 本身（1.4 實測確認）。
+  IGNORE：「No error is returned for uniqueness, NOT NULL, and UNIQUE constraint errors」→ `INSERT OR IGNORE` 會讓守衛靜默失效（Open Question 3 結論：**禁止**，列入 §3 mutation）；
+  REPLACE：NOT NULL 違反時以欄位預設值取代、無預設才 ABORT → 守衛表 `version` **不得**有 DEFAULT，`OR REPLACE` 亦禁止。
+  `lang_upsert.html`：「UPSERT does not intervene for failed NOT NULL, CHECK, or foreign key constraints」→ 守衛若誤加 `ON CONFLICT DO NOTHING` 仍會因 NOT NULL 失敗，但會吞掉殘留守衛列的主鍵衝突，仍禁止。
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/batch-api`、`sqlite/goodies`、`insert`）：`db.batch` 可含 insert／update／delete／select 與 `db.run`／`db.all` 的原生 `sql`；`insert().select(sql\`…\`)` 可用。
+
+**1.4 一次性實測（workerd＋drizzle 0.45.2，暫存測試檔已刪除，未 commit）**：
+1. **與 design 不同**：drizzle 0.45.2 的 `db.run(sql\`…${param}…\`)` 放進 `db.batch` 會拋 `TypeError: Cannot read properties of undefined (reading 'bind')`（`SQLiteRaw` 沒有預先 prepare 的 stmt；無參數的 `db.run` 才可用）。
+   → 守衛與 Decision 4／5 的陳述式**改用 query builder 搭配 `sql` 片段**：`db.insert(syncBatchGuards).values({ userId, version: sql\`CASE WHEN <條件> THEN 1 END\`, updatedAt })`、
+   `db.delete(syncBatchGuards).where(eq(...))`、`db.delete(matchmakerMatchSlots).where(and(eq(userId), sql\`match_id NOT IN (…json_each…)\`))`。三者在 batch 內皆正常。
+2. 守衛條件真：四條陳述式皆成功（changes 皆 1），守衛表最後為空。條件假：整批回滾（另兩表無本次寫入）。錯誤為 `Error`，`message` 為
+   `D1_ERROR: NOT NULL constraint failed: <table>.version: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_NOTNULL)`，`cause.message` 為去掉 `D1_ERROR: ` 前綴的同一段文字。
+   → Open Question 1 結論：`isBatchGuardViolation` 比對 `NOT NULL constraint failed: sync_batch_guards.version` 即可（最外層訊息就含），不需另比 `SQLITE_CONSTRAINT`；仍沿用 B6 逐層檢查 cause 的寫法以防正式 D1 前綴不同。
+3. 主鍵衝突訊息：`D1_ERROR: UNIQUE constraint failed: <table>.user_id, <table>.match_id: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_PRIMARYKEY)`——送出比分把歷史主鍵衝突分類為 409 時 MUST 比對表名 `matchmaker_history`，
+   否則殘留守衛列（`sync_batch_guards.user_id` 主鍵衝突）也會被吞成 409。
+4. batch 中影響 0 列的 UPDATE 不回滾（B5 OQ1）：確認，同批的 INSERT 已寫入。
+5. Decision 4 孤兒分槽 DELETE（`json_each(r.data, '$.matches')`＋`status != 'completed'`＋`user_id`）：只刪本人且不屬於未完成場次的分槽，他人同 match_id 的列不受影響。
+6. Decision 5：`db.insert(slots).select(sql\`SELECT …, 1 WHERE EXISTS (… json_each …)\`).onConflictDoNothing().returning()` 單獨執行與放進 batch 皆可；
+   未完成場次回一列，已存在／已完成／不存在的場次皆回空陣列（Open Question 2 結論：不需 `db.all`）。
+7. `text` 存入的 JSON 讀回後與原物件深度相等（含中文、小數、null、巢狀陣列），`json_extract` 讀出的數值為 SQL 數值。
+
+**B5／B6 帶過來的待辦**：見 Open Questions 5～8。
+
 ## Open Questions
 
-1. D1／miniflare 對 NOT NULL 違反的錯誤訊息完整文字（§1.4 實測），以及 `isBatchGuardViolation` 是否需要同時比對 `SQLITE_CONSTRAINT`。
-2. drizzle 對「`INSERT … SELECT … WHERE EXISTS (… json_each …) ON CONFLICT DO NOTHING RETURNING`」的表達方式（預期 `db.run(sql)` 無法取 RETURNING，改用 `db.all(sql)`／`db.get(sql)`；§1.4 實測）。
-3. `INSERT OR IGNORE`／`OR REPLACE` 對 NOT NULL 的處理（守衛 MUST NOT 使用，spec 已禁止）——§1.3 以 Context7 `/websites/sqlite_docs` 補查並記錄，作為 mutation 清單的依據。
+1. ~~D1／miniflare 對 NOT NULL 違反的錯誤訊息完整文字~~ → 已定案（apply §1.4 第 2 點）：比對 `NOT NULL constraint failed: sync_batch_guards.version`，不需另比 `SQLITE_CONSTRAINT`。
+2. ~~drizzle 對 `INSERT … SELECT … WHERE EXISTS … RETURNING` 的表達方式~~ → 已定案（§1.4 第 1、6 點）：`insert().select(sql).onConflictDoNothing().returning()`；**`db.run(sql)` 帶參數不能放進 batch，Decision 2 的「`db.run(sql)` 放進 `db.batch`」改為 query builder＋`sql` 片段**。
+3. ~~`INSERT OR IGNORE`／`OR REPLACE` 對 NOT NULL 的處理~~ → 已定案（§1.3）：IGNORE 靜默略過、REPLACE 以預設值取代，兩者皆使守衛失效；守衛表 `version` 不得有 DEFAULT。
 4. 對戰頁同時 `GET /round` 與 `GET /slots` 是否需要合併為單一端點（目前兩個請求；若 E2E 出現時序問題再議）。
+5. （B6 Final 轉 B7）`useRemoteRosterStore` 的 `reset()` 前未 `disposeAll()`：重置時若某參賽者的 v0 PUT 正在退避重試，reset 成功後重試仍會送出，讓該參賽者在雲端「復活」。
+   **納入 §6**：`player-roster` delta 新增 Scenario「登入時重置名單前停止所有待送與重試中的變更」，tasks 6.5 加 RED it、6.6 於送出 POST 前 `disposeAll()`。
+6. （B6 OQ11 ②）重置在途時卸載：B6 時伺服器已清名單但本機回合／歷史／分槽不清。B7 起回合與分槽改存雲端且由 reset batch 一併刪除，**此問題對回合與分槽消失**；
+   殘留範圍縮小為「本機歷史未被清除」（`resetLocalMatchProgress()` 只剩歷史），B8 刪除此函式後完全消失。§6 不另寫測試，於 §6 交件時由 leader 確認行為。
+7. （B6 OQ13）對戰頁回填 effect 在雲端名單載入期間以空名單送分：B7 雲端模式送分改為 POST，後端以雲端名單計算，但前端 `submitScore` 仍以本機名單做「預先驗證＋樂觀預測」——名單未就緒時預測回 `scoring-failed` 會擋下送出。
+   **§7／§10 要求**：`useRemoteRoundStore` 在名單未就緒時（由頁面傳入的名單 `syncStatus` 判定）SHALL NOT 執行回填；頁面回填 effect 的依賴加入「名單就緒」，讓載入完成後重跑；以 E2E「登入時經計分板完成的場次由雲端寫入評分並清除分槽」守住（不得惡化）。
+8. （B6 OQ10 ①／B5）跨分頁換帳號：G1 前必修，本 change 不處理（coordinator 已裁定）。
+9. （apply §1）drizzle 0.45.2 `db.run(sql)` 帶參數在 batch 中失敗是 drizzle 的實作限制（`SQLiteRaw` 無 stmt）；`hono-pickball/CLAUDE.md` 的整批守衛段落（§11.1）MUST 記載「batch 內不用帶參數的 `db.run(sql)`」。

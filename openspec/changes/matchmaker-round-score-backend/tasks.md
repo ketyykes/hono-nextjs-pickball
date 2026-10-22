@@ -19,19 +19,19 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/matchmaker-round-score-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
+- [x] 1.1 確認分支 `change/matchmaker-round-score-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
   `pnpm test` baseline（三個 workspace）、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md 並 commit
-- [ ] 1.2 對齊 B4～B6 實際落地：`packages/pickball-core/src/{matchmaker/round,matchmaker/history,scoreboard/types,api/*}.ts` 的實際匯出（`submitScore` 簽章、`ScoreboardState` schema 名稱）、
+- [x] 1.2 對齊 B4～B6 實際落地：`packages/pickball-core/src/{matchmaker/round,matchmaker/history,scoreboard/types,api/*}.ts` 的實際匯出（`submitScore` 簽章、`ScoreboardState` schema 名稱）、
   `hono-pickball/src/{routes/matchmaker.ts,matchmaker/players-repository.ts,auth/*}`、`test/helpers/session.ts`、`test/matchmaker-players.test.ts`、
   `nextjs-pickball/{lib/sync/*,hooks/useRemoteRosterStore.ts,hooks/useRosterStore.ts,hooks/useScoreboardStore.ts,hooks/useRemoteScoreboardStore.ts,lib/matchmaker/remote-transfer.ts,lib/matchmaker/storage.ts}`、
   `tests/e2e/user-data/*`、B5／B6 design Open Questions。實際簽章與本 design Context 不同處記入 Open Questions。
   比對本 change 的 MODIFIED Requirement 與目前主 spec：`user-data-sync`（一個）、`round-lifecycle`（兩個）、`match-history`（一個）、`match-rating`（一個）、`scoreboard`（兩個，B5 版本）、
   `player-roster`（兩個，B6 版本）、`data-transfer`（一個，B6 版本）、`pickleball-guide-page`（一個——MUST 已含 B6 的 `useRemoteRosterStore`）；
   **若主 spec 的原文與 delta 的原文部分不同（B5／B6 archive 時的調整），以主 spec 為底重新套用本 change 的增修並 commit**
-- [ ] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/llmstxt/developers_cloudflare_d1_llms-full_txt`（batch 回滾、`json_each`、limits 中 batch 的 query 計數）；
+- [x] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/llmstxt/developers_cloudflare_d1_llms-full_txt`（batch 回滾、`json_each`、limits 中 batch 的 query 計數）；
   `/websites/sqlite_docs`（NOT NULL 衝突處理預設 ABORT；`INSERT OR IGNORE`／`OR REPLACE` 對 NOT NULL 的行為——design Open Questions 3）；
   `/drizzle-team/drizzle-orm-docs`（`db.batch` 搭配 `db.run`／`db.all` 的 `sql`、`insert().select()`、`text(..., { mode: "json" })`）。與 design Decision 2、4、5 的差異記入 Open Questions
-- [ ] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行 design Decision 2 的守衛 batch（條件真／假各一次），記錄 NOT NULL 違反的完整錯誤訊息；
+- [x] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行 design Decision 2 的守衛 batch（條件真／假各一次），記錄 NOT NULL 違反的完整錯誤訊息；
   Decision 4 的孤兒分槽 DELETE 與 Decision 5 的 `INSERT … SELECT … WHERE EXISTS … RETURNING` 寫法。結果寫入 design Open Questions 1、2
 
 ## 2. 核心套件：回合與分槽 API 契約
@@ -82,9 +82,10 @@ Depends on: §5
 - [ ] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
 - [ ] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
 - [ ] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
-  「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言。確認五個 it 皆紅
+  「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言；
+  另新增 it「resetRoster 送出前停止所有參賽者的待送與重試中變更」（apply §1 納入的 B6 轉 B7 待辦，見 design Open Questions 5）。確認六個 it 皆紅
 - [ ] 6.6 GREEN（TDD）：`useRemoteRosterStore` 加 `applyRemotePlayers`／`reloadRemotePlayers`；`useRosterStore` 選擇器回傳加兩者（本機為不做事的函式，本機 hook 本體不改）；
-  `resetLocalMatchProgress()` 縮減為只移除歷史 key。6.5 全綠；B6 其餘 it 全綠
+  `resetLocalMatchProgress()` 縮減為只移除歷史 key；`reset()` 送出 POST 前先停止所有佇列（`disposeAll()`）。6.5 全綠；B6 其餘 it 全綠
 
 ## 7. 前端：雲端回合 hook 與選擇器
 

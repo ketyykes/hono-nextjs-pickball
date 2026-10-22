@@ -158,6 +158,7 @@
 | （既有）確認重置／取消重置／重置只移除列舉的四個 key／resetRoster 失敗時名單不變並回報 rejected／登入時重置名單清空雲端名單並保留本機訪客名單 | 對應 Scenario | 原樣通過 | regression guard | unit |
 | resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板 | resetLocalMatchProgress 只清除本次活動的進度（沿用主 spec 標題、內容改寫） | 只有歷史 key 被移除 | **改寫 B6 的 it**；舊實作多移除兩個 key → 紅 | unit |
 | resetRoster 成功後清空名單並只清除本機歷史 | 登入時重置名單 | 只有歷史 key 被移除 | **改寫 B6 的 it**；同上 → 紅 | hook |
+| resetRoster 送出前停止所有參賽者的待送與重試中變更 | 登入時重置名單前停止所有待送與重試中的變更 | reset 後推進假時鐘超過退避表全長，p1 的 PUT 不再出現 | B6 Final 轉 B7 的待辦（`reset()` 前未 `disposeAll()`）；舊實作重試的 v0 PUT 會在 reset 後送出 → 紅 | hook |
 | 登入時重置名單後雲端回合與分槽一併清除 | 登入時重置名單後對戰頁沒有回合 | 無場地卡；GET 為空 | reset batch 擴充的端到端證據 | e2e |
 
 ### Requirement: 登入時名單以雲端為準（MODIFIED）
