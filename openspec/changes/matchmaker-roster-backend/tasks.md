@@ -75,7 +75,8 @@ Depends on: §4
 - [x] 5.5 RED（TDD）：`hooks/useRosterStore.test.tsx` **只新增** `vi.mock("@/hooks/useSession", ...)` 區塊（預設本機快照）與三個 it：「已登入時改用雲端名單並回傳 syncStatus」
   「session 載入中或訪客時走本機且 syncStatus 為 local」「雲端模式下變更名單不寫入 matchmaker:roster:v1」。確認新 it 紅燈、既有 8 個 it 仍綠；先綠的斷言點名標註
 - [x] 5.6 GREEN（TDD）：`hooks/useRosterStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRosterStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器 `useRosterStore`；`UseRosterStoreResult` 加 `syncStatus`
-- [ ] 5.7 REFACTOR：`useRemoteRosterStore` 與 `useRemoteScoreboardStore` 的重複（載入／衝突重載／401 處理）是否值得抽共用 hook——**只在兩者皆有測試守住時**才抽，抽出後 B5 的測試 MUST 原樣通過；否則註記 skipped 並說明理由
+- [x] 5.7 REFACTOR（skipped）：`useRemoteRosterStore` 與 `useRemoteScoreboardStore` 的重複（載入／衝突重載／401 處理）是否值得抽共用 hook——**只在兩者皆有測試守住時**才抽，抽出後 B5 的測試 MUST 原樣通過；否則註記 skipped 並說明理由
+  - 結論：skipped，不抽共用 hook。兩者皆有測試守住，但形狀不同：計分板是單一 saver＋單一 version＋reducer dirty 旗標，名單是每位參賽者一個 saver＋版本 Map＋狀態彙總＋重置／重載閘門，可共用的只剩載入呼叫與 401 轉交幾行，抽出來需要泛型佇列註冊表，抽象成本高於重複成本；`hooks/useRemoteScoreboardStore.ts` 一行未動。
 
 ## 6. 前端：資料頁雲端分支
 
