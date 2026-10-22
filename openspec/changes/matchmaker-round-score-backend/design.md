@@ -254,3 +254,9 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     後端全套 20 檔／126 測試全綠，tsc／typecheck exit 0，無新相依。偏離：全套測試取鎖後 load 25 > 20 未等（結果全綠）。S6（`GET /slots` 拿掉 orderBy）判定為不可觀察的等價變異。
     Stage 1（sonnet）**PASS**，非阻擋：tasks.md 4.1 未點名 regression guard（只在 commit 訊息）；`NOT IN (SELECT json_extract(...))` 遇 NULL id 會靜默不刪（schema 保證不會發生）。
     Stage 2（opus）**審查進行中、尚未回報**（leader 被 harness 要求先交回）。**下一步**：等 Stage 2 結論；FAIL 則退回 §4 Implementer 補件並複審；PASS 後補 tasks.md 4.1 的 regression guard 點名（可併入）→ 派 §5。
+16. （apply §4 Stage 2，2026-10-23）opus 獨立 72 條變異 → **FAIL**（實作無 bug，三項 regression guard 缺口）：
+    ① `GET /slots/:matchId` 查無資料的 status 200 無斷言（T07 存活）；② 「不從 query 或 body 接受 userId」對 `GET /slots`、`GET /slots/:matchId` 斷言是空的（T16、T17 存活）；
+    ③ 「寫入與回傳的是驗證後輸出（含 schema 預設值）」無測試（round／slot PUT 改寫原始 body 存活，T12、T13）。S06（拿掉 orderBy）接受為不可觀察的等價變異，但 orderBy 必須保留（ANALYZE 後查詢計畫改 SCAN 會變 rowid 順序）。
+    **待 coordinator 裁定（非阻擋）**：回合 PUT 的完成狀態比對排在版本比對之前，停在舊回合的裝置重排時會得到 400（→ rejected）而非 409（→ conflict 自動重載）；符合 spec 字面，若要改先 409 須走 delta。
+    其他非阻擋：reset 使 version 不單調 → 理論 ABA；`NOT IN` 子查詢可加 `IS NOT NULL`；`type Db` 重複定義三次（§5 前可移到 `db/client.ts`）；`seedAndSignIn` 重複。Stage 2 已在低負載重跑後端全套 20 檔／126 全綠，並重現 RED（15 紅／3 綠）。
+    **下一步**：退回 §4 Implementer 補 ①～③ 與 tasks.md 4.1 的 regression guard 點名 → Stage 2 複審 → §5。
