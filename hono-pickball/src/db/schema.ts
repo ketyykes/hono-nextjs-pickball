@@ -1,6 +1,7 @@
+import type { Player } from "@pickball/core/matchmaker/types";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { relations, sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // 欄位對應 better-auth 1.6 核心 schema（account 不含 1.7 才新增的 issuer）。
 // B2 接上 adapter 若發現欄位不符，以新增 migration 修正，不改寫 0000。
@@ -113,3 +114,20 @@ export const scoreboardCurrent = sqliteTable("scoreboard_current", {
   version: integer("version").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+// 複合主鍵 (user_id, id)：參賽者 id 由前端產生，不同使用者匯入同一份備份會有相同 id，
+// 若以 id 單獨當主鍵，一位使用者的匯入會因另一位的資料失敗並洩漏「某 id 已存在」。
+export const matchmakerPlayers = sqliteTable(
+  "matchmaker_players",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    data: text("data", { mode: "json" }).$type<Player>().notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    version: integer("version").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.id] })],
+);

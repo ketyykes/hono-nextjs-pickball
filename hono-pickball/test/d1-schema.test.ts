@@ -274,7 +274,15 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		await expect(insertRow("mp-dup-a")).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
 		await insertRow("mp-dup-b");
 
-		expect(await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_players WHERE id = ?", "p1")).toBe(2);
+		expect(
+			await countRows(
+				db,
+				"SELECT COUNT(*) AS n FROM matchmaker_players WHERE user_id IN (?, ?) AND id = ?",
+				"mp-dup-a",
+				"mp-dup-b",
+				"p1",
+			),
+		).toBe(2);
 	});
 
 	it("matchmaker_players 的 user_id 必須參照既有使用者", async () => {

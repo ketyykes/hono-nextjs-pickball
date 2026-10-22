@@ -15,6 +15,13 @@
       "when": 1792652365128,
       "tag": "0001_scoreboard_current",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792684557592,
+      "tag": "0002_matchmaker_players",
+      "breakpoints": true
     }
   ]
 }
