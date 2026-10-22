@@ -71,11 +71,11 @@ export async function deletePlayer(db: Db, userId: string, id: string): Promise<
 		.where(and(eq(matchmakerPlayers.userId, userId), eq(matchmakerPlayers.id, id)));
 }
 
-/** 是否為主鍵／UNIQUE 衝突；錯誤可能被包在 cause 內，兩層都要看。 */
+/** 只認主鍵／UNIQUE 衝突（FK、NOT NULL、CHECK 違規不是 id 重複）；錯誤可能被包在 cause 內，逐層檢查。 */
 function isConstraintError(error: unknown): boolean {
 	let current: unknown = error;
 	for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
-		if (/UNIQUE constraint failed|SQLITE_CONSTRAINT/.test(current.message)) {
+		if (/SQLITE_CONSTRAINT_PRIMARYKEY|UNIQUE constraint failed/.test(current.message)) {
 			return true;
 		}
 		current = current.cause;
