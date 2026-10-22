@@ -1,8 +1,20 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useRosterStore } from "./useRosterStore";
 import { STORAGE_KEY } from "@/lib/matchmaker/storage";
 import type { Player } from "@pickball/core/matchmaker/types";
+import { useSession } from "@/hooks/useSession";
+
+// 預設回本機模式的快照（訪客、auth 停用），既有 it 因此不受選擇器影響；
+// 雲端選擇器的 it 各自以 mockReturnValue 覆寫。
+vi.mock("@/hooks/useSession", () => ({
+	useSession: vi.fn(() => ({
+		status: "ready",
+		authEnabled: false,
+		user: null,
+		refresh: vi.fn(),
+	})),
+}));
 
 /** 建立一份合法的持久化 Player 資料，可透過 overrides 覆寫特定欄位。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -161,5 +173,106 @@ describe("useRosterStore", () => {
 
 		expect(result.current.players).toHaveLength(2);
 		expect(result.current.droppedCount).toBe(1);
+	});
+});
+
+// 選擇器：依 session 在本機實作與雲端實作之間擇一，並多回傳 syncStatus。
+describe("useRosterStore 儲存模式選擇器", () => {
+	const loggedIn = {
+		status: "ready",
+		authEnabled: true,
+		user: { id: "u1", email: "a@example.com", name: "A" },
+		refresh: vi.fn(),
+	} as const;
+	const fetchMock = vi.fn<typeof fetch>();
+
+	function jsonResponse(body: unknown): Response {
+		return new Response(JSON.stringify(body), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
+	function matchmakerCalls() {
+		return fetchMock.mock.calls.filter(([path]) => String(path).startsWith("/api/matchmaker"));
+	}
+
+	beforeEach(() => {
+		localStorage.clear();
+		fetchMock.mockReset();
+		vi.stubGlobal("fetch", fetchMock);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+			refresh: vi.fn(),
+		});
+	});
+
+	it("已登入時改用雲端名單並回傳 syncStatus", async () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		const cloudPlayers = [makePlayer({ id: "c1" }), makePlayer({ id: "c2" })];
+		// 每次請求都要新的 Response（body 只能讀一次）
+		fetchMock.mockImplementation(() =>
+			Promise.resolve(
+				jsonResponse({ items: cloudPlayers.map((data) => ({ data, version: 3 })) }),
+			),
+		);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(result.current.players.map((player) => player.id)).toEqual(["c1", "c2"]);
+	});
+
+	it("session 載入中或訪客時走本機且 syncStatus 為 local", () => {
+		const snapshots = [
+			{ status: "loading", refresh: vi.fn() },
+			{ status: "ready", authEnabled: false, user: null, refresh: vi.fn() },
+		] as const;
+
+		for (const snapshot of snapshots) {
+			localStorage.clear();
+			vi.mocked(useSession).mockReturnValue(snapshot);
+			const { result, unmount } = renderHook(() => useRosterStore());
+
+			act(() => {
+				result.current.addPlayer({ name: "訪客新增", gender: "male", rating: 3 });
+			});
+
+			expect(result.current.syncStatus).toBe("local");
+			expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).players).toHaveLength(1);
+			expect(matchmakerCalls()).toHaveLength(0);
+			unmount();
+		}
+	});
+
+	it("雲端模式下變更名單不寫入 matchmaker:roster:v1", async () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		fetchMock.mockImplementation((_input, init) => {
+			if (init?.method === "PUT") {
+				const { data } = JSON.parse(String(init.body));
+				return Promise.resolve(jsonResponse({ data, version: 1 }));
+			}
+			return Promise.resolve(jsonResponse({ items: [] }));
+		});
+
+		const { result } = renderHook(() => useRosterStore());
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		act(() => {
+			result.current.addPlayer({ name: "雲端新增", gender: "female", rating: 4 });
+		});
+		await waitFor(() =>
+			expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true),
+		);
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		expect(result.current.players).toHaveLength(1);
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 });
