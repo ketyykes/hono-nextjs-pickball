@@ -205,3 +205,6 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
     （屬 `.claude/` 設定，不在 tasks 4.1 範圍）；核心套件沒有 `AGENTS.md` 入口；README 第 3 行「管理前後端」措辭未提核心套件。
 13. （apply §4 流程）coordinator 於 14:06 起規定 E2E／eslint／全套 vitest／build 須先取得 `/tmp/heavy-lock.sh` 共用鎖；規定送達前已派出的 §4 修正 Implementer
     曾在未持鎖下跑一次 `pnpm lint`（約 14:08，當時鎖由 min4wd 持有）。之後的重運算皆依規定持鎖。
+14. （apply Final Code Review，2026-10-22）✅ 通過，無必須修。diff ⊆ proposal Impact、主 spec 與 `.claude/**`／runbook／其他 change 零改動；lockfile 只有三段 importers；
+    `CORE_MODULES`＝對照表＝`src`＝文件清單；tsc 三段 exit 0；持鎖 `pnpm test` 核心 1／2、前端 87／823、後端 13／51；lint 0／3；B5 暫存 probe 於 `hono-pickball/src` 匯入核心套件 `tsc` exit 0。
+    建議（另開 change）：`scoreboard.spec.ts:187` 點選 radio 後補 `aria-checked` 斷言以避免 hydration 前點擊遺失。

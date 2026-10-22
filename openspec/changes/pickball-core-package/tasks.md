@@ -105,8 +105,9 @@ Depends on: §3
   > | webkit 3/3（重跑，取得共用重運算鎖後） | 47 | 0 | 0 | 6.11 28.91 59.63 |
   > | mobile-safari 1/3、2/3、3/3 | 42＋40＋47 | 5＋7＋0 | 0 | 28.59…／61.10…／257.06… |
   > **合計（webkit 3/3 以重跑計）：667 passed／38 skipped／0 failed，與基線相同。**
-  > 首跑失敗：`scoreboard.spec.ts:187`「15 分制下連贏 11 球不觸發 GameOverDialog」（`toBeHidden` 收到 visible，即 15 分制設定未生效），同時段 dev server 記錄 `ChunkLoadError`（Turbopack HMR client chunk 載入失敗），當時機器另有其他工作造成高負載。
+  > 首跑失敗：`scoreboard.spec.ts:187`「15 分制下連贏 11 球不觸發 GameOverDialog」（`toBeHidden` 收到 visible，即 15 分制設定未生效），同一 shard 的 dev server log 有 `ChunkLoadError`（Turbopack HMR client chunk 載入失敗，**出現在失敗 it 之後**，只能證明該時段 dev server 不穩、不能直接證明是本失敗的原因），當時機器另有其他工作造成高負載。
   > 隔離重跑：該 it `--repeat-each=3` 3/3 passed（load 18.65）；整個 webkit 3/3 第一次重跑時 load 飆至 300（外部工作），另有 3 個不同 it 失敗且伴隨 `ChunkLoadError`，不採為結論；取得共用重運算鎖、load 6.11 下第二次重跑 47/47 passed。
   > **判定交由 coordinator 裁定**（leader 未自行判定為雜訊）；證據：`/tmp/b4-e2e-run1/`（`summary.txt`、`webkit-3.log`、`isolate-webkit.log`、`webkit-3-rerun.log`、`webkit-3-rerun2.log`）。
+  > Final Code Review（opus）因果評估：同一次執行中走同一條 `ScoreboardSetup` → `useScoreboardStore` → `@pickball/core/scoreboard/reducer` 路徑的 `:211`、`:239`、`:320`、`:377` 皆通過，被搬模組 R100、前端單元測試 823 全綠，研判與本 change 無因果關係；較可能是高負載下點擊「15」早於 hydration 而遺失（該 it 點擊後未斷言 `aria-checked`）——強化該 it 屬改既有測試，本 change 不做，建議另開 change。
 - [x] 4.10 驗收（指令）C10：`DO_NOT_TRACK=1 openspec validate pickball-core-package --strict` 通過
   > `Change 'pickball-core-package' is valid`，exit 0。
