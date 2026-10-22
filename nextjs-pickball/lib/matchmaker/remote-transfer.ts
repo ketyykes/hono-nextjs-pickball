@@ -8,7 +8,8 @@ import { readSnapshot } from "./transfer-storage";
 /** 雲端分支的繁體中文訊息；風格比照 TRANSFER_MESSAGES：什麼失敗、資料有沒有動、建議怎麼做。 */
 export const REMOTE_TRANSFER_MESSAGES = {
 	fetchFailed: "無法取得雲端的參賽者名單，本次沒有匯入任何資料。請確認網路連線後再試一次。",
-	importFailed: "雲端匯入失敗，雲端名單沒有任何變動。請稍後再試一次。",
+	// 不斷言「沒有變動」：failed 也涵蓋後端已寫入、但回應在網路上遺失的情況。
+	importFailed: "雲端匯入失敗，請重新整理頁面確認名單後再試一次。",
 	importConflict: "雲端名單已在其他裝置變更，本次沒有匯入任何資料。請重新整理頁面確認最新名單後再匯入。",
 	unauthorized: "登入狀態已失效，本次沒有匯入或匯出任何資料。請重新登入後再試一次。",
 	previewHasErrors: "預覽仍有錯誤的資料列，本次沒有匯入任何資料。請先修正 CSV 後重新選檔。",
