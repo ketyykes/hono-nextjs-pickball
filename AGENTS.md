@@ -16,6 +16,7 @@ root 層慣例與規則的單一來源是 [`CLAUDE.md`](./CLAUDE.md) —— 檔�
 | [`openspec/specs/`](./openspec/specs/) | 各 capability 的正式規格 |
 | [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md) | 前端 workspace 細節 |
 | [`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md) | 後端 workspace 細節 |
+| [`packages/pickball-core/CLAUDE.md`](./packages/pickball-core/CLAUDE.md) | 核心套件（前後端共用純邏輯）細節 |
 
 > ⚠️ 若你的工具不會自動跟隨上述連結，請主動把 [`CLAUDE.md`](./CLAUDE.md) 讀入 ——
 > 沒讀到它就等於沒有拿到本專案的規範。

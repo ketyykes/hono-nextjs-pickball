@@ -85,6 +85,7 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
   - auth：`useSession`
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（分配引擎、名單、儲存等純函式模組）、`scoreboard/`（reducer、rules、storage、radio-navigation 等）
+  - **18 個純邏輯模組已移至核心套件 `@pickball/core`**（`scoreboard/{types,rules,reducer}`、`matchmaker/{types,allocation-types,allocation,candidates,duplication,pairing,rating-math,rating-types,rating,labels,round-types,round,history,history-range,transfer-types}`），這裡的舊路徑已不存在，且不留 re-export 轉址殼；一律從 `@pickball/core/<area>/<module>` 匯入。**它們的單元測試刻意留在 `lib/{scoreboard,matchmaker}/*.test.ts` 原位**（主 spec 以測試檔路徑為驗收錨點），不是漏搬。`next.config.ts` 以 `transpilePackages: ["@pickball/core"]` 讓 Next 轉譯該套件的 `.ts` 原始碼。新增純邏輯模組是否放核心套件，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔
 
