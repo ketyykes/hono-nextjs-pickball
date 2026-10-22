@@ -15,11 +15,11 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `d1a7303`（B3 archive） |
+| `main` HEAD | `27f0a26`（B4 merge；archive 待做） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；**下一棒 B4** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併（`27f0a26`）；**下一棒 B5** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -128,7 +128,7 @@ main@1e5e517
 | B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | **已合併 `a7866f5`**（28 tasks；後端 6 檔／25；E2E 633/27/0） |
 | B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | **已合併 `8cdfa53`**（37 tasks；後端 12 檔／50；E2E 635/35/0） |
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | **已合併 `e08e3cb`**（41 tasks；前端 87 檔／823；E2E 667/38/0） |
-| B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已 propose，未 apply |
+| B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已合併 `27f0a26` |
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已 propose，未 apply |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已 propose，未 apply |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已 propose，未 apply |
@@ -347,6 +347,8 @@ G1 change 本身要處理：
    for p in chromium firefox mobile-chrome; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p; done
    for p in webkit mobile-safari; do for i in 1 2 3; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p --shard=$i/3; done; done
    ```
+   **E2E、lint、全套 `pnpm test`、build 前一律先取共用鎖**（教訓 #15）：
+   `/tmp/heavy-lock.sh acquire nextjspickball "<說明>"`，跑完 `/tmp/heavy-lock.sh release nextjspickball`；取鎖後仍要 `uptime` load < 20。
    tasks.md 勾選數與 `git log main..HEAD` 對得上；抽 2～3 個 RED commit 用 `git show <commit>^:<path>` 複驗。
    migration 指令的 database 參數以 B1 定案的寫法為準，定案後回填本步驟。
 5. 合併回本機 `main`（**不 push**）：
@@ -466,6 +468,10 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     兩者同時套用那輪 load 117（`mediaanalysisd`、VM、Blender、mini4wd），結果無法判讀。**在機器安靜時重做「兩者同時」實驗**，
     若成立再以 change 修改 `playwright.config.ts`（webkit 類關 video、`outputDir`／report 移出 Next 專案目錄）恢復單一指令跑全套。
     在那之前：**跑 E2E 前先 `uptime`，load average > 20 就等**，再依 project 分開跑。
+15. **與 min4wd session 共用高負載互斥鎖**（2026-10-22 使用者指示、min4wd 已同意）：同機的 min4wd session（node v24 vitest 計分、Blender 出圖）
+    會把 load 推到 100～460，造成 WebKit E2E 逾時。`/tmp/heavy-lock.sh`（mkdir 原子鎖 `/tmp/heavy-compute.lock`，持有 >2 小時視為過期；
+    在 /tmp，重開機需重建）`acquire <owner> <說明>`／`release <owner>`／`status`。本 repo 的 E2E、eslint、全套 vitest、OpenNext／wrangler build
+    都要先取鎖（單檔測試除外），派出的 leader／subagent prompt 必須寫入此規則。B4 實證：持鎖＋load 6 重跑 webkit 3/3 47/47 通過。
 13. **主 spec 不可直接編輯**；`hooksInventory.test.ts` 直接讀主 spec，新增 hook 時依 delta 走、
     archive 時核對為 no-op（M14 `4b99156` 前例）。
 
@@ -543,6 +549,16 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - **archive 順序必須 B4→B9 依序**（B5 建 `user-data-sync`，B6～B9 ADDED／MODIFIED 皆以前一棒 archive 後的主 spec 為底；各棒 tasks §1 會重新對齊）。
 - 待 apply §1 實測：D1 Free 方案 50 query 上限是否逐陳述式計數；`json_extract` 讀回等價性；batch 內 `RETURNING` 寫法。
 - 各棒 tasks 的 E2E 驗收寫「依標準流程第 4 步指令（含 `user-data` project）」；B4～B6 tasks 內寫死的 shard 指令以第 4 步為準。
+
+### B4 紀錄（2026-10-22，合併 `27f0a26`）
+- 20/20 tasks；18 模組 `git mv` 至 `packages/pickball-core/src`（R100），前端 84 檔只改 import；後端 `workspace:*` 相依＋workerd 匯入測試（RED→GREEN）。
+- 測試：前端 87/823（不變，既有 it 名稱與斷言機械比對逐字不變）、後端 13/51（+1）、核心 1/2；lint 0 errors／3 warnings；`playwright --list` 705。
+- lockfile 只多三段 importers，`packages:`／`snapshots:` 零改動；`pnpm install` 會把 eslint-plugin-import peer 後綴展開，需還原（已還原後 `--frozen-lockfile` 穩定）。
+- E2E 667/38/0：webkit 3/3 首跑 1 失敗（`scoreboard.spec.ts:187` 15 分制 11-0 跳出 GameOverDialog，疑 hydration 前點擊遺失），load 28；
+  持鎖 load 6 重跑 47/47、coordinator 再跑 scoreboard.spec webkit＋mobile-safari 34/34 → 判定負載雜訊。
+- 合併後需 `pnpm install` 重建 workspace 連結。**Playwright 以路徑含 `/node_modules/` 決定是否轉譯 TS**，任何工具加 `--preserve-symlinks` 會讓 E2E 壞（見核心套件 CLAUDE.md）。
+- 待後續 change：`scoreboard.spec.ts:187` 點選後補 `aria-checked` 斷言；`stop-typecheck.sh` 檔頭與 `code-reviewer-readonly.md` 仍寫「兩個 workspace」、
+  核心套件無 `AGENTS.md`；`emojiFree.test.ts` 掃描範圍擴及核心套件（`labels.ts`）。G1 第 5 點：Workers Builds 能否解析 workspace 相依（遠端驗證）。
 
 ## commit footer 慣例
 
