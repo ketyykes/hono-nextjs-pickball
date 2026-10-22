@@ -157,6 +157,7 @@ Depends on: §7
   **不動**「matchmaker 為 LocalStorage-only」敘述（B6 改）
 - [x] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   結果：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`（含 test 段）、`pnpm --filter ./packages/pickball-core typecheck`（含 test 段）皆 exit 0（2026-10-22）。
+  補註（leader）：首輪核心套件 typecheck 的 log 為「No projects matched the filters」（帶 `--dir` 時 `./` filter 未對上，exit 0 為假綠），§8 Stage 1 指出後由 leader 自 repo root 重跑 `pnpm --filter ./packages/pickball-core typecheck`（`tsc --noEmit && tsc --noEmit -p test/tsconfig.json`）實得 exit 0。
 - [x] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
   結果：`pnpm lint` exit 0，0 errors／3 warnings（`useQuiz.ts`、`useRosterStore.ts`、`useScoreboardStore.ts` 的 unused-vars，與基線 3 條相同）。
 - [x] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
