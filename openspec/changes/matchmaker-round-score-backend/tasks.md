@@ -76,6 +76,8 @@ Depends on: §4
   `test/matchmaker-players.test.ts` **只新增** it「重置在同一 batch 內刪除本人的名單、回合、分槽與歷史」。確認紅燈並貼出輸出
   - **紅燈紀錄**：`matchmaker-score.test.ts` 16 個 it 全部真實紅燈（路由不存在回 404，或 `score-repository` 模組不存在）；`matchmaker-players.test.ts` 新增的重置 it 紅燈（回合、分槽、歷史未被刪除），既有 21 個 it 原樣綠。
   - **regression guard 點名**：RED 當下先綠者無（「未登入 401」「auth 停用 404」「getSession 500」三個迴圈 it 已在 §4 的 `matchmaker-round.test.ts`，§5 實作後仍須綠）。
+  - **事後補的 regression guard（GREEN 之後由 mutation 發現缺口而加，寫入即綠，非紅燈）**：「殘留的守衛列造成的主鍵衝突不被吞成 409 而是照常拋出」（守住歷史主鍵衝突的比對必須限定 `matchmaker_history`）；
+    「送出比分在單一 batch…」it 內加入另一位使用者（相同球員 id、場次 id、版本）資料不變的斷言（守住所有 `user_id` 條件）。
   - 錨點外自補的 it（皆為真實紅燈）：回合版本在計算後變動的守衛、歷史主鍵衝突（第二道防線）、名單缺少參賽者或回合不存在、body 不符 schema、完成時間取伺服器時間、不從 query 或 body 接受 userId（送出比分）。
 - [x] 5.2 GREEN（TDD）：新增 `src/matchmaker/score-repository.ts`（design Decision 2、3；`afterRead` 鉤子只作為選填參數，路由不傳）；`src/routes/matchmaker.ts` 加送出比分路由（失敗碼對應 400／409）；
   `players-repository.ts` 的 reset batch 加三張表。5.1 全綠；B6 的 `matchmaker-players.test.ts` 既有 it 全綠

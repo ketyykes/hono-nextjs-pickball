@@ -119,11 +119,20 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 		await seedRound(userId, round, 3);
 		await seedSlot(userId, makeSlot("m1", 2));
 		await seedSlot(userId, makeSlot("m2", 5));
+		// 另一位使用者有相同的球員 id、場次 id 與版本：任何缺少 user_id 條件的陳述式都會誤傷他
+		await seedAndSignIn("ms-golden-bystander@example.com");
+		const otherId = await userIdOf("ms-golden-bystander@example.com");
+		await seedPlayers(otherId, players.slice(0, 4).map((player) => makePlayer(player.id)));
+		await seedRound(otherId, round, 3);
+		await seedSlot(otherId, makeSlot("m1", 2));
+		await seedHistory(otherId, makeHistoryEntry("m1"));
+		const otherBefore = await snapshot(otherId);
 		const before = Date.now();
 
 		const res = await postScore(cookie, "m1", scoreBody(3));
 
 		expect(res.status).toBe(200);
+		expect(await snapshot(otherId)).toEqual(otherBefore);
 		const body = SubmitScoreResponseSchema.parse(await res.json());
 		const expected = submitScore({
 			round,
@@ -333,6 +342,30 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 		expect(after.matchmaker_players.map((row) => row.version)).toEqual([1, 1]);
 		expect(after.matchmaker_match_slots.map((row) => row.match_id)).toEqual(["m1", "m2"]);
 		expect(after.sync_batch_guards).toEqual([]);
+	});
+
+	it("殘留的守衛列造成的主鍵衝突不被吞成 409 而是照常拋出", async () => {
+		const { submitScoreForUser } = await import("../src/matchmaker/score-repository");
+		const { userId } = await setupSingles("ms-guard-residue@example.com");
+
+		const attempt = submitScoreForUser(
+			getDb(env),
+			userId,
+			{ matchId: "m1", scoreA: "11", scoreB: "7", roundVersion: 3 },
+			{
+				afterRead: async () => {
+					await env.DB?.prepare("INSERT INTO sync_batch_guards (user_id, version, updated_at) VALUES (?, 1, ?)")
+						.bind(userId, NOW.getTime())
+						.run();
+				},
+			},
+		);
+
+		await expect(attempt).rejects.toThrow(/sync_batch_guards\.user_id/);
+		await env.DB?.prepare("DELETE FROM sync_batch_guards WHERE user_id = ?").bind(userId).run();
+		const after = await snapshot(userId);
+		expect(after.matchmaker_history).toEqual([]);
+		expect(after.matchmaker_round[0].version).toBe(3);
 	});
 
 	it("B 對 A 的場次送出比分回 409 且 A 的資料不變", async () => {
