@@ -92,12 +92,15 @@ describe("/api/matchmaker 回合與分槽的授權與停用閘門", () => {
 		const bSlot = await request(cookieB, "GET", "/slots/m1");
 		const bRoundPut = await request(cookieB, "PUT", "/round", { data: makeRound([makeMatch("mx")]), version: 1 });
 		const bSlotPut = await request(cookieB, "PUT", "/slots/m1", { data: makeSlot("m1", 9), version: 0 });
+		// 以 A 的分槽版本（1）更新：B 名下沒有這一列，不可落到 A 的資料上
+		const bSlotPutV1 = await request(cookieB, "PUT", "/slots/m1", { data: makeSlot("m1", 9), version: 1 });
 
 		expect(await bRound.json()).toEqual({ data: null, version: 0 });
 		expect(await bSlots.json()).toEqual({ items: [] });
 		expect(await bSlot.json()).toEqual({ data: null, version: 0 });
 		expect(bRoundPut.status).toBe(409);
 		expect(bSlotPut.status).toBe(409);
+		expect(bSlotPutV1.status).toBe(409);
 		// A 的資料不變
 		expect(await getRound(cookieA)).toEqual({ data: round, version: 1 });
 		const aSlot = (await (await request(cookieA, "GET", "/slots/m1")).json()) as Versioned<{ scores: { us: number } }>;
@@ -268,6 +271,28 @@ describe("/api/matchmaker/round", () => {
 
 		expect(res.status).toBe(200);
 		expect(edited.status).toBe(400);
+	});
+
+	it("回合 PUT 的寫入與孤兒分槽清除在同一個 D1 batch 內送出", async () => {
+		const cookie = await seedAndSignIn("mr-one-batch@example.com");
+		const batchSizes: number[] = [];
+		const spyDb = {
+			prepare: (query: string) => env.DB!.prepare(query),
+			batch: (statements: D1PreparedStatement[]) => {
+				batchSizes.push(statements.length);
+				return env.DB!.batch(statements);
+			},
+			exec: (query: string) => env.DB!.exec(query),
+		} as unknown as D1Database;
+		const init = appRequestInit(cookie, { method: "PUT", body: { data: makeRound([makeMatch("m1")]), version: 0 } });
+
+		const created = await app.request("/api/matchmaker/round", init, { ...env, DB: spyDb });
+		const stale = await app.request("/api/matchmaker/round", init, { ...env, DB: spyDb });
+
+		expect(created.status).toBe(200);
+		expect(stale.status).toBe(409);
+		// 成功與衝突兩條路徑都是「一次 batch、兩條陳述式」
+		expect(batchSizes).toEqual([2, 2]);
 	});
 
 	it("回合 PUT 刪除不屬於新回合的分槽且衝突時分槽仍與雲端回合一致", async () => {
