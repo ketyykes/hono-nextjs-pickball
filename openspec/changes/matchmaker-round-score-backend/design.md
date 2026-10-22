@@ -236,3 +236,5 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
    **§7／§10 要求**：`useRemoteRoundStore` 在名單未就緒時（由頁面傳入的名單 `syncStatus` 判定）SHALL NOT 執行回填；頁面回填 effect 的依賴加入「名單就緒」，讓載入完成後重跑；以 E2E「登入時經計分板完成的場次由雲端寫入評分並清除分槽」守住（不得惡化）。
 8. （B6 OQ10 ①／B5）跨分頁換帳號：G1 前必修，本 change 不處理（coordinator 已裁定）。
 9. （apply §1）drizzle 0.45.2 `db.run(sql)` 帶參數在 batch 中失敗是 drizzle 的實作限制（`SQLiteRaw` 無 stmt）；`hono-pickball/CLAUDE.md` 的整批守衛段落（§11.1）MUST 記載「batch 內不用帶參數的 `db.run(sql)`」。
+10. （apply 進度）§2 完成：`4af02b7` RED、`290efe2` GREEN、Stage 2 第一輪 FAIL（`MatchSlotPutRequestSchema` 無測試、helper 命名）→ `78d22bc` regression guard、`4ca4367` refactor → 複審 PASS。核心 4 檔／11。
+   偏離：額外匯出 `MatchSlotPutRequestSchema`；`SubmitScoreResponseSchema` 的 round／players version 定為正整數。
