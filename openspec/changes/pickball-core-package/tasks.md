@@ -42,6 +42,11 @@ Depends on: §1
   ② 以腳本把前端所有 `@/lib/scoreboard/{types,rules,reducer}`、`@/lib/matchmaker/<被搬模組>` 與 `lib/` 內同層相對 import（`./round` 等，僅限指向被搬模組者）改為 `@pickball/core/<area>/<module>`
   （含測試檔與 `tests/e2e/specs/scoreboard-binding.spec.ts`）；③ `nextjs-pickball/package.json` 加 `"@pickball/core": "workspace:*"`、`next.config.ts` 加 `transpilePackages: ["@pickball/core"]`；`pnpm install`。
   完成後：2.2 轉綠；`pnpm --filter ./nextjs-pickball test --run` 檔數／測試數＝1.1 基線且全綠（regression guard）；`pnpm -r exec tsc --noEmit` exit 0；`pnpm lint` 不多於基線
+  > **apply 紀錄（2.2／2.3）**：RED `b750e1b` 紅燈原因經 `git show b750e1b^:packages/pickball-core/src` 機械複驗為「`src/` 不存在」（ENOENT＋`Cannot find module`），屬真紅燈。
+  > GREEN `3c9aed4` 內對測試檔有一處**型別層調整**：環境前提斷言 `expect(globalThis.window).toBeUndefined()`（`document`、`localStorage` 同）改為 `expect(Reflect.get(globalThis, "window")).toBeUndefined()`——
+  > 核心套件 `test/tsconfig.json` 繼承 `lib: ["ESNext"]`，`globalThis.window` 是 TS7017 型別錯誤；`Reflect.get` 的執行期語意相同（皆讀取該屬性並斷言為 `undefined`）。
+  > Stage 1 指出此為「GREEN 修改測試」的流程偏差；leader 裁定接受（斷言語意不變、不影響紅燈真實性），不改寫歷史，記錄於此與 design.md Open Questions 8。
+  > lockfile：`9b41602` 還原 `pnpm install` 對 3 處 `eslint-plugin-import` 快照鍵的 peer 後綴展開；相對 `main` 只剩 `importers` 新增（`packages/pickball-core` 與 `nextjs-pickball` 的 `link:`），vitest 未產生新解析變體。
 - [ ] 2.4 REFACTOR：檢查改寫後的 import 排序與既有風格一致（同檔多行 import 是否需合併）；無壞味道則註記 skipped。**不得**修改被搬模組內容
 
 ## 3. 後端取用

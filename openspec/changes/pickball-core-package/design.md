@@ -192,3 +192,7 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
    留待後續 change 決定是否把 `../packages/pickball-core/src` 納入，或在核心套件加同類守衛。
 7. （apply §1.3）Playwright 是否轉譯 workspace 套件取決於「解析後的絕對路徑是否含 `/node_modules/`」（見查證紀錄），與 Decision 6 推論一致但條件更明確；
    未來若有人為任何工具加 `--preserve-symlinks`／`NODE_PRESERVE_SYMLINKS=1`，E2E 會在載入核心套件時失敗。記入核心套件 `CLAUDE.md`。
+8. （apply §2）RED `b750e1b` 的測試檔在核心套件無 DOM 的 `test/tsconfig.json` 下有型別錯誤（`globalThis.window` → TS7017），GREEN `3c9aed4` 以 `Reflect.get(globalThis, "window")` 等價改寫。
+   Stage 1 判定為流程偏差（GREEN 改了測試）；leader 裁定接受：斷言語意不變、紅燈原因（`src/` 不存在）已機械複驗。教訓：無 DOM lib 的套件寫 RED 時，先跑該套件 `typecheck` 再 commit。
+9. （apply §2，回填 Open Questions 2）實測 lockfile：核心套件 importer 的 vitest 解析為與前端相同的 `4.1.8(...)` 變體，**未**產生新解析變體；`packages:`／`snapshots:` 段零改動
+   （`pnpm install` 曾展開 3 處 `eslint-plugin-import` 快照鍵的 peer 後綴，`9b41602` 已還原且 `pnpm install`／`--frozen-lockfile` 皆不再改寫）。
