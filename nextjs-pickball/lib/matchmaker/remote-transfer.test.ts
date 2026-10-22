@@ -177,6 +177,24 @@ describe("remote-transfer", () => {
 		expect(getUnauthorized).toHaveBeenCalledTimes(1);
 	});
 
+	it("預覽沒有可新增的列時不送出匯入並視為成功", async () => {
+		// 只有標題列的 CSV 會解析出空的 rows；後端 min(1) 會拒絕空陣列，重試也永遠失敗，
+		// 而本機分支遇到同一份檔案是無害的成功，雲端分支應一致。
+		const fetchMock = vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+			if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+			return new Response("x", { status: 400 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const preview = parseOk("名稱,性別,強度分數");
+		expect(preview.rows).toHaveLength(0);
+
+		const result = await importRemoteRoster(preview, { ids: [], now: CONTEXT.now });
+
+		expect(result).toEqual({ ok: true });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+	});
+
 	it("預覽含錯誤列時不送出任何請求並回傳錯誤", async () => {
 		const fetchMock = vi.fn();
 		vi.stubGlobal("fetch", fetchMock);
