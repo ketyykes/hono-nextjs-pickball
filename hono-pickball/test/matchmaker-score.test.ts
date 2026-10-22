@@ -245,7 +245,7 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 			expect(result.kind).toBe("conflict");
 			const after = await snapshot(userId);
 			expect(after.matchmaker_players.map((row) => [row.id, row.version])).toEqual(
-				ids.map((id) => [id, id === target ? 2 : 1]).concat([["p5", 1]]),
+				[...ids.map((id): [string, number] => [id, id === target ? 2 : 1]), ["p5", 1]],
 			);
 			// 所有名單的 data 都沒有被寫入新 rating 或 gamesPlayed
 			for (const row of after.matchmaker_players) {

@@ -1,6 +1,6 @@
 import { API_ERROR_CODES } from "@pickball/core/api/errors";
 import { PlayerImportRequestSchema } from "@pickball/core/api/players";
-import { MatchSlotPutRequestSchema, RoundPutRequestSchema } from "@pickball/core/api/round";
+import { MatchSlotPutRequestSchema, RoundPutRequestSchema, SubmitScoreRequestSchema } from "@pickball/core/api/round";
 import { versionedWriteSchema } from "@pickball/core/api/versioned";
 import { PlayerSchema } from "@pickball/core/matchmaker/types";
 import { zValidator } from "@hono/zod-validator";
@@ -17,6 +17,7 @@ import {
 	resetMatchmaker,
 } from "../matchmaker/players-repository";
 import { getRound, putRound } from "../matchmaker/round-repository";
+import { submitScoreForUser } from "../matchmaker/score-repository";
 import { getSlot, listSlots, putSlot } from "../matchmaker/slots-repository";
 
 const putBodySchema = versionedWriteSchema(PlayerSchema);
@@ -95,6 +96,26 @@ export const matchmakerRoutes = new Hono<SessionAppEnv>()
 		}
 		return c.json(saved);
 	})
+	.post(
+		"/round/matches/:matchId/score",
+		zValidator("json", SubmitScoreRequestSchema, invalidBodyHook),
+		async (c) => {
+			const { scoreA, scoreB, roundVersion } = c.req.valid("json");
+			const outcome = await submitScoreForUser(getDb(c.env), c.var.user.id, {
+				matchId: c.req.param("matchId"),
+				scoreA,
+				scoreB,
+				roundVersion,
+			});
+			if (outcome.kind === "invalid") {
+				return c.json({ error: API_ERROR_CODES.INVALID_BODY }, 400);
+			}
+			if (outcome.kind === "conflict") {
+				return c.json({ error: API_ERROR_CODES.VERSION_CONFLICT }, 409);
+			}
+			return c.json(outcome.value);
+		},
+	)
 	.post("/reset", async (c) => {
 		await resetMatchmaker(getDb(c.env), c.var.user.id);
 		return c.body(null, 204);
