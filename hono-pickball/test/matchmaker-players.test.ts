@@ -202,11 +202,13 @@ describe("/api/matchmaker 授權與停用閘門", () => {
 			["b1", 0],
 			["b2", 1],
 		]);
+		const bDelete = await request(cookieB, "DELETE", `/players/a1?userId=${idA}`);
 		const bReset = await request(cookieB, "POST", `/reset?userId=${idA}`, { userId: idA });
 
 		expect(((await bGet.json()) as { items: unknown[] }).items).toEqual([]);
 		expect(bPut.status).toBe(200);
 		expect(bImport.status).toBe(200);
+		expect(bDelete.status).toBe(204);
 		expect(bReset.status).toBe(204);
 		// A 的資料沒被動到，B 的寫入也沒落到 A 名下
 		const aItems = await listItems(cookieA);

@@ -190,6 +190,13 @@ describe("/api/scoreboard/current", () => {
 		const cookieA = await seedAndSignIn("sb-uid-a@example.com");
 		const cookieB = await seedAndSignIn("sb-uid-b@example.com");
 		const idA = await userIdOf("sb-uid-a@example.com");
+		const putA = await putCurrent(cookieA, { data: scoreState(9, 9), version: 0 });
+		expect(putA.status).toBe(200);
+		// GET 同樣不能被 query 的 userId 帶到別人的資料
+		const getWithQuery = await exports.default.fetch(
+			new Request(`${url}?userId=${idA}`, { headers: { Cookie: cookieB } }),
+		);
+		expect(await getWithQuery.json()).toEqual({ data: null, version: 0 });
 
 		const res = await exports.default.fetch(
 			new Request(`${url}?userId=${idA}`, {
@@ -200,7 +207,7 @@ describe("/api/scoreboard/current", () => {
 		);
 
 		expect(res.status).toBe(200);
-		expect(await (await getCurrent(cookieA)).json()).toEqual({ data: null, version: 0 });
+		expect(await (await getCurrent(cookieA)).json()).toEqual({ data: scoreState(9, 9), version: 1 });
 		expect(await (await getCurrent(cookieB)).json()).toEqual({ data: scoreState(2, 2), version: 1 });
 	});
 
