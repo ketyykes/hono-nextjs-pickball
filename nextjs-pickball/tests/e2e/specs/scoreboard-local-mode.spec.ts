@@ -19,6 +19,9 @@ test("訪客模式下計分板不渲染同步提示與 data-sync-status", async 
 	await expect(page.getByLabel(/我方目前 1 分/)).toBeVisible();
 
 	await expect(page.locator("[data-sync-status]")).toHaveCount(0);
+	// 單純加分不會觸發換發球 toast，所以頁面上不應有任何 role="status"；
+	// 這能抓到「文案為 null 時仍渲染空容器」的情況
+	await expect(page.getByRole("status")).toHaveCount(0);
 	for (const message of SYNC_MESSAGES) {
 		await expect(page.getByText(message)).toHaveCount(0);
 	}
