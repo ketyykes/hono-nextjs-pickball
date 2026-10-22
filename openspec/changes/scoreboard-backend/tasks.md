@@ -17,15 +17,15 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/scoreboard-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
+- [x] 1.1 確認分支 `change/scoreboard-backend`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
   `pnpm test` baseline（三個 workspace 的檔數／測試數）、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm lint`；`playwright test --list` 各 project 的數量；回填 environment.md 並 commit
-- [ ] 1.2 對齊 B4 實際落地：`@pickball/core` 的匯出路徑（`scoreboard/types`、`scoreboard/reducer`）、`CORE_MODULES` 現況、B4 design Open Questions（特別是 vitest-pool-workers 是否需要額外設定）。
+- [x] 1.2 對齊 B4 實際落地：`@pickball/core` 的匯出路徑（`scoreboard/types`、`scoreboard/reducer`）、`CORE_MODULES` 現況、B4 design Open Questions（特別是 vitest-pool-workers 是否需要額外設定）。
   對齊 B2／B3：`hono-pickball/src/index.ts`、`src/auth/{require-session,local-auth,create-auth}.ts`、`test/auth-me.test.ts` 的 seed／signIn 寫法、`nextjs-pickball/tests/e2e/helpers/{test-account,storage-state}.ts`。
   比對本 change 四個 MODIFIED Requirement 與目前主 spec（`scoreboard`、`dev-workflow`、`pickleball-guide-page`；B4 可能已改動 `dev-workflow` 的其他 Requirement）——若主 spec 的同名 Requirement 已與 delta 的「原文部分」不同，以主 spec 為底重新套用本 change 的增修並 commit。差異記入 design.md Open Questions
-- [ ] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/honojs/website`（`createMiddleware` 型別推導、`app.route` 與 sub-app `use("*")`）；
+- [x] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/honojs/website`（`createMiddleware` 型別推導、`app.route` 與 sub-app `use("*")`）；
   `/honojs/middleware`（`zValidator` hook）；`/drizzle-team/drizzle-orm-docs`（SQLite `onConflictDoNothing().returning()`、`update().where().returning()`、`text({ mode: "json" }).$type<T>()`）；
   `/llmstxt/developers_cloudflare_d1_llms-full_txt`（foreign key 預設強制、`wrangler d1 execute --command` 多陳述式）；`/websites/playwright_dev`（`testProject.workers`、project 層 `testDir`）。與 design Decision 2～8 的差異記入 Open Questions
-- [ ] 1.4 一次性實測（不 commit）：以 `pnpm --dir <repo>/hono-pickball exec wrangler d1 execute DB --local --env local --command "SELECT 1; SELECT 2;"` 確認多陳述式可執行且輸出可解析；結果寫入 Open Questions
+- [x] 1.4 一次性實測（不 commit）：以 `pnpm --dir <repo>/hono-pickball exec wrangler d1 execute DB --local --env local --command "SELECT 1; SELECT 2;"` 確認多陳述式可執行且輸出可解析；結果寫入 Open Questions
 
 ## 2. 核心套件：API 契約
 

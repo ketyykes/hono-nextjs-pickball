@@ -27,8 +27,8 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**：（apply Step 0／tasks 1.1 回填三個 workspace 的檔數／測試數；B4 合併紀錄為準）
-- **Initial commit hash**：（apply Step 0 回填：`change/scoreboard-backend` 分出時的 `main` HEAD）
+- **Baseline tests**（2026-10-22 apply Step 0 實測，持共用高負載鎖，load 3.6）：前端 Vitest 87 檔／823、後端 13 檔／51、核心套件 1 檔／2，全綠；`pnpm lint` 0 errors／3 warnings；`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0；`playwright test --list` 705（chromium／firefox／webkit／mobile-chrome／mobile-safari 各 141）。`pnpm install` 後 lockfile 零變動；`db:migrate:local`「No migrations to apply」、`db:seed:local` 成功
+- **Initial commit hash**：`621bb7e`（`change/scoreboard-backend` 分出時的 `main` HEAD；程式碼與 coordinator baseline `d9d9d80` 相同，之後只有 runbook 文件 commit）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
