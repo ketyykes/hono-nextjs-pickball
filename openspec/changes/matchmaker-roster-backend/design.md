@@ -200,3 +200,9 @@
     額外行為（leader 授權）：預覽含錯誤列時不送任何請求、回 `previewHasErrors`；GET 後沒有可新增的列（只有標題列的 CSV）時不送 POST、視為成功（本機分支同一檔案亦為無害成功；否則後端 `min(1)` 回 400、提示「請稍後再試」卻永遠失敗）。
     RED 流程瑕疵：6.1 紅燈在 shell 實際看到後，commit 因 zsh 錯誤晚於實作檔寫入磁碟才建立（RED commit 只含測試檔，`7fed3e3^` 無實作檔可複驗）。
     非阻擋（留給後續）：`importConflict` 成因描述（實務上是重試同一批 id 撞號）不精確但建議動作正確；`importFailed` 涵蓋「已 commit 但回應遺失」，§7 重試時重新產生 id 可能整批重複匯入——元件層以 reload 確認名單後再匯入緩解。下一步 §7。
+13. （apply §7，2026-10-23）完成（`c5b86b0` RED，10 個 E2E 全紅於頁面接線；`1f6c7a2` GREEN，同 commit 修正 spec 自身 4 處寫法——選強度、改雙打、場地 selector、等 reload 的 load 事件，未放寬斷言；`3c809eb` 7.3 skipped；Stage 2 收尾 `3421e6f` guard＋RED、`78ed4c7` fix）。
+    Stage 1、Stage 2 皆 PASS（無必修）；Stage 2 持鎖連跑 roster-sync 3 輪 30/30，並以延遲後三個 PUT 的實驗證實「等第一個 PUT 再等 synced」可涵蓋四位評分 PUT（synced 要等全部佇列清空）。
+    Stage 2 收尾：補對戰頁／統計頁 load-failed 取代與訪客三頁不輸出 `data-sync-status` 的守護（新增 `tests/e2e/specs/matchmaker-local-mode.spec.ts`，會在全部訪客 project 執行）；雲端 CSV 匯入進行中停用確認鈕（雙擊會以新 UUID 附加兩批重複參賽者，TDD）。`JsonBackupSection` 雲端匯出未加防重複（雙擊只多下載一份，不動雲端資料）。
+    OQ2 結論：頁面在雲端 loading 時以提示取代內容不影響 `useRoundStore` 的 hydrate 時序（hooks 皆在 early return 前呼叫）。
+    既有問題（非 §7 引入，留 B7）：對戰頁回填 effect（`app/matchmaker/page.tsx` deps 只有 `[round]`）在雲端 loading 期間執行時 `players` 為空或為本機訪客名單，`submitScore` 回 `SCORING_FAILED`，名單載入後不重試，要等下次 round 變動才補送——不損毀資料但回填延遲。
+    user-data E2E 18 個（scoreboard-sync 6、roster-sync 12）；訪客 chromium 既有 4 spec 42 passed。下一步 §8。
