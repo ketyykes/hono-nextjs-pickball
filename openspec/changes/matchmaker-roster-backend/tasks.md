@@ -85,6 +85,7 @@ Depends on: §5
 
 - [x] 6.1 RED（TDD）：新增 `lib/matchmaker/remote-transfer.test.ts`，三個 it（「雲端 CSV 匯入以雲端現有名單計算並只送出新增的參賽者」「雲端 CSV 匯入失敗時回傳錯誤且不視為成功」「雲端備份快照的參賽者取自雲端、回合與歷史取自本機」）。確認紅燈
 - [x] 6.2 GREEN（TDD）：新增 `lib/matchmaker/remote-transfer.ts`（design Decision 6）
+  - 6.2 收尾（Stage 2 建議）：RED ed6a324（空 appended 不送 POST）→ GREEN 02c54bd；regression guard 2a4255f（POST／GET 400、GET 204，寫入即綠）；文案 243c6e4（importFailed 不斷言無變動）
 
 ## 7. E2E 與頁面接線
 
