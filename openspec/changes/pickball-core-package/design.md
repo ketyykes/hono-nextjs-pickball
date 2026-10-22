@@ -196,3 +196,6 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
    Stage 1 判定為流程偏差（GREEN 改了測試）；leader 裁定接受：斷言語意不變、紅燈原因（`src/` 不存在）已機械複驗。教訓：無 DOM lib 的套件寫 RED 時，先跑該套件 `typecheck` 再 commit。
 9. （apply §2，回填 Open Questions 2）實測 lockfile：核心套件 importer 的 vitest 解析為與前端相同的 `4.1.8(...)` 變體，**未**產生新解析變體；`packages:`／`snapshots:` 段零改動
    （`pnpm install` 曾展開 3 處 `eslint-plugin-import` 快照鍵的 peer 後綴，`9b41602` 已還原且 `pnpm install`／`--frozen-lockfile` 皆不再改寫）。
+10. （apply §2 Stage 2 建議，不擋）前端（含測試與 E2E）註解約 20 處、被搬模組自身註解（如 `labels.ts` 第 1 行）仍寫舊路徑 `lib/matchmaker/...`／`lib/scoreboard/...`；
+    依 Non-Goals 本 change 不改，路徑以 `pickball-core` 對照表解讀，留待後續 change 統一更新。另：`module-boundary.test.ts` 的 `export const CORE_MODULES` 目前無外部匯入者、
+    `Reflect.get(globalThis, "window")` 可補一行註解說明 TS7017——皆屬可讀性建議，本 change 不動。

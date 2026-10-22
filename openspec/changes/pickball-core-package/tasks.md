@@ -32,13 +32,13 @@
 
 Depends on: §1
 
-- [ ] 2.1 設定層：新增 `packages/pickball-core/{package.json, tsconfig.json, test/tsconfig.json, vitest.config.ts}`（design Decision 1、5、6；`exports: {"./*": "./src/*.ts"}`、不設 `type`、
+- [x] 2.1 設定層：新增 `packages/pickball-core/{package.json, tsconfig.json, test/tsconfig.json, vitest.config.ts}`（design Decision 1、5、6；`exports: {"./*": "./src/*.ts"}`、不設 `type`、
   `dependencies: {zod: "^4.4.3"}`、devDeps `typescript ^5`／`vitest ^4.1.5`／`@types/node ^20`；scripts `build`＝`tsc --noEmit`、`test`＝`vitest`、`typecheck`＝`tsc --noEmit && tsc --noEmit -p test/tsconfig.json`）；
   root `pnpm-workspace.yaml` 的 `packages` 加 `packages/pickball-core`；`pnpm install`。記錄 `git diff --stat main -- pnpm-lock.yaml` 與新增的解析變體（design Open Questions 2）；
   確認 lockfile 的 `packages:` 段沒有新的套件名稱或版本（新增項只可能是既有套件因 peer 組合不同的解析變體，`snapshots:` 段同理）
-- [ ] 2.2 RED（TDD）：新增 `packages/pickball-core/test/module-boundary.test.ts`，寫入 `CORE_MODULES`（18 項）與兩個 it：「核心模組清單與 src 實際檔案一致」「每個核心模組可在沒有瀏覽器全域的 node 環境載入」。
+- [x] 2.2 RED（TDD）：新增 `packages/pickball-core/test/module-boundary.test.ts`，寫入 `CORE_MODULES`（18 項）與兩個 it：「核心模組清單與 src 實際檔案一致」「每個核心模組可在沒有瀏覽器全域的 node 環境載入」。
   以單檔指令確認紅燈（`src/` 不存在：ENOENT／模組解析失敗）並貼出輸出
-- [ ] 2.3 GREEN（TDD）：**同一個 commit 內**：① `git mv` 18 個模組到 `packages/pickball-core/src/{scoreboard,matchmaker}/`（內容零修改）；
+- [x] 2.3 GREEN（TDD）：**同一個 commit 內**：① `git mv` 18 個模組到 `packages/pickball-core/src/{scoreboard,matchmaker}/`（內容零修改）；
   ② 以腳本把前端所有 `@/lib/scoreboard/{types,rules,reducer}`、`@/lib/matchmaker/<被搬模組>` 與 `lib/` 內同層相對 import（`./round` 等，僅限指向被搬模組者）改為 `@pickball/core/<area>/<module>`
   （含測試檔與 `tests/e2e/specs/scoreboard-binding.spec.ts`）；③ `nextjs-pickball/package.json` 加 `"@pickball/core": "workspace:*"`、`next.config.ts` 加 `transpilePackages: ["@pickball/core"]`；`pnpm install`。
   完成後：2.2 轉綠；`pnpm --filter ./nextjs-pickball test --run` 檔數／測試數＝1.1 基線且全綠（regression guard）；`pnpm -r exec tsc --noEmit` exit 0；`pnpm lint` 不多於基線
@@ -47,7 +47,8 @@ Depends on: §1
   > 核心套件 `test/tsconfig.json` 繼承 `lib: ["ESNext"]`，`globalThis.window` 是 TS7017 型別錯誤；`Reflect.get` 的執行期語意相同（皆讀取該屬性並斷言為 `undefined`）。
   > Stage 1 指出此為「GREEN 修改測試」的流程偏差；leader 裁定接受（斷言語意不變、不影響紅燈真實性），不改寫歷史，記錄於此與 design.md Open Questions 8。
   > lockfile：`9b41602` 還原 `pnpm install` 對 3 處 `eslint-plugin-import` 快照鍵的 peer 後綴展開；相對 `main` 只剩 `importers` 新增（`packages/pickball-core` 與 `nextjs-pickball` 的 `link:`），vitest 未產生新解析變體。
-- [ ] 2.4 REFACTOR：檢查改寫後的 import 排序與既有風格一致（同檔多行 import 是否需合併）；無壞味道則註記 skipped。**不得**修改被搬模組內容
+- [x] 2.4 REFACTOR：檢查改寫後的 import 排序與既有風格一致（同檔多行 import 是否需合併）；無壞味道則註記 skipped。**不得**修改被搬模組內容
+  > **skipped**：改寫為原地替換指定字串；同檔對同一 `@pickball/core/...` 指定字串出現多次者共 25 組，Stage 2 逐一比對 `main` 皆為原本就有的 `import`＋`import type` 拆法，改寫未新增重複；前端 ESLint 無 import/order 規則，排序維持各檔原風格。
 
 ## 3. 後端取用
 
