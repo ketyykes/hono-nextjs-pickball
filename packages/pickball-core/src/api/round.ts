@@ -19,15 +19,14 @@ export const MatchSlotSchema = ScoreboardStateSchema.extend({
 /** PUT 單筆分槽：data.matchId 與 path 的一致性由後端檢查。 */
 export const MatchSlotPutRequestSchema = versionedWriteSchema(MatchSlotSchema);
 
-// 列表中的每一筆都已存在於資料庫，版本至少為 1；0 只代表「尚未建立」。
-const MatchSlotItemSchema = z.object({
-  data: MatchSlotSchema,
-  version: z.number().int().positive(),
-});
+// 已存在於資料庫的資料版本至少為 1；0 只代表「尚未建立」。
+function versionedItemSchema<T extends z.ZodType>(dataSchema: T) {
+  return z.object({ data: dataSchema, version: z.number().int().positive() });
+}
 
 /** GET 分槽清單：依 match_id 遞增排列。 */
 export const MatchSlotListResponseSchema = z.object({
-  items: z.array(MatchSlotItemSchema),
+  items: z.array(versionedItemSchema(MatchSlotSchema)),
 });
 
 /** GET 單筆分槽：不存在時 data 為 null、version 為 0。 */
@@ -40,14 +39,10 @@ export const SubmitScoreRequestSchema = z.object({
   roundVersion: z.number().int().positive(),
 });
 
-// 送出成功後寫入資料庫的資料都已存在，版本至少為 1。
-const VersionedPositiveSchema = <T extends z.ZodType>(dataSchema: T) =>
-  z.object({ data: dataSchema, version: z.number().int().positive() });
-
 /** 送出比分成功回應：players 僅含被更新者；boundaryHits 為一次性提示，不持久化。 */
 export const SubmitScoreResponseSchema = z.object({
-  round: VersionedPositiveSchema(RoundSchema),
-  players: z.array(VersionedPositiveSchema(PlayerSchema)),
+  round: versionedItemSchema(RoundSchema),
+  players: z.array(versionedItemSchema(PlayerSchema)),
   historyEntry: MatchHistoryEntrySchema,
   boundaryHits: z.array(
     z.object({
