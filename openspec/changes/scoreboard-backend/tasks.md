@@ -60,10 +60,12 @@ Depends on: §3
 
 - [x] 4.1 設定層（測試基礎建設）：新增 `hono-pickball/test/helpers/session.ts`（`seedUser(email)`、`signIn(email)` 回 Cookie 字串、`userIdOf(email)`；沿用 `auth-me.test.ts` 的 `buildTestAccountSeedSql` 與 `Origin` 寫法）；既有測試檔不改
   - 實跑紀錄：新增 `test/helpers/session.ts`（`seedUser`／`signIn`／`userIdOf`）；既有測試檔未動；typecheck 於 4.2 一併驗證
-- [ ] 4.2 RED（TDD）：新增 `test/scoreboard-current.test.ts`，寫入 spec 錨點的全部 it：「auth 停用且無 DB binding 時 GET 與 PUT /api/scoreboard/current 皆回 404」「未登入呼叫 GET 與 PUT /api/scoreboard/current 皆回 401」
+- [x] 4.2 RED（TDD）：新增 `test/scoreboard-current.test.ts`，寫入 spec 錨點的全部 it：「auth 停用且無 DB binding 時 GET 與 PUT /api/scoreboard/current 皆回 404」「未登入呼叫 GET 與 PUT /api/scoreboard/current 皆回 401」
   「B 的 cookie 讀不到 A 的計分板且寫入不影響 A」「尚無資料時 GET 回 data null 與 version 0」「以 version 0 首次寫入成功並回 version 1」「以目前 version 寫入成功並遞增 version，GET 取回相同資料」
   「version 不符時回 409 VERSION_CONFLICT 且資料不變」「已有資料時以 version 0 寫入回 409」「body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY」「data.matchId 非 null 時回 400 INVALID_BODY」。
   確認紅燈並貼出輸出；**「auth 停用…皆回 404」在路由不存在時同樣是 404，預期先綠——紀錄中點名並標 regression guard**（它在 GREEN 後證明的是「路由存在時停用仍 404」）
+  - 實跑紀錄：`pnpm --filter ./hono-pickball test --run test/scoreboard-current.test.ts` → 9 failed｜1 passed（路由不存在，皆為 `expected 404 to be 401/200/409/400`）；regression guard：「auth 停用且無 DB binding 時 GET 與 PUT /api/scoreboard/current 皆回 404」（路由不存在時同為 404，先綠）；其餘 9 個為真紅燈
+  - 依 spec Requirement 原文（「body 不是 JSON … → 400 INVALID_BODY」）於「body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY」額外加入第五種輸入：`Content-Type: application/json` 但 body 為語法錯誤的 JSON（`{"data":`）；it 名稱不變
 - [ ] 4.3 GREEN（TDD）：新增 `src/scoreboard/repository.ts`（`getCurrent`、`putCurrent`；design Decision 3 的單一條件式 SQL）、`src/routes/scoreboard.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession)`、`zValidator` hook 回 `INVALID_BODY`、`matchId` 檢查）；
   `src/index.ts` 以 `app.route("/api/scoreboard", scoreboardRoutes)` 掛載。4.2 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
 - [ ] 4.4 REFACTOR：錯誤回應的建立是否重複（抽成 `src/http/errors.ts` 的小 helper 與否）；無壞味道則註記 skipped
