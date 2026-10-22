@@ -159,4 +159,96 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 			updated_at: NOW + 2,
 		});
 	});
+
+	// 以下四個 it 對應 scoreboard_current（B5 新增的第一張使用者資料表）。
+	it("scoreboard_current 可由 migration 建立並寫入讀回", async () => {
+		const db = getTestDb();
+		await insertUser(db, "sc-rw-user", "sc-rw@example.com");
+		const data = JSON.stringify({ games: [], note: "快照" });
+		await db
+			.prepare(
+				"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)",
+			)
+			.bind("sc-rw-user", data, 1, NOW + 7)
+			.run();
+
+		const row = await db
+			.prepare("SELECT data, version, updated_at FROM scoreboard_current WHERE user_id = ?")
+			.bind("sc-rw-user")
+			.first();
+
+		expect(row).toEqual({ data, version: 1, updated_at: NOW + 7 });
+	});
+
+	it("同一使用者在 scoreboard_current 只能有一列", async () => {
+		const db = getTestDb();
+		await insertUser(db, "sc-dup-user", "sc-dup@example.com");
+		const insertRow = () =>
+			db
+				.prepare(
+					"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)",
+				)
+				.bind("sc-dup-user", "{}", 1, NOW)
+				.run();
+
+		await insertRow();
+		await expect(insertRow()).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
+
+		expect(
+			await countRows(
+				db,
+				"SELECT COUNT(*) AS n FROM scoreboard_current WHERE user_id = ?",
+				"sc-dup-user",
+			),
+		).toBe(1);
+	});
+
+	it("scoreboard_current 的 user_id 必須參照既有使用者", async () => {
+		const db = getTestDb();
+		await expect(
+			db
+				.prepare(
+					"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)",
+				)
+				.bind("sc-ghost-user", "{}", 1, NOW)
+				.run(),
+		).rejects.toThrow(/FOREIGN KEY/);
+	});
+
+	it("刪除使用者時其 scoreboard_current 一併刪除", async () => {
+		const db = getTestDb();
+		const userId = "sc-cascade-user";
+		await insertUser(db, userId, "sc-cascade@example.com");
+		await db
+			.prepare(
+				"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)",
+			)
+			.bind(userId, "{}", 1, NOW)
+			.run();
+
+		// 先確認資料確實建立，避免刪除後的 0 是恆真
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM scoreboard_current WHERE user_id = ?", userId),
+		).toBe(1);
+
+		await db.prepare("DELETE FROM user WHERE id = ?").bind(userId).run();
+
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM scoreboard_current WHERE user_id = ?", userId),
+		).toBe(0);
+	});
+
+	// regression guard（寫入即綠）：補 scoreboard_current.data 的 NOT NULL 約束覆蓋。
+	it("scoreboard_current 的 data 不可為 NULL", async () => {
+		const db = getTestDb();
+		await insertUser(db, "sc-null-user", "sc-null@example.com");
+		await expect(
+			db
+				.prepare(
+					"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, NULL, ?, ?)",
+				)
+				.bind("sc-null-user", 1, NOW)
+				.run(),
+		).rejects.toThrow(/NOT NULL/);
+	});
 });

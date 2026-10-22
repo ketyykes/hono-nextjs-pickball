@@ -4,6 +4,10 @@
 import { useEffect, useReducer, useRef, type Dispatch } from "react";
 import { createInitialState, scoreboardReducer } from "@pickball/core/scoreboard/reducer";
 import { readScoreboard, writeScoreboard } from "@/lib/scoreboard/storage";
+import { useSession } from "@/hooks/useSession";
+import { useRemoteScoreboardStore } from "@/hooks/useRemoteScoreboardStore";
+import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import type { SyncStatus } from "@/lib/sync/sync-status";
 import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 
 // 對戰場次綁定狀態：
@@ -30,7 +34,7 @@ export type ScoreboardBindingStatus = "standalone" | "pending" | "bound" | "miss
 // read effect cleanup 時將 ref reset 為 false，使 Strict Mode 第二次 mount 時
 // write effect 正確跳過（Strict Mode 重置 state 為初始值，若此時 write effect 執行
 // 會以 us:0 覆蓋 localStorage 中已儲存的值）。
-export function useScoreboardStore(matchIdParam?: string | null): readonly [
+function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 	ScoreboardState,
 	Dispatch<Action>,
 	ScoreboardBindingStatus,
@@ -95,4 +99,28 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	}, []);
 
 	return [state, dispatch, bindingStatus] as const;
+}
+
+// 儲存模式選擇器：兩個 hook 每次 render 都呼叫（hooks 規則），未被選用的一方不發請求。
+// 只有「已登入且未綁定場次」走雲端；帶 matchId 的分槽在 B7 之前一律留在本機。
+// session 載入中視為本機，訪客首屏時序不因等待 /api/session 而改變。
+export function useScoreboardStore(matchIdParam?: string | null): readonly [
+	ScoreboardState,
+	Dispatch<Action>,
+	ScoreboardBindingStatus,
+	SyncStatus,
+] {
+	const session = useSession();
+	const matchId = matchIdParam === "" || matchIdParam === undefined ? null : matchIdParam;
+	const local = useLocalScoreboardStore(matchIdParam);
+	const isRemote = resolveStorageMode(session) === "remote" && matchId === null;
+	const remote = useRemoteScoreboardStore({
+		enabled: isRemote,
+		onUnauthorized: session.refresh,
+	});
+
+	if (isRemote) {
+		return [remote[0], remote[1], "standalone", remote[2]] as const;
+	}
+	return [local[0], local[1], local[2], "local"] as const;
 }

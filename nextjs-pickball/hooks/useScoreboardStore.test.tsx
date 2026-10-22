@@ -1,10 +1,23 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { StrictMode } from "react";
 import { renderHook, act } from "@testing-library/react";
 import { useScoreboardStore, type ScoreboardBindingStatus } from "./useScoreboardStore";
 import { STORAGE_KEY } from "@/lib/scoreboard/storage";
 import { MATCH_SLOTS_KEY, writeMatchSlot } from "@/lib/scoreboard/match-slots";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import { waitFor } from "@testing-library/react";
+import { useSession } from "@/hooks/useSession";
+
+// 預設回本機模式的快照（訪客、auth 停用），既有 it 因此不受選擇器影響；
+// 雲端選擇器的 it 各自以 mockReturnValue 覆寫。
+vi.mock("@/hooks/useSession", () => ({
+	useSession: vi.fn(() => ({
+		status: "ready",
+		authEnabled: false,
+		user: null,
+		refresh: vi.fn(),
+	})),
+}));
 
 describe("useScoreboardStore", () => {
 	beforeEach(() => {
@@ -336,5 +349,145 @@ describe("useScoreboardStore", () => {
 				Reflect.deleteProperty(globalThis, "localStorage");
 			}
 		}
+	});
+});
+
+// 選擇器：依 session 在本機實作與雲端實作之間擇一，並多回傳 syncStatus。
+describe("useScoreboardStore 儲存模式選擇器", () => {
+	const loggedIn = {
+		status: "ready",
+		authEnabled: true,
+		user: { id: "u1", email: "a@example.com", name: "A" },
+		refresh: vi.fn(),
+	} as const;
+	const fetchMock = vi.fn<typeof fetch>();
+
+	function jsonResponse(body: unknown): Response {
+		return new Response(JSON.stringify(body), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
+	function scoreboardCalls() {
+		return fetchMock.mock.calls.filter(([path]) => String(path).startsWith("/api/scoreboard"));
+	}
+
+	beforeEach(() => {
+		localStorage.clear();
+		fetchMock.mockReset();
+		vi.stubGlobal("fetch", fetchMock);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+			refresh: vi.fn(),
+		});
+	});
+
+	it("已登入且未帶 matchId 時改用雲端並回傳 syncStatus", async () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		// 每次請求都要新的 Response（body 只能讀一次）
+		fetchMock.mockImplementation(() =>
+			Promise.resolve(
+				jsonResponse({
+					data: { ...createInitialState(), scores: { us: 4, them: 2 } },
+					version: 3,
+				}),
+			),
+		);
+
+		const { result } = renderHook(() => useScoreboardStore(null));
+
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+		expect(result.current[0].scores).toEqual({ us: 4, them: 2 });
+		expect(result.current[2]).toBe("standalone");
+
+		// 空字串的 matchId 視為未綁定，同樣走雲端
+		fetchMock.mockClear();
+		const emptyId = renderHook(() => useScoreboardStore(""));
+		await waitFor(() => expect(emptyId.result.current[3]).toBe("synced"));
+		expect(scoreboardCalls().length).toBeGreaterThan(0);
+		emptyId.unmount();
+
+		// 雲端 GET 回 401 時，選擇器把 session.refresh 交給雲端 hook 呼叫
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });
+		fetchMock.mockReset();
+		fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 401 })));
+		renderHook(() => useScoreboardStore(null));
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+	});
+
+	it("session 載入中或訪客時走本機且 syncStatus 為 local", () => {
+		const snapshots = [
+			{ status: "loading", refresh: vi.fn() },
+			{ status: "ready", authEnabled: false, user: null, refresh: vi.fn() },
+		] as const;
+
+		for (const snapshot of snapshots) {
+			localStorage.clear();
+			vi.mocked(useSession).mockReturnValue(snapshot);
+			const { result, unmount } = renderHook(() => useScoreboardStore(null));
+
+			act(() => {
+				result.current[1]({ type: "RALLY_WON", winner: "us" });
+			});
+
+			expect(result.current[3]).toBe("local");
+			expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).scores.us).toBe(1);
+			expect(scoreboardCalls()).toHaveLength(0);
+			unmount();
+		}
+	});
+
+	it("雲端模式下 dispatch 不寫入 scoreboard:current:v1", async () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		fetchMock.mockImplementation((_input, init) => {
+			if (init?.method === "PUT") {
+				return Promise.resolve(
+					jsonResponse({
+						data: { ...createInitialState(), scores: { us: 1, them: 0 } },
+						version: 1,
+					}),
+				);
+			}
+			return Promise.resolve(jsonResponse({ data: null, version: 0 }));
+		});
+
+		const { result } = renderHook(() => useScoreboardStore(null));
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() =>
+			expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true),
+		);
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+
+		expect(result.current[0].scores.us).toBe(1);
+		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+	});
+
+	it("已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local", () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		writeMatchSlot({ ...createInitialState({ targetScore: 11 }), matchId: "m1" });
+
+		const { result } = renderHook(() => useScoreboardStore("m1"));
+		expect(result.current[2]).toBe("bound");
+		expect(result.current[3]).toBe("local");
+
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+
+		const slots = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
+		expect(slots.m1.scores.us).toBe(1);
+		expect(scoreboardCalls()).toHaveLength(0);
 	});
 });

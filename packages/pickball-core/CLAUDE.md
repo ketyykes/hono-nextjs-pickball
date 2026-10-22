@@ -19,13 +19,13 @@
 
 ## 新增模組
 
-- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 18 項），否則邊界測試轉紅。
+- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 21 項），否則邊界測試轉紅。
 - 需要瀏覽器 I/O 的程式（localStorage、Blob 下載、canvas）留在前端，不進本套件。
 
 ## 測試
 
 - 被搬移的 18 個模組，其**既有**單元測試（其中 `scoreboard/types`、`matchmaker/{allocation-types,rating-math,rating-types,labels,transfer-types}` 6 個本來就沒有同名測試檔）**刻意留在前端原位** `nextjs-pickball/lib/{scoreboard,matchmaker}/*.test.ts`（主 spec 的驗收錨點以測試檔路徑定位），由前端 vitest 執行；不是漏搬。
-- 目前本套件的 `test/` 只有套件層守衛（模組邊界等）；新增核心模組的行為測試放哪裡由該 change 決定，若放在本套件須在 `test/**/*.test.ts`（vitest `include` 僅含此範圍）。`src/**` 的行為邏輯一律照 root `CLAUDE.md` 的 TDD 三步。
+- 目前本套件的 `test/` 有套件層守衛（模組邊界等）與 `test/api/` 的契約測試；新增核心模組的行為測試放哪裡由該 change 決定，若放在本套件須在 `test/**/*.test.ts`（vitest `include` 僅含此範圍）。`src/**` 的行為邏輯一律照 root `CLAUDE.md` 的 TDD 三步。
 - `pnpm test`＝vitest（不加 `--passWithNoTests`）；`pnpm typecheck`＝`tsc --noEmit && tsc --noEmit -p test/tsconfig.json`（兩段都要）；`pnpm build`＝`tsc --noEmit`。
 - 單檔測試（在 repo root）：`pnpm --filter ./packages/pickball-core test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）。
 

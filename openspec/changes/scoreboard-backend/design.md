@@ -165,9 +165,57 @@ runbook 已定「五個 key 全部要有後端版本」，本決策只是改變�
 5. E2E：使用者資料 spec 放 `tests/e2e/user-data/`、`beforeEach` 呼叫 `clearTestAccountUserData()`；驗收迴圈多一個 `--project=user-data`。
 6. 授權覆蓋表：每個端點三類測試（401／他人資料／停用 404）。
 
+## apply §1 查證紀錄（2026-10-22）
+
+**對齊 main（tasks 1.2，base `621bb7e`）**
+- `@pickball/core`：`exports` 為 `{"./*": "./src/*.ts"}`，匯入路徑 `@pickball/core/scoreboard/{types,reducer}` 與 design 假設相同；`src/` 目前只有 `scoreboard/`、`matchmaker/`，尚無 `api/`。
+  `test/module-boundary.test.ts` 的 `CORE_MODULES` 為 18 項，下限斷言 `>= 18`；另一個 it 對每個模組要求 `Object.keys(mod).length > 0`（`api/errors.ts` 只匯出型別會轉紅，必須至少匯出 `API_ERROR_CODES` 值）。
+  核心套件 vitest `include` 為 `test/**/*.test.ts`，`test/api/versioned.test.ts` 在範圍內；`test/tsconfig.json` 只有 `types: ["node"]`（無 DOM，B4 Open Questions 8 的教訓：RED 寫完先跑核心 `typecheck`）。
+- B4 Open Questions：無「vitest-pool-workers 需要額外設定」的待辦；`hono-pickball/test/pickball-core-import.test.ts` 已證明 workerd 可解析 workspace 套件，本 change 不需改 `vitest.config.ts`。
+- 後端：`src/index.ts` 內聯 `localAuth`（`createMiddleware<AuthAppEnv>`，gate → `createAuth` → `c.set("auth")`），掛 `/api/auth/*` 與 `/api/me`；`require-session.ts` 的 `AuthAppEnv` 三個變數同層、`requireSession` 以 `createMiddleware<AuthAppEnv>` 宣告——與 Context 一節相同。
+  `create-auth.ts` 匯入 `local-auth.ts`（Decision 2 的循環匯入理由成立）。`test/auth-me.test.ts` 的 `seed`／`signIn`／`userIdOf` 寫法（`buildTestAccountSeedSql`、`Origin: http://localhost:3005`、`exports.default.fetch`）可直接搬到 `test/helpers/session.ts`；
+  停用情境沿用 `auth-gating.test.ts` 的 `app.request(path, init, { ...env, ... })`。
+- 前端：`SessionSnapshot`、`useSession()`、`useScoreboardStore` 與 Context 一節相同；E2E helper `tests/e2e/helpers/{test-account,storage-state}.ts` 存在。
+- 主 spec 比對（以 Requirement 區塊逐行 diff）：`scoreboard`「localStorage 持久化」、`dev-workflow`「E2E 登入夾具」、`pickleball-guide-page`「互動行為由三支 hooks 提供且各有 smoke test」三者，
+  主 spec 現行文字與 delta 的「原文部分」完全一致，差異只有本 change 的增修（B4 未改動這三個 Requirement）——**不需要重新套用 delta**。
+
+**Context7（tasks 1.3）**
+- `/honojs/website`（`docs/guides/middleware.md`、`docs/api/context.md`）：`createMiddleware<{ Variables }>` 的變數經 `.use()` 鏈與 handler 參數合併進 `c.var`；`app.route()` 為分組方式。與 Decision 2 一致。
+- `/honojs/middleware`（`packages/zod-validator/README.md`）：`zValidator(target, schema, (result, c) => { if (!result.success) return c.json(...) })` 的 hook 回傳 Response 取代預設錯誤。已安裝 `@hono/zod-validator` 0.8.0，peer `zod ^3.25 || ^4`（已裝 4.4.3）。與 Decision 3 一致。
+- 本機查證 `hono` 4.12.25 `dist/validator/validator.js`：`json` target 在 `Content-Type` 不符時 `break`（value 維持 `{}` 進入驗證）；JSON 語法錯誤拋 `HTTPException(400, "Malformed JSON in request body")`。與 Decision 3 一致。
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/update.mdx`、`sqlite/insert.mdx`、`guides/empty-array-default-value.mdx`）：`update().set().where().returning()` 條件不成立時回空陣列；`insert().values().onConflictDoNothing()`；`text(..., { mode: "json" }).$type<T>()`。與 Decision 3、4 一致（已裝 drizzle-orm 0.45.2）。
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`d1/sql-api/foreign-keys`、`workers/wrangler/commands/d1`）：D1 的 FK 強制等同 `PRAGMA foreign_keys = on`，使用者查詢無法關閉；`--command` 接受「以 `;` 分隔的多個查詢」。與 Decision 4、8 一致。
+- `/websites/playwright_dev`（`api/class-testproject`）：`testProject.workers`（v1.52 起）限制單一 project 並行數、官方例即「共用測試帳號」；`testProject.testDir` 每個 project 可不同；`fullyParallel` 可設在 project 層。已裝 1.60.0。與 Decision 8 一致。
+- 結論：Decision 2～8 **無與查證結果不同之處**。
+
+**一次性實測（tasks 1.4，不 commit）**
+- `pnpm --dir <repo>/hono-pickball exec wrangler d1 execute DB --local --env local --command "SELECT 1 AS a; SELECT 2 AS b;"` exit 0，輸出「2 commands executed successfully」並附 JSON 陣列（每個陳述式一個 `{ results, success, meta }`）；
+  加 `--json` 時 stdout 只有該 JSON 陣列（banner 在 stderr），可 `JSON.parse`。`clearTestAccountUserData()` 對多張表各一句 `DELETE` 合併為單一 `--command` 可行。
+
 ## Open Questions
 
 1. D1 `batch()` 內「版本條件不成立的 UPDATE」只會影響 0 列、不會讓 batch 失敗回滾（Context7 `/llmstxt/developers_cloudflare_d1_llms-full_txt`：batch 只在**某個陳述式失敗**時整批回滾）。
    B7 的送出比分若要在 batch 內同時檢查回合版本，需要「條件不成立時讓陳述式失敗」的寫法（例如對 CHECK 約束違反、或以子查詢讓 INSERT 的 NOT NULL 欄位為 NULL），或先讀版本再以單一 batch 寫入並接受極小競態窗口——由 B7 決定並以測試證明。
 2. `useScoreboardStore` 第四個回傳值目前只有 `Scoreboard` 使用；`app/matchmaker/page.tsx` 等不經此 hook 的分槽讀寫不受影響（Decision 1）。
 3. CSRF 防線（JSON content-type＋`SameSite=Lax`＋不回 CORS 標頭）在正式網域（G1）需再複核，含 Google 登入後的 cookie 屬性。
+4. （apply §1）Decision 2～8 與 Context7／本機查證無差異；三個 MODIFIED Requirement 的主 spec 原文與 delta 一致，無需重新套用（見「apply §1 查證紀錄」）。
+5. （apply §1）`wrangler d1 execute --local --command` 多陳述式實測可行，`--json` 輸出可解析（見查證紀錄）。
+6. （apply §4 leader 裁定）spec「版本化讀寫契約」原文要求「body 不是 JSON → `400 { error: "INVALID_BODY" }`」，與 Decision 3 Rationale「JSON 語法錯誤由 Hono 拋純文字 400、spec 只承諾 400」不一致；以 spec 為準：
+   `src/routes/scoreboard.ts` 的 sub-app `onError` 將 `HTTPException(400)` 轉為 `INVALID_BODY`（實測 Hono 4.12 的 `app.route` 會套用 sub-app 的 `onError`），其他錯誤維持 Hono 預設；
+   「body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY」it 內加入第五種輸入（語法錯誤 JSON）。B6～B9 照抄 sub-app 形態時需一併帶上（§4 Stage 2 建議 B6 開工時把 `onError`＋`zValidator` hook 抽成 `src/http/` 共用）。
+7. （apply §3／§4 Stage 2 非阻擋建議，留後續）① `test/user-data-tables.test.ts` 的 `NOT LIKE '_cf_%'` 中 `_` 為單字元萬用字元，可改 `GLOB` 或 `ESCAPE`；
+   ② `scoreboard-current.test.ts` 未直接守「SHALL NOT 從 query／body 接受使用者 id」（PUT 改讀 `?userId=` 的變異存活）與「getSession 例外時回 500」（`onError` 吞 500 的變異存活；probe 實測現行實作回 500 正確）；
+   ③ GET 有資料的 it 未斷言 status 200。皆為測試加強，不影響現行行為，交 coordinator 決定是否在本 change 補。
+8. （apply §5）5.1 的 RED commit `bb6dd3e` 早於實際看到紅燈（實作檔當時未追蹤、不在 commit 內），Implementer 事後暫移實作重跑確認紅燈；`git show bb6dd3e^:nextjs-pickball/lib/sync/storage-mode.ts` 不存在，機械複驗成立。
+   §5 Stage 2 指出的 L14（失敗後以舊值覆蓋較新待送值）與 A12（回傳未經 schema 的 JSON）兩個存活變異已於 `12ae7e2` 補 regression guard 斷言。
+9. （apply §6）Stage 2 第一輪 FAIL：同一 mount 內 `enabled` true→false→true 且新一輪 GET 回 `data: null` 時保留前一輪比分（違反「data 為 null 時維持 `createInitialState()`」，可能把前一帳號比分寫上新帳號）；
+   已依 TDD 修正（RED `199578e`、fix `e718f67`：載入成功一律 `HYDRATE data ?? createInitialState()`），並補選擇器 401 呼叫 `refresh`、衝突重載不切 `loading`、StrictMode 過期 GET、`useScoreboardStore("")` 四條 regression guard（`d347fc3`）；複審 PASS。
+   test-plan／tasks 寫「既有 `useScoreboardStore.test.tsx` 15 個 it」為筆誤，基準實為 14 個（tasks 6.5 已註記）。
+10. （apply §6 非阻擋，交 B6）① 401 → `refresh()` 後 session 仍為登入（例如另一分頁換帳號）時 `enabled` 不切換、effect 不重跑，hook 會停在 `loading` 或 `saving` 且之後寫入被靜默丟棄；B6 照抄時應考慮以 user id 作為 effect 依賴或 401 後強制重載。
+    ② 衝突重載期間 `versionRef` 仍為舊版本，重載中使用者動作會多一輪 409→重載（有界、自癒）；可於重載開始時設 null 省去。③ 無歷史時 UNDO 回傳同一 state 仍標 dirty，多送一次 PUT（無害）。
+    ④ 雲端模式下本機 hook mount 時仍會把 `scoreboard:current:v1` 既有資料（經 zod 正規化）寫回原 key——Decision 5 已接受的取捨，使用者動作不寫入（有 it 守）。
+11. （apply §7）Stage 2 第一輪 FAIL：訪客 spec 的 `getByRole("status")` 計數 0 在直式 viewport 被既有 `OrientationHint`（亦為 `role="status"`）打破（mobile-safari／mobile-chrome 紅），已改為進頁前寫入 `scoreboard:hint-dismissed`（`bf98193`）；
+    並補「loading 取代計分畫面」的守護（在「雲端載入失敗時…」test 內先掛起 GET，`bea6b59`）。複審 PASS。
+    偏離：衝突 E2E 讓 A 得分兩次（spec 寫一次）——A 一分時 B 本機一分同為 1:1，無法區分「載入雲端」與「保留本機」。
+    取捨：疊加提示改為面板區頂端單行小字（`4cb5276`），375 以下直式會蓋住「我方 · 11 分制」標籤（不蓋按鈕與比分數字），衝突／拒絕狀態停留期間看不到該標籤；
+    `clearTestAccountUserData()` 失敗訊息不含 SQL／email／stderr（避免洩漏），排查需手動重跑 wrangler 指令。

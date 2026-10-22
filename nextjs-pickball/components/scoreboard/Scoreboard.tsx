@@ -14,6 +14,7 @@ import { ActionBar } from "@/components/scoreboard/ActionBar";
 import { OrientationHint } from "@/components/scoreboard/OrientationHint";
 import { GameOverDialog } from "@/components/scoreboard/GameOverDialog";
 import { MatchBindingNotice } from "@/components/scoreboard/MatchBindingNotice";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { cn } from "@/lib/utils";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 
@@ -55,7 +56,7 @@ export interface ScoreboardProps {
 
 // 計分器主容器：組合所有子元件，依 orientation 切換橫/直式排版
 export function Scoreboard({ matchId = null }: ScoreboardProps) {
-	const [state, dispatch, bindingStatus] = useScoreboardStore(matchId);
+	const [state, dispatch, bindingStatus, syncStatus] = useScoreboardStore(matchId);
 	const orientation = useOrientation();
 	const { isSupported, isFullscreen, toggle } = useFullscreen();
 	const { focusMode, toggleFocusMode } = useFocusMode({ isFullscreen });
@@ -95,6 +96,23 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 		return <MatchBindingNotice />;
 	}
 
+	// 雲端資料載入中或載入失敗時沒有可信的比分；顯示初始 0:0 會誤導使用者
+	// 以為比賽被清空而按下 RESET，因此以提示取代整個計分畫面。
+	// 同樣須排在所有 hook 之後。
+	if (syncStatus === "loading" || syncStatus === "load-failed") {
+		return (
+			<div
+				data-sync-status={syncStatus}
+				className={cn(
+					"flex h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4",
+					!focusMode && "pt-(--site-nav-h)",
+				)}
+			>
+				<SyncStatusNotice status={syncStatus} />
+			</div>
+		);
+	}
+
 	const locked = state.status !== "setup";
 	const buttonsDisabled = state.status === "finished";
 	const isLandscape = orientation === "landscape";
@@ -105,6 +123,8 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 		// 需重新分配高度預算。dvh 而非 vh：行動瀏覽器工具列展開時 100vh 大於可視高。
 		// 專注模式時 navbar 已隱藏（sb-focus），頂部 padding 歸零讓分數吃滿。
 		<div
+			// 本機模式為 undefined，React 不輸出屬性，訪客 DOM 不變
+			data-sync-status={syncStatus === "local" ? undefined : syncStatus}
 			className={cn(
 				"flex h-dvh flex-col overflow-hidden bg-background",
 				!focusMode && "pt-(--site-nav-h)",
@@ -150,7 +170,7 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 			<div
 				className={cn(
 					// min-h-0 讓此 flex item 可縮到內容尺寸以下，缺了它大字級會撐破鎖高
-					"flex min-h-0 flex-1",
+					"relative flex min-h-0 flex-1",
 					isLandscape ? "flex-row divide-x" : "flex-col divide-y",
 					"divide-border",
 				)}
@@ -168,6 +188,14 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 					state={state}
 					disabled={buttonsDisabled}
 					onWinRally={() => dispatch({ type: "RALLY_WON", winner: "them" })}
+				/>
+				{/* absolute 不佔 flex 高度，不會擠壓鎖高容器內的計分按鈕；pointer-events-none
+				    讓提示不攔截點擊。貼面板區頂端：面板容器在直式提示橫幅與設定列之下，
+				    且窄螢幕（320×568）下分隔帶中央會蓋到贏球鈕；縮成單行小字貼頂端，只壓到小字標籤。
+				    放在最後一個子元素，divide 的分隔線只會多畫在它自己身上。 */}
+				<SyncStatusNotice
+					status={syncStatus}
+					className="pointer-events-none absolute top-0.5 left-1/2 z-10 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 px-3 py-1 text-xs"
 				/>
 			</div>
 			<ActionBar
