@@ -52,6 +52,7 @@ Depends on: §2
 - [x] 3.5 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `scoreboardCurrent`（design Decision 4；`data` 以 `$type<ScoreboardState>()`）；`pnpm --filter ./hono-pickball db:generate --name scoreboard_current` 產生 `drizzle/0001_scoreboard_current.sql` 與 meta（不手改）；
   再跑一次 `db:generate` 確認無新檔；核心套件新增 `src/api/user-data-tables.ts`（`USER_DATA_TABLES = ["scoreboard_current"] as const`）並更新 `CORE_MODULES`；`db:migrate:local`；3.4 轉綠
   - 實跑紀錄：`db:generate --name scoreboard_current` 產生 `0001_scoreboard_current.sql`；再跑一次 `db:generate` 為「No schema changes」；`db:migrate:local` 套用 0001；後端 15 檔／58 tests 全綠（3.4 的 6 個 it 轉綠）；核心 module-boundary 綠；三處 typecheck exit 0
+  - 自跑變異發現 `scoreboard_current.data` 的 NOT NULL 無測試涵蓋，補一個 d1-schema it「scoreboard_current 的 data 不可為 NULL」（寫入即綠，標註 regression guard）；後端最終 15 檔／59 tests
 
 ## 4. 後端：計分板 API
 

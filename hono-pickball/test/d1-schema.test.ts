@@ -237,4 +237,18 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 			await countRows(db, "SELECT COUNT(*) AS n FROM scoreboard_current WHERE user_id = ?", userId),
 		).toBe(0);
 	});
+
+	// regression guard（寫入即綠）：補 scoreboard_current.data 的 NOT NULL 約束覆蓋。
+	it("scoreboard_current 的 data 不可為 NULL", async () => {
+		const db = getTestDb();
+		await insertUser(db, "sc-null-user", "sc-null@example.com");
+		await expect(
+			db
+				.prepare(
+					"INSERT INTO scoreboard_current (user_id, data, version, updated_at) VALUES (?, NULL, ?, ?)",
+				)
+				.bind("sc-null-user", 1, NOW)
+				.run(),
+		).rejects.toThrow(/NOT NULL/);
+	});
 });
