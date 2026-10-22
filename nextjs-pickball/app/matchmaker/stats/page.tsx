@@ -5,6 +5,7 @@ import { useState } from "react";
 import { EmptyHistory } from "@/components/matchmaker/EmptyHistory";
 import { HistoryRangeFilter } from "@/components/matchmaker/HistoryRangeFilter";
 import { PlayerStatsTable } from "@/components/matchmaker/PlayerStatsTable";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
 import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
@@ -20,7 +21,7 @@ import { computePlayerStats } from "@/lib/matchmaker/player-stats";
 // updatePlayer 是 useRoundStore 的必填注入埠（見該 hook 的 UseRoundStoreOptions）：
 // 本頁不觸發任何會變動狀態的動作，仍必須原樣傳入才符合既有介面的形狀。
 export default function MatchmakerStatsPage() {
-	const { players, updatePlayer } = useRosterStore();
+	const { players, updatePlayer, syncStatus } = useRosterStore();
 	const { history } = useRoundStore({ players, updatePlayer });
 
 	// 初次開啟預設選中今日，與歷史頁一致（spec「統計依區間篩選」、prd.md 13.4）。
@@ -46,8 +47,26 @@ export default function MatchmakerStatsPage() {
 	// players 的 rating 決定的，篩選只改變出場數／勝負／淨變化／搭檔對手等期間內統計。
 	const stats = computePlayerStats(filteredHistory, players);
 
+	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
+	if (syncStatus === "loading" || syncStatus === "load-failed") {
+		return (
+			<main
+				data-sync-status={syncStatus}
+				className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+			>
+				<SyncStatusNotice status={syncStatus} />
+			</main>
+		);
+	}
+
 	return (
-		<main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+		<main
+			// 本機模式為 undefined，React 不輸出屬性，訪客 DOM 不變
+			data-sync-status={syncStatus === "local" ? undefined : syncStatus}
+			className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
+		>
+			<SyncStatusNotice status={syncStatus} />
 			<div>
 				<h1 className="text-2xl font-bold">球員統計</h1>
 				<p className="text-sm text-muted-foreground">依區間排名每位球員的表現與強度消長。</p>

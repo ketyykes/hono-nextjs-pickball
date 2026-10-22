@@ -62,6 +62,8 @@ async function addPlayerViaDialog(page: Page, name: string) {
 	const dialog = page.getByRole("dialog", { name: "新增參賽者" });
 	await expect(dialog).toBeVisible();
 	await dialog.getByLabel("姓名").fill(name);
+	// 強度分數沒有預設值，不選預設按鈕送不出表單（比照 player-roster.spec.ts）
+	await dialog.getByRole("button", { name: "新手 1.00" }).click();
 	await dialog.getByRole("button", { name: "新增參賽者", exact: true }).click();
 	await expect(dialog).toBeHidden();
 }
@@ -223,13 +225,15 @@ test.describe("matchmaker 名單雲端同步", () => {
 
 		await page.goto(MATCHMAKER_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();
+		// 預設為單打（一場只動兩位），改雙打才會是 2 位勝方、2 位敗方
+		await page.getByRole("radio", { name: "雙打" }).click();
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 		await expect(page.getByLabel("第一隊比分").first()).toBeVisible();
 
-		// 四位參賽者可能排成一場雙打或兩場單打；逐場送出，等每次評分寫入的 PUT 完成
+		// 逐場送出（雙打 1 場地即一場），等每次評分寫入的 PUT 完成
 		const matchCount = await page.getByLabel("第一隊比分").count();
 		for (let i = 0; i < matchCount; i++) {
-			const court = page.locator('[data-testid^="court-card-"]').nth(i);
+			const court = page.getByTestId("match-stage-courts").locator('[data-slot="card"]').nth(i);
 			await court.getByLabel("第一隊比分").fill("11");
 			await court.getByLabel("第二隊比分").fill("5");
 			const puts = page.waitForResponse((response) => isPlayerPut(response) && response.ok());
@@ -268,8 +272,8 @@ test.describe("matchmaker 名單雲端同步", () => {
 			buildPlayer({ id: "c1", name: "雲端一號" }),
 			buildPlayer({ id: "c2", name: "雲端二號" }),
 		]);
-		// 準備本機訪客名單；寫入後 reload 一次，讓本機 hook 的 hydrate 把它正規化，
-		// 之後讀到的值才是「重置前的基準」
+		// 準備本機訪客名單。本機 hook 在雲端模式仍會 mount 並把它正規化寫回，
+		// 所以下面等 synced 之後才讀一次當「重置前的基準」，而不是比對寫入的原始字串
 		await page.evaluate(
 			({ key, value }) => window.localStorage.setItem(key, value),
 			{
@@ -329,6 +333,8 @@ test.describe("matchmaker 名單雲端同步", () => {
 					response.request().method() === "POST" &&
 					response.ok(),
 			),
+			// 匯入成功後元件會 location.reload()；等它載入完再導覽，否則 goto 會被進行中的重新整理中斷
+			page.waitForEvent("load"),
 			page.getByRole("button", { name: "確認匯入" }).click(),
 		]);
 
