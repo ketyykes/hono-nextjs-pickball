@@ -12,7 +12,11 @@ const SYNC_MESSAGES = [
 
 test("訪客模式下計分板不渲染同步提示與 data-sync-status", async ({ page }) => {
 	await page.goto("/");
-	await page.evaluate(() => window.localStorage.clear());
+	await page.evaluate(() => {
+		window.localStorage.clear();
+		// 直式提示橫幅本身是 role="status"，不關掉會讓下方「無 status」斷言在手機 viewport 誤判
+		window.sessionStorage.setItem("scoreboard:hint-dismissed", "1");
+	});
 	await page.goto("/scoreboard");
 
 	await page.getByRole("button", { name: /我方贏這一球/ }).click();
