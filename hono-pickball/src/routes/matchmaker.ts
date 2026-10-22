@@ -1,5 +1,6 @@
 import { API_ERROR_CODES } from "@pickball/core/api/errors";
 import { PlayerImportRequestSchema } from "@pickball/core/api/players";
+import { MatchSlotPutRequestSchema, RoundPutRequestSchema } from "@pickball/core/api/round";
 import { versionedWriteSchema } from "@pickball/core/api/versioned";
 import { PlayerSchema } from "@pickball/core/matchmaker/types";
 import { zValidator } from "@hono/zod-validator";
@@ -15,6 +16,8 @@ import {
 	putPlayer,
 	resetMatchmaker,
 } from "../matchmaker/players-repository";
+import { getRound, putRound } from "../matchmaker/round-repository";
+import { getSlot, listSlots, putSlot } from "../matchmaker/slots-repository";
 
 const putBodySchema = versionedWriteSchema(PlayerSchema);
 
@@ -57,6 +60,41 @@ export const matchmakerRoutes = new Hono<SessionAppEnv>()
 			return c.json({ items });
 		},
 	)
+	.get("/round", async (c) => {
+		const round = await getRound(getDb(c.env), c.var.user.id);
+		return c.json(round ?? { data: null, version: 0 });
+	})
+	.put("/round", zValidator("json", RoundPutRequestSchema, invalidBodyHook), async (c) => {
+		const { data, version } = c.req.valid("json");
+		const result = await putRound(getDb(c.env), c.var.user.id, data, version);
+		if (result.kind === "invalid") {
+			return c.json({ error: API_ERROR_CODES.INVALID_BODY }, 400);
+		}
+		if (result.kind === "conflict") {
+			return c.json({ error: API_ERROR_CODES.VERSION_CONFLICT }, 409);
+		}
+		return c.json(result.value);
+	})
+	.get("/slots", async (c) => {
+		const items = await listSlots(getDb(c.env), c.var.user.id);
+		return c.json({ items });
+	})
+	.get("/slots/:matchId", async (c) => {
+		const slot = await getSlot(getDb(c.env), c.var.user.id, c.req.param("matchId"));
+		return c.json(slot ?? { data: null, version: 0 });
+	})
+	.put("/slots/:matchId", zValidator("json", MatchSlotPutRequestSchema, invalidBodyHook), async (c) => {
+		const { data, version } = c.req.valid("json");
+		const matchId = c.req.param("matchId");
+		if (data.matchId !== matchId) {
+			return c.json({ error: API_ERROR_CODES.INVALID_BODY }, 400);
+		}
+		const saved = await putSlot(getDb(c.env), c.var.user.id, matchId, data, version);
+		if (!saved) {
+			return c.json({ error: API_ERROR_CODES.VERSION_CONFLICT }, 409);
+		}
+		return c.json(saved);
+	})
 	.post("/reset", async (c) => {
 		await resetMatchmaker(getDb(c.env), c.var.user.id);
 		return c.body(null, 204);
