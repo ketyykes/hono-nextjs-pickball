@@ -38,8 +38,8 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/round.test.ts`，it「MatchSlotListResponseSchema 要求每筆分槽的 matchId 為字串」「SubmitScoreRequestSchema 要求兩個比分字串與正整數 roundVersion」。確認紅燈
-- [ ] 2.2 GREEN（TDD）：新增 `src/api/round.ts`（design Decision 11）；`CORE_MODULES` 加一項
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/round.test.ts`，it「MatchSlotListResponseSchema 要求每筆分槽的 matchId 為字串」「SubmitScoreRequestSchema 要求兩個比分字串與正整數 roundVersion」。確認紅燈
+- [x] 2.2 GREEN（TDD）：新增 `src/api/round.ts`（design Decision 11）；`CORE_MODULES` 加一項
 
 ## 3. 後端：資料表與整批守衛
 
