@@ -8,7 +8,8 @@ type Db = ReturnType<typeof getDb>;
  * 產生整批守衛的 INSERT；MUST 放在 batch 的第一條。
  * 條件為假時 CASE 得到 NULL，違反 version 的 NOT NULL 而使該陳述式失敗，D1 隨之回滾整批。
  * 刻意不用 OR IGNORE／OR REPLACE／onConflictDoNothing：它們會讓違反約束的守衛被靜默略過。
- * condition 只能讀資料庫目前內容，不可帶入 batch 外先讀到的值。
+ * 比較必須在 SQL 內對資料庫目前內容執行；不可先在 JS 端判定再傳入常數條件（如 sql`1`），
+ * 否則先讀後寫之間的競態就沒有被消除（batch 前讀到的 version 只能當比較基準，不能當結果）。
  */
 export function insertBatchGuard(db: Db, userId: string, condition: SQL, now: Date) {
 	return db.insert(syncBatchGuards).values({
