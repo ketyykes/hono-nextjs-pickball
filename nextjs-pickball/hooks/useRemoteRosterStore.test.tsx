@@ -990,4 +990,32 @@ describe("useRemoteRosterStore 補充守護", () => {
 		await waitFor(() => expect(result.current.players).toEqual([]));
 		expect(result.current.syncStatus).toBe("synced");
 	});
+
+	it("重置進行中收到 401 後，重置成功的結果也不得清空名單或本機進度", async () => {
+		localStorage.setItem(ROUND_STORAGE_KEY, "x");
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+		await act(async () => {
+			releaseP1(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			releaseReset(204, {});
+		});
+		await settle();
+		expect(result.current.players).toHaveLength(1);
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe("x");
+	});
 });
