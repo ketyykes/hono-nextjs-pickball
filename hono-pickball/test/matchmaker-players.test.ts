@@ -197,6 +197,11 @@ describe("/api/matchmaker 授權與停用閘門", () => {
 			players: [makePlayer("b2", "B 的第二位")],
 			userId: idA,
 		});
+		// A 已有一列，B 的 sort_order 仍須從 0 起算（建立與匯入的 max 都只看本人的列）
+		expect(await sortOrders(await userIdOf("mp-uid-b@example.com"))).toEqual([
+			["b1", 0],
+			["b2", 1],
+		]);
 		const bReset = await request(cookieB, "POST", `/reset?userId=${idA}`, { userId: idA });
 
 		expect(((await bGet.json()) as { items: unknown[] }).items).toEqual([]);
