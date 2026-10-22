@@ -97,6 +97,7 @@ describe("/api/matchmaker 回合與分槽的授權與停用閘門", () => {
 
 		expect(await bRound.json()).toEqual({ data: null, version: 0 });
 		expect(await bSlots.json()).toEqual({ items: [] });
+		expect(bSlot.status).toBe(200);
 		expect(await bSlot.json()).toEqual({ data: null, version: 0 });
 		expect(bRoundPut.status).toBe(409);
 		expect(bSlotPut.status).toBe(409);
@@ -118,9 +119,12 @@ describe("/api/matchmaker 回合與分槽的授權與停用閘門", () => {
 		const idB = await userIdOf("mr-uid-b@example.com");
 		const roundA = makeRound([makeMatch("m1")]);
 		expect((await request(cookieA, "PUT", "/round", { data: roundA, version: 0 })).status).toBe(200);
+		// A 先有分槽，B 帶 A 的 userId 讀取時「讀不到」才有意義
+		expect((await request(cookieA, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 })).status).toBe(200);
 
 		const bGetRound = await request(cookieB, "GET", `/round?userId=${idA}`);
 		const bGetSlots = await request(cookieB, "GET", `/slots?userId=${idA}`);
+		const bGetSlot = await request(cookieB, "GET", `/slots/m1?userId=${idA}`);
 		const bPutRound = await request(cookieB, "PUT", `/round?userId=${idA}`, {
 			data: makeRound([makeMatch("b1")]),
 			version: 0,
@@ -134,13 +138,15 @@ describe("/api/matchmaker 回合與分槽的授權與停用閘門", () => {
 
 		expect(await bGetRound.json()).toEqual({ data: null, version: 0 });
 		expect(await bGetSlots.json()).toEqual({ items: [] });
+		expect(bGetSlot.status).toBe(200);
+		expect(await bGetSlot.json()).toEqual({ data: null, version: 0 });
 		expect(bPutRound.status).toBe(200);
 		expect(bPutSlot.status).toBe(200);
 		// 寫入落在 B 名下，A 的回合沒被覆蓋、也沒多出分槽
 		expect(await rowsOf("matchmaker_round", idB)).toHaveLength(1);
 		expect(await rowsOf("matchmaker_match_slots", idB)).toHaveLength(1);
 		expect(await getRound(cookieA)).toEqual({ data: roundA, version: 1 });
-		expect(await slotMatchIds(cookieA)).toEqual([]);
+		expect(await slotMatchIds(cookieA)).toEqual(["m1"]);
 	});
 
 	it("getSession 拋出例外時回合與分槽端點回 500", async () => {
@@ -183,6 +189,20 @@ describe("/api/matchmaker/round", () => {
 		// 已有資料卻送 0 同樣是衝突；兩次衝突都不改動資料
 		expect(createdAgain.status).toBe(409);
 		expect(await getRound(cookie)).toEqual({ data: second, version: 2 });
+	});
+
+	it("回合寫入並回傳驗證後的輸出（含 schema 補上的預設值）", async () => {
+		const cookie = await seedAndSignIn("mr-defaults@example.com");
+		// 模擬舊版資料：缺少後來才加入、帶 default 的 timer 欄位
+		const { timer: _omitted, ...withoutTimer } = makeRound([makeMatch("m1")]);
+
+		const created = await request(cookie, "PUT", "/round", { data: withoutTimer, version: 0 });
+		const updated = await request(cookie, "PUT", "/round", { data: withoutTimer, version: 1 });
+		const stored = (await getRound(cookie)) as Versioned<{ timer: unknown }>;
+
+		expect(((await created.json()) as Versioned<{ timer: unknown }>).data.timer).toBeNull();
+		expect(((await updated.json()) as Versioned<{ timer: unknown }>).data.timer).toBeNull();
+		expect(stored.data.timer).toBeNull();
 	});
 
 	it("回合 PUT 的 body 不合 RoundSchema 時回 400", async () => {

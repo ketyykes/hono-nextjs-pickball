@@ -36,6 +36,24 @@ describe("/api/matchmaker/slots", () => {
 		expect(stored.data.scores.us).toBe(0);
 	});
 
+	it("分槽寫入並回傳驗證後的輸出（含 schema 補上的預設值）", async () => {
+		const cookie = await seedAndSignIn("ms-defaults@example.com");
+		const userId = await userIdOf("ms-defaults@example.com");
+		await seedRound(userId, makeRound([makeMatch("m1")]));
+		// 模擬舊版資料：缺少後來才加入、帶 default 的欄位
+		const { courtNumber: _omitted, ...withoutCourtNumber } = makeSlot("m1");
+
+		const created = await request(cookie, "PUT", "/slots/m1", { data: withoutCourtNumber, version: 0 });
+		const updated = await request(cookie, "PUT", "/slots/m1", { data: withoutCourtNumber, version: 1 });
+		const stored = (await (await request(cookie, "GET", "/slots/m1")).json()) as SlotItem & {
+			data: { courtNumber: number | null };
+		};
+
+		expect(((await created.json()) as { data: { courtNumber: unknown } }).data.courtNumber).toBeNull();
+		expect(((await updated.json()) as { data: { courtNumber: unknown } }).data.courtNumber).toBeNull();
+		expect(stored.data.courtNumber).toBeNull();
+	});
+
 	it("分槽沒有回合時建立回 409", async () => {
 		const cookie = await seedAndSignIn("ms-noround@example.com");
 
@@ -71,6 +89,7 @@ describe("/api/matchmaker/slots", () => {
 				{ data: makeSlot("m3"), version: 1 },
 			],
 		});
+		expect(missing.status).toBe(200);
 		expect(await missing.json()).toEqual({ data: null, version: 0 });
 	});
 

@@ -59,6 +59,11 @@ Depends on: §3
 - [x] 4.1 RED（TDD）：新增 `test/matchmaker-round.test.ts`（spec「回合與送出比分的雲端 API」中該檔的 it，以及 `match-history`「回合 PUT 不新增、不修改也不刪除任何歷史」）與
   `test/matchmaker-slots.test.ts`（該檔的三個 it）。確認紅燈並貼出輸出；
   **「auth 停用…皆回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**；「未登入…皆回 401」若因 B6 sub-app 的 `requireSession` 先綠，同樣點名標註
+  - **regression guard 點名（誠實標註，寫入即綠，非紅燈）**：
+    - 4.1 RED 當下先綠的 3 個 it：「auth 停用且無 DB binding 時回合、分槽與送出比分端點皆回 404」（路由不存在也是 404）、「未登入呼叫回合、分槽與送出比分端點皆回 401」（B6 的 `requireSession` 先擋）、「getSession 拋出例外時回合與分槽端點回 500」。其餘 15 個 it 為真實紅燈（404）。
+    - 事後補的 guard（由 mutation 與 Stage 2 發現缺口）：`b10965e` 鍵順序不影響已完成場次比對；`d3fce67` 回合 PUT 單一 batch（D1 spy）與 B 以 version 1 PUT A 的分槽；
+      其後補的斷言與 it——GET 單筆分槽查無資料回 200（slots／round 兩檔）、「不從 query 或 body 接受 userId」it 內 A 先有分槽並斷言 `GET /slots`、`GET /slots/:matchId` 帶 A 的 userId 讀不到、
+      「回合寫入並回傳驗證後的輸出（含 schema 補上的預設值）」與「分槽寫入並回傳驗證後的輸出（含 schema 補上的預設值）」。
 - [x] 4.2 GREEN（TDD）：新增 `src/matchmaker/round-repository.ts`（design Decision 4）、`src/matchmaker/slots-repository.ts`（Decision 5）；`src/routes/matchmaker.ts` 加 `/round`、`/slots`、`/slots/:matchId` 路由
   （`zValidator` hook 回 400、path 與 `data.matchId` 檢查）。4.1 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
 - [x] 4.3 REFACTOR：與 `players-repository.ts`、`scoreboard/repository.ts` 的版本化寫入片段是否值得共用（若抽出，B5／B6 的測試 MUST 原樣通過）；無壞味道則註記 skipped；**skipped**：三處版本化寫入的形狀不同（players 為 insert-select 取 max sort_order、scoreboard 為單列 values、回合需同 batch 清分槽、分槽 v0 帶 EXISTS），共用片段會需要多個參數化旋鈕，無壞味道
