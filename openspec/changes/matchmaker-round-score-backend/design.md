@@ -238,3 +238,6 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
 9. （apply §1）drizzle 0.45.2 `db.run(sql)` 帶參數在 batch 中失敗是 drizzle 的實作限制（`SQLiteRaw` 無 stmt）；`hono-pickball/CLAUDE.md` 的整批守衛段落（§11.1）MUST 記載「batch 內不用帶參數的 `db.run(sql)`」。
 10. （apply 進度）§2 完成：`4af02b7` RED、`290efe2` GREEN、Stage 2 第一輪 FAIL（`MatchSlotPutRequestSchema` 無測試、helper 命名）→ `78d22bc` regression guard、`4ca4367` refactor → 複審 PASS。核心 4 檔／11。
    偏離：額外匯出 `MatchSlotPutRequestSchema`；`SubmitScoreResponseSchema` 的 round／players version 定為正整數。
+11. （apply 進度，leader 交回時）§3 Implementer 完成（`004050e` RED、`8014e1c` chore schema＋0003、`3ac0b3b` USER_DATA_TABLES、`b87454d` RED、`4137ee0` batch-guard.ts、`1c61c7b` guard；後端 18 檔／104）；
+    Stage 1 PASS（非阻擋：`8014e1c` 在 chore commit 內修正 RED 測試的計數查詢缺陷、未放寬斷言；分槽 `$type` 為 `MatchSlot`）；leader 實跑 `db:generate` 無新檔。
+    **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2（或取得其結論）後再開始 §4。§4～§11 未開始；§6～§10 的派工參考檔已以 `/tmp/b7tools/ticket.py <g>` 產生（非 repo 檔，需重建）。
