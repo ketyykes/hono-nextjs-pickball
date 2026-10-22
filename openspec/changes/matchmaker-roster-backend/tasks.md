@@ -96,7 +96,8 @@ Depends on: §6
   依賴頁面接線者（`data-sync-status`、提示、資料頁分支）應為紅；**已由 §5 選擇器達成而先綠者逐一點名標 regression guard**
 - [x] 7.2 GREEN（例外層：頁面與 I/O 樣板元件，以 7.1 驗收）：`app/matchmaker/{page,players/page,stats/page}.tsx` 依 spec 接上 `SyncStatusNotice` 與 `data-sync-status`（loading／load-failed 取代主要內容；所有 hooks 在 early return 前呼叫）；
   `components/matchmaker/RosterCsvImportSection.tsx`、`JsonBackupSection.tsx` 依 `resolveStorageMode(useSession())` 分支（本機分支程式碼不動）。7.1 全綠；不得以 `waitForTimeout` 取代狀態等待
-- [ ] 7.3 REFACTOR：三個頁面的同步提示接線是否重複到值得抽成小元件；無壞味道則註記 skipped
+- [x] 7.3 REFACTOR：三個頁面的同步提示接線是否重複到值得抽成小元件；無壞味道則註記 skipped
+  - skipped：三頁的接線只是各約 10 行的 early return 與一個屬性，根元素 className 與內容各異，抽成元件要多帶 children 與 className 參數，收益不抵複雜度；無壞味道
 
 ## 8. 文件同步與總驗收
 
