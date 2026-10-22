@@ -467,6 +467,12 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 				.bind("b7-guard-user", NOW)
 				.run(),
 		).rejects.toThrow(/NOT NULL/);
+
+		// 不得有 DEFAULT：SQLite 的 OR REPLACE 會以預設值取代 NULL 而使守衛失效
+		const versionColumn = await db
+			.prepare("SELECT dflt_value FROM pragma_table_info('sync_batch_guards') WHERE name = 'version'")
+			.first<{ dflt_value: string | null }>();
+		expect(versionColumn?.dflt_value).toBeNull();
 	});
 
 	it("刪除使用者時其回合、分槽與歷史一併刪除", async () => {

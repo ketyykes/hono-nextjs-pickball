@@ -110,5 +110,12 @@ describe("D1 整批守衛", () => {
 		// 非 Error 值也不可被誤判
 		expect(isBatchGuardViolation("NOT NULL constraint failed: sync_batch_guards.version")).toBe(false);
 		expect(isBatchGuardViolation(undefined)).toBe(false);
+		// 守衛訊息被包在 cause 內時仍要認得（正式 D1 的外層前綴可能不同）
+		const wrapped = new Error("包裝後的錯誤", {
+			cause: new Error("NOT NULL constraint failed: sync_batch_guards.version"),
+		});
+		expect(isBatchGuardViolation(wrapped)).toBe(true);
+		// 其他表的 NOT NULL 違反不是守衛失敗
+		expect(isBatchGuardViolation(new Error("NOT NULL constraint failed: matchmaker_round.data"))).toBe(false);
 	});
 });
