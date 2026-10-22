@@ -125,8 +125,9 @@ Depends on: §4、§5
 
 Depends on: §6
 
-- [ ] 7.1 設定層：`playwright.config.ts` 新增 project `user-data`（design Decision 8；既有五個 project 與 top-level 設定一行不改）；新增 `tests/e2e/helpers/user-data.ts`
+- [x] 7.1 設定層：`playwright.config.ts` 新增 project `user-data`（design Decision 8；既有五個 project 與 top-level 設定一行不改）；新增 `tests/e2e/helpers/user-data.ts`
   （`clearTestAccountUserData()`；表清單取自 `@pickball/core/api/user-data-tables`；email 跳脫單引號；`execFileSync` 以參數陣列呼叫、不經 shell）
+  - 實跑紀錄：設定層免紅燈；tsc exit 0；`playwright.config.ts` diff 僅新增 `user-data` project（既有五個與 top-level 未動）。helper 的實際執行驗證併入 7.2（beforeEach 會呼叫）
 - [ ] 7.2 RED（E2E）：新增 `tests/e2e/user-data/scoreboard-sync.spec.ts`（`test.use({ storageState })`、`test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON)`、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），六個 test（spec 錨點）；
   新增 `tests/e2e/specs/scoreboard-local-mode.spec.ts`（訪客，一個 test）。執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data` 與
   `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=chromium tests/e2e/specs/scoreboard-local-mode.spec.ts`（前後清殘留 dev server），貼出輸出：

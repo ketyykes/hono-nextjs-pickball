@@ -27,6 +27,15 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
     { name: "mobile-chrome", use: { ...devices["Pixel 5"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 12"] } },
+  // 使用者資料 spec 共用同一個測試帳號，單 worker 避免互改同一份雲端資料；
+  // 不在 project 層設 storageState，由各 spec 以 test.use 取用
+  {
+    name: "user-data",
+    testDir: "./tests/e2e/user-data",
+    workers: 1,
+    fullyParallel: false,
+    use: { ...devices["Desktop Chrome"] },
+  },
   ],
   webServer: [
     {
