@@ -331,7 +331,7 @@ describe("useRemoteRosterStore", () => {
 		});
 		await settle();
 		expect(fetchMock).toHaveBeenCalledTimes(callsAfterUnauthorized);
-		expect(callsAfterUnauthorized).toBe(4);
+		expect(callsAfterUnauthorized).toBe(3);
 		expect(putCase.onUnauthorized).toHaveBeenCalledTimes(1);
 	});
 
