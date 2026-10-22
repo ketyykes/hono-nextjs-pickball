@@ -770,4 +770,224 @@ describe("useRemoteRosterStore 補充守護", () => {
 		await settle(1300);
 		expect(fetchMock).toHaveBeenCalledTimes(callsAtDisable);
 	});
+
+	it("重置進行中收到 401 後，重置失敗也不重新開放操作", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+		await act(async () => {
+			releaseP1(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			releaseReset(500, {});
+		});
+		act(() => {
+			result.current.updatePlayer("p2", { name: "y" });
+		});
+		await settle();
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+		expect(onUnauthorized).toHaveBeenCalledTimes(1);
+	});
+
+	it("重置進行中即使衝突重載完成，也要等重置結束才開放操作", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+		enqueue(200, listBody([[makePlayer("p1"), 5], [makePlayer("p2"), 7]]));
+		await act(async () => {
+			releaseP1(409, {});
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+
+		act(() => {
+			result.current.updatePlayer("p2", { name: "重置中" });
+		});
+		await settle();
+		expect(putCalls()).toHaveLength(1);
+
+		await act(async () => {
+			releaseReset(500, {});
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("rejected"));
+		enqueueEcho(8);
+		act(() => {
+			result.current.updatePlayer("p2", { name: "重置後" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		expect(putVersions()).toEqual([3, 7]);
+	});
+
+	it("DELETE 回 401 時呼叫 onUnauthorized 且之後不再送出", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(401);
+		act(() => {
+			result.current.removePlayer("p1");
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		act(() => {
+			result.current.updatePlayer("p2", { name: "之後" });
+		});
+		await settle();
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(onUnauthorized).toHaveBeenCalledTimes(1);
+	});
+
+	it("DELETE 回 409 時重新載入名單並回報 conflict", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(409);
+		const cloudP1 = makePlayer("p1", { name: "雲端仍有 p1" });
+		enqueue(200, listBody([[cloudP1, 6]]));
+		act(() => {
+			result.current.removePlayer("p1");
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		expect(result.current.players).toEqual([cloudP1]);
+	});
+
+	it("舊世代的 DELETE 成功晚於重載到達，不得清掉剛載入的版本", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseDelete = enqueueDeferred();
+		act(() => {
+			result.current.removePlayer("p1");
+		});
+		await waitFor(() => expect(callsOf("DELETE")).toHaveLength(1));
+		enqueue(409);
+		enqueue(200, listBody([[makePlayer("p1"), 5], [makePlayer("p2"), 3]]));
+		act(() => {
+			result.current.updatePlayer("p2", { name: "觸發衝突" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		await act(async () => {
+			releaseDelete(204, {});
+		});
+		await settle();
+
+		enqueueEcho(6);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "重載後" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		expect(putVersions()).toEqual([3, 5]);
+	});
+
+	it("重置成功後，原本重試中的佇列不再送出", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(503);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("retrying"));
+		enqueue(204);
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(result.current.players).toEqual([]));
+		expect(result.current.syncStatus).toBe("synced");
+		const callsAfterReset = fetchMock.mock.calls.length;
+		await settle(1300);
+		expect(fetchMock).toHaveBeenCalledTimes(callsAfterReset);
+	});
+
+	it("retrying 優先於 conflict／rejected 黏著狀態", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result, unmount } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(400);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("rejected"));
+		enqueue(503);
+		act(() => {
+			result.current.updatePlayer("p2", { name: "y" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("retrying"));
+		unmount();
+	});
+
+	it("其他參賽者仍在途時，一筆儲存成功不清除黏著的 rejected", async () => {
+		enqueue(
+			200,
+			listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3], [makePlayer("p3"), 3]]),
+		);
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(400);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("rejected"));
+		const releaseP2 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "在途" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		enqueueEcho(4);
+		act(() => {
+			result.current.updatePlayer("p3", { name: "先完成" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(3));
+		await settle();
+		expect(result.current.syncStatus).toBe("rejected");
+
+		await act(async () => {
+			releaseP2(200, { data: makePlayer("p2", { name: "在途" }), version: 4 });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+	});
+
+	it("rejected 之後重置成功，狀態回到 synced", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(400);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("rejected"));
+		enqueue(204);
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(result.current.players).toEqual([]));
+		expect(result.current.syncStatus).toBe("synced");
+	});
 });
