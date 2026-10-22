@@ -139,7 +139,10 @@ Depends on: §6
   `components/scoreboard/Scoreboard.tsx` 依 design Decision 7 接上（`loading`／`load-failed` 取代畫面、其餘疊加、非 local 時根元素帶 `data-sync-status`）。7.2 全綠；
   不得放寬既有 test、不得以 `waitForTimeout` 取代 `data-sync-status` 等待
   - 實跑紀錄：`--project=user-data` 6 passed；tsc exit 0；提示以 fixed 定位疊加、不佔 flex 高度。mutation 結果見 7.4 紀錄後段
-- [ ] 7.4 REFACTOR：提示的版面是否遮擋計分按鈕（窄螢幕 390px 目視一次並截圖附在紀錄）；無壞味道則註記 skipped
+- [x] 7.4 REFACTOR：提示的版面是否遮擋計分按鈕（窄螢幕 390px 目視一次並截圖附在紀錄）；無壞味道則註記 skipped
+  - mutation 紀錄（7.3 GREEN 後、持鎖，每條只還原被變異的檔）：M1 helper 多刪 `session` → user-data 6 failed（轉紅，含「清空使用者資料後仍為登入態…」）；M2 helper 改為不刪（`DELETE FROM`→`SELECT * FROM`）→ 4 failed／2 passed（含「清空…」「另一裝置先寫入…」「儲存失敗…」「另一個瀏覽器 context…」轉紅；2 個本就不依賴已清空資料者仍綠）；M3 local 也帶 `data-sync-status` → 訪客 spec 轉紅；M4 `SyncStatusNotice` 在 `null` 時渲染 `<div role="status" />` → 原訪客 spec 仍綠（漏洞），補斷言 `getByRole("status")` 計數 0 後轉紅（commit「訪客 spec 補斷言…」）；M5 `load-failed` 仍渲染計分畫面 → 「雲端載入失敗時…」轉紅（其餘 5 綠）；M6 根元素不帶 `data-sync-status` → 5 failed／1 passed（僅 load-failed 那題仍綠，因取代畫面的根元素另帶屬性）；M7 對照組（`=== "local" ? undefined : s` 改寫為 `!== "local" ? s : undefined`）→ 6 passed 維持綠
+  - 7.4 截圖（不 commit）：`/tmp/b5-7.4-conflict.png`（390×844、`conflict`）、`/tmp/b5-7.4-retrying.png`（`retrying`，為初版 fixed 定位，已蓋住直式提示橫幅）、`/tmp/b5-7.4-conflict-landscape.png`（844×390）。觀察：初版 `fixed top-nav` 在直向會蓋住「建議橫向使用」橫幅（壞味道，已修）；改為面板容器內 `absolute`、直向置於兩面板分隔帶中央後，橫幅、設定列、兩顆贏球鈕皆未被遮擋，且提示 `pointer-events-none`（疊加時按鈕仍可點）；橫向貼面板區頂端，只會壓到「我方／對方 · 11 分制」小字、不蓋比分與按鈕
+  - 實跑紀錄：user-data 6 passed；chromium `scoreboard*.spec.ts`＋`auth-session.spec.ts` 45 passed、0 skipped；`--list` 既有五個 project 各 142、user-data 6
 
 ## 8. 文件同步與總驗收
 

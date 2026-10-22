@@ -133,12 +133,6 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 				focusMode && "portrait:pb-16",
 			)}
 		>
-			{/* fixed 定位不佔 flex 高度，避免擠壓鎖高容器內的計分按鈕；
-			    pointer-events-none 讓提示不攔截下方點擊 */}
-			<SyncStatusNotice
-				status={syncStatus}
-				className="pointer-events-none fixed top-[calc(var(--site-nav-h)+0.5rem)] left-1/2 z-[110] w-max max-w-[calc(100vw-1rem)] -translate-x-1/2"
-			/>
 			<OrientationHint visible={!isLandscape} />
 			{focusMode ? (
 				// 浮動退出鈕：z-40 低於 portal dialog（z-50），不會蓋住確認框
@@ -176,7 +170,7 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 			<div
 				className={cn(
 					// min-h-0 讓此 flex item 可縮到內容尺寸以下，缺了它大字級會撐破鎖高
-					"flex min-h-0 flex-1",
+					"relative flex min-h-0 flex-1",
 					isLandscape ? "flex-row divide-x" : "flex-col divide-y",
 					"divide-border",
 				)}
@@ -194,6 +188,14 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 					state={state}
 					disabled={buttonsDisabled}
 					onWinRally={() => dispatch({ type: "RALLY_WON", winner: "them" })}
+				/>
+				{/* absolute 不佔 flex 高度，不會擠壓鎖高容器內的計分按鈕；pointer-events-none
+				    讓提示不攔截點擊。直向時放在兩個面板的分隔帶中央（避開上方的直式提示橫幅
+				    與設定列、下方的贏球鈕）；橫向沒有橫幅，改貼面板區頂端避免蓋住比分。
+				    放在最後一個子元素，divide 的分隔線只會多畫在它自己身上。 */}
+				<SyncStatusNotice
+					status={syncStatus}
+					className="pointer-events-none absolute top-2 left-1/2 z-10 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 portrait:top-1/2 portrait:-translate-y-1/2"
 				/>
 			</div>
 			<ActionBar
