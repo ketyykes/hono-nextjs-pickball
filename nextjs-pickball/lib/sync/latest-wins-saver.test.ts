@@ -183,6 +183,20 @@ describe("createLatestWinsSaver", () => {
 		expect(send).toHaveBeenCalledTimes(2);
 		expect(send).toHaveBeenLastCalledWith("B");
 		saver.dispose();
+
+		// 在途期間才存的新資料，在在途請求失敗後也要取代失敗的那一份
+		const manual = createManualSend();
+		const manualSaver = createLatestWinsSaver<string>({
+			send: manual.send,
+			onResult: createEventLog().onResult,
+		});
+		manualSaver.save("A");
+		manualSaver.save("B");
+		manual.resolvers[0]("failed");
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(manual.send).toHaveBeenCalledTimes(2);
+		expect(manual.send).toHaveBeenLastCalledWith("B");
+		manualSaver.dispose();
 	});
 
 	it("dispose 後取消重試並忽略在途結果", async () => {

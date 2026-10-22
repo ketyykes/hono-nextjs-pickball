@@ -95,6 +95,7 @@ Depends on: §2
   - 綠燈：1 passed；lib/sync 四檔共 12 passed；tsc exit 0。
 - [x] 5.9 REFACTOR：四個模組的命名與匯出一致性；無壞味道則註記 skipped
   - skipped：四模組皆為 `<動詞/名詞>` 單一職責、具名匯出、型別與函式同檔，命名與匯出風格一致，無壞味道。mutation 後補強測試（loading 帶欄位、send reject、dispose 後 save）另以 test commit 記錄。
+  - Stage 2 後補 regression guard（實作原本即正確，非 TDD 紅燈）：saver 在途期間新 save 於失敗後取代失敗資料（L14）、requestJson 回傳 schema 解析後的值而非原始 JSON（A12）；兩條對應變異皆已確認轉紅。
 
 ## 6. 前端：計分板雲端 hook 與選擇器
 

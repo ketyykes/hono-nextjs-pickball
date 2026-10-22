@@ -29,6 +29,13 @@ describe("requestJson", () => {
 			value: { n: 1 },
 		});
 
+		// value 是 schema 解析後的值：未定義的 key 會被剝除
+		stubFetch(async () => jsonResponse({ n: 1, extra: true }));
+		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			kind: "ok",
+			value: { n: 1 },
+		});
+
 		// 204 不驗證，value 為 undefined
 		stubFetch(async () => new Response(null, { status: 204 }));
 		const result = await requestJson("PUT", "/api/x", {
