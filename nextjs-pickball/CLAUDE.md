@@ -24,7 +24,7 @@
 Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**已是多路由應用**：
 
 - `/` — 匹克球指南（Hero、TocBar、Part 01/02、Conclusion）
-- `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查
+- `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查。`/scoreboard` **登入且未綁定場次時以雲端為準**（經後端 API 同步，見「目錄約定」的 `lib/sync/`）；訪客或綁定場次（`?match=`）仍走 LocalStorage
 - `/matchmaker` — 對戰頁（場次舞台：本輪設定、場地色塊網格、比分輸入與送出、休息名單），milestone M5 = matchmaker-match-stage-ui change。**全站 navbar 的 matchmaker 入口指向這裡**，SHALL NOT 同時掛第二條指向名單頁的連結。
   本頁另提供**匯出 JPG 與列印 PDF**（milestone M9 = matchmaker-visual-export change）：兩者共用
   `lib/matchmaker/export-scene.ts` 的同一份 `ExportScene`，JPG 走 `lib/matchmaker/scene-canvas.ts`
@@ -70,13 +70,14 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
     - 需要登入態的 spec 以 `test.use({ storageState })` 取用；登入／登出流程用新 context，**不得對共用 state 登出**
     - 缺 `hono-pickball/.dev.vars` 的 `TEST_ACCOUNT_*` 或 `ENVIRONMENT=development` 時，globalSetup 會刪除舊 state 並 warn，auth spec 整檔 skip
     - state 路徑與 skip 原因的單一來源是 `tests/e2e/helpers/storage-state.ts`
+  - **`user-data` project**（第六個，Desktop Chrome、`testDir` 為 `tests/e2e/user-data/`、單 worker）：使用者資料（雲端同步）spec 只放 `tests/e2e/user-data/`，既有五個 project 維持訪客且不設 `storageState`；spec 以 `test.use({ storageState })` 取用登入態，`beforeEach` 呼叫 `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 清空測試帳號的雲端資料（依 `USER_DATA_TABLES` 逐表刪除）。驗收迴圈要多跑一次 `--project=user-data`
 
 ### 目錄約定
 
 以下路徑皆相對 `nextjs-pickball/`：
 
 - `app/` — 各路由進入點（見「架構總覽」）＋ `layout.tsx`、`globals.css`
-- `components/` — 依功能分子目錄：`ui/`（shadcn）、`auth/`（`LoginForm`）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（`SiteNavbar`、`AccountEntry`、`navItemStyles`——SiteNavbar 連結與 AccountEntry 共用內距與配色）、`matchmaker/`、`quiz/`、`scoreboard/`、`tour/`
+- `components/` — 依功能分子目錄：`ui/`（shadcn）、`auth/`（`LoginForm`）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（`SiteNavbar`、`AccountEntry`、`navItemStyles`——SiteNavbar 連結與 AccountEntry 共用內距與配色）、`matchmaker/`、`quiz/`、`scoreboard/`、`sync/`（`SyncStatusNotice`，同步狀態單行提示）、`tour/`
   - `guide/HeroTourCta` 是 **server component 例外**（其餘 guide 元件皆標 `"use client"`）；其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 依 capability 分組。跨 capability 歸屬清單的**單一來源**是 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement——**任何** capability 新增 hook 時，其 change 須一併更新該清單（歷史上曾漏更新導致規格失真）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
@@ -84,7 +85,9 @@ matchmaker 依 root `prd.md` 為 **LocalStorage-only 純前端功能**（名單�
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
   - auth：`useSession`
-- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）
+  - scoreboard 雲端同步（B5）：`useRemoteScoreboardStore`（歸 scoreboard 清單；由 `useScoreboardStore` 這個**選擇器 hook** 依 `resolveStorageMode` 在本機與雲端實作間切換，本機 hook 不改動；新增雲端 feature 比照此慣例，並同步更新上述主 spec 清單）
+    - 雲端 hook 實作要點：`HYDRATE`（載入雲端資料）不寫回；`createLatestWinsSaver` 於 effect 內建立；`Scoreboard.tsx` 在雲端載入中／失敗時以 `loading`／`load-failed` 取代畫面，`data-sync-status` 屬性只在非 local 模式渲染
+- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）、`sync/`（雲端同步共用基礎：`storage-mode` 的 `resolveStorageMode`、`api-client` 的 `requestJson`、`latest-wins-saver` 的 `createLatestWinsSaver`、`sync-status` 的 `SyncStatus`）
   - **18 個純邏輯模組已移至核心套件 `@pickball/core`**（`scoreboard/{types,rules,reducer}`、`matchmaker/{types,allocation-types,allocation,candidates,duplication,pairing,rating-math,rating-types,rating,labels,round-types,round,history,history-range,transfer-types}`），這裡的舊路徑已不存在，且不留 re-export 轉址殼；一律從 `@pickball/core/<area>/<module>` 匯入。**它們的單元測試刻意留在 `lib/{scoreboard,matchmaker}/*.test.ts` 原位**（主 spec 以測試檔路徑為驗收錨點），不是漏搬。`next.config.ts` 以 `transpilePackages: ["@pickball/core"]` 讓 Next 轉譯該套件的 `.ts` 原始碼。新增純邏輯模組是否放核心套件，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔

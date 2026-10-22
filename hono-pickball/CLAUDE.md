@@ -2,12 +2,13 @@
 
 本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
 
-> ⚠️ 範圍例外：matchmaker（對戰分配機）依 root `prd.md` 明定為 **LocalStorage-only 純前端功能**，
-> 引擎與名單邏輯**刻意**放在 `nextjs-pickball/lib/matchmaker/` —— 那不是待搬進來的「後端邏輯」。
+> ⚠️ 範圍例外：計分板（`/scoreboard`）已部分上雲（B5：登入且未綁定場次時以雲端為準，路由見 `src/routes/scoreboard.ts`）；
+> matchmaker（對戰分配機）目前仍為 **LocalStorage-only 純前端功能**，引擎與名單邏輯放在
+> `nextjs-pickball/lib/matchmaker/`，**待 B6 上雲**，在那之前不是待搬進來的「後端邏輯」。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
 
-後端可匯入 `@pickball/core`（`workspace:*`；前後端共用的純邏輯與契約，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)）。目前 `src/**` 尚未匯入，B5 起才使用；匯入不需額外的 wrangler／tsconfig 設定（`test/pickball-core-import.test.ts` 證明 workerd 測試可解析，`wrangler deploy --dry-run` 證明 esbuild 可打包）。
+後端可匯入 `@pickball/core`（`workspace:*`；前後端共用的純邏輯與契約，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)）。`src/**` 已於 B5 起匯入（如 `@pickball/core/api/versioned`、`@pickball/core/api/errors`、`@pickball/core/api/user-data-tables`）；匯入不需額外的 wrangler／tsconfig 設定（`test/pickball-core-import.test.ts` 證明 workerd 測試可解析，`wrangler deploy --dry-run` 證明 esbuild 可打包）。
 
 ## 常用指令
 
@@ -70,6 +71,12 @@
 - **auth 與 session 端點**（better-auth 1.6，email／password，註冊停用）：
   - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`ENVIRONMENT` 非 `"development"`）回 404，不建立 auth、不碰 D1**
   - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
+- **使用者資料 API**（B5 起；新 feature 如 B6～B9 一律照此做）：
+  - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
+  - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
+  - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
+  - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`（見 `src/routes/scoreboard.ts`），新 sub-app 照抄時一併帶上
+  - **授權覆蓋表**：每個端點須有三類測試——未登入 401、他人資料不可見／不可改、帳號停用 404
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
@@ -78,7 +85,8 @@
 
 - `drizzle-orm` 已被 `src/db/**` 匯入，**不再受下述複審限制**；`drizzle-kit`（devDependencies，CLI 工具本該如此）已由 `db:generate` 使用
 - `better-auth`、`@better-auth/drizzle-adapter` 已被 `src/auth/**` 匯入，**不再受下述複審限制**。**不升級到 better-auth 1.7**：其 `account.issuer` 為 breaking schema 變更（B1 design Decision 5），升級須另開 change 處理 migration
-- `@hono/zod-validator`、`zod`、`date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝；`zod` 另由核心套件 `@pickball/core` 引入（同一份版本），B5 起 `src` 才會經由它使用
+- `zod`、`@hono/zod-validator` 已被 `src/**` 匯入，**不再受下述複審限制**；`zod` 另由核心套件 `@pickball/core` 引入（同一份版本）
+- `date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝
 - **保留而非移除的理由**：`wrangler deploy --dry-run` 實測產物為 gzip **340.66 KiB**（B2 納入 better-auth 後；匯入前為 16.91 KiB），離 CF Free plan 的 3 MiB 上限餘裕極大；體積沒有壓力時，移除的收益低於日後重裝的摩擦
-- **複審期限：2026-11-12**。屆時若這三個未匯入的套件仍未被 `src/**` 匯入，開 change 移除（決策 D5）
+- **複審期限：2026-11-12**。屆時若 `date-fns` 仍未被 `src/**` 匯入，開 change 移除（決策 D5）
 - `@cloudflare/vitest-pool-workers` 與 `vitest` 不屬上述範圍——已於 change `backend-cleanup-and-tdd-enablement` 實際啟用
