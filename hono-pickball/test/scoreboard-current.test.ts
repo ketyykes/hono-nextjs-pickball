@@ -81,6 +81,10 @@ describe("/api/scoreboard/current", () => {
 		expect(putB.status).toBe(200);
 		expect(((await putB.json()) as { version: number }).version).toBe(1);
 
+		// A、B 此時版本同為 1：B 以 version 1 更新時，只能改到 B 自己那一列
+		const updateB = await putCurrent(cookieB, { data: scoreState(7, 7), version: 1 });
+		expect(updateB.status).toBe(200);
+
 		const getA = await getCurrent(cookieA);
 		expect(await getA.json()).toEqual({ data: scoreState(5, 3), version: 1 });
 	});
@@ -97,7 +101,10 @@ describe("/api/scoreboard/current", () => {
 	it("以 version 0 首次寫入成功並回 version 1", async () => {
 		const cookie = await seedAndSignIn("sb-first@example.com");
 
-		const putRes = await putCurrent(cookie, { data: scoreState(2, 1), version: 0 });
+		// 省略帶 schema 預設值的欄位：寫入與回傳的必須是驗證後的輸出（已補上 null）
+		const { matchId: _m, courtNumber: _c, teamPlayers: _t, ...withoutDefaults } = scoreState(2, 1);
+
+		const putRes = await putCurrent(cookie, { data: withoutDefaults, version: 0 });
 
 		expect(putRes.status).toBe(200);
 		expect(await putRes.json()).toEqual({ data: scoreState(2, 1), version: 1 });
