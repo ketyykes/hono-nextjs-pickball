@@ -5,6 +5,7 @@ import { localAuth } from './auth/local-auth-middleware'
 import { isLocalAuthEnabled } from './auth/local-auth'
 import { toPublicUser } from './auth/public-user'
 import { requireSession, type AuthAppEnv } from './auth/require-session'
+import { scoreboardRoutes } from './routes/scoreboard'
 
 const app = new Hono<AuthAppEnv>()
 
@@ -48,6 +49,8 @@ app.on(['GET', 'POST'], '/api/auth/*', (c) => c.var.auth.handler(c.req.raw))
 app.get('/api/me', localAuth, requireSession, (c) => {
   return c.json({ user: toPublicUser(c.var.user) })
 })
+
+app.route('/api/scoreboard', scoreboardRoutes)
 
 // 狀態探針永遠回 200：前端每頁都會呼叫，4xx 會被瀏覽器記為 console 錯誤。
 // 因此刻意不掛 localAuth（停用時要回 200 而非 404），停用分支也不建立 auth、不碰 D1。
