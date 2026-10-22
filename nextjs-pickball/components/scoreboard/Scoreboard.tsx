@@ -190,12 +190,12 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 					onWinRally={() => dispatch({ type: "RALLY_WON", winner: "them" })}
 				/>
 				{/* absolute 不佔 flex 高度，不會擠壓鎖高容器內的計分按鈕；pointer-events-none
-				    讓提示不攔截點擊。直向時放在兩個面板的分隔帶中央（避開上方的直式提示橫幅
-				    與設定列、下方的贏球鈕）；橫向沒有橫幅，改貼面板區頂端避免蓋住比分。
+				    讓提示不攔截點擊。貼面板區頂端：面板容器在直式提示橫幅與設定列之下，
+				    且窄螢幕（320×568）下分隔帶中央會蓋到贏球鈕；縮成單行小字貼頂端，只壓到小字標籤。
 				    放在最後一個子元素，divide 的分隔線只會多畫在它自己身上。 */}
 				<SyncStatusNotice
 					status={syncStatus}
-					className="pointer-events-none absolute top-2 left-1/2 z-10 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 portrait:top-1/2 portrait:-translate-y-1/2"
+					className="pointer-events-none absolute top-0.5 left-1/2 z-10 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 px-3 py-1 text-xs"
 				/>
 			</div>
 			<ActionBar
