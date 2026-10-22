@@ -150,6 +150,33 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
 - 合併後：`pnpm install` 一次（建立 workspace 連結）；之後一切指令照舊，root `pnpm test`／`pnpm build` 多出核心套件那一段。
 - **不 push**（D4）。回滾：revert 合併 commit 後 `pnpm install`。
 
+## apply §1 查證紀錄
+
+（2026-10-22，apply leader 實跑；`main`@`cc5c1c1`）
+
+### 1.2 盤點
+
+- 以 grep 掃 `nextjs-pickball/` 全部 `.ts`／`.tsx`／`.mts`／`.js`／`.mjs`（排除 `node_modules`、`.next`、`.open-next`），收集「模組指定字串指向 18 個被搬模組」的檔案：
+  `@/lib/scoreboard/<3>`、`@/lib/matchmaker/<15>`、`lib/scoreboard/` 與 `lib/matchmaker/` 內的同層 `./<被搬模組>`，以及 `../scoreboard/<被搬模組>`。
+  扣除 18 個被搬模組本身後為 **84 個檔案**（與 main@414d822 盤點一致）：其中 **40 個單元測試檔＋1 個 E2E**（`tests/e2e/specs/scoreboard-binding.spec.ts`，
+  `import type { TeamPlayers } from "@/lib/scoreboard/types"`）；84 檔中 46 檔位於 `lib/{scoreboard,matchmaker}/`。
+- **與 design／tasks 敘述的差異**：除 `@/lib/...` 與同層 `./...` 外，另有 **3 個檔案以跨 area 相對路徑 `../scoreboard/...` 匯入被搬模組**——
+  `lib/matchmaker/scoreboard-binding.ts`（`../scoreboard/reducer`、`../scoreboard/types`）、`lib/matchmaker/round-types.test.ts`（`../scoreboard/types`）、
+  `lib/matchmaker/scoreboard-binding.test.ts`（`../scoreboard/reducer`）。Decision 8 與 tasks 2.3 ② 只列「`@/lib/...` 與同層相對 import」，
+  但這 3 處同樣必須改寫為 `@pickball/core/scoreboard/...`（搬移後舊路徑不存在）；已計入 84 檔，§2 派工單明確告知 Implementer。
+- 18 個被搬模組的 import 只有 `zod` 與同 area 的 `./<被搬模組>`：**沒有**跨 area 匯入、**沒有**匯入任何留在前端的模組——遞移閉包成立，`git mv` 後內容零修改即可編譯。
+- `vi.mock`／`vi.doMock` 指向被搬模組：**0 處**。非 `from "..."` 形式（動態 `import()`、`require`）指向被搬模組：**0 處**。
+- 被搬模組去除註解後掃 `window`／`document`／`localStorage`／`fetch`／`setTimeout`／`setInterval`／`console`／`crypto`／`globalThis`／`Date.now`／`Math.random`：**0 處**。
+
+### 1.3 Context7 查證
+
+| Library ID | 查證項目 | 結果 | 與 design 的關係 |
+|---|---|---|---|
+| `/vercel/next.js/v16.2.9` | `transpilePackages` 對 Turbopack dev 與 build 的適用 | `docs/01-app/03-api-reference/05-config/01-next-config-js/transpilePackages.mdx`：「automatically transpile and bundle dependencies from local packages, such as those in monorepos」；`docs/03-architecture/nextjs-compiler.mdx` 範例 `transpilePackages: ['@acme/ui', ...]`。文件不區分 webpack／Turbopack，也不區分 dev／build | 與 Decision 1 一致；Turbopack dev／build 實際行為以 C4（`next build`、OpenNext）與 C7（dev server E2E）實證 |
+| `/cloudflare/workers-sdk` | vitest-pool-workers 對 workspace symlink 套件的解析、`deps.optimizer` | `fixtures/vitest-plugin-examples/module-resolution/README.md`：`deps.optimizer.ssr.include` 只針對「CommonJS 或 UMD 套件」出現 `Cannot use require() to import an ES Module`／`No such module` 時使用；`packages/vitest-plugin/AGENTS.md`：`cloudflareTest()` 設定 resolve conditions `workerd`／`worker`／`browser` | 與 Decision 1 一致：ESM 語法的 TS 原始碼預期不需 `deps.optimizer`；核心套件 `exports` 為單一字串樣式、不含 conditions，不受 resolve conditions 影響。以 tasks 3.1／3.2 實證 |
+| `/microsoft/playwright` | TS spec 匯入 workspace 套件 `.ts` 的轉譯行為 | `packages/playwright/src/transform/compilationCache.ts` 的 `belongsToNodeModules(file)`：**以絕對路徑是否含 `/node_modules/` 判斷**；`transform.ts` 的 `shouldTransform` 是唯一閘門（不看 testDir）；CJS loader（`pirates.ts`）與 ESM loader 皆先經此閘門，落在 `node_modules` 的檔案交給 Node 原生載入、**不做 TS 轉譯** | **補強 Decision 6 的推論**：關鍵在 Node 解析出的路徑。pnpm workspace 連結是 symlink，Node CJS 解析預設取 realpath（`packages/pickball-core/src/...`，不含 `node_modules`）→ 會被轉譯。若某工具以 `--preserve-symlinks` 執行則會走 `nextjs-pickball/node_modules/@pickball/core/...` 而**不轉譯、直接失敗**——本 repo 未使用該旗標。以 C5（`playwright test --list`）實證 |
+| `/websites/opennext_js` | monorepo | `aws/config/nx`：`outputFileTracingRoot` 必須指向 repo root 才能偵測 monorepo；`aws/inner_workings/architecture`：monorepo 輸出結構。Cloudflare 頁面無額外 workspace 套件設定 | 與 Decision 1 一致（`next.config.ts` 已設 `outputFileTracingRoot`）；以 C4 實證 |
+
 ## Open Questions
 
 1. 既有漂移（非本 change 造成）：`dev-workflow`「根層彙總指令必須涵蓋所有 workspace」要求每個 workspace 都有 `typecheck` script，但 `nextjs-pickball/package.json` 沒有；
@@ -158,3 +185,10 @@ Context7（`/websites/playwright_dev`，`docs/test-typescript`）：Playwright �
 3. B7 若需要 `roster.ts` 的 `updatePlayer` 語意（rating round）在後端重算，屆時連同 `colors.ts` 一起搬入並更新對照表與 `CORE_MODULES`。
 4. 核心套件不在任何 ESLint 設定範圍內（root `pnpm lint` 只跑 `nextjs-pickball`），被搬的 18 個模組因此失去 lint 覆蓋；以核心套件的 strict tsc 彌補。
    為核心套件加 ESLint 屬新設定，本 change 不做，留待需要時另提。
+5. （apply §1.2 發現）跨 area 相對 import `../scoreboard/{reducer,types}` 共 3 檔（見「apply §1 查證紀錄」），Decision 8／tasks 2.3 ② 的列舉未涵蓋；
+   處置：同樣改寫為 `@pickball/core/scoreboard/...`，屬「只改 import 指定字串」範圍內，不影響 C6 驗收。
+6. （apply §1.2 發現）`nextjs-pickball/app/emojiFree.test.ts` 的 `SCAN_DIRS` 為 `app`／`components`／`data`／`lib`／`hooks`（相對 `nextjs-pickball/`），
+   搬移後 18 個核心模組（含 `labels.ts` 的 `FORMAT_LABEL` 等介面文字）**不再受 emoji 守門掃描**。本 change 規定不得修改既有測試，故不擴大其掃描範圍；
+   留待後續 change 決定是否把 `../packages/pickball-core/src` 納入，或在核心套件加同類守衛。
+7. （apply §1.3）Playwright 是否轉譯 workspace 套件取決於「解析後的絕對路徑是否含 `/node_modules/`」（見查證紀錄），與 Decision 6 推論一致但條件更明確；
+   未來若有人為任何工具加 `--preserve-symlinks`／`NODE_PRESERVE_SYMLINKS=1`，E2E 會在載入核心套件時失敗。記入核心套件 `CLAUDE.md`。

@@ -22,9 +22,9 @@
 
 - [x] 1.1 確認分支 `change/pickball-core-package`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`pnpm test` baseline（B3 後預期前端 87 檔／823、後端 12 檔／50，以實測為準）、
   `pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm lint`（基線 0 errors／3 warnings）；`pnpm --filter ./nextjs-pickball exec playwright test --list` 的總數（C5 基線）；回填 environment.md 並 commit
-- [ ] 1.2 盤點：以 grep 重算「import 被搬 18 模組的前端檔案」清單（main@414d822 為 84 檔、其中 40 個測試檔、E2E 1 檔），確認被搬模組間只有 scoreboard／matchmaker 各自內部的相對 import、
+- [x] 1.2 盤點：以 grep 重算「import 被搬 18 模組的前端檔案」清單（main@414d822 為 84 檔、其中 40 個測試檔、E2E 1 檔），確認被搬模組間只有 scoreboard／matchmaker 各自內部的相對 import、
   沒有任何被搬模組匯入留在前端的模組、沒有 `vi.mock` 指向被搬模組；確認被搬模組（排除註解）沒有 `window`／`document`／`localStorage`／`fetch`／`setTimeout`／`console`／`crypto` 的使用。差異記入 design.md Open Questions
-- [ ] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/vercel/next.js/v16.2.9`（`transpilePackages` 對 Turbopack dev 與 build 的適用）；
+- [x] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/vercel/next.js/v16.2.9`（`transpilePackages` 對 Turbopack dev 與 build 的適用）；
   `/cloudflare/workers-sdk`（vitest-pool-workers 對 workspace symlink 套件的解析、`deps.optimizer`）；`/microsoft/playwright`（或最接近的 ID；TS spec 匯入 `node_modules` 下 workspace 套件 `.ts` 的轉譯行為）；
   `/websites/opennext_js`（monorepo）。與 design Decision 1、6 的差異記入 Open Questions
 
