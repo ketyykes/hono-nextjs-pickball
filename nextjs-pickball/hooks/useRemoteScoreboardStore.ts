@@ -112,11 +112,9 @@ export function useRemoteScoreboardStore({
 				return;
 			}
 			versionRef.current = result.value.version;
-			if (result.value.data !== null) {
-				dispatch({ type: "HYDRATE", state: result.value.data });
-			} else if (afterConflict) {
-				dispatch({ type: "HYDRATE", state: createInitialState() });
-			}
+			// 無資料時也要 HYDRATE 初始狀態：同一個 mount 內 enabled 切換（換帳號）後，
+			// 不能殘留前一輪的比分。HYDRATE 不標 dirty，不會寫回雲端。
+			dispatch({ type: "HYDRATE", state: result.value.data ?? createInitialState() });
 			dispatchStatusSafe(afterConflict ? "conflict" : "synced");
 		}
 
