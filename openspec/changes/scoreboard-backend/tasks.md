@@ -135,9 +135,10 @@ Depends on: §6
   - 紅燈紀錄：`playwright test --workers=1 --project=user-data` → 6 failed（`getByText('無法載入雲端資料，請重新整理頁面')` 與 `[data-sync-status="synced"]` 皆 `element(s) not found`，beforeEach 的 `clearTestAccountUserData()` 實際執行成功，代表核心套件 runtime import 在 Playwright 下可用）。六個皆為真紅燈、無先綠者。
   - regression guard：`scoreboard-local-mode.spec.ts`「訪客模式下計分板不渲染同步提示與 data-sync-status」→ `--project=chromium` 1 passed（接線前即綠，守的是接線後訪客 DOM 不變）
   - 偏離：衝突 test 讓 A 得分兩次（spec 為一次）——B 本機得一分若 A 也只有一分，無法區分「載入雲端」與「保留本機」
-- [ ] 7.3 GREEN（例外層：純呈現元件，以 7.2 驗收）：新增 `components/sync/SyncStatusNotice.tsx`（`role="status"`、文案取自 `syncStatusMessage`、`null` 時不渲染）；
+- [x] 7.3 GREEN（例外層：純呈現元件，以 7.2 驗收）：新增 `components/sync/SyncStatusNotice.tsx`（`role="status"`、文案取自 `syncStatusMessage`、`null` 時不渲染）；
   `components/scoreboard/Scoreboard.tsx` 依 design Decision 7 接上（`loading`／`load-failed` 取代畫面、其餘疊加、非 local 時根元素帶 `data-sync-status`）。7.2 全綠；
   不得放寬既有 test、不得以 `waitForTimeout` 取代 `data-sync-status` 等待
+  - 實跑紀錄：`--project=user-data` 6 passed；tsc exit 0；提示以 fixed 定位疊加、不佔 flex 高度。mutation 結果見 7.4 紀錄後段
 - [ ] 7.4 REFACTOR：提示的版面是否遮擋計分按鈕（窄螢幕 390px 目視一次並截圖附在紀錄）；無壞味道則註記 skipped
 
 ## 8. 文件同步與總驗收
