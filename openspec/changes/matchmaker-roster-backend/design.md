@@ -185,3 +185,13 @@
 10. （apply §4，2026-10-23）完成（`6a5f5f1`、`b01df1d` RED；`3ff0ea3` GREEN——4.2 與 4.4 合併為一個 feat commit，屬流程偏離；`1de7deb`、`82020ce` regression guard）。
     Stage 1 PASS；Stage 2 第一輪 FAIL（passthrough 只斷言兩個包裝、SSR guard 空轉），補測試後複審 PASS。前端 93 檔／852（Implementer 全套 851＋複審後新增 1）。
     非阻擋：`PUT_PLAYER_RESPONSE_SCHEMA` 的 version 為 nonnegative，比後端實際（≥1）寬；`removeItem` 拋例外的分支無測試（既有 `resetMatchmakerData` 同樣缺）。下一步 §5。
+11. （apply §5，2026-10-23）完成（`c9c6ec0`、`80c831c` RED；`20eaa2d`、`451634a` GREEN；`8b9d939` 主 spec 歸屬清單同步；`35629d3` guard；`2096238` 5.7 skipped；Stage 2 修正 `7ab38ea` RED＋guard、`d46b35c` fix、`6eb648c` guard）。
+    Stage 1 PASS；Stage 2 第一輪 FAIL（重置在途時 401 或衝突重載完成會重開操作——實跑重現多送 PUT；DELETE 錯誤路徑無測試），TDD 修正後複審 PASS。前端 94 檔／887。
+    實作偏離 Decision 3：未用 HYDRATE／UPSERT／REMOVE／RESET reducer，改以 `useState`＋`playersRef` 同步鏡像（變更操作需以最新名單同步算出新值再入佇列），同步狀態以 `useReducer` 彙總；可寫入由 phase／stopped／resetting／reloading 統一推導（`updateReady()`）。Stage 1 判為可接受。
+    5.5 先綠斷言：「session 載入中或訪客時走本機…」的本機 key 寫入與「無請求」斷言、「雲端模式下變更名單不寫入…」的 `toBeNull`，在舊實作下本就成立，被前面的 `syncStatus` 斷言先紅遮住（後者由 mutation 守住）。
+    **待 coordinator 裁定**：
+    ① 黏著狀態語意（REPRO-B）：p1 回 400 為 `rejected` 後，p2 儲存成功、全部閒置即回 `synced`，p1 被拒的變更從提示消失。現行解讀「下一次全部成功＝佇列全部閒置且最後一次成功」；更嚴格的作法是只讓「黏著之後才開始的儲存」清除。維持現狀。
+    ② 重置在途時卸載或停用（R10）：`cancelled` 使結果被忽略，伺服器可能已清空但本機回合／歷史／分槽不清。維持現狀。
+    ③ 重置在途時收到 401：reset 成功（204）的結果被 `stopped` 丟棄，伺服器已清空但畫面與本機進度不動（`6eb648c` 刻意守住，與 401 後切回本機一致）。
+    非阻擋：401 之後與衝突重載期間不重新發佈狀態（停留在前值，選擇器會因 session refresh 切回本機）；saver 刪除成功後仍留在 Map 直到下一次 `disposeAll`；兩處不可達的 `undefined` 防衛。
+    §7 須留意：雲端 loading／load-failed／重載中／重置中時 `updatePlayer` 靜默不做事，而 `useRoundStore` 的回合仍會前進（Risk 3 延伸），頁面以 `SyncStatusNotice` 取代內容來擋，E2E 確認。下一步 §6。
