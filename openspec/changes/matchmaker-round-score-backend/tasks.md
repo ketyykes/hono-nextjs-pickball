@@ -77,9 +77,9 @@ Depends on: §4
   - **紅燈紀錄**：`matchmaker-score.test.ts` 16 個 it 全部真實紅燈（路由不存在回 404，或 `score-repository` 模組不存在）；`matchmaker-players.test.ts` 新增的重置 it 紅燈（回合、分槽、歷史未被刪除），既有 21 個 it 原樣綠。
   - **regression guard 點名**：RED 當下先綠者無（「未登入 401」「auth 停用 404」「getSession 500」三個迴圈 it 已在 §4 的 `matchmaker-round.test.ts`，§5 實作後仍須綠）。
   - 錨點外自補的 it（皆為真實紅燈）：回合版本在計算後變動的守衛、歷史主鍵衝突（第二道防線）、名單缺少參賽者或回合不存在、body 不符 schema、完成時間取伺服器時間、不從 query 或 body 接受 userId（送出比分）。
-- [ ] 5.2 GREEN（TDD）：新增 `src/matchmaker/score-repository.ts`（design Decision 2、3；`afterRead` 鉤子只作為選填參數，路由不傳）；`src/routes/matchmaker.ts` 加送出比分路由（失敗碼對應 400／409）；
+- [x] 5.2 GREEN（TDD）：新增 `src/matchmaker/score-repository.ts`（design Decision 2、3；`afterRead` 鉤子只作為選填參數，路由不傳）；`src/routes/matchmaker.ts` 加送出比分路由（失敗碼對應 400／409）；
   `players-repository.ts` 的 reset batch 加三張表。5.1 全綠；B6 的 `matchmaker-players.test.ts` 既有 it 全綠
-- [ ] 5.3 REFACTOR：score-repository 的 batch 組裝是否清楚到 B9 可照抄（守衛 → 寫入 → 刪守衛）；無壞味道則註記 skipped
+- [x] 5.3 REFACTOR：score-repository 的 batch 組裝是否清楚到 B9 可照抄（守衛 → 寫入 → 刪守衛）；無壞味道則註記 skipped；**skipped**：batch 依序為守衛、歷史、回合、球員、分槽、刪守衛，各陳述式已逐條註解且守衛條件在 SQL 內比對，B9 可照抄，無壞味道
 
 ## 6. 前端：API 包裝、命令佇列與名單 port
 
