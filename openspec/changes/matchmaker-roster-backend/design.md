@@ -171,6 +171,7 @@
    **新增（version 0 PUT）與 CSV 匯入會寫進 B**。計分板（B5，單筆）在版本號相同時會把 A 的比分覆寫進 B。
    正解需要伺服器端驗證「前端以為的使用者」：例如前端在每個使用者資料請求帶 `X-Expected-User-Id`，後端與 `c.var.user.id` 不符時回 401（觸發 refresh），
    或以 `storage` 事件／BroadcastChannel 跨分頁同步 session。兩者都跨 B5／B6 共用層（`requestJson`、`requireSession`），屬 G1 前必修，不在 B6 範圍內實作。
+   **coordinator 已同意（2026-10-23）**：列為 G1 前必修，本 change 不處理。3.6 修改 `user-data-tables.test.ts` 的授權例外亦經 coordinator 確認。
 7. （apply 進度，2026-10-23 leader 交回時）§1、§2 完成（§2 Stage 1 PASS、Stage 2 第一輪 FAIL→補 5 條 regression guard 斷言 `a4c3a8a`→複審 PASS）。
    §3 Implementer 完成 3.1～3.6（`536d6ca..f52b59e`；後端 17 檔／95、`src/http/invalid-body.ts` 抽出 onError 與 zValidator hook），Stage 1 PASS；
    **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2 或取得其結論後再開始 §4。Stage 1 非阻擋觀察：`isConstraintError` 的 `SQLITE_CONSTRAINT` 比對範圍比主鍵衝突寬（FK／NOT NULL 也會判成 409）。
