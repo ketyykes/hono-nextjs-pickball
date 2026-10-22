@@ -433,6 +433,35 @@ describe("/api/matchmaker 名單端點", () => {
 		expect(await listItems(cookie)).toEqual([]);
 	});
 
+	it("匯入遇到非主鍵的約束違規時回 500 而非 409", async () => {
+		const cookie = await seedAndSignIn("mp-import-fk@example.com");
+		// 模擬 D1 實際形狀：外層訊息為 D1_ERROR，約束細節在 cause 內；FOREIGN KEY 違規不是 id 重複
+		const constraintError = new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_FOREIGNKEY)");
+		const batchFailingDb = {
+			prepare: (query: string) => env.DB?.prepare(query),
+			batch: () => {
+				throw new Error("Failed query", { cause: constraintError });
+			},
+		} as unknown as D1Database;
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const res = await app.request(
+				"/api/matchmaker/players/import",
+				{
+					method: "POST",
+					headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
+					body: JSON.stringify({ players: [makePlayer("p1")] }),
+				},
+				{ ...env, DB: batchFailingDb },
+			);
+
+			expect(res.status).toBe(500);
+		} finally {
+			spy.mockRestore();
+		}
+		expect(await listItems(cookie)).toEqual([]);
+	});
+
 	// regression guard（寫入即綠）：寫入與回傳的是驗證後的輸出，含 schema 補上的預設值。
 	it("省略 restCount 與 gamesPlayed 時以預設值 0 寫入並回傳", async () => {
 		const cookie = await seedAndSignIn("mp-defaults@example.com");
