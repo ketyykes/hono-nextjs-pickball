@@ -128,10 +128,13 @@ Depends on: §6
 - [x] 7.1 設定層：`playwright.config.ts` 新增 project `user-data`（design Decision 8；既有五個 project 與 top-level 設定一行不改）；新增 `tests/e2e/helpers/user-data.ts`
   （`clearTestAccountUserData()`；表清單取自 `@pickball/core/api/user-data-tables`；email 跳脫單引號；`execFileSync` 以參數陣列呼叫、不經 shell）
   - 實跑紀錄：設定層免紅燈；tsc exit 0；`playwright.config.ts` diff 僅新增 `user-data` project（既有五個與 top-level 未動）。helper 的實際執行驗證併入 7.2（beforeEach 會呼叫）
-- [ ] 7.2 RED（E2E）：新增 `tests/e2e/user-data/scoreboard-sync.spec.ts`（`test.use({ storageState })`、`test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON)`、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），六個 test（spec 錨點）；
+- [x] 7.2 RED（E2E）：新增 `tests/e2e/user-data/scoreboard-sync.spec.ts`（`test.use({ storageState })`、`test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON)`、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），六個 test（spec 錨點）；
   新增 `tests/e2e/specs/scoreboard-local-mode.spec.ts`（訪客，一個 test）。執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data` 與
   `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=chromium tests/e2e/specs/scoreboard-local-mode.spec.ts`（前後清殘留 dev server），貼出輸出：
   user-data 的六個 test 因畫面尚未接線（沒有 `data-sync-status`、沒有提示文案）而紅；**訪客 spec 在接線前就會綠——紀錄中點名並標 regression guard**（它守的是接線後訪客 DOM 不變）
+  - 紅燈紀錄：`playwright test --workers=1 --project=user-data` → 6 failed（`getByText('無法載入雲端資料，請重新整理頁面')` 與 `[data-sync-status="synced"]` 皆 `element(s) not found`，beforeEach 的 `clearTestAccountUserData()` 實際執行成功，代表核心套件 runtime import 在 Playwright 下可用）。六個皆為真紅燈、無先綠者。
+  - regression guard：`scoreboard-local-mode.spec.ts`「訪客模式下計分板不渲染同步提示與 data-sync-status」→ `--project=chromium` 1 passed（接線前即綠，守的是接線後訪客 DOM 不變）
+  - 偏離：衝突 test 讓 A 得分兩次（spec 為一次）——B 本機得一分若 A 也只有一分，無法區分「載入雲端」與「保留本機」
 - [ ] 7.3 GREEN（例外層：純呈現元件，以 7.2 驗收）：新增 `components/sync/SyncStatusNotice.tsx`（`role="status"`、文案取自 `syncStatusMessage`、`null` 時不渲染）；
   `components/scoreboard/Scoreboard.tsx` 依 design Decision 7 接上（`loading`／`load-failed` 取代畫面、其餘疊加、非 local 時根元素帶 `data-sync-status`）。7.2 全綠；
   不得放寬既有 test、不得以 `waitForTimeout` 取代 `data-sync-status` 等待
