@@ -9,17 +9,13 @@ import {
 	makeSlot,
 	request,
 	rowsOf,
+	seedAndSignIn,
 	seedHistory,
 	seedRound,
 	seedSlot,
 	throwingDb,
 } from "./helpers/matchmaker-fixtures";
-import { seedUser, signIn, userIdOf } from "./helpers/session";
-
-async function seedAndSignIn(email: string): Promise<string> {
-	await seedUser(email);
-	return signIn(email);
-}
+import { userIdOf } from "./helpers/session";
 
 interface Versioned<T> {
 	data: T;

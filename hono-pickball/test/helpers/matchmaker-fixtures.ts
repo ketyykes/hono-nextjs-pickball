@@ -5,6 +5,13 @@ import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { MatchSlot } from "@pickball/core/api/round";
 import { getDb } from "../../src/db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerRound } from "../../src/db/schema";
+import { seedUser, signIn } from "./session";
+
+/** 建立測試使用者並登入，回傳可放進 Cookie header 的字串。 */
+export async function seedAndSignIn(email: string): Promise<string> {
+	await seedUser(email);
+	return signIn(email);
+}
 
 export const origin = "http://localhost:3005";
 export const base = `${origin}/api/matchmaker`;

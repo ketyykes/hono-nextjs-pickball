@@ -1,9 +1,7 @@
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { and, eq } from "drizzle-orm";
-import type { getDb } from "../db/client";
+import type { Db } from "../db/client";
 import { scoreboardCurrent } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
 
 export interface VersionedScoreboard {
 	data: ScoreboardState;

@@ -1,8 +1,6 @@
 import { eq, type SQL, sql } from "drizzle-orm";
-import type { getDb } from "../db/client";
+import type { Db } from "../db/client";
 import { syncBatchGuards } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
 
 /**
  * 產生整批守衛的 INSERT；MUST 放在 batch 的第一條。

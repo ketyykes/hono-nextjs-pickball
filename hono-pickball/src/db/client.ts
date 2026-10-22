@@ -11,3 +11,6 @@ export function getDb(env: Pick<CloudflareBindings, "DB">) {
 	}
 	return drizzle(env.DB, { schema });
 }
+
+/** drizzle 實例型別；各 repository 共用，避免各檔重複推導。 */
+export type Db = ReturnType<typeof getDb>;

@@ -1,9 +1,7 @@
 import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { getDb } from "../db/client";
+import type { Db } from "../db/client";
 import { matchmakerPlayers } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
 
 export interface VersionedPlayer {
 	data: Player;

@@ -1,9 +1,7 @@
 import type { MatchSlot } from "@pickball/core/api/round";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { getDb } from "../db/client";
+import type { Db } from "../db/client";
 import { matchmakerMatchSlots } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
 
 export interface VersionedSlot {
 	data: MatchSlot;

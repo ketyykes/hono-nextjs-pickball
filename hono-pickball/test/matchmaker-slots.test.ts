@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { makeMatch, makeRound, makeSlot, request, rowsOf, seedRound } from "./helpers/matchmaker-fixtures";
-import { seedUser, signIn, userIdOf } from "./helpers/session";
-
-async function seedAndSignIn(email: string): Promise<string> {
-	await seedUser(email);
-	return signIn(email);
-}
+import { makeMatch, makeRound, makeSlot, request, rowsOf, seedAndSignIn, seedRound } from "./helpers/matchmaker-fixtures";
+import { userIdOf } from "./helpers/session";
 
 interface SlotItem {
 	data: { matchId: string; scores: { us: number; them: number } };

@@ -1,9 +1,7 @@
 import type { Round } from "@pickball/core/matchmaker/round-types";
 import { and, eq, sql } from "drizzle-orm";
-import type { getDb } from "../db/client";
+import type { Db } from "../db/client";
 import { matchmakerMatchSlots, matchmakerRound } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
 
 export interface VersionedRound {
 	data: Round;
