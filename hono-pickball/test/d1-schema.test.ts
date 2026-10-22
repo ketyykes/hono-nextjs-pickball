@@ -335,4 +335,165 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 				.run(),
 		).rejects.toThrow(/NOT NULL/);
 	});
+
+	// 以下四個 it 對應 B7 新增的 matchmaker_round／matchmaker_match_slots／matchmaker_history／sync_batch_guards。
+	it("matchmaker_round、matchmaker_match_slots、matchmaker_history 與 sync_batch_guards 可由 migration 建立並寫入讀回", async () => {
+		const db = getTestDb();
+		const userId = "b7-rw-user";
+		await insertUser(db, userId, "b7-rw@example.com");
+		const roundData = JSON.stringify({ matches: [], note: "回合" });
+		const slotData = JSON.stringify({ games: [], note: "分槽" });
+		const historyData = JSON.stringify({ matchId: "m1", note: "歷史" });
+		await db
+			.prepare("INSERT INTO matchmaker_round (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)")
+			.bind(userId, roundData, 4, NOW + 1)
+			.run();
+		await db
+			.prepare(
+				"INSERT INTO matchmaker_match_slots (user_id, match_id, data, version, updated_at) VALUES (?, ?, ?, ?, ?)",
+			)
+			.bind(userId, "m1", slotData, 5, NOW + 2)
+			.run();
+		await db
+			.prepare(
+				"INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind(userId, "m1", NOW + 3, historyData, 1, NOW + 4)
+			.run();
+		await db
+			.prepare("INSERT INTO sync_batch_guards (user_id, version, updated_at) VALUES (?, ?, ?)")
+			.bind(userId, 1, NOW + 5)
+			.run();
+
+		expect(
+			await db
+				.prepare("SELECT data, version, updated_at FROM matchmaker_round WHERE user_id = ?")
+				.bind(userId)
+				.first(),
+		).toEqual({ data: roundData, version: 4, updated_at: NOW + 1 });
+		expect(
+			await db
+				.prepare(
+					"SELECT match_id, data, version, updated_at FROM matchmaker_match_slots WHERE user_id = ?",
+				)
+				.bind(userId)
+				.first(),
+		).toEqual({ match_id: "m1", data: slotData, version: 5, updated_at: NOW + 2 });
+		expect(
+			await db
+				.prepare(
+					"SELECT match_id, played_at, data, version, updated_at FROM matchmaker_history WHERE user_id = ?",
+				)
+				.bind(userId)
+				.first(),
+		).toEqual({
+			match_id: "m1",
+			played_at: NOW + 3,
+			data: historyData,
+			version: 1,
+			updated_at: NOW + 4,
+		});
+		expect(
+			await db
+				.prepare("SELECT version, updated_at FROM sync_batch_guards WHERE user_id = ?")
+				.bind(userId)
+				.first(),
+		).toEqual({ version: 1, updated_at: NOW + 5 });
+	});
+
+	it("回合每位使用者一筆，分槽與歷史的 match_id 只在同一使用者內唯一", async () => {
+		const db = getTestDb();
+		await insertUser(db, "b7-pk-a", "b7-pk-a@example.com");
+		await insertUser(db, "b7-pk-b", "b7-pk-b@example.com");
+		const insertRound = (userId: string) =>
+			db
+				.prepare("INSERT INTO matchmaker_round (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)")
+				.bind(userId, "{}", 1, NOW)
+				.run();
+		const insertSlot = (userId: string) =>
+			db
+				.prepare(
+					"INSERT INTO matchmaker_match_slots (user_id, match_id, data, version, updated_at) VALUES (?, ?, ?, ?, ?)",
+				)
+				.bind(userId, "m1", "{}", 1, NOW)
+				.run();
+		const insertHistory = (userId: string) =>
+			db
+				.prepare(
+					"INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+				)
+				.bind(userId, "m1", NOW, "{}", 1, NOW)
+				.run();
+
+		await insertRound("b7-pk-a");
+		await insertSlot("b7-pk-a");
+		await insertHistory("b7-pk-a");
+
+		await expect(insertRound("b7-pk-a")).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
+		await expect(insertSlot("b7-pk-a")).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
+		await expect(insertHistory("b7-pk-a")).rejects.toThrow(/UNIQUE|PRIMARY KEY/);
+
+		// 使用者 B 使用相同的 match_id 必須成功
+		await insertRound("b7-pk-b");
+		await insertSlot("b7-pk-b");
+		await insertHistory("b7-pk-b");
+
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_match_slots WHERE match_id = ?", "m1"),
+		).toBe(2);
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM matchmaker_history WHERE match_id = ?", "m1"),
+		).toBe(2);
+	});
+
+	it("sync_batch_guards 的 version 不可為 NULL", async () => {
+		const db = getTestDb();
+		await insertUser(db, "b7-guard-user", "b7-guard@example.com");
+		await expect(
+			db
+				.prepare("INSERT INTO sync_batch_guards (user_id, version, updated_at) VALUES (?, NULL, ?)")
+				.bind("b7-guard-user", NOW)
+				.run(),
+		).rejects.toThrow(/NOT NULL/);
+	});
+
+	it("刪除使用者時其回合、分槽與歷史一併刪除", async () => {
+		const db = getTestDb();
+		const userId = "b7-cascade-user";
+		await insertUser(db, userId, "b7-cascade@example.com");
+		await db
+			.prepare("INSERT INTO matchmaker_round (user_id, data, version, updated_at) VALUES (?, ?, ?, ?)")
+			.bind(userId, "{}", 1, NOW)
+			.run();
+		await db
+			.prepare(
+				"INSERT INTO matchmaker_match_slots (user_id, match_id, data, version, updated_at) VALUES (?, ?, ?, ?, ?)",
+			)
+			.bind(userId, "m1", "{}", 1, NOW)
+			.run();
+		await db
+			.prepare(
+				"INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind(userId, "m1", NOW, "{}", 1, NOW)
+			.run();
+
+		const tables = ["matchmaker_round", "matchmaker_match_slots", "matchmaker_history"];
+		// 先確認資料確實建立，避免刪除後的 0 是恆真
+		for (const table of tables) {
+			expect(
+				await countRows(db, `SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, userId),
+				`${table} 刪除前應有 1 列`,
+			).toBe(1);
+		}
+
+		await db.prepare("DELETE FROM user WHERE id = ?").bind(userId).run();
+
+		for (const table of tables) {
+			expect(
+				await countRows(db, `SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, userId),
+				`${table} 刪除後應為 0 列`,
+			).toBe(0);
+		}
+	});
 });
