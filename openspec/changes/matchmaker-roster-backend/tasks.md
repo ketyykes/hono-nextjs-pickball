@@ -104,9 +104,10 @@ Depends on: §6
 
 Depends on: §7
 
-- [ ] 8.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「matchmaker 為 LocalStorage-only」敘述（訪客為本機；登入後名單以雲端為準，回合與歷史待 B7、B8）；hooks 歸屬加 `useRemoteRosterStore`；
+- [x] 8.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「matchmaker 為 LocalStorage-only」敘述（訪客為本機；登入後名單以雲端為準，回合與歷史待 B7、B8）；hooks 歸屬加 `useRemoteRosterStore`；
   `lib/sync/roster-api.ts`、`lib/matchmaker/remote-transfer.ts`；資料頁登入態差異。`hono-pickball/CLAUDE.md` 改寫「範圍例外」段落（名單已上雲）、路由約定加 `/api/matchmaker/*` 與多筆契約；
   design「交接給 B7～B9」四點寫入適當段落
+  驗收：兩份 CLAUDE.md 已改寫（前端：matchmaker 儲存分流段、頁面清單登入態差異、hooks 歸屬、lib 清單、E2E 指標；後端：範圍例外、`/api/matchmaker/*` 路由約定與後續 change 須知）。OQ9：`matchmaker-players.test.ts` 註解已改為與實測一致。
 - [ ] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
 - [ ] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
