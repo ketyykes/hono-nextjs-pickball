@@ -1,8 +1,8 @@
 // 球員統計計算核心。純函式、決定性、不修改輸入（design Decision 2：只回傳資料，
 // 不內嵌任何顯示文案；「已不在名單」等最終呈現文字交給 PlayerStatsTable.tsx）。
 
-import type { MatchHistoryEntry, HistoryPlayer } from "./history";
-import type { Player } from "./types";
+import type { MatchHistoryEntry, HistoryPlayer } from "@pickball/core/matchmaker/history";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /**
  * 球員統計結果。`mostFrequentPartner`／`mostFrequentOpponent` 為找到搭檔／對手時的

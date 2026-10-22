@@ -1,5 +1,5 @@
-import { getServeSide } from "@/lib/scoreboard/rules";
-import type { ServerNumber } from "@/lib/scoreboard/types";
+import { getServeSide } from "@pickball/core/scoreboard/rules";
+import type { ServerNumber } from "@pickball/core/scoreboard/types";
 
 interface ServeIndicatorProps {
 	servingTeamScore: number;

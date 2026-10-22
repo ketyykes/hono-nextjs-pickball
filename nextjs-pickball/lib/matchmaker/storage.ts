@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { PlayerSchema } from "./types";
+import { PlayerSchema } from "@pickball/core/matchmaker/types";
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalStorage } from "./storage-keys";
 // 分槽 key 取自 scoreboard 對外的具名匯出（match-slots.ts），不取 scoreboard 內部的
 // storage-keys.ts——跨 capability 只透過對外契約取用，字面值 SHALL NOT 在本檔重複寫死
 // （見 player-roster delta 的「四個 key 的名稱 MUST 取自同一個來源模組」）。
 import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // re-export（非改名）：M1 既有的匯入點（hooks/useRosterStore.ts 等）與既有測試
 // 都是 import { STORAGE_KEY } from "./storage"，key 本體已搬到 storage-keys.ts

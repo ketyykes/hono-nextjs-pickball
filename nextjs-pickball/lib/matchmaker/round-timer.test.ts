@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { RoundTimer } from "./round-types";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 import { remainingSeconds, isExpired, formatRemaining } from "./round-timer";
 
 // 倒數與時間到的純函式判定（spec round-lifecycle「回合計時器」）。「現在時間」一律由

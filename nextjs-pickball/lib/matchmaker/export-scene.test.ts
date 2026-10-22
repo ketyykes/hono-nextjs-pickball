@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 
 import { buildExportScene, EXPORT_APP_NAME } from "./export-scene";
 import { pickTextColor, DARK_FOREGROUND } from "./colors";
-import { TEAM_LABELS } from "./labels";
-import type { Round, RoundMatch } from "./round-types";
-import type { Player } from "./types";
+import { TEAM_LABELS } from "@pickball/core/matchmaker/labels";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位。與 stage-layout.test.ts 同構，刻意不共用。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

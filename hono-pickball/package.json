@@ -15,6 +15,7 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.14",
     "@hono/zod-validator": "^0.8.0",
+    "@pickball/core": "workspace:*",
     "better-auth": "^1.6.14",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",

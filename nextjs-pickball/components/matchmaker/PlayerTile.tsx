@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ratingBoundState } from "@/lib/matchmaker/rating-bounds";
 import type { RatingBoundState } from "@/lib/matchmaker/rating-bounds";
 import { playerTileStyle } from "@/lib/matchmaker/tile-style";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 const GENDER_LABEL: Record<Player["gender"], string> = {
 	male: "男",

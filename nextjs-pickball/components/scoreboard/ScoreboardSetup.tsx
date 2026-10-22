@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Maximize, Minimize } from "lucide-react";
 import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
 import { MATCHMAKER_ROUTE } from "@/lib/matchmaker/section-nav";
-import type { Mode, Team, TargetScore } from "@/lib/scoreboard/types";
+import type { Mode, Team, TargetScore } from "@pickball/core/scoreboard/types";
 
 // 2026 USA Pickleball 的三種官方分制，皆為 win by 2
 const TARGET_SCORE_OPTIONS = [11, 15, 21] as const;

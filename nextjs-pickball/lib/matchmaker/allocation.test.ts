@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { allocateRound } from "./allocation";
-import { EMPTY_SIGNATURE_INDEX } from "./allocation-types";
-import { buildSignatureIndex } from "./duplication";
-import type { AllocationInput, Match, RoundAllocation } from "./allocation-types";
-import type { Player } from "./types";
+import { allocateRound } from "@pickball/core/matchmaker/allocation";
+import { EMPTY_SIGNATURE_INDEX } from "@pickball/core/matchmaker/allocation-types";
+import { buildSignatureIndex } from "@pickball/core/matchmaker/duplication";
+import type { AllocationInput, Match, RoundAllocation } from "@pickball/core/matchmaker/allocation-types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，與 candidates.test.ts／pairing.test.ts／duplication.test.ts 同構，
 // 刻意不共用——allocation.test.ts 保持獨立、不依賴其他測試檔。

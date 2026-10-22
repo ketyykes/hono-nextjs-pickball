@@ -4,10 +4,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CourtCard } from "./CourtCard";
 import type { CourtCardProps } from "./CourtCard";
-import type { Player } from "@/lib/matchmaker/types";
-import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
-import { createInitialState } from "@/lib/scoreboard/reducer";
-import { DRAW_LABEL } from "@/lib/matchmaker/labels";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import { DRAW_LABEL } from "@pickball/core/matchmaker/labels";
 
 // 測試專用預設球員：colorFrom／colorTo 沿用調色盤既有第一組即可，色塊背景本身不是本檔
 // 斷言重點（漸層與對比已由 tile-style.test.ts、colors.test.ts 涵蓋），這裡只需要合法 hex。

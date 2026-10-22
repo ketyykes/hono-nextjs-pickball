@@ -1,11 +1,11 @@
-import { createInitialState } from "../scoreboard/reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import { readMatchSlot, writeMatchSlot, clearMatchSlots } from "../scoreboard/match-slots";
 import type { MatchSlots } from "../scoreboard/match-slots";
-import type { PlayerBadge, ScoreboardState, TeamPlayers } from "../scoreboard/types";
-import type { Round, RoundMatch } from "./round-types";
-import type { SubmitScoreInput } from "./round";
+import type { PlayerBadge, ScoreboardState, TeamPlayers } from "@pickball/core/scoreboard/types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import type { SubmitScoreInput } from "@pickball/core/matchmaker/round";
 import { pickTextColor } from "./colors";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 名單中找不到該球員時的替代文字（design Decision 3：呈現替代文字，不跳過、不拋錯）。
 // 與 export-scene.ts「名單中找不到球員時以替代文字呈現」的既有判斷同構，但兩個

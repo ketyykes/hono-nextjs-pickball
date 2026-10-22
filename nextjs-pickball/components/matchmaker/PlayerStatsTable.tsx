@@ -14,7 +14,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { pickTextColor } from "@/lib/matchmaker/colors";
-import { PLAYER_NOT_ON_ROSTER_LABEL } from "@/lib/matchmaker/labels";
+import { PLAYER_NOT_ON_ROSTER_LABEL } from "@pickball/core/matchmaker/labels";
 import type { PlayerStat } from "@/lib/matchmaker/player-stats";
 
 export interface PlayerStatsTableProps {

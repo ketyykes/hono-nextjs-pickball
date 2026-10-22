@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
 import { readRound, writeRound, readHistory, writeHistory } from "./round-storage";
-import type { Round, RoundMatch } from "./round-types";
-import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "./history";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import type { MatchHistoryEntry, HistoryTeam, HistoryPlayer } from "@pickball/core/matchmaker/history";
 
 /** 建立一份合法的測試用 RoundMatch，可透過 overrides 覆寫特定欄位（沿用 round-types.test.ts 的樣板）。 */
 function makeRoundMatch(overrides: Partial<RoundMatch> = {}): RoundMatch {

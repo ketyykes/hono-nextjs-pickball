@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readScoreboard, writeScoreboard, clearScoreboard, STORAGE_KEY } from "./storage";
 import { MATCH_SLOTS_KEY, writeMatchSlot } from "./match-slots";
-import { createInitialState } from "./reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 
 describe("storage", () => {
 	beforeEach(() => {

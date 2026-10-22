@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { labelDoublesComposition, pairDoubles, pairSingles } from "./pairing";
-import type { Player } from "./types";
+import { labelDoublesComposition, pairDoubles, pairSingles } from "@pickball/core/matchmaker/pairing";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，與 candidates.test.ts 的 makePlayer 同構，
 // 刻意不共用——pairing.test.ts 保持獨立、不依賴其他測試檔。

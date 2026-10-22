@@ -7,21 +7,21 @@ import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { courtCountBounds, changeCourtCount } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
-import { PLAYERS_PER_MATCH } from "@/lib/matchmaker/allocation-types";
+import { PLAYERS_PER_MATCH } from "@pickball/core/matchmaker/allocation-types";
 import {
 	FORMAT_LABEL,
 	ROUND_TIMER_LOCKED_REASON,
 	ROUND_TIMER_OFF_LABEL,
-} from "@/lib/matchmaker/labels";
-import type { MatchFormat } from "@/lib/matchmaker/allocation-types";
-import { ROUND_TIMER_DURATION_OPTIONS, TARGET_SCORE_OPTIONS } from "@/lib/matchmaker/round-types";
+} from "@pickball/core/matchmaker/labels";
+import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
+import { ROUND_TIMER_DURATION_OPTIONS, TARGET_SCORE_OPTIONS } from "@pickball/core/matchmaker/round-types";
 import type {
 	Round,
 	RoundTargetScore,
 	RoundTimer,
 	RoundTimerDurationMinutes,
-} from "@/lib/matchmaker/round-types";
-import type { SetTargetScoreResult, SetTimerDurationResult, StartTimerResult } from "@/lib/matchmaker/round";
+} from "@pickball/core/matchmaker/round-types";
+import type { SetTargetScoreResult, SetTimerDurationResult, StartTimerResult } from "@pickball/core/matchmaker/round";
 import { isTargetScoreLocked } from "@/lib/matchmaker/scoreboard-binding";
 // nextRadioIndex 與 capability 無關，位置為歷史因素（design Decision 6）；
 // matchmaker 與 scoreboard 的目標分數選擇器共用同一份 WAI-ARIA radio group 方向鍵索引計算。

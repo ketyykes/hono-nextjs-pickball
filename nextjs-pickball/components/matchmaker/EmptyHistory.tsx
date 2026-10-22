@@ -1,7 +1,7 @@
 // components/matchmaker/EmptyHistory.tsx
 "use client";
 
-import type { HistoryRange } from "@/lib/matchmaker/history-range";
+import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 
 // 各區間各自的空狀態文案（spec「空區間的友善空狀態」）：跨月週使「本月」成為空
 // 區間時，MUST 被視為正常結果而非錯誤，故五個區間各自有獨立、友善的措辭。

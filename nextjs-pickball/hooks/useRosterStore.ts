@@ -10,7 +10,7 @@ import {
 } from "@/lib/matchmaker/roster";
 import type { AddPlayerInput, UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import { readRoster, writeRoster, resetMatchmakerData } from "@/lib/matchmaker/storage";
-import type { Player } from "@/lib/matchmaker/types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 名單 store 的 state 形狀。
 // droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數（見 storage 的 Decision 3），

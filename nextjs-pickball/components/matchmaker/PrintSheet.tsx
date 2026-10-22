@@ -1,7 +1,7 @@
 // components/matchmaker/PrintSheet.tsx
 "use client";
 
-import { TEAM_LABELS } from "@/lib/matchmaker/labels";
+import { TEAM_LABELS } from "@pickball/core/matchmaker/labels";
 import type { ExportCourt, ExportScene, ExportTile } from "@/lib/matchmaker/export-scene";
 
 /**

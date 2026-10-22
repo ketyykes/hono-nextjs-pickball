@@ -10,6 +10,7 @@ hono-nextjs-pickball/
 │  └─ wrangler.jsonc       ← Worker「nextjs-pickball」設定（OpenNext + service binding）
 ├─ hono-pickball/          ← 後端：Hono on Cloudflare Workers
 │  └─ wrangler.jsonc       ← Worker「hono-pickball」設定
+├─ packages/pickball-core/ ← 前後端共用的純邏輯核心套件 `@pickball/core`（無建置產物）
 ├─ openspec/               ← OpenSpec 規格與變更（CLI 從 root 執行）
 ├─ docs/superpowers/       ← 設計文件與實作計畫（歷史紀錄；正式規格在 openspec/）
 ├─ .claude/                ← Claude Code 專案設定
@@ -27,14 +28,14 @@ hono-nextjs-pickball/
 
 | 指令 | 行為 |
 |---|---|
-| `pnpm install` | 一次安裝兩個 workspace 的依賴 |
+| `pnpm install` | 一次安裝三個 workspace 的依賴 |
 | `pnpm dev` | 同時起前端（:3005）與後端（:8787） |
 | `pnpm dev:web` | 只啟動 Next.js dev server |
 | `pnpm dev:api` | 只啟動 wrangler dev |
-| `pnpm build` | `pnpm -r build`，兩個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`） |
+| `pnpm build` | `pnpm -r build`，三個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`；核心套件無產物，build 即 `tsc --noEmit`） |
 | `pnpm lint` | 跑 Next.js ESLint |
-| `pnpm typecheck` | `pnpm -r exec tsc --noEmit` |
-| `pnpm test` | `pnpm -r test`，前端 Vitest + 後端 workerd Vitest |
+| `pnpm typecheck` | `pnpm -r exec tsc --noEmit`（核心套件只跑 `src` 這一段，不含其 `test/tsconfig.json`） |
+| `pnpm test` | `pnpm -r test`，前端 Vitest + 後端 workerd Vitest + 核心套件 Vitest（node 環境） |
 | `pnpm test:web` / `pnpm test:api` | 只跑單一 workspace 的單元測試 |
 | `pnpm test:e2e` | 跑 Playwright E2E（5 個 browser project） |
 | `pnpm --filter ./nextjs-pickball preview` | OpenNext build 後在本機 workerd runtime 驗證 |
@@ -50,28 +51,30 @@ hono-nextjs-pickball/
 | `nextjs-pickball` | `nextjs-pickball/` | Next.js（@opennextjs/cloudflare），service binding `HONO_API` 指向 hono-pickball |
 
 - 部署順序：**先 hono-pickball、後 nextjs-pickball**（service binding 目標必須先存在）
+- 兩個 Worker 皆相依 workspace 套件 `@pickball/core`；Workers Builds 在各自 root directory 下能否解析它**尚待遠端驗證**（本機 build 與 dry-run 已通過）
 - 部署後 URL 形式：`<worker>.<subdomain>.workers.dev`
 - 每個 Worker 的 root directory 與 build command 設在 **CF Dashboard → Settings → Builds**，不在 repo 內；`wrangler.jsonc` 的 `name` 必須與 Dashboard 上的 Worker 名稱一致，否則會部署到錯的 Worker
 
 ### 部署前手動檢查清單
 
-本專案**不使用 CI**，以下七步在推送前手動跑過（順序刻意由快到慢，讓失敗盡早出現）：
+本專案**不使用 CI**，以下八步在推送前手動跑過（順序刻意由快到慢，讓失敗盡早出現）：
 
 ```bash
 pnpm lint                                        # 1. ESLint
-pnpm -r exec tsc --noEmit                        # 2. 型別檢查（兩個 workspace）
+pnpm -r exec tsc --noEmit                        # 2. 型別檢查（三個 workspace）
 pnpm --filter ./nextjs-pickball test --run       # 3. 前端單元測試
-pnpm test:api --run                              # 4. 後端單元測試（workerd；--run 停用 watch）
-pnpm test:e2e                                    # 5. Playwright E2E（會自動帶起前後端）
-pnpm --filter ./nextjs-pickball preview          # 6. workerd runtime 整合驗證
+pnpm --filter ./packages/pickball-core test --run # 4. 核心套件單元測試
+pnpm test:api --run                              # 5. 後端單元測試（workerd；--run 停用 watch）
+pnpm test:e2e                                    # 6. Playwright E2E（會自動帶起前後端）
+pnpm --filter ./nextjs-pickball preview          # 7. workerd runtime 整合驗證
 ```
 
-> ⚠️ 第 5 步的 Playwright 設定會重用既有 dev server（`reuseExistingServer`）。若 dev server
+> ⚠️ 第 6 步的 Playwright 設定會重用既有 dev server（`reuseExistingServer`）。若 dev server
 > 已連續運行很久（隔夜以上），陳舊的 dev chunk 快取可能噴 `ChunkLoadError` 造成假失敗
 > （2026-09-03 於 webkit 實測，隔離重跑即過）。跑本清單前請先重啟 dev server，
 > 或先停掉它讓 Playwright 自行帶起乾淨的前後端。
 
-7. 確認部署順序：先 hono-pickball，後 nextjs-pickball
+8. 確認部署順序：先 hono-pickball，後 nextjs-pickball
 
 ## 各 workspace 細節
 
@@ -79,3 +82,4 @@ pnpm --filter ./nextjs-pickball preview          # 6. workerd runtime 整合驗�
 
 - 前端：規範見 [`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)；入口指標 [`nextjs-pickball/AGENTS.md`](./nextjs-pickball/AGENTS.md)
 - 後端：規範見 [`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md)；入口指標 [`hono-pickball/AGENTS.md`](./hono-pickball/AGENTS.md)
+- 核心套件：規範見 [`packages/pickball-core/CLAUDE.md`](./packages/pickball-core/CLAUDE.md)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getServeSide, isGameWon, applyRallyResult } from "./rules";
-import type { ScoreboardState } from "./types";
+import { getServeSide, isGameWon, applyRallyResult } from "@pickball/core/scoreboard/rules";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 
 function singlesInitial(overrides: Partial<ScoreboardState> = {}): ScoreboardState {
 	return {

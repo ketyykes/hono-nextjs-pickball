@@ -14,12 +14,12 @@ import {
 	SWAP_PLAYER_LABEL,
 	SWAP_PLAYER_NO_CANDIDATE_LABEL,
 	TEAM_LABELS,
-} from "@/lib/matchmaker/labels";
+} from "@pickball/core/matchmaker/labels";
 import type { CourtTileSource } from "@/lib/matchmaker/stage-layout";
-import type { Player } from "@/lib/matchmaker/types";
-import type { Round, RoundMatch } from "@/lib/matchmaker/round-types";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "@/lib/matchmaker/scoreboard-binding";
-import type { ScoreboardState } from "@/lib/scoreboard/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { PlayerTile } from "./PlayerTile";
 import { ScoreEntry } from "./ScoreEntry";
 

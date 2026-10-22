@@ -4,8 +4,8 @@ import {
 	DEFAULT_COURT_COUNT,
 	MIN_COURT_COUNT,
 	MAX_COURT_COUNT,
-} from "./allocation-types";
-import { DEFAULT_TARGET_SCORE } from "./round-types";
+} from "@pickball/core/matchmaker/allocation-types";
+import { DEFAULT_TARGET_SCORE } from "@pickball/core/matchmaker/round-types";
 import type { RoundSettings } from "./round-settings";
 import {
 	createRoundSettings,

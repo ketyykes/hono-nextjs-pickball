@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { addPlayer, removePlayer, togglePlayerActive, updatePlayer } from "./roster";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，預設值皆為合法值，呼叫端可用 overrides 覆寫個別欄位。
 function makePlayer(overrides: Partial<Player> = {}): Player {

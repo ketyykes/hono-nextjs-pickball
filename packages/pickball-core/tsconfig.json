@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // 不含 DOM、不載入任何 @types：瀏覽器全域在核心套件內是型別錯誤（零瀏覽器 API 的編譯期強制）。
+    "lib": ["ESNext"],
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -7,7 +7,7 @@ import {
 	SUBMIT_SCORE_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	START_TIMER_FAILURE_CODE,
-} from "@/lib/matchmaker/round";
+} from "@pickball/core/matchmaker/round";
 import { readRound, readHistory, writeRound, writeHistory } from "@/lib/matchmaker/round-storage";
 import type {
 	CreateRoundResult,
@@ -17,10 +17,10 @@ import type {
 	SetTimerDurationResult,
 	StartTimerResult,
 	SwapMatchPlayerResult,
-} from "@/lib/matchmaker/round";
-import type { Player } from "@/lib/matchmaker/types";
+} from "@pickball/core/matchmaker/round";
+import type { Player } from "@pickball/core/matchmaker/types";
 import { writeMatchSlot, readMatchSlot } from "@/lib/scoreboard/match-slots";
-import { createInitialState } from "@/lib/scoreboard/reducer";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位（沿用 round.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

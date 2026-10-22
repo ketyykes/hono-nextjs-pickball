@@ -13,6 +13,8 @@ const workspaceRoot = path.resolve(import.meta.dirname, "..");
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: workspaceRoot,
+  // 核心套件的 exports 直接指向 .ts 原始碼（無建置產物），需由 Next.js 轉譯。
+  transpilePackages: ["@pickball/core"],
   turbopack: {
     root: workspaceRoot,
   },

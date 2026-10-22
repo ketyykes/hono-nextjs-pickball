@@ -8,6 +8,9 @@
 hono-nextjs-pickball/     ← repo 與 root package 名稱
 ├─ nextjs-pickball/   ← 前端：Next.js 16 + React 19，經 OpenNext 部署為 Cloudflare Worker
 ├─ hono-pickball/     ← 後端：Hono API on Cloudflare Workers，所有後端邏輯都放這裡
+├─ packages/pickball-core/ ← 前後端共用的純邏輯核心套件 `@pickball/core`（零瀏覽器 API、無建置產物）；細節見其 CLAUDE.md
+│                       被搬入的 18 個模組，其既有單元測試刻意留在 `nextjs-pickball/lib/{scoreboard,matchmaker}/*.test.ts` 原位
+│                       （既有 spec 的驗收錨點以測試檔路徑定位），不是漏搬
 ├─ openspec/          ← OpenSpec 規格與變更；schemas/ 為 GENERATED 檔案（見「OpenSpec 慣例」）
 ├─ docs/              ← 設計文件歷史紀錄（superpowers/、prd.md、matchmaker-runbook-m3-m9.md）；已被 openspec 取代者於頁首標註。
 │                       prd.md 為「對戰分配機」PRD（M1～M9 已完成並 archive，2026-09-03 歸檔至此）：
@@ -61,10 +64,10 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
 | `pnpm dev` | 並行啟動前端（:3005）與後端（:8787），dev registry 自動接通 service binding |
 | `pnpm dev:web` | 只啟動 Next.js dev server |
 | `pnpm dev:api` | 只啟動 wrangler dev |
-| `pnpm build` | `pnpm -r build`，兩個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`） |
+| `pnpm build` | `pnpm -r build`，三個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`；核心套件無產物，build 即 `tsc --noEmit`） |
 | `pnpm lint` | 跑 nextjs-pickball ESLint |
-| `pnpm typecheck` | `pnpm -r exec tsc --noEmit` |
-| `pnpm test` | `pnpm -r test`：前端 Vitest（happy-dom）+ 後端 Vitest（workerd runtime） |
+| `pnpm typecheck` | `pnpm -r exec tsc --noEmit`（核心套件只跑 `src` 這一段，不含其 `test/tsconfig.json`；要含測試檔用 `pnpm --filter ./packages/pickball-core typecheck`） |
+| `pnpm test` | `pnpm -r test`：前端 Vitest（happy-dom）+ 後端 Vitest（workerd runtime）+ 核心套件 Vitest（node 環境） |
 | `pnpm test:web` / `pnpm test:api` | 只跑單一 workspace 的單元測試 |
 | `pnpm test:e2e` | 跑 nextjs-pickball Playwright E2E（webServer 會自動帶起前後端兩個 server） |
 
@@ -86,12 +89,12 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
   linked worktree 不擋是刻意的——前端 tsconfig 的 include 為 `**/*.ts`，測試檔全在範圍內，
   而 TDD 的 RED（測試 import 尚不存在的模組）本身就是型別錯誤且會單獨 commit；
   在 worktree 擋下等於逼 agent 跳過或偽造紅燈。理由全文見該腳本開頭註解。
-  ⚠️ 三個限制：① 此指令**不含 `hono-pickball/test/**` 的型別**（那段只在該 workspace
-  `pnpm typecheck` 的第二段）—— Stop hook 綠燈不代表後端測試檔型別無誤。
+  ⚠️ 三個限制：① 此指令**不含 `hono-pickball/test/**` 與 `packages/pickball-core/test/**` 的型別**（兩者都只在各自
+  workspace `pnpm typecheck` 的第二段；核心的用 `pnpm --filter ./packages/pickball-core typecheck`）—— Stop hook 綠燈不代表後端或核心套件測試檔型別無誤。
   ② linked worktree 只提示不擋，**綠燈不代表 worktree 型別無誤**，合併前仍須自行實跑。
   ③ 提示走 `systemMessage`，只顯示在終端機，**不會進入 Claude 的 context**。
   **不要改回 settings.json 內的一行 `pnpm -r exec tsc --noEmit`**——`pnpm -r` 的範圍由
-  cwd 的 `pnpm-workspace.yaml` 決定（只含兩個相對路徑的 workspace），當 session 開在主 repo、
+  cwd 的 `pnpm-workspace.yaml` 決定（只含三個相對路徑的 workspace：`nextjs-pickball`、`hono-pickball`、`packages/pickball-core`），當 session 開在主 repo、
   實作卻在 linked worktree 內進行時（本專案 openspec apply 的常態），它檢查的是沒被改動的主 repo。
 
 ## Cloudflare Workers 部署架構
@@ -112,8 +115,8 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
 
 ### 部署前檢查
 
-本專案不使用 CI，改以 root `README.md` 的「部署前手動檢查清單」七步把關
-（lint → tsc → 前端 unit → 後端 unit → e2e → preview → 部署順序）。推送前請實際跑過。
+本專案不使用 CI，改以 root `README.md` 的「部署前手動檢查清單」八步把關
+（lint → tsc → 前端 unit → 核心套件 unit → 後端 unit → e2e → preview → 部署順序）。推送前請實際跑過。
 
 ## OpenSpec 慣例
 
@@ -157,3 +160,4 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
 
 - 前端：[`nextjs-pickball/CLAUDE.md`](./nextjs-pickball/CLAUDE.md)
 - 後端：[`hono-pickball/CLAUDE.md`](./hono-pickball/CLAUDE.md)
+- 核心套件：[`packages/pickball-core/CLAUDE.md`](./packages/pickball-core/CLAUDE.md)

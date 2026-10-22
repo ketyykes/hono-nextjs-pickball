@@ -13,10 +13,10 @@ import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
 import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
 import { readRoster } from "./storage";
 import { readRound, readHistory } from "./round-storage";
-import { TRANSFER_MESSAGES } from "./transfer-types";
-import type { Backup } from "./transfer-types";
+import { TRANSFER_MESSAGES } from "@pickball/core/matchmaker/transfer-types";
+import type { Backup } from "@pickball/core/matchmaker/transfer-types";
 import type { BackupSnapshot } from "./backup";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /**
  * 「清除本機資料」涵蓋的全部 LocalStorage key（design Decision 2／5；tasks §0.6 對照表，

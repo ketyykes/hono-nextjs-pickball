@@ -7,6 +7,8 @@
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
 
+後端可匯入 `@pickball/core`（`workspace:*`；前後端共用的純邏輯與契約，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)）。目前 `src/**` 尚未匯入，B5 起才使用；匯入不需額外的 wrangler／tsconfig 設定（`test/pickball-core-import.test.ts` 證明 workerd 測試可解析，`wrangler deploy --dry-run` 證明 esbuild 可打包）。
+
 ## 常用指令
 
 - `pnpm dev` — `wrangler dev --env local`（http://localhost:8787）；走 `--env local` 才有本機 D1 binding（`DB`）
@@ -76,7 +78,7 @@
 
 - `drizzle-orm` 已被 `src/db/**` 匯入，**不再受下述複審限制**；`drizzle-kit`（devDependencies，CLI 工具本該如此）已由 `db:generate` 使用
 - `better-auth`、`@better-auth/drizzle-adapter` 已被 `src/auth/**` 匯入，**不再受下述複審限制**。**不升級到 better-auth 1.7**：其 `account.issuer` 為 breaking schema 變更（B1 design Decision 5），升級須另開 change 處理 migration
-- `@hono/zod-validator`、`zod`、`date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝
+- `@hono/zod-validator`、`zod`、`date-fns` 在 dependencies，但**仍未被 `src/**` 匯入**，為未來會員／揪團功能預先安裝；`zod` 另由核心套件 `@pickball/core` 引入（同一份版本），B5 起 `src` 才會經由它使用
 - **保留而非移除的理由**：`wrangler deploy --dry-run` 實測產物為 gzip **340.66 KiB**（B2 納入 better-auth 後；匯入前為 16.91 KiB），離 CF Free plan 的 3 MiB 上限餘裕極大；體積沒有壓力時，移除的收益低於日後重裝的摩擦
 - **複審期限：2026-11-12**。屆時若這三個未匯入的套件仍未被 `src/**` 匯入，開 change 移除（決策 D5）
 - `@cloudflare/vitest-pool-workers` 與 `vitest` 不屬上述範圍——已於 change `backend-cleanup-and-tdd-enablement` 實際啟用

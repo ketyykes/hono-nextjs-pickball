@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // 模組邊界測試需要讀檔案系統（node:fs）。
+    "types": ["node"]
+  },
+  "include": ["."]
+}

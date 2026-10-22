@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computePlayerStats } from "./player-stats";
-import type { MatchHistoryEntry, HistoryPlayer, HistoryTeam } from "./history";
-import type { Player } from "./types";
+import type { MatchHistoryEntry, HistoryPlayer, HistoryTeam } from "@pickball/core/matchmaker/history";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 /** 建立一份合法的測試用 Player 資料，可透過 overrides 覆寫特定欄位（沿用 history.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {

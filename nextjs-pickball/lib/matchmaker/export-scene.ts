@@ -4,12 +4,12 @@
 // ExportScene 為可序列化純資料（無函式、無 class 實例）。
 
 import { pickTextColor } from "./colors";
-import { DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS_BY_KEY } from "./labels";
+import { DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS_BY_KEY } from "@pickball/core/matchmaker/labels";
 import { buildCourtTiles } from "./stage-layout";
 import type { CourtTileTeamSource } from "./stage-layout";
-import type { MatchFormat } from "./allocation-types";
-import type { Round, RoundMatch } from "./round-types";
-import type { Gender, Player } from "./types";
+import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
+import type { Gender, Player } from "@pickball/core/matchmaker/types";
 
 /** App 名稱，匯出標題與（未來的）列印稿共用，SHALL NOT 由各呼叫端各自寫死（prd.md 9.4）。 */
 export const EXPORT_APP_NAME = "匹克球對戰分配機";

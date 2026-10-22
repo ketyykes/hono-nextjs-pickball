@@ -2,10 +2,10 @@
 "use client";
 
 import { useEffect, useReducer, useState } from "react";
-import { filterHistoryByRange } from "@/lib/matchmaker/history-range";
-import type { HistoryRange } from "@/lib/matchmaker/history-range";
+import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
+import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 import { readHistory } from "@/lib/matchmaker/round-storage";
-import type { MatchHistoryEntry } from "@/lib/matchmaker/history";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { HistoryRecordCard } from "./HistoryRecordCard";

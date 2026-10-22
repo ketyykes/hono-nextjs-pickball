@@ -7,8 +7,8 @@ import { HistoryRangeFilter } from "@/components/matchmaker/HistoryRangeFilter";
 import { PlayerStatsTable } from "@/components/matchmaker/PlayerStatsTable";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
-import { filterHistoryByRange } from "@/lib/matchmaker/history-range";
-import type { HistoryRange } from "@/lib/matchmaker/history-range";
+import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
+import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
 
 // 統計頁（球員排行榜）。本檔標 "use client" 並直接持有 useRosterStore 與 useRoundStore

@@ -7,7 +7,7 @@
 // 「時間到不自動結束任何場次」是 spec 的 MUST NOT 條款，讓型別簽章上就沒有 matches
 // 可碰，比「寫測試斷言沒有被改動」更強的保證（design Decision 5）。
 
-import type { RoundTimer } from "./round-types";
+import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 
 /**
  * 剩餘秒數。timer 為 null 或尚未開始（startedAt 為 null）時回傳 null，

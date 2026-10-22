@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { playerTileStyle } from "./tile-style";
 import { pickTextColor } from "./colors";
-import type { Player } from "./types";
+import type { Player } from "@pickball/core/matchmaker/types";
 
 // 測試用的完整參賽者建構器，與 duplication.test.ts／candidates.test.ts 等同構，
 // 刻意不共用——本檔保持獨立、不依賴其他測試檔。

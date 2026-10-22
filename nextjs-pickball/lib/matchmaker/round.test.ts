@@ -16,19 +16,19 @@ import {
 	SUBMIT_SCORE_FAILURE_CODE,
 	SWAP_MATCH_PLAYER_FAILURE_CODE,
 	VALIDATE_SCORE_FAILURE_CODE,
-} from "./round";
-import { fullMatchKey, opponentKeys, teammateKeys } from "./duplication";
-import { appendHistoryEntry, MatchHistoryEntrySchema } from "./history";
-import { roundRating } from "./rating-math";
-import { updateRatings } from "./rating";
+} from "@pickball/core/matchmaker/round";
+import { fullMatchKey, opponentKeys, teammateKeys } from "@pickball/core/matchmaker/duplication";
+import { appendHistoryEntry, MatchHistoryEntrySchema } from "@pickball/core/matchmaker/history";
+import { roundRating } from "@pickball/core/matchmaker/rating-math";
+import { updateRatings } from "@pickball/core/matchmaker/rating";
 import { updatePlayer } from "./roster";
-import { DEFAULT_TARGET_SCORE } from "./round-types";
-import { PLAYERS_PER_MATCH } from "./allocation-types";
-import { RATING_MAX, RATING_MIN } from "./rating-types";
-import type { Match, Team } from "./allocation-types";
-import type { MatchHistoryEntry } from "./history";
-import type { Player } from "./types";
-import type { Round, RoundMatch } from "./round-types";
+import { DEFAULT_TARGET_SCORE } from "@pickball/core/matchmaker/round-types";
+import { PLAYERS_PER_MATCH } from "@pickball/core/matchmaker/allocation-types";
+import { RATING_MAX, RATING_MIN } from "@pickball/core/matchmaker/rating-types";
+import type { Match, Team } from "@pickball/core/matchmaker/allocation-types";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import type { Player } from "@pickball/core/matchmaker/types";
+import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 
 // 測試用的完整參賽者建構器，與 allocation.test.ts／duplication.test.ts 同構，
 // 刻意不共用——round.test.ts 保持獨立、不依賴其他測試檔。

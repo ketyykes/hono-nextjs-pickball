@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeRangeCutoffs, rangeOfTime, filterHistoryByRange, HISTORY_RANGES } from "./history-range";
-import type { HistoryRange } from "./history-range";
-import type { MatchHistoryEntry } from "./history";
+import { computeRangeCutoffs, rangeOfTime, filterHistoryByRange, HISTORY_RANGES } from "@pickball/core/matchmaker/history-range";
+import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 
 /**
  * 建立最小合法的單打歷史紀錄 fixture，只有 `playedAt`／`matchId` 因測試需要而變動，

@@ -2,8 +2,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { HISTORY_RANGES } from "@/lib/matchmaker/history-range";
-import type { HistoryRange } from "@/lib/matchmaker/history-range";
+import { HISTORY_RANGES } from "@pickball/core/matchmaker/history-range";
+import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 
 // 區間篩選的顯示文案，依 HISTORY_RANGES 的順序（今日、本週、本月、上月、更早）排列。
 const RANGE_LABEL: Record<HistoryRange, string> = {
