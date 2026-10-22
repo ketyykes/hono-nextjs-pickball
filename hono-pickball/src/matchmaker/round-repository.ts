@@ -23,23 +23,33 @@ export async function getRound(db: Db, userId: string): Promise<VersionedRound |
 	return row ? { data: row.data, version: row.version } : null;
 }
 
+function compareKeys(a: string, b: string): number {
+	if (a < b) {
+		return -1;
+	}
+	if (a > b) {
+		return 1;
+	}
+	return 0;
+}
+
+/** 遞迴依鍵排序，讓內容相同但鍵順序不同的 JSON 值序列化後相等。 */
+function sortKeys(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(sortKeys);
+	}
+	if (typeof value === "object" && value !== null) {
+		return Object.fromEntries(
+			Object.entries(value)
+				.sort(([a], [b]) => compareKeys(a, b))
+				.map(([key, inner]) => [key, sortKeys(inner)]),
+		);
+	}
+	return value;
+}
+
 function isDeepEqual(a: unknown, b: unknown): boolean {
-	if (a === b) {
-		return true;
-	}
-	if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
-		return false;
-	}
-	if (Array.isArray(a) !== Array.isArray(b)) {
-		return false;
-	}
-	const recordA = a as Record<string, unknown>;
-	const recordB = b as Record<string, unknown>;
-	const keysA = Object.keys(recordA);
-	if (keysA.length !== Object.keys(recordB).length) {
-		return false;
-	}
-	return keysA.every((key) => Object.hasOwn(recordB, key) && isDeepEqual(recordA[key], recordB[key]));
+	return JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
 }
 
 /**
