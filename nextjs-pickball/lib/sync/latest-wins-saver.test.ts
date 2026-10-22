@@ -102,6 +102,22 @@ describe("createLatestWinsSaver", () => {
 		await vi.advanceTimersByTimeAsync(1);
 		expect(send).toHaveBeenCalledTimes(10);
 		saver.dispose();
+
+		// send 自己 reject 時視同 failed，仍走重試而不是卡死
+		const rejecting = vi
+			.fn<(payload: string) => Promise<SaveOutcome>>()
+			.mockRejectedValueOnce(new Error("boom"))
+			.mockResolvedValue("ok");
+		const rejectLog = createEventLog();
+		const rejectSaver = createLatestWinsSaver<string>({
+			send: rejecting,
+			onResult: rejectLog.onResult,
+		});
+		rejectSaver.save("R");
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(rejecting).toHaveBeenCalledTimes(2);
+		expect(rejectLog.events).toEqual(["saving", "retrying", "saving", "saved"]);
+		rejectSaver.dispose();
 	});
 
 	it("conflict、unauthorized、rejected 時停止並丟棄待送資料", async () => {
@@ -218,8 +234,16 @@ describe("createLatestWinsSaver", () => {
 		expect(third.send).toHaveBeenCalledTimes(1);
 		expect(failedAfter.events).toEqual(["saving"]);
 
-		// dispose 後的 save 也不送出
-		lateFail.save("Z");
-		expect(third.send).toHaveBeenCalledTimes(1);
+		// dispose 後的 save 也不送出（全新、閒置的佇列）
+		const idle = createManualSend();
+		const idleLog = createEventLog();
+		const idleSaver = createLatestWinsSaver<string>({
+			send: idle.send,
+			onResult: idleLog.onResult,
+		});
+		idleSaver.dispose();
+		idleSaver.save("Z");
+		expect(idle.send).not.toHaveBeenCalled();
+		expect(idleLog.events).toEqual([]);
 	});
 });

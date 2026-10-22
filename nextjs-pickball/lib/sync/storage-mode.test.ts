@@ -29,7 +29,15 @@ describe("resolveStorageMode", () => {
 			user: USER,
 		};
 
+		// 載入中即使（不應出現地）帶著啟用與 user，也必須是本機
+		const loadingWithFields = {
+			status: "loading",
+			authEnabled: true,
+			user: USER,
+		} as unknown as SessionSnapshot;
+
 		expect(resolveStorageMode(loading)).toBe("local");
+		expect(resolveStorageMode(loadingWithFields)).toBe("local");
 		expect(resolveStorageMode(disabled)).toBe("local");
 		expect(resolveStorageMode(guest)).toBe("local");
 		expect(resolveStorageMode(disabledWithUser)).toBe("local");

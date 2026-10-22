@@ -78,7 +78,7 @@ Depends on: §3
 Depends on: §2
 
 - [x] 5.1 RED（TDD）：新增 `nextjs-pickball/lib/sync/storage-mode.test.ts`，it「只有 session 就緒、auth 啟用且有 user 時為 remote」。確認紅燈
-  - 紅燈（commit 8d 之後以暫移實作檔複驗）：`Failed to resolve import "./storage-mode"`，Test Files 1 failed／no tests。無 regression guard。
+  - 紅燈（RED commit 之後以暫移實作檔複驗）：`Failed to resolve import "./storage-mode"`，Test Files 1 failed／no tests。無 regression guard。
 - [x] 5.2 GREEN（TDD）：新增 `lib/sync/storage-mode.ts`
   - 綠燈：1 passed。
 - [x] 5.3 RED（TDD）：新增 `lib/sync/api-client.test.ts`，五個 it（spec「前端 API 請求的結果分類」錨點）。確認紅燈
@@ -93,7 +93,8 @@ Depends on: §2
   - 紅燈：`Failed to resolve import "./sync-status"`，Test Files 1 failed／no tests。無 regression guard。
 - [x] 5.8 GREEN（TDD）：新增 `lib/sync/sync-status.ts`（`SyncStatus` 型別、`syncStatusMessage`）
   - 綠燈：1 passed；lib/sync 四檔共 12 passed；tsc exit 0。
-- [ ] 5.9 REFACTOR：四個模組的命名與匯出一致性；無壞味道則註記 skipped
+- [x] 5.9 REFACTOR：四個模組的命名與匯出一致性；無壞味道則註記 skipped
+  - skipped：四模組皆為 `<動詞/名詞>` 單一職責、具名匯出、型別與函式同檔，命名與匯出風格一致，無壞味道。mutation 後補強測試（loading 帶欄位、send reject、dispose 後 save）另以 test commit 記錄。
 
 ## 6. 前端：計分板雲端 hook 與選擇器
 
