@@ -25,6 +25,8 @@ export const CORE_MODULES = [
   "matchmaker/history",
   "matchmaker/history-range",
   "matchmaker/transfer-types",
+  "api/versioned",
+  "api/errors",
 ];
 
 const SRC_DIR = path.resolve(import.meta.dirname, "../src");
