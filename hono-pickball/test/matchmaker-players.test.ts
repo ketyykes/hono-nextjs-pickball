@@ -2,6 +2,16 @@ import { env, exports } from "cloudflare:workers";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
+import {
+	makeHistoryEntry,
+	makeMatch,
+	makeRound,
+	makeSlot,
+	rowsOf,
+	seedHistory,
+	seedRound,
+	seedSlot,
+} from "./helpers/matchmaker-fixtures";
 import { seedUser, signIn, userIdOf } from "./helpers/session";
 
 // storage 以測試檔隔離，同檔 it 共用 D1，所以各 it 使用自己的 email。
@@ -502,5 +512,34 @@ describe("/api/matchmaker 名單端點", () => {
 
 		expect(res.status).toBe(204);
 		expect(await listItems(cookie)).toEqual([]);
+	});
+
+	it("重置在同一 batch 內刪除本人的名單、回合、分槽與歷史", async () => {
+		const cookieA = await seedAndSignIn("mp-reset-all-a@example.com");
+		const cookieB = await seedAndSignIn("mp-reset-all-b@example.com");
+		const idA = await userIdOf("mp-reset-all-a@example.com");
+		const idB = await userIdOf("mp-reset-all-b@example.com");
+		const tables = ["matchmaker_players", "matchmaker_round", "matchmaker_match_slots", "matchmaker_history"];
+		for (const [cookie, id] of [
+			[cookieA, idA],
+			[cookieB, idB],
+		] as const) {
+			await importPlayers(cookie, [makePlayer("p1"), makePlayer("p2")]);
+			await seedRound(id, makeRound([makeMatch("m1"), makeMatch("m2")]));
+			await seedSlot(id, makeSlot("m1"));
+			await seedSlot(id, makeSlot("m2"));
+			await seedHistory(id, makeHistoryEntry("h1"));
+			await seedHistory(id, makeHistoryEntry("h2"));
+		}
+		const bBefore = await Promise.all(tables.map((table) => rowsOf(table, idB)));
+
+		const res = await request(cookieA, "POST", "/reset");
+
+		expect(res.status).toBe(204);
+		for (const table of tables) {
+			expect(await rowsOf(table, idA)).toEqual([]);
+		}
+		expect(await Promise.all(tables.map((table) => rowsOf(table, idB)))).toEqual(bBefore);
+		expect(bBefore.map((rows) => rows.length)).toEqual([2, 1, 2, 2]);
 	});
 });
