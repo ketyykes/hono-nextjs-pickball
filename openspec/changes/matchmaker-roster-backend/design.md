@@ -176,3 +176,7 @@
    §3 Implementer 完成 3.1～3.6（`536d6ca..f52b59e`；後端 17 檔／95、`src/http/invalid-body.ts` 抽出 onError 與 zValidator hook），Stage 1 PASS；
    **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2 或取得其結論後再開始 §4。Stage 1 非阻擋觀察：`isConstraintError` 的 `SQLITE_CONSTRAINT` 比對範圍比主鍵衝突寬（FK／NOT NULL 也會判成 409）。
    §4～§8 未開始。
+8. （apply §3 Stage 2 第一輪，2026-10-23）FAIL：唯一必修為「寫入與回傳驗證後輸出（含預設值）」無測試守住（V1、V2、R23 存活），以 regression guard 補 it；
+   `isConstraintError` 依 Stage 2 建議與 coordinator 裁定收斂為只認主鍵／UNIQUE，以 TDD 補「非主鍵約束違規回 500 而非 409」。已退回 §3 Implementer 修正，待複審。
+   Stage 2 非阻擋建議（留 §8／後續）：`userDataOnError` 對非 400 HTTPException 的 `getResponse()` 分支無測試（B5 既有缺口）；`src/http/invalid-body.ts` 檔名偏窄；
+   `hono-pickball/CLAUDE.md` 路由約定應改指向 `src/http/invalid-body.ts`（8.1 處理）；`matchmaker_players` 各欄 NOT NULL 未個別測試（migration 為工具產生，風險低）。
