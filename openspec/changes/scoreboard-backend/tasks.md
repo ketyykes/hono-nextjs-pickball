@@ -116,7 +116,8 @@ Depends on: §4、§5
   確認新 it 紅燈、既有 15 個 it 仍綠（mock 不改變既有行為），貼出輸出；「session 載入中或訪客時走本機」若因只檢查本機行為而先綠，須點名標 regression guard（其 `syncStatus` 斷言應為紅）
 - [x] 6.6 GREEN（TDD）：`hooks/useScoreboardStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalScoreboardStore`（`git diff` 應只顯示函式名稱那一行與新增的選擇器），新增選擇器 `useScoreboardStore`（回傳第四個元素 `syncStatus`）
   - 綠燈：選擇器新增；`git diff` 對本機 hook 只見 `export function` → `function useLocalScoreboardStore` 一行與新增的 import／選擇器；兩檔 25 passed（既有 14＋選擇器 4＋雲端 7）
-- [ ] 6.7 REFACTOR：選擇器與雲端 hook 的介面是否足以讓 B6 照抄（`enabled`、`onUnauthorized`、`syncStatus`）；無壞味道則註記 skipped
+- [x] 6.7 REFACTOR：選擇器與雲端 hook 的介面是否足以讓 B6 照抄（`enabled`、`onUnauthorized`、`syncStatus`）；無壞味道則註記 skipped
+  - REFACTOR skipped：雲端 hook 介面為 `useRemoteScoreboardStore({ enabled, onUnauthorized }) → [state, dispatch, syncStatus]`，選擇器回傳 `[state, dispatch, bindingStatus, syncStatus]`（雲端時 bindingStatus 為 standalone），B6 可照抄；無壞味道
 
 ## 7. E2E 夾具與計分板畫面接線
 
