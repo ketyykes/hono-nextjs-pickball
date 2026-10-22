@@ -334,7 +334,12 @@ SHALL NOT 全部拿到同一組——匯入是一次建立多人的操作，若�
 `id` 與 `createdAt` MUST 由呼叫端注入，SHALL NOT 於函式內部呼叫 `crypto.randomUUID()`
 或 `new Date()`（沿用 `player-roster` 的同一原則）。
 
-實作位於 `nextjs-pickball/lib/matchmaker/roster-csv.ts`。
+**登入時（雲端模式）**：預覽與驗證流程不變；確認後系統 MUST 先 `GET /api/matchmaker/players` 取得雲端現有名單，以同一個 `applyRosterImport`
+計算附加結果（自動配色依雲端名單判斷），再只把**新增的參賽者**以 `POST /api/matchmaker/players/import` 一次送出。整份原子性由後端的 D1 `batch()` 保證
+（`user-data-sync`「多筆使用者資料的逐筆版本化契約」），SHALL NOT 逐筆 PUT（中途失敗會留下半套資料）。送出失敗時 MUST 顯示錯誤、SHALL NOT 重新整理頁面，
+名單保持不變。SHALL NOT 讀寫本機 `matchmaker:roster:v1`。
+
+實作位於 `nextjs-pickball/lib/matchmaker/roster-csv.ts`。雲端分支位於 `nextjs-pickball/lib/matchmaker/remote-transfer.ts`。
 
 #### Scenario: 預覽回報將新增人數與問題列
 
@@ -383,7 +388,25 @@ SHALL NOT 全部拿到同一組——匯入是一次建立多人的操作，若�
 - **THEN** 參賽者頁出現這 2 位，且既有參賽者仍在
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，test 名稱「確認 CSV 匯入預覽後名單新增匯入的參賽者」
 
----
+#### Scenario: 雲端 CSV 匯入只送出新增的參賽者
+
+- **GIVEN** 雲端名單有 2 位，預覽為 3 筆合法資料
+- **WHEN** 呼叫雲端匯入函式（注入 3 個 id 與時間）
+- **THEN** 先 GET 名單，再以 `POST /api/matchmaker/players/import` 送出恰好 3 位（id 為注入值、配色與雲端既有 2 位互不相同時沿用 `applyRosterImport` 的結果），回傳成功
+- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端 CSV 匯入以雲端現有名單計算並只送出新增的參賽者」
+
+#### Scenario: 雲端 CSV 匯入失敗
+
+- **WHEN** GET 失敗，或 POST 回 409／500
+- **THEN** 回傳失敗結果（含繁體中文訊息），不視為成功
+- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端 CSV 匯入失敗時回傳錯誤且不視為成功」
+
+#### Scenario: 登入時 CSV 匯入寫入雲端
+
+- **GIVEN** 以測試帳號登入、雲端名單為空
+- **WHEN** 在資料頁選擇含 2 筆合法資料的參賽者 CSV 並確認匯入，之後開啟參賽者頁
+- **THEN** 參賽者頁出現這 2 位；本機 `matchmaker:roster:v1` 不存在
+- **驗收**：`nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts`，test 名稱「登入時 CSV 匯入的參賽者寫入雲端」
 
 ### Requirement: 清除本機資料與其確認流程
 
@@ -519,3 +542,41 @@ key 名稱多一處來源就多一處漏改，而漏改的失敗模式是「清�
 - **WHEN** 逐一取得本 capability 定義的全部錯誤訊息
 - **THEN** 每則訊息皆不含未翻譯的 zod 原始 issue 字串，且皆包含使用者可採取的下一步
 - **驗收**：`nextjs-pickball/lib/matchmaker/backup.test.ts`，it 名稱「所有錯誤訊息為繁體中文且各自包含可採取的修正方式」
+
+### Requirement: 登入時的資料工具頁
+
+`/matchmaker/data` 在雲端模式（`user-data-sync`「前端依 session 選擇儲存模式」）下 SHALL 依下表調整資料來源；本機模式一律維持既有行為與程式路徑。
+
+| 功能 | 雲端模式的行為 |
+|---|---|
+| JSON 匯出 | `buildBackup` 的快照中 `players` MUST 取自 `GET /api/matchmaker/players`；`currentRound` 與 `history` 仍取自本機（回合與歷史上雲前）。取得名單失敗時 MUST 顯示錯誤、不下載 |
+| JSON 還原 | MUST 停用：不渲染選檔按鈕，改以文字說明「登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能」 |
+| 參賽者 CSV 匯入 | 見「參賽者 CSV 匯入的預覽、附加寫入與整份原子性」的登入分支 |
+| 歷史 CSV 匯出 | 不變（歷史仍在本機） |
+| 清除本機資料 | 不變（只清本機 key，不呼叫任何雲端 API） |
+
+「JSON 完整備份的匯出內容」表中 `players` 的來源 `matchmaker:roster:v1`，在雲端模式下以本表為準；`buildBackup` 本身仍是純函式、不變。
+雲端分支的資料讀取 MUST 經 `nextjs-pickball/lib/matchmaker/remote-transfer.ts`，元件層只負責選檔、下載與顯示。
+
+JSON 還原停用的理由：還原是「以檔案覆寫全部資料」，雲端模式下等同覆寫雲端名單，其語意（覆寫、合併或拒絕）屬 B9「匯入本機資料」的決策範圍，本 change 不預先決定。
+
+#### Scenario: 雲端備份快照的來源
+
+- **GIVEN** 雲端名單有 2 位；本機有一個進行中回合與 3 筆歷史
+- **WHEN** 呼叫雲端備份快照函式
+- **THEN** 回傳的 `players` 為雲端那 2 位，`currentRound` 與 `history` 等於本機的資料
+- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端備份快照的參賽者取自雲端、回合與歷史取自本機」
+
+#### Scenario: 登入時 JSON 匯出的參賽者來自雲端
+
+- **GIVEN** 以測試帳號登入、雲端名單有 2 位；本機 `matchmaker:roster:v1` 有一份不同的訪客名單
+- **WHEN** 在資料頁按 JSON 匯出並讀取下載的檔案
+- **THEN** 檔案的 `players` 為雲端那 2 位
+- **驗收**：`nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts`，test 名稱「登入時 JSON 匯出的參賽者來自雲端」
+
+#### Scenario: 登入時 JSON 還原停用
+
+- **GIVEN** 以測試帳號登入
+- **WHEN** 開啟資料頁
+- **THEN** JSON 還原的選檔按鈕不存在，並顯示上表的說明文字
+- **驗收**：`nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts`，test 名稱「登入時 JSON 還原停用並顯示說明」
