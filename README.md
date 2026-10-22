@@ -10,6 +10,7 @@ hono-nextjs-pickball/
 │  └─ wrangler.jsonc       ← Worker「nextjs-pickball」設定（OpenNext + service binding）
 ├─ hono-pickball/          ← 後端：Hono on Cloudflare Workers
 │  └─ wrangler.jsonc       ← Worker「hono-pickball」設定
+├─ packages/pickball-core/ ← 前後端共用的純邏輯核心套件 `@pickball/core`（無建置產物）
 ├─ openspec/               ← OpenSpec 規格與變更（CLI 從 root 執行）
 ├─ docs/superpowers/       ← 設計文件與實作計畫（歷史紀錄；正式規格在 openspec/）
 ├─ .claude/                ← Claude Code 專案設定
@@ -27,14 +28,14 @@ hono-nextjs-pickball/
 
 | 指令 | 行為 |
 |---|---|
-| `pnpm install` | 一次安裝兩個 workspace 的依賴 |
+| `pnpm install` | 一次安裝三個 workspace 的依賴 |
 | `pnpm dev` | 同時起前端（:3005）與後端（:8787） |
 | `pnpm dev:web` | 只啟動 Next.js dev server |
 | `pnpm dev:api` | 只啟動 wrangler dev |
-| `pnpm build` | `pnpm -r build`，兩個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`） |
+| `pnpm build` | `pnpm -r build`，三個 workspace 都真的建置（後端為 `tsc --noEmit && wrangler deploy --dry-run`；核心套件無產物，build 即 `tsc --noEmit`） |
 | `pnpm lint` | 跑 Next.js ESLint |
-| `pnpm typecheck` | `pnpm -r exec tsc --noEmit` |
-| `pnpm test` | `pnpm -r test`，前端 Vitest + 後端 workerd Vitest |
+| `pnpm typecheck` | `pnpm -r exec tsc --noEmit`（核心套件只跑 `src` 這一段，不含其 `test/tsconfig.json`） |
+| `pnpm test` | `pnpm -r test`，前端 Vitest + 後端 workerd Vitest + 核心套件 Vitest（node 環境） |
 | `pnpm test:web` / `pnpm test:api` | 只跑單一 workspace 的單元測試 |
 | `pnpm test:e2e` | 跑 Playwright E2E（5 個 browser project） |
 | `pnpm --filter ./nextjs-pickball preview` | OpenNext build 後在本機 workerd runtime 驗證 |

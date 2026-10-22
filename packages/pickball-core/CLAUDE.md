@@ -13,7 +13,9 @@
 模組 MUST NOT 碰瀏覽器全域、計時器或 I/O（`window`、`localStorage`、`document`、`setTimeout`、`fetch` 等），後端 workerd 與測試環境都不保證存在。由兩層把關：
 
 1. `tsconfig.json` 的 `lib: ["ESNext"]`、`types: []`、`include: ["src"]`——沒有 DOM／node 型別，用到會 tsc 失敗。
-2. 測試在 node 環境載入每個核心模組（`test/module-boundary.test.ts`）。
+2. 測試在 node 環境載入每個核心模組（`test/module-boundary.test.ts`），並斷言 `window`／`document`／`localStorage` 不存在。
+
+兩層能力不同：執行期層只攔得到 node 環境本身不存在的瀏覽器全域；Node 本身具備的全域（`setTimeout`、`fetch`、`console`）在 node 下載入不會出錯，只能靠 tsc 那層攔截。實測在 `src/` 內引用 `setTimeout`、`fetch`、`console` 三者，tsc 皆報 `TS2304`／`TS2584` 找不到名稱。
 
 ## 新增模組
 
@@ -22,8 +24,8 @@
 
 ## 測試
 
-- 被搬移的 18 個模組，其單元測試**刻意留在前端原位** `nextjs-pickball/lib/{scoreboard,matchmaker}/*.test.ts`（主 spec 的驗收錨點以測試檔路徑定位），由前端 vitest 執行；不是漏搬。
-- 本套件的 `test/` 只放套件層守衛（模組邊界等）。
+- 被搬移的 18 個模組，其**既有**單元測試（其中 `scoreboard/types`、`matchmaker/{allocation-types,rating-math,rating-types,labels,transfer-types}` 6 個本來就沒有同名測試檔）**刻意留在前端原位** `nextjs-pickball/lib/{scoreboard,matchmaker}/*.test.ts`（主 spec 的驗收錨點以測試檔路徑定位），由前端 vitest 執行；不是漏搬。
+- 目前本套件的 `test/` 只有套件層守衛（模組邊界等）；新增核心模組的行為測試放哪裡由該 change 決定，若放在本套件須在 `test/**/*.test.ts`（vitest `include` 僅含此範圍）。`src/**` 的行為邏輯一律照 root `CLAUDE.md` 的 TDD 三步。
 - `pnpm test`＝vitest（不加 `--passWithNoTests`）；`pnpm typecheck`＝`tsc --noEmit && tsc --noEmit -p test/tsconfig.json`（兩段都要）；`pnpm build`＝`tsc --noEmit`。
 - 單檔測試（在 repo root）：`pnpm --filter ./packages/pickball-core test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）。
 
