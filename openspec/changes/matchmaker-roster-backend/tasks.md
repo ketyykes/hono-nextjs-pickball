@@ -95,6 +95,7 @@ Depends on: §6
   執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/roster-sync.spec.ts`（前後清殘留 dev server），貼出輸出：
   依賴頁面接線者（`data-sync-status`、提示、資料頁分支）應為紅；**已由 §5 選擇器達成而先綠者逐一點名標 regression guard**
 - [x] 7.2 GREEN（例外層：頁面與 I/O 樣板元件，以 7.1 驗收）：`app/matchmaker/{page,players/page,stats/page}.tsx` 依 spec 接上 `SyncStatusNotice` 與 `data-sync-status`（loading／load-failed 取代主要內容；所有 hooks 在 early return 前呼叫）；
+  - Stage 2 收尾：3421e6f（補對戰頁／統計頁 load-failed 與訪客模式三頁的 regression guard，並新增 CSV 匯入防重複送出的 RED）、下一個 `fix(web)` commit（雲端 CSV 匯入進行中 disable 確認鈕，GREEN）
   `components/matchmaker/RosterCsvImportSection.tsx`、`JsonBackupSection.tsx` 依 `resolveStorageMode(useSession())` 分支（本機分支程式碼不動）。7.1 全綠；不得以 `waitForTimeout` 取代狀態等待
 - [x] 7.3 REFACTOR：三個頁面的同步提示接線是否重複到值得抽成小元件；無壞味道則註記 skipped
   - skipped：三頁的接線只是各約 10 行的 early return 與一個屬性，根元素 className 與內容各異，抽成元件要多帶 children 與 className 參數，收益不抵複雜度；無壞味道

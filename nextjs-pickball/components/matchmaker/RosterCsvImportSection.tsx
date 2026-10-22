@@ -36,6 +36,8 @@ type PreviewState =
 export function RosterCsvImportSection() {
 	const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
 	const [message, setMessage] = useState<string | null>(null);
+	// 雲端匯入先 GET 再 POST，往返期間若可重複點擊，每次都會產生新的 UUID 而附加重複參賽者
+	const [isImporting, setIsImporting] = useState(false);
 	const isRemote = resolveStorageMode(useSession()) === "remote";
 
 	function handleFileText(text: string) {
@@ -55,8 +57,11 @@ export function RosterCsvImportSection() {
 	async function handleRemoteConfirm(parsed: Extract<ParseRosterCsvResult, { ok: true }>) {
 		const ids = parsed.rows.map(() => crypto.randomUUID());
 		const now = new Date().toISOString();
+		setIsImporting(true);
 		const imported = await importRemoteRoster(parsed, { ids, now });
 		if (!imported.ok) {
+			// 失敗時恢復可按；成功會 reload，不需要恢復
+			setIsImporting(false);
 			setMessage(imported.message);
 			return;
 		}
@@ -105,7 +110,7 @@ export function RosterCsvImportSection() {
 						testId="roster-csv-import-input"
 						onFileText={handleFileText}
 					/>
-					<Button disabled={!canConfirm} onClick={handleConfirm}>
+					<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
 						確認匯入
 					</Button>
 					{preview.status !== "idle" && (
