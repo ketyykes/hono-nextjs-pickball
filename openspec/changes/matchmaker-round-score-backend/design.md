@@ -260,3 +260,6 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     **待 coordinator 裁定（非阻擋）**：回合 PUT 的完成狀態比對排在版本比對之前，停在舊回合的裝置重排時會得到 400（→ rejected）而非 409（→ conflict 自動重載）；符合 spec 字面，若要改先 409 須走 delta。
     其他非阻擋：reset 使 version 不單調 → 理論 ABA；`NOT IN` 子查詢可加 `IS NOT NULL`；`type Db` 重複定義三次（§5 前可移到 `db/client.ts`）；`seedAndSignIn` 重複。Stage 2 已在低負載重跑後端全套 20 檔／126 全綠，並重現 RED（15 紅／3 綠）。
     **下一步**：退回 §4 Implementer 補 ①～③ 與 tasks.md 4.1 的 regression guard 點名 → Stage 2 複審 → §5。
+17. （apply §4 完成，2026-10-23）補件 39a8d7b（regression guard＋tasks 4.1 點名）、6b9aa19（refactor：`Db` 型別集中到 `src/db/client.ts`、`seedAndSignIn` 移入 fixtures）後 Stage 2 複審 **PASS**：T07／T12／T13／T16／T17 全數轉紅，refactor 後抽查 13 條既有變異仍全殺，等價對照維持綠。
+    後端全套 20 檔／128 全綠（取鎖、load 4.35）。leader 裁定：「不從 query 或 body 接受 userId（回合與分槽）」結尾斷言由 `[]` 改 `["m1"]` 可接受——該 it 為本 change 465614b 新增、非 B5／B6 既有 it，且斷言變強（Stage 2 確認）。
+    **待 coordinator 裁定**：OQ16 的「停在舊回合的裝置重排得 400 而非 409」（符合 spec 字面；若要改需 delta）。**下一步**：派 §5 Implementer（sonnet），ticket 用 `/tmp/b7tools/ticket-5-{paste,ref}.md`，另告知 `Db` 型別已在 `src/db/client.ts`、`getRound` 可重用、孤兒 DELETE 子查詢遇 NULL id 的防禦性 `IS NOT NULL` 可一併評估。
