@@ -37,7 +37,7 @@ hono-nextjs-pickball/
 | `pnpm typecheck` | `pnpm -r exec tsc --noEmit`（核心套件只跑 `src` 這一段，不含其 `test/tsconfig.json`） |
 | `pnpm test` | `pnpm -r test`，前端 Vitest + 後端 workerd Vitest + 核心套件 Vitest（node 環境） |
 | `pnpm test:web` / `pnpm test:api` | 只跑單一 workspace 的單元測試 |
-| `pnpm test:e2e` | 跑 Playwright E2E（5 個 browser project） |
+| `pnpm test:e2e` | 跑 Playwright E2E（5 個 browser project＋需登入的 `user-data` project） |
 | `pnpm --filter ./nextjs-pickball preview` | OpenNext build 後在本機 workerd runtime 驗證 |
 | `pnpm --filter ./<workspace> cf-typegen` | 改 `wrangler.jsonc` 後重新產生 Cloudflare binding 型別 |
 
