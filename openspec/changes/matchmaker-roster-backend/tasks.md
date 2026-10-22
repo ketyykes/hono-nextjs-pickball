@@ -58,10 +58,10 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：新增 `lib/sync/roster-api.test.ts`，it「名單 API 包裝以正確的方法、路徑與 body 呼叫 requestJson」。確認紅燈
-- [ ] 4.2 GREEN（TDD）：新增 `lib/sync/roster-api.ts`
-- [ ] 4.3 RED（TDD）：`lib/matchmaker/storage.test.ts` **只新增** it「resetLocalMatchProgress 只移除回合、歷史與分槽，保留名單與獨立計分板」。確認紅燈
-- [ ] 4.4 GREEN（TDD）：`lib/matchmaker/storage.ts` 新增 `resetLocalMatchProgress()`（key 取自與 `RESET_KEYS` 相同的常數；既有函式與 `RESET_KEYS` 不改）
+- [x] 4.1 RED（TDD）：新增 `lib/sync/roster-api.test.ts`，it「名單 API 包裝以正確的方法、路徑與 body 呼叫 requestJson」。確認紅燈
+- [x] 4.2 GREEN（TDD）：新增 `lib/sync/roster-api.ts`
+- [x] 4.3 RED（TDD）：`lib/matchmaker/storage.test.ts` **只新增** it「resetLocalMatchProgress 只移除回合、歷史與分槽，保留名單與獨立計分板」。確認紅燈
+- [x] 4.4 GREEN（TDD）：`lib/matchmaker/storage.ts` 新增 `resetLocalMatchProgress()`（key 取自與 `RESET_KEYS` 相同的常數；既有函式與 `RESET_KEYS` 不改）
 
 ## 5. 前端：名單雲端 hook 與選擇器
 

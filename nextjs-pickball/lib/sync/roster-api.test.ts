@@ -26,6 +26,7 @@ function makePlayer(id: string): Player {
 		restCount: 0,
 		gamesPlayed: 0,
 		isActive: true,
+		createdAt: "2026-01-01T00:00:00.000Z",
 	};
 }
 
