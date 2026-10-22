@@ -180,3 +180,5 @@
    `isConstraintError` 依 Stage 2 建議與 coordinator 裁定收斂為只認主鍵／UNIQUE，以 TDD 補「非主鍵約束違規回 500 而非 409」。已退回 §3 Implementer 修正，待複審。
    Stage 2 非阻擋建議（留 §8／後續）：`userDataOnError` 對非 400 HTTPException 的 `getResponse()` 分支無測試（B5 既有缺口）；`src/http/invalid-body.ts` 檔名偏窄；
    `hono-pickball/CLAUDE.md` 路由約定應改指向 `src/http/invalid-body.ts`（8.1 處理）；`matchmaker_players` 各欄 NOT NULL 未個別測試（migration 為工具產生，風險低）。
+9. （apply §3 Stage 2 複審，2026-10-23）PASS（`dd4d60d` guard、`d6b957e` RED、`b5de2e1` fix；後端 17 檔／97）。非阻擋：`isConstraintError` 走 cause 鏈的部分無測試覆蓋（實測 D1 batch 主鍵衝突在最外層訊息即可比對），
+   新 it 註解「約束細節在 cause 內」與 batch 實測不符——留 §8／後續修註解或補 it。下一步 §4。
