@@ -89,8 +89,10 @@ Depends on: §2
   - 紅燈：`Failed to resolve import "./latest-wins-saver"`，Test Files 1 failed／no tests。無 regression guard。
 - [x] 5.6 GREEN（TDD）：新增 `lib/sync/latest-wins-saver.ts`（`createLatestWinsSaver`；重試間隔常數具名）
   - 綠燈：5 passed。重試間隔常數 `RETRY_DELAYS_MS`；成功後退避重設（設計同 leader 建議）。
-- [ ] 5.7 RED（TDD）：新增 `lib/sync/sync-status.test.ts`，it「local、synced、saving 不顯示提示，其餘狀態各有固定文案」。確認紅燈
-- [ ] 5.8 GREEN（TDD）：新增 `lib/sync/sync-status.ts`（`SyncStatus` 型別、`syncStatusMessage`）
+- [x] 5.7 RED（TDD）：新增 `lib/sync/sync-status.test.ts`，it「local、synced、saving 不顯示提示，其餘狀態各有固定文案」。確認紅燈
+  - 紅燈：`Failed to resolve import "./sync-status"`，Test Files 1 failed／no tests。無 regression guard。
+- [x] 5.8 GREEN（TDD）：新增 `lib/sync/sync-status.ts`（`SyncStatus` 型別、`syncStatusMessage`）
+  - 綠燈：1 passed；lib/sync 四檔共 12 passed；tsc exit 0。
 - [ ] 5.9 REFACTOR：四個模組的命名與匯出一致性；無壞味道則註記 skipped
 
 ## 6. 前端：計分板雲端 hook 與選擇器
