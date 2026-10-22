@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
-import { createMiddleware } from 'hono/factory'
 import { createAuth } from './auth/create-auth'
+import { localAuth } from './auth/local-auth-middleware'
 import { isLocalAuthEnabled } from './auth/local-auth'
 import { toPublicUser } from './auth/public-user'
 import { requireSession, type AuthAppEnv } from './auth/require-session'
@@ -38,17 +38,6 @@ app.get('/api/cookie-check', (c) => {
     // 第一次呼叫為 null；第二次呼叫若帶回上次的值，代表 cookie 來回穿透成功
     receivedPreviousValue: previousValue ?? null,
   })
-})
-
-// gate 必須在 createAuth 之前：停用時不建立 auth 實例、不觸碰 D1（正式部署沒有 DB binding），
-// 回應與未定義路由相同的 404。通過後每個請求只建立一次 auth 並存於 context，
-// 後續的 handler 與 requireSession 一律讀 c.var.auth。
-const localAuth = createMiddleware<AuthAppEnv>(async (c, next) => {
-  if (!isLocalAuthEnabled(c.env)) {
-    return c.notFound()
-  }
-  c.set('auth', createAuth(c.env))
-  await next()
 })
 
 app.use('/api/auth/*', localAuth)

@@ -44,7 +44,8 @@ Depends on: §2
   - 紅燈紀錄：`typecheck` exit 2，`test/auth-env-types.test.ts(9,2): error TS2578: Unused '@ts-expect-error' directive.`（另有 TS2305：`SessionAppEnv` 尚不存在，屬功能不存在的紅燈原因）
 - [x] 3.2 GREEN（TDD）：`src/auth/require-session.ts` 拆為 `AuthAppEnv`／`SessionAppEnv`，`requireSession` 改為 `createMiddleware<SessionAppEnv>`；typecheck exit 0；既有後端測試全綠（regression guard）
   - 實跑紀錄：typecheck exit 0；後端全套 14 檔／52 tests 全綠（基線 13／51 + 型別測試檔 1 it）
-- [ ] 3.3 REFACTOR（regression guard：既有 `auth-gating`／`auth-me`／`auth-session`／`auth-sign-in` 測試）：`localAuth` 自 `src/index.ts` 原樣搬到 `src/auth/local-auth-middleware.ts`（design Decision 2），`index.ts` 改為匯入；後端測試全綠、數量不變
+- [x] 3.3 REFACTOR（regression guard：既有 `auth-gating`／`auth-me`／`auth-session`／`auth-sign-in` 測試）：`localAuth` 自 `src/index.ts` 原樣搬到 `src/auth/local-auth-middleware.ts`（design Decision 2），`index.ts` 改為匯入；後端測試全綠、數量不變
+  - 實跑紀錄：搬移後後端全套 14 檔／52 tests 全綠，數量與搬移前相同；typecheck exit 0
 - [ ] 3.4 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it（「scoreboard_current 可由 migration 建立並寫入讀回」「同一使用者在 scoreboard_current 只能有一列」「scoreboard_current 的 user_id 必須參照既有使用者」「刪除使用者時其 scoreboard_current 一併刪除」）；
   新增 `test/user-data-tables.test.ts`（「USER_DATA_TABLES 恰為 auth 以外的所有資料表」「每張使用者資料表皆有 user_id、version 與 updated_at 且 user_id 參照 user 並 cascade」）。確認紅燈（表不存在／`@pickball/core/api/user-data-tables` 不存在）
 - [ ] 3.5 GREEN（設定層＋TDD）：`src/db/schema.ts` 加 `scoreboardCurrent`（design Decision 4；`data` 以 `$type<ScoreboardState>()`）；`pnpm --filter ./hono-pickball db:generate --name scoreboard_current` 產生 `drizzle/0001_scoreboard_current.sql` 與 meta（不手改）；
