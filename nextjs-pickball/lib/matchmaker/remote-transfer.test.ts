@@ -140,10 +140,20 @@ describe("remote-transfer", () => {
 		expect(r1).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.fetchFailed });
 		expect(getFails).toHaveBeenCalledTimes(1);
 
-		// POST 409
+		// GET 回 400（rejected）與 5xx 同樣視為取得名單失敗
+		const getRejected = vi.fn().mockResolvedValue(new Response("bad", { status: 400 }));
+		vi.stubGlobal("fetch", getRejected);
+		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+			ok: false,
+			message: REMOTE_TRANSFER_MESSAGES.fetchFailed,
+		});
+		expect(getRejected).toHaveBeenCalledTimes(1);
+
+		// POST 回 409、500、400，皆不視為成功
 		for (const [status, message] of [
 			[409, REMOTE_TRANSFER_MESSAGES.importConflict],
 			[500, REMOTE_TRANSFER_MESSAGES.importFailed],
+			[400, REMOTE_TRANSFER_MESSAGES.importFailed],
 		] as const) {
 			const fetchMock = vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
 				if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
@@ -193,6 +203,23 @@ describe("remote-transfer", () => {
 		expect(result).toEqual({ ok: true });
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+	});
+
+	it("雲端名單 GET 回 204 沒有內容時視為取得失敗", async () => {
+		// requestJson 對 204 回 ok 且 value 為 undefined；名單 API 不該有此情形，必須當失敗而非當空名單
+		const preview = parseOk(CSV_THREE_ROWS);
+		const fetchMock = vi.fn().mockImplementation(async () => new Response(null, { status: 204 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+			ok: false,
+			message: REMOTE_TRANSFER_MESSAGES.fetchFailed,
+		});
+		expect(await buildRemoteBackupSnapshot()).toEqual({
+			ok: false,
+			message: REMOTE_TRANSFER_MESSAGES.backupFetchFailed,
+		});
+		expect(fetchMock.mock.calls.every(([, init]) => init.method === "GET")).toBe(true);
 	});
 
 	it("預覽含錯誤列時不送出任何請求並回傳錯誤", async () => {
