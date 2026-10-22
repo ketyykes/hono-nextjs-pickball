@@ -18,8 +18,8 @@
 | `main` HEAD | `d1a7303`（B3 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
-| propose | Wave 1（B1～B3）已 propose（`7c3ab72`）；Wave 2 待 S1 通過後 |
-| apply | Wave 1（B1～B3）已合併並 archive；**S1 通過（2026-10-22）**；下一步 Wave 2 propose |
+| propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
+| apply | Wave 1 已合併並 archive；S1 通過；**下一棒 B4** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -128,12 +128,12 @@ main@1e5e517
 | B1 | backend-d1-foundation | D1 binding（local）、drizzle schema／migration 流程、vitest D1 夾具 | 中 | change/backend-d1-foundation | **已合併 `a7866f5`**（28 tasks；後端 6 檔／25；E2E 633/27/0） |
 | B2 | auth-backend-test-account | better-auth 掛 `/api/auth/*`、本機測試帳號、`requireSession`、`GET /api/me` | 中 | change/auth-backend-test-account | **已合併 `8cdfa53`**（37 tasks；後端 12 檔／50；E2E 635/35/0） |
 | B3 | auth-frontend-session | 登入頁（測試帳號）、session hook、navbar 登入狀態、登入 E2E 夾具 | 中 | change/auth-frontend-session | **已合併 `e08e3cb`**（41 tasks；前端 87 檔／823；E2E 667/38/0） |
-| B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 未 propose |
-| B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 未 propose |
-| B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 未 propose |
-| B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 未 propose |
-| B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 未 propose |
-| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 未 propose |
+| B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已 propose，未 apply |
+| B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已 propose，未 apply |
+| B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已 propose，未 apply |
+| B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已 propose，未 apply |
+| B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
+| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
 
 「預估」以 M 系列經驗粗估（50 task ≈ 一棒）；propose 後依 tasks 數改寫成實數。
@@ -531,7 +531,18 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - coordinator 獨立驗證：tsc／後端 typecheck 0；lint 0／3；前端 87／823、後端 12／50；E2E 依 project 分開 667 passed／38 skipped／0 failed。
 - 已知風險（未處理）：高負載下 dev 模式偶發 Turbopack `ChunkLoadError`（layout chunk），不在 console 守衛白名單，只出現於 dev。
 
-<Wave 2 propose 後填>
+### Wave 2（2026-10-22，B4 20 tasks、B5 45、B6 35、B7 46、B8 30、B9 22；皆不新增第三方相依）
+- **跨 change 慣例（B4／B5 定案，B6～B9 沿用）**：表 `<feature>_<entity>`＋`user_id`/`data`(JSON)/`version`/`updated_at`，清單 `USER_DATA_TABLES`（核心套件）；
+  路由 `src/routes/<feature>.ts`＋`localAuth`/`requireSession`（B5 移到 `src/auth/`，型別拆 `AuthAppEnv`／`SessionAppEnv`）；GET `{data|null,version}`、
+  PUT version 比對 409 `VERSION_CONFLICT`／400 `INVALID_BODY`；前端 `lib/sync`（`resolveStorageMode`、`requestJson`、`createLatestWinsSaver`、`SyncStatus`）、
+  `useLocal<X>Store`／`useRemote<X>Store`／原名改選擇器；E2E 新增第六個 project `user-data`（workers 1）＋`clearTestAccountUserData()`（只刪資料表列，不刪 user／session）。
+- **與 runbook 草案差異**：`scoreboard:matches:v1` 由 B5 移到 B7；B5 只有 `/api/scoreboard/current`；B8 改 `from`/`to`（前端以核心 `rangeBounds` 算台灣時區切點，Workers 為 UTC）；
+  B6 登入時 JSON 還原暫停、B9 改為「從 JSON 備份匯入到雲端」。B6 合併後到 B7 合併前，登入態名單在雲端、回合／歷史仍在本機（不 push，正式站不受影響）。
+- **B7 batch 版本保護**：batch 首條 `INSERT INTO sync_batch_guards … VALUES (?, CASE WHEN <條件> THEN 1 END, ?)`，條件不成立觸發 NOT NULL 讓整批回滾，末條刪除守衛列。
+- **B9**：`POST /api/import`；四張 matchmaker 表任一有本人資料即 409 整份不寫入；計分板已有時只略過並標 `skipped`；本機資料一律保留。
+- **archive 順序必須 B4→B9 依序**（B5 建 `user-data-sync`，B6～B9 ADDED／MODIFIED 皆以前一棒 archive 後的主 spec 為底；各棒 tasks §1 會重新對齊）。
+- 待 apply §1 實測：D1 Free 方案 50 query 上限是否逐陳述式計數；`json_extract` 讀回等價性；batch 內 `RETURNING` 寫法。
+- 各棒 tasks 的 E2E 驗收寫「依標準流程第 4 步指令（含 `user-data` project）」；B4～B6 tasks 內寫死的 shard 指令以第 4 步為準。
 
 ## commit footer 慣例
 
