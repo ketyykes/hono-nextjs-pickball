@@ -81,8 +81,10 @@ Depends on: §2
   - 紅燈（commit 8d 之後以暫移實作檔複驗）：`Failed to resolve import "./storage-mode"`，Test Files 1 failed／no tests。無 regression guard。
 - [x] 5.2 GREEN（TDD）：新增 `lib/sync/storage-mode.ts`
   - 綠燈：1 passed。
-- [ ] 5.3 RED（TDD）：新增 `lib/sync/api-client.test.ts`，五個 it（spec「前端 API 請求的結果分類」錨點）。確認紅燈
-- [ ] 5.4 GREEN（TDD）：新增 `lib/sync/api-client.ts`（`requestJson`）
+- [x] 5.3 RED（TDD）：新增 `lib/sync/api-client.test.ts`，五個 it（spec「前端 API 請求的結果分類」錨點）。確認紅燈
+  - 紅燈：`Failed to resolve import "./api-client"`，Test Files 1 failed／no tests（模組尚不存在）。無 regression guard。
+- [x] 5.4 GREEN（TDD）：新增 `lib/sync/api-client.ts`（`requestJson`）
+  - 綠燈：5 passed。`ok` 的 `value` 型別為 `T | undefined`（204 時為 undefined）。
 - [ ] 5.5 RED（TDD）：新增 `lib/sync/latest-wins-saver.test.ts`，五個 it（spec「最新優先的雲端儲存與自動重試」錨點；`vi.useFakeTimers()`）。確認紅燈
 - [ ] 5.6 GREEN（TDD）：新增 `lib/sync/latest-wins-saver.ts`（`createLatestWinsSaver`；重試間隔常數具名）
 - [ ] 5.7 RED（TDD）：新增 `lib/sync/sync-status.test.ts`，it「local、synced、saving 不顯示提示，其餘狀態各有固定文案」。確認紅燈
