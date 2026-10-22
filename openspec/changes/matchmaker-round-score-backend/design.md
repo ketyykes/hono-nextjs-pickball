@@ -248,3 +248,5 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     使「比對字串只看 `sync_batch_guards`」「守衛改 `INSERT OR REPLACE`」「守衛加 `onConflictDoNothing`」「守衛表拿掉 user_id 主鍵」四個變異存活；實作本身正確，補 regression guard 即可（另加純函式斷言 `isBatchGuardViolation(new Error("UNIQUE constraint failed: sync_batch_guards.user_id")) === false`）。
     非阻擋：新表 `data`／`played_at` 的 NOT NULL 無斷言；`batch-guard.ts:11` 註解易被 §5 誤讀（應寫成「比較在 SQL 內對目前資料執行，不可在 JS 端先判定再傳常數條件」）；讀回 it 在守衛表留下一列。
     **下一步**：退回 §3 Implementer 補測試（regression guard，誠實標註）→ Stage 2 複審 → §4。工作樹乾淨（審查員已還原 0003 暫時變異）。
+14. （apply §3 完成，2026-10-23）補件 69b543b（regression guard）、3ecbb60（註解）後 Stage 2 複審 **PASS**：上輪存活變異 #9／#25～#28／#35／#37／#43 全數轉紅，三條等價對照維持綠。
+    §3 測試數：後端 d1-batch-guard 4、d1-schema 20、user-data-tables 2。保留到 §5 再決定：`guardedBatch` 包裝、`as never` fixture。**下一步**：派 §4 Implementer（sonnet）。
