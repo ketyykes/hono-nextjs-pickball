@@ -151,18 +151,26 @@ Depends on: §6
 
 Depends on: §7
 
-- [ ] 8.1 設定層（文件）：`hono-pickball/CLAUDE.md`：路由約定新增「使用者資料 API」段（sub-app、三類授權測試、版本化契約、`USER_DATA_TABLES`）；`localAuth` 位置改為 `src/auth/local-auth-middleware.ts`；
+- [x] 8.1 設定層（文件）：`hono-pickball/CLAUDE.md`：路由約定新增「使用者資料 API」段（sub-app、三類授權測試、版本化契約、`USER_DATA_TABLES`）；`localAuth` 位置改為 `src/auth/local-auth-middleware.ts`；
   依賴注意：`zod`、`@hono/zod-validator` 已被 `src` 匯入、移出複審清單（只剩 `date-fns`）；「範圍例外」段落註明計分板已部分上雲、matchmaker 段待 B6。
   `nextjs-pickball/CLAUDE.md`：`lib/sync/`、`components/sync/`、hooks 歸屬 `useRemoteScoreboardStore`、選擇器 hook 慣例、E2E 的 `user-data` project 與 `clearTestAccountUserData`；架構總覽 `/scoreboard` 註明「登入且未綁定場次時以雲端為準」；
   **不動**「matchmaker 為 LocalStorage-only」敘述（B6 改）
-- [ ] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
-- [ ] 8.5 驗收（指令）C4：`pnpm build` exit 0
-- [ ] 8.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
-- [ ] 8.7 驗收（指令）C6：`playwright test --list` 與閱讀 `playwright.config.ts`
-- [ ] 8.8 驗收（指令）C7：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
+- [x] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  結果：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`（含 test 段）、`pnpm --filter ./packages/pickball-core typecheck`（含 test 段）皆 exit 0（2026-10-22）。
+- [x] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
+  結果：`pnpm lint` exit 0，0 errors／3 warnings（`useQuiz.ts`、`useRosterStore.ts`、`useScoreboardStore.ts` 的 unused-vars，與基線 3 條相同）。
+- [x] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
+  結果：`pnpm test` exit 0 全綠。前端 92 檔／846（基線 87／823，+5 檔／+23）；後端 16 檔／69（基線 13／51，+3 檔／+18）；核心套件 2 檔／4（基線 1／2，+1 檔／+2）。
+- [x] 8.5 驗收（指令）C4：`pnpm build` exit 0
+  結果：`pnpm build` exit 0；後端 `Total Upload: 2376.84 KiB / gzip: 394.74 KiB`，前端 OpenNext build Done。
+- [x] 8.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
+  結果：`db:generate` 輸出「No schema changes, nothing to migrate」，`git status --porcelain hono-pickball/drizzle` 為空；`db:migrate:local` 輸出「No migrations to apply!」（`0001` 已套用）。
+- [x] 8.7 驗收（指令）C6：`playwright test --list` 與閱讀 `playwright.config.ts`
+  結果：`playwright test --list` 共 716 tests／17 files；chromium、firefox、webkit、mobile-chrome、mobile-safari 各 142（基線 141＋訪客 spec 1），user-data 6。`playwright.config.ts` 閱讀：既有五個 project 的 `use` 皆僅 `devices[...]`，皆無 `testDir`／`storageState`，top-level `use` 與 user-data 的 `use` 亦無 `storageState`（僅註解提及）；`scoreboard-sync.spec.ts` 的 6 條只出現在 `[user-data]`，`[user-data]` 下沒有 `specs/` 的 test。
+- [x] 8.8 驗收（指令）C7：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
   `for p in chromium firefox mobile-chrome user-data; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p; done`；
   `for p in webkit mobile-safari; do for i in 1 2 3; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p --shard=$i/3; done; done`；
   既有 test 全數原樣通過，新增 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 8.9 驗收（指令）C8：`DO_NOT_TRACK=1 openspec validate scoreboard-backend --strict` 通過
+  結果：`.dev.vars` 齊備、持共用鎖、整輪起始 load 約 2.7（各 project 開始時 1 分鐘 load 2.7～5.1，皆低於 20）。0 failed、0 flaky。passed／skipped：chromium 142／0；firefox 130／12；mobile-chrome 140／2；user-data 6／0；webkit 三 shard 43+40+47＝130／12（5+7+0）；mobile-safari 三 shard 43+40+47＝130／12（5+7+0）。舊五 project 加總 672 passed／38 skipped（基線 667／38，+5＝每 project 一條訪客 spec）；另 user-data 6 passed。總計 678 passed／38 skipped／0 failed。skipped 38 全為既有條件 skip（非 chromium 瀏覽器或 project 名稱非 chromium 者略過）：auth-proxy 8 條、api-health 6 條、navbar-rwd 與 auth-session 窄螢幕共 24 條，與基線相同；沒有因缺帳密的 skip（上述 skip 理由皆為瀏覽器條件，user-data 與訪客 spec 皆 0 skipped）。
+- [x] 8.9 驗收（指令）C8：`DO_NOT_TRACK=1 openspec validate scoreboard-backend --strict` 通過
+  結果：`DO_NOT_TRACK=1 openspec validate scoreboard-backend --strict` 輸出「Change 'scoreboard-backend' is valid」。
