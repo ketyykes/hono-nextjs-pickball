@@ -459,6 +459,13 @@ change/<change-id> 分支上，依 /opsx:apply 流程與該 change 的 execution
     WebKit 每 project 已 >64 條 test，**不分割跑全套必定在第 64 條後逾時**；且 `--shard` 是依「全部 project 的清單順序」切，
     不加 `--project` 時最後一份幾乎全是 mobile-safari，照樣超標。驗收一律「依 project 分開、WebKit 兩個 project 各 `--shard=i/3`」。
     另外 load average 高（>50）時 WebKit 會整批 `page.goto` 逾時，先看 `uptime` 再判定。
+    **2026-10-22 追查（未定論）**：一次跑完全套時，webkit／mobile-safari 固定在各自第 75、139 條（`player-stats:243`、`visual-export:476`）
+    的 `beforeEach page.goto("/")` 等不到 load；只跑 webkit 一次（141 條）可全過，但 `--repeat-each=2`（282 條）會重現 → 是同一個 WebKit
+    browser 累積後劣化，不是「前面跑過別的 project」。實驗（webkit `--repeat-each=2`，暫時 config 放 `/tmp/wk64/`）：
+    關 video → 固定位置逾時消失但仍有 Turbopack `ChunkLoadError`；Playwright 輸出移出專案目錄 → `ChunkLoadError` 消失但固定逾時仍在；
+    兩者同時套用那輪 load 117（`mediaanalysisd`、VM、Blender、mini4wd），結果無法判讀。**在機器安靜時重做「兩者同時」實驗**，
+    若成立再以 change 修改 `playwright.config.ts`（webkit 類關 video、`outputDir`／report 移出 Next 專案目錄）恢復單一指令跑全套。
+    在那之前：**跑 E2E 前先 `uptime`，load average > 20 就等**，再依 project 分開跑。
 13. **主 spec 不可直接編輯**；`hooksInventory.test.ts` 直接讀主 spec，新增 hook 時依 delta 走、
     archive 時核對為 no-op（M14 `4b99156` 前例）。
 
