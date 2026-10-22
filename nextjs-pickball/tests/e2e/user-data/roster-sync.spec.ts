@@ -72,7 +72,8 @@ function isPlayerPut(response: Response) {
 	return response.url().includes(`${PLAYERS_API}/`) && response.request().method() === "PUT";
 }
 
-// 改名並等到該次 PUT 完成；先等 PUT 再由呼叫端等 synced，避免在 saving 之前讀到舊的 synced
+// 開啟編輯 Dialog、改名並送出，只等 Dialog 關閉；本函式不等 PUT，
+// 呼叫端需自行以 waitForResponse（先註冊再觸發）與 synced 判斷同步完成
 async function renameFirstPlayer(page: Page, newName: string) {
 	await page.getByRole("button", { name: "編輯" }).click();
 	const dialog = page.getByRole("dialog", { name: "編輯參賽者" });
@@ -230,7 +231,8 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 		await expect(page.getByLabel("第一隊比分").first()).toBeVisible();
 
-		// 逐場送出（雙打 1 場地即一場），等每次評分寫入的 PUT 完成
+		// 逐場送出（雙打 1 場地即一場）。先等第一個 PUT 完成再等 synced：synced 要等全部參賽者
+		// 的儲存佇列清空才會出現，所以涵蓋四位參賽者的 PUT，不必逐一等
 		const matchCount = await page.getByLabel("第一隊比分").count();
 		for (let i = 0; i < matchCount; i++) {
 			const court = page.getByTestId("match-stage-courts").locator('[data-slot="card"]').nth(i);
@@ -264,6 +266,28 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
 		await expect(page.locator(LOAD_FAILED)).toBeVisible();
 		await expect(page.getByRole("button", { name: "新增參賽者" })).toHaveCount(0);
+	});
+
+	// regression guard：寫入時即綠（§7.2 已讓三頁接線），補上先前只有參賽者頁受保護的缺口
+	test("雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容", async ({ page }) => {
+		await page.route(`**${PLAYERS_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await route.fulfill({ status: 500, body: "" });
+				return;
+			}
+			await route.continue();
+		});
+
+		await page.goto(MATCHMAKER_PAGE);
+		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
+		await expect(page.locator(LOAD_FAILED)).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toHaveCount(0);
+
+		await page.goto("/matchmaker/stats");
+		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
+		await expect(page.locator(LOAD_FAILED)).toBeVisible();
+		await expect(page.getByRole("heading", { name: "球員統計" })).toHaveCount(0);
+		await expect(page.getByRole("table", { name: "球員排行榜" })).toHaveCount(0);
 	});
 
 	test("登入時重置名單清空雲端名單並保留本機訪客名單", async ({ page }) => {
@@ -343,6 +367,50 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await expect(page.getByText("CSV雲端一", { exact: true })).toBeVisible();
 		await expect(page.getByText("CSV雲端二", { exact: true })).toBeVisible();
 		expect(await readLocalRoster(page)).toBeNull();
+	});
+
+	test("登入時 CSV 匯入確認中不可重複送出", async ({ page }) => {
+		// 把 import POST 擋在 gate 後面，才能觀察「請求進行中」這段時間
+		let releasePost: () => void = () => {};
+		const postGate = new Promise<void>((resolve) => {
+			releasePost = resolve;
+		});
+		let postCount = 0;
+		await page.route(`**${PLAYERS_API}/import`, async (route) => {
+			postCount += 1;
+			await postGate;
+			await route.continue();
+		});
+
+		await page.goto(DATA_PAGE);
+		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
+		await page.getByTestId("roster-csv-import-input").setInputFiles({
+			name: "roster.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(
+				buildRosterCsv([{ name: "防重複一", gender: "男", rating: "3.50" }]),
+				"utf-8",
+			),
+		});
+		await expect(page.getByTestId("roster-csv-preview")).toBeVisible();
+
+		const confirm = page.getByRole("button", { name: "確認匯入" });
+		const postRequest = page.waitForRequest(
+			(request) => request.url().endsWith(`${PLAYERS_API}/import`) && request.method() === "POST",
+		);
+		await confirm.click();
+		await postRequest;
+
+		// 請求進行中不可再按；force 略過 Playwright 的可操作檢查，驗證即使硬點也不會多送
+		await expect(confirm).toBeDisabled();
+		await confirm.click({ force: true });
+
+		await Promise.all([page.waitForEvent("load"), Promise.resolve(releasePost())]);
+		expect(postCount).toBe(1);
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByText("防重複一", { exact: true })).toHaveCount(1);
 	});
 
 	test("登入時 JSON 匯出的參賽者來自雲端", async ({ page }) => {
