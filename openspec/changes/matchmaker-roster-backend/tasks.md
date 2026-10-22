@@ -108,13 +108,20 @@ Depends on: §7
   `lib/sync/roster-api.ts`、`lib/matchmaker/remote-transfer.ts`；資料頁登入態差異。`hono-pickball/CLAUDE.md` 改寫「範圍例外」段落（名單已上雲）、路由約定加 `/api/matchmaker/*` 與多筆契約；
   design「交接給 B7～B9」四點寫入適當段落
   驗收：兩份 CLAUDE.md 已改寫（前端：matchmaker 儲存分流段、頁面清單登入態差異、hooks 歸屬、lib 清單、E2E 指標；後端：範圍例外、`/api/matchmaker/*` 路由約定與後續 change 須知）。OQ9：`matchmaker-players.test.ts` 註解已改為與實測一致。
-- [ ] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
-- [ ] 8.5 驗收（指令）C4：`pnpm build` exit 0
-- [ ] 8.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
-- [ ] 8.7 驗收（指令）C6：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
+- [x] 8.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  驗收：`-r exec tsc --noEmit`、hono-pickball `typecheck`（含 test）、`@pickball/core` `typecheck`（含 test）三段皆 exit 0。
+- [x] 8.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
+  驗收：`pnpm lint` exit 0，0 errors、3 warnings（useQuiz、useRosterStore、useScoreboardStore 的 no-unused-vars），等於基線。
+- [x] 8.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
+  驗收：`pnpm test` exit 0。前端 95 檔／895（基線 92／846，+3 檔／+49）、後端 17 檔／97（基線 16／69，+1／+28）、核心 3 檔／6（基線 2／4，+1／+2）。
+- [x] 8.5 驗收（指令）C4：`pnpm build` exit 0
+  驗收：`pnpm build` exit 0（OpenNext 與 wrangler dry-run 皆過），build 後工作樹無變動。
+- [x] 8.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
+  驗收：`db:generate` 輸出 No schema changes、無新檔；`db:migrate:local` exit 0（No migrations to apply）。
+- [x] 8.7 驗收（指令）C6：`.dev.vars` 齊備下依 project 分開跑完整 E2E（前後清殘留 dev server）：
   `for p in chromium firefox mobile-chrome user-data; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p; done`；
   `for p in webkit mobile-safari; do for i in 1 2 3; do pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=$p --shard=$i/3; done; done`；
   既有 test 全數原樣通過，新增 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 8.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-roster-backend --strict` 通過
+  驗收：全部 10 次執行 exit 0，起始 1 分鐘 load 均在 3.3～5.5。chromium 145 passed；firefox 133 passed／12 skipped；mobile-chrome 143／2 skipped；user-data 18 passed／0 skipped；webkit 三 shard 44+41+48 passed／skipped 5+7+0；mobile-safari 三 shard 44+41+48 passed／skipped 5+7+0。0 failed、0 flaky。skipped 均為既有的 project 條件 skip（navbar-rwd 窄螢幕、auth-proxy、api-health 等），非缺帳密，新增的 roster-sync 與 matchmaker-local-mode 無 skip。
+- [x] 8.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-roster-backend --strict` 通過
+  驗收：`DO_NOT_TRACK=1 openspec validate matchmaker-roster-backend --strict` 通過（從 repo root 執行）。
