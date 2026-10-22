@@ -146,4 +146,13 @@ describe("storage", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBe(roster);
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
+
+	it("resetLocalMatchProgress 在沒有 localStorage 的環境（SSR）不拋例外", () => {
+		vi.stubGlobal("window", undefined);
+		try {
+			expect(() => resetLocalMatchProgress()).not.toThrow();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });
