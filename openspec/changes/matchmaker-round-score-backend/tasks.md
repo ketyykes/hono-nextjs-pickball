@@ -93,10 +93,14 @@ Depends on: §5
 - [x] 6.1 RED（TDD）：新增 `lib/sync/round-api.test.ts`，it「回合 API 包裝以正確的方法、路徑與 body 呼叫 requestJson」。確認紅燈
   - 紅燈：`1af288a`（只含測試檔）；`round-api` 模組不存在，兩個 it 皆因 import 解析失敗而紅。regression guard：無（兩個 it 皆為真紅燈）。額外 it「原樣回傳 requestJson 的結果」同批寫入。
 - [x] 6.2 GREEN（TDD）：新增 `lib/sync/round-api.ts`
+  - REFACTOR：skipped（無壞味道）。
+  - **事後補的 regression guard（Stage 2 mutation 發現缺口，寫入即綠，非紅燈）**：`round-api.test.ts` 的「PUT 回應 schema 只接受各自的資料形狀，回合與分槽不可互換」（殺 A06、A13；原本只比對 schema 常數身分，換成對方的 schema 仍綠）。
 - [x] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
   - 紅燈：`f3aec24`（只含測試檔）；`round-command-queue` 模組不存在，9 個 it（spec 三個＋額外六個）皆因 import 解析失敗而紅。regression guard：無。GREEN 時修正 RED 測試檔的一個 harness 筆誤（「成功但沒有回應內容」it 把 submitScore mock 設在錯的 harness），斷言未改。
   - **事後補的 regression guard（GREEN 之後由 mutation 發現缺口而加，寫入即綠，非紅燈）**：「退避等待期間排入的命令不提前送出，也不重置等待時間」、「停止後失敗次數歸零，下一次失敗重新從第一個退避間隔開始」、「請求拋出例外時視為網路失敗並重試」。
 - [x] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
+  - REFACTOR：skipped（無壞味道）。
+  - **事後補的 regression guard（Stage 2 mutation 發現缺口，寫入即綠，非紅燈）**：`round-command-queue.test.ts` 的「dispose 後不留計時器、佇列清空，之後排入的命令不進入 getPending」（殺 Q23、Q25、Q26）與「合併時夾著被丟棄的命令，後面的命令仍併入同一次 PUT」（殺 Q35）。Q24（`flush` 不檢查 `disposed`）為等價變異：dispose 後 `flush` 只能經 `enqueue`（已檢查）、`finish`（已檢查）或計時器（已清除）到達，無可觀察差異。
 - [x] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
   「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言；
   另新增 it「resetRoster 送出前停止所有參賽者的待送與重試中變更」（apply §1 納入的 B6 轉 B7 待辦，見 design Open Questions 5）。確認六個 it 皆紅
@@ -105,6 +109,7 @@ Depends on: §5
 - [x] 6.6 GREEN（TDD）：`useRemoteRosterStore` 加 `applyRemotePlayers`／`reloadRemotePlayers`；`useRosterStore` 選擇器回傳加兩者（本機為不做事的函式，本機 hook 本體不改）；
   `resetLocalMatchProgress()` 縮減為只移除歷史 key；`reset()` 送出 POST 前先停止所有佇列（`disposeAll()`）。6.5 全綠；B6 其餘 it 全綠
   - 實作註記：`disposeAll()` 放在 POST 送出前後，B6 三個「重置進行中收到 401／409」的既有 it 會因 saver 忽略舊世代結果而變紅；以 `handleStaleOutcome`（只在重置在途時、對舊世代在途請求的 401／409 照常處理）保持它們原樣通過，未修改任何既有 it。REFACTOR：`reloadAfterConflict` 泛化為 `reloadPlayers(afterConflict)`，其餘無壞味道（skipped）。
+  - **事後補的 regression guard（Stage 2 mutation 發現缺口，寫入即綠，非紅燈）**：`useRemoteRosterStore.test.tsx` 的「applyRemotePlayers 只在回應中的參賽者有待送變更時才重載」（殺 R03、R04）、「重置成功之後才到的舊世代 409 或 401，不得重載、不得呼叫 onUnauthorized，狀態維持 synced」（殺 R20）、「重置在途時卸載，之後舊世代回 409 不得發出 GET」（殺 R22）、「重置中已收到 401，之後另一筆舊世代回 409 不得發出 GET」（殺 R23）、「重置中 DELETE 回 401 時呼叫 onUnauthorized」（殺 R24）。
 
 ## 7. 前端：雲端回合 hook 與選擇器
 
