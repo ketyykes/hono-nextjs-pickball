@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useRoundStore } from "./useRoundStore";
 import {
 	createRound,
@@ -21,6 +21,18 @@ import type {
 import type { Player } from "@pickball/core/matchmaker/types";
 import { writeMatchSlot, readMatchSlot } from "@/lib/scoreboard/match-slots";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import { useSession } from "@/hooks/useSession";
+import { ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "@/lib/matchmaker/storage-keys";
+
+// 預設為訪客本機快照，既有的 it 因此一律走本機實作；雲端模式的 it 自行覆寫回傳值
+vi.mock("@/hooks/useSession", () => ({
+	useSession: vi.fn(() => ({
+		status: "ready",
+		authEnabled: false,
+		user: null,
+		refresh: vi.fn(),
+	})),
+}));
 
 /** 建立一份合法的測試用 Player，可透過 overrides 覆寫特定欄位（沿用 round.test.ts 的樣板）。 */
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -658,5 +670,147 @@ describe("useRoundStore", () => {
 		expect(droppedCount).toBe(0);
 		expect(entries).toHaveLength(1);
 		expect(entries[0]).toEqual(submitResult.historyEntry);
+	});
+});
+
+const REMOTE_ROUND_PATH = "/api/matchmaker/round";
+const REMOTE_SLOTS_PATH = "/api/matchmaker/slots";
+
+function jsonResponse(body: unknown): Response {
+	return new Response(JSON.stringify(body), {
+		status: 200,
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
+function mockSession(snapshot: "loading" | "guest" | "user"): void {
+	const refresh = vi.fn();
+	if (snapshot === "loading") {
+		vi.mocked(useSession).mockReturnValue({ status: "loading", refresh });
+		return;
+	}
+	vi.mocked(useSession).mockReturnValue({
+		status: "ready",
+		authEnabled: true,
+		user: snapshot === "user" ? { id: "u1", email: "a@example.com", name: "測試" } : null,
+		refresh,
+	});
+}
+
+describe("useRoundStore 的儲存模式選擇器", () => {
+	const fetchMock = vi.fn<typeof fetch>();
+	const applyRemotePlayers = vi.fn();
+	const reloadRemotePlayers = vi.fn();
+	const players: Player[] = [
+		makePlayer({ id: "p1" }),
+		makePlayer({ id: "p2" }),
+		makePlayer({ id: "p3" }),
+		makePlayer({ id: "p4" }),
+	];
+
+	beforeEach(() => {
+		localStorage.clear();
+		fetchMock.mockReset();
+		applyRemotePlayers.mockReset();
+		reloadRemotePlayers.mockReset();
+		vi.stubGlobal("fetch", fetchMock);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+			refresh: vi.fn(),
+		});
+	});
+
+	function renderStore() {
+		return renderHook(() =>
+			useRoundStore({ players, updatePlayer: vi.fn(), applyRemotePlayers, reloadRemotePlayers }),
+		);
+	}
+
+	it("雲端模式下產生對戰不寫入本機回合與歷史", async () => {
+		mockSession("user");
+		fetchMock.mockImplementation((input, init) => {
+			const method = init?.method ?? "GET";
+			if (method === "GET" && String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: null, version: 0 }));
+			}
+			if (method === "GET" && String(input) === REMOTE_SLOTS_PATH) {
+				return Promise.resolve(jsonResponse({ items: [] }));
+			}
+			if (method === "PUT" && String(input) === REMOTE_ROUND_PATH) {
+				const { data } = JSON.parse(String(init?.body));
+				return Promise.resolve(jsonResponse({ data, version: 1 }));
+			}
+			return Promise.reject(new Error(`unexpected fetch: ${method} ${String(input)}`));
+		});
+		const { result } = renderStore();
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		act(() => {
+			result.current.generateRound({ format: "doubles", courtCount: 1 });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		expect(result.current.round).not.toBeNull();
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+		const puts = fetchMock.mock.calls.filter(
+			([input, init]) => String(input) === REMOTE_ROUND_PATH && init?.method === "PUT",
+		);
+		expect(puts).toHaveLength(1);
+	});
+
+	it("已登入時改用雲端回合並回傳 syncStatus 與雲端分槽", async () => {
+		mockSession("user");
+		const created = createRound({
+			players,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		const slot = { ...createInitialState(), matchId: "match-1" };
+		fetchMock.mockImplementation((input) => {
+			if (String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: created.round, version: 2 }));
+			}
+			if (String(input) === REMOTE_SLOTS_PATH) {
+				return Promise.resolve(jsonResponse({ items: [{ data: slot, version: 1 }] }));
+			}
+			return Promise.reject(new Error(`unexpected fetch: ${String(input)}`));
+		});
+
+		const { result } = renderStore();
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		expect(result.current.round).toEqual(created.round);
+		expect(result.current.remoteMatchSlots).toEqual({ "match-1": slot });
+		expect(result.current.history).toEqual([]);
+	});
+
+	it("session 載入中或訪客時走本機回合且 syncStatus 為 local", async () => {
+		for (const snapshot of ["loading", "guest"] as const) {
+			localStorage.clear();
+			mockSession(snapshot);
+			const { result, unmount } = renderStore();
+
+			act(() => {
+				result.current.generateRound({ format: "doubles", courtCount: 1 });
+			});
+
+			expect(result.current.syncStatus).toBe("local");
+			expect(result.current.remoteMatchSlots).toBeNull();
+			expect(result.current.round).not.toBeNull();
+			expect(localStorage.getItem(ROUND_STORAGE_KEY)).not.toBeNull();
+			unmount();
+		}
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
