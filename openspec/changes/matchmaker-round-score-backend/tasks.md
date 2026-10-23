@@ -115,13 +115,26 @@ Depends on: §5
 
 Depends on: §6
 
-- [ ] 7.1 RED（TDD）：新增 `hooks/useRemoteRoundStore.test.tsx`，spec 該檔的全部 7 個 it。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
-- [ ] 7.2 GREEN（TDD）：新增 `hooks/useRemoteRoundStore.ts`（design Decision 6、7、8）
-- [ ] 7.3 RED（TDD）：`hooks/useRoundStore.test.tsx` **只新增** `vi.mock("@/hooks/useSession", ...)` 區塊（預設本機快照）與三個 it：「雲端模式下產生對戰不寫入本機回合與歷史」
+- [x] 7.1 RED（TDD）：新增 `hooks/useRemoteRoundStore.test.tsx`，spec 該檔的全部 7 個 it。mock `fetch`、stub `crypto.randomUUID`。確認紅燈
+  - 紅燈：`0d0c6ea`（只含測試檔）；`useRemoteRoundStore` 模組不存在，整檔因 import 解析失敗而紅（`git show 0d0c6ea^:nextjs-pickball/hooks/useRemoteRoundStore.ts` 查無此檔）。spec 的 7 個錨點 it 名稱逐字一致，同批另寫 20 個 it（OQ7 名單未就緒、transform 可重入、重載／401 閘門、卸載 dispose、各 `SyncStatus` 轉換、分槽清理等）。regression guard：無（皆因 import 失敗而紅）。
+  - GREEN 時修正 RED 測試檔兩處（斷言語意未削弱）：「休息次數結算」夾具需先有一個有人休息的上一輪（休息次數是結束上一輪時結算）；`restSettlements` 的型別窄化。
+  - **事後補的 regression guard（GREEN 之後由 mutation 發現缺口而加，寫入即綠，非紅燈）**：樂觀顯示送出（B18）、conflict／rejected 的 saving 黏著（S03、S04）、重試在途期間仍為 retrying（S02）、送出成功後以回應回合為基礎重新套用排隊變更（B02）、不同場次的送出各自排入（B21）、`startTimer` 開始時間沿用操作當下（B15d）、重複送出的失敗碼（M03）。最終 30 個 it。
+- [x] 7.2 GREEN（TDD）：新增 `hooks/useRemoteRoundStore.ts`（design Decision 6、7、8）
+  - `f813573`；30 個 it 全綠，tsc exit 0。
+  - **與 design／ticket 的差異**：① options 多一個選填的 `rosterSyncStatus`（OQ7：名單 `loading`／`load-failed` 時 `submitScore` 回 `scoring-failed` 且不送出；頁面把它列入回填 effect 依賴，頁面接線屬 §10）。② `reloadRemotePlayers()` 放在衝突重載「成功之後」呼叫（401 或重載失敗時不呼叫，滿足「401 後不再呼叫」）。③ `generateRound` 的新回合與休息結算在排入前決定，`apply` 恆回傳同一份（可重入）；`resetIncompleteMatches` 以「第 n 次取 id 固定」的來源重新套用，`startTimer` 沿用操作當下的時間。④ 排隊中的送出若又收到同場次，回 `scoring-failed`（不重複排入）。
+  - **已知副作用（預期）**：`hooks/hooksInventory.test.ts` 因 `useRemoteRoundStore` 尚未列入主 spec 歸屬清單而轉紅，由 §8.5／8.6 處理（本組不改主 spec）。
+- [x] 7.3 RED（TDD）：`hooks/useRoundStore.test.tsx` **只新增** `vi.mock("@/hooks/useSession", ...)` 區塊（預設本機快照）與三個 it：「雲端模式下產生對戰不寫入本機回合與歷史」
   「已登入時改用雲端回合並回傳 syncStatus 與雲端分槽」「session 載入中或訪客時走本機回合且 syncStatus 為 local」。確認新 it 紅燈、既有 it 仍綠；先綠的斷言點名標註
-- [ ] 7.4 GREEN（TDD）：`hooks/useRoundStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRoundStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器；
+  - 紅燈：`a179896`（只含測試檔）；3 個新 it 紅、既有 17 個 it 仍綠（`3 failed | 17 passed`）。三個 it 皆因 `syncStatus` 為 `undefined` 或雲端請求未發出而紅。
+  - 先綠（regression guard）的斷言：「session 載入中或訪客時走本機回合…」中的 `round` 非 null、`matchmaker:round:v1` 有值、`fetch` 未被呼叫——本機實作原本就成立，該 it 由 `syncStatus`／`remoteMatchSlots` 的斷言轉紅。只新增 `vi.mock("@/hooks/useSession", ...)` 區塊、三個 import（`afterEach`、`waitFor`、`useSession`）與新 it，既有 it 的名稱與斷言未改。
+  - 事後補兩個 it（寫入即綠，regression guard）：「選擇器把名單 port、名單狀態與 401 處理交給雲端實作」、「雲端 PUT 回 409 時選擇器呼叫 reloadRemotePlayers」。
+- [x] 7.4 GREEN（TDD）：`hooks/useRoundStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRoundStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器；
   `UseRoundStoreResult` 加 `syncStatus`、`remoteMatchSlots`；`UseRoundStoreOptions` 加兩個 port
-- [ ] 7.5 REFACTOR：`useRemoteRoundStore` 與 `useRemoteRosterStore`／`useRemoteScoreboardStore` 的載入、衝突重載與 401 處理是否值得抽共用——**只在皆有測試守住時**才抽，B5／B6 的測試 MUST 原樣通過；否則註記 skipped
+  - `55779b2`；`git diff 46c6a03 -- nextjs-pickball/hooks/useRoundStore.ts`：本體只見函式名稱／回傳型別那一行（`useRoundStore` → `useLocalRoundStore`，回傳 `LocalRoundStoreResult`），其餘皆為新增（import、options 欄位、結果欄位、`doNothing`、選擇器）。
+  - **與 design 的差異**：兩個 port 與 `rosterSyncStatus` 在 `UseRoundStoreOptions` 為**選填**——既有 `useRoundStore.test.tsx` 約 19 處只傳 `{ players, updatePlayer }`，且既有 it 不得修改，必填會使 tsc 失敗；省略時為不做事的函式，頁面（§10）會傳入。
+- [x] 7.5 REFACTOR：`useRemoteRoundStore` 與 `useRemoteRosterStore`／`useRemoteScoreboardStore` 的載入、衝突重載與 401 處理是否值得抽共用——**只在皆有測試守住時**才抽，B5／B6 的測試 MUST 原樣通過；否則註記 skipped
+  - **skipped**：三者的狀態機不同（名單是每人一個 saver＋重置，計分板是單一 saver＋dirty 追蹤，回合是命令佇列＋重新套用），僅 `LOAD_FAILED`／401 的幾行相似，抽共用需改動 B5／B6 的正式程式碼，換不到足夠的簡化。
+  - 7.2 之後的自我精簡（`a8d46c2`）：移除經 mutation 證實不可達的 `load` 內 `stopped` 檢查與 `handleUnauthorized` 內的重複 `queue.dispose()`。
 
 ## 8. 前端：雲端分槽 hook、計分板選擇器與歸屬清單
 
