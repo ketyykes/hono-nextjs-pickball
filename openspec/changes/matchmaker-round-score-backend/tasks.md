@@ -95,6 +95,7 @@ Depends on: §5
 - [x] 6.2 GREEN（TDD）：新增 `lib/sync/round-api.ts`
 - [x] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
   - 紅燈：`f3aec24`（只含測試檔）；`round-command-queue` 模組不存在，9 個 it（spec 三個＋額外六個）皆因 import 解析失敗而紅。regression guard：無。GREEN 時修正 RED 測試檔的一個 harness 筆誤（「成功但沒有回應內容」it 把 submitScore mock 設在錯的 harness），斷言未改。
+  - **事後補的 regression guard（GREEN 之後由 mutation 發現缺口而加，寫入即綠，非紅燈）**：「退避等待期間排入的命令不提前送出，也不重置等待時間」、「停止後失敗次數歸零，下一次失敗重新從第一個退避間隔開始」、「請求拋出例外時視為網路失敗並重試」。
 - [x] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
 - [x] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
   「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言；

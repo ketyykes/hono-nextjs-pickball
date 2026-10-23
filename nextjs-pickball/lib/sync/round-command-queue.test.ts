@@ -332,6 +332,66 @@ describe("round-command-queue", () => {
 		expect(inFlight.putRound).toHaveBeenCalledTimes(1);
 	});
 
+	// 以下三個是 GREEN 之後由 mutation 發現缺口才補的 regression guard（寫入即綠，非紅燈）
+	it("退避等待期間排入的命令不提前送出，也不重置等待時間", async () => {
+		const h = setup({ log: [] }, 1);
+		h.putRound.mockResolvedValue({ kind: "failed" });
+		h.queue.enqueue(step("A"));
+		await settle();
+		expect(h.putRound).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(500);
+		h.queue.enqueue(step("B"));
+		await vi.advanceTimersByTimeAsync(499);
+		expect(h.putRound).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(h.putRound).toHaveBeenCalledTimes(2);
+		// 重試時一併帶上等待期間排入的命令
+		expect(asFake(h.putRound.mock.calls[1][0]).log).toEqual(["A", "B"]);
+	});
+
+	it("停止後失敗次數歸零，下一次失敗重新從第一個退避間隔開始", async () => {
+		const h = setup({ log: [] }, 1);
+		h.putRound.mockResolvedValueOnce({ kind: "failed" });
+		h.putRound.mockResolvedValueOnce({ kind: "failed" });
+		h.putRound.mockResolvedValueOnce({ kind: "conflict" });
+		h.putRound.mockResolvedValue({ kind: "failed" });
+		h.queue.enqueue(step("A"));
+		await vi.advanceTimersByTimeAsync(1000);
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(h.putRound).toHaveBeenCalledTimes(3);
+		expect(h.events.at(-1)).toBe("conflict");
+
+		h.queue.enqueue(step("B"));
+		await settle();
+		expect(h.putRound).toHaveBeenCalledTimes(4);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(h.putRound).toHaveBeenCalledTimes(5);
+	});
+
+	it("請求拋出例外時視為網路失敗並重試", async () => {
+		const h = setup({ log: [] }, 1);
+		h.putRound.mockRejectedValueOnce(new Error("boom"));
+		h.putRound.mockResolvedValue(putOk({ log: ["A"] }, 2));
+		h.queue.enqueue(step("A"));
+		await settle();
+		expect(h.events).toEqual(["saving", "retrying"]);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(h.putRound).toHaveBeenCalledTimes(2);
+		expect(h.events.at(-1)).toBe("saved");
+
+		const s = setup({ log: [] }, 1);
+		s.submitScore.mockRejectedValueOnce(new Error("boom"));
+		s.submitScore.mockResolvedValue(submitOk({ log: [] }, 2));
+		s.queue.enqueue(submit("m1"));
+		await settle();
+		expect(s.events).toEqual(["saving", "retrying"]);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(s.submitScore).toHaveBeenCalledTimes(2);
+		expect(s.events.at(-1)).toBe("saved");
+	});
+
 	it("getPending 回傳尚未確認的命令，getConfirmed 回傳已確認的回合與版本", async () => {
 		const h = setup({ log: [] }, 4);
 		const first = deferred<PutResult>();
