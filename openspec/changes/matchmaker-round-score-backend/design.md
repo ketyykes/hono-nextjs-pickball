@@ -281,3 +281,10 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     非阻擋（交 §7 注意）：transform 的 apply 會在每次 flush／重試重新呼叫，MUST 可重入（generateRound 不可重新隨機）；hook 層要守住「重載中或停止後的操作不送出也不顯示」；
     `reloadRemotePlayers` 不檢查 `stopped`（401 後被呼叫仍發一次 GET）；重試會併入退避期間新排入的 transform（與 saver 語意一致）。§11.1 MUST 一併改掉 `nextjs-pickball/CLAUDE.md` 兩處 `resetLocalMatchProgress`「只清回合、歷史、分槽」的舊敘述。
     前端單元：§6 五檔 70 個 it 全綠；tsc exit 0；lint 0 errors／3 warnings。**下一步**：派 §7 Implementer（sonnet）。
+22. （apply §7 完成，2026-10-23）Implementer（sonnet）：0d0c6ea RED（模組不存在）→ f813573 GREEN → a179896 RED（3 紅／17 綠）→ 55779b2 GREEN → f023401 guard → a8d46c2 refactor（7.5 抽共用 skipped）→ 27329eb／ecf9065 tasks。
+    Stage 1（sonnet）**PASS**。Stage 2（opus，118 條變異）第一輪 **FAIL**（實作無 bug，20 條非等價存活：401／重載後操作閘門、重新套用契約、場次 id 不重複、排隊送出的預測、`players` 變更同步、選擇器傳 `updatePlayer`、雲端模式不讀本機回合／歷史、舊一輪 GET 以 `cancelled` 忽略）
+    → 補件 51cdff0、f6447b9（regression guard）、6805266（tasks）→ 複審 **PASS**（19 條全紅、等價對照 5 條綠、抽查 15 條仍紅；L22 判定等價）。
+    偏離（Stage 1／2 皆接受）：`UseRoundStoreOptions` 的 `applyRemotePlayers`／`reloadRemotePlayers`／`rosterSyncStatus` 為**選填**（既有約 18 處呼叫只傳兩個參數且既有 it 不得改），省略時為不做事的函式；`rosterSyncStatus` 為 OQ7 要求的名單就緒介面。
+    **§10 MUST**：頁面傳入三個 port 與 `rosterSyncStatus`（漏傳 `applyRemotePlayers` 會使評分靜默不更新）；回填 effect 依賴加入名單就緒與 `remoteMatchSlots`；`scoring-failed` 同時代表雲端／名單未就緒、重複送出與評分失敗，頁面不得當成永久失敗。
+    觀察：vitest 環境的 `<StrictMode>` wrapper 不會重跑 effect，StrictMode 安全性由「enabled 反覆切換時舊一輪結果被忽略」與「卸載時釋放佇列」兩個 it 間接守住；瀏覽器 dev 模式預期 GET 4 次（與 B5／B6 相同）。
+    已知：`hooks/hooksInventory.test.ts` 因 `useRemoteRoundStore` 未列入主 spec 而紅，由 §8.5／8.6 處理。前端 §7 兩檔 64 個 it。**下一步**：派 §8 Implementer（sonnet）。

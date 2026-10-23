@@ -134,7 +134,7 @@ Depends on: §6
   - **與 design 的差異**：兩個 port 與 `rosterSyncStatus` 在 `UseRoundStoreOptions` 為**選填**——既有 `useRoundStore.test.tsx` 約 18 處只傳 `{ players, updatePlayer }`，且既有 it 不得修改，必填會使 tsc 失敗；省略時為不做事的函式，頁面（§10）會傳入。
 - [x] 7.5 REFACTOR：`useRemoteRoundStore` 與 `useRemoteRosterStore`／`useRemoteScoreboardStore` 的載入、衝突重載與 401 處理是否值得抽共用——**只在皆有測試守住時**才抽，B5／B6 的測試 MUST 原樣通過；否則註記 skipped
   - **skipped**：三者的狀態機不同（名單是每人一個 saver＋重置，計分板是單一 saver＋dirty 追蹤，回合是命令佇列＋重新套用），僅 `LOAD_FAILED`／401 的幾行相似，抽共用需改動 B5／B6 的正式程式碼，換不到足夠的簡化。
-  - **Stage 2 mutation 發現缺口的事後 regression guard（寫入即綠，非紅燈；實作未改）**，`51cdff0`、後續補件 commit；逐 it 殺掉的變異（編號取自審查員 `/tmp/b7s2rev/muts.py`）：
+  - **Stage 2 mutation 發現缺口的事後 regression guard（寫入即綠，非紅燈；實作未改）**，`51cdff0`、`f6447b9`（場次 id 不重複 Q02 與無法套用的換人不清空畫面 E01 兩個 it）；逐 it 殺掉的變異（編號取自審查員 `/tmp/b7s2rev/muts.py`）：
     - `useRemoteRoundStore.test.tsx`「401 之後與衝突重載期間，七個操作皆不送出也不改變畫面」：G02、G03、G05、G06、G07。
     - 「排在送出比分後面的場次調整以回應的回合重新套用，不覆蓋伺服器算出的完成時間」：Q09、Q10（swap／reset 在送出後重新套用）。
     - 「排隊中的回合變更以伺服器回應的回合為基礎，保留伺服器改過的欄位」：Q06、Q07、Q09、Q10。
