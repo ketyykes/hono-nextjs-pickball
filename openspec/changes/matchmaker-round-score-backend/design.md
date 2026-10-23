@@ -271,3 +271,6 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     Stage 1（sonnet）PASS。Stage 2（opus，82 條變異）**FAIL**：M1 參與球員在讀取後被刪除的守衛無測試（守衛改寫成 NOT EXISTS 形式存活）；M2 reset「單一 batch」未驗證（拆成四次 await 存活）；
     M3 歷史主鍵衝突的分類寫在 `score-repository.ts`，但 user-data-sync delta 明定「分類邏輯集中在 `batch-guard.ts`」——**leader 裁定為必修**（spec 字面 MUST、成本低、B9 會重用）。
     錯誤碼優先序（舊 roundVersion＋不合法比分 → 409）經 Stage 2 對照 spec 步驟順序確認為 spec 明定行為。**下一步**：退回 §5 Implementer 補 M1～M3 → Stage 2 複審 → §6。
+20. （apply §5 完成，2026-10-23）補件 a9f71ef（refactor：`errorChainMatches`／`isHistoryPrimaryKeyViolation` 集中到 `batch-guard.ts`）、963b112（M1～M3 regression guard）、cc35acf（tasks 5.2／5.3 紀錄）後 Stage 2 複審 **PASS**：G11、P09 轉紅，23 條變異中 18 紅、5 條等價對照綠。後端 21 檔／149 全綠。
+    `guardedBatch` 不抽（單一呼叫端）。**§11 交接 B8～B9 時 MUST 寫入一句**：「B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`」。
+    leader 已修正 tasks 5.3 中 `isConstraintError` 不共用的理由措辭（原「需多一個旋鈕」不成立，改為 surgical＋未匯出）。**下一步**：派 §6 Implementer（sonnet），ticket `/tmp/b7tools/ticket-6-{paste,ref}.md`。

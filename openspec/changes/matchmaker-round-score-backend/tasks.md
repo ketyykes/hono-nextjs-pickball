@@ -82,7 +82,7 @@ Depends on: §4
 - [x] 5.2 GREEN（TDD）：新增 `src/matchmaker/score-repository.ts`（design Decision 2、3；`afterRead` 鉤子只作為選填參數，路由不傳）；`src/routes/matchmaker.ts` 加送出比分路由（失敗碼對應 400／409）；
   `players-repository.ts` 的 reset batch 加三張表。5.1 全綠；B6 的 `matchmaker-players.test.ts` 既有 it 全綠。GREEN commit 同時修正了 RED 測試檔的一行型別（`concat` 元素型別），斷言等價
 - [x] 5.3 REFACTOR：score-repository 的 batch 組裝是否清楚到 B9 可照抄（守衛 → 寫入 → 刪守衛）；無壞味道則註記 skipped；Stage 2 退回後已實際重構：歷史主鍵衝突的分類集中到 `batch-guard.ts`（`isHistoryPrimaryKeyViolation`，與 `isBatchGuardViolation` 共用逐層查 cause 的 `errorChainMatches`），`score-repository.ts` 引用之，並補齊 batch 每條陳述式的「為什麼」註解（守衛 → 歷史 → 回合 → 球員 → 分槽 → 刪守衛）。
-  `players-repository.ts` 的 `isConstraintError` 不共用：它認任何主鍵／UNIQUE 衝突（名單匯入的 id 重複），與「限定 matchmaker_history」語意不同，硬共用需多一個旋鈕，且 B6 行為不可變。
+  `players-repository.ts` 的 `isConstraintError` 不共用：它認任何主鍵／UNIQUE 衝突（名單匯入的 id 重複），與「限定 matchmaker_history」語意不同；技術上可改寫為 `errorChainMatches(e, 判斷式)`，但為維持 B6 程式碼不動（surgical）且 `errorChainMatches` 目前未匯出，本 change 不改，留待 B9 抽共用時一併處理（Stage 2 複審指正原「需多一個旋鈕」的理由不成立）。
   **`guardedBatch` 包裝（OQ14）決定不抽**：目前只有送出比分一處使用，守衛 → 寫入 → 刪守衛的順序已在 `score-repository.ts` 一處清楚呈現；B9 若出現第二個呼叫端再抽，避免單一用途的抽象。
   補件 regression guard（寫入即綠）：「計算後參與球員被刪除時整批守衛使 batch 不寫入任何資料」、「重置以單一 D1 batch 送出四條刪除」、d1-batch-guard 的「歷史主鍵衝突的判定只認 matchmaker_history 的 UNIQUE 衝突」
 
