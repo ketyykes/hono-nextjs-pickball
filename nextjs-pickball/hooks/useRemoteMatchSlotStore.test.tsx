@@ -114,6 +114,8 @@ describe("useRemoteMatchSlotStore", () => {
 		const { result } = renderSlot({ enabled: true });
 
 		await waitFor(() => expect(result.current[2]).toBe("missing"));
+		// missing 時由失效說明取代畫面，不再疊加同步提示
+		expect(result.current[3]).toBe("synced");
 		act(() => {
 			result.current[1]({ type: "RALLY_WON", winner: "us" });
 		});
