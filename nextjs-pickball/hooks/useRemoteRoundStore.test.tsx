@@ -1122,6 +1122,55 @@ describe("useRemoteRoundStore", () => {
 		expect(result.current.round?.matches[0].status).toBe("completed");
 	});
 
+	it("重排產生多個新場次時，場次 id 彼此不重複", async () => {
+		const players = makePlayers(8);
+		const round = buildRound(players, "singles", 4);
+		const { result } = await mountSynced(round, 2, [], { players });
+
+		onPutEcho(3);
+		let outcome!: { ok: boolean };
+		act(() => {
+			outcome = result.current.resetIncompleteMatches();
+		});
+		expect(outcome.ok).toBe(true);
+		const shown = result.current.round?.matches.map((match) => match.id) ?? [];
+		expect(shown).toHaveLength(4);
+		expect(new Set(shown).size).toBe(4);
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		const sent = bodiesOf("PUT", ROUND_PATH)[0].data.matches.map((match: { id: string }) => match.id);
+		expect(new Set(sent).size).toBe(4);
+	});
+
+	it("排在送出比分後面、已無法套用的換人不會清空畫面，也不會被預測進畫面", async () => {
+		const players = makePlayers(6);
+		const round = buildTimedRound(players);
+		const leaving = round.matches[1].teams[0].playerIds[0];
+		const resting = round.restingPlayerIds[0];
+		const { result } = await mountSynced(round, 2, [], { players });
+
+		const deferredPut = onDeferred("PUT", ROUND_PATH);
+		act(() => {
+			result.current.setTargetScore(15);
+		});
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		act(() => {
+			result.current.submitScore("m1", "11", "7");
+			result.current.swapMatchPlayer("m2", leaving, resting);
+		});
+		onDeferred("POST", SCORE_PATH);
+		deferredPut.release(200, (body: { data: Round }) => ({
+			data: {
+				...body.data,
+				restingPlayerIds: body.data.restingPlayerIds.filter((id) => id !== resting),
+			},
+			version: 3,
+		}));
+		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+		expect(result.current.round).not.toBeNull();
+		expect(result.current.round?.matches[0].status).toBe("completed");
+		expect(result.current.round?.matches[1].teams[0].playerIds).toEqual([leaving]);
+	});
+
 	it("名單從空變成六人之後，generateRound 以新名單排出回合", async () => {
 		onLoad(null, 0);
 		const { result, rerender } = renderRound({ players: [] });
