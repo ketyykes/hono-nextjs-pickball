@@ -130,7 +130,7 @@ describe("storage", () => {
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 
-	it("resetLocalMatchProgress 只移除回合、歷史與分槽，保留名單與獨立計分板", () => {
+	it("resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板", () => {
 		const roster = JSON.stringify({ version: 1, players: [makePlayer()] });
 		localStorage.setItem(STORAGE_KEY, roster);
 		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ round: true }));
@@ -140,9 +140,9 @@ describe("storage", () => {
 
 		resetLocalMatchProgress();
 
-		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBeNull();
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
-		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe(JSON.stringify({ round: true }));
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe(JSON.stringify({ "match-1": { untouched: true } }));
 		expect(localStorage.getItem(STORAGE_KEY)).toBe(roster);
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
