@@ -274,3 +274,10 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
 20. （apply §5 完成，2026-10-23）補件 a9f71ef（refactor：`errorChainMatches`／`isHistoryPrimaryKeyViolation` 集中到 `batch-guard.ts`）、963b112（M1～M3 regression guard）、cc35acf（tasks 5.2／5.3 紀錄）後 Stage 2 複審 **PASS**：G11、P09 轉紅，23 條變異中 18 紅、5 條等價對照綠。後端 21 檔／149 全綠。
     `guardedBatch` 不抽（單一呼叫端）。**§11 交接 B8～B9 時 MUST 寫入一句**：「B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`」。
     leader 已修正 tasks 5.3 中 `isConstraintError` 不共用的理由措辭（原「需多一個旋鈕」不成立，改為 surgical＋未匯出）。**下一步**：派 §6 Implementer（sonnet），ticket `/tmp/b7tools/ticket-6-{paste,ref}.md`。
+21. （apply §6 完成，2026-10-23，接手 leader）前任 leader 與 §6 Implementer 於 mutation 階段被 coordinator 停止；接手後核對 §6 交件條件：必做變異皆已轉紅（`/tmp/b7tools/mut/out{1,2}.txt`），
+    leader 補跑 H4（原變異為語法錯誤的假紅）改為 H4b／H4c 皆紅。Stage 1（sonnet）**PASS**。Stage 2（opus，102 條變異）第一輪 **FAIL**（實作無 bug，13 條非等價存活）：
+    回應 schema 內容未驗證（A06／A13）、dispose 後計時器／佇列／enqueue（Q23／Q25／Q26）、合併中夾被丟棄命令（Q35）、`applyRemotePlayers` 的 busy 判斷只看回應中的參賽者（R03／R04）、
+    `handleStaleOutcome` 的 `resetting`／`cancelled`／`stopped` 與 DELETE 路徑（R20／R22～R24）。補件 77d7554（regression guard）、e43e717（tasks 紀錄）後複審 **PASS**：13 條全數轉紅、等價對照維持綠、抽查 19 條仍紅。
+    非阻擋（交 §7 注意）：transform 的 apply 會在每次 flush／重試重新呼叫，MUST 可重入（generateRound 不可重新隨機）；hook 層要守住「重載中或停止後的操作不送出也不顯示」；
+    `reloadRemotePlayers` 不檢查 `stopped`（401 後被呼叫仍發一次 GET）；重試會併入退避期間新排入的 transform（與 saver 語意一致）。§11.1 MUST 一併改掉 `nextjs-pickball/CLAUDE.md` 兩處 `resetLocalMatchProgress`「只清回合、歷史、分槽」的舊敘述。
+    前端單元：§6 五檔 70 個 it 全綠；tsc exit 0；lint 0 errors／3 warnings。**下一步**：派 §7 Implementer（sonnet）。
