@@ -134,6 +134,20 @@ Depends on: §6
   - **與 design 的差異**：兩個 port 與 `rosterSyncStatus` 在 `UseRoundStoreOptions` 為**選填**——既有 `useRoundStore.test.tsx` 約 18 處只傳 `{ players, updatePlayer }`，且既有 it 不得修改，必填會使 tsc 失敗；省略時為不做事的函式，頁面（§10）會傳入。
 - [x] 7.5 REFACTOR：`useRemoteRoundStore` 與 `useRemoteRosterStore`／`useRemoteScoreboardStore` 的載入、衝突重載與 401 處理是否值得抽共用——**只在皆有測試守住時**才抽，B5／B6 的測試 MUST 原樣通過；否則註記 skipped
   - **skipped**：三者的狀態機不同（名單是每人一個 saver＋重置，計分板是單一 saver＋dirty 追蹤，回合是命令佇列＋重新套用），僅 `LOAD_FAILED`／401 的幾行相似，抽共用需改動 B5／B6 的正式程式碼，換不到足夠的簡化。
+  - **Stage 2 mutation 發現缺口的事後 regression guard（寫入即綠，非紅燈；實作未改）**，`51cdff0`、後續補件 commit；逐 it 殺掉的變異（編號取自審查員 `/tmp/b7s2rev/muts.py`）：
+    - `useRemoteRoundStore.test.tsx`「401 之後與衝突重載期間，七個操作皆不送出也不改變畫面」：G02、G03、G05、G06、G07。
+    - 「排在送出比分後面的場次調整以回應的回合重新套用，不覆蓋伺服器算出的完成時間」：Q09、Q10（swap／reset 在送出後重新套用）。
+    - 「排隊中的回合變更以伺服器回應的回合為基礎，保留伺服器改過的欄位」：Q06、Q07、Q09、Q10。
+    - 「回應的回合中換入的球員已不在休息名單時，排隊的換人被丟棄且畫面等於已確認回合」：Q11。
+    - 「重排產生多個新場次時，場次 id 彼此不重複」：Q02。
+    - 「排在送出比分後面、已無法套用的換人不會清空畫面，也不會被預測進畫面」：E01。
+    - 「排隊中的送出會被預測進畫面…」：E02。
+    - 「名單從空變成六人之後，generateRound 以新名單排出回合」：C10。
+    - 「enabled 反覆切換時，舊一輪較晚回來的載入結果被忽略」：L14、L19。
+    - 「已載入之後 enabled 關閉再開啟，重新載入前回到 loading 且清空回合」：R01。
+    - 既有 it 加一條斷言：名單未就緒的失敗碼（O06）。
+    - `useRoundStore.test.tsx`「雲端模式產生下一輪時，上一輪休息者的休息次數在 PUT 成功後經 updatePlayer 結算」：S05；「雲端模式不使用訪客時期的本機回合與歷史」：S12、S13。
+    - 複驗：以審查員 harness 重跑，上列變異全部轉紅；等價對照 R15、P03、P06、C09、S14 維持綠；L22（effect 開頭不重設 ref，審查員標 probe）仍存活，判定近似等價（`LOAD_START` 與載入完成前 `readyRef` 本來就由 cleanup 與 `updateReady` 維持為 false）。
   - 7.2 之後的自我精簡（`a8d46c2`）：移除經 mutation 證實不可達的 `load` 內 `stopped` 檢查與 `handleUnauthorized` 內的重複 `queue.dispose()`。
 
 ## 8. 前端：雲端分槽 hook、計分板選擇器與歸屬清單
