@@ -414,4 +414,47 @@ describe("round-command-queue", () => {
 		expect(h.queue.getConfirmed().version).toBe(5);
 		expect(h.queue.getPending()).toEqual([s]);
 	});
+
+	// regression guard：以下兩個 it 在寫入當下即綠，補的是 Stage 2 mutation 發現的缺口
+	it("dispose 後不留計時器、佇列清空，之後排入的命令不進入 getPending", async () => {
+		const h = setup({ log: [] }, 1);
+		h.putRound.mockResolvedValue({ kind: "failed" });
+
+		h.queue.enqueue(step("A"));
+		h.queue.enqueue(step("B"));
+		await settle();
+		// 等待退避期間：有一個重試計時器，命令仍在佇列
+		expect(vi.getTimerCount()).toBe(1);
+		expect(h.queue.getPending()).toHaveLength(2);
+
+		h.queue.dispose();
+		expect(vi.getTimerCount()).toBe(0);
+		expect(h.queue.getPending()).toHaveLength(0);
+
+		h.queue.enqueue(step("C"));
+		await settle();
+		expect(h.queue.getPending()).toHaveLength(0);
+		expect(h.putRound).toHaveBeenCalledTimes(1);
+	});
+
+	it("合併時夾著被丟棄的命令，後面的命令仍併入同一次 PUT", async () => {
+		const h = setup({ log: [] }, 1);
+		const first = deferred<PutResult>();
+		h.putRound.mockReturnValueOnce(first.promise);
+		h.putRound.mockResolvedValue(putOk({ log: ["X", "A", "B"] }, 3));
+
+		h.queue.enqueue(step("X"));
+		h.queue.enqueue(step("A"));
+		h.queue.enqueue(discard());
+		h.queue.enqueue(step("B"));
+		await settle();
+
+		first.resolve(putOk({ log: ["X"] }, 2));
+		await settle();
+
+		// 丟棄的命令不得中斷合併：A、B 在同一次 PUT，之後沒有第三次請求
+		expect(h.putRound).toHaveBeenCalledTimes(2);
+		expect(asFake(h.putRound.mock.calls[1][0]).log).toEqual(["X", "A", "B"]);
+		expect(h.queue.getPending()).toHaveLength(0);
+	});
 });

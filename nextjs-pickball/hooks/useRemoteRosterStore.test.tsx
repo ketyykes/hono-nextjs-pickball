@@ -1193,4 +1193,163 @@ describe("useRemoteRosterStore 名單 port（接收後端寫入的評分）", ()
 		expect(fetchMock).not.toHaveBeenCalled();
 		expect(result.current.players).toEqual([]);
 	});
+
+	// regression guard：以下 it 在實作完成後補寫，寫入當下即綠（Stage 2 mutation 發現的缺口）
+	it("applyRemotePlayers 只在回應中的參賽者有待送變更時才重載", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 2], [makePlayer("p2"), 2]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		// 只有 p2 有在途的 PUT
+		enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "p2 在途" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+
+		// 回應只含閒置的 p1：不得因為別人忙碌而重載
+		const updatedP1 = makePlayer("p1", { rating: 4.2 });
+		act(() => {
+			result.current.applyRemotePlayers([{ data: updatedP1, version: 3 }]);
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+		expect(result.current.players.find((player) => player.id === "p1")).toEqual(updatedP1);
+		expect(result.current.syncStatus).not.toBe("conflict");
+
+		// 回應的第二筆（p2）忙碌：即使第一筆閒置也要重載並回報 conflict
+		const cloudP1 = makePlayer("p1", { name: "雲端 p1" });
+		const cloudP2 = makePlayer("p2", { name: "雲端 p2" });
+		enqueue(200, listBody([[cloudP1, 5], [cloudP2, 5]]));
+		act(() => {
+			result.current.applyRemotePlayers([
+				{ data: updatedP1, version: 3 },
+				{ data: makePlayer("p2"), version: 3 },
+			]);
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		expect(callsOf("GET")).toHaveLength(2);
+		expect(result.current.players).toEqual([cloudP1, cloudP2]);
+	});
+});
+
+describe("useRemoteRosterStore 重置期間舊世代結果的處理邊界", () => {
+	it("重置成功之後才到的舊世代 409 或 401，不得重載、不得呼叫 onUnauthorized，狀態維持 synced", async () => {
+		for (const staleStatus of [409, 401]) {
+			fetchMock.mockClear();
+			enqueue(200, listBody([[makePlayer("p1"), 3]]));
+			const { result, onUnauthorized, unmount } = renderRemote({ enabled: true });
+			await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+			const releaseP1 = enqueueDeferred();
+			act(() => {
+				result.current.updatePlayer("p1", { name: "x" });
+			});
+			await waitFor(() => expect(putCalls()).toHaveLength(1));
+			const releaseReset = enqueueDeferred();
+			act(() => {
+				result.current.resetRoster();
+			});
+			await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+			await act(async () => {
+				releaseReset(204, {});
+			});
+			await waitFor(() => expect(result.current.players).toEqual([]));
+
+			await act(async () => {
+				releaseP1(staleStatus, {});
+			});
+			await settle();
+
+			expect(callsOf("GET")).toHaveLength(1);
+			expect(onUnauthorized).not.toHaveBeenCalled();
+			expect(result.current.syncStatus).toBe("synced");
+			unmount();
+		}
+	});
+
+	it("重置在途時卸載，之後舊世代回 409 不得發出 GET", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result, unmount } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		unmount();
+		await act(async () => {
+			releaseP1(409, {});
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+
+		await act(async () => {
+			releaseReset(204, {});
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+	});
+
+	it("重置中已收到 401，之後另一筆舊世代回 409 不得發出 GET", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		const releaseP2 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "y" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		await act(async () => {
+			releaseP1(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			releaseP2(409, {});
+		});
+		await settle();
+
+		expect(callsOf("GET")).toHaveLength(1);
+		expect(onUnauthorized).toHaveBeenCalledTimes(1);
+	});
+
+	it("重置中 DELETE 回 401 時呼叫 onUnauthorized", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseDelete = enqueueDeferred();
+		act(() => {
+			result.current.removePlayer("p1");
+		});
+		await waitFor(() => expect(callsOf("DELETE")).toHaveLength(1));
+		enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		await act(async () => {
+			releaseDelete(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+	});
 });

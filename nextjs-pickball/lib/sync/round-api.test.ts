@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Round } from "@pickball/core/matchmaker/round-types";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import {
 	MatchSlotGetResponseSchema,
 	MatchSlotListResponseSchema,
@@ -82,5 +83,27 @@ describe("round-api", () => {
 		await expect(fetchRemoteSlot("m1")).resolves.toBe(result);
 		await expect(putRemoteSlot("m1", SLOT, 1)).resolves.toBe(result);
 		await expect(submitRemoteScore("m1", "1", "2", 1)).resolves.toBe(result);
+	});
+
+	// regression guard：兩個 PUT 回應 schema 原本只以常數身分比對，換成對方的 schema 時仍會綠燈
+	it("PUT 回應 schema 只接受各自的資料形狀，回合與分槽不可互換", () => {
+		const validRound = {
+			roundNumber: 1,
+			createdAt: "2026-01-01T00:00:00.000Z",
+			format: "doubles",
+			courtCount: 1,
+			targetScore: 11,
+			matches: [],
+			restingPlayerIds: [],
+			seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+			timer: null,
+		};
+		const validSlot = { ...createInitialState({ matchId: "m1" }), matchId: "m1" };
+
+		expect(PUT_ROUND_RESPONSE_SCHEMA.safeParse({ data: validRound, version: 2 }).success).toBe(true);
+		expect(PUT_ROUND_RESPONSE_SCHEMA.safeParse({ data: validSlot, version: 2 }).success).toBe(false);
+
+		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validSlot, version: 1 }).success).toBe(true);
+		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validRound, version: 1 }).success).toBe(false);
 	});
 });
