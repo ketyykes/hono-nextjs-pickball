@@ -4,7 +4,12 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, type SQL, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound } from "../db/schema";
-import { insertBatchGuard, isBatchGuardViolation, releaseBatchGuard } from "./batch-guard";
+import {
+	insertBatchGuard,
+	isBatchGuardViolation,
+	isHistoryPrimaryKeyViolation,
+	releaseBatchGuard,
+} from "./batch-guard";
 import { getRound } from "./round-repository";
 
 export interface SubmitScoreForUserInput {
@@ -32,18 +37,6 @@ const INVALID_BODY_CODES: readonly string[] = [
 	VALIDATE_SCORE_FAILURE_CODE.NEGATIVE_SCORE,
 	VALIDATE_SCORE_FAILURE_CODE.TIE,
 ];
-
-/** 只認 matchmaker_history 的主鍵衝突，避免把其他表的唯一性錯誤（如殘留守衛列）吞成 409。 */
-function isHistoryPrimaryKeyViolation(error: unknown): boolean {
-	let current: unknown = error;
-	for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
-		if (current.message.includes("UNIQUE constraint failed: matchmaker_history.")) {
-			return true;
-		}
-		current = current.cause;
-	}
-	return false;
-}
 
 /**
  * 後端權威的送出比分：讀回合與名單 → 核心 submitScore → 單一 batch 寫入。
@@ -83,6 +76,7 @@ export async function submitScoreForUser(
 	await options.afterRead?.();
 
 	const updatedPlayers = result.playerPatches.map((patch) => {
+		// playerPatches 的 id 必然來自 playerRows，find 不會落空；斷言只為滿足型別，不用額外的錯誤分支
 		const row = playerRows.find((candidate) => candidate.id === patch.id) as (typeof playerRows)[number];
 		const data: Player = { ...row.data, rating: patch.rating, gamesPlayed: patch.gamesPlayed };
 		return { id: patch.id, data, readVersion: row.version };
@@ -96,6 +90,7 @@ export async function submitScoreForUser(
 		AND (SELECT COUNT(*) FROM matchmaker_players WHERE user_id = ${userId} AND (${sql.join(playerConditions, sql` OR `)})) = ${updatedPlayers.length}`;
 
 	const statements = [
+		// 第一條：必須在任何寫入之前，否則會讀到自己剛寫入的新 version 而失效
 		insertBatchGuard(db, userId, guardCondition, now),
 		// 不加 onConflictDoNothing：主鍵衝突必須拋出，使整批回滾
 		db.insert(matchmakerHistory).values({
@@ -106,10 +101,12 @@ export async function submitScoreForUser(
 			version: 1,
 			updatedAt: now,
 		}),
+		// 版本條件已由守衛保證；這裡仍帶 version 只是縱深防禦（0 列 UPDATE 不會回滾）
 		db
 			.update(matchmakerRound)
 			.set({ data: result.round, version: round.version + 1, updatedAt: now })
 			.where(and(eq(matchmakerRound.userId, userId), eq(matchmakerRound.version, round.version))),
+		// 只更新這場的參賽者；同樣帶 user_id 與 version 條件
 		...updatedPlayers.map((player) =>
 			db
 				.update(matchmakerPlayers)
@@ -122,9 +119,11 @@ export async function submitScoreForUser(
 					),
 				),
 		),
+		// 場次完成後計分板分槽不再有意義，與其他寫入同批刪除以維持「分槽只存在於未完成場次」
 		db
 			.delete(matchmakerMatchSlots)
 			.where(and(eq(matchmakerMatchSlots.userId, userId), eq(matchmakerMatchSlots.matchId, input.matchId))),
+		// 最後一條：使守衛表在 batch 結束後恆為空
 		releaseBatchGuard(db, userId),
 	];
 
@@ -143,6 +142,7 @@ export async function submitScoreForUser(
 			round: { data: result.round, version: round.version + 1 },
 			players: updatedPlayers.map((player) => ({ data: player.data, version: player.readVersion + 1 })),
 			historyEntry: result.historyEntry,
+			// 核心回傳 readonly，複製一份才能指派給回應型別
 			boundaryHits: result.boundaryHits.map((hit) => ({ ...hit })),
 		},
 	};

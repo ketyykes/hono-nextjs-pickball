@@ -22,14 +22,29 @@ export function releaseBatchGuard(db: Db, userId: string) {
 	return db.delete(syncBatchGuards).where(eq(syncBatchGuards.userId, userId));
 }
 
-/** 錯誤是否為整批守衛失敗；錯誤可能被包在 cause 內，逐層檢查。不比對寬泛的 SQLITE_CONSTRAINT。 */
-export function isBatchGuardViolation(error: unknown): boolean {
+/** 逐層檢查錯誤與其 cause（正式 D1 的外層前綴可能不同），任一層符合就回 true。 */
+function errorChainMatches(error: unknown, matches: (message: string) => boolean): boolean {
 	let current: unknown = error;
 	for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
-		if (current.message.includes("NOT NULL constraint failed: sync_batch_guards.version")) {
+		if (matches(current.message)) {
 			return true;
 		}
 		current = current.cause;
 	}
 	return false;
+}
+
+/** 錯誤是否為整批守衛失敗；不比對寬泛的 SQLITE_CONSTRAINT。 */
+export function isBatchGuardViolation(error: unknown): boolean {
+	return errorChainMatches(error, (message) =>
+		message.includes("NOT NULL constraint failed: sync_batch_guards.version"),
+	);
+}
+
+/**
+ * 錯誤是否為 matchmaker_history 的主鍵衝突（同一場次重複寫入歷史）。
+ * 必須限定表名：殘留守衛列的 sync_batch_guards.user_id 衝突、其他表的錯誤都不能被吞成 409。
+ */
+export function isHistoryPrimaryKeyViolation(error: unknown): boolean {
+	return errorChainMatches(error, (message) => message.includes("UNIQUE constraint failed: matchmaker_history."));
 }
