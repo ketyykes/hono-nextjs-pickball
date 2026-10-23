@@ -482,6 +482,7 @@ describe("useRemoteRoundStore", () => {
 			blocked = result.current.submitScore("m1", "11", "7");
 		});
 		expect(blocked.ok).toBe(false);
+		if (!blocked.ok) expect(blocked.code).toBe("scoring-failed");
 		await settle();
 		expect(callsOf("POST", SCORE_PATH)).toHaveLength(0);
 		expect(result.current.round).toEqual(round);
@@ -904,6 +905,301 @@ describe("useRemoteRoundStore", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	// ---- Stage 2 mutation 發現缺口後補的 regression guard（寫入即綠） ----
+
+	function buildTimedRound(players: Player[]): Round {
+		return {
+			...buildRound(players, "singles", 2),
+			timer: { durationMinutes: 10 as const, startedAt: null },
+		};
+	}
+
+	it("401 之後與衝突重載期間，七個操作皆不送出也不改變畫面", async () => {
+		const players = makePlayers(6);
+		const round = buildTimedRound(players);
+		const leaving = round.matches[1].teams[0].playerIds[0];
+		const resting = round.restingPlayerIds[0];
+
+		async function expectAllBlocked(current: Rendered) {
+			const callsBefore = fetchMock.mock.calls.length;
+			const shown = current.result.current.round;
+			let outcomes: Array<{ ok: boolean }> = [];
+			act(() => {
+				const store = current.result.current;
+				outcomes = [
+					store.generateRound({ format: "singles", courtCount: 2 }),
+					store.resetIncompleteMatches(),
+					store.submitScore("m1", "11", "7"),
+					store.setTargetScore(15),
+					store.setTimerDuration(15),
+					store.startTimer(),
+					store.swapMatchPlayer("m2", leaving, resting),
+				];
+			});
+			expect(outcomes).toHaveLength(7);
+			expect(outcomes.every((outcome) => !outcome.ok)).toBe(true);
+			await settle();
+			expect(fetchMock.mock.calls.length).toBe(callsBefore);
+			expect(current.result.current.round).toBe(shown);
+		}
+
+		// 401 之後
+		const stopped = await mountSynced(round, 3, [], { players });
+		on("PUT", ROUND_PATH, 401);
+		act(() => {
+			stopped.result.current.setTargetScore(15);
+		});
+		await waitFor(() => expect(stopped.onUnauthorized).toHaveBeenCalledTimes(1));
+		await expectAllBlocked(stopped);
+
+		// 衝突重載期間
+		const reloading = await mountSynced(round, 3, [], { players });
+		on("PUT", ROUND_PATH, 409);
+		const reload = onDeferred("GET", ROUND_PATH);
+		on("GET", SLOTS_PATH, 200, { items: [] });
+		act(() => {
+			reloading.result.current.setTargetScore(15);
+		});
+		await waitFor(() => expect(callsOf("GET", ROUND_PATH).length).toBeGreaterThanOrEqual(3));
+		await expectAllBlocked(reloading);
+		reload.release(200, { data: round, version: 6 });
+		await waitFor(() => expect(reloading.result.current.syncStatus).toBe("conflict"));
+	});
+
+	it("排在送出比分後面的場次調整以回應的回合重新套用，不覆蓋伺服器算出的完成時間", async () => {
+		for (const kind of ["swap", "reset"] as const) {
+			fetchMock.mockClear();
+			const players = makePlayers(6);
+			const round = buildTimedRound(players);
+			const leaving = round.matches[1].teams[0].playerIds[0];
+			const resting = round.restingPlayerIds[0];
+			const { result } = await mountSynced(round, 3, [], { players });
+
+			const response = buildSubmitResponse(round, players, "m1", 3);
+			const deferredPost = onDeferred("POST", SCORE_PATH);
+			act(() => {
+				result.current.submitScore("m1", "11", "7");
+			});
+			await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+			let outcome!: { ok: boolean };
+			act(() => {
+				outcome =
+					kind === "swap"
+						? result.current.swapMatchPlayer("m2", leaving, resting)
+						: result.current.resetIncompleteMatches();
+			});
+			expect(outcome.ok).toBe(true);
+			onPutEcho(5);
+			deferredPost.release(200, response);
+			await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+
+			const body = bodiesOf("PUT", ROUND_PATH)[0];
+			expect(body.version).toBe(4);
+			const sent = body.data.matches as Array<{ id: string; completedAt: string | null }>;
+			expect(sent.find((match) => match.id === "m1")?.completedAt).toBe(LATER);
+			// 場次 id 不重複（穩定 id 來源要逐次前進）
+			expect(new Set(sent.map((match) => match.id)).size).toBe(sent.length);
+			const shown = result.current.round?.matches.map((match) => match.id) ?? [];
+			expect(new Set(shown).size).toBe(shown.length);
+			if (kind === "swap") {
+				expect(body.data.matches[1].teams[0].playerIds).toEqual([resting]);
+			}
+			await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		}
+	});
+
+	it("排隊中的回合變更以伺服器回應的回合為基礎，保留伺服器改過的欄位", async () => {
+		const cases = ["timer", "swap", "reset", "start"] as const;
+		for (const kind of cases) {
+			fetchMock.mockClear();
+			const players = makePlayers(6);
+			const round = buildTimedRound(players);
+			const leaving = round.matches[1].teams[0].playerIds[0];
+			const resting = round.restingPlayerIds[0];
+			const { result } = await mountSynced(round, 2, [], { players });
+
+			const deferredPut = onDeferred("PUT", ROUND_PATH);
+			act(() => {
+				result.current.setTargetScore(15);
+			});
+			await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+			act(() => {
+				if (kind === "timer") result.current.setTimerDuration(15);
+				if (kind === "swap") result.current.swapMatchPlayer("m2", leaving, resting);
+				if (kind === "reset") result.current.resetIncompleteMatches();
+				if (kind === "start") result.current.startTimer();
+			});
+			onPutEcho(6);
+			// 伺服器把目標分數改成 21
+			deferredPut.release(200, (body: { data: Round }) => ({
+				data: { ...body.data, targetScore: 21 },
+				version: 3,
+			}));
+			await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(2));
+			const second = bodiesOf("PUT", ROUND_PATH)[1];
+			expect(second.version).toBe(3);
+			expect(second.data.targetScore).toBe(21);
+			if (kind === "timer") expect(second.data.timer.durationMinutes).toBe(15);
+			if (kind === "start") expect(second.data.timer.startedAt).not.toBeNull();
+			if (kind === "swap") expect(second.data.matches[1].teams[0].playerIds).toEqual([resting]);
+			await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		}
+
+		// 反向：先改計時長度，伺服器改成 20 分鐘，之後排入的目標分數保留 20
+		fetchMock.mockClear();
+		const players = makePlayers(6);
+		const { result } = await mountSynced(buildTimedRound(players), 2, [], { players });
+		const deferredPut = onDeferred("PUT", ROUND_PATH);
+		act(() => {
+			result.current.setTimerDuration(15);
+		});
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		act(() => {
+			result.current.setTargetScore(15);
+		});
+		onPutEcho(6);
+		deferredPut.release(200, (body: { data: Round }) => ({
+			data: { ...body.data, timer: { durationMinutes: 20, startedAt: null } },
+			version: 3,
+		}));
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(2));
+		expect(bodiesOf("PUT", ROUND_PATH)[1].data.timer.durationMinutes).toBe(20);
+		expect(bodiesOf("PUT", ROUND_PATH)[1].data.targetScore).toBe(15);
+	});
+
+	it("回應的回合中換入的球員已不在休息名單時，排隊的換人被丟棄且畫面等於已確認回合", async () => {
+		const players = makePlayers(6);
+		const round = buildTimedRound(players);
+		const leaving = round.matches[1].teams[0].playerIds[0];
+		const resting = round.restingPlayerIds[0];
+		const { result } = await mountSynced(round, 2, [], { players });
+
+		const deferredPut = onDeferred("PUT", ROUND_PATH);
+		act(() => {
+			result.current.setTargetScore(15);
+		});
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		let swapped!: { ok: boolean };
+		act(() => {
+			swapped = result.current.swapMatchPlayer("m2", leaving, resting);
+		});
+		expect(swapped.ok).toBe(true);
+
+		let confirmed: Round | null = null;
+		deferredPut.release(200, (body: { data: Round }) => {
+			confirmed = {
+				...body.data,
+				restingPlayerIds: body.data.restingPlayerIds.filter((id) => id !== resting),
+			};
+			return { data: confirmed, version: 3 };
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		await settle();
+		expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1);
+		expect(result.current.round).toEqual(confirmed);
+	});
+
+	it("排隊中的送出會被預測進畫面：前一個 PUT 回來後、POST 回來前，該場仍顯示完成", async () => {
+		const players = makePlayers(6);
+		const round = buildTimedRound(players);
+		const leaving = round.matches[1].teams[0].playerIds[0];
+		const resting = round.restingPlayerIds[0];
+		const { result } = await mountSynced(round, 3, [], { players });
+
+		const deferredPut = onDeferred("PUT", ROUND_PATH);
+		act(() => {
+			result.current.swapMatchPlayer("m2", leaving, resting);
+		});
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		act(() => {
+			result.current.submitScore("m1", "11", "7");
+		});
+		onDeferred("POST", SCORE_PATH);
+		deferredPut.release(200, (body: { data: Round }) => ({ data: body.data, version: 4 }));
+		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+		expect(result.current.round?.matches[0].status).toBe("completed");
+	});
+
+	it("名單從空變成六人之後，generateRound 以新名單排出回合", async () => {
+		onLoad(null, 0);
+		const { result, rerender } = renderRound({ players: [] });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const six = makePlayers(6);
+		rerender({ enabled: true, players: six });
+		onPutEcho(1);
+		let outcome!: { ok: boolean };
+		act(() => {
+			outcome = result.current.generateRound({ format: "singles", courtCount: 1 });
+		});
+		expect(outcome.ok).toBe(true);
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		const body = bodiesOf("PUT", ROUND_PATH)[0];
+		const used = [
+			...body.data.matches.flatMap((match: { teams: Array<{ playerIds: string[] }> }) =>
+				match.teams.flatMap((team) => team.playerIds),
+			),
+			...body.data.restingPlayerIds,
+		];
+		expect([...used].sort()).toEqual(six.map((player) => player.id).sort());
+	});
+
+	it("enabled 反覆切換時，舊一輪較晚回來的載入結果被忽略", async () => {
+		const players = makePlayers(4);
+		const oldRound = buildRound(players, "doubles", 1);
+		const newRound = { ...buildRound(players, "doubles", 1), roundNumber: 8 };
+
+		const oldRoundGet = onDeferred("GET", ROUND_PATH);
+		const oldSlotsGet = onDeferred("GET", SLOTS_PATH);
+		const { result, rerender } = renderRound({ players });
+		await waitFor(() => expect(callsOf("GET", ROUND_PATH)).toHaveLength(1));
+		rerender({ enabled: false, players });
+		const newRoundGet = onDeferred("GET", ROUND_PATH);
+		const newSlotsGet = onDeferred("GET", SLOTS_PATH);
+		rerender({ enabled: true, players });
+		await waitFor(() => expect(callsOf("GET", ROUND_PATH)).toHaveLength(2));
+
+		// 重新啟用的當下是載入中，不殘留任何回合
+		expect(result.current.syncStatus).toBe("loading");
+		expect(result.current.round).toBeNull();
+
+		newRoundGet.release(200, { data: newRound, version: 7 });
+		newSlotsGet.release(200, { items: [] });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		oldRoundGet.release(200, { data: oldRound, version: 2 });
+		oldSlotsGet.release(200, { items: [{ data: makeSlot("m1"), version: 1 }] });
+		await settle();
+		expect(result.current.round).toEqual(newRound);
+		expect(result.current.remoteMatchSlots).toEqual({});
+
+		onPutEcho(8);
+		act(() => {
+			result.current.setTargetScore(15);
+		});
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		expect(bodiesOf("PUT", ROUND_PATH)[0].version).toBe(7);
+	});
+
+	it("已載入之後 enabled 關閉再開啟，重新載入前回到 loading 且清空回合", async () => {
+		const players = makePlayers(4);
+		const first = buildRound(players, "doubles", 1);
+		const second = { ...buildRound(players, "doubles", 1), roundNumber: 5 };
+		const { result, rerender } = await mountSynced(first, 2, [makeSlot("m1")], { players });
+
+		rerender({ enabled: false, players });
+		const roundGet = onDeferred("GET", ROUND_PATH);
+		const slotsGet = onDeferred("GET", SLOTS_PATH);
+		rerender({ enabled: true, players });
+		expect(result.current.syncStatus).toBe("loading");
+		expect(result.current.round).toBeNull();
+		expect(result.current.remoteMatchSlots).toEqual({});
+
+		roundGet.release(200, { data: second, version: 4 });
+		slotsGet.release(200, { items: [] });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(result.current.round).toEqual(second);
 	});
 
 	it("enabled 由 true 變 false 時回到 local 且清空回合與分槽", async () => {

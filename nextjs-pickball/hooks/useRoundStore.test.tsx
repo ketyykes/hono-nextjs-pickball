@@ -921,4 +921,86 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
 		expect(reloadRemotePlayers).toHaveBeenCalledTimes(1);
 	});
+	it("雲端模式產生下一輪時，上一輪休息者的休息次數在 PUT 成功後經 updatePlayer 結算", async () => {
+		mockSession("user");
+		const six = Array.from({ length: 6 }, (_, index) => makePlayer({ id: `q${index + 1}` }));
+		const previous = createRound({
+			players: six,
+			format: "singles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!previous.ok) throw new Error("測試前置失敗：createRound 未成功");
+		fetchMock.mockImplementation((input, init) => {
+			const method = init?.method ?? "GET";
+			if (method === "GET" && String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: previous.round, version: 2 }));
+			}
+			if (method === "GET" && String(input) === REMOTE_SLOTS_PATH) {
+				return Promise.resolve(jsonResponse({ items: [] }));
+			}
+			if (method === "PUT" && String(input) === REMOTE_ROUND_PATH) {
+				const { data } = JSON.parse(String(init?.body));
+				return Promise.resolve(jsonResponse({ data, version: 3 }));
+			}
+			return Promise.reject(new Error(`unexpected fetch: ${method} ${String(input)}`));
+		});
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() =>
+			useRoundStore({ players: six, updatePlayer, applyRemotePlayers, reloadRemotePlayers }),
+		);
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1 });
+		});
+		expect(updatePlayer).not.toHaveBeenCalled();
+		await waitFor(() => expect(updatePlayer).toHaveBeenCalled());
+		const resting = previous.round.restingPlayerIds;
+		expect(updatePlayer).toHaveBeenCalledTimes(resting.length);
+		for (const id of resting) {
+			expect(updatePlayer).toHaveBeenCalledWith(id, { restCount: 1 });
+		}
+	});
+
+	it("雲端模式不使用訪客時期的本機回合與歷史", async () => {
+		const created = createRound({
+			players,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		const scored = submitScore({
+			round: created.round,
+			players,
+			matchId: "match-1",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: "2026-08-23T00:05:00.000Z",
+		});
+		if (!scored.ok) throw new Error("測試前置失敗：submitScore 未成功");
+		writeRound(scored.round);
+		writeHistory([scored.historyEntry]);
+
+		mockSession("user");
+		fetchMock.mockImplementation((input) => {
+			if (String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: null, version: 0 }));
+			}
+			return Promise.resolve(jsonResponse({ items: [] }));
+		});
+		const { result } = renderStore();
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		expect(result.current.round).toBeNull();
+		expect(result.current.history).toEqual([]);
+		// 雲端模式不動訪客時期留在本機的資料
+		expect(readRound()).toEqual(scored.round);
+		expect(readHistory().entries).toEqual([scored.historyEntry]);
+	});
 });
