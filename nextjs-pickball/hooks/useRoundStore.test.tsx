@@ -813,4 +813,112 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		}
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+	it("選擇器把名單 port、名單狀態與 401 處理交給雲端實作", async () => {
+		const updatePlayer = vi.fn();
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: true,
+			user: { id: "u1", email: "a@example.com", name: "測試" },
+			refresh,
+		});
+		const round = createRound({
+			players,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!round.ok) throw new Error("測試前置失敗：createRound 未成功");
+		const scored = submitScore({
+			round: round.round,
+			players,
+			matchId: "match-1",
+			rawScoreA: "11",
+			rawScoreB: "7",
+			now: "2026-08-23T00:05:00.000Z",
+		});
+		if (!scored.ok) throw new Error("測試前置失敗：submitScore 未成功");
+		fetchMock.mockImplementation((input, init) => {
+			const method = init?.method ?? "GET";
+			if (method === "GET" && String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: round.round, version: 3 }));
+			}
+			if (method === "GET" && String(input) === REMOTE_SLOTS_PATH) {
+				return Promise.resolve(jsonResponse({ items: [] }));
+			}
+			if (method === "POST") {
+				return Promise.resolve(
+					jsonResponse({
+						round: { data: scored.round, version: 4 },
+						players: scored.playerPatches.map((patch) => ({
+							data: { ...players.find((player) => player.id === patch.id)!, rating: patch.rating },
+							version: 2,
+						})),
+						historyEntry: scored.historyEntry,
+						boundaryHits: [],
+					}),
+				);
+			}
+			return Promise.reject(new Error(`unexpected fetch: ${method} ${String(input)}`));
+		});
+
+		// 名單載入中：雲端 submitScore 不送出
+		const { result, rerender } = renderHook(
+			(props: { rosterSyncStatus: "loading" | "synced" }) =>
+				useRoundStore({
+					players,
+					updatePlayer,
+					applyRemotePlayers,
+					reloadRemotePlayers,
+					rosterSyncStatus: props.rosterSyncStatus,
+				}),
+			{ initialProps: { rosterSyncStatus: "loading" } },
+		);
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		let blocked: SubmitScoreResult | undefined;
+		act(() => {
+			blocked = result.current.submitScore("match-1", "11", "7");
+		});
+		expect(blocked?.ok).toBe(false);
+		expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+
+		// 名單就緒後送出成功，回應的參賽者交給 applyRemotePlayers
+		rerender({ rosterSyncStatus: "synced" });
+		act(() => {
+			result.current.submitScore("match-1", "11", "7");
+		});
+		await waitFor(() => expect(applyRemotePlayers).toHaveBeenCalledTimes(1));
+		expect(updatePlayer).not.toHaveBeenCalled();
+
+		// 401 交給 session.refresh
+		fetchMock.mockReset();
+		fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 401 })));
+		const second = renderStore();
+		await waitFor(() => expect(refresh).toHaveBeenCalled());
+		second.unmount();
+	});
+
+	it("雲端 PUT 回 409 時選擇器呼叫 reloadRemotePlayers", async () => {
+		mockSession("user");
+		const paths: string[] = [];
+		fetchMock.mockImplementation((input, init) => {
+			const method = init?.method ?? "GET";
+			paths.push(`${method} ${String(input)}`);
+			if (method === "PUT") return Promise.resolve(new Response(null, { status: 409 }));
+			if (String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: null, version: 0 }));
+			}
+			return Promise.resolve(jsonResponse({ items: [] }));
+		});
+		const { result } = renderStore();
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		act(() => {
+			result.current.generateRound({ format: "doubles", courtCount: 1 });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		expect(reloadRemotePlayers).toHaveBeenCalledTimes(1);
+	});
 });

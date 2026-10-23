@@ -287,6 +287,8 @@ describe("useRemoteRoundStore", () => {
 			outcome = result.current.submitScore("m1", "11", "7");
 		});
 		expect(outcome.ok).toBe(true);
+		// 樂觀顯示該場完成，不必等 POST 回來
+		expect(result.current.round?.matches[0].status).toBe("completed");
 		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
 		expect(bodiesOf("POST", SCORE_PATH)[0]).toEqual({ scoreA: "11", scoreB: "7", roundVersion: 3 });
 
@@ -665,7 +667,7 @@ describe("useRemoteRoundStore", () => {
 
 	it("rejected 之後下一次儲存成功即回到 synced", async () => {
 		const players = makePlayers(4);
-		const { result } = await mountSynced(buildRound(players, "doubles", 1), 2, [], { players });
+		const { result, statusLog } = await mountSynced(buildRound(players, "doubles", 1), 2, [], { players });
 
 		on("PUT", ROUND_PATH, 400);
 		act(() => {
@@ -677,6 +679,8 @@ describe("useRemoteRoundStore", () => {
 			result.current.setTargetScore(21);
 		});
 		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		const tail = statusLog.slice(statusLog.indexOf("rejected"));
+		expect(tail.slice(0, tail.indexOf("synced"))).not.toContain("saving");
 	});
 
 	it("回合 PUT 回 401 時呼叫 onUnauthorized 一次並停止，之後的操作不送出", async () => {
@@ -708,7 +712,7 @@ describe("useRemoteRoundStore", () => {
 	it("衝突重載期間的操作不送出也不改變畫面，重載完成後恢復", async () => {
 		const players = makePlayers(4);
 		const round = buildRound(players, "doubles", 1);
-		const { result } = await mountSynced(round, 3, [], { players });
+		const { result, statusLog } = await mountSynced(round, 3, [], { players });
 
 		on("PUT", ROUND_PATH, 409);
 		const reloadRound = onDeferred("GET", ROUND_PATH);
@@ -736,6 +740,10 @@ describe("useRemoteRoundStore", () => {
 		});
 		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(putsBefore + 1));
 		expect(bodiesOf("PUT", ROUND_PATH).at(-1).version).toBe(6);
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		// 衝突文案維持到下一次儲存成功為止，重送時的 saving 不蓋掉它
+		const tail = statusLog.slice(statusLog.indexOf("conflict"));
+		expect(tail.slice(0, tail.indexOf("synced"))).not.toContain("saving");
 	});
 
 	it("衝突重載時收到 401 則呼叫 onUnauthorized 且不呼叫 reloadRemotePlayers", async () => {
@@ -812,6 +820,85 @@ describe("useRemoteRoundStore", () => {
 		expect(outcomes.every((outcome) => !outcome.ok)).toBe(true);
 		await settle();
 		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("送出比分成功後畫面以回應的回合為基礎，重新套用排隊中的回合變更", async () => {
+		const players = makePlayers(4);
+		const base = buildRound(players, "doubles", 1);
+		const round = { ...base, timer: { durationMinutes: 10 as const, startedAt: null } };
+		const { result } = await mountSynced(round, 3, [], { players });
+
+		const response = buildSubmitResponse(round, players, "m1", 3);
+		const deferredPost = onDeferred("POST", SCORE_PATH);
+		const deferredPut = onDeferred("PUT", ROUND_PATH);
+		act(() => {
+			result.current.submitScore("m1", "11", "7");
+			result.current.startTimer();
+		});
+		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+		deferredPost.release(200, response);
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+
+		// PUT 還在途：畫面 = 回應的回合（伺服器算出的完成時間）+ 排隊中的變更
+		expect(result.current.round?.matches[0].completedAt).toBe(LATER);
+		expect(result.current.round?.timer?.startedAt).not.toBeNull();
+		expect(bodiesOf("PUT", ROUND_PATH)[0].version).toBe(4);
+		expect(bodiesOf("PUT", ROUND_PATH)[0].data.matches[0].completedAt).toBe(LATER);
+		deferredPut.release(200, (body: { data: Round }) => ({ data: body.data, version: 5 }));
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+	});
+
+	it("不同場次的送出各自排入，依序各送出一次", async () => {
+		const players = makePlayers(4);
+		const round = buildRound(players, "singles", 2);
+		const { result } = await mountSynced(round, 3, [], { players });
+
+		const first = buildSubmitResponse(round, players, "m1", 3);
+		const deferredFirst = onDeferred("POST", SCORE_PATH);
+		let second!: ReturnType<typeof result.current.submitScore>;
+		act(() => {
+			result.current.submitScore("m1", "11", "7");
+			second = result.current.submitScore("m2", "11", "9");
+		});
+		expect(second.ok).toBe(true);
+		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+		on("POST", "/api/matchmaker/round/matches/m2/score", 200, buildSubmitResponse(first.round.data, players, "m2", 4));
+		deferredFirst.release(200, first);
+		await waitFor(() =>
+			expect(callsOf("POST", "/api/matchmaker/round/matches/m2/score")).toHaveLength(1),
+		);
+		expect(bodiesOf("POST", "/api/matchmaker/round/matches/m2/score")[0].roundVersion).toBe(4);
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+	});
+
+	it("startTimer 的開始時間在操作當下決定，重新套用與送出時沿用同一個值", async () => {
+		const players = makePlayers(4);
+		const round = buildRound(players, "doubles", 1);
+		const { result } = await mountSynced({ ...round, timer: { durationMinutes: 10, startedAt: null } }, 2, [], {
+			players,
+		});
+
+		vi.useFakeTimers({ toFake: ["Date"] });
+		try {
+			vi.setSystemTime(new Date("2026-10-23T01:00:00.000Z"));
+			const deferred = onDeferred("PUT", ROUND_PATH);
+			act(() => {
+				result.current.setTargetScore(15);
+			});
+			await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+			act(() => {
+				result.current.startTimer();
+			});
+			expect(result.current.round?.timer?.startedAt).toBe("2026-10-23T01:00:00.000Z");
+
+			vi.setSystemTime(new Date("2026-10-23T01:00:09.000Z"));
+			onPutEcho(5);
+			deferred.release(200, (body: { data: Round }) => ({ data: body.data, version: 3 }));
+			await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(2));
+			expect(bodiesOf("PUT", ROUND_PATH)[1].data.timer.startedAt).toBe("2026-10-23T01:00:00.000Z");
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("enabled 由 true 變 false 時回到 local 且清空回合與分槽", async () => {
