@@ -1170,8 +1170,8 @@ describe("useRemoteRosterStore 名單 port（接收後端寫入的評分）", ()
 		await waitFor(() => expect(result.current.syncStatus).toBe("load-failed"));
 		expect(result.current.players.map((p) => p.id)).toEqual(["p1"]);
 
-		const second = renderRemote({ enabled: true });
 		enqueue(200, listBody([[makePlayer("p1"), 2]]));
+		const second = renderRemote({ enabled: true });
 		await waitFor(() => expect(second.result.current.syncStatus).toBe("synced"));
 		enqueue(401);
 		act(() => {

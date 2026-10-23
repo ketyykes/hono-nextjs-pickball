@@ -36,10 +36,13 @@ export interface UseRemoteRosterStoreOptions {
 type Payload = { op: "put"; player: Player } | { op: "delete" };
 type LoadPhase = "loading" | "load-failed" | "ready";
 type StickyStatus = "conflict" | "rejected" | null;
+type RemotePlayerItem = Parameters<UseRosterStoreResult["applyRemotePlayers"]>[0][number];
 
 interface Controller {
 	enqueue: (id: string, payload: Payload) => void;
 	reset: () => void;
+	apply: (items: RemotePlayerItem[]) => void;
+	reload: () => void;
 }
 
 // 彙總順序：retrying 優先（使用者最需要知道網路有問題），其次是黏著的
@@ -157,25 +160,55 @@ export function useRemoteRosterStore({
 			publish();
 		}
 
-		function reloadAfterConflict(): void {
+		function reloadPlayers(afterConflict: boolean): void {
 			// 先關閉寫入並釋放所有佇列，重載期間的動作與其他筆的待送變更都不再送出
 			reloading = true;
 			updateReady();
 			disposeAll();
-			void load(true);
+			void load(afterConflict);
+		}
+
+		// 後端已把評分寫進雲端，這裡只更新畫面與版本，不送任何請求
+		function apply(items: RemotePlayerItem[]): void {
+			// 有待送或在途變更的參賽者：那些 PUT 會帶舊 version 得到 409，或覆蓋剛寫入的評分，
+			// 提前整份重載比等它失敗清楚
+			if (items.some((item) => busy.has(item.data.id))) {
+				reloadPlayers(true);
+				return;
+			}
+			const current = playersRef.current;
+			const known = items.filter((item) => current.some((player) => player.id === item.data.id));
+			for (const item of known) versions.set(item.data.id, item.version);
+			replacePlayers(
+				current.map((player) => known.find((item) => item.data.id === player.id)?.data ?? player),
+			);
+		}
+
+		// 重置送出前的 disposeAll 會讓 saver 忽略舊世代的結果，但此時在途請求回來的 401 與 409
+		// 仍要照常處理（session 已失效、或雲端版本已變），否則重置失敗後會以過期的版本繼續儲存
+		function handleStaleOutcome(sentEpoch: number, kind: SaveOutcome): void {
+			if (sentEpoch === epoch || !resetting || cancelled || stopped) return;
+			if (kind === "unauthorized") handleUnauthorized();
+			if (kind === "conflict") reloadPlayers(true);
 		}
 
 		async function send(id: string, payload: Payload): Promise<SaveOutcome> {
 			const sentEpoch = epoch;
 			if (payload.op === "delete") {
 				const result = await deleteRemotePlayer(id);
-				if (result.kind !== "ok") return result.kind;
+				if (result.kind !== "ok") {
+					handleStaleOutcome(sentEpoch, result.kind);
+					return result.kind;
+				}
 				if (sentEpoch === epoch) versions.delete(id);
 				return "ok";
 			}
 			// 在這裡才讀版本：同一人排隊的第二次 PUT 要帶第一次成功後的新版本
 			const result = await putRemotePlayer(payload.player, versions.get(id) ?? 0);
-			if (result.kind !== "ok") return result.kind;
+			if (result.kind !== "ok") {
+				handleStaleOutcome(sentEpoch, result.kind);
+				return result.kind;
+			}
 			if (result.value === undefined) return "failed";
 			if (sentEpoch === epoch) versions.set(id, result.value.version);
 			return "ok";
@@ -200,7 +233,7 @@ export function useRemoteRosterStore({
 					sticky = "rejected";
 					break;
 				case "conflict":
-					reloadAfterConflict();
+					reloadPlayers(true);
 					return;
 				case "unauthorized":
 					handleUnauthorized();
@@ -225,6 +258,8 @@ export function useRemoteRosterStore({
 			// 重置不可逆：不做樂觀更新，也不重試；進行中不接受其他動作
 			resetting = true;
 			updateReady();
+			// 送出前就停止所有佇列：POST 在途期間退避計時器仍會到期，重試的 PUT 會讓已被重置的參賽者復活
+			disposeAll();
 			const result = await resetRemoteMatchmaker();
 			// 重置在途時可能已收到 401（stopped）：此時不得再重開，也不再發布狀態
 			if (cancelled || stopped) return;
@@ -248,7 +283,12 @@ export function useRemoteRosterStore({
 			publish();
 		}
 
-		controllerRef.current = { enqueue, reset: () => void reset() };
+		controllerRef.current = {
+			enqueue,
+			reset: () => void reset(),
+			apply,
+			reload: () => reloadPlayers(false),
+		};
 		void load(false);
 		return () => {
 			cancelled = true;
@@ -305,6 +345,18 @@ export function useRemoteRosterStore({
 		controller.reset();
 	}
 
+	function applyRemotePlayers(items: RemotePlayerItem[]): void {
+		const controller = controllerRef.current;
+		if (controller === null || !readyRef.current) return;
+		controller.apply(items);
+	}
+
+	function reloadRemotePlayers(): void {
+		const controller = controllerRef.current;
+		if (controller === null) return;
+		controller.reload();
+	}
+
 	return {
 		players,
 		droppedCount: 0,
@@ -313,6 +365,8 @@ export function useRemoteRosterStore({
 		removePlayer,
 		togglePlayerActive,
 		resetRoster,
+		applyRemotePlayers,
+		reloadRemotePlayers,
 		syncStatus: enabled ? status : "local",
 	};
 }

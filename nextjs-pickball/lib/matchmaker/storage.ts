@@ -115,11 +115,12 @@ export function clearRoster(): void {
 const RESET_KEYS = [ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, MATCH_SLOTS_KEY] as const;
 
 /**
- * 登入（雲端模式）時的重置只清本機的「本次活動進度」：回合、歷史與分槽。
- * 名單 key 刻意不在內——雲端模式下本機名單是訪客時期的資料，之後還要靠它做「匯入本機資料」；
- * 獨立計分板 scoreboard:current:v1 同樣與活動無關。key 與 RESET_KEYS 共用同一組來源常數。
+ * 登入（雲端模式）時的重置只清本機歷史：回合與分槽已改存雲端並由後端重置端點一併刪除，
+ * 本機的回合與分槽是訪客時期的資料，之後還要靠它們做「匯入本機資料」；歷史在 B8 上雲前
+ * 仍讀本機，不清會讓重置後的畫面殘留上一場活動的賽果。名單與獨立計分板 scoreboard:current:v1
+ * 同樣不動。key 與 RESET_KEYS 共用同一組來源常數。
  */
-const LOCAL_PROGRESS_KEYS = [ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, MATCH_SLOTS_KEY] as const;
+const LOCAL_PROGRESS_KEYS = [HISTORY_STORAGE_KEY] as const;
 
 /**
  * 重置 matchmaker 相關的 localStorage 資料。只移除 RESET_KEYS 列舉的 key

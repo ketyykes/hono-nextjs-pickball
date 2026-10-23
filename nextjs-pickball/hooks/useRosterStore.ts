@@ -105,10 +105,19 @@ export interface UseRosterStoreResult {
 	resetRoster: () => void;
 	/** 本機模式恆為 local；雲端模式反映載入與儲存狀態。 */
 	syncStatus: SyncStatus;
+	/** 以後端已寫入的參賽者取代畫面上的同 id 資料；不送請求。本機模式為不做事的函式。 */
+	applyRemotePlayers: (items: { data: Player; version: number }[]) => void;
+	/** 停止所有佇列並重新載入雲端名單。本機模式為不做事的函式。 */
+	reloadRemotePlayers: () => void;
 }
 
 // 本機實作不知道同步狀態，由選擇器補上 local。
-type LocalRosterStoreResult = Omit<UseRosterStoreResult, "syncStatus">;
+type LocalRosterStoreResult = Omit<
+	UseRosterStoreResult,
+	"syncStatus" | "applyRemotePlayers" | "reloadRemotePlayers"
+>;
+
+function doNothing(): void {}
 
 // 整合 reducer 與 localStorage，比照 useScoreboardStore 的 write/read effect 順序與
 // hasHydratedRef 守門模式：write effect 放前面（mount 時 ref=false 故跳過）、
@@ -193,5 +202,10 @@ export function useRosterStore(): UseRosterStoreResult {
 	const isRemote = resolveStorageMode(session) === "remote";
 	const remote = useRemoteRosterStore({ enabled: isRemote, onUnauthorized: session.refresh });
 	if (isRemote) return remote;
-	return { ...local, syncStatus: "local" };
+	return {
+		...local,
+		syncStatus: "local",
+		applyRemotePlayers: doNothing,
+		reloadRemotePlayers: doNothing,
+	};
 }

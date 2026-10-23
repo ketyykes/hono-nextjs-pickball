@@ -96,11 +96,14 @@ Depends on: §5
 - [x] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
   - 紅燈：`f3aec24`（只含測試檔）；`round-command-queue` 模組不存在，9 個 it（spec 三個＋額外六個）皆因 import 解析失敗而紅。regression guard：無。GREEN 時修正 RED 測試檔的一個 harness 筆誤（「成功但沒有回應內容」it 把 submitScore mock 設在錯的 harness），斷言未改。
 - [x] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
-- [ ] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
+- [x] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
   「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言；
   另新增 it「resetRoster 送出前停止所有參賽者的待送與重試中變更」（apply §1 納入的 B6 轉 B7 待辦，見 design Open Questions 5）。確認六個 it 皆紅
-- [ ] 6.6 GREEN（TDD）：`useRemoteRosterStore` 加 `applyRemotePlayers`／`reloadRemotePlayers`；`useRosterStore` 選擇器回傳加兩者（本機為不做事的函式，本機 hook 本體不改）；
+  - 紅燈：`6b6ac49`（只含測試檔），7 紅（spec 要求的六個 it 加「enabled 為 false 時 applyRemotePlayers 與 reloadRemotePlayers 不發出請求」）；另有額外的「reloadRemotePlayers 重新 GET 失敗時回報 load-failed，401 時呼叫 onUnauthorized」（紅）與新檔 `hooks/useRosterStore.ports.test.tsx` 兩個 it（紅，TypeError: not a function）。**regression guard：無**（所有新增與改寫的 it 皆為真紅燈）。
+  - 偏離／註記：GREEN 時修正 RED 測試檔一個筆誤（reload 的 401 情境把第二個 hook 的 GET 回應排在 render 之後，改為之前），斷言未改。resetRoster 失敗後 versions 已被 `disposeAll()` 清除（OQ5 的必然結果）：之後的編輯以 version 0 送出會得 409 並自動重載，由「雲端拒絕儲存，請重新整理頁面」提示涵蓋。
+- [x] 6.6 GREEN（TDD）：`useRemoteRosterStore` 加 `applyRemotePlayers`／`reloadRemotePlayers`；`useRosterStore` 選擇器回傳加兩者（本機為不做事的函式，本機 hook 本體不改）；
   `resetLocalMatchProgress()` 縮減為只移除歷史 key；`reset()` 送出 POST 前先停止所有佇列（`disposeAll()`）。6.5 全綠；B6 其餘 it 全綠
+  - 實作註記：`disposeAll()` 放在 POST 送出前後，B6 三個「重置進行中收到 401／409」的既有 it 會因 saver 忽略舊世代結果而變紅；以 `handleStaleOutcome`（只在重置在途時、對舊世代在途請求的 401／409 照常處理）保持它們原樣通過，未修改任何既有 it。REFACTOR：`reloadAfterConflict` 泛化為 `reloadPlayers(afterConflict)`，其餘無壞味道（skipped）。
 
 ## 7. 前端：雲端回合 hook 與選擇器
 
