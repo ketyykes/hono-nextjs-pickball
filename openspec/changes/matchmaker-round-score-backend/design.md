@@ -267,3 +267,7 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     ② 孤兒 DELETE 子查詢加 `IS NOT NULL` 防禦：若可在 §5 或之後某組以 TDD／regression guard 低成本加入就做，否則記為後續（§5 派工單已列為可選）。
     ③ reset 後 version 從 1 起算的 ABA 時間窗：列為 **G1 前評估項**，本 change 不處理。
     ④ 等待 subagent 時 leader 留在同一回合輪詢，只有完成、需裁定或脈絡將盡時才交回。
+19. （apply §5 進度，2026-10-23）Implementer（sonnet）DONE：7bac769 RED（17 紅／21 綠，Stage 2 已重現）→ afc0dd0 GREEN（RED 測試檔一行型別修正，斷言等價）→ f980078 勾選（5.3 skipped）→ dc981ca 自補 guard。後端 21 檔／146 全綠。`IS NOT NULL`（OQ18②）未做：API 層不可觀察，記為後續防禦。
+    Stage 1（sonnet）PASS。Stage 2（opus，82 條變異）**FAIL**：M1 參與球員在讀取後被刪除的守衛無測試（守衛改寫成 NOT EXISTS 形式存活）；M2 reset「單一 batch」未驗證（拆成四次 await 存活）；
+    M3 歷史主鍵衝突的分類寫在 `score-repository.ts`，但 user-data-sync delta 明定「分類邏輯集中在 `batch-guard.ts`」——**leader 裁定為必修**（spec 字面 MUST、成本低、B9 會重用）。
+    錯誤碼優先序（舊 roundVersion＋不合法比分 → 409）經 Stage 2 對照 spec 步驟順序確認為 spec 明定行為。**下一步**：退回 §5 Implementer 補 M1～M3 → Stage 2 複審 → §6。
