@@ -243,7 +243,6 @@ export function useRemoteRoundStore({
 			if (stopped) return;
 			stopped = true;
 			updateReady();
-			queue?.dispose();
 			callbacksRef.current.onUnauthorized();
 		}
 
@@ -306,7 +305,7 @@ export function useRemoteRoundStore({
 
 		async function load(afterConflict: boolean): Promise<void> {
 			const [roundResult, slotsResult] = await Promise.all([fetchRemoteRound(), fetchRemoteSlots()]);
-			if (cancelled || stopped) return;
+			if (cancelled) return;
 			if (roundResult.kind === "unauthorized" || slotsResult.kind === "unauthorized") {
 				handleUnauthorized();
 				return;

@@ -330,7 +330,9 @@ describe("useRemoteRoundStore", () => {
 		act(() => {
 			second = result.current.submitScore("m1", "11", "7");
 		});
+		// 在途的送出仍在佇列中，所以是「重複送出」而不是「場次已完成」
 		expect(second.ok).toBe(false);
+		if (!second.ok) expect(second.code).toBe("scoring-failed");
 		await settle();
 		expect(callsOf("POST", SCORE_PATH)).toHaveLength(1);
 
@@ -642,12 +644,15 @@ describe("useRemoteRoundStore", () => {
 			result.current.setTargetScore(15);
 		});
 		await waitFor(() => expect(result.current.syncStatus).toBe("saving"));
-		on("PUT", ROUND_PATH, 500);
-		onPutEcho(4);
+		const deferredRetry = onDeferred("PUT", ROUND_PATH);
 		deferred.release(500, {});
 		await waitFor(() => expect(result.current.syncStatus).toBe("retrying"));
-		await waitFor(() => expect(result.current.syncStatus).toBe("synced"), { timeout: 4000 });
-		// 重送時的 saving 不蓋掉 retrying
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(2), { timeout: 3000 });
+		await settle();
+		// 重送在途期間的 saving 不蓋掉 retrying
+		expect(result.current.syncStatus).toBe("retrying");
+		deferredRetry.release(200, (body: { data: Round }) => ({ data: body.data, version: 4 }));
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
 		const afterRetrying = statusLog.slice(statusLog.indexOf("retrying"));
 		expect(afterRetrying.slice(0, afterRetrying.indexOf("synced"))).not.toContain("saving");
 	});
