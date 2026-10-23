@@ -235,9 +235,9 @@ afterEach(() => {
 
 describe("useRemoteRoundStore", () => {
 	it("generateRound 樂觀顯示並在回合 PUT 成功後才結算休息次數", async () => {
-		onLoad(null, 0);
-		const first = renderRound({ players: makePlayers(6) });
-		await waitFor(() => expect(first.result.current.syncStatus).toBe("synced"));
+		// 休息次數是在「結束上一輪」時結算，因此雲端要先有一個有人休息的上一輪
+		const previous = buildRound(makePlayers(6), "singles", 1);
+		const first = await mountSynced(previous, 2, [], { players: makePlayers(6) });
 
 		const deferred = onDeferred("PUT", ROUND_PATH);
 		let outcome!: ReturnType<typeof first.result.current.generateRound>;
@@ -245,8 +245,9 @@ describe("useRemoteRoundStore", () => {
 			outcome = first.result.current.generateRound({ format: "singles", courtCount: 1 });
 		});
 		if (!outcome.ok) throw new Error("generateRound 應成功");
+		const settlements = outcome.restSettlements;
 		expect(first.result.current.round).toEqual(outcome.round);
-		expect(outcome.restSettlements.length).toBeGreaterThan(0);
+		expect(settlements.length).toBeGreaterThan(0);
 		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
 		expect(first.updatePlayer).not.toHaveBeenCalled();
 		// 雲端模式不寫入本機回合與歷史
@@ -254,21 +255,17 @@ describe("useRemoteRoundStore", () => {
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
 
 		deferred.release(200, (body: { data: Round }) => ({ data: body.data, version: 1 }));
-		await waitFor(() =>
-			expect(first.updatePlayer).toHaveBeenCalledTimes(outcome.restSettlements.length),
-		);
-		for (const settlement of outcome.restSettlements) {
+		await waitFor(() => expect(first.updatePlayer).toHaveBeenCalledTimes(settlements.length));
+		for (const settlement of settlements) {
 			expect(first.updatePlayer).toHaveBeenCalledWith(settlement.id, {
 				restCount: settlement.restCount,
 			});
 		}
 		await waitFor(() => expect(first.result.current.syncStatus).toBe("synced"));
-		expect(bodiesOf("PUT", ROUND_PATH)[0].version).toBe(0);
+		expect(bodiesOf("PUT", ROUND_PATH)[0].version).toBe(2);
 
 		// 409 時丟棄結算
-		onLoad(null, 0);
-		const second = renderRound({ players: makePlayers(6) });
-		await waitFor(() => expect(second.result.current.syncStatus).toBe("synced"));
+		const second = await mountSynced(previous, 2, [], { players: makePlayers(6) });
 		on("PUT", ROUND_PATH, 409);
 		onLoad(buildRound(makePlayers(4), "doubles", 1), 5);
 		act(() => {
