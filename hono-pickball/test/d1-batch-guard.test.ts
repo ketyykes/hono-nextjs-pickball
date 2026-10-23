@@ -153,4 +153,26 @@ describe("D1 整批守衛", () => {
 		// 殘留列未被釋放陳述式刪除（整批已回滾）
 		expect(await countRows("sync_batch_guards", userId)).toBe(1);
 	});
+
+	// regression guard（寫入即綠）：歷史主鍵衝突的判定必須限定表名與 UNIQUE。
+	it("歷史主鍵衝突的判定只認 matchmaker_history 的 UNIQUE 衝突", async () => {
+		const { isHistoryPrimaryKeyViolation } = await import("../src/matchmaker/batch-guard");
+
+		expect(
+			isHistoryPrimaryKeyViolation(
+				new Error("UNIQUE constraint failed: matchmaker_history.user_id, matchmaker_history.match_id"),
+			),
+		).toBe(true);
+		expect(
+			isHistoryPrimaryKeyViolation(
+				new Error("外層", {
+					cause: new Error("UNIQUE constraint failed: matchmaker_history.user_id, matchmaker_history.match_id"),
+				}),
+			),
+		).toBe(true);
+		expect(isHistoryPrimaryKeyViolation(new Error("NOT NULL constraint failed: matchmaker_history.data"))).toBe(false);
+		expect(isHistoryPrimaryKeyViolation(new Error("UNIQUE constraint failed: sync_batch_guards.user_id"))).toBe(false);
+		expect(isHistoryPrimaryKeyViolation(new Error("UNIQUE constraint failed: matchmaker_players.user_id, matchmaker_players.id"))).toBe(false);
+		expect(isHistoryPrimaryKeyViolation("UNIQUE constraint failed: matchmaker_history.user_id")).toBe(false);
+	});
 });

@@ -542,4 +542,25 @@ describe("/api/matchmaker 名單端點", () => {
 		expect(await Promise.all(tables.map((table) => rowsOf(table, idB)))).toEqual(bBefore);
 		expect(bBefore.map((rows) => rows.length)).toEqual([2, 1, 2, 2]);
 	});
+
+	it("重置以單一 D1 batch 送出四條刪除", async () => {
+		const cookie = await seedAndSignIn("mp-reset-one-batch@example.com");
+		const batchSizes: number[] = [];
+		const spyDb = {
+			prepare: (query: string) => env.DB!.prepare(query),
+			batch: (statements: D1PreparedStatement[]) => {
+				batchSizes.push(statements.length);
+				return env.DB!.batch(statements);
+			},
+			exec: (query: string) => env.DB!.exec(query),
+		} as unknown as D1Database;
+
+		const res = await app.request("/api/matchmaker/reset", appRequestInit(cookie, endpoints[4]), {
+			...env,
+			DB: spyDb,
+		});
+
+		expect(res.status).toBe(204);
+		expect(batchSizes).toEqual([4]);
+	});
 });

@@ -4,6 +4,7 @@ import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import { updateRatings } from "@pickball/core/matchmaker/rating";
 import { submitScore } from "@pickball/core/matchmaker/round";
 import type { Player } from "@pickball/core/matchmaker/types";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getDb } from "../src/db/client";
 import { matchmakerPlayers } from "../src/db/schema";
@@ -19,7 +20,7 @@ import {
 	seedRound,
 	seedSlot,
 } from "./helpers/matchmaker-fixtures";
-import { userIdOf } from "./helpers/session";
+import { seedUser, userIdOf } from "./helpers/session";
 
 const NOW = new Date(1_700_000_000_000);
 const TABLES = [
@@ -183,7 +184,7 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 			timer: { durationMinutes: 10, startedAt: null },
 		});
 		// 讓兩人 rating 不同，平局時 S=0.5 才會使高分者下降、低分者上升
-		await getDb(env).delete(matchmakerPlayers);
+		await getDb(env).delete(matchmakerPlayers).where(eq(matchmakerPlayers.userId, userId));
 		await seedPlayers(userId, [makePlayer("m1-a", { rating: 5 }), makePlayer("m1-b", { rating: 3 })]);
 
 		const res = await postScore(cookie, "m1", scoreBody(3, "9", "9"));
@@ -224,9 +225,8 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 		// 四位參與球員逐一被改動，每一位都必須使守衛失敗
 		for (const target of ids) {
 			const email = `ms-guard-player-${target}@example.com`;
-			const cookie = await seedAndSignIn(email);
+			await seedUser(email);
 			const userId = await userIdOf(email);
-			void cookie;
 			await seedPlayers(userId, [...ids.map((id) => makePlayer(id)), makePlayer("p5")]);
 			await seedRound(
 				userId,
@@ -265,6 +265,33 @@ describe("POST /api/matchmaker/round/matches/:matchId/score", () => {
 			expect(after.matchmaker_match_slots.map((row) => row.match_id)).toEqual(["m1"]);
 			expect(after.sync_batch_guards).toEqual([]);
 		}
+	});
+
+	it("計算後參與球員被刪除時整批守衛使 batch 不寫入任何資料", async () => {
+		const { submitScoreForUser } = await import("../src/matchmaker/score-repository");
+		const { userId } = await setupSingles("ms-guard-player-deleted@example.com");
+
+		const result = await submitScoreForUser(
+			getDb(env),
+			userId,
+			{ matchId: "m1", scoreA: "11", scoreB: "7", roundVersion: 3 },
+			{
+				afterRead: async () => {
+					await env.DB?.prepare("DELETE FROM matchmaker_players WHERE user_id = ? AND id = ?")
+						.bind(userId, "m1-a")
+						.run();
+				},
+			},
+		);
+
+		expect(result.kind).toBe("conflict");
+		const after = await snapshot(userId);
+		expect(after.matchmaker_history).toEqual([]);
+		expect(after.matchmaker_round[0].version).toBe(3);
+		expect(after.matchmaker_players.map((row) => [row.id, row.version])).toEqual([["m1-b", 1]]);
+		expect(JSON.parse(after.matchmaker_players[0].data as string)).toEqual(makePlayer("m1-b"));
+		expect(after.matchmaker_match_slots.map((row) => row.match_id)).toEqual(["m1", "m2"]);
+		expect(after.sync_batch_guards).toEqual([]);
 	});
 
 	it("計算後回合被刪除時整批守衛使 batch 不寫入任何資料", async () => {
