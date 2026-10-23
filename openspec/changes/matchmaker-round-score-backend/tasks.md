@@ -131,7 +131,7 @@ Depends on: §6
 - [x] 7.4 GREEN（TDD）：`hooks/useRoundStore.ts`：既有函式本體原封不動改名為同檔的 `useLocalRoundStore`（`git diff` 只見函式名稱那一行與新增部分）；新增選擇器；
   `UseRoundStoreResult` 加 `syncStatus`、`remoteMatchSlots`；`UseRoundStoreOptions` 加兩個 port
   - `55779b2`；`git diff 46c6a03 -- nextjs-pickball/hooks/useRoundStore.ts`：本體只見函式名稱／回傳型別那一行（`useRoundStore` → `useLocalRoundStore`，回傳 `LocalRoundStoreResult`），其餘皆為新增（import、options 欄位、結果欄位、`doNothing`、選擇器）。
-  - **與 design 的差異**：兩個 port 與 `rosterSyncStatus` 在 `UseRoundStoreOptions` 為**選填**——既有 `useRoundStore.test.tsx` 約 19 處只傳 `{ players, updatePlayer }`，且既有 it 不得修改，必填會使 tsc 失敗；省略時為不做事的函式，頁面（§10）會傳入。
+  - **與 design 的差異**：兩個 port 與 `rosterSyncStatus` 在 `UseRoundStoreOptions` 為**選填**——既有 `useRoundStore.test.tsx` 約 18 處只傳 `{ players, updatePlayer }`，且既有 it 不得修改，必填會使 tsc 失敗；省略時為不做事的函式，頁面（§10）會傳入。
 - [x] 7.5 REFACTOR：`useRemoteRoundStore` 與 `useRemoteRosterStore`／`useRemoteScoreboardStore` 的載入、衝突重載與 401 處理是否值得抽共用——**只在皆有測試守住時**才抽，B5／B6 的測試 MUST 原樣通過；否則註記 skipped
   - **skipped**：三者的狀態機不同（名單是每人一個 saver＋重置，計分板是單一 saver＋dirty 追蹤，回合是命令佇列＋重新套用），僅 `LOAD_FAILED`／401 的幾行相似，抽共用需改動 B5／B6 的正式程式碼，換不到足夠的簡化。
   - 7.2 之後的自我精簡（`a8d46c2`）：移除經 mutation 證實不可達的 `load` 內 `stopped` 檢查與 `handleUnauthorized` 內的重複 `queue.dispose()`。
