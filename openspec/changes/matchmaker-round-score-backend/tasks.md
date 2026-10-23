@@ -154,14 +154,27 @@ Depends on: §6
 
 Depends on: §7
 
-- [ ] 8.1 RED（TDD）：新增 `hooks/useRemoteMatchSlotStore.test.tsx`，spec 該檔的四個 it。確認紅燈
-- [ ] 8.2 GREEN（TDD）：新增 `hooks/useRemoteMatchSlotStore.ts`（spec `scoreboard`「登入時獨立計分板以雲端為準」的分槽段落）
-- [ ] 8.3 RED（TDD）：`hooks/useScoreboardStore.test.tsx`：**刪除** B5 的 it「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」（tasks 檔頭授權的唯一刪除；commit 訊息載明原因與 spec 出處），
+- [x] 8.1 RED（TDD）：新增 `hooks/useRemoteMatchSlotStore.test.tsx`，spec 該檔的四個 it。確認紅燈
+  - 紅燈：`844ee47`（只含測試檔；`git show 844ee47^:nextjs-pickball/hooks/useRemoteMatchSlotStore.ts` 查無此檔）。模組不存在，整檔因 import 解析失敗而紅（輸出 `/tmp/b7s8/red81.txt`）。spec 的 4 個錨點 it 名稱逐字一致。regression guard：無（皆因 import 失敗而紅）。
+  - 事後補的 regression guard（GREEN 後自跑 mutation 發現缺口而加，寫入即綠，非紅燈）：`1c59e2b`、`21cc08b`，共 4 個 it：分槽儲存的同步狀態轉換與保留規則（saving／retrying／rejected、成功後沿用版本、204 視為失敗、卸載後不重試）、衝突文案維持到下一次儲存成功、重新啟用與換場次的重載、卸載後結果忽略與 `onUnauthorized` 取最新函式；另在 missing 的錨點 it 加一條 `syncStatus` 為 synced 的斷言。最終 8 個 it。
+- [x] 8.2 GREEN（TDD）：新增 `hooks/useRemoteMatchSlotStore.ts`（spec `scoreboard`「登入時獨立計分板以雲端為準」的分槽段落）
+  - `0465fcd`；4 個錨點 it 綠，tsc exit 0。
+  - **與 design 的差異**：回傳為四元組 `[state, dispatch, bindingStatus, syncStatus]`（選擇器可直接回傳）；`missing` 時 `syncStatus` 設為 `synced`（失效說明取代畫面，不疊加同步提示）；載入失敗時 `bindingStatus` 維持 `pending`、`syncStatus` 為 `load-failed`。`statusReducer` 與 B5 同型但各自一份（B7 7.5 已記 skipped 的同一理由）。
+- [x] 8.3 RED（TDD）：`hooks/useScoreboardStore.test.tsx`：**刪除** B5 的 it「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」（tasks 檔頭授權的唯一刪除；commit 訊息載明原因與 spec 出處），
   新增 it「已登入且帶 matchId 時改用雲端分槽且不寫入 scoreboard:matches:v1」。確認新 it 紅燈
-- [ ] 8.4 GREEN（TDD）：`hooks/useScoreboardStore.ts` 選擇器加 `matchId` 非 null 的雲端分支（本機實作不改）。8.3 綠；B5 其餘 it 全綠
-- [ ] 8.5 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRoundStore`、`useRemoteMatchSlotStore` 未列入主 spec 而**真的轉紅**，貼出輸出
-- [ ] 8.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4、B6 5.4 前例）；
+  - 紅燈：`d0cd0a0`（只含測試檔）；新 it 紅、其餘 17 個 it 綠（`1 failed | 17 passed`，輸出 `/tmp/b7s8/red83.txt`），失敗為 `expected 'missing' to be 'bound'`。刪除的 B5 it：「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」（`git show d0cd0a0 -- nextjs-pickball/hooks/useScoreboardStore.test.tsx` 只見該 it 被新 it 取代；commit 訊息載明原因與 spec 出處）。
+  - 先綠的斷言：無（新 it 在 `bindingStatus` 等待處即紅）。
+- [x] 8.4 GREEN（TDD）：`hooks/useScoreboardStore.ts` 選擇器加 `matchId` 非 null 的雲端分支（本機實作不改）。8.3 綠；B5 其餘 it 全綠
+  - `b13f610`；`git diff` 只動 `useScoreboardStore.ts` 的選擇器（新增 `useRemoteMatchSlotStore` import 與分支，`useLocalScoreboardStore` 本體未動）。8.3 綠、B5 其餘 it 全綠；tsc exit 0。
+  - 事後補 regression guard：選擇器對分槽 hook 傳入 `session.refresh`（`1c59e2b`，mutation B03 存活後補）。
+  - 已知（與 B5 獨立計分板路徑相同）：選擇器每次 render 仍呼叫本機 hook；雲端模式帶 matchId 時本機 hook 若讀到訪客遺留的同 id 分槽，只會原樣寫回相同內容，不寫入雲端模式的狀態。
+- [x] 8.5 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteRoundStore`、`useRemoteMatchSlotStore` 未列入主 spec 而**真的轉紅**，貼出輸出
+  - 紅燈（8.2 之後跑，輸出 `/tmp/b7s8/red85.txt`）：「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」失敗，`missing` 為 `["useRemoteMatchSlotStore", "useRemoteRoundStore"]`；另一個 it 綠。
+- [x] 8.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec `openspec/specs/pickleball-guide-page/spec.md` 的對應句，只動這一句（B3 3.6、B5 6.4、B6 5.4 前例）；
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteRoundStore 與 useRemoteMatchSlotStore（B7 §8）`。重跑 8.5 轉綠。archive 時此段 MODIFIED 應為 no-op
+  - `aafd02f`；`git diff eba2f78 -- openspec/specs/` 只動 `pickleball-guide-page/spec.md` 的「本 capability 只擁有上述三支」那一行（加入 `useRemoteRoundStore`、`useRemoteMatchSlotStore`），內容與 delta 該句逐字相同。`hooksInventory.test.ts` 2 個 it 轉綠。
+  - **§8 mutation（自跑，48 條）**：分槽 hook 36 條 A01～A36、選擇器 8 條 B01～B08、等價對照 4 條（E01～E03、BE1）；首輪存活 A04、A19、A21～A24、A26～A32、A35、B03 皆補 regression guard 後轉紅。最終僅 A20（204 時 `value` 為 undefined，移除檢查後讀 `.version` 拋錯，saver 同樣視為 failed，行為等價）與 A36（`enabled` 為 false 時回傳的 `bindingStatus`，選擇器不讀取）判定等價。必做三項：missing 仍 PUT（A01、A16）、409 重載回 null 不轉 missing（A02、A03）、帶 matchId 仍走本機（B01、B02、B06）皆轉紅。
+  - 驗收：本組 3 檔 + `hooksInventory.test.ts` 綠；全套前端 100 檔 981 個 it 綠；`pnpm -r exec tsc --noEmit` exit 0；`pnpm lint` 0 errors／3 warnings。
 
 ## 9. 前端：資料頁雲端回合
 
