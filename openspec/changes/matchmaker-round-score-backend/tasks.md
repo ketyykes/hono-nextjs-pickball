@@ -93,8 +93,9 @@ Depends on: §5
 - [x] 6.1 RED（TDD）：新增 `lib/sync/round-api.test.ts`，it「回合 API 包裝以正確的方法、路徑與 body 呼叫 requestJson」。確認紅燈
   - 紅燈：`1af288a`（只含測試檔）；`round-api` 模組不存在，兩個 it 皆因 import 解析失敗而紅。regression guard：無（兩個 it 皆為真紅燈）。額外 it「原樣回傳 requestJson 的結果」同批寫入。
 - [x] 6.2 GREEN（TDD）：新增 `lib/sync/round-api.ts`
-- [ ] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
-- [ ] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
+- [x] 6.3 RED（TDD）：新增 `lib/sync/round-command-queue.test.ts`，spec 該檔的三個 it（假時鐘驗證退避表）。確認紅燈
+  - 紅燈：`f3aec24`（只含測試檔）；`round-command-queue` 模組不存在，9 個 it（spec 三個＋額外六個）皆因 import 解析失敗而紅。regression guard：無。GREEN 時修正 RED 測試檔的一個 harness 筆誤（「成功但沒有回應內容」it 把 submitScore mock 設在錯的 harness），斷言未改。
+- [x] 6.4 GREEN（TDD）：新增 `lib/sync/round-command-queue.ts`（design Decision 6；退避表取自 `latest-wins-saver.ts` 的同一常數，SHALL NOT 另寫一份）
 - [ ] 6.5 RED（TDD）：`hooks/useRemoteRosterStore.test.tsx` 新增三個 it（`applyRemotePlayers` 兩個、`reloadRemotePlayers` 一個），並把 B6 的「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」改寫為
   「resetRoster 成功後清空名單並只清除本機歷史」；`lib/matchmaker/storage.test.ts` 把 B6 的 `resetLocalMatchProgress` it 改寫為 spec 的新名稱與斷言；
   另新增 it「resetRoster 送出前停止所有參賽者的待送與重試中變更」（apply §1 納入的 B6 轉 B7 待辦，見 design Open Questions 5）。確認六個 it 皆紅

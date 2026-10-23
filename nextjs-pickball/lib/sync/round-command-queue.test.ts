@@ -299,8 +299,8 @@ describe("round-command-queue", () => {
 		await settle();
 		expect(h.events).toEqual(["saving", "retrying"]);
 
-		h.submitScore.mockResolvedValueOnce({ kind: "ok", value: undefined });
 		const s = setup();
+		s.submitScore.mockResolvedValueOnce({ kind: "ok", value: undefined });
 		s.queue.enqueue(submit("m1"));
 		await settle();
 		expect(s.events).toEqual(["saving", "retrying"]);
