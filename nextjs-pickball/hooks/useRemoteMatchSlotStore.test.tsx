@@ -30,6 +30,18 @@ function enqueue(status: number, body: unknown = {}): void {
 	queue.push(() => Promise.resolve(jsonResponse(status, body)));
 }
 
+/** 手動決定何時回應的請求，用來觀察「在途」期間的狀態。 */
+function enqueueDeferred(): (status: number, body: unknown) => void {
+	let release: (status: number, body: unknown) => void = () => {};
+	queue.push(
+		() =>
+			new Promise<Response>((resolve) => {
+				release = (status, body) => resolve(jsonResponse(status, body));
+			}),
+	);
+	return (status, body) => release(status, body);
+}
+
 function putCalls() {
 	return fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
 }
@@ -209,5 +221,157 @@ describe("useRemoteMatchSlotStore", () => {
 		await settle();
 		expect(fetchMock).not.toHaveBeenCalled();
 		expect(disabled.result.current[3]).toBe("local");
+	});
+
+	// 以下為 regression guard：實作先於測試存在，寫入當下即綠燈（B7 §8 自跑 mutation 後補）
+	it("regression guard：分槽儲存的同步狀態轉換與保留規則", async () => {
+		enqueue(200, { data: slotWithScores(0, 0), version: 4 });
+		const { result, unmount } = renderSlot({ enabled: true });
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+
+		// saving，成功後沿用回應的 version
+		const releaseFirst = enqueueDeferred();
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("saving"));
+		await act(async () => {
+			releaseFirst(200, { data: slotWithScores(1, 0), version: 5 });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+		enqueue(200, { data: slotWithScores(2, 0), version: 6 });
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+		expect(putVersions()).toEqual([4, 5]);
+
+		// 503：retrying，重送在途期間仍是 retrying，成功後 synced
+		enqueue(503);
+		const releaseRetry = enqueueDeferred();
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("retrying"));
+		await waitFor(() => expect(putCalls()).toHaveLength(4), { timeout: 3000 });
+		expect(result.current[3]).toBe("retrying");
+		await act(async () => {
+			releaseRetry(200, { data: slotWithScores(3, 0), version: 7 });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("synced"), { timeout: 3000 });
+
+		// 4xx：rejected，下一次送出的 saving 期間不覆蓋它
+		enqueue(400);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("rejected"));
+		const releaseAfterRejected = enqueueDeferred();
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(6));
+		expect(result.current[3]).toBe("rejected");
+		await act(async () => {
+			releaseAfterRejected(200, { data: slotWithScores(5, 0), version: 8 });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+
+		// 204 沒有內容可更新版本，視為失敗而非成功
+		enqueue(204);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("retrying"));
+		unmount();
+		// 卸載後等待中的重試不得再送出
+		const callsAtUnmount = fetchMock.mock.calls.length;
+		await settle(1300);
+		expect(fetchMock).toHaveBeenCalledTimes(callsAtUnmount);
+	});
+
+	it("regression guard：衝突文案維持到下一次儲存成功為止", async () => {
+		enqueue(200, { data: slotWithScores(0, 0), version: 4 });
+		const { result } = renderSlot({ enabled: true });
+		await waitFor(() => expect(result.current[2]).toBe("bound"));
+
+		enqueue(409);
+		enqueue(200, { data: slotWithScores(9, 9), version: 7 });
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("conflict"));
+
+		const release = enqueueDeferred();
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		expect(result.current[3]).toBe("conflict");
+		await act(async () => {
+			release(200, { data: slotWithScores(10, 9), version: 8 });
+		});
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
+	});
+
+	it("regression guard：重新啟用或換場次時回到 pending／loading 並重新載入", async () => {
+		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
+		const rendered = renderHook(
+			({ enabled, matchId }) =>
+				useRemoteMatchSlotStore({ enabled, matchId, onUnauthorized: vi.fn() }),
+			{ initialProps: { enabled: true, matchId: "m1" } },
+		);
+		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
+
+		// 重新啟用：載入中不得殘留上一輪的 bound／synced
+		rendered.rerender({ enabled: false, matchId: "m1" });
+		const releaseReload = enqueueDeferred();
+		rendered.rerender({ enabled: true, matchId: "m1" });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		expect(rendered.result.current[2]).toBe("pending");
+		expect(rendered.result.current[3]).toBe("loading");
+		await act(async () => {
+			releaseReload(200, { data: slotWithScores(2, 1), version: 4 });
+		});
+		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
+
+		// 換場次：改讀新場次的分槽
+		enqueue(200, { data: null, version: 0 });
+		rendered.rerender({ enabled: true, matchId: "m2" });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+		expect(fetchMock.mock.calls[2][0]).toBe("/api/matchmaker/slots/m2");
+		await waitFor(() => expect(rendered.result.current[2]).toBe("missing"));
+	});
+
+	it("regression guard：卸載後才到達的結果被忽略，且 onUnauthorized 以最新的函式呼叫", async () => {
+		// 卸載後才回來的 401 不得呼叫 onUnauthorized
+		const releaseStale = enqueueDeferred();
+		const unmounted = renderSlot({ enabled: true });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		unmounted.unmount();
+		await act(async () => {
+			releaseStale(401, {});
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		});
+		expect(unmounted.onUnauthorized).not.toHaveBeenCalled();
+
+		// rerender 換了 onUnauthorized 後，GET 401 呼叫的是新的函式
+		fetchMock.mockClear();
+		const releaseGet = enqueueDeferred();
+		const first = vi.fn();
+		const second = vi.fn();
+		const rendered = renderHook(
+			({ onUnauthorized }) =>
+				useRemoteMatchSlotStore({ enabled: true, matchId: "m1", onUnauthorized }),
+			{ initialProps: { onUnauthorized: first } },
+		);
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		rendered.rerender({ onUnauthorized: second });
+		await act(async () => {
+			releaseGet(401, {});
+		});
+		await waitFor(() => expect(second).toHaveBeenCalledTimes(1));
+		expect(first).not.toHaveBeenCalled();
 	});
 });

@@ -474,6 +474,18 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
+	// regression guard：實作先於測試存在，寫入當下即綠燈（B7 §8 自跑 mutation 後補）
+	it("regression guard：帶 matchId 的雲端分槽 GET 回 401 時呼叫 session.refresh", async () => {
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });
+		fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 401 })));
+
+		renderHook(() => useScoreboardStore("m1"));
+
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+		expect(fetchMock.mock.calls[0][0]).toBe("/api/matchmaker/slots/m1");
+	});
+
 	it("已登入且帶 matchId 時改用雲端分槽且不寫入 scoreboard:matches:v1", async () => {
 		vi.mocked(useSession).mockReturnValue(loggedIn);
 		const slot = { ...createInitialState({ targetScore: 11 }), matchId: "m1" };
