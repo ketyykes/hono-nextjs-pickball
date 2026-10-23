@@ -64,10 +64,7 @@ export interface UseRemoteRoundStoreOptions {
 	rosterSyncStatus?: SyncStatus;
 }
 
-export type UseRemoteRoundStoreResult = UseRoundStoreResult & {
-	syncStatus: SyncStatus;
-	remoteMatchSlots: Record<string, ScoreboardState> | null;
-};
+export type UseRemoteRoundStoreResult = UseRoundStoreResult;
 
 type LoadPhase = "loading" | "load-failed" | "ready";
 type SlotRecord = Record<string, ScoreboardState>;
