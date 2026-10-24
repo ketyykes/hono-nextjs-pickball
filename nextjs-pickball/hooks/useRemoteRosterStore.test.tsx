@@ -348,7 +348,7 @@ describe("useRemoteRosterStore", () => {
 		expect(result.current.syncStatus).toBe("local");
 	});
 
-	it("resetRoster 成功後清空名單並只清除本機回合、歷史與分槽", async () => {
+	it("resetRoster 成功後清空名單並只清除本機歷史", async () => {
 		for (const key of [
 			ROSTER_STORAGE_KEY,
 			ROUND_STORAGE_KEY,
@@ -376,10 +376,41 @@ describe("useRemoteRosterStore", () => {
 		expect(posts).toHaveLength(1);
 		expect(posts[0][0]).toBe("/api/matchmaker/reset");
 		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBe("x");
-		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe("x");
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
-		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe("x");
 		expect(localStorage.getItem(SCOREBOARD_CURRENT_KEY)).toBe("x");
+	});
+
+	it("resetRoster 送出前停止所有參賽者的待送與重試中變更", async () => {
+		enqueue(200, listBody([]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		// p1 的 version 0 PUT 回 503，進入退避等待
+		enqueue(503);
+		act(() => {
+			result.current.addPlayer({ name: "新球員", gender: "male", rating: 3 });
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("retrying"));
+		const addedId = result.current.players[0].id;
+		expect(putVersions()).toEqual([0]);
+
+		// POST 尚在途時，退避計時器到期：停止必須發生在送出 POST 之前，而不是等結果回來
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		const putsAtReset = putCalls().length;
+		await settle(1300);
+		expect(putCalls()).toHaveLength(putsAtReset);
+
+		await act(async () => {
+			releaseReset(204, {});
+		});
+		await waitFor(() => expect(result.current.players).toEqual([]));
+		await settle(1300);
+		expect(putCalls().filter(([url]) => String(url).endsWith(`/${addedId}`))).toHaveLength(putsAtReset);
 	});
 
 	it("resetRoster 失敗時名單不變並回報 rejected", async () => {
@@ -1017,5 +1048,308 @@ describe("useRemoteRosterStore 補充守護", () => {
 		await settle();
 		expect(result.current.players).toHaveLength(1);
 		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe("x");
+	});
+});
+
+describe("useRemoteRosterStore 名單 port（接收後端寫入的評分）", () => {
+	it("applyRemotePlayers 以回應取代參賽者與 version 且不送出請求", async () => {
+		const p1 = makePlayer("p1");
+		const p2 = makePlayer("p2");
+		enqueue(200, listBody([[p1, 2], [p2, 2]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		const callsBefore = fetchMock.mock.calls.length;
+
+		act(() => {
+			result.current.applyRemotePlayers([
+				{ data: makePlayer("p1", { rating: 4.2 }), version: 3 },
+				{ data: makePlayer("p9"), version: 1 },
+			]);
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(callsBefore);
+		expect(result.current.players.find((p) => p.id === "p1")?.rating).toBe(4.2);
+		expect(result.current.players.find((p) => p.id === "p2")).toEqual(p2);
+		// 名單中沒有的 id 不會被加進來
+		expect(result.current.players.map((p) => p.id)).toEqual(["p1", "p2"]);
+		expect(result.current.syncStatus).toBe("synced");
+
+		enqueueEcho(4);
+		act(() => {
+			result.current.updatePlayer("p1", { name: "改名" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		expect(putVersions()).toEqual([3]);
+		expect(putBodies()[0].data.rating).toBe(4.2);
+	});
+
+	it("applyRemotePlayers 遇到該參賽者有待送或在途變更時視同衝突並整份重新載入", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 2]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		// p1 一筆在途、一筆待送
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "在途" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		act(() => {
+			result.current.updatePlayer("p1", { name: "待送" });
+		});
+
+		const cloudP1 = makePlayer("p1", { name: "雲端", rating: 4.2 });
+		const cloudP2 = makePlayer("p2");
+		enqueue(200, listBody([[cloudP1, 5], [cloudP2, 2]]));
+		act(() => {
+			result.current.applyRemotePlayers([{ data: cloudP1, version: 3 }]);
+		});
+
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		expect(result.current.players).toEqual([cloudP1, cloudP2]);
+		expect(callsOf("GET")).toHaveLength(2);
+
+		// 在途的結果晚到，待送的不得再送出
+		await act(async () => {
+			releaseP1(200, { data: makePlayer("p1", { name: "在途" }), version: 3 });
+		});
+		await settle();
+		expect(putCalls()).toHaveLength(1);
+		expect(result.current.players).toEqual([cloudP1, cloudP2]);
+		expect(result.current.syncStatus).toBe("conflict");
+	});
+
+	it("reloadRemotePlayers 停止佇列並以雲端名單取代", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 2]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "在途" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		act(() => {
+			result.current.updatePlayer("p1", { name: "待送" });
+		});
+
+		const cloudP3 = makePlayer("p3");
+		enqueue(200, listBody([[cloudP3, 7]]));
+		act(() => {
+			result.current.reloadRemotePlayers();
+		});
+
+		await waitFor(() => expect(result.current.players).toEqual([cloudP3]));
+		expect(result.current.syncStatus).toBe("synced");
+
+		await act(async () => {
+			releaseP1(200, { data: makePlayer("p1", { name: "在途" }), version: 3 });
+		});
+		await settle();
+		expect(putCalls()).toHaveLength(1);
+		expect(result.current.players).toEqual([cloudP3]);
+
+		// 重載後以新載入的 version 繼續儲存
+		enqueueEcho(8);
+		act(() => {
+			result.current.updatePlayer("p3", { name: "改名" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		expect(putVersions()).toEqual([2, 7]);
+	});
+
+	it("reloadRemotePlayers 重新 GET 失敗時回報 load-failed，401 時呼叫 onUnauthorized", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 2]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		enqueue(500);
+		act(() => {
+			result.current.reloadRemotePlayers();
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("load-failed"));
+		expect(result.current.players.map((p) => p.id)).toEqual(["p1"]);
+
+		enqueue(200, listBody([[makePlayer("p1"), 2]]));
+		const second = renderRemote({ enabled: true });
+		await waitFor(() => expect(second.result.current.syncStatus).toBe("synced"));
+		enqueue(401);
+		act(() => {
+			second.result.current.reloadRemotePlayers();
+		});
+		await waitFor(() => expect(second.onUnauthorized).toHaveBeenCalledTimes(1));
+		expect(onUnauthorized).not.toHaveBeenCalled();
+	});
+
+	it("enabled 為 false 時 applyRemotePlayers 與 reloadRemotePlayers 不發出請求", async () => {
+		const { result } = renderRemote({ enabled: false });
+
+		act(() => {
+			result.current.applyRemotePlayers([{ data: makePlayer("p1"), version: 1 }]);
+			result.current.reloadRemotePlayers();
+		});
+		await settle();
+
+		expect(fetchMock).not.toHaveBeenCalled();
+		expect(result.current.players).toEqual([]);
+	});
+
+	// regression guard：以下 it 在實作完成後補寫，寫入當下即綠（Stage 2 mutation 發現的缺口）
+	it("applyRemotePlayers 只在回應中的參賽者有待送變更時才重載", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 2], [makePlayer("p2"), 2]]));
+		const { result } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		// 只有 p2 有在途的 PUT
+		enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "p2 在途" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+
+		// 回應只含閒置的 p1：不得因為別人忙碌而重載
+		const updatedP1 = makePlayer("p1", { rating: 4.2 });
+		act(() => {
+			result.current.applyRemotePlayers([{ data: updatedP1, version: 3 }]);
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+		expect(result.current.players.find((player) => player.id === "p1")).toEqual(updatedP1);
+		expect(result.current.syncStatus).not.toBe("conflict");
+
+		// 回應的第二筆（p2）忙碌：即使第一筆閒置也要重載並回報 conflict
+		const cloudP1 = makePlayer("p1", { name: "雲端 p1" });
+		const cloudP2 = makePlayer("p2", { name: "雲端 p2" });
+		enqueue(200, listBody([[cloudP1, 5], [cloudP2, 5]]));
+		act(() => {
+			result.current.applyRemotePlayers([
+				{ data: updatedP1, version: 3 },
+				{ data: makePlayer("p2"), version: 3 },
+			]);
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("conflict"));
+		expect(callsOf("GET")).toHaveLength(2);
+		expect(result.current.players).toEqual([cloudP1, cloudP2]);
+	});
+});
+
+describe("useRemoteRosterStore 重置期間舊世代結果的處理邊界", () => {
+	it("重置成功之後才到的舊世代 409 或 401，不得重載、不得呼叫 onUnauthorized，狀態維持 synced", async () => {
+		for (const staleStatus of [409, 401]) {
+			fetchMock.mockClear();
+			enqueue(200, listBody([[makePlayer("p1"), 3]]));
+			const { result, onUnauthorized, unmount } = renderRemote({ enabled: true });
+			await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+			const releaseP1 = enqueueDeferred();
+			act(() => {
+				result.current.updatePlayer("p1", { name: "x" });
+			});
+			await waitFor(() => expect(putCalls()).toHaveLength(1));
+			const releaseReset = enqueueDeferred();
+			act(() => {
+				result.current.resetRoster();
+			});
+			await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+			await act(async () => {
+				releaseReset(204, {});
+			});
+			await waitFor(() => expect(result.current.players).toEqual([]));
+
+			await act(async () => {
+				releaseP1(staleStatus, {});
+			});
+			await settle();
+
+			expect(callsOf("GET")).toHaveLength(1);
+			expect(onUnauthorized).not.toHaveBeenCalled();
+			expect(result.current.syncStatus).toBe("synced");
+			unmount();
+		}
+	});
+
+	it("重置在途時卸載，之後舊世代回 409 不得發出 GET", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result, unmount } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(1));
+		const releaseReset = enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		unmount();
+		await act(async () => {
+			releaseP1(409, {});
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+
+		await act(async () => {
+			releaseReset(204, {});
+		});
+		await settle();
+		expect(callsOf("GET")).toHaveLength(1);
+	});
+
+	it("重置中已收到 401，之後另一筆舊世代回 409 不得發出 GET", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3], [makePlayer("p2"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseP1 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p1", { name: "x" });
+		});
+		const releaseP2 = enqueueDeferred();
+		act(() => {
+			result.current.updatePlayer("p2", { name: "y" });
+		});
+		await waitFor(() => expect(putCalls()).toHaveLength(2));
+		enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		await act(async () => {
+			releaseP1(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		await act(async () => {
+			releaseP2(409, {});
+		});
+		await settle();
+
+		expect(callsOf("GET")).toHaveLength(1);
+		expect(onUnauthorized).toHaveBeenCalledTimes(1);
+	});
+
+	it("重置中 DELETE 回 401 時呼叫 onUnauthorized", async () => {
+		enqueue(200, listBody([[makePlayer("p1"), 3]]));
+		const { result, onUnauthorized } = renderRemote({ enabled: true });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const releaseDelete = enqueueDeferred();
+		act(() => {
+			result.current.removePlayer("p1");
+		});
+		await waitFor(() => expect(callsOf("DELETE")).toHaveLength(1));
+		enqueueDeferred();
+		act(() => {
+			result.current.resetRoster();
+		});
+		await waitFor(() => expect(callsOf("POST")).toHaveLength(1));
+
+		await act(async () => {
+			releaseDelete(401, {});
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
 	});
 });

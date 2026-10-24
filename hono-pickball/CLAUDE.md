@@ -3,8 +3,9 @@
 本檔描述 **hono-pickball workspace**（monorepo 後端）：Hono 4 API on Cloudflare Workers。**所有後端邏輯（含 better-auth、drizzle、D1）都放這裡**，不要寫進前端的 API route。
 
 > ⚠️ 範圍例外：計分板（`/scoreboard`）已部分上雲（B5：登入且未綁定場次時以雲端為準，路由見 `src/routes/scoreboard.ts`）；
-> matchmaker（對戰分配機）的**參賽者名單已上雲**（B6：`src/routes/matchmaker.ts`，表 `matchmaker_players`）。
-> **回合、歷史、場次分槽仍為前端 LocalStorage**，待 B7、B8，在那之前不是待搬進來的「後端邏輯」；
+> matchmaker（對戰分配機）的**參賽者名單已上雲**（B6：`src/routes/matchmaker.ts`，表 `matchmaker_players`），
+> **回合、場次分槽與送出比分（含歷史寫入）也已上雲**（B7：表 `matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history`）。
+> **歷史的讀取端點尚未提供，歷史頁與統計頁仍讀前端 LocalStorage**，待 B8，在那之前不是待搬進來的「後端邏輯」；
 > 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
@@ -79,16 +80,37 @@
   - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`，共用實作為 `src/http/invalid-body.ts` 的 `userDataOnError`（搭配 zValidator 的 `invalidBodyHook`），新 sub-app 直接沿用、不要另寫
   - **授權覆蓋表**：每個端點須有三類測試——未登入 401、他人資料不可見／不可改、帳號停用 404
 - **matchmaker 名單 API**（B6，`src/routes/matchmaker.ts`、`src/matchmaker/players-repository.ts`）：
-  - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409）；`POST /reset`（batch 刪除）
+  - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409）；`POST /reset`（`db.batch()` 一次刪除 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表）
   - 掛 `localAuth, requireSession`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
   - 多筆契約要點：複合主鍵 `(user_id, id)`；`sort_order = coalesce(max,-1)+1`；`GET` 依 `sort_order, rowid` 排序；只有主鍵衝突判 409，其他約束違規為 500（`isConstraintError` 只認 `SQLITE_CONSTRAINT_PRIMARYKEY` 與 `UNIQUE constraint failed`，並沿 cause 鏈查找）
-  - **後續 change 須知**（詳見 openspec change `matchmaker-roster-backend` design「交接給 B7～B9」）：
-    1. 場次分槽（`scoreboard:matches:v1`）隨回合一起上雲；`POST /api/matchmaker/reset` 的 batch 要加入回合與分槽表
-    2. 送出比分採後端權威 batch：更新 `matchmaker_players.data`（四人評分）、寫回合、寫歷史；版本條件不成立時讓 batch 失敗的寫法見 B5 Open Questions 1
-    3. 歷史（B8）只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 要同步
+- **matchmaker 回合、場次分槽與送出比分 API**（B7，同在 `src/routes/matchmaker.ts`；`src/matchmaker/{round,slots,score}-repository.ts`）：
+  - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序是 coordinator 裁定維持的行為（符合 spec 字面），舊回合裝置重排時會先得到 400 而非 409，不要自行對調
+  - `GET /slots`（清單）、`GET /slots/:matchId`（單筆，不存在回 `{ data: null, version: 0 }`）、`PUT /slots/:matchId`（path 的 `matchId` 必須等於 `data.matchId`，否則 400；版本不符 409）。**`GET /slots` 的 `orderBy`（依 `match_id`）必須保留**：不排序時 `ANALYZE` 後查詢計畫可能改變回傳順序（design Open Questions 第 16 條）
+  - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
+  - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
+  - **後續 change 須知**（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）：
+    1. **B8**：`matchmaker_history` 已有 `played_at`（ms）與主鍵，讀取端點只需 GET；追加順序以 `rowid` 保存。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 已含該表。前端 `useRemoteRoundStore` 的 `history` 恆為空陣列，B8 改讀雲端後，前端 `resetLocalMatchProgress()` 刪除、`buildRemoteBackupSnapshot()` 的 `history` 改取雲端
+    2. **B9**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
+    3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`
+       （現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
+
+## 多表寫入用整批守衛
+
+D1 沒有互動式 transaction，只有 `db.batch()`：batch 中任一陳述式**失敗**會回滾整批，但**影響 0 列的 UPDATE 不算失敗**（B5 Open Questions 1），所以光靠 `WHERE version = ?` 擋不住競態。需要多表一致寫入（例：送出比分）時，一律用整批守衛，實作在 `src/matchmaker/batch-guard.ts`：
+
+- **寫法**：batch 的**第一條**為 `insertBatchGuard(db, userId, condition, now)`，即對 `sync_batch_guards` 插入 `version = CASE WHEN <條件> THEN 1 END`；**最後一條**為 `releaseBatchGuard(db, userId)`（DELETE），使守衛表在任何 batch 結束後恆為空。`<條件>` 是在 SQL 內對資料庫**目前**內容做的版本比較（例：回合版本與每位被更新球員的版本）。條件為假 → `CASE` 得 NULL → 違反 `version` 的 NOT NULL → 該陳述式失敗 → D1 回滾整批
+- **守衛必須是第一條**：後面的陳述式會把 version 加一，守衛放後面會讀到自己剛寫入的新 version 而失效
+- **錯誤分類集中在 `batch-guard.ts`**：`isBatchGuardViolation(error)`（訊息含 `NOT NULL constraint failed: sync_batch_guards.version`，不比對寬泛的 `SQLITE_CONSTRAINT`）與 `isHistoryPrimaryKeyViolation(error)`（限定 `matchmaker_history.`，殘留守衛列或其他表的衝突不得被吞成 409），兩者都沿 cause 鏈逐層檢查；呼叫端 catch 後符合者回 conflict，其餘照常拋出（500）
+- **禁止事項**：
+  - 不得改用多次 `run()` 加 try/catch 補償：前面的寫入已提交，補償不可靠
+  - 守衛 INSERT 不得加 `OR IGNORE`／`OR REPLACE`／`onConflictDoNothing`，否則違反約束的守衛會被靜默略過
+  - `sync_batch_guards.version` 不得有 `DEFAULT`，否則 NULL 會被預設值取代而不失敗
+  - **drizzle 0.45.2 的 batch 內不可使用帶參數的 `db.run(sql)`**（`SQLiteRaw` 無 stmt，執行失敗）；一律改用 query builder 搭配 `sql` 片段（`insertBatchGuard` 即如此）
+  - 不得在 JS 端先判定再傳常數條件（如 `sql`1``）：先讀後寫之間的競態就沒被消除。batch 前讀到的 version 只能當比較基準，比較本身必須在 SQL 內執行
+- 測試：`test/d1-batch-guard.test.ts` 固定兩個平台行為（0 列 UPDATE 不回滾、守衛失敗整批回滾）；repository 層以測試專用的 `afterRead` 鉤子模擬競態
 
 ## 依賴注意
 

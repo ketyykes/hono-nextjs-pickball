@@ -198,6 +198,8 @@
 - **THEN** `matchmaker:round:v1` 與 `matchmaker:history:v1` 皆不存在；`PUT /api/matchmaker/round` 被呼叫一次
 - **驗收**：`nextjs-pickball/hooks/useRoundStore.test.tsx`，it 名稱「雲端模式下產生對戰不寫入本機回合與歷史」
 
+---
+
 ## ADDED Requirements
 
 ### Requirement: 回合與送出比分的雲端 API

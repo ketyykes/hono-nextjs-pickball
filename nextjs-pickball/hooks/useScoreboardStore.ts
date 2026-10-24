@@ -6,6 +6,7 @@ import { createInitialState, scoreboardReducer } from "@pickball/core/scoreboard
 import { readScoreboard, writeScoreboard } from "@/lib/scoreboard/storage";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteScoreboardStore } from "@/hooks/useRemoteScoreboardStore";
+import { useRemoteMatchSlotStore } from "@/hooks/useRemoteMatchSlotStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 import type { SyncStatus } from "@/lib/sync/sync-status";
 import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
@@ -102,7 +103,7 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 }
 
 // 儲存模式選擇器：兩個 hook 每次 render 都呼叫（hooks 規則），未被選用的一方不發請求。
-// 只有「已登入且未綁定場次」走雲端；帶 matchId 的分槽在 B7 之前一律留在本機。
+// 已登入時：未綁定場次走獨立計分板的雲端實作，帶 matchId 走雲端分槽。
 // session 載入中視為本機，訪客首屏時序不因等待 /api/session 而改變。
 export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	ScoreboardState,
@@ -113,14 +114,23 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	const session = useSession();
 	const matchId = matchIdParam === "" || matchIdParam === undefined ? null : matchIdParam;
 	const local = useLocalScoreboardStore(matchIdParam);
-	const isRemote = resolveStorageMode(session) === "remote" && matchId === null;
+	const isRemoteMode = resolveStorageMode(session) === "remote";
 	const remote = useRemoteScoreboardStore({
-		enabled: isRemote,
+		enabled: isRemoteMode && matchId === null,
+		onUnauthorized: session.refresh,
+	});
+	// matchId 為 null 時 enabled 恆為 false，傳入的字串不會被使用
+	const remoteSlot = useRemoteMatchSlotStore({
+		enabled: isRemoteMode && matchId !== null,
+		matchId: matchId ?? "",
 		onUnauthorized: session.refresh,
 	});
 
-	if (isRemote) {
+	if (isRemoteMode && matchId === null) {
 		return [remote[0], remote[1], "standalone", remote[2]] as const;
+	}
+	if (isRemoteMode) {
+		return remoteSlot;
 	}
 	return [local[0], local[1], local[2], "local"] as const;
 }

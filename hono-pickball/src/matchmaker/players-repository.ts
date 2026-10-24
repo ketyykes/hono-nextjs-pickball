@@ -1,9 +1,7 @@
 import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { getDb } from "../db/client";
-import { matchmakerPlayers } from "../db/schema";
-
-type Db = ReturnType<typeof getDb>;
+import type { Db } from "../db/client";
+import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound } from "../db/schema";
 
 export interface VersionedPlayer {
 	data: Player;
@@ -121,7 +119,12 @@ export async function importPlayers(
 	return players.map((player) => ({ data: player, version: 1 }));
 }
 
-/** 刪除本人全部對戰分配機資料；之後的資料表（回合、歷史）要加進同一個 batch。 */
+/** 刪除本人全部對戰分配機資料；之後新增的資料表要加進同一個 batch。 */
 export async function resetMatchmaker(db: Db, userId: string): Promise<void> {
-	await db.batch([db.delete(matchmakerPlayers).where(eq(matchmakerPlayers.userId, userId))]);
+	await db.batch([
+		db.delete(matchmakerPlayers).where(eq(matchmakerPlayers.userId, userId)),
+		db.delete(matchmakerRound).where(eq(matchmakerRound.userId, userId)),
+		db.delete(matchmakerMatchSlots).where(eq(matchmakerMatchSlots.userId, userId)),
+		db.delete(matchmakerHistory).where(eq(matchmakerHistory.userId, userId)),
+	]);
 }

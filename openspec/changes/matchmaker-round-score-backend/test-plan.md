@@ -131,7 +131,7 @@
 
 ## scoreboard
 
-### Requirement: localStorage 持久化（MODIFIED）
+### Requirement: 本機模式的 localStorage 持久化（ADDED；以 REMOVED「localStorage 持久化」取代，見 design「apply §1 查證紀錄」）
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
@@ -156,15 +156,16 @@
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
 | （既有）確認重置／取消重置／重置只移除列舉的四個 key／resetRoster 失敗時名單不變並回報 rejected／登入時重置名單清空雲端名單並保留本機訪客名單 | 對應 Scenario | 原樣通過 | regression guard | unit |
-| resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板 | resetLocalMatchProgress 只清除本機歷史 | 只有歷史 key 被移除 | **改寫 B6 的 it**；舊實作多移除兩個 key → 紅 | unit |
+| resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板 | resetLocalMatchProgress 只清除本次活動的進度（沿用主 spec 標題、內容改寫） | 只有歷史 key 被移除 | **改寫 B6 的 it**；舊實作多移除兩個 key → 紅 | unit |
 | resetRoster 成功後清空名單並只清除本機歷史 | 登入時重置名單 | 只有歷史 key 被移除 | **改寫 B6 的 it**；同上 → 紅 | hook |
+| resetRoster 送出前停止所有參賽者的待送與重試中變更 | 登入時重置名單前停止所有待送與重試中的變更 | reset 後推進假時鐘超過退避表全長，p1 的 PUT 不再出現 | B6 Final 轉 B7 的待辦（`reset()` 前未 `disposeAll()`）；舊實作重試的 v0 PUT 會在 reset 後送出 → 紅 | hook |
 | 登入時重置名單後雲端回合與分槽一併清除 | 登入時重置名單後對戰頁沒有回合 | 無場地卡；GET 為空 | reset batch 擴充的端到端證據 | e2e |
 
 ### Requirement: 登入時名單以雲端為準（MODIFIED）
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| （既有，B6）`roster-api.test.ts`、`useRosterStore.test.tsx`、`useRemoteRosterStore.test.tsx`、`roster-sync.spec.ts` 的 it／test（含「登入時送出比分後評分寫入雲端名單」） | B6 Scenario | 原樣通過 | regression guard（送出比分的 E2E 觀察結果不變，機制改由後端） | unit |
+| （既有，B6）`roster-api.test.ts`、`useRosterStore.test.tsx`、`useRemoteRosterStore.test.tsx`、`roster-sync.spec.ts` 的 it／test | B6 Scenario | 原樣通過；**例外**「登入時送出比分後評分寫入雲端名單」的等待由逐人 PUT 改為送出比分 POST ok，並加斷言送出期間無參賽者 PUT（名稱與 2 升 2 降斷言不動；coordinator 於 apply §10 授權） | regression guard（送出比分的 E2E 觀察結果不變，機制改由後端；原規劃漏算該 test 等待逐人 PUT） | unit／e2e |
 | applyRemotePlayers 以回應取代參賽者與 version 且不送出請求 | 同名 | 無請求；rating 4.2；之後 PUT version 3 | 新 port；不存在 → 紅 | hook |
 | applyRemotePlayers 遇到該參賽者有待送或在途變更時視同衝突並整份重新載入 | 同名 | 不再送出；重新載入；conflict | 避免帶舊 version 覆蓋評分 | hook |
 | reloadRemotePlayers 停止佇列並以雲端名單取代 | 同名 | 新名單；synced | 回合衝突時的名單同步 | hook |

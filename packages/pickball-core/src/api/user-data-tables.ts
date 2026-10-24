@@ -2,6 +2,13 @@
  * 所有使用者資料表（auth 核心四張以外）的名稱。
  * 後端測試雙向比對 sqlite_master，E2E 清空資料以此為唯一來源；新增資料表時必須同步列入。
  */
-export const USER_DATA_TABLES = ["scoreboard_current", "matchmaker_players"] as const;
+export const USER_DATA_TABLES = [
+  "scoreboard_current",
+  "matchmaker_players",
+  "matchmaker_round",
+  "matchmaker_match_slots",
+  "matchmaker_history",
+  "sync_batch_guards",
+] as const;
 
 export type UserDataTable = (typeof USER_DATA_TABLES)[number];

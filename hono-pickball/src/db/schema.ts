@@ -1,3 +1,6 @@
+import type { MatchSlot } from "@pickball/core/api/round";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
+import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { Player } from "@pickball/core/matchmaker/types";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { relations, sql } from "drizzle-orm";
@@ -131,3 +134,55 @@ export const matchmakerPlayers = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.id] })],
 );
+
+// 每位使用者一筆目前回合；回合的所有變更都是整份替換，所以不拆欄。
+export const matchmakerRound = sqliteTable("matchmaker_round", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  data: text("data", { mode: "json" }).$type<Round>().notNull(),
+  version: integer("version").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+// 場次 id 由前端產生，只在同一使用者內唯一，故用複合主鍵。
+export const matchmakerMatchSlots = sqliteTable(
+  "matchmaker_match_slots",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    matchId: text("match_id").notNull(),
+    data: text("data", { mode: "json" }).$type<MatchSlot>().notNull(),
+    version: integer("version").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.matchId] })],
+);
+
+// played_at 拆欄供依區間查詢與排序；歷史只增不改，version 恆為 1。
+// 主鍵 (user_id, match_id) 是同一場次重複完成的第二道防線。
+export const matchmakerHistory = sqliteTable(
+  "matchmaker_history",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    matchId: text("match_id").notNull(),
+    playedAt: integer("played_at", { mode: "timestamp_ms" }).notNull(),
+    data: text("data", { mode: "json" }).$type<MatchHistoryEntry>().notNull(),
+    version: integer("version").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.matchId] })],
+);
+
+// 整批守衛：平時恆為空。version 刻意不設 DEFAULT 且為 NOT NULL，
+// 否則 NULL 會被預設值取代而使守衛失效。
+export const syncBatchGuards = sqliteTable("sync_batch_guards", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

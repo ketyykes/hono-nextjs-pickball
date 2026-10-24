@@ -1,0 +1,453 @@
+import { existsSync } from "node:fs";
+import { test, expect, type Browser, type Page, type Response, type Route } from "@playwright/test";
+import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
+import { clearTestAccountUserData } from "../helpers/user-data";
+
+// 登入後的對戰回合與場次分槽以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
+// 不用固定延遲：已登入者在 /api/session 回應前會先看到本機畫面，必須等同步狀態再操作。
+
+const ROUND_KEY = "matchmaker:round:v1";
+const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
+const MATCHMAKER_PAGE = "/matchmaker";
+const PLAYERS_PAGE = "/matchmaker/players";
+const PLAYERS_API = "/api/matchmaker/players";
+const ROUND_API = "/api/matchmaker/round";
+const SLOTS_API = "/api/matchmaker/slots";
+const SYNCED = '[data-sync-status="synced"]';
+const CONFLICT = '[data-sync-status="conflict"]';
+const LOAD_FAILED = '[data-sync-status="load-failed"]';
+const LOADING = '[data-sync-status="loading"]';
+const COURT_GRIDS = '[data-testid="match-stage-courts"] [data-testid$="-grid"]';
+
+test.use({ storageState: storageStatePath });
+test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);
+
+test.beforeEach(() => {
+	clearTestAccountUserData();
+});
+
+function buildPlayer(index: number) {
+	return {
+		id: `rs${index}`,
+		name: `回合測試員${index}`,
+		gender: "other" as const,
+		colorFrom: "#4f46e5",
+		colorTo: "#818cf8",
+		rating: 3,
+		restCount: 0,
+		gamesPlayed: 0,
+		isActive: true,
+		createdAt: "2026-01-01T00:00:00.000Z",
+	};
+}
+
+const PLAYER_NAMES = [1, 2, 3, 4].map((index) => buildPlayer(index).name);
+
+// 準備雲端名單走 API 而非 UI：比逐一開 Dialog 快且穩。
+// page.request 與頁面共用同一份 storage state 的 cookie，等同已登入的同一位使用者。
+async function seedCloudPlayers(page: Page, count: number) {
+	for (let index = 1; index <= count; index++) {
+		const player = buildPlayer(index);
+		const response = await page.request.put(`${PLAYERS_API}/${player.id}`, {
+			data: { data: player, version: 0 },
+		});
+		expect(response.ok(), `種入雲端參賽者 ${player.id} 失敗：${response.status()}`).toBe(true);
+	}
+}
+
+function isRoundPut(response: Response) {
+	return response.url().endsWith(ROUND_API) && response.request().method() === "PUT";
+}
+
+function isSlotPut(response: Response) {
+	return response.url().includes(`${SLOTS_API}/`) && response.request().method() === "PUT";
+}
+
+function isScorePost(response: Response) {
+	return response.url().includes(`${ROUND_API}/matches/`) && response.request().method() === "POST";
+}
+
+// 開啟對戰頁、等雲端名單與回合載入完成後產生一輪（預設 1 場地單打），並等回合 PUT 完成
+async function generateRound(page: Page) {
+	await page.goto(MATCHMAKER_PAGE);
+	await expect(page.locator(SYNCED)).toBeVisible();
+	await Promise.all([
+		page.waitForResponse((response) => isRoundPut(response) && response.ok()),
+		page.getByRole("button", { name: "產生本輪對戰" }).click(),
+	]);
+	await expect(page.locator(COURT_GRIDS)).toHaveCount(1);
+	await expect(page.locator(SYNCED)).toBeVisible();
+}
+
+// 從場地色塊既有的 data-testid（`court-${match.id}-grid`）反解析 matchId
+async function courtMatchId(page: Page, courtIndex: number): Promise<string> {
+	const testId = await page.locator(COURT_GRIDS).nth(courtIndex).getAttribute("data-testid");
+	const match = /^court-(.*)-grid$/.exec(testId ?? "");
+	if (!match) {
+		throw new Error(`無法從 data-testid 解析 matchId：${String(testId)}`);
+	}
+	return match[1];
+}
+
+// 手動輸入比分並送出，等 POST 完成再等 synced
+async function submitScoreManually(page: Page, matchId: string, scoreA: string, scoreB: string) {
+	const court = page.getByTestId(`court-${matchId}`);
+	await court.getByLabel("第一隊比分").fill(scoreA);
+	await court.getByLabel("第二隊比分").fill(scoreB);
+	await Promise.all([
+		page.waitForResponse((response) => isScorePost(response)),
+		court.getByRole("button", { name: "送出比分" }).click(),
+	]);
+}
+
+// 從場地卡進入計分板：雲端模式導向前會先建立分槽，等 PUT 回應後才會換頁
+async function enterScoreboard(page: Page, matchId: string) {
+	await Promise.all([
+		page.waitForResponse((response) => isSlotPut(response) && response.ok()),
+		page.getByTestId(`court-${matchId}`).getByRole("link", { name: "進入計分板" }).click(),
+	]);
+	await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+	await expect(page.locator(SYNCED)).toBeVisible();
+}
+
+// 我方得分並等該次分槽 PUT 完成；先等 PUT 再等 synced，避免讀到送出前的舊 synced
+async function scoreUs(page: Page, times: number) {
+	for (let i = 0; i < times; i++) {
+		await Promise.all([
+			page.waitForResponse((response) => isSlotPut(response) && response.ok()),
+			page.getByRole("button", { name: /我方贏這一球/ }).click(),
+		]);
+		await expect(page.locator(SYNCED)).toBeVisible();
+	}
+}
+
+async function readLocal(page: Page, key: string) {
+	return page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key);
+}
+
+// 場地卡上每位球員的「強度 x.xx」文字；雲端評分寫入後同一頁面不重新整理也要更新
+async function readCourtRatings(page: Page) {
+	const text = await page.getByTestId("match-stage-courts").innerText();
+	return text.match(/強度 \d+\.\d+/g) ?? [];
+}
+
+async function readCourtsText(page: Page) {
+	return page.getByTestId("match-stage-courts").innerText();
+}
+
+async function withSecondContext(browser: Browser, run: (pageB: Page) => Promise<void>) {
+	const contextB = await browser.newContext({ storageState: storageStatePath });
+	try {
+		await run(await contextB.newPage());
+	} finally {
+		await contextB.close();
+	}
+}
+
+// 從參賽者頁讀出「姓名 → 強度」，用來比對評分前後的變化
+async function readRatings(page: Page, names: string[]) {
+	const ratings: Record<string, number> = {};
+	for (const name of names) {
+		const card = page.locator('[data-slot="card"]').filter({ hasText: name });
+		const text = await card.innerText();
+		const match = /強度 (\d+\.\d+)/.exec(text);
+		expect(match, `找不到 ${name} 的強度文字`).not.toBeNull();
+		ratings[name] = Number(match?.[1]);
+	}
+	return ratings;
+}
+
+test.describe("matchmaker 對戰回合雲端同步", () => {
+	test("登入後產生的回合在重新整理與另一個 context 中由雲端還原", async ({ page, browser }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+		const courtsText = await readCourtsText(page);
+
+		await page.reload();
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.locator(COURT_GRIDS)).toHaveCount(1);
+		expect(await courtMatchId(page, 0)).toBe(matchId);
+		expect(await readCourtsText(page)).toBe(courtsText);
+		expect(await readLocal(page, ROUND_KEY)).toBeNull();
+
+		await withSecondContext(browser, async (pageB) => {
+			await pageB.goto(MATCHMAKER_PAGE);
+			await expect(pageB.locator(SYNCED)).toBeVisible();
+			await expect(pageB.locator(COURT_GRIDS)).toHaveCount(1);
+			expect(await courtMatchId(pageB, 0)).toBe(matchId);
+			expect(await readCourtsText(pageB)).toBe(courtsText);
+		});
+	});
+
+	test("登入時經計分板完成的場次由雲端寫入評分並清除分槽", async ({ page }) => {
+		await seedCloudPlayers(page, 4);
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		const before = await readRatings(page, PLAYER_NAMES);
+
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+		const ratingsBefore = await readCourtRatings(page);
+		expect(ratingsBefore.length).toBeGreaterThan(0);
+		await enterScoreboard(page, matchId);
+
+		// 11 分制下我方連贏 11 球（side-out：對方全程未曾發球）後出現結束對話框
+		await scoreUs(page, 11);
+		await page.getByRole("button", { name: "關閉" }).click();
+		// 本機分槽是訪客時期的資料：雲端模式的回填不得動它（分槽由後端送出比分的 batch 刪除）
+		await page.evaluate(
+			({ key, id }) => window.localStorage.setItem(key, JSON.stringify({ [id]: { sentinel: true } })),
+			{ key: MATCH_SLOTS_KEY, id: matchId },
+		);
+		// 讓名單比回合與分槽晚載入完成：回填必須等名單就緒後重跑，而不是在名單載入中就放棄
+		let releasePlayers: () => void = () => {};
+		const playersGate = new Promise<void>((resolve) => {
+			releasePlayers = resolve;
+		});
+		await page.route(`**${PLAYERS_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await playersGate;
+			}
+			await route.continue();
+		});
+		const roundAndSlotsLoaded = Promise.all([
+			page.waitForResponse(
+				(response) => response.url().endsWith(ROUND_API) && response.request().method() === "GET",
+			),
+			page.waitForResponse(
+				(response) => response.url().endsWith(SLOTS_API) && response.request().method() === "GET",
+			),
+		]);
+		const scorePosted = page.waitForResponse((response) => isScorePost(response) && response.ok());
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await roundAndSlotsLoaded;
+		releasePlayers();
+		await scorePosted;
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		const court = page.getByTestId(`court-${matchId}`);
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:0");
+		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
+		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		// 評分寫入雲端後，同一頁面不重新整理就要看到新的強度（applyRemotePlayers 套用回應）
+		await expect.poll(() => readCourtRatings(page)).not.toEqual(ratingsBefore);
+
+		expect(await readLocal(page, MATCH_SLOTS_KEY)).toContain("sentinel");
+
+		const slotsResponse = await page.request.get(SLOTS_API);
+		expect(slotsResponse.ok()).toBe(true);
+		const slots = (await slotsResponse.json()) as { items: { id?: string }[] };
+		expect(JSON.stringify(slots)).not.toContain(matchId);
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		const after = await readRatings(page, PLAYER_NAMES);
+		const higher = PLAYER_NAMES.filter((name) => after[name] > before[name]);
+		expect(higher, `升分者：${JSON.stringify({ before, after })}`).toHaveLength(1);
+	});
+
+	test("另一裝置先送出同一場比分時顯示衝突提示並載入最新回合", async ({ page, browser }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+
+		await withSecondContext(browser, async (pageB) => {
+			await pageB.goto(MATCHMAKER_PAGE);
+			await expect(pageB.locator(SYNCED)).toBeVisible();
+			await expect(pageB.locator(COURT_GRIDS)).toHaveCount(1);
+			const ratingsBeforeOnB = await readCourtRatings(pageB);
+
+			// A 先送出 11:5 並等雲端寫入完成
+			await submitScoreManually(page, matchId, "11", "5");
+			await expect(page.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+			await expect(page.locator(SYNCED)).toBeVisible();
+
+			// B 仍持有舊版本回合，送出不同比分會得到 409 並重新載入雲端
+			await submitScoreManually(pageB, matchId, "3", "11");
+			await expect(pageB.getByText("資料已在其他裝置更新，已重新載入最新資料")).toBeVisible();
+			await expect(pageB.locator(CONFLICT)).toBeVisible();
+			await expect(pageB.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+			// 另一裝置送出比分時評分也已改變：衝突後要重新載入名單，B 才看得到新的強度
+			await expect.poll(() => readCourtRatings(pageB)).not.toEqual(ratingsBeforeOnB);
+		});
+	});
+
+	test("雲端回合載入失敗時對戰頁顯示錯誤提示", async ({ page }) => {
+		await page.route(`**${ROUND_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await route.fulfill({ status: 500, body: "" });
+				return;
+			}
+			await route.continue();
+		});
+
+		await page.goto(MATCHMAKER_PAGE);
+		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
+		await expect(page.locator(LOAD_FAILED)).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toHaveCount(0);
+	});
+
+	test("登入時重置名單後雲端回合與分槽一併清除", async ({ page }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+		await submitScoreManually(page, matchId, "11", "5");
+		await expect(page.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+		await expect(page.locator(SYNCED)).toBeVisible();
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await page.getByRole("button", { name: "重置名單" }).click();
+		const alert = page.getByRole("alertdialog", { name: "重置參賽者名單" });
+		await Promise.all([
+			page.waitForResponse(
+				(response) => response.url().endsWith("/api/matchmaker/reset") && response.ok(),
+			),
+			alert.getByRole("button", { name: "確定重置" }).click(),
+		]);
+		await expect(page.locator(SYNCED)).toBeVisible();
+
+		await page.goto(MATCHMAKER_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.locator(COURT_GRIDS)).toHaveCount(0);
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toBeVisible();
+
+		const roundResponse = await page.request.get(ROUND_API);
+		expect(await roundResponse.json()).toEqual({ data: null, version: 0 });
+		const slotsResponse = await page.request.get(SLOTS_API);
+		expect(await slotsResponse.json()).toEqual({ items: [] });
+	});
+
+	test("登入時場次計分板的進度在重新整理後由雲端還原且不寫入本機", async ({ page }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+
+		// 分槽建立（PUT v0）未完成前不得導向，否則計分板會把「尚未建立」誤判為「場次已失效」
+		let releaseSlotPut: () => void = () => {};
+		const slotPutGate = new Promise<void>((resolve) => {
+			releaseSlotPut = resolve;
+		});
+		const gateHandler = async (route: Route) => {
+			if (route.request().method() === "PUT") {
+				await slotPutGate;
+			}
+			await route.continue();
+		};
+		await page.route(`**${SLOTS_API}/*`, gateHandler);
+		const slotPutRequest = page.waitForRequest(
+			(request) => request.url().includes(`${SLOTS_API}/`) && request.method() === "PUT",
+		);
+		await page.getByTestId(`court-${matchId}`).getByRole("link", { name: "進入計分板" }).click();
+		await slotPutRequest;
+		await expect(
+			page.waitForRequest((request) => request.url().includes("/scoreboard?match="), { timeout: 1500 }),
+		).rejects.toThrow();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		releaseSlotPut();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await page.unroute(`**${SLOTS_API}/*`, gateHandler);
+		await expect(page.locator(SYNCED)).toBeVisible();
+
+		await scoreUs(page, 2);
+		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
+
+		await page.reload();
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
+		expect(await readLocal(page, MATCH_SLOTS_KEY)).toBeNull();
+
+		// 回到對戰頁：計分中的標示與目標分數鎖定都以雲端分槽為準
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		const court = page.getByTestId(`court-${matchId}`);
+		await expect(court.getByText("計分中")).toBeVisible();
+		await expect(court.getByText("2:0")).toBeVisible();
+		await expect(page.getByText("本輪已開始計分，目標分數不可更改")).toBeVisible();
+
+		// 分槽已存在時再次進入：PUT v0 回 409 也要導向，且比分接續
+		const [conflictResponse] = await Promise.all([
+			page.waitForResponse((response) => isSlotPut(response)),
+			court.getByRole("link", { name: "繼續計分" }).click(),
+		]);
+		expect(conflictResponse.status()).toBe(409);
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
+	});
+
+	test("regression guard：產生對戰後休息者的休息次數寫入雲端名單", async ({ page }) => {
+		// 5 位參賽者、預設 1 場地單打：3 位休息，結算在回合 PUT 成功後才經 updatePlayer 套用
+		await seedCloudPlayers(page, 5);
+		await generateRound(page);
+		// 休息次數在結束上一輪（產生下一輪）時結算，所以再產生一輪
+		await Promise.all([
+			page.waitForResponse((response) => isRoundPut(response) && response.ok()),
+			page.getByRole("button", { name: "產生本輪對戰" }).click(),
+		]);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect
+			.poll(async () => {
+				const response = await page.request.get(PLAYERS_API);
+				const body = (await response.json()) as { items: { data: { restCount: number } }[] };
+				return body.items.reduce((sum, item) => sum + item.data.restCount, 0);
+			})
+			.toBeGreaterThan(0);
+	});
+
+	test("regression guard：雲端回合載入中時對戰頁以載入提示取代內容", async ({ page }) => {
+		let releaseGet: () => void = () => {};
+		const getGate = new Promise<void>((resolve) => {
+			releaseGet = resolve;
+		});
+		await page.route(`**${ROUND_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await getGate;
+			}
+			await route.continue();
+		});
+
+		await page.goto(MATCHMAKER_PAGE);
+		await expect(page.locator(LOADING)).toBeVisible();
+		await expect(page.getByText("正在載入雲端資料…")).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toHaveCount(0);
+
+		releaseGet();
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toBeVisible();
+	});
+
+	test("regression guard：分槽建立失敗時不導向並提示，恢復後可再進入", async ({ page }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+
+		const failHandler = async (route: Route) => {
+			if (route.request().method() === "PUT") {
+				await route.fulfill({ status: 500, body: "" });
+				return;
+			}
+			await route.continue();
+		};
+		await page.route(`**${SLOTS_API}/*`, failHandler);
+		const link = page.getByTestId(`court-${matchId}`).getByRole("link", { name: "進入計分板" });
+		await Promise.all([
+			page.waitForResponse((response) => isSlotPut(response) && response.status() === 500),
+			link.click(),
+		]);
+		await expect(page.getByText("無法建立計分板，請稍後再試")).toBeVisible();
+		await expect(
+			page.waitForRequest((request) => request.url().includes("/scoreboard?match="), { timeout: 1500 }),
+		).rejects.toThrow();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		// 失敗後不可卡在「進行中」：解除攔截後再按一次要能成功導向
+		await page.unroute(`**${SLOTS_API}/*`, failHandler);
+		await link.click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await expect(page.locator(SYNCED)).toBeVisible();
+	});
+});

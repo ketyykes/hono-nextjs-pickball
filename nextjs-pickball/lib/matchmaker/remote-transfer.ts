@@ -1,4 +1,5 @@
 import type { Player } from "@pickball/core/matchmaker/types";
+import { fetchRemoteRound } from "../sync/round-api";
 import { fetchRemotePlayers, importRemotePlayers } from "../sync/roster-api";
 import type { BackupSnapshot } from "./backup";
 import { applyRosterImport } from "./roster-csv";
@@ -57,23 +58,25 @@ export async function importRemoteRoster(
 }
 
 /**
- * 雲端備份快照：參賽者取自雲端，回合與歷史仍取自本機（回合與歷史尚未上雲）。
- * 取名單失敗時不回傳快照，避免使用者下載到缺名單的備份而誤以為完整。
+ * 雲端備份快照：參賽者與回合取自雲端，歷史仍取自本機（歷史尚未上雲）。
+ * 任一雲端讀取失敗時不回傳快照，避免使用者下載到缺名單或缺回合的備份而誤以為完整。
  */
 export async function buildRemoteBackupSnapshot(): Promise<RemoteBackupSnapshotResult> {
-	const existing = await fetchRemotePlayers();
-	if (existing.kind === "unauthorized") return { ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized };
-	if (existing.kind !== "ok" || existing.value === undefined) {
+	const [players, round] = await Promise.all([fetchRemotePlayers(), fetchRemoteRound()]);
+	if (players.kind === "unauthorized" || round.kind === "unauthorized") {
+		return { ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized };
+	}
+	// 204 沒有內容（value 為 undefined）不該出現，當失敗；雲端尚無回合時 data 為 null，那是合法的空值。
+	if (players.kind !== "ok" || players.value === undefined || round.kind !== "ok" || round.value === undefined) {
 		return { ok: false, message: REMOTE_TRANSFER_MESSAGES.backupFetchFailed };
 	}
 
-	const local = readSnapshot();
 	return {
 		ok: true,
 		snapshot: {
-			players: existing.value.items.map((item) => item.data),
-			currentRound: local.currentRound,
-			history: local.history,
+			players: players.value.items.map((item) => item.data),
+			currentRound: round.value.data,
+			history: readSnapshot().history,
 		},
 	};
 }

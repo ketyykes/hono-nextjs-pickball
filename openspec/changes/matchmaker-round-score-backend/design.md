@@ -176,9 +176,132 @@
    歷史主鍵使重複的 `matchId` 整批失敗。
 3. 本 change 不新增錯誤碼；B9 若需要區分「雲端已有資料」，以 409 搭配前端文案處理即可。
 
+## apply §1 查證紀錄（2026-10-23）
+
+**1.1 環境**：見 environment.md Verification（baseline 95／895、17／97、3／6；lockfile 零變動）。
+
+**1.2 對齊 main**：B4～B6 落地簽章與本 design Context 一致——核心 `submitScore({ round, players, matchId, rawScoreA, rawScoreB, now })`、
+失敗碼 `empty-field`／`invalid-number`／`negative-score`／`tie`／`already-completed`（`VALIDATE_SCORE_FAILURE_CODE`）與 `match-not-found`／`scoring-failed`（`SUBMIT_SCORE_FAILURE_CODE`）；
+`ScoreboardStateSchema`（`scoreboard/types`）、`RoundSchema`（`matchmaker/round-types`）、`MatchHistoryEntrySchema`（`matchmaker/history`）；`USER_DATA_TABLES` 目前兩張；`CORE_MODULES` 位於 `test/module-boundary.test.ts`。
+後端 `src/routes/matchmaker.ts` 的 sub-app 已 `.use("*", localAuth, requireSession).onError(userDataOnError)`；`invalidBodyHook` 在 `src/http/invalid-body.ts`。
+前端 `useRoundStore({ players, updatePlayer })`、`RETRY_DELAYS_MS`（`lib/sync/latest-wins-saver.ts` 具名匯出）。
+MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外無差異（B5／B6 archive 未另行調整原文）；下列兩處為 validate 錯誤的修正：
+- `scoreboard`「localStorage 持久化」：OpenSpec 1.9 的 `findMissingCurrentScenarios` 使 MODIFIED **不可能**丟棄主 spec 既有 Scenario（validate 與 archive 皆擋；RENAMED 後的 MODIFIED 仍比對改名前的區塊），
+  而 B5 的「登入但帶 matchId 時仍走本機分槽」標題本身與 B7 行為矛盾，無法沿用。改為 **REMOVED「localStorage 持久化」＋ADDED「本機模式的 localStorage 持久化」**（本文與其餘 11 個 Scenario 逐字保留）。
+  以暫存目錄模擬 archive 驗證：套用成功、主 spec 無重複標題；代價是該 Requirement 移到 scoreboard 主 spec 末尾。
+- `player-roster`「重置名單與二次確認」：B7 delta 把 B6 的 Scenario 改名為「resetLocalMatchProgress 只清除本機歷史」→ 沿用主 spec 標題「resetLocalMatchProgress 只清除本次活動的進度」、內容改寫（標題語意仍成立）。
+- `round-lifecycle`「回合與歷史的持久化與損壞降級」末尾補回主 spec 原有的 `---`（否則 archive 會吃掉分隔線）。
+- 既有跨 Requirement 同名 Scenario（`player-roster`「刪除參賽者」、`backend-database`「user_id 必須參照既有使用者」）：前者剛好在本 change MODIFIED 的「登入時名單以雲端為準」內，
+  但實測改名會觸發同一個「omits scenario」錯誤（validate 失敗），**無法在 MODIFIED 內順手改名**；要改只能 REMOVED＋ADDED 整個 Requirement，代價過大，維持原狀。本 change 新增的 Scenario 標題皆在各主 spec 內唯一（模擬 archive 後逐標題計數確認）。
+
+**1.3 Context7 查證**：
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`d1/worker-api/d1-database#batch`）：「Batched statements are SQL transactions. If a statement in the sequence fails, then an error is returned for that specific statement, and it aborts or rolls back the entire sequence」——與 Decision 2 一致。
+  limits：「Queries per Worker invocation：1000（Paid）／50（Free）」；「Batch limits：Limits for individual queries … apply to each individual statement contained within a batch」——**batch 內每條陳述式是否各計一個 query 仍未明說**，
+  保守以逐條計：送出比分約 2 次讀取＋6～9 條 batch 陳述式＋session 驗證的查詢，遠低於 50。本機 miniflare 不強制此上限，無法實測。`json_each(value, path)`／`json_extract` 有文件（`sql-api/query-json`），與 Decision 4、5 一致。
+- `/websites/sqlite_docs`：`lang_createtable.html` §4.1「if a constraint definition does not include a conflict-clause, the default conflict resolution algorithm is ABORT」；
+  `lang_conflict.html` ABORT 只回退**當前陳述式**並保留同一 transaction 先前的變更——整批回滾來自 D1 batch 的語意，不是 SQLite 本身（1.4 實測確認）。
+  IGNORE：「No error is returned for uniqueness, NOT NULL, and UNIQUE constraint errors」→ `INSERT OR IGNORE` 會讓守衛靜默失效（Open Question 3 結論：**禁止**，列入 §3 mutation）；
+  REPLACE：NOT NULL 違反時以欄位預設值取代、無預設才 ABORT → 守衛表 `version` **不得**有 DEFAULT，`OR REPLACE` 亦禁止。
+  `lang_upsert.html`：「UPSERT does not intervene for failed NOT NULL, CHECK, or foreign key constraints」→ 守衛若誤加 `ON CONFLICT DO NOTHING` 仍會因 NOT NULL 失敗，但會吞掉殘留守衛列的主鍵衝突，仍禁止。
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/batch-api`、`sqlite/goodies`、`insert`）：`db.batch` 可含 insert／update／delete／select 與 `db.run`／`db.all` 的原生 `sql`；`insert().select(sql\`…\`)` 可用。
+
+**1.4 一次性實測（workerd＋drizzle 0.45.2，暫存測試檔已刪除，未 commit）**：
+1. **與 design 不同**：drizzle 0.45.2 的 `db.run(sql\`…${param}…\`)` 放進 `db.batch` 會拋 `TypeError: Cannot read properties of undefined (reading 'bind')`（`SQLiteRaw` 沒有預先 prepare 的 stmt；無參數的 `db.run` 才可用）。
+   → 守衛與 Decision 4／5 的陳述式**改用 query builder 搭配 `sql` 片段**：`db.insert(syncBatchGuards).values({ userId, version: sql\`CASE WHEN <條件> THEN 1 END\`, updatedAt })`、
+   `db.delete(syncBatchGuards).where(eq(...))`、`db.delete(matchmakerMatchSlots).where(and(eq(userId), sql\`match_id NOT IN (…json_each…)\`))`。三者在 batch 內皆正常。
+2. 守衛條件真：四條陳述式皆成功（changes 皆 1），守衛表最後為空。條件假：整批回滾（另兩表無本次寫入）。錯誤為 `Error`，`message` 為
+   `D1_ERROR: NOT NULL constraint failed: <table>.version: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_NOTNULL)`，`cause.message` 為去掉 `D1_ERROR: ` 前綴的同一段文字。
+   → Open Question 1 結論：`isBatchGuardViolation` 比對 `NOT NULL constraint failed: sync_batch_guards.version` 即可（最外層訊息就含），不需另比 `SQLITE_CONSTRAINT`；仍沿用 B6 逐層檢查 cause 的寫法以防正式 D1 前綴不同。
+3. 主鍵衝突訊息：`D1_ERROR: UNIQUE constraint failed: <table>.user_id, <table>.match_id: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_PRIMARYKEY)`——送出比分把歷史主鍵衝突分類為 409 時 MUST 比對表名 `matchmaker_history`，
+   否則殘留守衛列（`sync_batch_guards.user_id` 主鍵衝突）也會被吞成 409。
+4. batch 中影響 0 列的 UPDATE 不回滾（B5 OQ1）：確認，同批的 INSERT 已寫入。
+5. Decision 4 孤兒分槽 DELETE（`json_each(r.data, '$.matches')`＋`status != 'completed'`＋`user_id`）：只刪本人且不屬於未完成場次的分槽，他人同 match_id 的列不受影響。
+6. Decision 5：`db.insert(slots).select(sql\`SELECT …, 1 WHERE EXISTS (… json_each …)\`).onConflictDoNothing().returning()` 單獨執行與放進 batch 皆可；
+   未完成場次回一列，已存在／已完成／不存在的場次皆回空陣列（Open Question 2 結論：不需 `db.all`）。
+7. `text` 存入的 JSON 讀回後與原物件深度相等（含中文、小數、null、巢狀陣列），`json_extract` 讀出的數值為 SQL 數值。
+
+**B5／B6 帶過來的待辦**：見 Open Questions 5～8。
+
 ## Open Questions
 
-1. D1／miniflare 對 NOT NULL 違反的錯誤訊息完整文字（§1.4 實測），以及 `isBatchGuardViolation` 是否需要同時比對 `SQLITE_CONSTRAINT`。
-2. drizzle 對「`INSERT … SELECT … WHERE EXISTS (… json_each …) ON CONFLICT DO NOTHING RETURNING`」的表達方式（預期 `db.run(sql)` 無法取 RETURNING，改用 `db.all(sql)`／`db.get(sql)`；§1.4 實測）。
-3. `INSERT OR IGNORE`／`OR REPLACE` 對 NOT NULL 的處理（守衛 MUST NOT 使用，spec 已禁止）——§1.3 以 Context7 `/websites/sqlite_docs` 補查並記錄，作為 mutation 清單的依據。
+1. ~~D1／miniflare 對 NOT NULL 違反的錯誤訊息完整文字~~ → 已定案（apply §1.4 第 2 點）：比對 `NOT NULL constraint failed: sync_batch_guards.version`，不需另比 `SQLITE_CONSTRAINT`。
+2. ~~drizzle 對 `INSERT … SELECT … WHERE EXISTS … RETURNING` 的表達方式~~ → 已定案（§1.4 第 1、6 點）：`insert().select(sql).onConflictDoNothing().returning()`；**`db.run(sql)` 帶參數不能放進 batch，Decision 2 的「`db.run(sql)` 放進 `db.batch`」改為 query builder＋`sql` 片段**。
+3. ~~`INSERT OR IGNORE`／`OR REPLACE` 對 NOT NULL 的處理~~ → 已定案（§1.3）：IGNORE 靜默略過、REPLACE 以預設值取代，兩者皆使守衛失效；守衛表 `version` 不得有 DEFAULT。
 4. 對戰頁同時 `GET /round` 與 `GET /slots` 是否需要合併為單一端點（目前兩個請求；若 E2E 出現時序問題再議）。
+5. （B6 Final 轉 B7）`useRemoteRosterStore` 的 `reset()` 前未 `disposeAll()`：重置時若某參賽者的 v0 PUT 正在退避重試，reset 成功後重試仍會送出，讓該參賽者在雲端「復活」。
+   **納入 §6**：`player-roster` delta 新增 Scenario「登入時重置名單前停止所有待送與重試中的變更」，tasks 6.5 加 RED it、6.6 於送出 POST 前 `disposeAll()`。
+6. （B6 OQ11 ②）重置在途時卸載：B6 時伺服器已清名單但本機回合／歷史／分槽不清。B7 起回合與分槽改存雲端且由 reset batch 一併刪除，**此問題對回合與分槽消失**；
+   殘留範圍縮小為「本機歷史未被清除」（`resetLocalMatchProgress()` 只剩歷史），B8 刪除此函式後完全消失。§6 不另寫測試，於 §6 交件時由 leader 確認行為。
+7. （B6 OQ13）對戰頁回填 effect 在雲端名單載入期間以空名單送分：B7 雲端模式送分改為 POST，後端以雲端名單計算，但前端 `submitScore` 仍以本機名單做「預先驗證＋樂觀預測」——名單未就緒時預測回 `scoring-failed` 會擋下送出。
+   **§7／§10 要求**：`useRemoteRoundStore` 在名單未就緒時（由頁面傳入的名單 `syncStatus` 判定）SHALL NOT 執行回填；頁面回填 effect 的依賴加入「名單就緒」，讓載入完成後重跑；以 E2E「登入時經計分板完成的場次由雲端寫入評分並清除分槽」守住（不得惡化）。
+8. （B6 OQ10 ①／B5）跨分頁換帳號：G1 前必修，本 change 不處理（coordinator 已裁定）。
+9. （apply §1）drizzle 0.45.2 `db.run(sql)` 帶參數在 batch 中失敗是 drizzle 的實作限制（`SQLiteRaw` 無 stmt）；`hono-pickball/CLAUDE.md` 的整批守衛段落（§11.1）MUST 記載「batch 內不用帶參數的 `db.run(sql)`」。
+10. （apply 進度）§2 完成：`4af02b7` RED、`290efe2` GREEN、Stage 2 第一輪 FAIL（`MatchSlotPutRequestSchema` 無測試、helper 命名）→ `78d22bc` regression guard、`4ca4367` refactor → 複審 PASS。核心 4 檔／11。
+   偏離：額外匯出 `MatchSlotPutRequestSchema`；`SubmitScoreResponseSchema` 的 round／players version 定為正整數。
+11. （apply 進度，leader 交回時）§3 Implementer 完成（`004050e` RED、`8014e1c` chore schema＋0003、`3ac0b3b` USER_DATA_TABLES、`b87454d` RED、`4137ee0` batch-guard.ts、`1c61c7b` guard；後端 18 檔／104）；
+    Stage 1 PASS（非阻擋：`8014e1c` 在 chore commit 內修正 RED 測試的計數查詢缺陷、未放寬斷言；分槽 `$type` 為 `MatchSlot`）；leader 實跑 `db:generate` 無新檔。
+    **Stage 2（opus）於交回時仍在執行、結果未知**——接手者須重新派 §3 Stage 2（或取得其結論）後再開始 §4。§4～§11 未開始；§6～§10 的派工參考檔已以 `/tmp/b7tools/ticket.py <g>` 產生（非 repo 檔，需重建）。
+12. （coordinator 裁定，2026-10-23）① 派工單偏離 execution-plan「逐字貼進 prompt」：規則全文、tasks／test-plan 原文、必做變異清單直接貼在派工單內；spec／design／既有介面改由 `/tmp/b7tools/ticket.py <g>` 自 artifacts 機械擷取為
+    `/tmp/b7tools/ticket-<g>-ref.md`，派工前確認檔案存在且非空，subagent 第一個動作 MUST 完整讀取並覆述標題；Stage 2 審查員另須自行讀 spec／design 原檔核對。**此偏離經 coordinator 同意**（理由：逐張全文貼入會耗盡 leader 脈絡）。
+    ② scoreboard 以 REMOVED「localStorage 持久化」＋ADDED「本機模式的 localStorage 持久化」取代 MODIFIED：coordinator 接受。
+13. （apply §3 Stage 2 第一輪，2026-10-23）FAIL，唯一必修：`test/d1-batch-guard.test.ts` 缺「殘留守衛列」情境（守衛表已有該使用者一列時，守衛 INSERT 的 `sync_batch_guards.user_id` 主鍵衝突 MUST NOT 被 `isBatchGuardViolation` 分類為衝突、整批回滾），
+    使「比對字串只看 `sync_batch_guards`」「守衛改 `INSERT OR REPLACE`」「守衛加 `onConflictDoNothing`」「守衛表拿掉 user_id 主鍵」四個變異存活；實作本身正確，補 regression guard 即可（另加純函式斷言 `isBatchGuardViolation(new Error("UNIQUE constraint failed: sync_batch_guards.user_id")) === false`）。
+    非阻擋：新表 `data`／`played_at` 的 NOT NULL 無斷言；`batch-guard.ts:11` 註解易被 §5 誤讀（應寫成「比較在 SQL 內對目前資料執行，不可在 JS 端先判定再傳常數條件」）；讀回 it 在守衛表留下一列。
+    **下一步**：退回 §3 Implementer 補測試（regression guard，誠實標註）→ Stage 2 複審 → §4。工作樹乾淨（審查員已還原 0003 暫時變異）。
+14. （apply §3 完成，2026-10-23）補件 69b543b（regression guard）、3ecbb60（註解）後 Stage 2 複審 **PASS**：上輪存活變異 #9／#25～#28／#35／#37／#43 全數轉紅，三條等價對照維持綠。
+    §3 測試數：後端 d1-batch-guard 4、d1-schema 20、user-data-tables 2。保留到 §5 再決定：`guardedBatch` 包裝、`as never` fixture。**下一步**：派 §4 Implementer（sonnet）。
+15. （apply §4 進度，2026-10-23）Implementer（sonnet）DONE：465614b RED（只含測試檔，15 紅／3 先綠＝404、401、getSession 500 迴圈，標 regression guard）→ 5a6d744 GREEN → 65a1c55 勾選（4.3 skipped）→ b10965e／91028d2／d3fce67 自補 guard 與 refactor。
+    後端全套 20 檔／126 測試全綠，tsc／typecheck exit 0，無新相依。偏離：全套測試取鎖後 load 25 > 20 未等（結果全綠）。S6（`GET /slots` 拿掉 orderBy）判定為不可觀察的等價變異。
+    Stage 1（sonnet）**PASS**，非阻擋：tasks.md 4.1 未點名 regression guard（只在 commit 訊息）；`NOT IN (SELECT json_extract(...))` 遇 NULL id 會靜默不刪（schema 保證不會發生）。
+    Stage 2（opus）**審查進行中、尚未回報**（leader 被 harness 要求先交回）。**下一步**：等 Stage 2 結論；FAIL 則退回 §4 Implementer 補件並複審；PASS 後補 tasks.md 4.1 的 regression guard 點名（可併入）→ 派 §5。
+16. （apply §4 Stage 2，2026-10-23）opus 獨立 72 條變異 → **FAIL**（實作無 bug，三項 regression guard 缺口）：
+    ① `GET /slots/:matchId` 查無資料的 status 200 無斷言（T07 存活）；② 「不從 query 或 body 接受 userId」對 `GET /slots`、`GET /slots/:matchId` 斷言是空的（T16、T17 存活）；
+    ③ 「寫入與回傳的是驗證後輸出（含 schema 預設值）」無測試（round／slot PUT 改寫原始 body 存活，T12、T13）。S06（拿掉 orderBy）接受為不可觀察的等價變異，但 orderBy 必須保留（ANALYZE 後查詢計畫改 SCAN 會變 rowid 順序）。
+    **待 coordinator 裁定（非阻擋）**：回合 PUT 的完成狀態比對排在版本比對之前，停在舊回合的裝置重排時會得到 400（→ rejected）而非 409（→ conflict 自動重載）；符合 spec 字面，若要改先 409 須走 delta。
+    其他非阻擋：reset 使 version 不單調 → 理論 ABA；`NOT IN` 子查詢可加 `IS NOT NULL`；`type Db` 重複定義三次（§5 前可移到 `db/client.ts`）；`seedAndSignIn` 重複。Stage 2 已在低負載重跑後端全套 20 檔／126 全綠，並重現 RED（15 紅／3 綠）。
+    **下一步**：退回 §4 Implementer 補 ①～③ 與 tasks.md 4.1 的 regression guard 點名 → Stage 2 複審 → §5。
+17. （apply §4 完成，2026-10-23）補件 39a8d7b（regression guard＋tasks 4.1 點名）、6b9aa19（refactor：`Db` 型別集中到 `src/db/client.ts`、`seedAndSignIn` 移入 fixtures）後 Stage 2 複審 **PASS**：T07／T12／T13／T16／T17 全數轉紅，refactor 後抽查 13 條既有變異仍全殺，等價對照維持綠。
+    後端全套 20 檔／128 全綠（取鎖、load 4.35）。leader 裁定：「不從 query 或 body 接受 userId（回合與分槽）」結尾斷言由 `[]` 改 `["m1"]` 可接受——該 it 為本 change 465614b 新增、非 B5／B6 既有 it，且斷言變強（Stage 2 確認）。
+    **待 coordinator 裁定**：OQ16 的「停在舊回合的裝置重排得 400 而非 409」（符合 spec 字面；若要改需 delta）。**下一步**：派 §5 Implementer（sonnet），ticket 用 `/tmp/b7tools/ticket-5-{paste,ref}.md`，另告知 `Db` 型別已在 `src/db/client.ts`、`getRound` 可重用、孤兒 DELETE 子查詢遇 NULL id 的防禦性 `IS NOT NULL` 可一併評估。
+18. （coordinator 裁定，2026-10-23）① OQ16：**coordinator 裁定維持**現行行為（先比對場次完成狀態回 400，符合 spec 字面），本 change 不改 delta；舊回合裝置重排改回 409 自動重載列為後續 UX 改善。
+    ② 孤兒 DELETE 子查詢加 `IS NOT NULL` 防禦：若可在 §5 或之後某組以 TDD／regression guard 低成本加入就做，否則記為後續（§5 派工單已列為可選）。
+    ③ reset 後 version 從 1 起算的 ABA 時間窗：列為 **G1 前評估項**，本 change 不處理。
+    ④ 等待 subagent 時 leader 留在同一回合輪詢，只有完成、需裁定或脈絡將盡時才交回。
+19. （apply §5 進度，2026-10-23）Implementer（sonnet）DONE：7bac769 RED（17 紅／21 綠，Stage 2 已重現）→ afc0dd0 GREEN（RED 測試檔一行型別修正，斷言等價）→ f980078 勾選（5.3 skipped）→ dc981ca 自補 guard。後端 21 檔／146 全綠。`IS NOT NULL`（OQ18②）未做：API 層不可觀察，記為後續防禦。
+    Stage 1（sonnet）PASS。Stage 2（opus，82 條變異）**FAIL**：M1 參與球員在讀取後被刪除的守衛無測試（守衛改寫成 NOT EXISTS 形式存活）；M2 reset「單一 batch」未驗證（拆成四次 await 存活）；
+    M3 歷史主鍵衝突的分類寫在 `score-repository.ts`，但 user-data-sync delta 明定「分類邏輯集中在 `batch-guard.ts`」——**leader 裁定為必修**（spec 字面 MUST、成本低、B9 會重用）。
+    錯誤碼優先序（舊 roundVersion＋不合法比分 → 409）經 Stage 2 對照 spec 步驟順序確認為 spec 明定行為。**下一步**：退回 §5 Implementer 補 M1～M3 → Stage 2 複審 → §6。
+20. （apply §5 完成，2026-10-23）補件 a9f71ef（refactor：`errorChainMatches`／`isHistoryPrimaryKeyViolation` 集中到 `batch-guard.ts`）、963b112（M1～M3 regression guard）、cc35acf（tasks 5.2／5.3 紀錄）後 Stage 2 複審 **PASS**：G11、P09 轉紅，23 條變異中 18 紅、5 條等價對照綠。後端 21 檔／149 全綠。
+    `guardedBatch` 不抽（單一呼叫端）。**§11 交接 B8～B9 時 MUST 寫入一句**：「B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`」。
+    leader 已修正 tasks 5.3 中 `isConstraintError` 不共用的理由措辭（原「需多一個旋鈕」不成立，改為 surgical＋未匯出）。**下一步**：派 §6 Implementer（sonnet），ticket `/tmp/b7tools/ticket-6-{paste,ref}.md`。
+21. （apply §6 完成，2026-10-23，接手 leader）前任 leader 與 §6 Implementer 於 mutation 階段被 coordinator 停止；接手後核對 §6 交件條件：必做變異皆已轉紅（`/tmp/b7tools/mut/out{1,2}.txt`），
+    leader 補跑 H4（原變異為語法錯誤的假紅）改為 H4b／H4c 皆紅。Stage 1（sonnet）**PASS**。Stage 2（opus，102 條變異）第一輪 **FAIL**（實作無 bug，13 條非等價存活）：
+    回應 schema 內容未驗證（A06／A13）、dispose 後計時器／佇列／enqueue（Q23／Q25／Q26）、合併中夾被丟棄命令（Q35）、`applyRemotePlayers` 的 busy 判斷只看回應中的參賽者（R03／R04）、
+    `handleStaleOutcome` 的 `resetting`／`cancelled`／`stopped` 與 DELETE 路徑（R20／R22～R24）。補件 77d7554（regression guard）、e43e717（tasks 紀錄）後複審 **PASS**：13 條全數轉紅、等價對照維持綠、抽查 19 條仍紅。
+    非阻擋（交 §7 注意）：transform 的 apply 會在每次 flush／重試重新呼叫，MUST 可重入（generateRound 不可重新隨機）；hook 層要守住「重載中或停止後的操作不送出也不顯示」；
+    `reloadRemotePlayers` 不檢查 `stopped`（401 後被呼叫仍發一次 GET）；重試會併入退避期間新排入的 transform（與 saver 語意一致）。§11.1 MUST 一併改掉 `nextjs-pickball/CLAUDE.md` 兩處 `resetLocalMatchProgress`「只清回合、歷史、分槽」的舊敘述。
+    前端單元：§6 五檔 70 個 it 全綠；tsc exit 0；lint 0 errors／3 warnings。**下一步**：派 §7 Implementer（sonnet）。
+22. （apply §7 完成，2026-10-23）Implementer（sonnet）：0d0c6ea RED（模組不存在）→ f813573 GREEN → a179896 RED（3 紅／17 綠）→ 55779b2 GREEN → f023401 guard → a8d46c2 refactor（7.5 抽共用 skipped）→ 27329eb／ecf9065 tasks。
+    Stage 1（sonnet）**PASS**。Stage 2（opus，118 條變異）第一輪 **FAIL**（實作無 bug，20 條非等價存活：401／重載後操作閘門、重新套用契約、場次 id 不重複、排隊送出的預測、`players` 變更同步、選擇器傳 `updatePlayer`、雲端模式不讀本機回合／歷史、舊一輪 GET 以 `cancelled` 忽略）
+    → 補件 51cdff0、f6447b9（regression guard）、6805266（tasks）→ 複審 **PASS**（19 條全紅、等價對照 5 條綠、抽查 15 條仍紅；L22 判定等價）。
+    偏離（Stage 1／2 皆接受）：`UseRoundStoreOptions` 的 `applyRemotePlayers`／`reloadRemotePlayers`／`rosterSyncStatus` 為**選填**（既有約 18 處呼叫只傳兩個參數且既有 it 不得改），省略時為不做事的函式；`rosterSyncStatus` 為 OQ7 要求的名單就緒介面。
+    **§10 MUST**：頁面傳入三個 port 與 `rosterSyncStatus`（漏傳 `applyRemotePlayers` 會使評分靜默不更新）；回填 effect 依賴加入名單就緒與 `remoteMatchSlots`；`scoring-failed` 同時代表雲端／名單未就緒、重複送出與評分失敗，頁面不得當成永久失敗。
+    觀察：vitest 環境的 `<StrictMode>` wrapper 不會重跑 effect，StrictMode 安全性由「enabled 反覆切換時舊一輪結果被忽略」與「卸載時釋放佇列」兩個 it 間接守住；瀏覽器 dev 模式預期 GET 4 次（與 B5／B6 相同）。
+    已知：`hooks/hooksInventory.test.ts` 因 `useRemoteRoundStore` 未列入主 spec 而紅，由 §8.5／8.6 處理。前端 §7 兩檔 64 個 it。**下一步**：派 §8 Implementer（sonnet）。
+23. （apply §8 審查，2026-10-24，第三任 leader）Stage 1（sonnet）**PASS**（錨點逐字、授權刪除只一個 B5 it、本機實作與主 spec 只一句皆核對通過）。
+    Stage 2（opus，59 條變異：56 應紅中 51 紅、等價對照 3 條綠；8.1／8.3／8.5 紅燈皆以 `git show <commit>^:` 重現為真紅）**FAIL**，實作無 bug，4 條非等價存活需補 regression guard（只動測試檔）：
+    H12（409 後重載 GET 回 401 未清 `versionRef`）、H42（換場次／重新啟用的載入中沿用前一場 version）、H38（`useReducer` 初始 `loading` 改 `synced` 會閃一幀計分畫面）、H10（GET 回 204 應為 load-failed）。H27 判定等價。
+    非阻擋（交 §10）：B5 `useRemoteScoreboardStore` 可能有同型缺口（H12／H42），不在本 change 範圍；雲端模式帶 matchId 時選擇器仍掛載本機 hook 會**讀取** `scoreboard:matches:v1`（與 B5 同型，tasks 8.4 已記），E2E 驗本機 key 不存在時注意前置狀態；分槽 hook 無 StrictMode 專屬 it；missing 時不 HYDRATE，靠頁面 `key={matchId}` 重掛載。
+    **下一步**：§8 補件（sonnet）→ Stage 2 複審 → §9。
+24. （apply §8 完成，2026-10-24）補件 8454871（4 個 regression guard：H12／H42／H38／H10，只動測試檔）、c14d503（tasks 8.1 紀錄）後 Stage 2 複審 **PASS**：4 條全數轉紅、等價對照 E1～E3 綠、抽查 14 條（含必做 R1、R2、R3a～c）仍紅；H27 判定等價。分槽 hook 12 個 it。**下一步**：派 §9 Implementer（sonnet）。
+25. （apply §9 完成，2026-10-24）Implementer（sonnet）：198ced5 RED（改寫授權的 B6 it，1 紅／7 綠，`git show 198ced5^:` 複驗 currentRound 取本機）→ 7240149 GREEN → 7f71d4e 自補 guard（同一改寫 it 內追加「名單失敗而回合成功」斷言）→ da384b6 tasks（REFACTOR skipped）。前端全套 100 檔／985 綠，lint 0／3。
+    Stage 1（sonnet）**PASS**；Stage 2（opus，26 條變異：23 紅、3 等價對照綠、無非等價存活；RED 重現 1 failed）**PASS**，並實測 7f71d4e 確為加強（舊測試下 M6／M7 存活）。
+    非阻擋（列後續，本 change 不改）：回合讀取失敗共用 `backupFetchFailed` 文案「無法取得雲端的參賽者名單…」語意不準；匯出 JSON 按鈕無 pending 狀態（B6 既有，兩條 GET 稍放大）；無 E2E 斷言下載 JSON 的 currentRound 來自雲端（spec 只要求 unit）。**下一步**：派 §10 Implementer（sonnet）。
+26. （apply §10 進度，2026-10-24）Implementer（sonnet）：232face RED（6 條中紅 4、先綠 2＝回合還原與重置清除，標 regression guard；`git show 232face^:` 查無此檔）→ fa6fd34 GREEN（page、stats page、CourtCard、MatchStage）→ 2049558／85ffd6e 自補 guard → fe82cff tasks（10.3 skipped）。
+    偏離：`CourtCard` 以可選 prop `remoteNavigate`（`MatchStage` 轉傳、頁面以 `router.push` 提供）取代直接 `useRouter`，因既有 CourtCard 單元測試無 router context；`MatchStage.tsx` 不在 proposal Impact 清單（+4 行純轉傳，Stage 1 判定為清單遺漏而非 scope creep）。
+    **coordinator 裁定（授權）**：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待逐人 PUT 而必紅，改為等待送出比分 POST ok 並加嚴「送出期間無參賽者 PUT」，名稱與 2 升 2 降斷言不動；tasks 檔頭第五個例外、test-plan 一併更正（e04ef43、4171aaa）。Stage 2 以 RO1／RO3 證實新等待與新斷言皆有作用。
+    Stage 1（sonnet）**PASS**。Stage 2（opus，38 條：23 紅、6 等價、2 非阻擋）**FAIL**，實作無 bug，7 條非等價存活需補 E2E guard（只動 `round-sync.spec.ts`）：P18 頁面未驗傳入 `reloadRemotePlayers`、P20 頁面未驗傳入 `updatePlayer`（休息次數）、P23 回合 loading 時未以 Notice 取代內容、C2 分槽 PUT 409 時仍導向（繼續計分）、C3／C4／C7 分槽 PUT 失敗時的錯誤文案與不導向。
+    非阻擋（交 §11／Final）：P13 loading／load-failed 優先序、C8 連點防護（冪等）；頁面與 hook 的名單就緒為雙重守衛，承重的是依賴陣列；CourtCard 雲端分支遇 unauthorized 不呼叫 onUnauthorized；修飾鍵點擊被 `preventDefault` 吃掉；`remoteNavigate` 可改必填判別型 prop。
+    **下一步**：§10 補件（sonnet）→ Stage 2 複審 → §11。
+27. （apply §10 完成，2026-10-24）補件 269d7fc（只含 `round-sync.spec.ts`：test 3／test 6 追加斷言、新增 3 個「regression guard：」開頭的 test）、b5f13be（tasks 10.2）後 Stage 2 複審 **PASS**：P18、P20、P23、C2、C3、C4、C7 全數轉紅，等價對照 5 條綠，抽查 11 條（含必做 P1、C1、P2）仍紅；`--project=user-data` 27 passed（round-sync 9＋roster-sync 12＋scoreboard-sync 6）。
+    注意（交 Final）：round-sync 為 9 條＝spec 錨點 6 條＋3 條 regression guard（名稱無對應錨點，以前綴標示，同 §8 單元測試慣例）；建立失敗 guard 在 alert 後多一段 1.5 秒負向等待（冗餘、不影響正確性）。**下一步**：§11.1 文件（sonnet）與 11.2～11.8 指令驗收（leader）。

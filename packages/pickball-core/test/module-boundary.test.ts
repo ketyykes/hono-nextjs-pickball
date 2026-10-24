@@ -29,6 +29,7 @@ export const CORE_MODULES = [
   "api/errors",
   "api/user-data-tables",
   "api/players",
+  "api/round",
 ];
 
 const SRC_DIR = path.resolve(import.meta.dirname, "../src");

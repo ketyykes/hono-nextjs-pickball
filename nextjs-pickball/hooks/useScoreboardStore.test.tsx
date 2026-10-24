@@ -474,20 +474,47 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
-	it("已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local", () => {
+	// regression guard：實作先於測試存在，寫入當下即綠燈（B7 §8 自跑 mutation 後補）
+	it("regression guard：帶 matchId 的雲端分槽 GET 回 401 時呼叫 session.refresh", async () => {
+		const refresh = vi.fn();
+		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });
+		fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 401 })));
+
+		renderHook(() => useScoreboardStore("m1"));
+
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+		expect(fetchMock.mock.calls[0][0]).toBe("/api/matchmaker/slots/m1");
+	});
+
+	it("已登入且帶 matchId 時改用雲端分槽且不寫入 scoreboard:matches:v1", async () => {
 		vi.mocked(useSession).mockReturnValue(loggedIn);
-		writeMatchSlot({ ...createInitialState({ targetScore: 11 }), matchId: "m1" });
+		const slot = { ...createInitialState({ targetScore: 11 }), matchId: "m1" };
+		fetchMock.mockImplementation((_input, init) => {
+			if (init?.method === "PUT") {
+				return Promise.resolve(
+					jsonResponse({ data: { ...slot, scores: { us: 1, them: 0 } }, version: 2 }),
+				);
+			}
+			return Promise.resolve(jsonResponse({ data: slot, version: 1 }));
+		});
 
 		const { result } = renderHook(() => useScoreboardStore("m1"));
-		expect(result.current[2]).toBe("bound");
-		expect(result.current[3]).toBe("local");
+		await waitFor(() => expect(result.current[2]).toBe("bound"));
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
 
 		act(() => {
 			result.current[1]({ type: "RALLY_WON", winner: "us" });
 		});
+		await waitFor(() =>
+			expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true),
+		);
+		await waitFor(() => expect(result.current[3]).toBe("synced"));
 
-		const slots = JSON.parse(localStorage.getItem(MATCH_SLOTS_KEY)!);
-		expect(slots.m1.scores.us).toBe(1);
+		const puts = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
+		expect(puts).toHaveLength(1);
+		expect(puts[0][0]).toBe("/api/matchmaker/slots/m1");
+		expect(result.current[0].scores.us).toBe(1);
+		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 		expect(scoreboardCalls()).toHaveLength(0);
 	});
 });

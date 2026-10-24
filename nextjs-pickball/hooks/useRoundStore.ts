@@ -32,6 +32,11 @@ import type { UpdatePlayerPatch } from "@/lib/matchmaker/roster";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import type { Round, RoundTargetScore, RoundTimerDurationMinutes } from "@pickball/core/matchmaker/round-types";
 import type { Player } from "@pickball/core/matchmaker/types";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
+import { useSession } from "@/hooks/useSession";
+import { useRemoteRoundStore } from "@/hooks/useRemoteRoundStore";
+import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import type { SyncStatus } from "@/lib/sync/sync-status";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
 // 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate
@@ -93,6 +98,14 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 export interface UseRoundStoreOptions {
 	readonly players: readonly Player[];
 	readonly updatePlayer: (id: string, patch: UpdatePlayerPatch) => void;
+	/** 雲端模式用：後端寫入評分後，把回應中的參賽者套進畫面（由 `useRosterStore` 提供）。
+	 * 選填是為了讓只用本機模式的既有呼叫端不必改動；省略時為不做事的函式。 */
+	readonly applyRemotePlayers?: (items: { data: Player; version: number }[]) => void;
+	/** 雲端模式用：回合衝突時重新載入雲端名單（由 `useRosterStore` 提供）。省略時為不做事的函式。 */
+	readonly reloadRemotePlayers?: () => void;
+	/** 雲端模式用：名單的同步狀態。名單載入中或載入失敗時雲端 submitScore 不送出，
+	 * 頁面也應把它列入自動回填 effect 的依賴，讓載入完成後重跑。 */
+	readonly rosterSyncStatus?: SyncStatus;
 }
 
 /** generateRound 對外的輸入：`players`／`previousRound` 取自 hook 目前握有的狀態，
@@ -130,7 +143,16 @@ export interface UseRoundStoreResult {
 	/** 臨時換人：委派 round.ts 的 swapMatchPlayer，把某場 pending 場次中一位在場球員換成
 	 * 休息名單中的另一位球員，失敗（`ok: false`）時不套用任何變動。 */
 	swapMatchPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => SwapMatchPlayerResult;
+	/** 本機模式恆為 local；雲端模式反映載入與儲存狀態。 */
+	syncStatus: SyncStatus;
+	/** 雲端模式為雲端目前回合的場次分槽；本機模式恆為 null（呼叫端沿用 `readMatchSlots()`）。 */
+	remoteMatchSlots: Record<string, ScoreboardState> | null;
 }
+
+// 本機實作不知道同步狀態，由選擇器補上 local。
+type LocalRoundStoreResult = Omit<UseRoundStoreResult, "syncStatus" | "remoteMatchSlots">;
+
+function doNothing(): void {}
 
 // 「找不到目前回合」與 round.ts 私有的 MATCH_NOT_FOUND_MESSAGE（「找不到指定的場次」）
 // 是不同情境：後者是「回合存在但 matchId 過期」，前者是「整個回合都不存在」——本頁面
@@ -169,7 +191,7 @@ const NO_ROUND_TO_SWAP_MATCH_PLAYER_MESSAGE = "目前沒有進行中的回合，
 // 整合 reducer 與 localStorage，結構比照 useRosterStore.ts：write effect 放前面
 // （mount 時 ref=false 故跳過）、read/hydrate effect 放後面，避免 read 前就被
 // write effect 用初始（空）state 覆蓋 localStorage 的競態。
-export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResult {
+export function useLocalRoundStore(options: UseRoundStoreOptions): LocalRoundStoreResult {
 	const { players, updatePlayer } = options;
 
 	// 惰性初始化用 createInitialState 本身（不取參數），不用 `(_arg) => createInitialState()`
@@ -396,4 +418,23 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		startTimer,
 		swapMatchPlayer,
 	};
+}
+
+// 儲存模式選擇器：本機 hook 在雲端模式下仍會 mount（hooks 規則不允許條件呼叫），
+// 它只會讀取並把同一份本機資料寫回，使用者動作一律走雲端 hook，不會改到本機回合與歷史。
+export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResult {
+	const session = useSession();
+	const local = useLocalRoundStore(options);
+	const isRemote = resolveStorageMode(session) === "remote";
+	const remote = useRemoteRoundStore({
+		enabled: isRemote,
+		players: options.players,
+		updatePlayer: options.updatePlayer,
+		applyRemotePlayers: options.applyRemotePlayers ?? doNothing,
+		reloadRemotePlayers: options.reloadRemotePlayers ?? doNothing,
+		onUnauthorized: session.refresh,
+		rosterSyncStatus: options.rosterSyncStatus,
+	});
+	if (isRemote) return remote;
+	return { ...local, syncStatus: "local", remoteMatchSlots: null };
 }
