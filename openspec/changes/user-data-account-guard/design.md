@@ -226,13 +226,15 @@ OpenSpec 1.9 的 MODIFIED 不可丟棄或改名既有 Scenario（B7 apply §1 �
 ## Open Questions
 
 > 以下為 propose 時（2026-10-24）新發現、需 coordinator 裁定的事項，皆附建議值；apply 期間未裁定者依建議值執行。apply §1 的查證紀錄另起一節附在本檔末。
+>
+> **coordinator 2026-10-24 裁定：問題 1～5 皆採建議值**（1 採 (a)；2 保留該 E2E 並如實註明紅燈只來自狀態碼；3 `CourtCard` 自讀 `useSession()`；4 runbook 由 coordinator 處理；5 同名 Scenario 不處理）。Q1～Q12 已定案。
 
-1. **資料頁兩個區塊的 refresh 沒有單元測試**：`JsonBackupSection`、`RosterCsvImportSection` 沒有元件測試檔，「未授權時呼叫 `refresh()`」是一行元件程式碼。
+1. **資料頁兩個區塊的 refresh 沒有單元測試**（coordinator 2026-10-24 裁定：採建議值）：`JsonBackupSection`、`RosterCsvImportSection` 沒有元件測試檔，「未授權時呼叫 `refresh()`」是一行元件程式碼。
    選項：(a) 只以 `remote-transfer.test.ts` 驗證未授權標示＋Stage 2 閱讀確認元件呼叫 refresh；(b) 為兩個元件新增元件測試檔；(c) 新增一條資料頁換帳號 E2E。
    **建議 (a)**：行為邏輯（何時算未授權）已在 `lib/` 以 TDD 守住，元件層只剩呼叫；(b)／(c) 的成本（mock 下載樣板或多一條 E2E）高於收益。
-2. **「送出比分」換帳號 E2E 的紅燈只來自狀態碼**：B 沒有 A 的回合，守衛不存在時送出比分在 B 名下也會因版本／場次不符回 409、資料本來就不會被寫入；該 test 在 RED 階段是因「預期 401 實得 409」而紅，
+2. **「送出比分」換帳號 E2E 的紅燈只來自狀態碼**（coordinator 2026-10-24 裁定：採建議值）：B 沒有 A 的回合，守衛不存在時送出比分在 B 名下也會因版本／場次不符回 409、資料本來就不會被寫入；該 test 在 RED 階段是因「預期 401 實得 409」而紅，
    並非「資料被寫入 B」。真正的資料毀損面由後端列舉測試守住（樣本請求針對 B 自己已 seed 的回合與 pending 場次，若放行必定寫入 B 的評分與歷史）。**建議**：保留此 E2E（它驗證前端走 401 → refresh 的路徑），tasks 與紅燈紀錄中如實註明紅燈性質。
-3. **`CourtCard` 改為自行呼叫 `useSession()`**：B7 的 `CourtCard` 只靠 `remoteNavigate` prop 判斷雲端模式，不讀 session。本 change 讓它在 render 時讀 `useSession()` 取 user id 與 `refresh`（Decision 8），
+3. **`CourtCard` 改為自行呼叫 `useSession()`**（coordinator 2026-10-24 裁定：採建議值）：B7 的 `CourtCard` 只靠 `remoteNavigate` prop 判斷雲端模式，不讀 session。本 change 讓它在 render 時讀 `useSession()` 取 user id 與 `refresh`（Decision 8），
    既有 `CourtCard.test.tsx` 的 render 需要 mock `@/hooks/useSession`（只新增 `vi.mock` 區塊，既有 it 不改）。**建議**：採用；替代為從 `page.tsx` 經 `MatchStage` 傳入 `remoteUserId`，但會擴大到例外層檔案且無法單元驗證。
-4. **B7 記為「維持現狀」的「CourtCard 遇 unauthorized 不 refresh」由本 change 修正**（Q4 的直接結果）。**建議**：runbook 的 B7 維持現狀清單在本 change 合併時劃掉該項（coordinator 處理）。
-5. **既有主 spec 的同名 Scenario**（`backend-database`「user_id 必須參照既有使用者」、`player-roster`「刪除參賽者」）不在本 change 範圍，未處理；本 change 新增標題皆已以 python 計數確認在各主 spec 合併後唯一。
+4. **B7 記為「維持現狀」的「CourtCard 遇 unauthorized 不 refresh」由本 change 修正**（coordinator 2026-10-24 裁定：採建議值）（Q4 的直接結果）。**建議**：runbook 的 B7 維持現狀清單在本 change 合併時劃掉該項（coordinator 處理）。
+5. **既有主 spec 的同名 Scenario**（coordinator 2026-10-24 裁定：採建議值）（`backend-database`「user_id 必須參照既有使用者」、`player-roster`「刪除參賽者」）不在本 change 範圍，未處理；本 change 新增標題皆已以 python 計數確認在各主 spec 合併後唯一。

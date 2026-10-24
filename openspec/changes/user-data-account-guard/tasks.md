@@ -29,7 +29,7 @@
 
 ## 1. 對齊 main＋查證（不寫產品程式碼）
 
-- [ ] 1.1 驗收（指令）：確認分支 `change/user-data-account-guard`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
+- [x] 1.1 驗收（指令）：確認分支 `change/user-data-account-guard`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
   持鎖跑 `pnpm test` baseline（三個 workspace）、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md Verification 並 commit
 - [ ] 1.2 對齊 B7 實際落地並盤點機械改動點：`lib/sync/{api-client,roster-api,round-api,round-command-queue}.ts` 簽章、四支雲端 hook 的 options 與主 effect 依賴、三個選擇器、
   `CourtCard` 雲端建立分槽、`JsonBackupSection`／`RosterCsvImportSection`、`remote-transfer.ts`；`rg -n "Cookie:|exports.default.fetch|app.request\(" hono-pickball/test` 與 `rg -n "requestJson\(|page.request|context.request" nextjs-pickball` 逐一列表（哪些需要帶標頭、哪些在守衛之前結束而不需要）。
