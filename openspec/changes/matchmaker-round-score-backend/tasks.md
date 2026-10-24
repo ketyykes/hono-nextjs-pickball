@@ -213,9 +213,11 @@ Depends on: §9
 
 Depends on: §10
 
-- [ ] 11.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「回合與歷史在本機」敘述（登入後回合與分槽以雲端為準、送出比分後端權威、歷史讀取待 B8）；hooks 歸屬加兩支 hook；
+- [x] 11.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「回合與歷史在本機」敘述（登入後回合與分槽以雲端為準、送出比分後端權威、歷史讀取待 B8）；hooks 歸屬加兩支 hook；
   `lib/sync/{round-api,round-command-queue}.ts`。`hono-pickball/CLAUDE.md` 路由約定加回合／分槽／送出比分，並新增「多表寫入用整批守衛」段落（design Decision 2 的寫法與禁止事項）；
   design「交接給 B8～B9」三點寫入適當段落
+  已完成：`nextjs-pickball/CLAUDE.md`（架構總覽 `/scoreboard`、`/matchmaker/data`、重置、儲存分流段、hooks 歸屬、`lib/sync/`、`user-data` spec 清單）與 `hono-pickball/CLAUDE.md`（範圍例外、reset 四張表、回合／分槽／送出比分路由、「多表寫入用整批守衛」段、B8～B9 交接三點）。
+  核對發現：design OQ20 的 `guardedBatch` 並非程式碼中的具名函式（OQ14 決定不抽，守衛 batch 與 try/catch 直接寫在 `score-repository.ts`）；`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`（未匯出）、`isConstraintError` 在 `players-repository.ts`（未匯出）。OQ20 指定句已逐字寫入，並附一行現況說明。
 - [ ] 11.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 11.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
 - [ ] 11.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異

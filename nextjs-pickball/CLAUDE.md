@@ -24,7 +24,7 @@
 Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**已是多路由應用**：
 
 - `/` — 匹克球指南（Hero、TocBar、Part 01/02、Conclusion）
-- `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查。`/scoreboard` **登入且未綁定場次時以雲端為準**（經後端 API 同步，見「目錄約定」的 `lib/sync/`）；訪客或綁定場次（`?match=`）仍走 LocalStorage
+- `/quiz`、`/scoreboard`、`/tour`、`/health` — 測驗、單場 side-out 計分板、導覽動畫、健康檢查。`/scoreboard` **登入時以雲端為準**（經後端 API 同步，見「目錄約定」的 `lib/sync/`）：未綁定場次走計分板雲端同步（B5），綁定場次（`?match=`）走雲端場次分槽（B7，`useRemoteMatchSlotStore`）；訪客仍走 LocalStorage
 - `/matchmaker` — 對戰頁（場次舞台：本輪設定、場地色塊網格、比分輸入與送出、休息名單），milestone M5 = matchmaker-match-stage-ui change。**全站 navbar 的 matchmaker 入口指向這裡**，SHALL NOT 同時掛第二條指向名單頁的連結。
   本頁另提供**匯出 JPG 與列印 PDF**（milestone M9 = matchmaker-visual-export change）：兩者共用
   `lib/matchmaker/export-scene.ts` 的同一份 `ExportScene`，JPG 走 `lib/matchmaker/scene-canvas.ts`
@@ -33,8 +33,8 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   各場地色塊的「進入計分板」入口導向 `/scoreboard?match=<matchId>` 時，兩隊名稱行會顯示該隊球員姓名與雙色漸層色塊（milestone M12 = matchmaker-scoreboard-team-labels change）；獨立開啟 `/scoreboard`（無 `match` 參數）維持「我方」／「對方」純文字，零行為變更
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
 - `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
-  - `/matchmaker/data` 登入態差異（B6）：JSON 匯出的 players 取自雲端，回合與歷史取自本機；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
-  - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後只清本機回合、歷史、分槽（`resetLocalMatchProgress()`），保留本機 roster key
+  - `/matchmaker/data` 登入態差異（B6）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），歷史取自本機（B8 前）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
+  - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後只清本機歷史（`resetLocalMatchProgress()`，B7 後只移除 `matchmaker:history:v1`），保留本機 roster key；雲端的回合與分槽由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜（milestone M11 = matchmaker-player-stats change），同樣不在全站 navbar。
   統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`
   （球員範圍為「目前名單」與「歷史紀錄」的**聯集**，回傳已排序完成），呈現層為
@@ -51,9 +51,10 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
 matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍在前端或核心套件，是刻意決策，不是待搬的後端邏輯）：
 - 訪客（含 auth 停用、session 載入中）仍全走 LocalStorage
 - 登入後**參賽者名單**以雲端為準（B6：`/api/matchmaker/*`，選擇器 `useRosterStore` 依 `resolveStorageMode` 切換）
-- 回合、歷史、場次分槽仍在本機，待 B7、B8
+- 登入後**回合與場次分槽**以雲端為準（B7：`useRoundStore` 選擇器切 `useRemoteRoundStore`；計分板帶 `?match=` 時 `useScoreboardStore` 切 `useRemoteMatchSlotStore`）；**送出比分由後端權威**（`POST /api/matchmaker/round/matches/:matchId/score`，評分、回合完成狀態、歷史、刪除分槽在同一個 batch，前端不逐人 PUT 評分）
+- 歷史讀取（歷史頁、統計頁、歷史 CSV）仍在本機，待 B8；過渡期登入時歷史寫入雲端但畫面讀本機，`useRemoteRoundStore` 的 `history` 恆為空陣列
 - 雲端模式下使用者操作不會改動本機 `matchmaker:roster:v1`（該 key 保留訪客時期名單，作為 B9 匯入來源）；但選擇器仍會掛載本機 hook（hooks 不可條件式呼叫），mount 時依既有逐筆降級規則讀取並寫回同一份名單
-- 後續 change 須知（詳見 openspec change `matchmaker-roster-backend` design「交接給 B7～B9」）：B7 後 `useRoundStore` 在雲端模式不應再經 `updatePlayer` port 逐人 PUT 評分（由後端權威 batch 寫入，避免重複寫入）；登入態 JSON 還原目前停用，B9 決定其去留
+- 後續 change 須知：登入態 JSON 還原目前停用，B9 決定其去留；B8 讓歷史頁與統計頁改讀雲端後，刪除 `resetLocalMatchProgress()`，`buildRemoteBackupSnapshot()` 的 `history` 改取雲端（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）
 
 ### shadcn/ui
 
@@ -77,7 +78,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
     - 需要登入態的 spec 以 `test.use({ storageState })` 取用；登入／登出流程用新 context，**不得對共用 state 登出**
     - 缺 `hono-pickball/.dev.vars` 的 `TEST_ACCOUNT_*` 或 `ENVIRONMENT=development` 時，globalSetup 會刪除舊 state 並 warn，auth spec 整檔 skip
     - state 路徑與 skip 原因的單一來源是 `tests/e2e/helpers/storage-state.ts`
-  - **`user-data` project**（第六個，Desktop Chrome、`testDir` 為 `tests/e2e/user-data/`、單 worker）：使用者資料（雲端同步）spec 只放 `tests/e2e/user-data/`，既有五個 project 維持訪客且不設 `storageState`；spec 以 `test.use({ storageState })` 取用登入態，`beforeEach` 呼叫 `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 清空測試帳號的雲端資料（依 `USER_DATA_TABLES` 逐表刪除）。驗收迴圈要多跑一次 `--project=user-data`（名單同步 spec 為 `tests/e2e/user-data/roster-sync.spec.ts`；訪客守護為 `tests/e2e/specs/matchmaker-local-mode.spec.ts`）
+  - **`user-data` project**（第六個，Desktop Chrome、`testDir` 為 `tests/e2e/user-data/`、單 worker）：使用者資料（雲端同步）spec 只放 `tests/e2e/user-data/`，既有五個 project 維持訪客且不設 `storageState`；spec 以 `test.use({ storageState })` 取用登入態，`beforeEach` 呼叫 `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 清空測試帳號的雲端資料（依 `USER_DATA_TABLES` 逐表刪除）。驗收迴圈要多跑一次 `--project=user-data`（名單同步 spec 為 `tests/e2e/user-data/roster-sync.spec.ts`，回合與分槽同步 spec 為 `tests/e2e/user-data/round-sync.spec.ts`；訪客守護為 `tests/e2e/specs/matchmaker-local-mode.spec.ts`）
 
 ### 目錄約定
 
@@ -94,13 +95,19 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - auth：`useSession`
   - scoreboard 雲端同步（B5）：`useRemoteScoreboardStore`（歸 scoreboard 清單；由 `useScoreboardStore` 這個**選擇器 hook** 依 `resolveStorageMode` 在本機與雲端實作間切換，本機 hook 不改動；新增雲端 feature 比照此慣例，並同步更新上述主 spec 清單）
     - 雲端 hook 實作要點：`HYDRATE`（載入雲端資料）不寫回；`createLatestWinsSaver` 於 effect 內建立；`Scoreboard.tsx` 在雲端載入中／失敗時以 `loading`／`load-failed` 取代畫面，`data-sync-status` 屬性只在非 local 模式渲染
+  - matchmaker 回合與場次分槽雲端同步（B7）：`useRemoteRoundStore`（歸 round-lifecycle 清單；由 `useRoundStore` 選擇器切換，本機實作 `useLocalRoundStore`）、`useRemoteMatchSlotStore`（歸 scoreboard 清單；由 `useScoreboardStore` 選擇器在帶 `matchId` 時切換）
+    - `useRemoteRoundStore` 實作要點：回合變更走命令佇列（單一在途），送出時以最新已確認回合重新套用命令，不送算好的舊快照；送出比分走 `POST …/score`，不逐人 PUT 評分；回合 409 整份重載（回合與分槽）並呼叫 `reloadRemotePlayers`，401 交給 session refresh；全部分槽由本 hook 一併載入並以 `remoteMatchSlots` 回傳（雲端模式有值，本機為 `null`）
+    - `useRemoteMatchSlotStore` 實作要點：分槽不存在代表場次已失效（`bindingStatus` 為 `missing`），此時不寫入
+    - 對戰頁雲端模式：回填與鎖定判定以 `remoteMatchSlots` 為來源、不呼叫 `clearMatchSlots`（後端送出比分的 batch 已刪除分槽）；名單就緒（`isRosterReady`）前不回填，effect 依賴陣列含 `remoteMatchSlots` 與 `isRosterReady`；`CourtCard` 經 `remoteNavigate` 先 await 分槽 `PUT`（version 0），結果為 ok 或 conflict 才導向 `/scoreboard?match=<id>`，其他結果顯示錯誤
   - matchmaker 名單雲端同步（B6）：`useRemoteRosterStore`（歸 player-roster 清單；由 `useRosterStore` 選擇器切換，本機實作 `useLocalRosterStore` 一行未改）
     - 雲端 hook 實作要點：每位參賽者一個最新優先佇列、任一 409 整份重載、401 交給 session refresh；loading、load-failed、重載中、重置中都不送出也不改名單
     - 對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容，`data-sync-status` 只在非 local 時輸出
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）、`sync/`（雲端同步共用基礎：`storage-mode` 的 `resolveStorageMode`、`api-client` 的 `requestJson`、`latest-wins-saver` 的 `createLatestWinsSaver`、`sync-status` 的 `SyncStatus`）
   - `lib/sync/roster-api.ts`：名單 API 薄包裝，一律經 `requestJson`
+  - `lib/sync/round-api.ts`：回合、場次分槽、送出比分的路徑字串與回應 schema 的唯一來源，一律經 `requestJson`，hook 不自行拼路徑
+  - `lib/sync/round-command-queue.ts`：回合命令佇列（無 React 相依，由 `useRemoteRoundStore` 持有），單一在途、先進先出
   - `lib/matchmaker/remote-transfer.ts`：資料頁雲端分支，含 `importRemoteRoster`、`buildRemoteBackupSnapshot`、`REMOTE_TRANSFER_MESSAGES`
-  - `lib/matchmaker/storage.ts` 的 `resetLocalMatchProgress()`：登入時重置只清回合、歷史、分槽
+  - `lib/matchmaker/storage.ts` 的 `resetLocalMatchProgress()`：登入時重置只清本機歷史（回合與分槽已在雲端，由後端 reset batch 刪除）
   - **18 個純邏輯模組已移至核心套件 `@pickball/core`**（`scoreboard/{types,rules,reducer}`、`matchmaker/{types,allocation-types,allocation,candidates,duplication,pairing,rating-math,rating-types,rating,labels,round-types,round,history,history-range,transfer-types}`），這裡的舊路徑已不存在，且不留 re-export 轉址殼；一律從 `@pickball/core/<area>/<module>` 匯入。**它們的單元測試刻意留在 `lib/{scoreboard,matchmaker}/*.test.ts` 原位**（主 spec 以測試檔路徑為驗收錨點），不是漏搬。`next.config.ts` 以 `transpilePackages: ["@pickball/core"]` 讓 Next 轉譯該套件的 `.ts` 原始碼。新增純邏輯模組是否放核心套件，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔
