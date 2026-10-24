@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
-import { buildTestAccountSeedSql } from "../src/db/seed/test-account.ts";
+import { buildTestAccountSeedSql, deriveSwitchAccountEmail } from "../src/db/seed/test-account.ts";
 
 // 以腳本位置推導 hono-pickball/，避免依賴執行時的 cwd
 const projectRoot = join(import.meta.dirname, "..");
@@ -33,12 +33,21 @@ for (const name of requiredVars) {
   }
 }
 
-const sql = await buildTestAccountSeedSql({
-  email: devVars.TEST_ACCOUNT_EMAIL as string,
-  password: devVars.TEST_ACCOUNT_PASSWORD as string,
-  name: devVars.TEST_ACCOUNT_NAME as string,
-  now: new Date(),
-});
+const password = devVars.TEST_ACCOUNT_PASSWORD as string;
+const email = devVars.TEST_ACCOUNT_EMAIL as string;
+const name = devVars.TEST_ACCOUNT_NAME as string;
+const now = new Date();
+
+// 第二帳號供「另一分頁換帳號」E2E 使用；與原帳號同密碼、寫入同一個暫存檔一次執行
+const sql = [
+  await buildTestAccountSeedSql({ email, password, name, now }),
+  await buildTestAccountSeedSql({
+    email: deriveSwitchAccountEmail(email),
+    password,
+    name: `${name}（B）`,
+    now,
+  }),
+].join("\n");
 
 mkdirSync(tmpDir, { recursive: true });
 // 每次呼叫用唯一目錄，避免並行執行時互相刪除對方的暫存檔
