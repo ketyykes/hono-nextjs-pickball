@@ -288,3 +288,8 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     **§10 MUST**：頁面傳入三個 port 與 `rosterSyncStatus`（漏傳 `applyRemotePlayers` 會使評分靜默不更新）；回填 effect 依賴加入名單就緒與 `remoteMatchSlots`；`scoring-failed` 同時代表雲端／名單未就緒、重複送出與評分失敗，頁面不得當成永久失敗。
     觀察：vitest 環境的 `<StrictMode>` wrapper 不會重跑 effect，StrictMode 安全性由「enabled 反覆切換時舊一輪結果被忽略」與「卸載時釋放佇列」兩個 it 間接守住；瀏覽器 dev 模式預期 GET 4 次（與 B5／B6 相同）。
     已知：`hooks/hooksInventory.test.ts` 因 `useRemoteRoundStore` 未列入主 spec 而紅，由 §8.5／8.6 處理。前端 §7 兩檔 64 個 it。**下一步**：派 §8 Implementer（sonnet）。
+23. （apply §8 審查，2026-10-24，第三任 leader）Stage 1（sonnet）**PASS**（錨點逐字、授權刪除只一個 B5 it、本機實作與主 spec 只一句皆核對通過）。
+    Stage 2（opus，59 條變異：56 應紅中 51 紅、等價對照 3 條綠；8.1／8.3／8.5 紅燈皆以 `git show <commit>^:` 重現為真紅）**FAIL**，實作無 bug，4 條非等價存活需補 regression guard（只動測試檔）：
+    H12（409 後重載 GET 回 401 未清 `versionRef`）、H42（換場次／重新啟用的載入中沿用前一場 version）、H38（`useReducer` 初始 `loading` 改 `synced` 會閃一幀計分畫面）、H10（GET 回 204 應為 load-failed）。H27 判定等價。
+    非阻擋（交 §10）：B5 `useRemoteScoreboardStore` 可能有同型缺口（H12／H42），不在本 change 範圍；雲端模式帶 matchId 時選擇器仍掛載本機 hook 會**讀取** `scoreboard:matches:v1`（與 B5 同型，tasks 8.4 已記），E2E 驗本機 key 不存在時注意前置狀態；分槽 hook 無 StrictMode 專屬 it；missing 時不 HYDRATE，靠頁面 `key={matchId}` 重掛載。
+    **下一步**：§8 補件（sonnet）→ Stage 2 複審 → §9。
