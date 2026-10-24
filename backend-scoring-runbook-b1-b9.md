@@ -132,7 +132,7 @@ main@1e5e517
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f`、archive `fca0b95` |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8`、archive `11a2dbf` |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
-| B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 未 propose；草稿在 `/tmp/acct-guard-draft/`（draft、spec-deltas、tasks-outline、decisions Q1～Q12 皆採建議值） |
+| B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已 propose `862fafa`（30 tasks；design OQ 新問題 1～5 皆採建議值）；apply 中 |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
 | B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
@@ -603,7 +603,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   **後續 change**：site-navbar loading 時預留入口寬度（改主 spec，一併消除使用者誤點與 CLS）。在那之前此條失敗以隔離重跑判讀，診斷資料 `/tmp/qdbg/`。
 - coordinator 裁定：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」改等 `POST …/score` 並加「無逐人 PUT」斷言（tasks 例外清單第五個）。
 - 維持現狀／後續：OQ16 舊回合重排先得 400 而非 409；reset 後 version 從 1 起算的 ABA（G1 前評估）；rejected 時樂觀顯示不回滾；`updatedPlayers` 為空的 `sql.join` 防禦；
-  CourtCard 遇 unauthorized 不 refresh；`seedAndSignIn` 兩份本地複本（B8／B9 新測試改用 `test/helpers/matchmaker-fixtures.ts`）。
+  ~~CourtCard 遇 unauthorized 不 refresh~~（B7.5 處理）；`seedAndSignIn` 兩份本地複本（B8／B9 新測試改用 `test/helpers/matchmaker-fixtures.ts`）。
 - **B7 archive 後 validate 失敗（各棒 §1 修）**：B8 `player-roster` MODIFIED「重置名單與二次確認」缺「resetLocalMatchProgress 只清除本次活動的進度」與「登入時重置名單前停止所有待送與重試中的變更」；
   B9 `data-transfer` MODIFIED「登入時的資料工具頁」缺「登入時 JSON 還原停用」（同 B6 後，未新增）。
 - **交接給 B8～B9**：見 B7 design「交接給 B8～B9」與 hono-pickball/CLAUDE.md「後續 change 須知」三點。
