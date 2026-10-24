@@ -37,14 +37,14 @@ afterEach(() => {
 describe("requestJson", () => {
 	it("2xx 且回應符合 schema 時為 ok", async () => {
 		stubFetch(async () => jsonResponse({ n: 1 }));
-		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+		await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 			kind: "ok",
 			value: { n: 1 },
 		});
 
 		// value 是 schema 解析後的值：未定義的 key 會被剝除
 		stubFetch(async () => jsonResponse({ n: 1, extra: true }));
-		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+		await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 			kind: "ok",
 			value: { n: 1 },
 		});
@@ -54,18 +54,19 @@ describe("requestJson", () => {
 		const result = await requestJson("PUT", "/api/x", {
 			body: { a: 1 },
 			schema,
+			expectedUserId: "user-a",
 		});
 		expect(result).toEqual({ kind: "ok", value: undefined });
 	});
 
 	it("409 為 conflict、401 為 unauthorized", async () => {
 		stubFetch(async () => jsonResponse({ error: "x" }, 409));
-		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+		await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 			kind: "conflict",
 		});
 
 		stubFetch(async () => jsonResponse({ error: "x" }, 401));
-		await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+		await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 			kind: "unauthorized",
 		});
 	});
@@ -73,7 +74,7 @@ describe("requestJson", () => {
 	it("其餘 4xx 為 rejected 並帶狀態碼", async () => {
 		for (const status of [400, 404]) {
 			stubFetch(async () => jsonResponse({ error: "x" }, status));
-			await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 				kind: "rejected",
 				status,
 			});
@@ -96,7 +97,7 @@ describe("requestJson", () => {
 
 		for (const failure of failures) {
 			stubFetch(failure);
-			await expect(requestJson("GET", "/api/x", { schema })).resolves.toEqual({
+			await expect(requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" })).resolves.toEqual({
 				kind: "failed",
 			});
 		}
@@ -104,7 +105,7 @@ describe("requestJson", () => {
 
 	it("GET 帶 keepalive，有 body 時帶 JSON content-type，皆為 same-origin 憑證", async () => {
 		const getMock = stubFetch(async () => jsonResponse({ n: 1 }));
-		await requestJson("GET", "/api/x", { schema });
+		await requestJson("GET", "/api/x", { schema, expectedUserId: "user-a" });
 		const [getUrl, getInit] = getMock.mock.calls[0] as unknown as [
 			string,
 			RequestInit,
@@ -116,7 +117,7 @@ describe("requestJson", () => {
 		expect(getInit.body).toBeUndefined();
 
 		const putMock = stubFetch(async () => jsonResponse({ n: 1 }));
-		await requestJson("PUT", "/api/x", { body: { a: 1 }, schema });
+		await requestJson("PUT", "/api/x", { body: { a: 1 }, schema, expectedUserId: "user-a" });
 		const [, putInit] = putMock.mock.calls[0] as unknown as [string, RequestInit];
 		expect(putInit.method).toBe("PUT");
 		expect(putInit.credentials).toBe("same-origin");

@@ -34,8 +34,14 @@ export interface ConfirmedRound {
 export interface RoundCommandQueueOptions {
 	initial: ConfirmedRound;
 	getPlayers: () => readonly Player[];
-	putRound: typeof putRemoteRound;
-	submitScore: typeof submitRemoteScore;
+	/** 已綁定帳號的送出函式：佇列不知道帳號，由持有佇列的世代以閉包綁定（design Decision 6）。 */
+	putRound: (round: Round, version: number) => ReturnType<typeof putRemoteRound>;
+	submitScore: (
+		matchId: string,
+		scoreA: string,
+		scoreB: string,
+		roundVersion: number,
+	) => ReturnType<typeof submitRemoteScore>;
 	/** 狀態轉換；與 createLatestWinsSaver 的 onResult 同一組事件。 */
 	onEvent: (event: SaverEvent) => void;
 	/** 任何請求成功後，已確認的回合與版本都已更新。 */
