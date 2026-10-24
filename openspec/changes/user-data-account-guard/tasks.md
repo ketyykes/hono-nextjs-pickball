@@ -61,16 +61,26 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：`hono-pickball/test/seed-test-account.test.ts` 新增「deriveSwitchAccountEmail 產生不同於原值且固定的 email」「衍生帳號與原帳號以同一組密碼皆可登入且為不同使用者」。確認紅燈
-- [ ] 4.2 GREEN（TDD）：`src/db/seed/test-account.ts` 加 `deriveSwitchAccountEmail`（design Decision 9）。4.1 全綠
-- [ ] 4.3 設定層（腳本 I/O）：`scripts/seed-test-account.ts` 以同一組密碼產生兩個帳號的 SQL（同一暫存檔、同一次 `--local --env local` 執行）。驗收（指令）C2
-- [ ] 4.4 設定層（tests helper）：`tests/e2e/helpers/test-account.ts` 加同一衍生規則與「在既有 context 以第二帳號登入」helper（失敗 throw）；
+- [x] 4.1 RED（TDD）：`hono-pickball/test/seed-test-account.test.ts` 新增「deriveSwitchAccountEmail 產生不同於原值且固定的 email」「衍生帳號與原帳號以同一組密碼皆可登入且為不同使用者」。確認紅燈 **紀錄**：RED commit `40c6839`；單檔實跑 2 failed｜3 passed（`TypeError: deriveSwitchAccountEmail is not a function`）；`git show 40c6839^:hono-pickball/test/seed-test-account.test.ts | grep -c deriveSwitchAccountEmail` = 0（RED 前檔案不含該行為），紅燈為真，無 regression guard。
+- [x] 4.2 GREEN（TDD）：`src/db/seed/test-account.ts` 加 `deriveSwitchAccountEmail`（design Decision 9）。4.1 全綠 **紀錄**：GREEN commit `638faa9`；seed-test-account.test.ts 5 passed。mutation：回傳原值（全部）轉紅 2 條；僅含 `+` 輸入回傳原值轉紅 1 條；結果不恆定（附 Math.random）轉紅 1 條；等價變異（`-switch`→`-sw`）維持綠。每次還原後 `git status` 乾淨。REFACTOR：skipped（無壞味道）。
+- [x] 4.3 設定層（腳本 I/O）：`scripts/seed-test-account.ts` 以同一組密碼產生兩個帳號的 SQL（同一暫存檔、同一次 `--local --env local` 執行）。驗收（指令）C2 **紀錄**：commit `8973704`；`db:seed:local` 連跑兩次皆 exit 0；`SELECT count(*), count(distinct email) FROM user`（`--local --env local`）= 2／2；`grep -c -- "--remote"` = 0；暫存目錄執行後已刪除。兩個帳號登入以 §4.5 實跑中 B 以同密碼 `signInAsSwitchAccount` 成功（失敗會 throw）與 globalSetup A 登入成功佐證，未另印密碼。
+- [x] 4.4 設定層（tests helper）：`tests/e2e/helpers/test-account.ts` 加同一衍生規則與「在既有 context 以第二帳號登入」helper（失敗 throw）；
   `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 改清兩個帳號、新增 `expectedUserHeaders(request)`；
   `roster-sync.spec.ts`、`round-sync.spec.ts` 的 `page.request` 直接 API 呼叫改帶 `expectedUserHeaders(page.request)`（守衛尚未存在，持鎖跑 `--project=user-data` 既有 spec 必須照綠，證明只是加標頭）
-- [ ] 4.5 RED（E2E 驗收型）：新增 `tests/e2e/user-data/account-switch.spec.ts` 的七個 test（spec「另一分頁換帳號時本分頁不寫入新帳號」錨點；`test.use({ storageState })`、`beforeEach` 呼叫 `clearTestAccountUserData()`）。
+  **紀錄**：commit `a948621`；持鎖實跑 `--project=user-data` 既有三個 spec（roster-sync／round-sync／scoreboard-sync）：27 passed、0 failed、0 skipped（加標頭前後行為一致，守衛尚未存在）。`@pickball/core/api/headers` 的常數可被 Playwright 載入（沿用 `user-data-tables` 同路徑），tsc／eslint 皆 exit 0。
+- [x] 4.5 RED（E2E 驗收型）：新增 `tests/e2e/user-data/account-switch.spec.ts` 的七個 test（spec「另一分頁換帳號時本分頁不寫入新帳號」錨點；`test.use({ storageState })`、`beforeEach` 呼叫 `clearTestAccountUserData()`）。
   持鎖以 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/account-switch.spec.ts` 實跑並貼輸出：七條皆紅。
   守衛尚未存在，紅燈為真：計分、新增參賽者、重置、產生對戰四條因「本分頁的寫入進了 B」而紅；進入計分板一條因 409 被當成已存在而導向；
   「使用者資料請求經前端 proxy 帶上目前帳號的標頭」因標頭不存在而紅；「送出比分」一條的紅燈只來自狀態碼（預期 401 實得 409），依 design Open Questions 2 如實註明。GREEN 見 §9
+  **紀錄**：commit `d6392c5`；持鎖實跑七條皆紅（0 passed）。逐條紅燈原因（斷言最先失敗處）：
+  (1) 計分：PUT 預期 401 實得 409（B 版本已大於本分頁的 0，版本衝突擋下，非寫入 B；仍屬守衛不存在）；
+  (2) 新增參賽者：預期 401 實得 200（本分頁的新增真的寫進 B）；
+  (3) 重置：預期 401 實得 204（真的刪除 B 的名單）；
+  (4) 產生對戰：預期 401 實得 200（真的在 B 建立回合）；
+  (5) 送出比分：預期 401 實得 409，**紅燈只來自狀態碼**（B 沒有 A 的回合，資料本來就不會被寫入；design Open Questions 2，已於 spec 內註解）；
+  (6) 進入計分板：預期 401 實得 409（409 被視為已存在，之後會導向）；
+  (7) proxy 標頭：`x-expected-user-id` 為 undefined（前端尚未帶標頭）。
+  與派工描述差異：(1) 的紅燈為 409 而非「寫入 B」，因 B 先寫成 2:0 使版本不同；GREEN 見 §9。
 
 ## 5. 後端：預期帳號守衛
 
