@@ -303,3 +303,5 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     Stage 1（sonnet）**PASS**。Stage 2（opus，38 條：23 紅、6 等價、2 非阻擋）**FAIL**，實作無 bug，7 條非等價存活需補 E2E guard（只動 `round-sync.spec.ts`）：P18 頁面未驗傳入 `reloadRemotePlayers`、P20 頁面未驗傳入 `updatePlayer`（休息次數）、P23 回合 loading 時未以 Notice 取代內容、C2 分槽 PUT 409 時仍導向（繼續計分）、C3／C4／C7 分槽 PUT 失敗時的錯誤文案與不導向。
     非阻擋（交 §11／Final）：P13 loading／load-failed 優先序、C8 連點防護（冪等）；頁面與 hook 的名單就緒為雙重守衛，承重的是依賴陣列；CourtCard 雲端分支遇 unauthorized 不呼叫 onUnauthorized；修飾鍵點擊被 `preventDefault` 吃掉；`remoteNavigate` 可改必填判別型 prop。
     **下一步**：§10 補件（sonnet）→ Stage 2 複審 → §11。
+27. （apply §10 完成，2026-10-24）補件 269d7fc（只含 `round-sync.spec.ts`：test 3／test 6 追加斷言、新增 3 個「regression guard：」開頭的 test）、b5f13be（tasks 10.2）後 Stage 2 複審 **PASS**：P18、P20、P23、C2、C3、C4、C7 全數轉紅，等價對照 5 條綠，抽查 11 條（含必做 P1、C1、P2）仍紅；`--project=user-data` 27 passed（round-sync 9＋roster-sync 12＋scoreboard-sync 6）。
+    注意（交 Final）：round-sync 為 9 條＝spec 錨點 6 條＋3 條 regression guard（名稱無對應錨點，以前綴標示，同 §8 單元測試慣例）；建立失敗 guard 在 alert 後多一段 1.5 秒負向等待（冗餘、不影響正確性）。**下一步**：§11.1 文件（sonnet）與 11.2～11.8 指令驗收（leader）。
