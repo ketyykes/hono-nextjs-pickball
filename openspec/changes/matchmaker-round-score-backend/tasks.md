@@ -157,6 +157,7 @@ Depends on: §7
 - [x] 8.1 RED（TDD）：新增 `hooks/useRemoteMatchSlotStore.test.tsx`，spec 該檔的四個 it。確認紅燈
   - 紅燈：`844ee47`（只含測試檔；`git show 844ee47^:nextjs-pickball/hooks/useRemoteMatchSlotStore.ts` 查無此檔）。模組不存在，整檔因 import 解析失敗而紅（輸出 `/tmp/b7s8/red81.txt`）。spec 的 4 個錨點 it 名稱逐字一致。regression guard：無（皆因 import 失敗而紅）。
   - 事後補的 regression guard（GREEN 後自跑 mutation 發現缺口而加，寫入即綠，非紅燈）：`1c59e2b`、`21cc08b`，共 4 個 it：分槽儲存的同步狀態轉換與保留規則（saving／retrying／rejected、成功後沿用版本、204 視為失敗、卸載後不重試）、衝突文案維持到下一次儲存成功、重新啟用與換場次的重載、卸載後結果忽略與 `onUnauthorized` 取最新函式；另在 missing 的錨點 it 加一條 `syncStatus` 為 synced 的斷言。最終 8 個 it。
+  - 事後補的 regression guard（Stage 2 mutation 發現缺口而加，寫入即綠，非紅燈）：`8454871`，共 4 個 it：衝突後重新 GET 回 401 時呼叫 onUnauthorized 且之後不再送出 PUT（殺 H12）、換場次後載入中 dispatch 不得以前一場的 version 送出 PUT（殺 H42）、啟用後第一個 render 的 syncStatus 即為 loading（殺 H38）、GET 回 204 時為 load-failed（殺 H10）。最終 12 個 it。
 - [x] 8.2 GREEN（TDD）：新增 `hooks/useRemoteMatchSlotStore.ts`（spec `scoreboard`「登入時獨立計分板以雲端為準」的分槽段落）
   - `0465fcd`；4 個錨點 it 綠，tsc exit 0。
   - **與 design 的差異**：回傳為四元組 `[state, dispatch, bindingStatus, syncStatus]`（選擇器可直接回傳）；`missing` 時 `syncStatus` 設為 `synced`（失效說明取代畫面，不疊加同步提示）；載入失敗時 `bindingStatus` 維持 `pending`、`syncStatus` 為 `load-failed`。`statusReducer` 與 B5 同型但各自一份（B7 7.5 已記 skipped 的同一理由）。
