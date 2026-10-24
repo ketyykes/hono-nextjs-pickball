@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { MatchSlot } from "@pickball/core/api/round";
+import type { SyncStatus } from "@/lib/sync/sync-status";
 import { useRemoteMatchSlotStore } from "./useRemoteMatchSlotStore";
 import type { ScoreboardBindingStatus } from "./useScoreboardStore";
 
@@ -375,5 +376,69 @@ describe("useRemoteMatchSlotStore", () => {
 		});
 		await waitFor(() => expect(second).toHaveBeenCalledTimes(1));
 		expect(first).not.toHaveBeenCalled();
+	});
+
+	// 以下為 Stage 2 審查的 mutation（H12、H42、H38、H10）發現缺口後補的 regression guard，寫入當下即綠燈
+	it("regression guard：衝突後重新 GET 回 401 時呼叫 onUnauthorized，之後 dispatch 不再送出 PUT", async () => {
+		enqueue(200, { data: slotWithScores(0, 0), version: 4 });
+		const { result, onUnauthorized } = renderSlot({ enabled: true });
+		await waitFor(() => expect(result.current[2]).toBe("bound"));
+
+		enqueue(409);
+		enqueue(401);
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await settle();
+		expect(putCalls()).toHaveLength(1);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+	});
+
+	it("regression guard：換場次後載入中 dispatch 不得以前一場的 version 送出 PUT", async () => {
+		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
+		const rendered = renderHook(
+			({ matchId }) =>
+				useRemoteMatchSlotStore({ enabled: true, matchId, onUnauthorized: vi.fn() }),
+			{ initialProps: { matchId: "m1" } },
+		);
+		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
+
+		// 第二場的 GET 永不回應，維持載入中
+		queue.push(() => new Promise<Response>(() => {}));
+		rendered.rerender({ matchId: "m2" });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		act(() => {
+			rendered.result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await settle();
+		expect(putCalls()).toHaveLength(0);
+	});
+
+	it("regression guard：啟用後第一個 render 的 syncStatus 即為 loading", async () => {
+		const statusLog: SyncStatus[] = [];
+		// GET 永不回應，避免載入完成後的 synced 混入紀錄
+		queue.push(() => new Promise<Response>(() => {}));
+		renderHook(() => {
+			const value = useRemoteMatchSlotStore({
+				enabled: true,
+				matchId: "m1",
+				onUnauthorized: vi.fn(),
+			});
+			statusLog.push(value[3]);
+			return value;
+		});
+		await settle();
+		expect(statusLog[0]).toBe("loading");
+		expect(statusLog).not.toContain("synced");
+	});
+
+	it("regression guard：GET 回 204（無內容）時為 load-failed", async () => {
+		queue.push(() => Promise.resolve(new Response(null, { status: 204 })));
+		const { result } = renderSlot({ enabled: true });
+		await waitFor(() => expect(result.current[3]).toBe("load-failed"));
 	});
 });
