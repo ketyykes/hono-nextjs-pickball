@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { test, expect, type Browser, type Page, type Response, type Route } from "@playwright/test";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
-import { clearTestAccountUserData } from "../helpers/user-data";
+import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
 // 登入後的對戰回合與場次分槽以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
 // 不用固定延遲：已登入者在 /api/session 回應前會先看到本機畫面，必須等同步狀態再操作。
@@ -50,6 +50,7 @@ async function seedCloudPlayers(page: Page, count: number) {
 		const player = buildPlayer(index);
 		const response = await page.request.put(`${PLAYERS_API}/${player.id}`, {
 			data: { data: player, version: 0 },
+			headers: await expectedUserHeaders(page.request),
 		});
 		expect(response.ok(), `種入雲端參賽者 ${player.id} 失敗：${response.status()}`).toBe(true);
 	}
@@ -236,7 +237,7 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 
 		expect(await readLocal(page, MATCH_SLOTS_KEY)).toContain("sentinel");
 
-		const slotsResponse = await page.request.get(SLOTS_API);
+		const slotsResponse = await page.request.get(SLOTS_API, { headers: await expectedUserHeaders(page.request) });
 		expect(slotsResponse.ok()).toBe(true);
 		const slots = (await slotsResponse.json()) as { items: { id?: string }[] };
 		expect(JSON.stringify(slots)).not.toContain(matchId);
@@ -314,9 +315,9 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(page.locator(COURT_GRIDS)).toHaveCount(0);
 		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toBeVisible();
 
-		const roundResponse = await page.request.get(ROUND_API);
+		const roundResponse = await page.request.get(ROUND_API, { headers: await expectedUserHeaders(page.request) });
 		expect(await roundResponse.json()).toEqual({ data: null, version: 0 });
-		const slotsResponse = await page.request.get(SLOTS_API);
+		const slotsResponse = await page.request.get(SLOTS_API, { headers: await expectedUserHeaders(page.request) });
 		expect(await slotsResponse.json()).toEqual({ items: [] });
 	});
 
@@ -391,7 +392,7 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(page.locator(SYNCED)).toBeVisible();
 		await expect
 			.poll(async () => {
-				const response = await page.request.get(PLAYERS_API);
+				const response = await page.request.get(PLAYERS_API, { headers: await expectedUserHeaders(page.request) });
 				const body = (await response.json()) as { items: { data: { restCount: number } }[] };
 				return body.items.reduce((sum, item) => sum + item.data.restCount, 0);
 			})

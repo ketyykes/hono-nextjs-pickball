@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
-import { clearTestAccountUserData } from "../helpers/user-data";
+import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
 // 登入後的 matchmaker 名單以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
 // 不用固定延遲：已登入者在 /api/session 回應前會先看到本機名單，必須等同步狀態再操作。
@@ -52,6 +52,7 @@ async function seedCloudPlayers(page: Page, players: ReturnType<typeof buildPlay
 	for (const player of players) {
 		const response = await page.request.put(`${PLAYERS_API}/${player.id}`, {
 			data: { data: player, version: 0 },
+			headers: await expectedUserHeaders(page.request),
 		});
 		expect(response.ok(), `種入雲端參賽者 ${player.id} 失敗：${response.status()}`).toBe(true);
 	}

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
+import type { BrowserContext } from "@playwright/test";
 
 export interface TestAccount {
 	email: string;
@@ -62,5 +63,53 @@ export function readTestAccount(): TestAccount | null {
 export function ensureTestAccountSeeded(): void {
 	for (const script of ["db:migrate:local", "db:seed:local"]) {
 		execFileSync("pnpm", ["--dir", honoRoot, script], { stdio: "pipe" });
+	}
+}
+
+/**
+ * 與後端 `deriveSwitchAccountEmail` 相同的規則（前後端不共用 src，各寫一份）；
+ * 兩份規則漂移時，下方 signInAsSwitchAccount 會登入失敗而 throw。
+ */
+export function deriveSwitchAccountEmail(email: string): string {
+	const atIndex = email.lastIndexOf("@");
+	const local = email.slice(0, atIndex);
+	const domain = email.slice(atIndex);
+	if (local.includes("+")) {
+		return `${local}-switch${domain}`;
+	}
+	return `${local}+switch${domain}`;
+}
+
+/** 衍生第二帳號的帳密；密碼與原帳號相同。缺值時 throw。 */
+export function readSwitchAccount(): TestAccount {
+	const result = readTestAccountResult();
+	if (!result.ok) {
+		throw new Error(`缺少測試帳密：${result.missing.join(", ")}`);
+	}
+	return {
+		email: deriveSwitchAccountEmail(result.account.email),
+		password: result.account.password,
+		name: `${result.account.name}（B）`,
+	};
+}
+
+const FRONTEND_ORIGIN = "http://localhost:3005";
+
+/**
+ * 在既有 context 以第二帳號登入，覆寫同一 origin 的 session cookie（等同另一分頁換帳號）。
+ * better-auth 未啟用 multi-session，登入不會撤銷原 session，因此共用 storage state 的 A 仍可使用。
+ * 失敗一律 throw（錯誤訊息不含帳密），不得 skip。
+ */
+export async function signInAsSwitchAccount(context: BrowserContext): Promise<void> {
+	const account = readSwitchAccount();
+	const response = await context.request.post(`${FRONTEND_ORIGIN}/api/auth/sign-in/email`, {
+		// better-auth 檢查 Origin；自寫 request 不像瀏覽器會自動帶
+		headers: { Origin: FRONTEND_ORIGIN },
+		data: { email: account.email, password: account.password },
+	});
+	if (!response.ok()) {
+		throw new Error(
+			`第二帳號登入失敗，HTTP ${response.status()}（請確認 seed 已建立衍生帳號，且前後端衍生規則一致）`,
+		);
 	}
 }
