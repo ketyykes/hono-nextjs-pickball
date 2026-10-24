@@ -204,6 +204,7 @@ Depends on: §9
   兩個 port 自 `useRosterStore` 傳入；所有 hooks 在 early return 前呼叫）、`app/matchmaker/stats/page.tsx`（傳入 port）、`components/matchmaker/CourtCard.tsx`（雲端模式 await PUT v0 再導向，本機分支不動）、
   `app/scoreboard/page.tsx`（若 §8 選擇器已涵蓋則不改）。10.1 全綠；不得以 `waitForTimeout` 取代狀態等待
   - fa6fd34：round-sync 6 條全綠；`app/scoreboard/page.tsx` 未改（§8 選擇器已涵蓋）。偏離：`CourtCard` 不直接用 `useRouter`（既有 CourtCard 單元測試無 router context，會拋錯），改為可選 prop `remoteNavigate`（`MatchStage` 轉傳，頁面以 `router.push` 提供）；未傳入即走原本機分支，一行未動。頁面同步狀態取名單與回合兩者中最需注意者（`mergeSyncStatus`）。
+  - Stage 2 補件（269d7fc，皆為寫入即綠的 regression guard，不改產品碼）：P18 頁面漏傳 `reloadRemotePlayers`（test 3 追加：衝突後 B 的場地卡強度重新載入）、P20 `updatePlayer` 改空函式（新增 test：再產生一輪後雲端休息次數增加）、P23 early return 漏掉 `loading`（新增 test：回合 GET 暫扣時顯示載入提示且無產生按鈕）、C2 分槽 PUT 409 不導向（test 6 追加：繼續計分回 409 仍導向且比分 2:0）、C3／C4／C7 分槽建立失敗分支（新增 test：PUT 回 500 時顯示錯誤、不導向，解除後可再進入）。7 條變異皆轉紅，等價對照維持綠。
   - 已知：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待 `PUT /api/matchmaker/players/*`，B7 後評分改由送出比分的 POST 寫入、不再逐人 PUT，該 test 在 `waitForResponse` 逾時。→ coordinator 授權改寫等待條件並加嚴（tasks 檔頭第五個例外），改寫 commit `e04ef43`（leader 依裁定執行；文件 `4171aaa`）。
 - [x] 10.3 REFACTOR：對戰頁本機與雲端分槽來源的分支是否可收斂成一個小函式；無壞味道則註記 skipped
   - skipped：分支只有 `remoteMatchSlots ?? matchSlots` 一行與回填 effect 內的早退區塊，收斂成函式需把 `submitScore`、`players`、`round` 全傳入，反而擴大面積並碰到本機分支。
