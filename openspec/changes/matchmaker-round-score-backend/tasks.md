@@ -228,7 +228,16 @@ Depends on: §10
   - 取鎖：exit 0（後端 `wrangler deploy --dry-run`，無遠端操作）。
 - [x] 11.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
   - `db:generate`：「No schema changes, nothing to migrate」，`hono-pickball/drizzle` 無新檔；`db:migrate:local`：exit 0（「No migrations to apply!」，0003 已套用）。
-- [ ] 11.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
+- [x] 11.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
   既有 test 全數原樣通過，新增 6 個 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - coordinator 於 HEAD 03d2550 持共用鎖整輪執行（各段開始時 1 分鐘 load 3.9～6.1）：合計 713 passed／38 skipped／1 failed。
+    chromium 145、firefox 133＋12 skipped、mobile-chrome 143＋2 skipped、user-data 27 passed（含新增 round-sync 6 條、無 skip）、
+    webkit 三段 132 passed＋12 skipped＋1 failed、mobile-safari 三段 133 passed＋12 skipped。
+  - 唯一失敗：webkit `quiz.spec.ts:49`「A. 從 Navbar 點「測驗」連結進入 /quiz…」（點擊後 URL 仍為 `/`）。未自行判定雜訊，經隔離重跑與根因追查：
+    B7 分支重跑 12 次失 1、15 次失 1；main 27 次全過。以事件捕捉診斷 80 次失 7，每次皆為 mousedown 落在「測驗」、mouseup 落在「對戰分配」、
+    click 派給共同祖先 `<nav>`——根因是 `AccountEntry` 於 session loading 時不佔寬度（主 spec site-navbar「載入中或未啟用時不渲染」明定），
+    `/api/session` 回應後插入圖示使 navbar 連結左移。首頁實際載入的 18 個 client chunk 之原始碼與 main 逐檔 diff 為空、不含任何 B7 模組，
+    `AccountEntry` 最後修改於 base 之前（dbdd2b6）。coordinator 裁定：既有競態（發生率約 3～9%，main 27 次全過的機率約 25%），非 B7 回歸，
+    不阻擋本 change；修正需改 site-navbar 主 spec，列為後續 change。診斷資料在 /tmp/qdbg/。
 - [x] 11.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-round-score-backend --strict` 通過
   - exit 0：「Change 'matchmaker-round-score-backend' is valid」。
