@@ -294,3 +294,6 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     非阻擋（交 §10）：B5 `useRemoteScoreboardStore` 可能有同型缺口（H12／H42），不在本 change 範圍；雲端模式帶 matchId 時選擇器仍掛載本機 hook 會**讀取** `scoreboard:matches:v1`（與 B5 同型，tasks 8.4 已記），E2E 驗本機 key 不存在時注意前置狀態；分槽 hook 無 StrictMode 專屬 it；missing 時不 HYDRATE，靠頁面 `key={matchId}` 重掛載。
     **下一步**：§8 補件（sonnet）→ Stage 2 複審 → §9。
 24. （apply §8 完成，2026-10-24）補件 8454871（4 個 regression guard：H12／H42／H38／H10，只動測試檔）、c14d503（tasks 8.1 紀錄）後 Stage 2 複審 **PASS**：4 條全數轉紅、等價對照 E1～E3 綠、抽查 14 條（含必做 R1、R2、R3a～c）仍紅；H27 判定等價。分槽 hook 12 個 it。**下一步**：派 §9 Implementer（sonnet）。
+25. （apply §9 完成，2026-10-24）Implementer（sonnet）：198ced5 RED（改寫授權的 B6 it，1 紅／7 綠，`git show 198ced5^:` 複驗 currentRound 取本機）→ 7240149 GREEN → 7f71d4e 自補 guard（同一改寫 it 內追加「名單失敗而回合成功」斷言）→ da384b6 tasks（REFACTOR skipped）。前端全套 100 檔／985 綠，lint 0／3。
+    Stage 1（sonnet）**PASS**；Stage 2（opus，26 條變異：23 紅、3 等價對照綠、無非等價存活；RED 重現 1 failed）**PASS**，並實測 7f71d4e 確為加強（舊測試下 M6／M7 存活）。
+    非阻擋（列後續，本 change 不改）：回合讀取失敗共用 `backupFetchFailed` 文案「無法取得雲端的參賽者名單…」語意不準；匯出 JSON 按鈕無 pending 狀態（B6 既有，兩條 GET 稍放大）；無 E2E 斷言下載 JSON 的 currentRound 來自雲端（spec 只要求 unit）。**下一步**：派 §10 Implementer（sonnet）。
