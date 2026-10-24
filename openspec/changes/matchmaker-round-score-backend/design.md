@@ -297,3 +297,9 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
 25. （apply §9 完成，2026-10-24）Implementer（sonnet）：198ced5 RED（改寫授權的 B6 it，1 紅／7 綠，`git show 198ced5^:` 複驗 currentRound 取本機）→ 7240149 GREEN → 7f71d4e 自補 guard（同一改寫 it 內追加「名單失敗而回合成功」斷言）→ da384b6 tasks（REFACTOR skipped）。前端全套 100 檔／985 綠，lint 0／3。
     Stage 1（sonnet）**PASS**；Stage 2（opus，26 條變異：23 紅、3 等價對照綠、無非等價存活；RED 重現 1 failed）**PASS**，並實測 7f71d4e 確為加強（舊測試下 M6／M7 存活）。
     非阻擋（列後續，本 change 不改）：回合讀取失敗共用 `backupFetchFailed` 文案「無法取得雲端的參賽者名單…」語意不準；匯出 JSON 按鈕無 pending 狀態（B6 既有，兩條 GET 稍放大）；無 E2E 斷言下載 JSON 的 currentRound 來自雲端（spec 只要求 unit）。**下一步**：派 §10 Implementer（sonnet）。
+26. （apply §10 進度，2026-10-24）Implementer（sonnet）：232face RED（6 條中紅 4、先綠 2＝回合還原與重置清除，標 regression guard；`git show 232face^:` 查無此檔）→ fa6fd34 GREEN（page、stats page、CourtCard、MatchStage）→ 2049558／85ffd6e 自補 guard → fe82cff tasks（10.3 skipped）。
+    偏離：`CourtCard` 以可選 prop `remoteNavigate`（`MatchStage` 轉傳、頁面以 `router.push` 提供）取代直接 `useRouter`，因既有 CourtCard 單元測試無 router context；`MatchStage.tsx` 不在 proposal Impact 清單（+4 行純轉傳，Stage 1 判定為清單遺漏而非 scope creep）。
+    **coordinator 裁定（授權）**：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待逐人 PUT 而必紅，改為等待送出比分 POST ok 並加嚴「送出期間無參賽者 PUT」，名稱與 2 升 2 降斷言不動；tasks 檔頭第五個例外、test-plan 一併更正（e04ef43、4171aaa）。Stage 2 以 RO1／RO3 證實新等待與新斷言皆有作用。
+    Stage 1（sonnet）**PASS**。Stage 2（opus，38 條：23 紅、6 等價、2 非阻擋）**FAIL**，實作無 bug，7 條非等價存活需補 E2E guard（只動 `round-sync.spec.ts`）：P18 頁面未驗傳入 `reloadRemotePlayers`、P20 頁面未驗傳入 `updatePlayer`（休息次數）、P23 回合 loading 時未以 Notice 取代內容、C2 分槽 PUT 409 時仍導向（繼續計分）、C3／C4／C7 分槽 PUT 失敗時的錯誤文案與不導向。
+    非阻擋（交 §11／Final）：P13 loading／load-failed 優先序、C8 連點防護（冪等）；頁面與 hook 的名單就緒為雙重守衛，承重的是依賴陣列；CourtCard 雲端分支遇 unauthorized 不呼叫 onUnauthorized；修飾鍵點擊被 `preventDefault` 吃掉；`remoteNavigate` 可改必填判別型 prop。
+    **下一步**：§10 補件（sonnet）→ Stage 2 複審 → §11。
