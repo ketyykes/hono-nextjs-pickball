@@ -78,7 +78,6 @@ const SAMPLES: Record<string, Sample> = {
 		path: "/api/matchmaker/players/import",
 		body: { players: [makePlayer("imported-1")] },
 	},
-	"POST /api/matchmaker/reset": { method: "POST", path: "/api/matchmaker/reset" },
 	"GET /api/matchmaker/round": { method: "GET", path: "/api/matchmaker/round" },
 	"PUT /api/matchmaker/round": {
 		method: "PUT",
@@ -97,6 +96,8 @@ const SAMPLES: Record<string, Sample> = {
 		path: "/api/matchmaker/round/matches/m1/score",
 		body: { scoreA: "11", scoreB: "7", roundVersion: 1 },
 	},
+	// reset 會清空整個使用者的資料，排在最後：守衛被整條拿掉時，前面的 PUT／score 快照斷言才能先獨立轉紅
+	"POST /api/matchmaker/reset": { method: "POST", path: "/api/matchmaker/reset" },
 };
 
 function listUserDataRouteKeys(): string[] {
@@ -185,6 +186,8 @@ describe("使用者資料請求的預期帳號守衛", () => {
 			"本人帳號加尾碼（防止 startsWith）": `${idB}x`,
 			"本人帳號的前綴（防止反向 startsWith）": idB.slice(0, -1),
 			多值串接: `${idB},${idA}`,
+			// 前後空白與 tab 會被 Fetch Headers 正規化，無法用來測 trim；VT 不會被正規化，所以用它擋「trim 後比較」的實作
+			"本人帳號加 VT（防止 trim）": `${idB}\u000b`,
 		};
 
 		for (const [routeKey, sample] of Object.entries(SAMPLES)) {
