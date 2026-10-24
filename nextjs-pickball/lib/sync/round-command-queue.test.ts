@@ -3,6 +3,7 @@ import type { SubmitScoreResponse } from "@pickball/core/api/round";
 import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { Player } from "@pickball/core/matchmaker/types";
 import type { SaverEvent } from "./latest-wins-saver";
+import type { putRemoteRound, submitRemoteScore } from "./round-api";
 import {
 	createRoundCommandQueue,
 	type RoundCommand,

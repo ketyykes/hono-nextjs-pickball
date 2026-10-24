@@ -51,6 +51,11 @@ import type { GenerateRoundInput, UseRoundStoreResult } from "@/hooks/useRoundSt
 export interface UseRemoteRoundStoreOptions {
 	/** false 時不發任何請求，且對外狀態恆為 local。 */
 	enabled: boolean;
+	/**
+	 * 目前登入的帳號。換帳號即結束舊世代（丟棄命令佇列與在途結果）並重新載入；
+	 * 為 null 時視同停用，避免以不明帳號送出請求。
+	 */
+	userId: string | null;
 	readonly players: readonly Player[];
 	updatePlayer: (id: string, patch: UpdatePlayerPatch) => void;
 	applyRemotePlayers: (items: { data: Player; version: number }[]) => void;
@@ -73,17 +78,21 @@ interface RemoteState {
 	round: Round | null;
 	slots: SlotRecord;
 	status: SyncStatus;
+	/** 目前狀態屬於哪個帳號；render 時與 userId 不同代表 effect 還沒換世代（design Decision 7）。 */
+	owner: string | null;
 }
 
 type RemoteAction =
-	| { type: "LOAD_START" }
+	| { type: "LOAD_START"; owner: string }
 	| { type: "LOADED"; round: Round | null; slots: SlotRecord; afterConflict: boolean }
 	| { type: "LOAD_FAILED" }
 	| { type: "SET_ROUND"; round: Round | null }
 	| { type: "SET_SLOTS"; slots: SlotRecord }
 	| { type: "SAVER"; event: SaverEvent };
 
-const INITIAL_STATE: RemoteState = { round: null, slots: {}, status: "loading" };
+const INITIAL_STATE: RemoteState = { round: null, slots: {}, status: "loading", owner: null };
+// 換帳號的那一幀交給畫面的內容：模組常數，避免每次 render 產生新物件
+const NO_SLOTS: SlotRecord = {};
 const EMPTY_HISTORY: MatchHistoryEntry[] = [];
 
 // saver 事件到 SyncStatus 的映射。重送時的 saving 不覆蓋 retrying、conflict、rejected：
@@ -92,9 +101,10 @@ const EMPTY_HISTORY: MatchHistoryEntry[] = [];
 function remoteReducer(state: RemoteState, action: RemoteAction): RemoteState {
 	switch (action.type) {
 		case "LOAD_START":
-			return INITIAL_STATE;
+			return { ...INITIAL_STATE, owner: action.owner };
 		case "LOADED":
 			return {
+				...state,
 				round: action.round,
 				slots: action.slots,
 				status: action.afterConflict ? "conflict" : "synced",
@@ -178,6 +188,7 @@ interface Controller {
  */
 export function useRemoteRoundStore({
 	enabled,
+	userId,
 	players,
 	updatePlayer,
 	applyRemotePlayers,
@@ -186,6 +197,9 @@ export function useRemoteRoundStore({
 	rosterSyncStatus,
 }: UseRemoteRoundStoreOptions): UseRemoteRoundStoreResult {
 	const [state, dispatch] = useReducer(remoteReducer, INITIAL_STATE);
+	const active = enabled && userId !== null;
+	// 換帳號的那一次 render：舊世代的資料不得交給畫面，所有操作也不送出
+	const mismatched = active && state.owner !== userId;
 
 	// 操作要用「目前」的回合與名單同步算出結果，不能等 render 之後才讀到 state
 	const roundRef = useRef<Round | null>(null);
@@ -213,9 +227,12 @@ export function useRemoteRoundStore({
 	}, []);
 
 	useEffect(() => {
-		if (!enabled) return;
-		// StrictMode 與 enabled 切換都會重跑本 effect：舊一輪在途的 GET 以 cancelled 忽略，
-		// 舊一輪的佇列於 cleanup 釋放
+		if (!enabled || userId === null) return;
+		// 世代內的每個請求（載入、回合 PUT、送出比分、衝突重載）都用這個帳號，不在送出當下改讀其他來源：
+		// 否則舊世代的待送命令可能帶著新帳號的標頭通過伺服器守衛
+		const expectedUserId = userId;
+		// StrictMode、enabled 與 userId 切換都會重跑本 effect：舊一輪在途的 GET 以 cancelled 忽略，
+		// 舊一輪的佇列於 cleanup 釋放（佇列 dispose 後在途結果一律忽略，因此也不會呼叫跨 store 的 port）
 		let cancelled = false;
 		let stopped = false;
 		let reloading = false;
@@ -227,7 +244,7 @@ export function useRemoteRoundStore({
 
 		readyRef.current = false;
 		roundRef.current = null;
-		dispatch({ type: "LOAD_START" });
+		dispatch({ type: "LOAD_START", owner: expectedUserId });
 
 		function updateReady(): void {
 			readyRef.current = phase === "ready" && !stopped && !reloading;
@@ -304,7 +321,10 @@ export function useRemoteRoundStore({
 		}
 
 		async function load(afterConflict: boolean): Promise<void> {
-			const [roundResult, slotsResult] = await Promise.all([fetchRemoteRound(), fetchRemoteSlots()]);
+			const [roundResult, slotsResult] = await Promise.all([
+				fetchRemoteRound(expectedUserId),
+				fetchRemoteSlots(expectedUserId),
+			]);
 			if (cancelled) return;
 			if (roundResult.kind === "unauthorized" || slotsResult.kind === "unauthorized") {
 				handleUnauthorized();
@@ -331,8 +351,9 @@ export function useRemoteRoundStore({
 			queue = createRoundCommandQueue({
 				initial: { round: loadedRound, version: roundResult.value.version },
 				getPlayers: () => playersRef.current,
-				putRound: putRemoteRound,
-				submitScore: submitRemoteScore,
+				putRound: (round, version) => putRemoteRound(expectedUserId, round, version),
+				submitScore: (matchId, scoreA, scoreB, roundVersion) =>
+					submitRemoteScore(expectedUserId, matchId, scoreA, scoreB, roundVersion),
 				onEvent: handleEvent,
 				onConfirmed: handleConfirmed,
 				onSubmitted: handleSubmitted,
@@ -363,10 +384,10 @@ export function useRemoteRoundStore({
 			queue?.dispose();
 			controllerRef.current = null;
 		};
-	}, [enabled, showRound]);
+	}, [enabled, userId, showRound]);
 
 	function notReady(): boolean {
-		return controllerRef.current === null || !readyRef.current;
+		return mismatched || controllerRef.current === null || !readyRef.current;
 	}
 
 	// 回合變更操作的共同尾段：樂觀更新畫面，並把「對回合套用此操作」的命令排入佇列
@@ -425,7 +446,7 @@ export function useRemoteRoundStore({
 
 	function submitScore(matchId: string, rawScoreA: string, rawScoreB: string): SubmitScoreResult {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) {
+		if (mismatched || controller === null || !readyRef.current) {
 			return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: NOT_READY_MESSAGE };
 		}
 		// 名單未就緒時以空名單預測會回 scoring-failed 並擋下送出（design Open Questions 第 7 點）
@@ -536,8 +557,20 @@ export function useRemoteRoundStore({
 		return result;
 	}
 
+	let round: Round | null = null;
+	let syncStatus: SyncStatus = "local";
+	let remoteMatchSlots: SlotRecord | null = null;
+	if (active && mismatched) {
+		syncStatus = "loading";
+		remoteMatchSlots = NO_SLOTS;
+	} else if (active) {
+		round = state.round;
+		syncStatus = state.status;
+		remoteMatchSlots = state.slots;
+	}
+
 	return {
-		round: enabled ? state.round : null,
+		round,
 		history: EMPTY_HISTORY,
 		droppedCount: 0,
 		generateRound,
@@ -547,7 +580,7 @@ export function useRemoteRoundStore({
 		setTimerDuration,
 		startTimer,
 		swapMatchPlayer,
-		syncStatus: enabled ? state.status : "local",
-		remoteMatchSlots: enabled ? state.slots : null,
+		syncStatus,
+		remoteMatchSlots,
 	};
 }

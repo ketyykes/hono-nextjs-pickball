@@ -157,6 +157,7 @@ function renderRound(initial: Partial<RenderProps> = {}) {
 		(props: RenderProps) => {
 			const value = useRemoteRoundStore({
 				enabled: props.enabled,
+				userId: "user-a",
 				players: props.players,
 				rosterSyncStatus: props.rosterSyncStatus,
 				updatePlayer,

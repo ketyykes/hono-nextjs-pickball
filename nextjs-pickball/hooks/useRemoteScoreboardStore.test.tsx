@@ -57,6 +57,7 @@ function renderRemote(options: { enabled: boolean; onUnauthorized?: () => void; 
 	const rendered = renderHook(() => {
 		const value = useRemoteScoreboardStore({
 			enabled: options.enabled,
+			userId: "user-a",
 			onUnauthorized,
 		});
 		statusLog.push(value[2]);
@@ -158,7 +159,7 @@ describe("useRemoteScoreboardStore", () => {
 		enqueue(200, { data: stateWithScores(3, 1), version: 2 });
 		enqueue(200, { data: null, version: 0 });
 		const reused = renderHook(
-			({ enabled }) => useRemoteScoreboardStore({ enabled, onUnauthorized: vi.fn() }),
+			({ enabled }) => useRemoteScoreboardStore({ enabled, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true } },
 		);
 		await waitFor(() => expect(reused.result.current[0].scores).toEqual({ us: 3, them: 1 }));

@@ -98,7 +98,11 @@ function renderRemote(options: {
 	const statusLog: SyncStatus[] = [];
 	const rendered = renderHook(
 		() => {
-			const value = useRemoteRosterStore({ enabled: options.enabled, onUnauthorized });
+			const value = useRemoteRosterStore({
+				enabled: options.enabled,
+				userId: "user-a",
+				onUnauthorized,
+			});
 			statusLog.push(value.syncStatus);
 			return value;
 		},
@@ -146,7 +150,7 @@ function renderAccount(initialProps: AccountProps) {
 	return { ...rendered, renders };
 }
 
-const NEW_PLAYER_INPUT = { name: "新球員", gender: "male" } as const;
+const NEW_PLAYER_INPUT = { name: "新球員", gender: "male", rating: 3 } as const;
 
 beforeEach(() => {
 	queue = [];
@@ -788,7 +792,7 @@ describe("useRemoteRosterStore 補充守護", () => {
 		enqueue(200, listBody([[makePlayer("p1"), 3]]));
 		enqueue(200, listBody([]));
 		const rendered = renderHook(
-			({ enabled }) => useRemoteRosterStore({ enabled, onUnauthorized: vi.fn() }),
+			({ enabled }) => useRemoteRosterStore({ enabled, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true } },
 		);
 		await waitFor(() => expect(rendered.result.current.players).toHaveLength(1));
@@ -821,7 +825,7 @@ describe("useRemoteRosterStore 補充守護", () => {
 		fetchMock.mockClear();
 		enqueue(200, listBody([[makePlayer("p1"), 3]]));
 		const rendered = renderHook(
-			({ enabled }) => useRemoteRosterStore({ enabled, onUnauthorized: vi.fn() }),
+			({ enabled }) => useRemoteRosterStore({ enabled, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true } },
 		);
 		await waitFor(() => expect(rendered.result.current.syncStatus).toBe("synced"));

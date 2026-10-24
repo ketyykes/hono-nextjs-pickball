@@ -58,6 +58,7 @@ function renderSlot(options: { enabled: boolean; onUnauthorized?: () => void }) 
 		const value = useRemoteMatchSlotStore({
 			enabled: options.enabled,
 			matchId: "m1",
+			userId: "user-a",
 			onUnauthorized,
 		});
 		bindingLog.push(value[2]);
@@ -351,7 +352,7 @@ describe("useRemoteMatchSlotStore", () => {
 		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
 		const rendered = renderHook(
 			({ enabled, matchId }) =>
-				useRemoteMatchSlotStore({ enabled, matchId, onUnauthorized: vi.fn() }),
+				useRemoteMatchSlotStore({ enabled, matchId, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true, matchId: "m1" } },
 		);
 		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
@@ -395,7 +396,7 @@ describe("useRemoteMatchSlotStore", () => {
 		const second = vi.fn();
 		const rendered = renderHook(
 			({ onUnauthorized }) =>
-				useRemoteMatchSlotStore({ enabled: true, matchId: "m1", onUnauthorized }),
+				useRemoteMatchSlotStore({ enabled: true, matchId: "m1", userId: "user-a", onUnauthorized }),
 			{ initialProps: { onUnauthorized: first } },
 		);
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -431,7 +432,7 @@ describe("useRemoteMatchSlotStore", () => {
 		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
 		const rendered = renderHook(
 			({ matchId }) =>
-				useRemoteMatchSlotStore({ enabled: true, matchId, onUnauthorized: vi.fn() }),
+				useRemoteMatchSlotStore({ enabled: true, matchId, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { matchId: "m1" } },
 		);
 		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
@@ -455,6 +456,7 @@ describe("useRemoteMatchSlotStore", () => {
 			const value = useRemoteMatchSlotStore({
 				enabled: true,
 				matchId: "m1",
+				userId: "user-a",
 				onUnauthorized: vi.fn(),
 			});
 			statusLog.push(value[3]);
