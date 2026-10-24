@@ -16,6 +16,7 @@ const SLOTS_API = "/api/matchmaker/slots";
 const SYNCED = '[data-sync-status="synced"]';
 const CONFLICT = '[data-sync-status="conflict"]';
 const LOAD_FAILED = '[data-sync-status="load-failed"]';
+const LOADING = '[data-sync-status="loading"]';
 const COURT_GRIDS = '[data-testid="match-stage-courts"] [data-testid$="-grid"]';
 
 test.use({ storageState: storageStatePath });
@@ -256,6 +257,7 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 			await pageB.goto(MATCHMAKER_PAGE);
 			await expect(pageB.locator(SYNCED)).toBeVisible();
 			await expect(pageB.locator(COURT_GRIDS)).toHaveCount(1);
+			const ratingsBeforeOnB = await readCourtRatings(pageB);
 
 			// A 先送出 11:5 並等雲端寫入完成
 			await submitScoreManually(page, matchId, "11", "5");
@@ -267,6 +269,8 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 			await expect(pageB.getByText("資料已在其他裝置更新，已重新載入最新資料")).toBeVisible();
 			await expect(pageB.locator(CONFLICT)).toBeVisible();
 			await expect(pageB.getByTestId(`court-${matchId}-score`)).toHaveText("11:5");
+			// 另一裝置送出比分時評分也已改變：衝突後要重新載入名單，B 才看得到新的強度
+			await expect.poll(() => readCourtRatings(pageB)).not.toEqual(ratingsBeforeOnB);
 		});
 	});
 
@@ -363,5 +367,87 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(court.getByText("計分中")).toBeVisible();
 		await expect(court.getByText("2:0")).toBeVisible();
 		await expect(page.getByText("本輪已開始計分，目標分數不可更改")).toBeVisible();
+
+		// 分槽已存在時再次進入：PUT v0 回 409 也要導向，且比分接續
+		const [conflictResponse] = await Promise.all([
+			page.waitForResponse((response) => isSlotPut(response)),
+			court.getByRole("link", { name: "繼續計分" }).click(),
+		]);
+		expect(conflictResponse.status()).toBe(409);
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
+	});
+
+	test("regression guard：產生對戰後休息者的休息次數寫入雲端名單", async ({ page }) => {
+		// 5 位參賽者、預設 1 場地單打：3 位休息，結算在回合 PUT 成功後才經 updatePlayer 套用
+		await seedCloudPlayers(page, 5);
+		await generateRound(page);
+		// 休息次數在結束上一輪（產生下一輪）時結算，所以再產生一輪
+		await Promise.all([
+			page.waitForResponse((response) => isRoundPut(response) && response.ok()),
+			page.getByRole("button", { name: "產生本輪對戰" }).click(),
+		]);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect
+			.poll(async () => {
+				const response = await page.request.get(PLAYERS_API);
+				const body = (await response.json()) as { items: { data: { restCount: number } }[] };
+				return body.items.reduce((sum, item) => sum + item.data.restCount, 0);
+			})
+			.toBeGreaterThan(0);
+	});
+
+	test("regression guard：雲端回合載入中時對戰頁以載入提示取代內容", async ({ page }) => {
+		let releaseGet: () => void = () => {};
+		const getGate = new Promise<void>((resolve) => {
+			releaseGet = resolve;
+		});
+		await page.route(`**${ROUND_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await getGate;
+			}
+			await route.continue();
+		});
+
+		await page.goto(MATCHMAKER_PAGE);
+		await expect(page.locator(LOADING)).toBeVisible();
+		await expect(page.getByText("正在載入雲端資料…")).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toHaveCount(0);
+
+		releaseGet();
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByRole("button", { name: "產生本輪對戰" })).toBeVisible();
+	});
+
+	test("regression guard：分槽建立失敗時不導向並提示，恢復後可再進入", async ({ page }) => {
+		await seedCloudPlayers(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+
+		const failHandler = async (route: Route) => {
+			if (route.request().method() === "PUT") {
+				await route.fulfill({ status: 500, body: "" });
+				return;
+			}
+			await route.continue();
+		};
+		await page.route(`**${SLOTS_API}/*`, failHandler);
+		const link = page.getByTestId(`court-${matchId}`).getByRole("link", { name: "進入計分板" });
+		await Promise.all([
+			page.waitForResponse((response) => isSlotPut(response) && response.status() === 500),
+			link.click(),
+		]);
+		await expect(page.getByText("無法建立計分板，請稍後再試")).toBeVisible();
+		await expect(
+			page.waitForRequest((request) => request.url().includes("/scoreboard?match="), { timeout: 1500 }),
+		).rejects.toThrow();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		// 失敗後不可卡在「進行中」：解除攔截後再按一次要能成功導向
+		await page.unroute(`**${SLOTS_API}/*`, failHandler);
+		await link.click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await expect(page.locator(SYNCED)).toBeVisible();
 	});
 });
