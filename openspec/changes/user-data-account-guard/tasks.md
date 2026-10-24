@@ -42,8 +42,8 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/errors.test.ts`「API_ERROR_CODES 恰為四個錯誤碼且值等於鍵名」、`test/api/headers.test.ts`「EXPECTED_USER_ID_HEADER 為 X-Expected-User-Id」。確認兩者皆紅並貼輸出
-- [ ] 2.2 GREEN（TDD）：`src/api/errors.ts` 加 `ACCOUNT_MISMATCH`；新增 `src/api/headers.ts`；`test/module-boundary.test.ts` 的 `CORE_MODULES` 加 `api/headers`（24 項）。
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/errors.test.ts`「API_ERROR_CODES 恰為四個錯誤碼且值等於鍵名」、`test/api/headers.test.ts`「EXPECTED_USER_ID_HEADER 為 X-Expected-User-Id」。確認兩者皆紅並貼輸出
+- [x] 2.2 GREEN（TDD）：`src/api/errors.ts` 加 `ACCOUNT_MISMATCH`；新增 `src/api/headers.ts`；`test/module-boundary.test.ts` 的 `CORE_MODULES` 加 `api/headers`（24 項）。
   驗收（指令）：核心全套綠、`pnpm --filter ./packages/pickball-core typecheck` exit 0
 
 ## 3. 後端：測試 helper 先帶標頭（設定層）
