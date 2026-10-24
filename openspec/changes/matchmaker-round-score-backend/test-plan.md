@@ -165,7 +165,7 @@
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| （既有，B6）`roster-api.test.ts`、`useRosterStore.test.tsx`、`useRemoteRosterStore.test.tsx`、`roster-sync.spec.ts` 的 it／test（含「登入時送出比分後評分寫入雲端名單」） | B6 Scenario | 原樣通過 | regression guard（送出比分的 E2E 觀察結果不變，機制改由後端） | unit |
+| （既有，B6）`roster-api.test.ts`、`useRosterStore.test.tsx`、`useRemoteRosterStore.test.tsx`、`roster-sync.spec.ts` 的 it／test | B6 Scenario | 原樣通過；**例外**「登入時送出比分後評分寫入雲端名單」的等待由逐人 PUT 改為送出比分 POST ok，並加斷言送出期間無參賽者 PUT（名稱與 2 升 2 降斷言不動；coordinator 於 apply §10 授權） | regression guard（送出比分的 E2E 觀察結果不變，機制改由後端；原規劃漏算該 test 等待逐人 PUT） | unit／e2e |
 | applyRemotePlayers 以回應取代參賽者與 version 且不送出請求 | 同名 | 無請求；rating 4.2；之後 PUT version 3 | 新 port；不存在 → 紅 | hook |
 | applyRemotePlayers 遇到該參賽者有待送或在途變更時視同衝突並整份重新載入 | 同名 | 不再送出；重新載入；conflict | 避免帶舊 version 覆蓋評分 | hook |
 | reloadRemotePlayers 停止佇列並以雲端名單取代 | 同名 | 新名單；synced | 回合衝突時的名單同步 | hook |

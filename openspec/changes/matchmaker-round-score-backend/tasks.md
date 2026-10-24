@@ -14,6 +14,7 @@
 > **訪客路徑零迴歸**：本機實作（`useLocalRoundStore` 本體、`useLocalScoreboardStore`、`useLocalRosterStore`、`round-storage.ts`、`match-slots.ts`、`scoreboard-binding.ts`、核心 `round.ts`／`rating.ts`／`history.ts`）一行不改；
 > 既有 it 的名稱與斷言一律不得修改，**唯一例外**為：`hooks/useScoreboardStore.test.tsx` 刪除 B5 的「已登入但帶 matchId 時仍走本機分槽且 syncStatus 為 local」；
 > `lib/matchmaker/storage.test.ts`、`hooks/useRemoteRosterStore.test.tsx`、`lib/matchmaker/remote-transfer.test.ts` 各改寫一個 B6 的 it（名稱與斷言依 delta spec）。
+> **第五個例外（coordinator 於 apply §10 授權，2026-10-24）**：`tests/e2e/user-data/roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」只把送出後的等待由逐人 PUT 改為等待送出比分 POST（`/api/matchmaker/round/matches/:matchId/score`）回應 ok，並加嚴一條「送出比分期間沒有任何 `PUT /api/matchmaker/players/:id`」；test 名稱與「2 升 2 降」斷言不動（delta `player-roster`「送出比分的評分寫回雲端名單」THEN：前端不逐人 PUT）。
 > 允許新增 it 的既有測試檔：`hooks/useRoundStore.test.tsx`（只新增 `vi.mock("@/hooks/useSession", ...)` 區塊與新 it）、`hooks/useScoreboardStore.test.tsx`、`hooks/useRemoteRosterStore.test.tsx`、
 > `hono-pickball/test/d1-schema.test.ts`、`hono-pickball/test/matchmaker-players.test.ts`、`packages/pickball-core/test/module-boundary.test.ts`（清單）。
 
@@ -203,7 +204,7 @@ Depends on: §9
   兩個 port 自 `useRosterStore` 傳入；所有 hooks 在 early return 前呼叫）、`app/matchmaker/stats/page.tsx`（傳入 port）、`components/matchmaker/CourtCard.tsx`（雲端模式 await PUT v0 再導向，本機分支不動）、
   `app/scoreboard/page.tsx`（若 §8 選擇器已涵蓋則不改）。10.1 全綠；不得以 `waitForTimeout` 取代狀態等待
   - fa6fd34：round-sync 6 條全綠；`app/scoreboard/page.tsx` 未改（§8 選擇器已涵蓋）。偏離：`CourtCard` 不直接用 `useRouter`（既有 CourtCard 單元測試無 router context，會拋錯），改為可選 prop `remoteNavigate`（`MatchStage` 轉傳，頁面以 `router.push` 提供）；未傳入即走原本機分支，一行未動。頁面同步狀態取名單與回合兩者中最需注意者（`mergeSyncStatus`）。
-  - 已知：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待 `PUT /api/matchmaker/players/*`，B7 後評分改由送出比分的 POST 寫入、不再逐人 PUT，該 test 在 `waitForResponse` 逾時（待裁定改寫，見交件說明）。
+  - 已知：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待 `PUT /api/matchmaker/players/*`，B7 後評分改由送出比分的 POST 寫入、不再逐人 PUT，該 test 在 `waitForResponse` 逾時。→ coordinator 授權改寫等待條件並加嚴（tasks 檔頭第五個例外），改寫 commit 見下一行。
 - [x] 10.3 REFACTOR：對戰頁本機與雲端分槽來源的分支是否可收斂成一個小函式；無壞味道則註記 skipped
   - skipped：分支只有 `remoteMatchSlots ?? matchSlots` 一行與回填 effect 內的早退區塊，收斂成函式需把 `submitScore`、`players`、`round` 全傳入，反而擴大面積並碰到本機分支。
 
