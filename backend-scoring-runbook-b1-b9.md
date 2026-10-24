@@ -15,11 +15,11 @@
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `a94a741`（B7 合併；archive 待做） |
+| `main` HEAD | `5cdf647`（B7 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併 `a94a741`；**下一棒 B7.5**（B7 archive 後 propose） |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；**下一棒 B7.5**（B7 archive 後 propose） |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -131,7 +131,7 @@ main@1e5e517
 | B4 | pickball-core-package | 抽出共用 schema＋純函式為 workspace 套件，前端改 import，行為零變更 | 中～大 | change/pickball-core-package | 已合併 `27f0a26`、archive `d9d9d80` |
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f`、archive `fca0b95` |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8`、archive `11a2dbf` |
-| B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741` |
+| B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
 | B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 未 propose；草稿在 `/tmp/acct-guard-draft/`（draft、spec-deltas、tasks-outline、decisions Q1～Q12 皆採建議值） |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
 | B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
@@ -595,7 +595,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
   `player-roster`「刪除參賽者」×2（原有／B6）。主 spec 不可直接改；B7～B9 若 MODIFIED 到這些 Requirement 就順手改名，否則 B9 後以一個小 change 統一改名。
   後續各棒 delta 的 Scenario 標題要加 Requirement 專屬前綴，避免再撞名。
 
-### B7 紀錄（2026-10-24，合併 `a94a741`；改 `backend-database`／`data-transfer`／`player-roster`／`round-lifecycle`／`scoreboard`／`user-data-sync` 等）
+### B7 紀錄（2026-10-24，合併 `a94a741`，archive `5cdf647` → `2026-10-24-matchmaker-round-score-backend`；改 `backend-database`／`data-transfer`／`player-roster`／`round-lifecycle`／`scoreboard`／`user-data-sync` 等）
 - 46 tasks；leader 三任（第一任 17h 迴圈重複交回、第二任電腦睡眠後 3.5h 無進展，皆 TaskStop 重派）。Final Code Review（opus）APPROVE WITH NITS、無必修；文件小問題 coordinator 修於 `03d2550`。
 - 測試：前端 100/985、後端 21/149、核心 4/11；lint 0/3；無新相依。E2E（coordinator 持鎖、load 3.9～6.1）713 passed／38 skipped／1 failed（`user-data` 27）。
 - **唯一失敗＝既有競態，非 B7 回歸**：webkit `quiz.spec.ts:49` 點 navbar「測驗」偶發不導覽。根因 `AccountEntry` loading 時不佔寬度（主 spec site-navbar 明定），
@@ -604,6 +604,8 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - coordinator 裁定：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」改等 `POST …/score` 並加「無逐人 PUT」斷言（tasks 例外清單第五個）。
 - 維持現狀／後續：OQ16 舊回合重排先得 400 而非 409；reset 後 version 從 1 起算的 ABA（G1 前評估）；rejected 時樂觀顯示不回滾；`updatedPlayers` 為空的 `sql.join` 防禦；
   CourtCard 遇 unauthorized 不 refresh；`seedAndSignIn` 兩份本地複本（B8／B9 新測試改用 `test/helpers/matchmaker-fixtures.ts`）。
+- **B7 archive 後 validate 失敗（各棒 §1 修）**：B8 `player-roster` MODIFIED「重置名單與二次確認」缺「resetLocalMatchProgress 只清除本次活動的進度」與「登入時重置名單前停止所有待送與重試中的變更」；
+  B9 `data-transfer` MODIFIED「登入時的資料工具頁」缺「登入時 JSON 還原停用」（同 B6 後，未新增）。
 - **交接給 B8～B9**：見 B7 design「交接給 B8～B9」與 hono-pickball/CLAUDE.md「後續 change 須知」三點。
 
 ## commit footer 慣例
