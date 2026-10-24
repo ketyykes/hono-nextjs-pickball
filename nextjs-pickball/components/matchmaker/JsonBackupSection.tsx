@@ -8,7 +8,7 @@ import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
 import { useSession } from "@/hooks/useSession";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
-import { buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
+import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
@@ -27,13 +27,21 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 // 不用字串比對 message 內容判斷類別。
 export function JsonBackupSection() {
 	const [message, setMessage] = useState<string | null>(null);
-	const isRemote = resolveStorageMode(useSession()) === "remote";
+	const session = useSession();
+	const isRemote = resolveStorageMode(session) === "remote";
+	// 以觸發當下畫面所見的帳號送出；帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 
 	async function handleRemoteExport() {
+		if (userId === null) {
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
 		const exportedAt = new Date().toISOString();
-		const result = await buildRemoteBackupSnapshot();
+		const result = await buildRemoteBackupSnapshot(userId);
 		if (!result.ok) {
 			setMessage(result.message);
+			if (result.unauthorized) void session.refresh();
 			return;
 		}
 		setMessage(null);
