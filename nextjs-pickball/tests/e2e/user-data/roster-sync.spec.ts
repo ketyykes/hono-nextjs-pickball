@@ -72,6 +72,11 @@ function isPlayerPut(response: Response) {
 	return response.url().includes(`${PLAYERS_API}/`) && response.request().method() === "PUT";
 }
 
+// B7 起登入時送出比分改為 POST /api/matchmaker/round/matches/:matchId/score，評分由後端在同一個 batch 內寫入
+function isScorePost(response: Response) {
+	return /\/api\/matchmaker\/round\/matches\/[^/]+\/score$/.test(new URL(response.url()).pathname) && response.request().method() === "POST";
+}
+
 // 開啟編輯 Dialog、改名並送出，只等 Dialog 關閉；本函式不等 PUT，
 // 呼叫端需自行以 waitForResponse（先註冊再觸發）與 synced 判斷同步完成
 async function renameFirstPlayer(page: Page, newName: string) {
@@ -231,18 +236,27 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 		await expect(page.getByLabel("第一隊比分").first()).toBeVisible();
 
-		// 逐場送出（雙打 1 場地即一場）。先等第一個 PUT 完成再等 synced：synced 要等全部參賽者
-		// 的儲存佇列清空才會出現，所以涵蓋四位參賽者的 PUT，不必逐一等
+		// 逐場送出（雙打 1 場地即一場）。B7 起評分由後端在送出比分的 batch 內寫入（delta player-roster
+		// 「送出比分的評分寫回雲端名單」：前端不逐人 PUT），所以等送出比分的 POST 完成再等 synced，
+		// 並記錄送出期間的參賽者 PUT，最後斷言一個都沒有
+		const playerPutUrls: string[] = [];
+		page.on("request", (request) => {
+			if (request.method() === "PUT" && request.url().includes(`${PLAYERS_API}/`)) {
+				playerPutUrls.push(request.url());
+			}
+		});
 		const matchCount = await page.getByLabel("第一隊比分").count();
 		for (let i = 0; i < matchCount; i++) {
 			const court = page.getByTestId("match-stage-courts").locator('[data-slot="card"]').nth(i);
 			await court.getByLabel("第一隊比分").fill("11");
 			await court.getByLabel("第二隊比分").fill("5");
-			const puts = page.waitForResponse((response) => isPlayerPut(response) && response.ok());
+			const scorePosted = page.waitForResponse((response) => isScorePost(response) && response.ok());
 			await court.getByRole("button", { name: "送出比分" }).click();
-			await puts;
+			await scorePosted;
 			await expect(page.locator(SYNCED)).toBeVisible();
 		}
+
+		expect(playerPutUrls, "送出比分期間不應逐人 PUT 參賽者").toEqual([]);
 
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();
