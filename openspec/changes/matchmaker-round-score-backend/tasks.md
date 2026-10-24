@@ -193,13 +193,19 @@ Depends on: §8
 
 Depends on: §9
 
-- [ ] 10.1 RED（E2E）：新增 `tests/e2e/user-data/round-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 6 個 test。
+- [x] 10.1 RED（E2E）：新增 `tests/e2e/user-data/round-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 6 個 test。
   以單檔執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/round-sync.spec.ts`（前後清殘留 dev server），貼出輸出：
   依賴頁面接線者應為紅；**已由 §7、§8 選擇器達成而先綠者逐一點名標 regression guard**
-- [ ] 10.2 GREEN（例外層：頁面與 I/O 樣板元件，以 10.1 驗收）：`app/matchmaker/page.tsx`（雲端模式以 `remoteMatchSlots` 回填與鎖定、不呼叫 `clearMatchSlots`、`SyncStatusNotice`／`data-sync-status`；
+  - 紅燈（232face，只含 spec 檔；`git show 232face^:nextjs-pickball/tests/e2e/user-data/round-sync.spec.ts` 不存在可複驗）：4 failed／2 passed。紅：「登入時經計分板完成的場次…」與「登入時場次計分板的進度…」（`waitForResponse` 逾時：場地卡未先 PUT 分槽）、「另一裝置先送出同一場比分時…」（頁面不顯示回合衝突文案）、「雲端回合載入失敗時對戰頁…」（頁面只看名單狀態，找不到錯誤文案）。
+  - 先綠（regression guard）：「登入後產生的回合在重新整理與另一個 context 中由雲端還原」「登入時重置名單後雲端回合與分槽一併清除」——選擇器 `useRoundStore` 在 §7、§8 已切換雲端，頁面不需接線即成立。
+  - GREEN 後以 mutation 發現 5 條缺口並補強（皆為 regression guard，補在 GREEN 之後：2049558、85ffd6e）：雲端回填不動本機分槽（sentinel）、回到對戰頁後「計分中」與目標分數鎖定、名單晚載入時回填仍會執行、評分在同一頁面即時顯示（`applyRemotePlayers`）、分槽 PUT 完成前不導向。
+- [x] 10.2 GREEN（例外層：頁面與 I/O 樣板元件，以 10.1 驗收）：`app/matchmaker/page.tsx`（雲端模式以 `remoteMatchSlots` 回填與鎖定、不呼叫 `clearMatchSlots`、`SyncStatusNotice`／`data-sync-status`；
   兩個 port 自 `useRosterStore` 傳入；所有 hooks 在 early return 前呼叫）、`app/matchmaker/stats/page.tsx`（傳入 port）、`components/matchmaker/CourtCard.tsx`（雲端模式 await PUT v0 再導向，本機分支不動）、
   `app/scoreboard/page.tsx`（若 §8 選擇器已涵蓋則不改）。10.1 全綠；不得以 `waitForTimeout` 取代狀態等待
-- [ ] 10.3 REFACTOR：對戰頁本機與雲端分槽來源的分支是否可收斂成一個小函式；無壞味道則註記 skipped
+  - fa6fd34：round-sync 6 條全綠；`app/scoreboard/page.tsx` 未改（§8 選擇器已涵蓋）。偏離：`CourtCard` 不直接用 `useRouter`（既有 CourtCard 單元測試無 router context，會拋錯），改為可選 prop `remoteNavigate`（`MatchStage` 轉傳，頁面以 `router.push` 提供）；未傳入即走原本機分支，一行未動。頁面同步狀態取名單與回合兩者中最需注意者（`mergeSyncStatus`）。
+  - 已知：既有 `roster-sync.spec.ts`「登入時送出比分後評分寫入雲端名單」等待 `PUT /api/matchmaker/players/*`，B7 後評分改由送出比分的 POST 寫入、不再逐人 PUT，該 test 在 `waitForResponse` 逾時（待裁定改寫，見交件說明）。
+- [x] 10.3 REFACTOR：對戰頁本機與雲端分槽來源的分支是否可收斂成一個小函式；無壞味道則註記 skipped
+  - skipped：分支只有 `remoteMatchSlots ?? matchSlots` 一行與回填 effect 內的早退區塊，收斂成函式需把 `submitScore`、`players`、`round` 全傳入，反而擴大面積並碰到本機分支。
 
 ## 11. 文件同步與總驗收
 
