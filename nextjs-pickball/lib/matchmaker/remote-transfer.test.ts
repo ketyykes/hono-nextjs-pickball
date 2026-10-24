@@ -235,13 +235,19 @@ describe("remote-transfer", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("雲端備份快照的參賽者取自雲端、回合與歷史取自本機", async () => {
-		const fetchMock = vi.fn().mockImplementation(async () => listResponse(CLOUD_PLAYERS));
+	it("雲端備份快照的參賽者與回合取自雲端、歷史取自本機", async () => {
+		const cloudRound = { ...makeRound(), roundNumber: 7 };
+		const localRound = makeRound();
+		const fetchMock = vi.fn().mockImplementation(async (path: string) => {
+			if (path === "/api/matchmaker/round") {
+				return new Response(JSON.stringify({ data: cloudRound, version: 3 }), { status: 200 });
+			}
+			return listResponse(CLOUD_PLAYERS);
+		});
 		vi.stubGlobal("fetch", fetchMock);
-		const round = makeRound();
 		const history = [makeHistoryEntry("m-1"), makeHistoryEntry("m-2"), makeHistoryEntry("m-3")];
 		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [makePlayer({ id: "guest" })] }));
-		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round }));
+		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round: localRound }));
 		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: history }));
 
 		const result = await buildRemoteBackupSnapshot();
@@ -249,10 +255,42 @@ describe("remote-transfer", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.snapshot.players).toEqual(CLOUD_PLAYERS);
-		expect(result.snapshot.currentRound).toEqual(round);
+		expect(result.snapshot.currentRound).toEqual(cloudRound);
+		expect(result.snapshot.currentRound).not.toEqual(localRound);
 		expect(result.snapshot.history).toEqual(history);
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock.mock.calls.every(([, init]) => init.method === "GET")).toBe(true);
+		expect(fetchMock.mock.calls.map(([path]) => path).sort()).toEqual([
+			"/api/matchmaker/players",
+			"/api/matchmaker/round",
+		]);
+
+		// 雲端沒有進行中的回合（data 為 null）時，currentRound 為 null，不可退回本機的回合
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation(async (path: string) => {
+				if (path === "/api/matchmaker/round") return new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
+				return listResponse(CLOUD_PLAYERS);
+			}),
+		);
+		const noRound = await buildRemoteBackupSnapshot();
+		expect(noRound.ok).toBe(true);
+		if (noRound.ok) expect(noRound.snapshot.currentRound).toBeNull();
+
+		// 回合讀取失敗（5xx、204 無內容、401）時回傳錯誤、不回傳快照，即使名單讀取成功
+		const roundFails = async (response: () => Response, expected: string) => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockImplementation(async (path: string) => {
+					if (path === "/api/matchmaker/round") return response();
+					return listResponse(CLOUD_PLAYERS);
+				}),
+			);
+			expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: expected });
+		};
+		await roundFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		await roundFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		await roundFails(() => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized);
 	});
 
 	it("雲端備份快照取得名單失敗時回傳錯誤、不產生快照", async () => {
