@@ -1,4 +1,5 @@
 import { env, exports } from "cloudflare:workers";
+import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { expect } from "vitest";
 import { buildTestAccountSeedSql } from "../../src/db/seed/test-account";
 
@@ -26,6 +27,19 @@ export async function userIdOf(email: string): Promise<string> {
 	return row.id;
 }
 
+// cookie → user id：讓請求 helper 能替每個成功路徑請求補上該 cookie 所屬使用者的預期帳號標頭，
+// 而不必在每個 it 內手動傳 id（it 本體因此零改動）。
+const userIdByCookie = new Map<string, string>();
+
+/** 依 cookie 回傳 `X-Expected-User-Id` 標頭；未經 signIn 的 cookie 回空物件（不帶標頭）。 */
+export function expectedUserHeader(cookie: string): Record<string, string> {
+	const userId = userIdByCookie.get(cookie);
+	if (userId === undefined) {
+		return {};
+	}
+	return { [EXPECTED_USER_ID_HEADER]: userId };
+}
+
 /** 登入並回傳可直接放進 Cookie header 的 name=value。 */
 export async function signIn(email: string): Promise<string> {
 	const res = await exports.default.fetch(
@@ -38,5 +52,7 @@ export async function signIn(email: string): Promise<string> {
 	expect(res.status).toBe(200);
 	const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0];
 	expect(cookie).toContain("better-auth.session_token=");
+	const body = (await res.json()) as { user: { id: string } };
+	userIdByCookie.set(cookie, body.user.id);
 	return cookie;
 }

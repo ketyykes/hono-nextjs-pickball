@@ -12,7 +12,7 @@ import {
 	seedRound,
 	seedSlot,
 } from "./helpers/matchmaker-fixtures";
-import { seedUser, signIn, userIdOf } from "./helpers/session";
+import { expectedUserHeader, seedUser, signIn, userIdOf } from "./helpers/session";
 
 // storage 以測試檔隔離，同檔 it 共用 D1，所以各 it 使用自己的 email。
 const origin = "http://localhost:3005";
@@ -49,6 +49,7 @@ function request(
 	const headers: Record<string, string> = { Origin: origin };
 	if (cookie) {
 		headers.Cookie = cookie;
+		Object.assign(headers, expectedUserHeader(cookie));
 	}
 	const init: RequestInit = { method, headers };
 	if (body !== undefined) {
@@ -103,6 +104,7 @@ function appRequestInit(cookie: string | undefined, endpoint: (typeof endpoints)
 	const headers: Record<string, string> = { Origin: origin };
 	if (cookie) {
 		headers.Cookie = cookie;
+		Object.assign(headers, expectedUserHeader(cookie));
 	}
 	const init: RequestInit = { method: endpoint.method, headers };
 	if (endpoint.body !== undefined) {
@@ -430,7 +432,7 @@ describe("/api/matchmaker 名單端點", () => {
 				"/api/matchmaker/players/import",
 				{
 					method: "POST",
-					headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
+					headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json", ...expectedUserHeader(cookie) },
 					body: JSON.stringify({ players: [makePlayer("p1")] }),
 				},
 				{ ...env, DB: batchFailingDb },
@@ -461,7 +463,7 @@ describe("/api/matchmaker 名單端點", () => {
 				"/api/matchmaker/players/import",
 				{
 					method: "POST",
-					headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
+					headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json", ...expectedUserHeader(cookie) },
 					body: JSON.stringify({ players: [makePlayer("p1")] }),
 				},
 				{ ...env, DB: batchFailingDb },

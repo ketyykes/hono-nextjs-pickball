@@ -3,7 +3,7 @@ import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
-import { seedUser, signIn, userIdOf } from "./helpers/session";
+import { expectedUserHeader, seedUser, signIn, userIdOf } from "./helpers/session";
 
 const origin = "http://localhost:3005";
 const url = `${origin}/api/scoreboard/current`;
@@ -14,14 +14,14 @@ function scoreState(us: number, them: number): ScoreboardState {
 }
 
 function getCurrent(cookie: string): Promise<Response> {
-	return exports.default.fetch(new Request(url, { headers: { Cookie: cookie } }));
+	return exports.default.fetch(new Request(url, { headers: { Cookie: cookie, ...expectedUserHeader(cookie) } }));
 }
 
 function putCurrent(cookie: string, body: unknown, contentType = "application/json"): Promise<Response> {
 	return exports.default.fetch(
 		new Request(url, {
 			method: "PUT",
-			headers: { Cookie: cookie, "Content-Type": contentType, Origin: origin },
+			headers: { Cookie: cookie, "Content-Type": contentType, Origin: origin, ...expectedUserHeader(cookie) },
 			body: typeof body === "string" ? body : JSON.stringify(body),
 		}),
 	);
@@ -194,14 +194,14 @@ describe("/api/scoreboard/current", () => {
 		expect(putA.status).toBe(200);
 		// GET 同樣不能被 query 的 userId 帶到別人的資料
 		const getWithQuery = await exports.default.fetch(
-			new Request(`${url}?userId=${idA}`, { headers: { Cookie: cookieB } }),
+			new Request(`${url}?userId=${idA}`, { headers: { Cookie: cookieB, ...expectedUserHeader(cookieB) } }),
 		);
 		expect(await getWithQuery.json()).toEqual({ data: null, version: 0 });
 
 		const res = await exports.default.fetch(
 			new Request(`${url}?userId=${idA}`, {
 				method: "PUT",
-				headers: { Cookie: cookieB, "Content-Type": "application/json", Origin: origin },
+				headers: { Cookie: cookieB, "Content-Type": "application/json", Origin: origin, ...expectedUserHeader(cookieB) },
 				body: JSON.stringify({ data: scoreState(2, 2), version: 0, userId: idA }),
 			}),
 		);

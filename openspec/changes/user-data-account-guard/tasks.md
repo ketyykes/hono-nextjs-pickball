@@ -50,10 +50,12 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 設定層（tests helper）：`test/helpers/session.ts` 的 `signIn` 記錄 cookie → user id 並匯出 `expectedUserHeader(cookie)`（design Decision 10；取得 user id 的方式依 1.3 結果）；
+- [x] 3.1 設定層（tests helper）：`test/helpers/session.ts` 的 `signIn` 記錄 cookie → user id 並匯出 `expectedUserHeader(cookie)`（design Decision 10；取得 user id 的方式依 1.3 結果）；
   `test/helpers/matchmaker-fixtures.ts` 的 `request()`／`appRequestInit()` 有 cookie 時自動帶 `X-Expected-User-Id`（標頭名取自 `EXPECTED_USER_ID_HEADER`）；
   `scoreboard-current.test.ts`、`matchmaker-players.test.ts` 的本地 helper 與 1.2 盤點出的 inline 請求補標頭。**此時守衛尚未存在，後端全套必須照綠**（證明只是加標頭、未改行為）
-- [ ] 3.2 驗收（指令）：後端全套通過數與 1.1 baseline 相同；`pnpm --filter ./hono-pickball typecheck` exit 0；`git diff main -- hono-pickball/test` 只見標頭與 helper 變更（C10 後端部分）
+  紀錄：設定層、無 RED。守衛未上線時後端全套 21 檔／149 it 全綠（與 baseline 相同）。mutation：暫時 probe 測試下，signIn 記錯 id 轉紅、`appRequestInit` 拿掉標頭轉紅；僅拿掉 `request()` 的標頭無 it 可感知（此時無 it 可感知，將由 §5 守衛上線後的全套驗證）；等價變異維持綠。
+- [x] 3.2 驗收（指令）：後端全套通過數與 1.1 baseline 相同；`pnpm --filter ./hono-pickball typecheck` exit 0；`git diff main -- hono-pickball/test` 只見標頭與 helper 變更（C10 後端部分）
+  紀錄：全套 21 檔／149 it 通過；hono-pickball typecheck 與 `pnpm -r exec tsc --noEmit` exit 0；`git diff df48f1f -- hono-pickball/test` 僅見標頭與 helper 變更。
 
 ## 4. 衍生第二帳號、E2E 夾具與換帳號 E2E（驗收型 RED）
 
