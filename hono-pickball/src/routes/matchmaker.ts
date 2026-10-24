@@ -6,6 +6,7 @@ import { PlayerSchema } from "@pickball/core/matchmaker/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { localAuth } from "../auth/local-auth-middleware";
+import { requireExpectedUser } from "../auth/require-expected-user";
 import { requireSession, type SessionAppEnv } from "../auth/require-session";
 import { getDb } from "../db/client";
 import { invalidBodyHook, userDataOnError } from "../http/invalid-body";
@@ -23,8 +24,8 @@ import { getSlot, listSlots, putSlot } from "../matchmaker/slots-repository";
 const putBodySchema = versionedWriteSchema(PlayerSchema);
 
 export const matchmakerRoutes = new Hono<SessionAppEnv>()
-	// 整個 sub-app 一律先過停用閘門與 session 驗證，新增端點時不可能漏掛授權
-	.use("*", localAuth, requireSession)
+	// 整個 sub-app 一律先過停用閘門、session 與預期帳號驗證，新增端點時不可能漏掛授權
+	.use("*", localAuth, requireSession, requireExpectedUser)
 	.onError(userDataOnError)
 	.get("/players", async (c) => {
 		const items = await listPlayers(getDb(c.env), c.var.user.id);
