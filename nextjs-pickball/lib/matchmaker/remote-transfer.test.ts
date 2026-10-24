@@ -291,6 +291,23 @@ describe("remote-transfer", () => {
 		await roundFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
 		await roundFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
 		await roundFails(() => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized);
+
+		// 名單讀取失敗而回合讀取成功時同樣不回傳快照（兩條讀取各自獨立判斷，不能互相掩護）
+		const playersFails = async (response: () => Response, expected: string) => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockImplementation(async (path: string) => {
+					if (path === "/api/matchmaker/round") {
+						return new Response(JSON.stringify({ data: cloudRound, version: 3 }), { status: 200 });
+					}
+					return response();
+				}),
+			);
+			expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: expected });
+		};
+		await playersFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		await playersFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		await playersFails(() => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized);
 	});
 
 	it("雲端備份快照取得名單失敗時回傳錯誤、不產生快照", async () => {
