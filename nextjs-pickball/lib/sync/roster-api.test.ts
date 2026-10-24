@@ -101,4 +101,20 @@ describe("roster-api", () => {
 		await expect(deleteRemotePlayer("p-1")).resolves.toBe(result);
 		await expect(importRemotePlayers([makePlayer("p-1")])).resolves.toBe(result);
 	});
+
+	it("包裝把 expectedUserId 交給 requestJson", async () => {
+		const player = makePlayer("p-1");
+
+		await fetchRemotePlayers("user-a");
+		await putRemotePlayer("user-a", player, 3);
+		await deleteRemotePlayer("user-a", "p-1");
+		await importRemotePlayers("user-a", [player]);
+		await resetRemoteMatchmaker("user-a");
+
+		const calls = vi.mocked(requestJson).mock.calls;
+		expect(calls).toHaveLength(5);
+		for (const call of calls) {
+			expect(call[2].expectedUserId).toBe("user-a");
+		}
+	});
 });

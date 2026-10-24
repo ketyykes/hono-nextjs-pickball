@@ -106,4 +106,19 @@ describe("round-api", () => {
 		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validSlot, version: 1 }).success).toBe(true);
 		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validRound, version: 1 }).success).toBe(false);
 	});
+
+	it("包裝把 expectedUserId 交給 requestJson", async () => {
+		await fetchRemoteRound("user-a");
+		await putRemoteRound("user-a", ROUND, 3);
+		await fetchRemoteSlots("user-a");
+		await fetchRemoteSlot("user-a", "m 1");
+		await putRemoteSlot("user-a", "m 1", SLOT, 0);
+		await submitRemoteScore("user-a", "m 1", "11", "7", 4);
+
+		const calls = vi.mocked(requestJson).mock.calls;
+		expect(calls).toHaveLength(6);
+		for (const call of calls) {
+			expect(call[2].expectedUserId).toBe("user-a");
+		}
+	});
 });
