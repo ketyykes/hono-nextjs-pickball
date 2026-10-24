@@ -186,6 +186,11 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		// 11 分制下我方連贏 11 球（side-out：對方全程未曾發球）後出現結束對話框
 		await scoreUs(page, 11);
 		await page.getByRole("button", { name: "關閉" }).click();
+		// 本機分槽是訪客時期的資料：雲端模式的回填不得動它（分槽由後端送出比分的 batch 刪除）
+		await page.evaluate(
+			({ key, id }) => window.localStorage.setItem(key, JSON.stringify({ [id]: { sentinel: true } })),
+			{ key: MATCH_SLOTS_KEY, id: matchId },
+		);
 		await Promise.all([
 			page.waitForResponse((response) => isScorePost(response) && response.ok()),
 			page.getByRole("link", { name: "返回對戰" }).click(),
@@ -197,6 +202,8 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
 		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
 		await expect(page.locator(SYNCED)).toBeVisible();
+
+		expect(await readLocal(page, MATCH_SLOTS_KEY)).toContain("sentinel");
 
 		const slotsResponse = await page.request.get(SLOTS_API);
 		expect(slotsResponse.ok()).toBe(true);
@@ -292,5 +299,14 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(page.locator(SYNCED)).toBeVisible();
 		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
 		expect(await readLocal(page, MATCH_SLOTS_KEY)).toBeNull();
+
+		// 回到對戰頁：計分中的標示與目標分數鎖定都以雲端分槽為準
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		const court = page.getByTestId(`court-${matchId}`);
+		await expect(court.getByText("計分中")).toBeVisible();
+		await expect(court.getByText("2:0")).toBeVisible();
+		await expect(page.getByText("本輪已開始計分，目標分數不可更改")).toBeVisible();
 	});
 });
