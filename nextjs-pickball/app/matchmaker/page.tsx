@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useState } from "react";
+import { useRouter } from "next/navigation";
 import { EmptyStage } from "@/components/matchmaker/EmptyStage";
 import { ExportActions } from "@/components/matchmaker/ExportActions";
 import { MatchStage } from "@/components/matchmaker/MatchStage";
@@ -12,6 +13,7 @@ import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
+import type { SyncStatus } from "@/lib/sync/sync-status";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
 import { jpgExportFileName } from "@/lib/matchmaker/export-filename";
@@ -30,15 +32,58 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 // （這個值本來就用不到，不會有測試比對它）。中性字串讓「這是佔位不是真檔名」一望即知。
 const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 
+// 名單與回合各有自己的同步狀態，頁面只顯示一個：取最需要使用者注意的那個。
+// local 排在最後，兩者皆為 local（訪客）時才會是 local。
+const SYNC_STATUS_PRIORITY: readonly SyncStatus[] = [
+	"load-failed",
+	"loading",
+	"rejected",
+	"conflict",
+	"retrying",
+	"saving",
+	"synced",
+	"local",
+];
+
+function mergeSyncStatus(first: SyncStatus, second: SyncStatus): SyncStatus {
+	const found = SYNC_STATUS_PRIORITY.find((status) => status === first || status === second);
+	return found ?? "local";
+}
+
 // 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點
 // （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
-	const { players, updatePlayer, syncStatus } = useRosterStore();
-	const { round, generateRound, resetIncompleteMatches, submitScore, setTargetScore, setTimerDuration, startTimer, swapMatchPlayer } = useRoundStore({
+	const router = useRouter();
+	const {
 		players,
 		updatePlayer,
+		syncStatus: rosterSyncStatus,
+		applyRemotePlayers,
+		reloadRemotePlayers,
+	} = useRosterStore();
+	// 雲端模式下評分由後端權威寫入：applyRemotePlayers 漏傳會使評分靜默不更新
+	const {
+		round,
+		generateRound,
+		resetIncompleteMatches,
+		submitScore,
+		setTargetScore,
+		setTimerDuration,
+		startTimer,
+		swapMatchPlayer,
+		syncStatus: roundSyncStatus,
+		remoteMatchSlots,
+	} = useRoundStore({
+		players,
+		updatePlayer,
+		applyRemotePlayers,
+		reloadRemotePlayers,
+		rosterSyncStatus,
 	});
+	const syncStatus = mergeSyncStatus(rosterSyncStatus, roundSyncStatus);
+	// 名單載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
+	const isRosterReady = rosterSyncStatus !== "loading" && rosterSyncStatus !== "load-failed";
 
 	const [settings, setSettings] = useState<RoundSettings>(() => createRoundSettings());
 	const [roundError, setRoundError] = useState<string | null>(null);
@@ -66,6 +111,19 @@ export default function MatchmakerPage() {
 	useEffect(() => {
 		if (round === null) return;
 
+		// 雲端模式：分槽來源為 remoteMatchSlots，送出走同一個 submitScore 入口。
+		// 不呼叫 clearMatchSlots——後端已在送出比分的 batch 內刪除該分槽。
+		// submitScore 回 scoring-failed 可能只是名單未就緒或同場正在送出，不當成永久失敗：
+		// 下一次 round／remoteMatchSlots／名單就緒變動時本 effect 會重跑。
+		if (remoteMatchSlots !== null) {
+			if (!isRosterReady) return;
+			const [firstRemote] = collectFinishedSubmissions(round, remoteMatchSlots);
+			if (firstRemote === undefined) return;
+			const remoteInput = toSubmitScoreInput(firstRemote, { round, players, now: new Date().toISOString() });
+			submitScore(remoteInput.matchId, remoteInput.rawScoreA, remoteInput.rawScoreB);
+			return;
+		}
+
 		const { slots } = readMatchSlots();
 		const finished = collectFinishedSubmissions(round, slots);
 		if (finished.length === 0) {
@@ -82,12 +140,17 @@ export default function MatchmakerPage() {
 		// 其餘待送出項目留給下一次 effect 執行（round 因本次 dispatch 而變動後）處理，
 		// 這裡先反映目前讀到的槽（含尚未處理的那些），避免畫面短暫顯示錯誤的計分中狀態。
 		//
-		// 依賴陣列刻意只放 round：players／submitScore 每次 render 都換新參考，
+		// 依賴陣列刻意不放 players／submitScore：它們每次 render 都換新參考，
 		// 列入 deps 會讓本 effect 在每次 render 後都重跑，而非只在「回合資料就緒
-		// 或變動」時才觸發。
+		// 或變動」時才觸發。remoteMatchSlots 與名單就緒只在雲端模式會變動
+		// （本機模式恆為 null／true），不影響訪客的觸發時機。
 		setMatchSlots(slots);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [round]);
+	}, [round, remoteMatchSlots, isRosterReady]);
+
+	// 雲端模式的場地卡在導向計分板前要先建立分槽，導向交給 router（CourtCard 不直接依賴 router）
+	const remoteNavigate = remoteMatchSlots === null ? undefined : (href: string) => router.push(href);
+	const stageSlots = remoteMatchSlots ?? matchSlots;
 
 	// generateRound 一次互動只呼叫一次（useRoundStore 的已知限制，見該檔註解）：
 	// 本函式是 RoundControls／EmptyStage 兩個入口共用的唯一呼叫點。
@@ -200,7 +263,7 @@ export default function MatchmakerPage() {
 					settings={settings}
 					onSettingsChange={setSettings}
 					round={round}
-					matchSlots={matchSlots}
+					matchSlots={stageSlots}
 					activePlayerCount={activePlayerCount}
 					onGenerate={handleGenerate}
 					onReset={handleReset}
@@ -233,7 +296,8 @@ export default function MatchmakerPage() {
 						round={round}
 						players={players}
 						hasActivePlayers={hasActivePlayers}
-						matchSlots={matchSlots}
+						matchSlots={stageSlots}
+						remoteNavigate={remoteNavigate}
 						onSubmitScore={handleSubmitScore}
 						submitError={submitError}
 						onSwapPlayer={handleSwapPlayer}

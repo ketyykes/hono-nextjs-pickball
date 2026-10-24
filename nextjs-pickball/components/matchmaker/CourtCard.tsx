@@ -1,6 +1,8 @@
 // components/matchmaker/CourtCard.tsx
 "use client";
 
+import { useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "@/lib/matchmaker/scoreboard-binding";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
+import { putRemoteSlot } from "@/lib/sync/round-api";
 import { PlayerTile } from "./PlayerTile";
 import { ScoreEntry } from "./ScoreEntry";
 
@@ -40,6 +43,9 @@ export interface CourtCardProps {
 	// 換人被拒絕時的繁體中文錯誤訊息，null 代表目前沒有換人錯誤（design Decision 6，
 	// 比照既有 submitError 的字串｜null 形態）。
 	swapError: string | null;
+	// 雲端模式才傳入：進入計分板前先以 PUT（version 0）建立雲端分槽，成功或已存在才用它導向。
+	// 未傳入（訪客）時完全沿用本機的 ensureMatchSlot 流程。
+	remoteNavigate?: (href: string) => void;
 }
 
 // RoundMatch 只存 playerIds（design Open Questions 2b）：回合與名單同時活著，內嵌整個
@@ -76,7 +82,11 @@ export function CourtCard({
 	submitError,
 	onSwapPlayer,
 	swapError,
+	remoteNavigate,
 }: CourtCardProps) {
+	const [enterError, setEnterError] = useState<string | null>(null);
+	// 避免連點時重複送出 PUT
+	const enteringRef = useRef(false);
 	const completed = match.status === "completed";
 	const isDoubles = match.format === "doubles";
 	const [teamA, teamB] = match.teams;
@@ -106,6 +116,26 @@ export function CourtCard({
 	// 完成 ensureMatchSlot（寫入 localStorage）之後，Link 才會開始換頁。
 	function handleEnterScoreboard() {
 		ensureMatchSlot(buildMatchSlotSeed(round, match, players));
+	}
+
+	// 雲端模式：必須等分槽建立完成才導向，否則計分板頁的 GET 會把「尚未建立」誤判為「場次已失效」。
+	// 409 代表分槽已存在（先前進入過），同樣可以導向；其餘結果不導向並提示。
+	async function handleEnterScoreboardRemote(event: MouseEvent<HTMLAnchorElement>) {
+		event.preventDefault();
+		if (remoteNavigate === undefined || enteringRef.current) return;
+		enteringRef.current = true;
+		setEnterError(null);
+		try {
+			const seed = buildMatchSlotSeed(round, match, players);
+			const result = await putRemoteSlot(match.id, seed, 0);
+			if (result.kind === "ok" || result.kind === "conflict") {
+				remoteNavigate(`/scoreboard?match=${match.id}`);
+				return;
+			}
+			setEnterError("無法建立計分板，請稍後再試");
+		} finally {
+			enteringRef.current = false;
+		}
 	}
 
 	const tileSource: CourtTileSource = {
@@ -227,11 +257,17 @@ export function CourtCard({
 							<span />
 						)}
 						<Button asChild variant="outline" size="sm">
-							<Link href={`/scoreboard?match=${match.id}`} onClick={handleEnterScoreboard}>
+							<Link href={`/scoreboard?match=${match.id}`} onClick={remoteNavigate === undefined ? handleEnterScoreboard : handleEnterScoreboardRemote}>
 								{entryLabel}
 							</Link>
 						</Button>
 					</div>
+				)}
+
+				{enterError !== null && (
+					<p role="alert" className="text-sm text-destructive">
+						{enterError}
+					</p>
 				)}
 
 				{!isDoubles && (

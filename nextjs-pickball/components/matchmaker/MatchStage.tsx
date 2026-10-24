@@ -30,6 +30,8 @@ export interface MatchStageProps {
 	// 各場次的計分板槽（matchId → 槽 state），由對戰頁的 reconcile effect 提供，
 	// 供各場地區塊呈現「計分中」標示（見 CourtCard 的 matchSlot 用途）。
 	matchSlots: MatchSlots;
+	// 雲端模式才傳入：場地卡建立雲端分槽後以它導向計分板；未傳入即維持本機行為。
+	remoteNavigate?: (href: string) => void;
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: MatchStageSubmitError | null;
 	// 換人操作的委派回呼（spec「場地區塊的換人操作」，design Decision 6：候選人清單由
@@ -57,6 +59,7 @@ export function MatchStage({
 	players,
 	hasActivePlayers,
 	matchSlots,
+	remoteNavigate,
 	onSubmitScore,
 	submitError,
 	onSwapPlayer,
@@ -87,6 +90,7 @@ export function MatchStage({
 							players={players}
 							round={round}
 							matchSlot={matchSlots[match.id] ?? null}
+							remoteNavigate={remoteNavigate}
 							onSubmitScore={onSubmitScore}
 							submitError={submitError?.matchId === match.id ? submitError.message : null}
 							onSwapPlayer={onSwapPlayer}

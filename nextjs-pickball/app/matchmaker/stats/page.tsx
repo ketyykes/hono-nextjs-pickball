@@ -21,8 +21,14 @@ import { computePlayerStats } from "@/lib/matchmaker/player-stats";
 // updatePlayer 是 useRoundStore 的必填注入埠（見該 hook 的 UseRoundStoreOptions）：
 // 本頁不觸發任何會變動狀態的動作，仍必須原樣傳入才符合既有介面的形狀。
 export default function MatchmakerStatsPage() {
-	const { players, updatePlayer, syncStatus } = useRosterStore();
-	const { history } = useRoundStore({ players, updatePlayer });
+	const { players, updatePlayer, syncStatus, applyRemotePlayers, reloadRemotePlayers } = useRosterStore();
+	const { history } = useRoundStore({
+		players,
+		updatePlayer,
+		applyRemotePlayers,
+		reloadRemotePlayers,
+		rosterSyncStatus: syncStatus,
+	});
 
 	// 初次開啟預設選中今日，與歷史頁一致（spec「統計依區間篩選」、prd.md 13.4）。
 	const [selectedRange, setSelectedRange] = useState<HistoryRange>("today");
