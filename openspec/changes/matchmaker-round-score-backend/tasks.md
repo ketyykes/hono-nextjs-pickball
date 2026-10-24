@@ -181,8 +181,13 @@ Depends on: §7
 
 Depends on: §8
 
-- [ ] 9.1 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 把 B6 的「雲端備份快照的參賽者取自雲端、回合與歷史取自本機」改寫為「雲端備份快照的參賽者與回合取自雲端、歷史取自本機」（含回合讀取失敗的斷言）。確認紅燈
-- [ ] 9.2 GREEN（TDD）：`buildRemoteBackupSnapshot()` 的 `currentRound` 改取雲端。9.1 綠
+- [x] 9.1 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 把 B6 的「雲端備份快照的參賽者取自雲端、回合與歷史取自本機」改寫為「雲端備份快照的參賽者與回合取自雲端、歷史取自本機」（含回合讀取失敗的斷言）。確認紅燈
+  - 紅燈 commit `198ced5`（僅含 `remote-transfer.test.ts`；`git show 198ced5^:nextjs-pickball/lib/matchmaker/remote-transfer.ts` 仍為 `currentRound: local.currentRound`）。單檔輸出：1 failed | 7 passed，`expected roundNumber 7 ... received 1`（舊實作取本機回合）。
+  - 改寫範圍：只改寫 B6 該 it（名稱依 spec）；含雲端回合 null、回合讀取 500／204／401 失敗的斷言。
+  - 後續補強 commit（regression guard，非 TDD 紅燈）：補「名單失敗而回合成功」500／204／401 斷言。原因：mutation 發現原 RED 只讓兩條 GET 同時失敗，名單端的分支變異會存活。
+- [x] 9.2 GREEN（TDD）：`buildRemoteBackupSnapshot()` 的 `currentRound` 改取雲端。9.1 綠
+  - GREEN commit `7240149`：`buildRemoteBackupSnapshot()` 以 `fetchRemoteRound()`（經 `round-api.ts`）取回合，與名單並行讀取；任一 401 回 unauthorized，任一非 ok／204 回 backupFetchFailed；歷史仍讀本機。單檔 8 passed。
+  - REFACTOR skipped（無壞味道）。
 
 ## 10. E2E 與頁面接線
 
