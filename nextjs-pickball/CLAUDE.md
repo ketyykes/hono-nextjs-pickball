@@ -33,7 +33,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   各場地色塊的「進入計分板」入口導向 `/scoreboard?match=<matchId>` 時，兩隊名稱行會顯示該隊球員姓名與雙色漸層色塊（milestone M12 = matchmaker-scoreboard-team-labels change）；獨立開啟 `/scoreboard`（無 `match` 參數）維持「我方」／「對方」純文字，零行為變更
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
 - `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
-  - `/matchmaker/data` 登入態差異（B6）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），歷史取自本機（B8 前）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
+  - `/matchmaker/data` 登入態差異（B6／B7）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），歷史取自本機（B8 前）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
   - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後只清本機歷史（`resetLocalMatchProgress()`，B7 後只移除 `matchmaker:history:v1`），保留本機 roster key；雲端的回合與分槽由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜（milestone M11 = matchmaker-player-stats change），同樣不在全站 navbar。
   統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`

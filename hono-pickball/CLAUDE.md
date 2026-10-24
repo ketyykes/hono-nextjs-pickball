@@ -86,13 +86,16 @@
 - **matchmaker 回合、場次分槽與送出比分 API**（B7，同在 `src/routes/matchmaker.ts`；`src/matchmaker/{round,slots,score}-repository.ts`）：
   - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序是 coordinator 裁定維持的行為（符合 spec 字面），舊回合裝置重排時會先得到 400 而非 409，不要自行對調
   - `GET /slots`（清單）、`GET /slots/:matchId`（單筆，不存在回 `{ data: null, version: 0 }`）、`PUT /slots/:matchId`（path 的 `matchId` 必須等於 `data.matchId`，否則 400；版本不符 409）。**`GET /slots` 的 `orderBy`（依 `match_id`）必須保留**：不排序時 `ANALYZE` 後查詢計畫可能改變回傳順序（design Open Questions 第 16 條）
-  - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法回 400、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
+  - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
   - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
   - **後續 change 須知**（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）：
     1. **B8**：`matchmaker_history` 已有 `played_at`（ms）與主鍵，讀取端點只需 GET；追加順序以 `rowid` 保存。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 已含該表。前端 `useRemoteRoundStore` 的 `history` 恆為空陣列，B8 改讀雲端後，前端 `resetLocalMatchProgress()` 刪除、`buildRemoteBackupSnapshot()` 的 `history` 改取雲端
     2. **B9**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
     3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`
        （現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
+- 現有測試端點：
+  - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
+  - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
 
 ## 多表寫入用整批守衛
 
@@ -108,10 +111,6 @@ D1 沒有互動式 transaction，只有 `db.batch()`：batch 中任一陳述式*
   - **drizzle 0.45.2 的 batch 內不可使用帶參數的 `db.run(sql)`**（`SQLiteRaw` 無 stmt，執行失敗）；一律改用 query builder 搭配 `sql` 片段（`insertBatchGuard` 即如此）
   - 不得在 JS 端先判定再傳常數條件（如 `sql`1``）：先讀後寫之間的競態就沒被消除。batch 前讀到的 version 只能當比較基準，比較本身必須在 SQL 內執行
 - 測試：`test/d1-batch-guard.test.ts` 固定兩個平台行為（0 列 UPDATE 不回滾、守衛失敗整批回滾）；repository 層以測試專用的 `afterRead` 鉤子模擬競態
-
-- 現有測試端點：
-  - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
-  - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
 
 ## 依賴注意
 
