@@ -115,14 +115,18 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	const matchId = matchIdParam === "" || matchIdParam === undefined ? null : matchIdParam;
 	const local = useLocalScoreboardStore(matchIdParam);
 	const isRemoteMode = resolveStorageMode(session) === "remote";
+	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 	const remote = useRemoteScoreboardStore({
 		enabled: isRemoteMode && matchId === null,
+		userId,
 		onUnauthorized: session.refresh,
 	});
 	// matchId 為 null 時 enabled 恆為 false，傳入的字串不會被使用
 	const remoteSlot = useRemoteMatchSlotStore({
 		enabled: isRemoteMode && matchId !== null,
 		matchId: matchId ?? "",
+		userId,
 		onUnauthorized: session.refresh,
 	});
 

@@ -109,7 +109,7 @@ describe("remote-transfer", () => {
 		const localBefore = localStorage.getItem(ROSTER_STORAGE_KEY);
 
 		const preview = parseOk(CSV_THREE_ROWS);
-		const result = await importRemoteRoster(preview, CONTEXT);
+		const result = await importRemoteRoster("user-a", preview, CONTEXT);
 
 		expect(result).toEqual({ ok: true });
 		const calls = fetchMock.mock.calls;
@@ -136,14 +136,14 @@ describe("remote-transfer", () => {
 		// GET 失敗：不得繼續 POST
 		const getFails = vi.fn().mockResolvedValue(new Response("boom", { status: 500 }));
 		vi.stubGlobal("fetch", getFails);
-		const r1 = await importRemoteRoster(preview, CONTEXT);
+		const r1 = await importRemoteRoster("user-a", preview, CONTEXT);
 		expect(r1).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.fetchFailed });
 		expect(getFails).toHaveBeenCalledTimes(1);
 
 		// GET 回 400（rejected）與 5xx 同樣視為取得名單失敗
 		const getRejected = vi.fn().mockResolvedValue(new Response("bad", { status: 400 }));
 		vi.stubGlobal("fetch", getRejected);
-		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+		expect(await importRemoteRoster("user-a", preview, CONTEXT)).toEqual({
 			ok: false,
 			message: REMOTE_TRANSFER_MESSAGES.fetchFailed,
 		});
@@ -160,7 +160,7 @@ describe("remote-transfer", () => {
 				return new Response("x", { status });
 			});
 			vi.stubGlobal("fetch", fetchMock);
-			const result = await importRemoteRoster(preview, CONTEXT);
+			const result = await importRemoteRoster("user-a", preview, CONTEXT);
 			expect(result).toEqual({ ok: false, message });
 			expect(fetchMock).toHaveBeenCalledTimes(2);
 		}
@@ -173,14 +173,14 @@ describe("remote-transfer", () => {
 			return new Response("x", { status: 401 });
 		});
 		vi.stubGlobal("fetch", fetchMock);
-		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+		expect(await importRemoteRoster("user-a", preview, CONTEXT)).toEqual({
 			ok: false,
 			message: REMOTE_TRANSFER_MESSAGES.unauthorized,
 		});
 
 		const getUnauthorized = vi.fn().mockResolvedValue(new Response("x", { status: 401 }));
 		vi.stubGlobal("fetch", getUnauthorized);
-		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+		expect(await importRemoteRoster("user-a", preview, CONTEXT)).toEqual({
 			ok: false,
 			message: REMOTE_TRANSFER_MESSAGES.unauthorized,
 		});
@@ -198,7 +198,7 @@ describe("remote-transfer", () => {
 		const preview = parseOk("名稱,性別,強度分數");
 		expect(preview.rows).toHaveLength(0);
 
-		const result = await importRemoteRoster(preview, { ids: [], now: CONTEXT.now });
+		const result = await importRemoteRoster("user-a", preview, { ids: [], now: CONTEXT.now });
 
 		expect(result).toEqual({ ok: true });
 		expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -211,11 +211,11 @@ describe("remote-transfer", () => {
 		const fetchMock = vi.fn().mockImplementation(async () => new Response(null, { status: 204 }));
 		vi.stubGlobal("fetch", fetchMock);
 
-		expect(await importRemoteRoster(preview, CONTEXT)).toEqual({
+		expect(await importRemoteRoster("user-a", preview, CONTEXT)).toEqual({
 			ok: false,
 			message: REMOTE_TRANSFER_MESSAGES.fetchFailed,
 		});
-		expect(await buildRemoteBackupSnapshot()).toEqual({
+		expect(await buildRemoteBackupSnapshot("user-a")).toEqual({
 			ok: false,
 			message: REMOTE_TRANSFER_MESSAGES.backupFetchFailed,
 		});
@@ -230,7 +230,7 @@ describe("remote-transfer", () => {
 			rows: [],
 			errors: [{ row: 2, column: "名稱", reason: "不可為空" }],
 		};
-		const result = await importRemoteRoster(withErrors, { ids: [], now: CONTEXT.now });
+		const result = await importRemoteRoster("user-a", withErrors, { ids: [], now: CONTEXT.now });
 		expect(result).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.previewHasErrors });
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
@@ -250,7 +250,7 @@ describe("remote-transfer", () => {
 		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round: localRound }));
 		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: history }));
 
-		const result = await buildRemoteBackupSnapshot();
+		const result = await buildRemoteBackupSnapshot("user-a");
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
@@ -273,7 +273,7 @@ describe("remote-transfer", () => {
 				return listResponse(CLOUD_PLAYERS);
 			}),
 		);
-		const noRound = await buildRemoteBackupSnapshot();
+		const noRound = await buildRemoteBackupSnapshot("user-a");
 		expect(noRound.ok).toBe(true);
 		if (noRound.ok) expect(noRound.snapshot.currentRound).toBeNull();
 
@@ -286,7 +286,7 @@ describe("remote-transfer", () => {
 					return listResponse(CLOUD_PLAYERS);
 				}),
 			);
-			expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: expected });
+			expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: expected });
 		};
 		await roundFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
 		await roundFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
@@ -303,7 +303,7 @@ describe("remote-transfer", () => {
 					return response();
 				}),
 			);
-			expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: expected });
+			expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: expected });
 		};
 		await playersFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
 		await playersFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
@@ -312,17 +312,17 @@ describe("remote-transfer", () => {
 
 	it("雲端備份快照取得名單失敗時回傳錯誤、不產生快照", async () => {
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 500 })));
-		const result = await buildRemoteBackupSnapshot();
+		const result = await buildRemoteBackupSnapshot("user-a");
 		expect(result).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.backupFetchFailed });
 
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 401 })));
-		expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized });
+		expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized });
 	});
 
 	it("雲端匯入與備份的每個請求都帶呼叫端給的帳號", async () => {
 		function expectedUsers(fetchMock: ReturnType<typeof vi.fn>): Array<string | null> {
-			return fetchMock.mock.calls.map(([, init]: [string, RequestInit]) =>
-				new Headers(init.headers).get("X-Expected-User-Id"),
+			return fetchMock.mock.calls.map(([, init]) =>
+				new Headers((init as RequestInit).headers).get("X-Expected-User-Id"),
 			);
 		}
 

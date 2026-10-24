@@ -22,6 +22,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import { buildMatchSlotSeed, ensureMatchSlot, mapTeamScores } from "@/lib/matchmaker/scoreboard-binding";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
+import { useSession } from "@/hooks/useSession";
 import { putRemoteSlot } from "@/lib/sync/round-api";
 import { PlayerTile } from "./PlayerTile";
 import { ScoreEntry } from "./ScoreEntry";
@@ -85,6 +86,9 @@ export function CourtCard({
 	remoteNavigate,
 }: CourtCardProps) {
 	const [enterError, setEnterError] = useState<string | null>(null);
+	// 建立分槽屬於觸發當下的登入帳號；帳號已被其他分頁換掉時伺服器會回 401，此時刷新 session
+	const session = useSession();
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 	// 避免連點時重複送出 PUT
 	const enteringRef = useRef(false);
 	const completed = match.status === "completed";
@@ -123,15 +127,20 @@ export function CourtCard({
 	async function handleEnterScoreboardRemote(event: MouseEvent<HTMLAnchorElement>) {
 		event.preventDefault();
 		if (remoteNavigate === undefined || enteringRef.current) return;
+		if (userId === null) {
+			setEnterError("無法建立計分板，請稍後再試");
+			return;
+		}
 		enteringRef.current = true;
 		setEnterError(null);
 		try {
 			const seed = buildMatchSlotSeed(round, match, players);
-			const result = await putRemoteSlot(match.id, seed, 0);
+			const result = await putRemoteSlot(userId, match.id, seed, 0);
 			if (result.kind === "ok" || result.kind === "conflict") {
 				remoteNavigate(`/scoreboard?match=${match.id}`);
 				return;
 			}
+			if (result.kind === "unauthorized") void session.refresh();
 			setEnterError("無法建立計分板，請稍後再試");
 		} finally {
 			enteringRef.current = false;

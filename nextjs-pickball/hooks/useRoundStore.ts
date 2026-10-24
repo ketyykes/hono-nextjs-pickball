@@ -426,8 +426,11 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	const session = useSession();
 	const local = useLocalRoundStore(options);
 	const isRemote = resolveStorageMode(session) === "remote";
+	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 	const remote = useRemoteRoundStore({
 		enabled: isRemote,
+		userId,
 		players: options.players,
 		updatePlayer: options.updatePlayer,
 		applyRemotePlayers: options.applyRemotePlayers ?? doNothing,

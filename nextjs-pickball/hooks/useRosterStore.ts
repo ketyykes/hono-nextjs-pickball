@@ -200,7 +200,9 @@ export function useRosterStore(): UseRosterStoreResult {
 	const session = useSession();
 	const local = useLocalRosterStore();
 	const isRemote = resolveStorageMode(session) === "remote";
-	const remote = useRemoteRosterStore({ enabled: isRemote, onUnauthorized: session.refresh });
+	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
+	const remote = useRemoteRosterStore({ enabled: isRemote, userId, onUnauthorized: session.refresh });
 	if (isRemote) return remote;
 	return {
 		...local,
