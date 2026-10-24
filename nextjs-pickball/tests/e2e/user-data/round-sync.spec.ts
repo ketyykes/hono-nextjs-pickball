@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
+import { test, expect, type Browser, type Page, type Response, type Route } from "@playwright/test";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { clearTestAccountUserData } from "../helpers/user-data";
 
@@ -124,6 +124,12 @@ async function readLocal(page: Page, key: string) {
 	return page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key);
 }
 
+// 場地卡上每位球員的「強度 x.xx」文字；雲端評分寫入後同一頁面不重新整理也要更新
+async function readCourtRatings(page: Page) {
+	const text = await page.getByTestId("match-stage-courts").innerText();
+	return text.match(/強度 \d+\.\d+/g) ?? [];
+}
+
 async function readCourtsText(page: Page) {
 	return page.getByTestId("match-stage-courts").innerText();
 }
@@ -181,6 +187,8 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 
 		await generateRound(page);
 		const matchId = await courtMatchId(page, 0);
+		const ratingsBefore = await readCourtRatings(page);
+		expect(ratingsBefore.length).toBeGreaterThan(0);
 		await enterScoreboard(page, matchId);
 
 		// 11 分制下我方連贏 11 球（side-out：對方全程未曾發球）後出現結束對話框
@@ -191,10 +199,30 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 			({ key, id }) => window.localStorage.setItem(key, JSON.stringify({ [id]: { sentinel: true } })),
 			{ key: MATCH_SLOTS_KEY, id: matchId },
 		);
-		await Promise.all([
-			page.waitForResponse((response) => isScorePost(response) && response.ok()),
-			page.getByRole("link", { name: "返回對戰" }).click(),
+		// 讓名單比回合與分槽晚載入完成：回填必須等名單就緒後重跑，而不是在名單載入中就放棄
+		let releasePlayers: () => void = () => {};
+		const playersGate = new Promise<void>((resolve) => {
+			releasePlayers = resolve;
+		});
+		await page.route(`**${PLAYERS_API}`, async (route) => {
+			if (route.request().method() === "GET") {
+				await playersGate;
+			}
+			await route.continue();
+		});
+		const roundAndSlotsLoaded = Promise.all([
+			page.waitForResponse(
+				(response) => response.url().endsWith(ROUND_API) && response.request().method() === "GET",
+			),
+			page.waitForResponse(
+				(response) => response.url().endsWith(SLOTS_API) && response.request().method() === "GET",
+			),
 		]);
+		const scorePosted = page.waitForResponse((response) => isScorePost(response) && response.ok());
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await roundAndSlotsLoaded;
+		releasePlayers();
+		await scorePosted;
 		await expect(page).toHaveURL(/\/matchmaker$/);
 
 		const court = page.getByTestId(`court-${matchId}`);
@@ -202,6 +230,8 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
 		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
 		await expect(page.locator(SYNCED)).toBeVisible();
+		// 評分寫入雲端後，同一頁面不重新整理就要看到新的強度（applyRemotePlayers 套用回應）
+		await expect.poll(() => readCourtRatings(page)).not.toEqual(ratingsBefore);
 
 		expect(await readLocal(page, MATCH_SLOTS_KEY)).toContain("sentinel");
 
@@ -290,7 +320,32 @@ test.describe("matchmaker 對戰回合雲端同步", () => {
 		await seedCloudPlayers(page, 4);
 		await generateRound(page);
 		const matchId = await courtMatchId(page, 0);
-		await enterScoreboard(page, matchId);
+
+		// 分槽建立（PUT v0）未完成前不得導向，否則計分板會把「尚未建立」誤判為「場次已失效」
+		let releaseSlotPut: () => void = () => {};
+		const slotPutGate = new Promise<void>((resolve) => {
+			releaseSlotPut = resolve;
+		});
+		const gateHandler = async (route: Route) => {
+			if (route.request().method() === "PUT") {
+				await slotPutGate;
+			}
+			await route.continue();
+		};
+		await page.route(`**${SLOTS_API}/*`, gateHandler);
+		const slotPutRequest = page.waitForRequest(
+			(request) => request.url().includes(`${SLOTS_API}/`) && request.method() === "PUT",
+		);
+		await page.getByTestId(`court-${matchId}`).getByRole("link", { name: "進入計分板" }).click();
+		await slotPutRequest;
+		await expect(
+			page.waitForRequest((request) => request.url().includes("/scoreboard?match="), { timeout: 1500 }),
+		).rejects.toThrow();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		releaseSlotPut();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await page.unroute(`**${SLOTS_API}/*`, gateHandler);
+		await expect(page.locator(SYNCED)).toBeVisible();
 
 		await scoreUs(page, 2);
 		await expect(page.getByLabel(/我方目前 2 分/)).toBeVisible();
