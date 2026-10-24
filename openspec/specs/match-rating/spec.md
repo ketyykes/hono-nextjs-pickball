@@ -265,7 +265,10 @@ K_eff = K_base × (1 + 20 / (20 + 該員累計出場次數))
 
 錯誤訊息 MUST 為繁體中文，MUST 說明可採取的修正方式並附上實際輸入值，SHALL NOT 只顯示技術錯誤碼。
 
-實作位於 `nextjs-pickball/lib/matchmaker/rating.ts`。
+評分的**唯一實作**是核心套件的這個純函式：本機模式由前端呼叫、雲端模式由後端的送出比分端點呼叫（經核心 `submitScore`，見 `round-lifecycle`「比分送出的完成流程」）。
+後端 SHALL NOT 另寫一份公式、常數或四捨五入規則——兩份實作在 `D`、`K_base`、K 遞減或 clamp 任一處分岔，同一場比賽在登入前後就會得到不同的評分，且無法事後辨識。
+
+實作位於 `packages/pickball-core/src/matchmaker/rating.ts`。
 
 #### Scenario: 隊伍人數與對戰方式不符
 
@@ -311,3 +314,10 @@ K_eff = K_base × (1 + 20 / (20 + 該員累計出場次數))
 - **THEN** 回傳結果 SHALL NOT 包含任何 `gamesPlayed` 或 `restCount` 的新值
 - **AND** 輸入球員的 `gamesPlayed` 維持原值
 - **驗收**：`nextjs-pickball/lib/matchmaker/rating.test.ts`，it 名稱「評分更新不累加 gamesPlayed 與 restCount」
+
+#### Scenario: 雲端送出比分的評分與核心純函式逐位一致
+
+- **GIVEN** 已登入；四位球員的 rating 與 `gamesPlayed` 各不相同（含一位 7.98 的觸頂邊界）
+- **WHEN** 送出 `11` 比 `3`
+- **THEN** 寫入 `matchmaker_players` 的四個 `rating` 與在測試中直接呼叫核心 `submitScore`（相同輸入）得到的 `playerPatches` 逐位相等；回應的 `boundaryHits` 與其相同
+- **驗收**：`hono-pickball/test/matchmaker-score.test.ts`，it 名稱「雲端寫入的評分與核心 submitScore 的結果逐位相等並回報觸界」

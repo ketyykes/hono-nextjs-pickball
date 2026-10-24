@@ -549,23 +549,24 @@ key 名稱多一處來源就多一處漏改，而漏改的失敗模式是「清�
 
 | 功能 | 雲端模式的行為 |
 |---|---|
-| JSON 匯出 | `buildBackup` 的快照中 `players` MUST 取自 `GET /api/matchmaker/players`；`currentRound` 與 `history` 仍取自本機（回合與歷史上雲前）。取得名單失敗時 MUST 顯示錯誤、不下載 |
+| JSON 匯出 | `buildBackup` 的快照中 `players` MUST 取自 `GET /api/matchmaker/players`、`currentRound` MUST 取自 `GET /api/matchmaker/round`；`history` 仍取自本機（歷史讀取上雲前）。任一雲端讀取失敗時 MUST 顯示錯誤、不下載 |
 | JSON 還原 | MUST 停用：不渲染選檔按鈕，改以文字說明「登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能」 |
 | 參賽者 CSV 匯入 | 見「參賽者 CSV 匯入的預覽、附加寫入與整份原子性」的登入分支 |
 | 歷史 CSV 匯出 | 不變（歷史仍在本機） |
 | 清除本機資料 | 不變（只清本機 key，不呼叫任何雲端 API） |
 
-「JSON 完整備份的匯出內容」表中 `players` 的來源 `matchmaker:roster:v1`，在雲端模式下以本表為準；`buildBackup` 本身仍是純函式、不變。
+「JSON 完整備份的匯出內容」表中 `players` 與 `currentRound` 的來源（`matchmaker:roster:v1`、`matchmaker:round:v1`），在雲端模式下以本表為準；`buildBackup` 本身仍是純函式、不變。
 雲端分支的資料讀取 MUST 經 `nextjs-pickball/lib/matchmaker/remote-transfer.ts`，元件層只負責選檔、下載與顯示。
 
 JSON 還原停用的理由：還原是「以檔案覆寫全部資料」，雲端模式下等同覆寫雲端名單，其語意（覆寫、合併或拒絕）屬 B9「匯入本機資料」的決策範圍，本 change 不預先決定。
 
 #### Scenario: 雲端備份快照的來源
 
-- **GIVEN** 雲端名單有 2 位；本機有一個進行中回合與 3 筆歷史
+- **GIVEN** 雲端名單有 2 位、雲端有一個進行中回合；本機有另一個回合與 3 筆歷史
 - **WHEN** 呼叫雲端備份快照函式
-- **THEN** 回傳的 `players` 為雲端那 2 位，`currentRound` 與 `history` 等於本機的資料
-- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端備份快照的參賽者取自雲端、回合與歷史取自本機」
+- **THEN** 回傳的 `players` 為雲端那 2 位、`currentRound` 為雲端的回合，`history` 等於本機的資料
+- **AND** 雲端回合讀取失敗時回傳錯誤、不回傳快照
+- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端備份快照的參賽者與回合取自雲端、歷史取自本機」
 
 #### Scenario: 登入時 JSON 匯出的參賽者來自雲端
 

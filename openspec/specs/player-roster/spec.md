@@ -278,11 +278,13 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 `scoreboard:current:v1` **不**在重置範圍內：獨立計分板的進度與分配機的活動無關，一併清掉會讓使用者正在進行的個人比賽無故歸零。重置範圍涵蓋分槽 key 而不涵蓋獨立槽，正是「一場一槽」與「全站唯一一場」兩種語意的分界所在。
 
-**登入時（雲端模式，`user-data-sync`「前端依 session 選擇儲存模式」）**：確認後系統 MUST 呼叫 `POST /api/matchmaker/reset`，
-**成功後**才清空畫面上的名單，並以 `resetLocalMatchProgress()` 只清除本機的 `matchmaker:round:v1`、`matchmaker:history:v1` 與 `scoreboard:matches:v1`
-（這三者在回合與歷史上雲之前仍存於本機，屬於本次活動）；SHALL NOT 清除本機的 `matchmaker:roster:v1`——登入時畫面上的名單來自雲端，
-本機那份是訪客時期的名單，清掉會讓之後的「匯入本機資料」無資料可匯。呼叫失敗時（`requestJson` 結果為 `failed`、`rejected` 或 `conflict` 皆同；重置不可逆，SHALL NOT 自動重試）名單 MUST 保持不變並回報 `rejected`（顯示「雲端拒絕儲存，請重新整理頁面」）；結果為 `unauthorized` 時改為呼叫 `onUnauthorized`。
-`resetLocalMatchProgress()` 的三個 key MUST 取自與 `RESET_KEYS` 相同的來源常數，SHALL NOT 另寫字面值。
+**登入時（雲端模式，`user-data-sync`「前端依 session 選擇儲存模式」）**：確認後系統 MUST 呼叫 `POST /api/matchmaker/reset`
+（後端在單一 batch 內刪除雲端的名單、回合、分槽與歷史，見 `round-lifecycle`「回合與送出比分的雲端 API」），
+**成功後**才清空畫面上的名單，並以 `resetLocalMatchProgress()` 只清除本機的 `matchmaker:history:v1`
+（B7～B8 之間，登入時的歷史頁與統計頁仍讀本機歷史；不清除會讓重置後的登入畫面仍顯示上一場活動的賽果。B8 把歷史讀取搬上雲後刪除此函式）。
+SHALL NOT 清除本機的 `matchmaker:roster:v1`、`matchmaker:round:v1` 與 `scoreboard:matches:v1`——雲端模式不讀寫這三者，它們是訪客時期的資料，
+清掉會讓之後的「匯入本機資料」無資料可匯。呼叫失敗時（`requestJson` 結果為 `failed`、`rejected` 或 `conflict` 皆同；重置不可逆，SHALL NOT 自動重試）名單 MUST 保持不變並回報 `rejected`（顯示「雲端拒絕儲存，請重新整理頁面」）；結果為 `unauthorized` 時改為呼叫 `onUnauthorized`。
+`resetLocalMatchProgress()` 移除的 key MUST 取自與 `RESET_KEYS` 相同的來源常數，SHALL NOT 另寫字面值。
 
 實作位於 `nextjs-pickball/lib/matchmaker/storage.ts`、`nextjs-pickball/lib/matchmaker/storage-keys.ts` 與 `nextjs-pickball/components/matchmaker/ResetRosterDialog.tsx`。`resetLocalMatchProgress()` 位於 `nextjs-pickball/lib/matchmaker/storage.ts`；雲端分支位於 `nextjs-pickball/hooks/useRemoteRosterStore.ts`。
 
@@ -312,15 +314,22 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 - **GIVEN** LocalStorage 同時存在 `matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`、`scoreboard:matches:v1` 與 `scoreboard:current:v1`
 - **WHEN** 呼叫 `resetLocalMatchProgress()`
-- **THEN** `matchmaker:round:v1`、`matchmaker:history:v1`、`scoreboard:matches:v1` 被移除；`matchmaker:roster:v1` 與 `scoreboard:current:v1` 不受影響
-- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「resetLocalMatchProgress 只移除回合、歷史與分槽，保留名單與獨立計分板」
+- **THEN** 只有 `matchmaker:history:v1` 被移除；其餘四個 key 不受影響
+- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板」
 
 #### Scenario: 登入時重置名單
 
 - **GIVEN** 雲端模式，名單已載入 3 位，`POST /api/matchmaker/reset` 回 204
 - **WHEN** 呼叫 `resetRoster()`
-- **THEN** 該 POST 被呼叫一次；名單變為空、`syncStatus` 為 `synced`；本機的回合、歷史與分槽 key 被移除，本機 `matchmaker:roster:v1` 保留
-- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「resetRoster 成功後清空名單並只清除本機回合、歷史與分槽」
+- **THEN** 該 POST 被呼叫一次；名單變為空、`syncStatus` 為 `synced`；本機只有歷史 key 被移除，本機 `matchmaker:roster:v1`、`matchmaker:round:v1` 與 `scoreboard:matches:v1` 保留
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「resetRoster 成功後清空名單並只清除本機歷史」
+
+#### Scenario: 登入時重置名單前停止所有待送與重試中的變更
+
+- **GIVEN** 雲端模式，p1 的 v0 PUT 回 503 正在等待退避重試
+- **WHEN** 呼叫 `resetRoster()`，`POST /api/matchmaker/reset` 回 204，之後推進時間超過退避表全長
+- **THEN** reset 送出後不再有任何對 `/api/matchmaker/players/p1` 的 PUT（否則重試的 v0 PUT 會在雲端重置後讓 p1「復活」）；名單為空
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「resetRoster 送出前停止所有參賽者的待送與重試中變更」
 
 #### Scenario: 登入時重置失敗不動名單
 
@@ -335,6 +344,13 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 - **WHEN** 在參賽者頁按「重置名單」並確認，之後重新整理
 - **THEN** 參賽者頁為空白狀態；本機 `matchmaker:roster:v1` 內容與重置前相同
 - **驗收**：`nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts`，test 名稱「登入時重置名單清空雲端名單並保留本機訪客名單」
+
+#### Scenario: 登入時重置名單後對戰頁沒有回合
+
+- **GIVEN** 以測試帳號登入，已產生一輪並完成一場
+- **WHEN** 在參賽者頁確認重置名單後開啟 `/matchmaker`
+- **THEN** 對戰頁沒有任何場地卡；`GET /api/matchmaker/round` 回 `{ data: null, version: 0 }`、`GET /api/matchmaker/slots` 回空清單
+- **驗收**：`nextjs-pickball/tests/e2e/user-data/round-sync.spec.ts`，test 名稱「登入時重置名單後雲端回合與分槽一併清除」
 
 ### Requirement: LocalStorage 持久化與逐筆降級
 
@@ -498,7 +514,8 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 
 `useRosterStore()` SHALL 為選擇器（`user-data-sync`「前端依 session 選擇儲存模式」）：`resolveStorageMode(useSession())` 為 `"remote"` 時回傳
 `hooks/useRemoteRosterStore.ts` 的結果，否則回傳本機實作 `useLocalRosterStore`。回傳物件 MUST 保留既有的 `players`、`droppedCount`、`addPlayer`、`updatePlayer`、
-`removePlayer`、`togglePlayerActive`、`resetRoster`（簽章不變），另加 `syncStatus`（本機模式恆為 `"local"`）。呼叫端（含 `useRoundStore` 的 `updatePlayer` port）不需要知道目前模式。
+`removePlayer`、`togglePlayerActive`、`resetRoster`（簽章不變），另加 `syncStatus`（本機模式恆為 `"local"`）、`applyRemotePlayers` 與 `reloadRemotePlayers`（本機模式皆為不做任何事的函式）。
+呼叫端（含 `useRoundStore` 經 `updatePlayer` port 寫入的休息次數）不需要知道目前模式；送出比分的評分在雲端模式改由後端寫入，前端以 `applyRemotePlayers` 接收（見下方第 9 點）。
 
 雲端實作 `useRemoteRosterStore({ enabled, onUnauthorized })` MUST 依 `user-data-sync`「多筆使用者資料的逐筆版本化契約」：
 
@@ -511,6 +528,10 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 6. 任一請求回 409 → 停止所有佇列、重新 GET、以雲端名單取代、`conflict`；回 401 → 呼叫 `onUnauthorized` 並停止送出。
 7. 載入失敗時為 `load-failed`，此時所有變更操作 MUST 不送出請求、不改變名單。
 8. `resetRoster` 見「重置名單與二次確認」的登入分支。
+9. `applyRemotePlayers(items)` MUST 以 `items` 中每筆的 `data` 與 `version` 取代名單中同 id 的參賽者，SHALL NOT 送出任何請求（資料已由後端寫入）。
+   若其中任一 id 有尚未送出或在途的變更，MUST 視同衝突：停止所有佇列、重新 GET、以雲端名單取代並回報 `conflict`——
+   否則待送的 PUT 會帶著舊 version 得到 409，或覆蓋後端剛寫入的評分。
+10. `reloadRemotePlayers()` MUST 停止所有佇列、重新 GET 並以雲端名單取代；狀態轉為 `synced`（呼叫端已自行回報衝突），失敗時為 `load-failed`。
 
 使用 `useRosterStore` 的頁面（`app/matchmaker/page.tsx`、`app/matchmaker/players/page.tsx`、`app/matchmaker/stats/page.tsx`）在 `syncStatus` 為 `loading` 或 `load-failed` 時
 MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名單可供產生對戰或統計），其餘非 `local` 狀態照常顯示並疊加 `SyncStatusNotice`，
@@ -630,8 +651,28 @@ MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名�
 
 - **GIVEN** 雲端名單有四位參賽者
 - **WHEN** 在對戰頁產生對戰、輸入比分並送出，等到同步完成後重新整理參賽者頁
-- **THEN** 勝方兩位的強度分數高於送出前、敗方兩位低於送出前（評分經 `updatePlayer` port 寫入雲端）
+- **THEN** 勝方兩位的強度分數高於送出前、敗方兩位低於送出前（評分由後端在送出比分的 batch 內寫入，前端不逐人 PUT）
 - **驗收**：`nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts`，test 名稱「登入時送出比分後評分寫入雲端名單」
+
+#### Scenario: applyRemotePlayers 只取代畫面上的參賽者且不送出請求
+
+- **GIVEN** `enabled: true`，名單有 p1（version 2）與 p2，沒有待送變更
+- **WHEN** `applyRemotePlayers([{ data: <p1 的 rating 為 4.2>, version: 3 }])`，之後 `updatePlayer("p1", { name: "改名" })`
+- **THEN** `applyRemotePlayers` 後沒有任何請求、p1 的 rating 為 4.2；之後的 PUT 帶 `version: 3`
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「applyRemotePlayers 以回應取代參賽者與 version 且不送出請求」
+
+#### Scenario: applyRemotePlayers 遇到待送變更時整份重新載入
+
+- **GIVEN** p1 的 PUT 在途
+- **WHEN** `applyRemotePlayers([{ data: <p1>, version: 3 }])`，重新 GET 回雲端名單
+- **THEN** 在途與待送的變更不再送出；`players` 為重新載入的名單、`syncStatus` 為 `conflict`
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「applyRemotePlayers 遇到該參賽者有待送或在途變更時視同衝突並整份重新載入」
+
+#### Scenario: reloadRemotePlayers 重新載入雲端名單
+
+- **WHEN** 呼叫 `reloadRemotePlayers()`，GET 回另一份名單
+- **THEN** `players` 為該名單、`syncStatus` 為 `synced`
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「reloadRemotePlayers 停止佇列並以雲端名單取代」
 
 #### Scenario: 雲端名單載入失敗
 
