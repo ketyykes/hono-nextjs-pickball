@@ -293,3 +293,4 @@ MODIFIED Requirement 與主 spec 逐段比對：除本 change 刻意的增修外
     H12（409 後重載 GET 回 401 未清 `versionRef`）、H42（換場次／重新啟用的載入中沿用前一場 version）、H38（`useReducer` 初始 `loading` 改 `synced` 會閃一幀計分畫面）、H10（GET 回 204 應為 load-failed）。H27 判定等價。
     非阻擋（交 §10）：B5 `useRemoteScoreboardStore` 可能有同型缺口（H12／H42），不在本 change 範圍；雲端模式帶 matchId 時選擇器仍掛載本機 hook 會**讀取** `scoreboard:matches:v1`（與 B5 同型，tasks 8.4 已記），E2E 驗本機 key 不存在時注意前置狀態；分槽 hook 無 StrictMode 專屬 it；missing 時不 HYDRATE，靠頁面 `key={matchId}` 重掛載。
     **下一步**：§8 補件（sonnet）→ Stage 2 複審 → §9。
+24. （apply §8 完成，2026-10-24）補件 8454871（4 個 regression guard：H12／H42／H38／H10，只動測試檔）、c14d503（tasks 8.1 紀錄）後 Stage 2 複審 **PASS**：4 條全數轉紅、等價對照 E1～E3 綠、抽查 14 條（含必做 R1、R2、R3a～c）仍紅；H27 判定等價。分槽 hook 12 個 it。**下一步**：派 §9 Implementer（sonnet）。
