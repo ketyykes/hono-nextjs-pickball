@@ -31,12 +31,12 @@
 
 - [x] 1.1 驗收（指令）：確認分支 `change/user-data-account-guard`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local`、`db:seed:local` 成功；
   持鎖跑 `pnpm test` baseline（三個 workspace）、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md Verification 並 commit
-- [ ] 1.2 對齊 B7 實際落地並盤點機械改動點：`lib/sync/{api-client,roster-api,round-api,round-command-queue}.ts` 簽章、四支雲端 hook 的 options 與主 effect 依賴、三個選擇器、
+- [x] 1.2 對齊 B7 實際落地並盤點機械改動點：`lib/sync/{api-client,roster-api,round-api,round-command-queue}.ts` 簽章、四支雲端 hook 的 options 與主 effect 依賴、三個選擇器、
   `CourtCard` 雲端建立分槽、`JsonBackupSection`／`RosterCsvImportSection`、`remote-transfer.ts`；`rg -n "Cookie:|exports.default.fetch|app.request\(" hono-pickball/test` 與 `rg -n "requestJson\(|page.request|context.request" nextjs-pickball` 逐一列表（哪些需要帶標頭、哪些在守衛之前結束而不需要）。
   比對本 change MODIFIED「使用者資料 API 的路由、授權與停用閘門」與目前主 spec 的既有段落與四個 Scenario，若有差異以主 spec 為底重新套用並 commit。與 design Context 不同處記入 design「apply §1 查證紀錄」
-- [ ] 1.3 一次性實測（不 commit）：Hono `app.routes` 是否含經 `app.route()` 掛載的 sub-app 路由、路徑是否已合併前綴、`use()` 的 method 是否為 `ALL`、是否出現自動 HEAD；
+- [x] 1.3 一次性實測（不 commit）：Hono `app.routes` 是否含經 `app.route()` 掛載的 sub-app 路由、路徑是否已合併前綴、`use()` 的 method 是否為 `ALL`、是否出現自動 HEAD；
   better-auth 登入回應 body 是否含 `user.id`；同一 cookie jar 以第二帳號登入後，第一帳號的 session token 是否仍有效。結果記入查證紀錄（決定 design Decision 4、10 是否走退路）
-- [ ] 1.4 Context7 查證（附 library ID 記入查證紀錄）：`/better-auth/better-auth/v1.6.23`（無 multi-session 時再次登入覆寫 cookie、不撤銷舊 session）；`/websites/hono_dev`（`app.routes`、`createMiddleware`、`c.req.header` 不分大小寫）
+- [x] 1.4 Context7 查證（附 library ID 記入查證紀錄）：`/better-auth/better-auth/v1.6.23`（無 multi-session 時再次登入覆寫 cookie、不撤銷舊 session）；`/websites/hono_dev`（`app.routes`、`createMiddleware`、`c.req.header` 不分大小寫）
 
 ## 2. 核心套件：錯誤碼與標頭常數
 
