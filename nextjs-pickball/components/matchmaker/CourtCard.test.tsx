@@ -1,6 +1,6 @@
 // components/matchmaker/CourtCard.test.tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CourtCard } from "./CourtCard";
 import type { CourtCardProps } from "./CourtCard";
@@ -8,6 +8,20 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import { DRAW_LABEL } from "@pickball/core/matchmaker/labels";
+import { useSession } from "@/hooks/useSession";
+import { putRemoteSlot } from "@/lib/sync/round-api";
+
+// 預設為訪客快照：既有的 it 都走本機分支，不受 CourtCard 讀取 session 影響；
+// 雲端分槽的 it 自行覆寫回傳值。
+vi.mock("@/hooks/useSession", () => ({
+	useSession: vi.fn(() => ({
+		status: "ready",
+		authEnabled: false,
+		user: null,
+		refresh: vi.fn(),
+	})),
+}));
+vi.mock("@/lib/sync/round-api", () => ({ putRemoteSlot: vi.fn() }));
 
 // 測試專用預設球員：colorFrom／colorTo 沿用調色盤既有第一組即可，色塊背景本身不是本檔
 // 斷言重點（漸層與對比已由 tile-style.test.ts、colors.test.ts 涵蓋），這裡只需要合法 hex。
@@ -750,5 +764,38 @@ describe("CourtCard", () => {
 		const withoutError = render(<CourtCard {...buildProps({ swapError: null })} />);
 		expect(withoutError.queryByRole("alert")).toBeNull();
 		withoutError.unmount();
+	});
+});
+
+describe("CourtCard 的雲端分槽入口", () => {
+	afterEach(() => {
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+			refresh: vi.fn(),
+		});
+		vi.mocked(putRemoteSlot).mockReset();
+	});
+
+	it("雲端建立分槽帶入目前帳號且未授權時刷新 session 並不導向", async () => {
+		const refresh = vi.fn().mockResolvedValue(undefined);
+		vi.mocked(useSession).mockReturnValue({
+			status: "ready",
+			authEnabled: true,
+			user: { id: "user-a", email: "a@example.com", name: "A" },
+			refresh,
+		});
+		vi.mocked(putRemoteSlot).mockResolvedValue({ kind: "unauthorized" });
+		const remoteNavigate = vi.fn();
+		render(<CourtCard {...buildProps({ remoteNavigate })} />);
+
+		await userEvent.setup().click(screen.getByRole("link", { name: "進入計分板" }));
+
+		await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+		expect(putRemoteSlot).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(putRemoteSlot).mock.calls[0][0]).toBe("user-a");
+		expect(await screen.findByText("無法建立計分板，請稍後再試")).not.toBeNull();
+		expect(remoteNavigate).not.toHaveBeenCalled();
 	});
 });

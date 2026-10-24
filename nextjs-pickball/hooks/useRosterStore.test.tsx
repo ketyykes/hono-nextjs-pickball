@@ -283,4 +283,40 @@ describe("useRosterStore 儲存模式選擇器", () => {
 		expect(result.current.players).toHaveLength(1);
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
+
+	it("選擇器把 session 的 user id 傳給雲端 hook", async () => {
+		const sessionOf = (id: string) =>
+			({
+				status: "ready",
+				authEnabled: true,
+				user: { id, email: `${id}@example.com`, name: id },
+				refresh: vi.fn(),
+			}) as const;
+		function expectedUsers(): Array<string | null> {
+			return matchmakerCalls().map(([, init]) =>
+				new Headers(init?.headers).get("X-Expected-User-Id"),
+			);
+		}
+		fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ items: [] })));
+
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-a"));
+		const { result, rerender, unmount } = renderHook(() => useRosterStore());
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(expectedUsers()).toEqual(["user-a"]);
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-b"));
+		rerender();
+		await waitFor(() => expect(expectedUsers()).toEqual(["user-a", "user-b"]));
+		unmount();
+
+		// session 載入中與訪客沒有任何使用者資料請求
+		fetchMock.mockClear();
+		for (const snapshot of [
+			{ status: "loading", refresh: vi.fn() },
+			{ status: "ready", authEnabled: false, user: null, refresh: vi.fn() },
+		] as const) {
+			vi.mocked(useSession).mockReturnValue(snapshot);
+			renderHook(() => useRosterStore()).unmount();
+		}
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });

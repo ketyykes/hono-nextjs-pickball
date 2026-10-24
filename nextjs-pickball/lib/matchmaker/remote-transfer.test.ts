@@ -318,4 +318,116 @@ describe("remote-transfer", () => {
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 401 })));
 		expect(await buildRemoteBackupSnapshot()).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized });
 	});
+
+	it("雲端匯入與備份的每個請求都帶呼叫端給的帳號", async () => {
+		function expectedUsers(fetchMock: ReturnType<typeof vi.fn>): Array<string | null> {
+			return fetchMock.mock.calls.map(([, init]: [string, RequestInit]) =>
+				new Headers(init.headers).get("X-Expected-User-Id"),
+			);
+		}
+
+		// 匯入：匯入前的 GET 與匯入的 POST 用同一個帳號
+		const importFetch = vi.fn().mockImplementation(async (_path: string, init: RequestInit) => {
+			if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+			return listResponse([]);
+		});
+		vi.stubGlobal("fetch", importFetch);
+		await importRemoteRoster("user-a", parseOk(CSV_THREE_ROWS), CONTEXT);
+		expect(importFetch.mock.calls.map(([, init]) => init.method)).toEqual(["GET", "POST"]);
+		expect(expectedUsers(importFetch)).toEqual(["user-a", "user-a"]);
+
+		// 備份：名單與回合兩個 GET 用同一個帳號
+		const backupFetch = vi.fn().mockImplementation(async (path: string) => {
+			if (path === "/api/matchmaker/round") {
+				return new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
+			}
+			return listResponse(CLOUD_PLAYERS);
+		});
+		vi.stubGlobal("fetch", backupFetch);
+		await buildRemoteBackupSnapshot("user-a");
+		expect(backupFetch).toHaveBeenCalledTimes(2);
+		expect(expectedUsers(backupFetch)).toEqual(["user-a", "user-a"]);
+	});
+
+	it("雲端匯入與備份遇到 401 時以機器可讀欄位標示未授權", async () => {
+		const preview = parseOk(CSV_THREE_ROWS);
+		const unauthorizedResponse = () => new Response("x", { status: 401 });
+
+		// 匯入：GET 401
+		vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => unauthorizedResponse()));
+		const getUnauthorized = await importRemoteRoster("user-a", preview, CONTEXT);
+		expect(getUnauthorized.ok).toBe(false);
+		if (!getUnauthorized.ok) {
+			expect(getUnauthorized.unauthorized).toBe(true);
+			expect(getUnauthorized.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+
+		// 匯入：POST 401
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+				if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+				return unauthorizedResponse();
+			}),
+		);
+		const postUnauthorized = await importRemoteRoster("user-a", preview, CONTEXT);
+		expect(postUnauthorized.ok).toBe(false);
+		if (!postUnauthorized.ok) {
+			expect(postUnauthorized.unauthorized).toBe(true);
+			expect(postUnauthorized.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+
+		// 備份：名單 GET 與回合 GET 各自 401
+		for (const unauthorizedPath of ["/api/matchmaker/players", "/api/matchmaker/round"]) {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockImplementation(async (path: string) => {
+					if (path === unauthorizedPath) return unauthorizedResponse();
+					if (path === "/api/matchmaker/round") {
+						return new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
+					}
+					return listResponse(CLOUD_PLAYERS);
+				}),
+			);
+			const backup = await buildRemoteBackupSnapshot("user-a");
+			expect(backup.ok).toBe(false);
+			if (!backup.ok) {
+				expect(backup.unauthorized).toBe(true);
+				expect(backup.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			}
+		}
+
+		// 其他失敗（取得失敗、衝突、匯入失敗、備份取得失敗）不帶未授權欄位，訊息不變
+		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 500 })));
+		const getFailed = await importRemoteRoster("user-a", preview, CONTEXT);
+		expect(getFailed).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.fetchFailed });
+		if (!getFailed.ok) expect(getFailed.unauthorized).toBeUndefined();
+
+		for (const [status, message] of [
+			[409, REMOTE_TRANSFER_MESSAGES.importConflict],
+			[500, REMOTE_TRANSFER_MESSAGES.importFailed],
+		] as const) {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+					if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+					return new Response("x", { status });
+				}),
+			);
+			const failed = await importRemoteRoster("user-a", preview, CONTEXT);
+			expect(failed.ok).toBe(false);
+			if (!failed.ok) {
+				expect(failed.unauthorized).toBeUndefined();
+				expect(failed.message).toBe(message);
+			}
+		}
+
+		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 500 })));
+		const backupFailed = await buildRemoteBackupSnapshot("user-a");
+		expect(backupFailed.ok).toBe(false);
+		if (!backupFailed.ok) {
+			expect(backupFailed.unauthorized).toBeUndefined();
+			expect(backupFailed.message).toBe(REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		}
+	});
 });
