@@ -218,11 +218,17 @@ Depends on: §10
   design「交接給 B8～B9」三點寫入適當段落
   已完成：`nextjs-pickball/CLAUDE.md`（架構總覽 `/scoreboard`、`/matchmaker/data`、重置、儲存分流段、hooks 歸屬、`lib/sync/`、`user-data` spec 清單）與 `hono-pickball/CLAUDE.md`（範圍例外、reset 四張表、回合／分槽／送出比分路由、「多表寫入用整批守衛」段、B8～B9 交接三點）。
   核對發現：design OQ20 的 `guardedBatch` 並非程式碼中的具名函式（OQ14 決定不抽，守衛 batch 與 try/catch 直接寫在 `score-repository.ts`）；`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`（未匯出）、`isConstraintError` 在 `players-repository.ts`（未匯出）。OQ20 指定句已逐字寫入，並附一行現況說明。
-- [ ] 11.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 11.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 11.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
-- [ ] 11.5 驗收（指令）C4：`pnpm build` exit 0
-- [ ] 11.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
+- [x] 11.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 2026-10-24（leader，HEAD 0a29734 起跑）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./packages/pickball-core typecheck` exit 0（輸出無 "No projects matched"）。
+- [x] 11.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
+  - 取鎖（load 3.30）：0 errors、3 warnings（與基線相同的三個既有 unused-vars）。
+- [x] 11.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
+  - 取鎖：前端 100 檔／985（基線 95／895，+5／+90）；後端 21 檔／149（基線 17／97，+4／+52）；核心 4 檔／11（基線 3／6，+1／+5）；全綠。
+- [x] 11.5 驗收（指令）C4：`pnpm build` exit 0
+  - 取鎖：exit 0（後端 `wrangler deploy --dry-run`，無遠端操作）。
+- [x] 11.6 驗收（指令）C5：`db:generate` 無新檔、`db:migrate:local` 成功
+  - `db:generate`：「No schema changes, nothing to migrate」，`hono-pickball/drizzle` 無新檔；`db:migrate:local`：exit 0（「No migrations to apply!」，0003 已套用）。
 - [ ] 11.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
   既有 test 全數原樣通過，新增 6 個 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 11.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-round-score-backend --strict` 通過
+- [x] 11.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-round-score-backend --strict` 通過
+  - exit 0：「Change 'matchmaker-round-score-backend' is valid」。
