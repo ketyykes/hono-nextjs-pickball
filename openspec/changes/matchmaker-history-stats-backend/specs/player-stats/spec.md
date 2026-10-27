@@ -20,7 +20,7 @@
 - **THEN** 該球員的出場數只計入上月的紀錄，不含今日的紀錄
 - **驗收**：`nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`，test 名稱「切換區間後排行榜只反映該區間的歷史紀錄」
 
-#### Scenario: 登入時計時回合的平局在統計頁計為和局
+#### Scenario: 統計區間：登入時計時回合的平局在統計頁計為和局
 
 - **GIVEN** 以測試帳號登入、雲端資料已清空，名單有兩位，已產生一輪設定計時的單打並開始計時
 - **WHEN** 送出 `9` 比 `9`、開啟 `/matchmaker/stats`
@@ -44,7 +44,7 @@ SHALL NOT 顯示只有標題列的空表格——排行榜在完全沒有資料�
 - **THEN** 畫面顯示引導型空狀態，不顯示排行榜表格
 - **驗收**：`nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`，test 名稱「完全沒有歷史紀錄時顯示引導型空狀態」
 
-#### Scenario: 雲端 total 為 0 時統計頁顯示引導型空狀態
+#### Scenario: 統計空狀態：雲端 total 為 0 時統計頁顯示引導型空狀態
 
 - **GIVEN** 雲端模式，`useRemoteHistory` 回 `{ items: [], total: 0, syncStatus: "synced" }`
 - **WHEN** 渲染 `RemoteStatsContent`
@@ -89,7 +89,7 @@ SHALL NOT 顯示只有標題列的空表格——排行榜在完全沒有資料�
 - **THEN** 三個 key 的內容與操作前逐字相同
 - **驗收**：`nextjs-pickball/tests/e2e/specs/player-stats.spec.ts`，test 名稱「瀏覽統計頁不改動任何持久化資料」
 
-#### Scenario: 登入時瀏覽統計頁只發出讀取請求
+#### Scenario: 統計頁唯讀：登入時瀏覽統計頁只發出讀取請求
 
 - **GIVEN** 以測試帳號登入，雲端已有歷史
 - **WHEN** 開啟 `/matchmaker/stats` 並依序切換五個區間
