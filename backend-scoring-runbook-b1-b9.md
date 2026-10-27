@@ -11,15 +11,15 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-24，**B7 已合併，下一棒 B7.5**）
+## 狀態快照（最後更新 2026-10-27，**B7.5 已合併，下一棒 B8**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `5cdf647`（B7 archive） |
+| `main` HEAD | `f366f23`（B7.5 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；**下一棒 B7.5**（B7 archive 後 propose） |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；**下一棒 B8** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -132,7 +132,7 @@ main@1e5e517
 | B5 | scoreboard-backend | 計分板兩個 key 的後端儲存 API＋前端儲存層切換 | 中 | change/scoreboard-backend | 已合併 `f8a821f`、archive `fca0b95` |
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8`、archive `11a2dbf` |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
-| B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已 propose `862fafa`（30 tasks；design OQ 新問題 1～5 皆採建議值）；apply 中 |
+| B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已合併 `46c392a`、archive `f366f23` |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
 | B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
@@ -607,6 +607,16 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - **B7 archive 後 validate 失敗（各棒 §1 修）**：B8 `player-roster` MODIFIED「重置名單與二次確認」缺「resetLocalMatchProgress 只清除本次活動的進度」與「登入時重置名單前停止所有待送與重試中的變更」；
   B9 `data-transfer` MODIFIED「登入時的資料工具頁」缺「登入時 JSON 還原停用」（同 B6 後，未新增）。
 - **交接給 B8～B9**：見 B7 design「交接給 B8～B9」與 hono-pickball/CLAUDE.md「後續 change 須知」三點。
+
+### B7.5 紀錄（2026-10-27，合併 `46c392a`，archive `f366f23` → `2026-10-27-user-data-account-guard`；改 `auth`／`dev-workflow`／`user-data-sync`）
+- 30 tasks。leader 做到 §8（`b1cc1a7`）後被使用者停止、不可續派；§8.4～§9 由 coordinator 直接完成。§6～§8 的紅燈輸出隨 leader session 遺失，tasks 以 RED／GREEN 分開的 commit 作證。
+- coordinator 修正：名單 hook 在 effect 內清空名單觸發 `react-hooks/set-state-in-effect`（lint error），`players` 改 reducer（`e30eb0f`）；文件 `cc35496`。
+- 測試：前端 100/1010、後端 22/157、核心 6/13；lint 0/3；build、validate 通過。E2E（持鎖、load ≈5）721 passed／38 skipped／0 failed（`user-data` 34，含換帳號七條；quiz 競態本輪未出現）。
+- 9.2 WebKit／Safari 手動驗證未做，以 webkit／mobile-safari E2E 代證；實機手動留給 S2。
+- 機器 2026-10-25 重開過：`/tmp/heavy-lock.sh` 已依記憶重建（mkdir 原子鎖＋owner/note/since、2 小時過期）；舊 `/tmp/b*run.sh` 已不存在，B7.5 用 `/tmp/b75run.sh`。
+- **B8／B9 §1 必做（交接）**：除 B7 後的 validate 失敗外，依 B7.5 design「交接給 B8／B9」：
+  B8 `GET /api/matchmaker/history` 補守衛樣本、授權覆蓋表加第四欄、`history-api` 以 `expectedUserId` 為第一參數、`useRemoteHistory` 加 `userId` 世代與擁有者標記（hook RED 多一個換帳號 it）、歷史匯出與 `HistoryCsvSection` 雲端分支以點擊時 user id 呼叫且未授權 refresh、E2E 用 `expectedUserHeaders()`；
+  B9 `src/routes/import.ts` 開頭 `use("*", localAuth, requireSession, requireExpectedUser)`、樣本表補 `POST /api/import`、`user-data-sync` 加「預期帳號與 session 不符時匯入回 401 且雲端不寫入」Scenario、`importLocalData(expectedUserId, payload)`、未授權 refresh、授權覆蓋表第四欄。
 
 ## commit footer 慣例
 
