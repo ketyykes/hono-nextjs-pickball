@@ -1,4 +1,5 @@
 import { API_ERROR_CODES } from "@pickball/core/api/errors";
+import { HistoryQuerySchema } from "@pickball/core/api/history";
 import { PlayerImportRequestSchema } from "@pickball/core/api/players";
 import { MatchSlotPutRequestSchema, RoundPutRequestSchema, SubmitScoreRequestSchema } from "@pickball/core/api/round";
 import { versionedWriteSchema } from "@pickball/core/api/versioned";
@@ -17,6 +18,7 @@ import {
 	putPlayer,
 	resetMatchmaker,
 } from "../matchmaker/players-repository";
+import { listHistory } from "../matchmaker/history-repository";
 import { getRound, putRound } from "../matchmaker/round-repository";
 import { submitScoreForUser } from "../matchmaker/score-repository";
 import { getSlot, listSlots, putSlot } from "../matchmaker/slots-repository";
@@ -96,6 +98,10 @@ export const matchmakerRoutes = new Hono<SessionAppEnv>()
 			return c.json({ error: API_ERROR_CODES.VERSION_CONFLICT }, 409);
 		}
 		return c.json(saved);
+	})
+	.get("/history", zValidator("query", HistoryQuerySchema, invalidBodyHook), async (c) => {
+		const query = c.req.valid("query");
+		return c.json(await listHistory(getDb(c.env), c.var.user.id, query));
 	})
 	.post(
 		"/round/matches/:matchId/score",

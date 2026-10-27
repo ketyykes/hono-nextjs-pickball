@@ -59,8 +59,9 @@ Depends on: §2
   - **先綠者（regression guard，非 RED）**：`matchmaker-history.test.ts`「auth 停用且無 DB binding 時歷史端點回 404」（路由不存在時也是 404）、「未登入呼叫歷史端點回 401」（sub-app 的 `requireSession` 已先擋）；`expected-user-guard.test.ts`「每條使用者資料路由在預期帳號與 session 不符時…」「缺少或空白的預期帳號標頭使…」（sub-app 的 `use("*")` 在路由不存在時仍先回 401）。機械複驗：`git show <RED commit>^:hono-pickball/src/routes/matchmaker.ts` 不含 `/history`。
   - 授權修改已執行：`SAMPLES` 補 `GET /api/matchmaker/history`、`toHaveLength(13)` → 14；其餘既有 it 名稱與斷言未動。
   - RED 階段 `pnpm --filter ./hono-pickball typecheck`（兩段）exit 0（測試不 import 尚不存在的模組，只靠 HTTP 呼叫）。
-- [ ] 3.2 GREEN（TDD）：新增 `src/matchmaker/history-repository.ts`（design Decision 2）；`src/routes/matchmaker.ts` 的既有 sub-app 加 `GET /history`（`zValidator("query", …, invalidBodyHook)` 回 400；不另建 sub-app，守衛由既有 `use("*", localAuth, requireSession, requireExpectedUser)` 涵蓋）。
+- [x] 3.2 GREEN（TDD）：新增 `src/matchmaker/history-repository.ts`（design Decision 2）；`src/routes/matchmaker.ts` 的既有 sub-app 加 `GET /history`（`zValidator("query", …, invalidBodyHook)` 回 400；不另建 sub-app，守衛由既有 `use("*", localAuth, requireSession, requireExpectedUser)` 涵蓋）。
   3.1 全綠（含 `expected-user-guard.test.ts` 全檔）；`pnpm --filter ./hono-pickball typecheck` exit 0
+  - 綠燈紀錄：`matchmaker-history.test.ts` 7/7 綠、`expected-user-guard.test.ts` 6/6 綠；`pnpm --filter ./hono-pickball typecheck`（兩段）與 `pnpm -r exec tsc --noEmit` 皆 exit 0。
 - [ ] 3.3 REFACTOR：逐列驗證與計數是否值得抽成與名單讀取共用的 helper；無壞味道則註記 skipped
 
 ## 4. 前端：歷史 API 包裝、雲端 hook 與歸屬清單
