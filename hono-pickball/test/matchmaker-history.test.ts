@@ -169,4 +169,30 @@ describe("/api/matchmaker/history 雲端歷史", () => {
 		expect(rows).toHaveLength(2);
 		expect(rows.find((row) => row.match_id === "broken")?.data).toBe(brokenData);
 	});
+
+	it("data 不是合法 JSON 的歷史列同樣被略過並計數而不使端點失敗", async () => {
+		const cookie = await seedAndSignIn("history-not-json@example.com");
+		const userId = await userIdOf("history-not-json@example.com");
+		const notJson = "{not json";
+		if (!env.DB) {
+			throw new Error("D1 binding DB 不存在");
+		}
+		await env.DB.prepare(
+			"INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		)
+			.bind(userId, "not-json", 150, notJson, 1, 1_700_000_000_000)
+			.run();
+		await seedHistory(userId, entryAt("good", 100));
+
+		const res = await request(cookie, "GET", "/history");
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as HistoryListBody;
+		expect(matchIdsOf(body)).toEqual(["good"]);
+		expect(body.droppedCount).toBe(1);
+		expect(body.total).toBe(2);
+		const rows = await rowsOf("matchmaker_history", userId);
+		expect(rows).toHaveLength(2);
+		expect(rows.find((row) => row.match_id === "not-json")?.data).toBe(notJson);
+	});
 });
