@@ -167,6 +167,13 @@ hook MUST 記錄目前結果所屬的 `userId`（擁有者標記），render 時
 - **THEN** 兩次皆只回合法那筆、`droppedCount` 為 1、`total` 為 2；資料表仍有兩列
 - **驗收**：`hono-pickball/test/matchmaker-history.test.ts`，it 名稱「不合 schema 的歷史列被略過並計入 droppedCount 且不被刪除」
 
+#### Scenario: 雲端歷史：data 不是合法 JSON 的列同樣被略過並計數
+
+- **GIVEN** 以 SQL 直接插入一筆 `data` 為非 JSON 文字（例：`{not json`）的列與一筆合法列
+- **WHEN** GET
+- **THEN** 回 200、只回合法那筆、`droppedCount` 為 1、`total` 為 2；該列的原始文字未被改寫——單一列損毀 SHALL NOT 使整個端點失敗（否則歷史頁、統計頁與匯出全部無法使用）
+- **驗收**：`hono-pickball/test/matchmaker-history.test.ts`，it 名稱「data 不是合法 JSON 的歷史列同樣被略過並計數而不使端點失敗」
+
 #### Scenario: 雲端歷史：rangeBounds 與 rangeOfTime 對任意時間判定一致
 
 - **GIVEN** 固定的 `now`（含跨月週與月初的情境）與涵蓋五個區間及各切點前後 1 毫秒的時間樣本

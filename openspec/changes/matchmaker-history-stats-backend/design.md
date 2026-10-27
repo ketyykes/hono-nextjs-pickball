@@ -118,6 +118,9 @@
    `remote-transfer.test.ts`「雲端匯入與備份的每個請求都帶呼叫端給的帳號」的備份呼叫次數 2 → 3。兩者都只是本 change 行為的必然結果，tasks 檔頭已列入。
 5. （apply §2 完成，2026-10-27）Implementer（sonnet）：df77c9f RED（3 紅、無先綠）→ b2621ee GREEN（`rangeBounds`、`api/history.ts`、`CORE_MODULES`）。Stage 1（sonnet）PASS。
    Stage 2（opus）第一輪 FAIL（實作無缺陷，9 條非等價存活：只帶 `to` 的查詢（「更早」區間）、`from=0` 的 truthy 判斷、`to` 的安全整數、`"1.0"`、回應五個欄位的必填性）→ c7f6e86 regression guard → 複審 PASS（9 條全紅、4 條等價對照綠、抽查 9 條仍紅）。
+6. （apply §3，leader 裁定 2026-10-27）§3 Implementer（sonnet）：1995cff RED（5 紅＋守衛列舉真紅；先綠：停用 404、未登入 401、守衛「不符」「缺少或空白」「未登入／停用優先」）→ 54b03f1 GREEN → 3d4e239（3.3 skipped）。Stage 1（sonnet）PASS；Stage 2（opus，41 條變異全殺、4 條等價對照綠）PASS。
+   Stage 2 實測：`data` 欄位若為非 JSON 文字，drizzle json mode 讀取時即拋錯 → 整個端點 500，歷史頁、統計頁與兩種匯出全部失效，與 Decision 2「略過並計數」的目的相反；
+   spec 字面「每一列的 data MUST 以 MatchHistoryEntrySchema 驗證：不合法者 … 計入 droppedCount」可涵蓋此情形。**裁定**：在 §3 追加 task 3.4（新增 Scenario「雲端歷史：data 不是合法 JSON 的列同樣被略過並計數」），以 `sql` 片段取原始文字再 `JSON.parse`。
 
 ## apply §1 查證紀錄（2026-10-27）
 

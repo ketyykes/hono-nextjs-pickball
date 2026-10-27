@@ -65,6 +65,8 @@ Depends on: §2
   - 後端全套（持共用高負載鎖）：`pnpm --filter ./hono-pickball test` 23 檔／164 個 it 全綠。
   - 變異驗證（Implementer 自跑，harness 在 /tmp/b8tools/s3，不入 repo）：共 44 次，40 次預期轉紅且皆轉紅，4 次等價對照（型別標註、`from` 改 truthy 判斷［from=0 與不篩選等價］、`data` 改取 `row.data`、只改註解）如預期仍綠；每次替換前 `count(old)==1`、`git diff --stat` 有輸出、輸出含 `Test Files`，還原後 `git status --porcelain` 與基線一致（皆為空）。
     涵蓋：列表與 total 各自拿掉 `user_id`；`from` 含改 `>`、`to` 不含改 `<=`、`from`／`to` 被忽略、`to` 改 truthy（to=0 被忽略）；desc／asc 次排序各自改 `rowid DESC`、拿掉次排序、主排序方向對調、`order` 被忽略（恆 desc／恆 asc）、預設改 asc；`total` 改為篩選後筆數／恆 0；損毀列改丟出 500／改為刪除／不計入 `droppedCount`／不驗證／`safeParse` 直通；`version` 改 2／加一、`data` 被改、每列重複；`zValidator` 拿掉、`invalidBodyHook` 拿掉、`HistoryQuerySchema` 改回 `z.coerce.number()`（400 it 轉紅）；`/history` 不經 `requireExpectedUser`（守衛「不符」「缺少或空白」兩 it 轉紅）、拿掉 `requireSession`、拿掉 `localAuth`、401 body／狀態碼改錯、停用改 403、`ACCOUNT_MISMATCH` 狀態碼改 403、守衛只擋缺少不擋不符、守衛樣本表的 history 條目拿掉（「列舉…一致」轉紅）、路徑改名。
+- [ ] 3.4 RED→GREEN（TDD，apply §3 Stage 2 追加，design Open Questions 6）：新增 it「data 不是合法 JSON 的歷史列同樣被略過並計數而不使端點失敗」（預期 500 → 真紅）；
+  `history-repository.ts` 以 `sql` 片段取 `data` 原始文字、`try { JSON.parse }` 失敗即計入 `droppedCount`，再交給 `MatchHistoryEntrySchema.safeParse`（不刪除、不改寫）。commit 分 `test:`／`feat:`
 - [x] 3.3 REFACTOR：逐列驗證與計數是否值得抽成與名單讀取共用的 helper；無壞味道則註記 skipped
   - skipped：名單、回合、分槽的 repository 皆無逐列 `safeParse` 與計數（`grep safeParse|count(` 僅 `history-repository.ts` 命中），只有一個使用端，抽 helper 屬單次使用抽象，無壞味道。
 

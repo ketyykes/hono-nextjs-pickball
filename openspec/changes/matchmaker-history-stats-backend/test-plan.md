@@ -42,6 +42,7 @@
 | 預設依 played_at 由新到舊且同時間依插入順序，asc 為由舊到新 | 雲端歷史：預設由新到舊、同時間依插入順序 | 兩種順序逐筆比對 | 與 `filterHistoryByRange` 的穩定排序一致 | integration |
 | from 含、to 不含地篩選 played_at，total 仍為全部筆數 | 雲端歷史：依 from 與 to 篩選且 total 不受篩選影響 | 只有 200；total 3 | 半開區間 | integration |
 | from、to 或 order 不合法時回 400 | 雲端歷史：不合法的查詢參數 | 五者 400（含 `from=` 空字串；§1 查證 `z.coerce.number()` 對空字串得 0） | 錯誤路徑 | integration |
+| data 不是合法 JSON 的歷史列同樣被略過並計數而不使端點失敗 | 雲端歷史：data 不是合法 JSON 的列同樣被略過並計數 | 200；items 只有合法那筆；droppedCount 1；total 2；原始文字不變 | apply §3 Stage 2 實測：drizzle json mode 讀取時 `JSON.parse` 拋錯 → 整個端點 500 → 紅 | integration |
 | （既有，B7.5，改樣本表）每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變；缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變 | 雲端歷史：預期帳號缺少或不符時歷史端點回 401 且不回傳歷史 | `SAMPLES` 補 `GET /api/matchmaker/history` 後兩個 it 對該路由逐變體 401＋快照不變 | 守衛在 sub-app 層；**路由不存在時 sub-app 的 `use("*")` 仍先回 401，預期先綠 → regression guard** | integration |
 | （既有，B7.5，**授權修改**）列舉出的使用者資料路由恰與守衛樣本表一致 | 同上 AND | 列舉＝樣本鍵；`toHaveLength(13)` 改 14 | 樣本先補、路由未加 → 列舉 13 ≠ 樣本 14 → **真紅** | integration |
 | 不合 schema 的歷史列被略過並計入 droppedCount 且不被刪除 | 雲端歷史：損毀列被略過並計數但不刪除 | 兩次 GET 一致；表仍兩列 | 雲端降級與本機的差異點 | integration |
