@@ -51,10 +51,14 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `test/matchmaker-history.test.ts`，spec「登入時歷史以雲端為準」中該檔的全部 7 個 it（以 `matchmaker-fixtures.ts` 的 `seedAndSignIn`／`request()`／`seedHistory` 登入與 seed；刻意損毀的一列以 SQL 直接插入）；
+- [x] 3.1 RED（TDD）：新增 `test/matchmaker-history.test.ts`，spec「登入時歷史以雲端為準」中該檔的全部 7 個 it（以 `matchmaker-fixtures.ts` 的 `seedAndSignIn`／`request()`／`seedHistory` 登入與 seed；刻意損毀的一列以 SQL 直接插入）；
   同時在 `test/expected-user-guard.test.ts` 的 `SAMPLES` 補 `GET /api/matchmaker/history`（B 有歷史 `h0`，放行即會回傳資料）並把 `toHaveLength(13)` 改為 14（檔頭授權）。確認紅燈並貼出輸出；
   **「auth 停用…回 404」預期先綠——點名標 regression guard**；「未登入…回 401」若因 sub-app 的 `requireSession` 先綠，同樣點名；
   守衛的「不符」「缺少或空白」兩個 it 對新樣本預期先綠（sub-app 的 `use("*")` 在路由不存在時仍先回 401），點名標 regression guard；「列舉…一致」應因列舉 13 ≠ 樣本 14 而**真紅**
+  - 紅燈紀錄：`matchmaker-history.test.ts` 7 個 it 中 5 個真紅（「B 看不到 A 的歷史且 total 為 0」「預設依 played_at…」「from 含、to 不含…」「from、to 或 order 不合法時回 400」「不合 schema 的歷史列被略過…」，皆為路由不存在而回 404：`expected 404 to be 200`／`expected 404 to be 400`）；`expected-user-guard.test.ts`「列舉出的使用者資料路由恰與守衛樣本表一致」真紅（`expected [ …(13) ] to deeply equal [ …(14) ]`）。
+  - **先綠者（regression guard，非 RED）**：`matchmaker-history.test.ts`「auth 停用且無 DB binding 時歷史端點回 404」（路由不存在時也是 404）、「未登入呼叫歷史端點回 401」（sub-app 的 `requireSession` 已先擋）；`expected-user-guard.test.ts`「每條使用者資料路由在預期帳號與 session 不符時…」「缺少或空白的預期帳號標頭使…」（sub-app 的 `use("*")` 在路由不存在時仍先回 401）。機械複驗：`git show <RED commit>^:hono-pickball/src/routes/matchmaker.ts` 不含 `/history`。
+  - 授權修改已執行：`SAMPLES` 補 `GET /api/matchmaker/history`、`toHaveLength(13)` → 14；其餘既有 it 名稱與斷言未動。
+  - RED 階段 `pnpm --filter ./hono-pickball typecheck`（兩段）exit 0（測試不 import 尚不存在的模組，只靠 HTTP 呼叫）。
 - [ ] 3.2 GREEN（TDD）：新增 `src/matchmaker/history-repository.ts`（design Decision 2）；`src/routes/matchmaker.ts` 的既有 sub-app 加 `GET /history`（`zValidator("query", …, invalidBodyHook)` 回 400；不另建 sub-app，守衛由既有 `use("*", localAuth, requireSession, requireExpectedUser)` 涵蓋）。
   3.1 全綠（含 `expected-user-guard.test.ts` 全檔）；`pnpm --filter ./hono-pickball typecheck` exit 0
 - [ ] 3.3 REFACTOR：逐列驗證與計數是否值得抽成與名單讀取共用的 helper；無壞味道則註記 skipped

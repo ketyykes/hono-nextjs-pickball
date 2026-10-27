@@ -96,6 +96,7 @@ const SAMPLES: Record<string, Sample> = {
 		path: "/api/matchmaker/round/matches/m1/score",
 		body: { scoreA: "11", scoreB: "7", roundVersion: 1 },
 	},
+	"GET /api/matchmaker/history": { method: "GET", path: "/api/matchmaker/history" },
 	// reset 會清空整個使用者的資料，排在最後：守衛被整條拿掉時，前面的 PUT／score 快照斷言才能先獨立轉紅
 	"POST /api/matchmaker/reset": { method: "POST", path: "/api/matchmaker/reset" },
 };
@@ -229,7 +230,7 @@ describe("使用者資料請求的預期帳號守衛", () => {
 		const enumerated = listUserDataRouteKeys();
 
 		expect(enumerated).toEqual(Object.keys(SAMPLES).sort());
-		expect(enumerated).toHaveLength(13);
+		expect(enumerated).toHaveLength(14);
 		for (const [routeKey, sample] of Object.entries(SAMPLES)) {
 			expect(routeKey.startsWith(`${sample.method} `), `${routeKey} 的樣本方法`).toBe(true);
 		}
