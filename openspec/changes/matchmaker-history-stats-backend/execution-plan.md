@@ -37,15 +37,17 @@ subagent 不繼承主對話 context。每次派工 MUST **逐字貼進 prompt**�
 a. **指令裡禁止 `cd`，一律用絕對路徑**（`pnpm --dir`、`git -C`、`pnpm --filter ./<workspace>`）。
 b. Implementer 交件前 MUST 自跑 mutation 並列出「幾次／改什麼／是否轉紅」。本 change 必做變異（依所屬群組）：
    - §2：`rangeBounds` 的任一界線改用相鄰切點、`today.to` 改為 `now`；`HistoryQuerySchema` 拿掉 `from < to`；回應 schema 的 `winner` 拿掉 `"draw"`。
-   - §3：拿掉 `user_id` 條件；`from` 改為 `>`、`to` 改為 `<=`；`desc` 的次排序改為 `rowid DESC`；`total` 改為篩選後筆數；損毀列改為丟出 500 或刪除該列；`order` 參數被忽略；`zValidator` 拿掉。
-   - §4：包裝的查詢字串少帶 `to`；hook 不以 `rangeBounds` 而以 `computeRangeCutoffs` 直接取錯一個切點；不丟棄過期回應；401 不呼叫 `onUnauthorized`；停用時仍請求。
+   - §3：拿掉 `user_id` 條件；`from` 改為 `>`、`to` 改為 `<=`；`desc` 的次排序改為 `rowid DESC`；`total` 改為篩選後筆數；損毀列改為丟出 500 或刪除該列；`order` 參數被忽略；`zValidator` 拿掉；
+     `HistoryQuerySchema` 改回 `z.coerce.number()`；守衛樣本表的 history 條目拿掉；（暫時性）把 `/history` 掛到不帶 `requireExpectedUser` 的另一個 sub-app。
+   - §4：包裝的查詢字串少帶 `to`；包裝不傳 `expectedUserId`；hook 不以 `rangeBounds` 而以 `computeRangeCutoffs` 直接取錯一個切點；不丟棄過期回應；401 不呼叫 `onUnauthorized`；停用時仍請求；
+     `userId` 為 null 時仍請求；主 effect 依賴拿掉 `userId`；擁有者標記比對拿掉（換帳號當下仍回 A 的歷史）；換帳號後 A 晚到的回應照樣套用。
    - §5：損毀提示文案改一字；`total === 0` 判定改為 `items.length === 0`；雲端統計改為只算勝負不算和局（以 `winner === "teamA"` 判定勝方以外皆敗）。
-   - §6：快照的 `history` 取本機或以 `desc` 請求；CSV 取本機；重置仍清本機歷史。
-   - §7：頁面在本機模式也渲染雲端元件；統計頁雲端內容仍掛 `useRoundStore`。
-   - **每個查詢參數、每個狀態碼分支、每個 `SyncStatus` 轉換都要有至少一個會轉紅的變異。**
+   - §6：快照的 `history` 取本機或以 `desc` 請求；快照的歷史 GET 不帶呼叫端帳號；歷史 401 不標示未授權；CSV 取本機；CSV 的 401 不標示未授權；重置仍清本機歷史。
+   - §7：頁面在本機模式也渲染雲端元件；統計頁雲端內容仍掛 `useRoundStore`；`HistoryCsvSection` 雲端分支未授權時不 `refresh()`（Stage 2 閱讀確認，比照 B7.5 OQ1 (a)）。
+   - **每個查詢參數、每個狀態碼分支、每個 `SyncStatus` 轉換、未登入／他人資料／帳號不符的每個授權分支都要有至少一個會轉紅的變異。**
 c. mutation harness 三重落地檢查：`src.count(old) == 1`、替換後 `new != old`、`git --no-pager diff --stat -- <file>` 有輸出；另放一條等價變異當對照組；每次變異後還原並確認 `git status` 乾淨。
 d. Stage 2 Reviewer MUST 獨立再做 mutation、逐分支逐欄位機械盤點覆蓋率，不採信 Implementer 自述。
-e. 後端 API 每個端點 MUST 有「未登入 401」「存取他人資料被拒」「auth 停用 404」三類測試（test-plan 授權覆蓋表）。
+e. 後端 API 每個端點 MUST 有「未登入 401」「存取他人資料被拒」「auth 停用 404」「X-Expected-User-Id 缺少／不符 401 ACCOUNT_MISMATCH」四類測試（test-plan 授權覆蓋表；第四類由 `expected-user-guard.test.ts` 列舉測試＋樣本覆蓋）。
 f. 紅燈宣稱一律用 `git show <commit>^:<path>` 機械複驗；查核不過改標 regression guard。
 g. 逐 task commit；註解只寫「為什麼」。
 h. 編輯器診斷不可信，以 `pnpm -r exec tsc --noEmit` 與 `pnpm --filter ./hono-pickball typecheck` 的 exit code 為準。測試一律顯式匯入 `describe`／`it`／`expect`／`vi`。
@@ -57,7 +59,7 @@ k. **測試帳密禁止寫進任何會被 commit 的檔案或 commit 訊息**；
 l. 單檔測試 `pnpm --filter ./<workspace> test --run <path>`，**`--run` 前不可加 `--`**。
 m. **SHALL NOT 新增任何 npm 相依**；需要時回報 `BLOCKED`。
 n. **既有 it／test 的名稱與斷言一律不得修改**，唯一例外為 tasks 檔頭列出的三個 it；本機元件與 `history-range.ts` 既有函式一行不改。
-o. Commit：Conventional Commits、繁體中文，結尾一行 `Claude-Session: <coordinator 傳下的值>`，不得加 Generated 或 Co-Authored-By。
+o. Commit：Conventional Commits、繁體中文；**commit 訊息不得加任何 attribution／footer 行**（不加 Claude-Session、Generated、Co-Authored-By；coordinator 2026-10-27 指示）。
 p. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**之前**乾淨停止，狀態寫進 design.md `## Open Questions` 並 commit 後回報。
 q. **後端 SHALL NOT 計算區間切點**（Workers 為 UTC）；區間只經核心 `rangeBounds`。
 
@@ -86,7 +88,7 @@ q. **後端 SHALL NOT 計算區間切點**（Workers 為 UTC）；區間只經�
 - **required first action**：覆述收到的 spec／test-plan 片段標題；對不上回報 `NEEDS_CONTEXT`。
 - **review checklist**：
   - [ ] 每個 Scenario 都有對應測試或指令驗收，名稱逐字相同。
-  - [ ] 授權覆蓋表三欄齊備（e）。
+  - [ ] 授權覆蓋表四欄齊備（e）；守衛樣本表含 `GET /api/matchmaker/history`。
   - [ ] 雲端歷史端點沒有任何寫入路徑；統計頁雲端內容不掛回合 store。
   - [ ] 平局統計在雲端路徑有 E2E 守住，draw-followups 的 it 原樣通過。
   - [ ] 沒有 scope creep：沒有後端統計、沒有分頁、沒有匯入。

@@ -71,7 +71,23 @@
 
 ### Decision 6：核心 `api/history.ts`
 
-**Choice**：`HistoryQuerySchema`（`from`／`to` 以 `z.coerce.number().int().nonnegative()`、`order` 列舉、`from < to` 的 refine）、`HistoryListResponseSchema`；`CORE_MODULES` 加一項。
+**Choice**：`HistoryQuerySchema`（`from`／`to` 以 `z.string().regex(/^\d+$/)` 轉數字並要求安全整數——apply §1 實測 `z.coerce.number()` 對空字串得 0，見查證紀錄；`order` 列舉、`from < to` 的 refine）、`HistoryListResponseSchema`；`CORE_MODULES` 加一項。
+
+### Decision 7：對齊 B7.5 預期帳號守衛（apply §1 追加）
+
+**Choice**：
+- 後端：`GET /history` 加在既有 matchmaker sub-app，沿用 `use("*", localAuth, requireSession, requireExpectedUser)`；`test/expected-user-guard.test.ts` 的 `SAMPLES` 補一條、列舉數 13 → 14（授權修改既有 it 的一個數字）。
+- 前端包裝：`fetchRemoteHistory(expectedUserId, query)`。
+- hook：`useRemoteHistory({ enabled, userId, range, onUnauthorized })`；主 effect 依賴含 `userId`；以 `useReducer` 保存 `{ owner, items, total, droppedCount, syncStatus }`，render 時 `owner !== userId` 回傳空結果與 `loading`；
+  請求序號（`ref` 遞增）只採用最後一次；effect cleanup 設 `cancelled`，舊世代或舊 range 的結果不 dispatch。`enabled && userId !== null` 才請求。
+- 雲端內容元件：`RemoteHistoryView`、`RemoteStatsContent` 自行 `useSession()` 取 user id 與 `refresh`（比照選擇器 hook 的接線）；元件測試 mock `@/hooks/useSession`。
+- 一次性操作：`buildRemoteBackupSnapshot(expectedUserId)` 三個 GET 用同一個 id；`buildRemoteHistoryCsv(expectedUserId)` 回 `{ ok: true, csv } | RemoteTransferFailure`；
+  401 回既有 `unauthorizedFailure()`（先檢查所有讀取有無 401，再檢查其他失敗——使 B7.5 的「遇到 401 時標示未授權」it 不需改動）；`HistoryCsvSection` 雲端分支以點擊當下的 user id 呼叫、失敗顯示訊息、未授權時 `refresh()`。
+  CSV 失敗訊息新增 `REMOTE_TRANSFER_MESSAGES.historyCsvFetchFailed`；備份快照的歷史讀取失敗沿用 `backupFetchFailed`（其文案只提「參賽者名單」為 B7 既有的不精確，列後續，不在本 change 改）。
+
+**Rationale**：B7.5 design「交接給 B8／B9」逐條要求；`user-data-sync`「雲端 store 以登入帳號為界」已以「之後的 change 新增者」涵蓋本 change 的 hook 與一次性操作，故只在 `match-history`／`data-transfer` 補 Scenario，不 MODIFIED `user-data-sync`。
+
+**Alternatives considered**：MODIFIED `user-data-sync`「雲端 store 以登入帳號為界」把 `useRemoteHistory` 列入清單——需逐字帶入 12 個 Scenario，與 B9 撞同一條，且該 Requirement 已寫明「之後的 change 新增者」。不選。
 
 ## Risks / Trade-offs
 
@@ -93,5 +109,35 @@
 
 ## Open Questions
 
-1. `z.coerce.number()` 對空字串會轉成 0（`?from=` 被視為 0），§1 決定是否以 `z.string().regex(/^\d+$/)` 再轉數字（建議後者，並把「空字串」加入 400 的測試樣本）。
+1. ~~`z.coerce.number()` 對空字串會轉成 0~~ → **apply §1 已定案**：採 `z.string().regex(/^\d+$/)` 再轉數字（Decision 6），「空字串」已加入 400 的測試樣本（delta「雲端歷史：不合法的查詢參數」）。
 2. `RemoteStatsContent` 在名單 `load-failed`、歷史 `synced` 時的呈現：沿用 B6「名單載入失敗以 `SyncStatusNotice` 取代內容」，§7 E2E 驗證。
+3. **（apply §1，待 coordinator 知悉，非阻擋）`player-roster`「resetLocalMatchProgress 只清除本次活動的進度」沿用標題、內容改寫**：OpenSpec 的 MODIFIED 不可丟棄主 spec 既有 Scenario（validate 擋），
+   而本 change 刪除該函式與其 it。比照 B7 apply §1 的前例（沿用主 spec 標題、改寫內容），本 Scenario 改為以指令 `rg resetLocalMatchProgress nextjs-pickball` 無輸出守住「函式已刪除」，
+   標題的字面語意與內容不再一致（標題是舊行為）。替代方案為 REMOVED＋ADDED 整條 Requirement（11 個 Scenario、Requirement 移到主 spec 末尾），成本高於收益，不選。若 coordinator 要求改名，需另開 change 處理。
+4. **（apply §1，B7.5 交接）授權修改的既有 it 由三個增為五個**：`expected-user-guard.test.ts`「列舉出的使用者資料路由恰與守衛樣本表一致」的路由數 13 → 14（B7.5 刻意設計的交接紅燈）；
+   `remote-transfer.test.ts`「雲端匯入與備份的每個請求都帶呼叫端給的帳號」的備份呼叫次數 2 → 3。兩者都只是本 change 行為的必然結果，tasks 檔頭已列入。
+
+## apply §1 查證紀錄（2026-10-27）
+
+**1.1 環境**：見 environment.md Verification（baseline 前端 100／1010、後端 22／157、核心 6／13；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 34；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` exit 0）。
+
+**1.2 對齊 main**：
+- 後端：`src/routes/matchmaker.ts` 的 sub-app 已為 `.use("*", localAuth, requireSession, requireExpectedUser).onError(userDataOnError)`，`invalidBodyHook` 在 `src/http/invalid-body.ts`；`matchmaker_history` 的 `played_at` 為 `integer({ mode: "timestamp_ms" })`（drizzle 以 `Date` 讀寫，SQL 比較時為毫秒整數）。
+  既有排序前例：`players-repository.ts` 以 `.orderBy(asc(...), sql\`rowid\`)`。測試 helper：`test/helpers/matchmaker-fixtures.ts` 已有 `seedAndSignIn`、`request()`（有 cookie 時自動帶 `X-Expected-User-Id`）、`makeHistoryEntry`、`seedHistory`（`played_at` 取自 `entry.playedAt`）、`rowsOf`；`test/helpers/session.ts` 有 `userIdOf`、`expectedUserHeader`。
+- 核心：`CORE_MODULES` 在 `packages/pickball-core/test/module-boundary.test.ts`（目前 24 項）；`test/matchmaker/` 目錄尚不存在（新增）；zod `^4.4.3`。
+- 前端：`requestJson(method, path, { body?, schema, expectedUserId })`；`remote-transfer.ts` 已有 `unauthorizedFailure()`（不可列舉的 `unauthorized: true`）；`buildRemoteBackupSnapshot(expectedUserId)` 的 history 取 `readSnapshot().history`；
+  `HistoryCsvSection` 尚無 session 與訊息狀態；`JsonBackupSection` 已以點擊時的 user id 呼叫並在未授權時 `refresh()`（範本）；選擇器以 `session.status === "ready" ? session.user?.id ?? null : null` 取 user id、`onUnauthorized: session.refresh`。
+  統計頁仍掛 `useRosterStore`＋`useRoundStore`；歷史頁 `page.tsx` 為 server component、只渲染 `HistoryView`。
+- MODIFIED Requirement 與目前主 spec 逐段比對（python difflib）：`match-history` 兩條、`data-transfer` 一條、`pickleball-guide-page` 一條除本 change 刻意增修外無差異（主 spec 已含 B7 的 `useRemoteRoundStore`／`useRemoteMatchSlotStore`）；
+  `player-stats`「統計依區間篩選」把 `nextjs-pickball/lib/matchmaker/history-range.ts` 改為核心路徑（模組已移至核心，屬正確修正），且兩個區塊末尾漏了主 spec 的 `---` → 已補回；
+  `player-roster`「重置名單與二次確認」缺兩個 Scenario（validate --strict 失敗）→ 「登入時重置名單前停止所有待送與重試中的變更」原文帶入；「resetLocalMatchProgress 只清除本次活動的進度」見 Open Questions 3。commit `d6dd2dd`。
+- B7.5 交接（`changes/archive/2026-10-27-user-data-account-guard/design.md`「交接給 B8／B9」、`hono-pickball/CLAUDE.md`「後續 change 須知」第 4 點、`nextjs-pickball/CLAUDE.md` 帳號世代段）逐項落實為 Decision 7，並寫入 delta（commit `4030332`）、test-plan 授權覆蓋表第四欄、tasks 檔頭與 §3／§4／§6／§7。
+- B7 交接（`2026-10-24-matchmaker-round-score-backend/design.md`「交接給 B8～B9」）：`played_at` 與 `rowid` 追加順序、`useRemoteRoundStore.history` 恆空、刪除 `resetLocalMatchProgress()`、快照 history 改雲端——皆已在本 change 範圍內；後端測試 seed 用 `matchmaker-fixtures.ts`。
+- 新增 Scenario 標題皆加 Requirement 專屬前綴（雲端歷史／歷史頁唯讀／損毀提示／統計區間／統計空狀態／統計頁唯讀／登入資料工具）；模擬合併後逐標題計數：五個 capability 皆無新增重複（`player-roster`「刪除參賽者」為主 spec 既有的重複，B7.5 OQ5 已裁定不處理）。
+
+**1.3 Context7 查證**：
+- `/cloudflare/cloudflare-docs`（`workers/wrangler/commands/workers` 的 dev、`workers/local-development`）：「`wrangler dev` runs the local `workerd` runtime with `TZ=UTC` to match the production Cloudflare runtime. `Date` and `Intl` APIs inside your Worker observe UTC」——與 Decision 1 一致。
+- `/colinhacks/zod`（`packages/zod/src/v4/core/schemas.ts` 的 `$ZodNumber`）：`coerce` 為 `payload.value = Number(payload.value)` 後只檢查 finite number。本機以 zod 4.4.3 實測 `z.coerce.number().int().nonnegative()`：`""` → 0（通過）、`" 12 "` → 12、`"1e3"` → 1000、`"0x10"` → 16。
+  **與 design 假設的差異**：不只空字串，空白、科學記號與十六進位也會被接受 → Decision 6 改為 regex＋安全整數，Open Questions 1 定案。
+- `/drizzle-team/drizzle-orm-docs`（`sql` 運算子於 `orderBy`）：`orderBy` 可放 `sql` 模板片段（`.orderBy(sql\`${t.id} desc nulls first\`)`），可與 `asc()`／`desc()` 混用多欄——與 Decision 2（`desc(playedAt), sql\`rowid\``）一致；repo 內 `players-repository.ts` 已有相同用法。
+
