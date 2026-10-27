@@ -27,6 +27,8 @@
 - **THEN** 兩位球員的勝負和欄皆依序為 `0`、`0`、`1`，出場數皆為 1
 - **驗收**：`nextjs-pickball/tests/e2e/user-data/history-sync.spec.ts`，test 名稱「登入時計時回合的平局在統計頁計為和局」
 
+---
+
 ### Requirement: 空狀態的呈現
 
 `matchmaker:history:v1` 完全沒有任何紀錄時，統計頁 SHALL 顯示
@@ -49,6 +51,8 @@ SHALL NOT 顯示只有標題列的空表格——排行榜在完全沒有資料�
 - **THEN** 顯示引導型空狀態、不顯示排行榜表格
 - **AND** `total` 為 5 而 `items` 為空時，顯示排行榜表格（名單成員皆為出場 0）
 - **驗收**：`nextjs-pickball/components/matchmaker/RemoteStatsContent.test.tsx`，it 名稱「雲端 total 為 0 時顯示引導型空狀態，否則顯示排行榜」
+
+---
 
 ### Requirement: 統計頁的可用性、無障礙與唯讀保證
 

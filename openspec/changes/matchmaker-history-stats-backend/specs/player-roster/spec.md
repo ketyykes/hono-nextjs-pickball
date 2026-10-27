@@ -45,12 +45,29 @@
 - **AND** `scoreboard:current:v1` **不受影響**
 - **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「重置只移除列舉的四個 key，不影響獨立計分板資料」
 
+#### Scenario: resetLocalMatchProgress 只清除本次活動的進度
+
+> B8 起本 Scenario 改為守住「過渡函式已刪除」：OpenSpec 的 MODIFIED 不可丟棄主 spec 既有 Scenario，故沿用原標題、改寫內容（design「apply §1 查證紀錄」）。
+> 「本次活動的進度」在 B8 起已全部位於雲端，由後端 reset batch 清除（見「登入時重置名單」），前端不再清除任何本機 key。
+
+- **GIVEN** B8 起登入時的重置不再清除任何本機 key
+- **WHEN** 在 `nextjs-pickball/` 搜尋 `resetLocalMatchProgress`
+- **THEN** 沒有任何結果；本機重置只剩 `resetMatchmakerData()` 一個入口（見「重置只清除列舉範圍內的 key」）
+- **驗收**：指令 `rg resetLocalMatchProgress nextjs-pickball` 無輸出（tasks 6.2）；本機 key 皆保留由 `nextjs-pickball/hooks/useRemoteRosterStore.test.tsx` 的「resetRoster 成功後清空名單且不清除任何本機資料」驗證
+
 #### Scenario: 登入時重置名單
 
 - **GIVEN** 雲端模式，名單已載入 3 位，`POST /api/matchmaker/reset` 回 204
 - **WHEN** 呼叫 `resetRoster()`
 - **THEN** 該 POST 被呼叫一次；名單變為空、`syncStatus` 為 `synced`；本機 `RESET_KEYS` 的四個 key 與 `scoreboard:current:v1` 皆保留
 - **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「resetRoster 成功後清空名單且不清除任何本機資料」
+
+#### Scenario: 登入時重置名單前停止所有待送與重試中的變更
+
+- **GIVEN** 雲端模式，p1 的 v0 PUT 回 503 正在等待退避重試
+- **WHEN** 呼叫 `resetRoster()`，`POST /api/matchmaker/reset` 回 204，之後推進時間超過退避表全長
+- **THEN** reset 送出後不再有任何對 `/api/matchmaker/players/p1` 的 PUT（否則重試的 v0 PUT 會在雲端重置後讓 p1「復活」）；名單為空
+- **驗收**：`nextjs-pickball/hooks/useRemoteRosterStore.test.tsx`，it 名稱「resetRoster 送出前停止所有參賽者的待送與重試中變更」
 
 #### Scenario: 登入時重置失敗不動名單
 
