@@ -19,8 +19,10 @@ export async function listHistory(db: Db, userId: string, query: HistoryQuery): 
 	}
 	const primaryOrder = query.order === "asc" ? asc(matchmakerHistory.playedAt) : desc(matchmakerHistory.playedAt);
 
+	// 以 sql 片段取 data 原始文字：drizzle json mode 會在讀取時直接 JSON.parse，
+	// 單列非 JSON 就會讓整個查詢拋錯（500），歷史頁、統計頁與匯出全部不能用
 	const rows = await db
-		.select()
+		.select({ rawData: sql<string>`${matchmakerHistory.data}`, version: matchmakerHistory.version })
 		.from(matchmakerHistory)
 		.where(and(...conditions))
 		.orderBy(primaryOrder, sql`rowid`);
@@ -34,7 +36,14 @@ export async function listHistory(db: Db, userId: string, query: HistoryQuery): 
 	const items: HistoryListResponse["items"] = [];
 	let droppedCount = 0;
 	for (const row of rows) {
-		const parsed = MatchHistoryEntrySchema.safeParse(row.data);
+		let raw: unknown;
+		try {
+			raw = JSON.parse(row.rawData);
+		} catch {
+			droppedCount += 1;
+			continue;
+		}
+		const parsed = MatchHistoryEntrySchema.safeParse(raw);
 		if (!parsed.success) {
 			droppedCount += 1;
 			continue;
