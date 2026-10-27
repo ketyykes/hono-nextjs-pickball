@@ -38,7 +38,8 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/matchmaker/history-range-bounds.test.ts`（兩個 it）與 `test/api/history.test.ts`（一個 it）。確認紅燈
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/matchmaker/history-range-bounds.test.ts`（兩個 it）與 `test/api/history.test.ts`（一個 it）。確認紅燈
+  - 紅燈紀錄：`history-range-bounds.test.ts` 2 個 it 皆紅（`TypeError: rangeBounds is not a function`）；`history.test.ts` 整檔紅（`Cannot find module '../../src/api/history'`，1 個 it 無法載入）。無先綠者，無 regression guard。
 - [ ] 2.2 GREEN（TDD）：`src/matchmaker/history-range.ts` 新增 `rangeBounds`（既有函式不改，`git diff` 只見新增）；新增 `src/api/history.ts`；`CORE_MODULES` 加 `api/history`
 
 ## 3. 後端：歷史讀取 API
