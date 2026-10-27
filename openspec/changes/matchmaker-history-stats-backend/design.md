@@ -116,6 +116,8 @@
    標題的字面語意與內容不再一致（標題是舊行為）。替代方案為 REMOVED＋ADDED 整條 Requirement（11 個 Scenario、Requirement 移到主 spec 末尾），成本高於收益，不選。若 coordinator 要求改名，需另開 change 處理。
 4. **（apply §1，B7.5 交接）授權修改的既有 it 由三個增為五個**：`expected-user-guard.test.ts`「列舉出的使用者資料路由恰與守衛樣本表一致」的路由數 13 → 14（B7.5 刻意設計的交接紅燈）；
    `remote-transfer.test.ts`「雲端匯入與備份的每個請求都帶呼叫端給的帳號」的備份呼叫次數 2 → 3。兩者都只是本 change 行為的必然結果，tasks 檔頭已列入。
+5. （apply §2 完成，2026-10-27）Implementer（sonnet）：df77c9f RED（3 紅、無先綠）→ b2621ee GREEN（`rangeBounds`、`api/history.ts`、`CORE_MODULES`）。Stage 1（sonnet）PASS。
+   Stage 2（opus）第一輪 FAIL（實作無缺陷，9 條非等價存活：只帶 `to` 的查詢（「更早」區間）、`from=0` 的 truthy 判斷、`to` 的安全整數、`"1.0"`、回應五個欄位的必填性）→ c7f6e86 regression guard → 複審 PASS（9 條全紅、4 條等價對照綠、抽查 9 條仍紅）。
 
 ## apply §1 查證紀錄（2026-10-27）
 
