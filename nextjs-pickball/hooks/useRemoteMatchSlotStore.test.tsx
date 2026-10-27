@@ -58,6 +58,7 @@ function renderSlot(options: { enabled: boolean; onUnauthorized?: () => void }) 
 		const value = useRemoteMatchSlotStore({
 			enabled: options.enabled,
 			matchId: "m1",
+			userId: "user-a",
 			onUnauthorized,
 		});
 		bindingLog.push(value[2]);
@@ -70,6 +71,35 @@ async function settle(ms = 50): Promise<void> {
 	await act(async () => {
 		await new Promise((resolve) => setTimeout(resolve, ms));
 	});
+}
+
+/** 假計時器下推進時間；waitFor 在 vitest 假計時器下會卡住，因此帳號世代的測試一律用它。 */
+async function advance(ms: number): Promise<void> {
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(ms);
+	});
+}
+
+function expectedUserOf(init: RequestInit | undefined): string | null {
+	return new Headers(init?.headers).get("X-Expected-User-Id");
+}
+
+interface AccountProps {
+	userId: string | null;
+}
+
+function renderAccount(initialProps: AccountProps) {
+	const rendered = renderHook(
+		(props: AccountProps) =>
+			useRemoteMatchSlotStore({
+				enabled: true,
+				matchId: "m1",
+				userId: props.userId,
+				onUnauthorized: vi.fn(),
+			}),
+		{ initialProps },
+	);
+	return rendered;
 }
 
 beforeEach(() => {
@@ -322,7 +352,7 @@ describe("useRemoteMatchSlotStore", () => {
 		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
 		const rendered = renderHook(
 			({ enabled, matchId }) =>
-				useRemoteMatchSlotStore({ enabled, matchId, onUnauthorized: vi.fn() }),
+				useRemoteMatchSlotStore({ enabled, matchId, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true, matchId: "m1" } },
 		);
 		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
@@ -366,7 +396,7 @@ describe("useRemoteMatchSlotStore", () => {
 		const second = vi.fn();
 		const rendered = renderHook(
 			({ onUnauthorized }) =>
-				useRemoteMatchSlotStore({ enabled: true, matchId: "m1", onUnauthorized }),
+				useRemoteMatchSlotStore({ enabled: true, matchId: "m1", userId: "user-a", onUnauthorized }),
 			{ initialProps: { onUnauthorized: first } },
 		);
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -402,7 +432,7 @@ describe("useRemoteMatchSlotStore", () => {
 		enqueue(200, { data: slotWithScores(2, 1), version: 4 });
 		const rendered = renderHook(
 			({ matchId }) =>
-				useRemoteMatchSlotStore({ enabled: true, matchId, onUnauthorized: vi.fn() }),
+				useRemoteMatchSlotStore({ enabled: true, matchId, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { matchId: "m1" } },
 		);
 		await waitFor(() => expect(rendered.result.current[2]).toBe("bound"));
@@ -426,6 +456,7 @@ describe("useRemoteMatchSlotStore", () => {
 			const value = useRemoteMatchSlotStore({
 				enabled: true,
 				matchId: "m1",
+				userId: "user-a",
 				onUnauthorized: vi.fn(),
 			});
 			statusLog.push(value[3]);
@@ -440,5 +471,44 @@ describe("useRemoteMatchSlotStore", () => {
 		queue.push(() => Promise.resolve(new Response(null, { status: 204 })));
 		const { result } = renderSlot({ enabled: true });
 		await waitFor(() => expect(result.current[3]).toBe("load-failed"));
+	});
+
+	it("userId 變更時丟棄前一帳號的待送變更並以新帳號重新載入", async () => {
+		vi.useFakeTimers();
+		try {
+			enqueue(200, { data: slotWithScores(2, 1), version: 4 });
+			const { result, rerender } = renderAccount({ userId: "user-a" });
+			await advance(0);
+			expect(result.current[2]).toBe("bound");
+
+			enqueue(500);
+			act(() => {
+				result.current[1]({ type: "RALLY_WON", winner: "us" });
+			});
+			await advance(0);
+			expect(putCalls()).toHaveLength(1);
+			const before = fetchMock.mock.calls.length;
+
+			enqueue(200, { data: null, version: 0 });
+			rerender({ userId: "user-b" });
+			await advance(30_000);
+
+			const after = fetchMock.mock.calls.slice(before);
+			expect(after).toHaveLength(1);
+			expect(after[0][1]?.method ?? "GET").toBe("GET");
+			expect(expectedUserOf(after[0][1])).toBe("user-b");
+			expect(result.current[2]).toBe("missing");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("enabled 為 true 但 userId 為 null 時不發出任何請求", async () => {
+		const { result } = renderAccount({ userId: null });
+		act(() => {
+			result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		await settle();
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

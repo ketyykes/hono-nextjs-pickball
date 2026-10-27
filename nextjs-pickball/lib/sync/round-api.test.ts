@@ -33,12 +33,12 @@ describe("round-api", () => {
 	});
 
 	it("回合 API 包裝以正確的方法、路徑與 body 呼叫 requestJson", async () => {
-		await fetchRemoteRound();
-		await putRemoteRound(ROUND, 3);
-		await fetchRemoteSlots();
-		await fetchRemoteSlot("m 1");
-		await putRemoteSlot("m 1", SLOT, 0);
-		await submitRemoteScore("m 1", "11", "7", 4);
+		await fetchRemoteRound("user-a");
+		await putRemoteRound("user-a", ROUND, 3);
+		await fetchRemoteSlots("user-a");
+		await fetchRemoteSlot("user-a", "m 1");
+		await putRemoteSlot("user-a", "m 1", SLOT, 0);
+		await submitRemoteScore("user-a", "m 1", "11", "7", 4);
 
 		const calls = vi.mocked(requestJson).mock.calls;
 		expect(calls).toHaveLength(6);
@@ -77,12 +77,12 @@ describe("round-api", () => {
 	it("原樣回傳 requestJson 的結果", async () => {
 		const result = { kind: "conflict" } as const;
 		vi.mocked(requestJson).mockResolvedValue(result);
-		await expect(fetchRemoteRound()).resolves.toBe(result);
-		await expect(putRemoteRound(ROUND, 1)).resolves.toBe(result);
-		await expect(fetchRemoteSlots()).resolves.toBe(result);
-		await expect(fetchRemoteSlot("m1")).resolves.toBe(result);
-		await expect(putRemoteSlot("m1", SLOT, 1)).resolves.toBe(result);
-		await expect(submitRemoteScore("m1", "1", "2", 1)).resolves.toBe(result);
+		await expect(fetchRemoteRound("user-a")).resolves.toBe(result);
+		await expect(putRemoteRound("user-a", ROUND, 1)).resolves.toBe(result);
+		await expect(fetchRemoteSlots("user-a")).resolves.toBe(result);
+		await expect(fetchRemoteSlot("user-a", "m1")).resolves.toBe(result);
+		await expect(putRemoteSlot("user-a", "m1", SLOT, 1)).resolves.toBe(result);
+		await expect(submitRemoteScore("user-a", "m1", "1", "2", 1)).resolves.toBe(result);
 	});
 
 	// regression guard：兩個 PUT 回應 schema 原本只以常數身分比對，換成對方的 schema 時仍會綠燈
@@ -105,5 +105,20 @@ describe("round-api", () => {
 
 		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validSlot, version: 1 }).success).toBe(true);
 		expect(PUT_SLOT_RESPONSE_SCHEMA.safeParse({ data: validRound, version: 1 }).success).toBe(false);
+	});
+
+	it("包裝把 expectedUserId 交給 requestJson", async () => {
+		await fetchRemoteRound("user-a");
+		await putRemoteRound("user-a", ROUND, 3);
+		await fetchRemoteSlots("user-a");
+		await fetchRemoteSlot("user-a", "m 1");
+		await putRemoteSlot("user-a", "m 1", SLOT, 0);
+		await submitRemoteScore("user-a", "m 1", "11", "7", 4);
+
+		const calls = vi.mocked(requestJson).mock.calls;
+		expect(calls).toHaveLength(6);
+		for (const call of calls) {
+			expect(call[2].expectedUserId).toBe("user-a");
+		}
 	});
 });

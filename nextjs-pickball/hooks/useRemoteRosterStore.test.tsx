@@ -98,7 +98,11 @@ function renderRemote(options: {
 	const statusLog: SyncStatus[] = [];
 	const rendered = renderHook(
 		() => {
-			const value = useRemoteRosterStore({ enabled: options.enabled, onUnauthorized });
+			const value = useRemoteRosterStore({
+				enabled: options.enabled,
+				userId: "user-a",
+				onUnauthorized,
+			});
 			statusLog.push(value.syncStatus);
 			return value;
 		},
@@ -113,6 +117,40 @@ async function settle(ms = 50): Promise<void> {
 		await new Promise((resolve) => setTimeout(resolve, ms));
 	});
 }
+
+/** 假計時器下推進時間；waitFor 在 vitest 假計時器下會卡住，因此帳號世代的測試一律用它。 */
+async function advance(ms: number): Promise<void> {
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(ms);
+	});
+}
+
+function expectedUserOf(init: RequestInit | undefined): string | null {
+	return new Headers(init?.headers).get("X-Expected-User-Id");
+}
+
+interface AccountProps {
+	userId: string | null;
+}
+
+function renderAccount(initialProps: AccountProps) {
+	const renders: Array<ReturnType<typeof useRemoteRosterStore>> = [];
+	const rendered = renderHook(
+		(props: AccountProps) => {
+			const value = useRemoteRosterStore({
+				enabled: true,
+				userId: props.userId,
+				onUnauthorized: vi.fn(),
+			});
+			renders.push(value);
+			return value;
+		},
+		{ initialProps },
+	);
+	return { ...rendered, renders };
+}
+
+const NEW_PLAYER_INPUT = { name: "新球員", gender: "male", rating: 3 } as const;
 
 beforeEach(() => {
 	queue = [];
@@ -754,7 +792,7 @@ describe("useRemoteRosterStore 補充守護", () => {
 		enqueue(200, listBody([[makePlayer("p1"), 3]]));
 		enqueue(200, listBody([]));
 		const rendered = renderHook(
-			({ enabled }) => useRemoteRosterStore({ enabled, onUnauthorized: vi.fn() }),
+			({ enabled }) => useRemoteRosterStore({ enabled, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true } },
 		);
 		await waitFor(() => expect(rendered.result.current.players).toHaveLength(1));
@@ -787,7 +825,7 @@ describe("useRemoteRosterStore 補充守護", () => {
 		fetchMock.mockClear();
 		enqueue(200, listBody([[makePlayer("p1"), 3]]));
 		const rendered = renderHook(
-			({ enabled }) => useRemoteRosterStore({ enabled, onUnauthorized: vi.fn() }),
+			({ enabled }) => useRemoteRosterStore({ enabled, userId: "user-a", onUnauthorized: vi.fn() }),
 			{ initialProps: { enabled: true } },
 		);
 		await waitFor(() => expect(rendered.result.current.syncStatus).toBe("synced"));
@@ -1351,5 +1389,108 @@ describe("useRemoteRosterStore 重置期間舊世代結果的處理邊界", () =
 			releaseDelete(401, {});
 		});
 		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+	});
+
+	it("userId 變更時丟棄前一帳號的待送變更並以新帳號重新載入", async () => {
+		vi.useFakeTimers();
+		try {
+			enqueue(200, listBody([[makePlayer("a1"), 1], [makePlayer("a2"), 1]]));
+			const { result, rerender } = renderAccount({ userId: "user-a" });
+			await advance(0);
+			expect(result.current.syncStatus).toBe("synced");
+
+			enqueue(500);
+			act(() => {
+				result.current.addPlayer(NEW_PLAYER_INPUT);
+			});
+			await advance(0);
+			expect(putCalls()).toHaveLength(1);
+			const before = fetchMock.mock.calls.length;
+
+			enqueue(200, listBody([[makePlayer("b1"), 2]]));
+			rerender({ userId: "user-b" });
+			await advance(30_000);
+
+			const after = fetchMock.mock.calls.slice(before);
+			expect(after).toHaveLength(1);
+			expect(after[0][1]?.method ?? "GET").toBe("GET");
+			expect(expectedUserOf(after[0][1])).toBe("user-b");
+			expect(callsOf("DELETE")).toHaveLength(0);
+			expect(result.current.players.map((player) => player.id)).toEqual(["b1"]);
+			expect(result.current.syncStatus).toBe("synced");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("每個世代的請求一律帶該世代的帳號", async () => {
+		vi.useFakeTimers();
+		try {
+			enqueue(200, listBody([]));
+			const { result, rerender } = renderAccount({ userId: "user-a" });
+			await advance(0);
+
+			enqueue(500);
+			enqueueEcho(1);
+			act(() => {
+				result.current.addPlayer(NEW_PLAYER_INPUT);
+			});
+			await advance(1_500);
+			expect(putCalls()).toHaveLength(2);
+			const beforeSwitch = fetchMock.mock.calls.length;
+
+			enqueue(200, listBody([]));
+			enqueueEcho(1);
+			rerender({ userId: "user-b" });
+			await advance(0);
+			act(() => {
+				result.current.addPlayer(NEW_PLAYER_INPUT);
+			});
+			await advance(0);
+
+			const users = fetchMock.mock.calls.map(([, init]) => expectedUserOf(init));
+			expect(users.slice(0, beforeSwitch)).toEqual(Array(beforeSwitch).fill("user-a"));
+			expect(users.slice(beforeSwitch)).toEqual(["user-b", "user-b"]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("userId 變更的那一次 render 起不回傳前一帳號的資料", async () => {
+		enqueue(200, listBody([[makePlayer("a1"), 1], [makePlayer("a2"), 1]]));
+		const { result, rerender, renders } = renderAccount({ userId: "user-a" });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(result.current.players).toHaveLength(2);
+
+		const rendersBefore = renders.length;
+		const releaseB = enqueueDeferred();
+		rerender({ userId: "user-b" });
+
+		// 換帳號後的第一次 render（effect 尚未重設任何狀態的那一幀）
+		const firstFrame = renders[rendersBefore];
+		expect(firstFrame.players).toEqual([]);
+		expect(firstFrame.syncStatus).toBe("loading");
+
+		act(() => {
+			firstFrame.addPlayer(NEW_PLAYER_INPUT);
+			firstFrame.removePlayer("a1");
+		});
+		expect(result.current.players).toEqual([]);
+		await settle();
+		expect(putCalls()).toHaveLength(0);
+		expect(callsOf("DELETE")).toHaveLength(0);
+		releaseB(200, listBody([]));
+	});
+
+	it("enabled 為 true 但 userId 為 null 時不發出任何請求", async () => {
+		const { result } = renderAccount({ userId: null });
+		act(() => {
+			result.current.addPlayer(NEW_PLAYER_INPUT);
+			result.current.removePlayer("x");
+			result.current.resetRoster();
+			result.current.reloadRemotePlayers();
+		});
+		await settle();
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

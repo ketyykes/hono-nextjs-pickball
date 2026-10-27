@@ -20,6 +20,11 @@ const envelopeSchema = versionedEnvelopeSchema(ScoreboardStateSchema);
 export interface UseRemoteScoreboardStoreOptions {
 	/** false 時不發任何請求，且對外狀態恆為 local。 */
 	enabled: boolean;
+	/**
+	 * 目前登入的帳號。換帳號即結束舊世代並重新載入；為 null 時視同停用，
+	 * 避免以不明帳號送出請求。
+	 */
+	userId: string | null;
 	/** GET／PUT 收到 401 時呼叫；選擇器傳入 session 的 refresh。 */
 	onUnauthorized: () => void;
 }
@@ -36,6 +41,10 @@ function trackedReducer(current: TrackedState, action: Action): TrackedState {
 	const next = scoreboardReducer(current.state, action);
 	return { state: next, dirty: action.type !== "HYDRATE" };
 }
+
+// 換帳號的那一幀、effect 還沒重設狀態前使用：呼叫端拿到的 dispatch 不得改到前一帳號的資料
+const IGNORE_ACTION: Dispatch<Action> = () => {};
+const INITIAL_SCOREBOARD_STATE = createInitialState();
 
 type StatusAction =
 	| { type: "set"; status: SyncStatus }
@@ -70,6 +79,7 @@ function statusReducer(current: SyncStatus, action: StatusAction): SyncStatus {
  */
 export function useRemoteScoreboardStore({
 	enabled,
+	userId,
 	onUnauthorized,
 }: UseRemoteScoreboardStoreOptions): readonly [ScoreboardState, Dispatch<Action>, SyncStatus] {
 	const [tracked, dispatch] = useReducer(
@@ -78,6 +88,13 @@ export function useRemoteScoreboardStore({
 		(): TrackedState => ({ state: createInitialState(), dirty: false }),
 	);
 	const [status, dispatchStatus] = useReducer(statusReducer, "loading");
+	// 目前狀態屬於哪個帳號：render 時與 userId 不同代表 effect 還沒換世代，
+	// 此時不能把前一帳號的資料交給畫面（design Decision 7）
+	const [owner, setOwner] = useReducer(
+		(_current: string | null, next: string | null): string | null => next,
+		null,
+	);
+	const active = enabled && userId !== null;
 
 	// null 代表尚未取得雲端版本（載入中、載入失敗、已收到 401）：此時 SHALL NOT 寫入
 	const versionRef = useRef<number | null>(null);
@@ -91,15 +108,24 @@ export function useRemoteScoreboardStore({
 	}, [onUnauthorized]);
 
 	useEffect(() => {
-		if (!enabled) return;
-		// StrictMode 與 enabled 切換都會重跑本 effect：每次都重建 saver 並於 cleanup 釋放，
+		if (!enabled || userId === null) return;
+		// 世代內的每個請求都用這個帳號，不在送出當下改讀其他來源：
+		// 否則舊世代的待送值可能帶著新帳號的標頭通過伺服器守衛
+		const expectedUserId = userId;
+		// StrictMode、enabled 與 userId 切換都會重跑本 effect：每次都重建 saver 並於 cleanup 釋放，
 		// 舊的在途結果以 cancelled 旗標忽略
 		let cancelled = false;
 		versionRef.current = null;
+		// 不殘留前一個世代的比分；HYDRATE 不標 dirty，不會寫回雲端
+		dispatch({ type: "HYDRATE", state: createInitialState() });
+		setOwner(expectedUserId);
 		dispatchStatus({ type: "set", status: "loading" });
 
 		async function loadCurrent(afterConflict: boolean): Promise<void> {
-			const result = await requestJson("GET", CURRENT_PATH, { schema: envelopeSchema });
+			const result = await requestJson("GET", CURRENT_PATH, {
+				schema: envelopeSchema,
+				expectedUserId,
+			});
 			if (cancelled) return;
 			if (result.kind === "unauthorized") {
 				versionRef.current = null;
@@ -126,6 +152,7 @@ export function useRemoteScoreboardStore({
 			const result = await requestJson("PUT", CURRENT_PATH, {
 				body: { data: payload, version: versionRef.current },
 				schema: envelopeSchema,
+				expectedUserId,
 			});
 			if (result.kind !== "ok") return result.kind;
 			if (result.value === undefined) return "failed";
@@ -157,7 +184,7 @@ export function useRemoteScoreboardStore({
 			saver.dispose();
 			saverRef.current = null;
 		};
-	}, [enabled]);
+	}, [enabled, userId]);
 
 	useEffect(() => {
 		if (!tracked.dirty) return;
@@ -166,5 +193,7 @@ export function useRemoteScoreboardStore({
 		saverRef.current?.save(tracked.state);
 	}, [tracked]);
 
-	return [tracked.state, dispatch, enabled ? status : "local"] as const;
+	if (!active) return [tracked.state, dispatch, "local"] as const;
+	if (owner !== userId) return [INITIAL_SCOREBOARD_STATE, IGNORE_ACTION, "loading"] as const;
+	return [tracked.state, dispatch, status] as const;
 }

@@ -78,7 +78,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
     - 需要登入態的 spec 以 `test.use({ storageState })` 取用；登入／登出流程用新 context，**不得對共用 state 登出**
     - 缺 `hono-pickball/.dev.vars` 的 `TEST_ACCOUNT_*` 或 `ENVIRONMENT=development` 時，globalSetup 會刪除舊 state 並 warn，auth spec 整檔 skip
     - state 路徑與 skip 原因的單一來源是 `tests/e2e/helpers/storage-state.ts`
-  - **`user-data` project**（第六個，Desktop Chrome、`testDir` 為 `tests/e2e/user-data/`、單 worker）：使用者資料（雲端同步）spec 只放 `tests/e2e/user-data/`，既有五個 project 維持訪客且不設 `storageState`；spec 以 `test.use({ storageState })` 取用登入態，`beforeEach` 呼叫 `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 清空測試帳號的雲端資料（依 `USER_DATA_TABLES` 逐表刪除）。驗收迴圈要多跑一次 `--project=user-data`（名單同步 spec 為 `tests/e2e/user-data/roster-sync.spec.ts`，回合與分槽同步 spec 為 `tests/e2e/user-data/round-sync.spec.ts`；訪客守護為 `tests/e2e/specs/matchmaker-local-mode.spec.ts`）
+  - **`user-data` project**（第六個，Desktop Chrome、`testDir` 為 `tests/e2e/user-data/`、單 worker）：使用者資料（雲端同步）spec 只放 `tests/e2e/user-data/`，既有五個 project 維持訪客且不設 `storageState`；spec 以 `test.use({ storageState })` 取用登入態，`beforeEach` 呼叫 `tests/e2e/helpers/user-data.ts` 的 `clearTestAccountUserData()` 清空測試帳號的雲端資料（依 `USER_DATA_TABLES` 逐表刪除，含第二帳號）。spec 直接打 API 時用同檔的 `expectedUserHeaders()` 帶預期帳號標頭；換帳號 spec 為 `tests/e2e/user-data/account-switch.spec.ts`，使用 seed 衍生的第二帳號（B7.5）。驗收迴圈要多跑一次 `--project=user-data`（名單同步 spec 為 `tests/e2e/user-data/roster-sync.spec.ts`，回合與分槽同步 spec 為 `tests/e2e/user-data/round-sync.spec.ts`；訪客守護為 `tests/e2e/specs/matchmaker-local-mode.spec.ts`）
 
 ### 目錄約定
 
@@ -94,6 +94,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
   - auth：`useSession`
   - scoreboard 雲端同步（B5）：`useRemoteScoreboardStore`（歸 scoreboard 清單；由 `useScoreboardStore` 這個**選擇器 hook** 依 `resolveStorageMode` 在本機與雲端實作間切換，本機 hook 不改動；新增雲端 feature 比照此慣例，並同步更新上述主 spec 清單）
+    - **帳號世代（B7.5，四支雲端 hook 共通）**：hook 收 `userId` option，主 effect 依賴含 `userId`；一個世代內所有請求（載入、儲存、重試、重置、衝突重載）都帶該世代的 `expectedUserId`，換帳號即丟棄舊世代的待送變更並重新載入；以 reducer 保存的擁有者標記（`owner`）與 `userId` 不同時，render 期就不回傳前一帳號的資料、操作不送出；`userId` 為 `null` 時不發任何請求。一次性雲端操作（`CourtCard` 建立分槽、JSON 備份、CSV 匯入）以觸發當下 `useSession()` 的 user id 呼叫，未授權時 `refresh()`
     - 雲端 hook 實作要點：`HYDRATE`（載入雲端資料）不寫回；`createLatestWinsSaver` 於 effect 內建立；`Scoreboard.tsx` 在雲端載入中／失敗時以 `loading`／`load-failed` 取代畫面，`data-sync-status` 屬性只在非 local 模式渲染
   - matchmaker 回合與場次分槽雲端同步（B7）：`useRemoteRoundStore`（歸 round-lifecycle 清單；由 `useRoundStore` 選擇器切換，本機實作 `useLocalRoundStore`）、`useRemoteMatchSlotStore`（歸 scoreboard 清單；由 `useScoreboardStore` 選擇器在帶 `matchId` 時切換）
     - `useRemoteRoundStore` 實作要點：回合變更走命令佇列（單一在途），送出時以最新已確認回合重新套用命令，不送算好的舊快照；送出比分走 `POST …/score`，不逐人 PUT 評分；回合 409 整份重載（回合與分槽）並呼叫 `reloadRemotePlayers`，401 交給 session refresh；全部分槽由本 hook 一併載入並以 `remoteMatchSlots` 回傳（雲端模式有值，本機為 `null`）
@@ -103,6 +104,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
     - 雲端 hook 實作要點：每位參賽者一個最新優先佇列、任一 409 整份重載、401 交給 session refresh；loading、load-failed、重載中、重置中都不送出也不改名單
     - 對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容，`data-sync-status` 只在非 local 時輸出
 - `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）、`sync/`（雲端同步共用基礎：`storage-mode` 的 `resolveStorageMode`、`api-client` 的 `requestJson`、`latest-wins-saver` 的 `createLatestWinsSaver`、`sync-status` 的 `SyncStatus`）
+  - `lib/sync/api-client.ts` 的 `requestJson`：**必填 `expectedUserId`**，每個請求帶 `X-Expected-User-Id`（B7.5）；只用呼叫端給的值、不讀 session store，401（含 `ACCOUNT_MISMATCH`）分類為 `unauthorized`。API 包裝（`roster-api`、`round-api`、`remote-transfer`）一律以 `expectedUserId` 為第一參數
   - `lib/sync/roster-api.ts`：名單 API 薄包裝，一律經 `requestJson`
   - `lib/sync/round-api.ts`：回合、場次分槽、送出比分的路徑字串與回應 schema 的唯一來源，一律經 `requestJson`，hook 不自行拼路徑
   - `lib/sync/round-command-queue.ts`：回合命令佇列（無 React 相依，由 `useRemoteRoundStore` 持有），單一在途、先進先出

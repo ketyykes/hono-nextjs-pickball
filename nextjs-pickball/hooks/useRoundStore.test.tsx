@@ -1003,4 +1003,44 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		expect(readRound()).toEqual(scored.round);
 		expect(readHistory().entries).toEqual([scored.historyEntry]);
 	});
+
+	it("選擇器把 session 的 user id 傳給雲端 hook", async () => {
+		const sessionOf = (id: string) =>
+			({
+				status: "ready",
+				authEnabled: true,
+				user: { id, email: `${id}@example.com`, name: id },
+				refresh: vi.fn(),
+			}) as const;
+		function expectedUsers(path: string): Array<string | null> {
+			return fetchMock.mock.calls
+				.filter(([input]) => String(input) === path)
+				.map(([, init]) => new Headers(init?.headers).get("X-Expected-User-Id"));
+		}
+		fetchMock.mockImplementation((input) => {
+			if (String(input) === REMOTE_ROUND_PATH) {
+				return Promise.resolve(jsonResponse({ data: null, version: 0 }));
+			}
+			return Promise.resolve(jsonResponse({ items: [] }));
+		});
+
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-a"));
+		const { result, rerender, unmount } = renderStore();
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(expectedUsers(REMOTE_ROUND_PATH)).toEqual(["user-a"]);
+		expect(expectedUsers(REMOTE_SLOTS_PATH)).toEqual(["user-a"]);
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-b"));
+		rerender();
+		await waitFor(() => expect(expectedUsers(REMOTE_ROUND_PATH)).toEqual(["user-a", "user-b"]));
+		expect(expectedUsers(REMOTE_SLOTS_PATH)).toEqual(["user-a", "user-b"]);
+		unmount();
+
+		// session 載入中與訪客沒有任何使用者資料請求
+		fetchMock.mockClear();
+		for (const snapshot of ["loading", "guest"] as const) {
+			mockSession(snapshot);
+			renderStore().unmount();
+		}
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });

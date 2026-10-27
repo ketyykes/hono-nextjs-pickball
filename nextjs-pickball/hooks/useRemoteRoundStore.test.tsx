@@ -157,6 +157,7 @@ function renderRound(initial: Partial<RenderProps> = {}) {
 		(props: RenderProps) => {
 			const value = useRemoteRoundStore({
 				enabled: props.enabled,
+				userId: "user-a",
 				players: props.players,
 				rosterSyncStatus: props.rosterSyncStatus,
 				updatePlayer,
@@ -217,6 +218,46 @@ function buildSubmitResponse(round: Round, players: Player[], matchId: string, r
 		historyEntry: scored.historyEntry,
 		boundaryHits: [],
 	};
+}
+
+/** 假計時器下推進時間；waitFor 在 vitest 假計時器下會卡住，因此需要等退避計時器的測試用它。 */
+async function advance(ms: number): Promise<void> {
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(ms);
+	});
+}
+
+function expectedUserOf(init: RequestInit | undefined): string | null {
+	return new Headers(init?.headers).get("X-Expected-User-Id");
+}
+
+interface AccountProps {
+	userId: string | null;
+	players: Player[];
+}
+
+function renderAccount(initialProps: AccountProps) {
+	const updatePlayer = vi.fn();
+	const applyRemotePlayers = vi.fn();
+	const reloadRemotePlayers = vi.fn();
+	const renders: Array<ReturnType<typeof useRemoteRoundStore>> = [];
+	const rendered = renderHook(
+		(props: AccountProps) => {
+			const value = useRemoteRoundStore({
+				enabled: true,
+				userId: props.userId,
+				players: props.players,
+				updatePlayer,
+				applyRemotePlayers,
+				reloadRemotePlayers,
+				onUnauthorized: vi.fn(),
+			});
+			renders.push(value);
+			return value;
+		},
+		{ initialProps },
+	);
+	return { ...rendered, updatePlayer, applyRemotePlayers, reloadRemotePlayers, renders };
 }
 
 beforeEach(() => {
@@ -1264,5 +1305,111 @@ describe("useRemoteRoundStore", () => {
 		expect(result.current.syncStatus).toBe("local");
 		expect(result.current.round).toBeNull();
 		expect(result.current.remoteMatchSlots).toBeNull();
+	});
+
+	it("userId 變更時丟棄前一帳號的命令佇列並以新帳號重新載入", async () => {
+		vi.useFakeTimers();
+		try {
+			const players = makePlayers(4);
+			onLoad(buildRound(players, "doubles", 1), 2);
+			const { result, rerender, updatePlayer } = renderAccount({ userId: "user-a", players });
+			await advance(0);
+			expect(result.current.syncStatus).toBe("synced");
+
+			on("PUT", ROUND_PATH, 500);
+			act(() => {
+				result.current.setTargetScore(15);
+			});
+			await advance(0);
+			expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1);
+			const before = fetchMock.mock.calls.length;
+
+			const roundB = buildRound(players, "singles", 1);
+			onLoad(roundB, 5, [makeSlot("m1")]);
+			rerender({ userId: "user-b", players });
+			await advance(30_000);
+
+			const after = fetchMock.mock.calls.slice(before);
+			expect(after).toHaveLength(2);
+			expect(after.map(([, init]) => init?.method ?? "GET")).toEqual(["GET", "GET"]);
+			expect(after.map(([, init]) => expectedUserOf(init))).toEqual(["user-b", "user-b"]);
+			expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1);
+			expect(result.current.round).toEqual(roundB);
+			expect(result.current.remoteMatchSlots).toEqual({ m1: makeSlot("m1") });
+			expect(updatePlayer).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("userId 變更的那一次 render 起不回傳前一帳號的資料", async () => {
+		const players = makePlayers(4);
+		const roundA = buildRound(players, "doubles", 1);
+		onLoad(roundA, 2, [makeSlot("m1")]);
+		const { result, rerender, renders } = renderAccount({ userId: "user-a", players });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(result.current.round).toEqual(roundA);
+
+		const rendersBefore = renders.length;
+		onDeferred("GET", ROUND_PATH);
+		onDeferred("GET", SLOTS_PATH);
+		rerender({ userId: "user-b", players });
+
+		// 換帳號後的第一次 render（effect 尚未重設任何狀態的那一幀）
+		const firstFrame = renders[rendersBefore];
+		expect(firstFrame.round).toBeNull();
+		expect(firstFrame.remoteMatchSlots).toEqual({});
+		expect(firstFrame.syncStatus).toBe("loading");
+
+		let outcome!: ReturnType<typeof firstFrame.setTargetScore>;
+		act(() => {
+			outcome = firstFrame.setTargetScore(15);
+		});
+		expect(outcome.ok).toBe(false);
+		await settle();
+		expect(callsOf("PUT", ROUND_PATH)).toHaveLength(0);
+		expect(result.current.round).toBeNull();
+	});
+
+	it("enabled 為 true 但 userId 為 null 時不發出任何請求", async () => {
+		const players = makePlayers(4);
+		const { result } = renderAccount({ userId: null, players });
+		act(() => {
+			result.current.generateRound({ format: "doubles", courtCount: 1 });
+			result.current.setTargetScore(15);
+			result.current.submitScore("m1", "11", "7");
+		});
+		await settle();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("換帳號後才回來的送出比分結果不呼叫 applyRemotePlayers", async () => {
+		const players = makePlayers(4);
+		const roundA = buildRound(players, "doubles", 1);
+		onLoad(roundA, 3);
+		const { result, rerender, applyRemotePlayers, reloadRemotePlayers } = renderAccount({
+			userId: "user-a",
+			players,
+		});
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		const deferred = onDeferred("POST", SCORE_PATH);
+		act(() => {
+			result.current.submitScore("m1", "11", "7");
+		});
+		await waitFor(() => expect(callsOf("POST", SCORE_PATH)).toHaveLength(1));
+
+		const roundB = buildRound(players, "singles", 1);
+		onLoad(roundB, 5);
+		rerender({ userId: "user-b", players });
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+		await act(async () => {
+			deferred.release(200, buildSubmitResponse(roundA, players, "m1", 3));
+		});
+		await settle();
+		expect(applyRemotePlayers).not.toHaveBeenCalled();
+		expect(reloadRemotePlayers).not.toHaveBeenCalled();
+		expect(result.current.round).toEqual(roundB);
 	});
 });

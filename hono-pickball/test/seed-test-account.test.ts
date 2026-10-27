@@ -2,7 +2,7 @@ import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 // 官方要求：import main 模組，src/ 改動時測試才會自動重跑。
 import "../src/index";
-import { buildTestAccountSeedSql } from "../src/db/seed/test-account";
+import { buildTestAccountSeedSql, deriveSwitchAccountEmail } from "../src/db/seed/test-account";
 
 // storage 以測試檔隔離，同檔 it 共用 D1，各 it 使用不同 email。
 describe("buildTestAccountSeedSql", () => {
@@ -72,6 +72,41 @@ describe("buildTestAccountSeedSql", () => {
 
 		expect((await signIn(email, "test-password-first")).status).toBe(401);
 		expect((await signIn(email, "test-password-second")).status).toBe(200);
+	});
+});
+
+describe("deriveSwitchAccountEmail", () => {
+	it("deriveSwitchAccountEmail 產生不同於原值且固定的 email", () => {
+		for (const input of ["tester@example.com", "tester+x@example.com"]) {
+			const first = deriveSwitchAccountEmail(input);
+			const second = deriveSwitchAccountEmail(input);
+
+			expect(first.split("@")).toHaveLength(2);
+			expect(first.split("@")[1]).toBe(input.split("@")[1]);
+			expect(first).not.toBe(input);
+			expect(second).toBe(first);
+		}
+	});
+
+	it("衍生帳號與原帳號以同一組密碼皆可登入且為不同使用者", async () => {
+		if (!env.DB) {
+			throw new Error("D1 binding DB 不存在");
+		}
+		const email = "seed-switch@example.com";
+		const switchEmail = deriveSwitchAccountEmail(email);
+		const password = "test-password-switch";
+		const now = new Date(1_700_000_000_000);
+		await env.DB.exec(await buildTestAccountSeedSql({ email, password, name: "Switch", now }));
+		await env.DB.exec(await buildTestAccountSeedSql({ email: switchEmail, password, name: "Switch B", now }));
+
+		const original = await signIn(email, password);
+		const derived = await signIn(switchEmail, password);
+
+		expect(original.status).toBe(200);
+		expect(derived.status).toBe(200);
+		const originalBody = await original.json<{ user: { id: string } }>();
+		const derivedBody = await derived.json<{ user: { id: string } }>();
+		expect(derivedBody.user.id).not.toBe(originalBody.user.id);
 	});
 });
 

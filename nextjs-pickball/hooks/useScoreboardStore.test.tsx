@@ -517,4 +517,64 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 		expect(scoreboardCalls()).toHaveLength(0);
 	});
+
+	it("選擇器把 session 的 user id 傳給雲端 hook", async () => {
+		const sessionOf = (id: string) =>
+			({
+				status: "ready",
+				authEnabled: true,
+				user: { id, email: `${id}@example.com`, name: id },
+				refresh: vi.fn(),
+			}) as const;
+		function expectedUsers(pathPrefix: string): Array<string | null> {
+			return fetchMock.mock.calls
+				.filter(([path]) => String(path).startsWith(pathPrefix))
+				.map(([, init]) => new Headers(init?.headers).get("X-Expected-User-Id"));
+		}
+		const slot = { ...createInitialState(), matchId: "m1" };
+		fetchMock.mockImplementation((input) =>
+			Promise.resolve(
+				jsonResponse(
+					String(input).startsWith("/api/matchmaker/slots")
+						? { data: slot, version: 1 }
+						: { data: null, version: 0 },
+				),
+			),
+		);
+
+		// 獨立計分板：A 載入後換成 B，載入請求的帳號依序為 A、B
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-a"));
+		const standalone = renderHook(() => useScoreboardStore(null));
+		await waitFor(() => expect(standalone.result.current[3]).toBe("synced"));
+		expect(expectedUsers("/api/scoreboard")).toEqual(["user-a"]);
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-b"));
+		standalone.rerender();
+		await waitFor(() => expect(expectedUsers("/api/scoreboard")).toEqual(["user-a", "user-b"]));
+		standalone.unmount();
+
+		// 場次分槽分支同樣帶帳號
+		fetchMock.mockClear();
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-a"));
+		const bound = renderHook(() => useScoreboardStore("m1"));
+		await waitFor(() => expect(bound.result.current[2]).toBe("bound"));
+		expect(expectedUsers("/api/matchmaker/slots")).toEqual(["user-a"]);
+		vi.mocked(useSession).mockReturnValue(sessionOf("user-b"));
+		bound.rerender();
+		await waitFor(() =>
+			expect(expectedUsers("/api/matchmaker/slots")).toEqual(["user-a", "user-b"]),
+		);
+		bound.unmount();
+
+		// session 載入中與訪客沒有任何使用者資料請求
+		fetchMock.mockClear();
+		for (const snapshot of [
+			{ status: "loading", refresh: vi.fn() },
+			{ status: "ready", authEnabled: false, user: null, refresh: vi.fn() },
+		] as const) {
+			vi.mocked(useSession).mockReturnValue(snapshot);
+			const local = renderHook(() => useScoreboardStore(null));
+			local.unmount();
+		}
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });

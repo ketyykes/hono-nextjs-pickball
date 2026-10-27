@@ -39,11 +39,11 @@ describe("roster-api", () => {
 	it("名單 API 包裝以正確的方法、路徑與 body 呼叫 requestJson", async () => {
 		const player = makePlayer("p-1");
 
-		await fetchRemotePlayers();
-		await putRemotePlayer(player, 3);
-		await deleteRemotePlayer("p-1");
-		await importRemotePlayers([player]);
-		await resetRemoteMatchmaker();
+		await fetchRemotePlayers("user-a");
+		await putRemotePlayer("user-a", player, 3);
+		await deleteRemotePlayer("user-a", "p-1");
+		await importRemotePlayers("user-a", [player]);
+		await resetRemoteMatchmaker("user-a");
 
 		const calls = vi.mocked(requestJson).mock.calls;
 		expect(calls).toHaveLength(5);
@@ -75,7 +75,7 @@ describe("roster-api", () => {
 	});
 
 	it("PUT body 的 version 取自呼叫參數", async () => {
-		await putRemotePlayer(makePlayer("p-1"), 7);
+		await putRemotePlayer("user-a", makePlayer("p-1"), 7);
 
 		expect(vi.mocked(requestJson).mock.calls[0][2].body).toEqual({
 			data: makePlayer("p-1"),
@@ -84,8 +84,8 @@ describe("roster-api", () => {
 	});
 
 	it("id 含特殊字元時路徑以 encodeURIComponent 編碼", async () => {
-		await putRemotePlayer(makePlayer("a/b c"), 1);
-		await deleteRemotePlayer("a/b c");
+		await putRemotePlayer("user-a", makePlayer("a/b c"), 1);
+		await deleteRemotePlayer("user-a", "a/b c");
 
 		const calls = vi.mocked(requestJson).mock.calls;
 		expect(calls[0][1]).toBe("/api/matchmaker/players/a%2Fb%20c");
@@ -95,10 +95,26 @@ describe("roster-api", () => {
 	it("原樣回傳 requestJson 的結果", async () => {
 		const result = { kind: "unauthorized" } as const;
 		vi.mocked(requestJson).mockResolvedValue(result);
-		await expect(fetchRemotePlayers()).resolves.toBe(result);
-		await expect(resetRemoteMatchmaker()).resolves.toBe(result);
-		await expect(putRemotePlayer(makePlayer("p-1"), 1)).resolves.toBe(result);
-		await expect(deleteRemotePlayer("p-1")).resolves.toBe(result);
-		await expect(importRemotePlayers([makePlayer("p-1")])).resolves.toBe(result);
+		await expect(fetchRemotePlayers("user-a")).resolves.toBe(result);
+		await expect(resetRemoteMatchmaker("user-a")).resolves.toBe(result);
+		await expect(putRemotePlayer("user-a", makePlayer("p-1"), 1)).resolves.toBe(result);
+		await expect(deleteRemotePlayer("user-a", "p-1")).resolves.toBe(result);
+		await expect(importRemotePlayers("user-a", [makePlayer("p-1")])).resolves.toBe(result);
+	});
+
+	it("包裝把 expectedUserId 交給 requestJson", async () => {
+		const player = makePlayer("p-1");
+
+		await fetchRemotePlayers("user-a");
+		await putRemotePlayer("user-a", player, 3);
+		await deleteRemotePlayer("user-a", "p-1");
+		await importRemotePlayers("user-a", [player]);
+		await resetRemoteMatchmaker("user-a");
+
+		const calls = vi.mocked(requestJson).mock.calls;
+		expect(calls).toHaveLength(5);
+		for (const call of calls) {
+			expect(call[2].expectedUserId).toBe("user-a");
+		}
 	});
 });

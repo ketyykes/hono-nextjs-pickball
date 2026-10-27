@@ -32,3 +32,17 @@ export async function buildTestAccountSeedSql(
 		`INSERT INTO account (id, account_id, provider_id, user_id, password, created_at, updated_at) VALUES (${quote(accountId)}, ${quote(userId)}, 'credential', ${quote(userId)}, ${quote(passwordHash)}, ${timestamp}, ${timestamp});`,
 	].join("\n");
 }
+
+/**
+ * 由測試帳號 email 衍生第二個帳號（plus addressing），供「另一分頁換帳號」E2E 使用。
+ * 本地部分已含 `+` 時改附加 `-switch`，確保任何輸入都得到不同於原值的結果。
+ */
+export function deriveSwitchAccountEmail(email: string): string {
+	const atIndex = email.lastIndexOf("@");
+	const local = email.slice(0, atIndex);
+	const domain = email.slice(atIndex);
+	if (local.includes("+")) {
+		return `${local}-switch${domain}`;
+	}
+	return `${local}+switch${domain}`;
+}

@@ -226,13 +226,101 @@ OpenSpec 1.9 的 MODIFIED 不可丟棄或改名既有 Scenario（B7 apply §1 �
 ## Open Questions
 
 > 以下為 propose 時（2026-10-24）新發現、需 coordinator 裁定的事項，皆附建議值；apply 期間未裁定者依建議值執行。apply §1 的查證紀錄另起一節附在本檔末。
+>
+> **coordinator 2026-10-24 裁定：問題 1～5 皆採建議值**（1 採 (a)；2 保留該 E2E 並如實註明紅燈只來自狀態碼；3 `CourtCard` 自讀 `useSession()`；4 runbook 由 coordinator 處理；5 同名 Scenario 不處理）。Q1～Q12 已定案。
 
-1. **資料頁兩個區塊的 refresh 沒有單元測試**：`JsonBackupSection`、`RosterCsvImportSection` 沒有元件測試檔，「未授權時呼叫 `refresh()`」是一行元件程式碼。
+1. **資料頁兩個區塊的 refresh 沒有單元測試**（coordinator 2026-10-24 裁定：採建議值）：`JsonBackupSection`、`RosterCsvImportSection` 沒有元件測試檔，「未授權時呼叫 `refresh()`」是一行元件程式碼。
    選項：(a) 只以 `remote-transfer.test.ts` 驗證未授權標示＋Stage 2 閱讀確認元件呼叫 refresh；(b) 為兩個元件新增元件測試檔；(c) 新增一條資料頁換帳號 E2E。
    **建議 (a)**：行為邏輯（何時算未授權）已在 `lib/` 以 TDD 守住，元件層只剩呼叫；(b)／(c) 的成本（mock 下載樣板或多一條 E2E）高於收益。
-2. **「送出比分」換帳號 E2E 的紅燈只來自狀態碼**：B 沒有 A 的回合，守衛不存在時送出比分在 B 名下也會因版本／場次不符回 409、資料本來就不會被寫入；該 test 在 RED 階段是因「預期 401 實得 409」而紅，
+2. **「送出比分」換帳號 E2E 的紅燈只來自狀態碼**（coordinator 2026-10-24 裁定：採建議值）：B 沒有 A 的回合，守衛不存在時送出比分在 B 名下也會因版本／場次不符回 409、資料本來就不會被寫入；該 test 在 RED 階段是因「預期 401 實得 409」而紅，
    並非「資料被寫入 B」。真正的資料毀損面由後端列舉測試守住（樣本請求針對 B 自己已 seed 的回合與 pending 場次，若放行必定寫入 B 的評分與歷史）。**建議**：保留此 E2E（它驗證前端走 401 → refresh 的路徑），tasks 與紅燈紀錄中如實註明紅燈性質。
-3. **`CourtCard` 改為自行呼叫 `useSession()`**：B7 的 `CourtCard` 只靠 `remoteNavigate` prop 判斷雲端模式，不讀 session。本 change 讓它在 render 時讀 `useSession()` 取 user id 與 `refresh`（Decision 8），
+3. **`CourtCard` 改為自行呼叫 `useSession()`**（coordinator 2026-10-24 裁定：採建議值）：B7 的 `CourtCard` 只靠 `remoteNavigate` prop 判斷雲端模式，不讀 session。本 change 讓它在 render 時讀 `useSession()` 取 user id 與 `refresh`（Decision 8），
    既有 `CourtCard.test.tsx` 的 render 需要 mock `@/hooks/useSession`（只新增 `vi.mock` 區塊，既有 it 不改）。**建議**：採用；替代為從 `page.tsx` 經 `MatchStage` 傳入 `remoteUserId`，但會擴大到例外層檔案且無法單元驗證。
-4. **B7 記為「維持現狀」的「CourtCard 遇 unauthorized 不 refresh」由本 change 修正**（Q4 的直接結果）。**建議**：runbook 的 B7 維持現狀清單在本 change 合併時劃掉該項（coordinator 處理）。
-5. **既有主 spec 的同名 Scenario**（`backend-database`「user_id 必須參照既有使用者」、`player-roster`「刪除參賽者」）不在本 change 範圍，未處理；本 change 新增標題皆已以 python 計數確認在各主 spec 合併後唯一。
+4. **B7 記為「維持現狀」的「CourtCard 遇 unauthorized 不 refresh」由本 change 修正**（coordinator 2026-10-24 裁定：採建議值）（Q4 的直接結果）。**建議**：runbook 的 B7 維持現狀清單在本 change 合併時劃掉該項（coordinator 處理）。
+5. **既有主 spec 的同名 Scenario**（coordinator 2026-10-24 裁定：採建議值）（`backend-database`「user_id 必須參照既有使用者」、`player-roster`「刪除參賽者」）不在本 change 範圍，未處理；本 change 新增標題皆已以 python 計數確認在各主 spec 合併後唯一。
+
+## apply §1 查證紀錄
+
+> 2026-10-24，分支 `change/user-data-account-guard`，起點 `e8d025b`。§1 不寫產品程式碼；實測用暫時測試檔已刪除、未 commit。
+
+### 1.2 對齊 B7 實際落地
+
+**與 design Context 的差異**：無實質差異。補充：
+- 後端 13 條使用者資料路由與 Context 一致（`scoreboard.ts` 2 條、`matchmaker.ts` 11 條）。
+- 前端 `lib/sync` 包裝數與 Context 一致：`roster-api.ts` 5 個（fetch／put／delete／import／reset）、`round-api.ts` 6 個（fetchRound／putRound／fetchSlots／fetchSlot／putSlot／submitScore）。
+- 三個選擇器（`useScoreboardStore.ts:114-118`、`useRosterStore.ts:200-203`、`useRoundStore.ts:426-429`）皆以 `useSession()` ＋ `resolveStorageMode` 判斷；`useRoundStore` 已有 `useSession`，因此 `session.user.id` 可直接取用。
+- 四支雲端 hook 主 effect 依賴：scoreboard `[enabled]`（:160）、roster `[enabled, replacePlayers]`（:299）、round `[enabled, showRound]`（:366）、slot `[enabled, matchId]`（:173）。
+- `CourtCard.tsx:130` 以 `putRemoteSlot(match.id, seed, 0)` 建立分槽，檔內沒有 `useSession`／`refresh`。
+- `JsonBackupSection.tsx:30`、`RosterCsvImportSection.tsx:41` 皆 `resolveStorageMode(useSession()) === "remote"`。
+- `remote-transfer.ts` 的呼叫點：`importRemoteRoster`（fetchRemotePlayers → importRemotePlayers，各有 unauthorized 分支）、`buildRemoteBackupSnapshot`（fetchRemotePlayers／fetchRemoteRound）。
+- 前端 `requestJson(` 的非測試呼叫點僅：`roster-api.ts` 5 處、`round-api.ts` 6 處、`useRemoteScoreboardStore.ts:102,126` 2 處（hook 直接呼叫，無包裝）。包裝的其餘呼叫端：`round-command-queue.ts`、三支雲端 hook、`remote-transfer.ts`、`CourtCard.tsx`。
+
+**MODIFIED delta 與主 spec 比對**：以程式逐行 diff「使用者資料 API 的路由、授權與停用閘門」整段。結論：**一致**——差異只有 delta 刻意的修改（middleware 鏈加 `requireExpectedUser`、新增 `requireExpectedUser` 條目與「header」字樣、三類改四類情境、新增 helper 帶標頭要求、跨 capability 敘述一句）；未改的段落（`localAuth`／`requireSession` 條目、Hono 型別參數段）與四個 Scenario（標題、GIVEN／WHEN／THEN、驗收 it 名稱）逐字相同。不需重新套用。
+
+**後端測試請求盤點**（`rg -n "Cookie:|exports.default.fetch|app.request\(" hono-pickball/test`）。「需要」＝請求帶有效 cookie 且會通過 `requireSession` 抵達守衛；「不需要」＝守衛之前結束。經 `matchmaker-fixtures.ts` 的 `request()`／`appRequestInit()` 者由 helper 集中帶標頭（§3 只改 helper 即涵蓋）。
+
+| 檔案:行號 | 請求 | 需要標頭 | 理由 |
+|---|---|---|---|
+| `helpers/session.ts:31` | `signIn` 的 sign-in/email | 不需要 | `/api/auth/*`，在 allowlist；但此處要記錄 cookie→user id（登入 body 有 `user.id`，見 1.3） |
+| `helpers/matchmaker-fixtures.ts:94` `request()` | 所有 matchmaker 成功路徑 | 需要（有 cookie 時自動帶） | helper 內集中處理；無 cookie 時不帶 |
+| `helpers/matchmaker-fixtures.ts:99-114` `appRequestInit()` | 同上 | 需要（有 cookie 時自動帶） | 同上 |
+| `scoreboard-current.test.ts:17` `getCurrent` | GET，cookie | 需要 | 本地 helper，成功路徑 |
+| `scoreboard-current.test.ts:21-28` `putCurrent` | PUT，cookie | 需要 | 本地 helper，成功路徑 |
+| `scoreboard-current.test.ts:39-48` | GET／PUT，無 cookie，auth 停用 | 不需要 | `localAuth` 先回 404 |
+| `scoreboard-current.test.ts:55-62` | GET／PUT，無 cookie | 不需要 | `requireSession` 回 401 UNAUTHORIZED（守衛在其後） |
+| `scoreboard-current.test.ts:196-198` | GET `?userId=` 帶 cookieB | 需要 | 預期 200 `{data:null}`，需為 B 的 id |
+| `scoreboard-current.test.ts:201-208` | PUT `?userId=` 帶 cookieB | 需要 | 預期 200，需為 B 的 id |
+| `scoreboard-current.test.ts:230-239` | GET／PUT，cookie，DB 拋錯 | 不需要 | `getSession` 拋例外，500 在 `requireSession`；帶了也無妨 |
+| `matchmaker-players.test.ts:58` 本地 `request()` | 成功路徑，cookie | 需要 | 本地複本 helper（:41-58） |
+| `matchmaker-players.test.ts:102-113` 本地 `appRequestInit()` | 供 :134、:237、:558 | 需要（有 cookie 時） | 本地複本 helper |
+| `matchmaker-players.test.ts:134` | 5 端點，無 cookie，auth 停用 | 不需要 | `localAuth` 404 |
+| `matchmaker-players.test.ts:237` | 5 端點，cookie，DB 拋錯 | 不需要 | `getSession` 500，守衛之前 |
+| `matchmaker-players.test.ts:429-436` | POST import，cookie，batch 失敗 | 需要 | 預期 500 來自 handler 的 batch；沒標頭會變 401 |
+| `matchmaker-players.test.ts:460-467` | POST import，cookie，FK 錯誤 | 需要 | 同上，預期 500 非 409 |
+| `matchmaker-players.test.ts:558` | POST reset，cookie，spy DB | 需要（經本地 `appRequestInit`） | 預期 204 與 batch 次數 |
+| `matchmaker-round.test.ts:59` | 6 端點，無 cookie，auth 停用 | 不需要 | `localAuth` 404（fixtures `appRequestInit(undefined)`） |
+| `matchmaker-round.test.ts:155` | 6 端點，cookie，DB 拋錯 | 不需要 | `getSession` 500；fixtures 自動帶也無妨 |
+| `matchmaker-round.test.ts:303-306` | PUT round 兩次，cookie，spy DB | 需要（經 fixtures `appRequestInit`） | 預期 200／409 |
+| `matchmaker-round.test.ts` 其餘（`request(...)`、`getRound`、`slotMatchIds`） | 成功路徑 | 需要（經 fixtures `request`） | cookie 皆來自 fixtures `seedAndSignIn` → `signIn`，可由 Map 查 user id |
+| `matchmaker-slots.test.ts` 全部 | `request(cookie,…)` | 需要（經 fixtures） | 同上；無 inline 請求 |
+| `matchmaker-score.test.ts` 全部 | `postScore` → `request()` | 需要（經 fixtures） | 同上；無 inline 請求 |
+| `auth-me.test.ts`、`auth-session.test.ts`、`auth-gating.test.ts`、`auth-sign-in.test.ts`、`api-cookie-check.test.ts`、`api-health.test.ts`、`routing.test.ts`、`smoke.test.ts`、`seed-test-account.test.ts:79` | `/api/me`、`/api/session`、`/api/auth/*`、health、cookie-check | 不需要 | 全在 allowlist，不掛守衛（`/api/me` 沿用 `localAuth, requireSession`） |
+
+**結論**：§3 只需改 `helpers/session.ts`、`helpers/matchmaker-fixtures.ts`、`scoreboard-current.test.ts`（本地 helper＋:196、:201 兩處 inline）、`matchmaker-players.test.ts`（本地 `request`／`appRequestInit`＋:429、:460 兩處 inline）。
+`matchmaker-round.test.ts`／`matchmaker-slots.test.ts`／`matchmaker-score.test.ts` **無需任何 inline 改動**（全部經 fixtures helper），tasks 檔頭授權清單中這三檔的「inline 請求」授權不會用到。
+
+**前端／E2E 直接打 API 盤點**（`rg -n "requestJson\(|page.request|context.request" nextjs-pickball`）：
+
+| 檔案:行號 | 呼叫 | 需要標頭 | 理由 |
+|---|---|---|---|
+| `lib/sync/roster-api.ts:23,27,34,38,45` | `requestJson` 五個包裝 | 由 `requestJson` 集中帶 | §6 簽章加 `expectedUserId` |
+| `lib/sync/round-api.ts:28,32,39,43,47,59` | `requestJson` 六個包裝 | 同上 | 同上 |
+| `hooks/useRemoteScoreboardStore.ts:102,126` | 直接 `requestJson` GET／PUT | 同上 | 無包裝，hook 自行傳 userId |
+| `lib/sync/api-client.test.ts` | `requestJson` 單元測試 | n/a | 測試改動限授權的三種 |
+| `tests/e2e/user-data/round-sync.spec.ts:51` | `page.request.put` 種入名單 | 需要 | 通過守衛才能寫入 |
+| `tests/e2e/user-data/round-sync.spec.ts:239` | `page.request.get(SLOTS_API)` | 需要 | GET 也要標頭（Q1） |
+| `tests/e2e/user-data/round-sync.spec.ts:317` | `page.request.get(ROUND_API)` | 需要 | 同上 |
+| `tests/e2e/user-data/round-sync.spec.ts:319` | `page.request.get(SLOTS_API)` | 需要 | 同上 |
+| `tests/e2e/user-data/round-sync.spec.ts:394` | `page.request.get(PLAYERS_API)`（poll 內） | 需要 | 同上 |
+| `tests/e2e/user-data/roster-sync.spec.ts:53` | `page.request.put` 種入名單 | 需要 | 同上 |
+| 其餘 `tests/e2e/**` | 只有 `page.route`／`waitForResponse`／`page.on("request")` | 不需要 | 攔截或觀察瀏覽器自身請求，非直接打 API；`context.request` 無使用 |
+
+E2E 直接 API 呼叫共 **6 處**（round-sync 5、roster-sync 1），標頭值需取自已登入使用者的 id（頁面共用 storage state；可先 `page.request.get("/api/me")` 取 `user.id`，`/api/me` 不要求標頭）。
+
+### 1.3 一次性實測（暫時測試檔 `hono-pickball/test/zz-probe.test.ts`，已刪除、未 commit）
+
+以 `import app from "../src/index"` 取 `app.routes`，並在 vitest 內 `seedUser` 兩個使用者、經 `exports.default.fetch` 實登入。
+
+1. **`app.routes` 含 sub-app 路由且路徑已合併前綴**：是。例：`GET /api/scoreboard/current`、`PUT /api/matchmaker/players/:id`、`POST /api/matchmaker/round/matches/:matchId/score`、`POST /api/matchmaker/reset`。
+2. **`use("*", …)` 的 method 為 `ALL`**：是，路徑為 `/api/scoreboard/*`、`/api/matchmaker/*`（另有 `ALL /api/auth/*`）。
+3. **無自動 HEAD**：未出現任何 HEAD 項目。
+4. **重要：`app.routes` 以「每個 handler／middleware 一筆」列出，同一 method＋path 會重複**。實測：`ALL /api/scoreboard/*` 與 `ALL /api/matchmaker/*` 各出現 2 次（`localAuth`、`requireSession`；加上 `requireExpectedUser` 後會是 3 次）；`PUT /api/scoreboard/current`、`PUT /api/matchmaker/players/:id`、`POST /api/matchmaker/players/import`、`PUT /api/matchmaker/round`、`PUT /api/matchmaker/slots/:matchId`、`POST /api/matchmaker/round/matches/:matchId/score` 各 2 次（路由層另有一個 middleware，推測為 body 驗證）；`GET /api/me` 3 次。
+   → **§5 的列舉 MUST 以 `method + " " + path` 去重（Set）後再排除 `ALL` 與 allowlist**，否則「恰為 13 條」會算成 20。去重後使用者資料路由 = scoreboard 2 + matchmaker 11 = **13**，與 Decision 4 相符。**Decision 4 不需走退路**，但需補「去重」這個細節（記入此處，§5 apply 時以此為準）。
+   - 列舉全文（去重後、排除 ALL）：GET／POST `/api/auth/*`、GET `/api/health`、GET `/api/cookie-check`、GET `/api/me`、GET `/api/session` 為 allowlist；其餘 13 條為：GET／PUT `/api/scoreboard/current`；GET `/api/matchmaker/players`、PUT／DELETE `/api/matchmaker/players/:id`、POST `/api/matchmaker/players/import`、GET／PUT `/api/matchmaker/round`、GET `/api/matchmaker/slots`、GET／PUT `/api/matchmaker/slots/:matchId`、POST `/api/matchmaker/round/matches/:matchId/score`、POST `/api/matchmaker/reset`。
+5. **better-auth 登入回應 body 含 `user.id`**：是。body 鍵為 `["redirect","token","user"]`，`user.id` 與 `userIdOf(email)` 相等。→ **Decision 10 不走退路**：`signIn` 可由登入回應取 id（或沿用 `userIdOf`，兩者等價）。
+6. **同一 cookie jar 以第二帳號登入後，第一帳號 token 是否仍有效**：**仍有效**。帶 A 的 cookie 再登入 B，回應發出新的 `better-auth.session_token`（值與 A 不同）；之後以**舊 A token** 呼叫 `GET /api/me` 仍回 200 與 A 的 user；B 的新 token 回 B。→ 證實 Context「舊 session 不會被撤銷」；換帳號的衝突完全來自瀏覽器端 cookie 被覆寫，伺服器端無任何防線，守衛是必要的。
+
+### 1.4 Context7 查證
+
+- `/better-auth/better-auth/v1.6.23`（查詢「未啟用 multi-session 時再次登入是否覆寫 cookie、不撤銷舊 session」）：文件只描述 multi-session plugin「登入時**額外**加一個 cookie 以維持多個 session」，反推未啟用時只有單一 session cookie；文件**未明文**寫出「覆寫」與「不撤銷」，該行為以 1.3 第 6 點的實測為準（本專案 `create-auth.ts` 未啟用 multi-session）。
+- `/websites/hono_dev`：`app.routes` 文件頁僅間接出現（`showRoutes` 以合併前綴列出 sub-app 路由，如 `GET /v1/posts`），未說明重複項；以 1.3 的實測為準（含「每 handler 一筆」的重複現象）。`c.req.header('User-Agent')` 範例以首字母大寫取值，與 Fetch `Headers` 大小寫不敏感一致（`X-Expected-User-Id` 於 §5 以單元測試再驗）。`createMiddleware` 為既有 `requireSession` 已使用的慣例，無需另查。

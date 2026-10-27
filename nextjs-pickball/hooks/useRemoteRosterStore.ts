@@ -1,7 +1,7 @@
 // hooks/useRemoteRosterStore.ts
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
 	addPlayer as addPlayerToRoster,
 	updatePlayer as updatePlayerInRoster,
@@ -29,6 +29,11 @@ import type { UseRosterStoreResult } from "@/hooks/useRosterStore";
 export interface UseRemoteRosterStoreOptions {
 	/** false 時不發任何請求，且對外狀態恆為 local。 */
 	enabled: boolean;
+	/**
+	 * 目前登入的帳號。換帳號即結束舊世代並重新載入；為 null 時視同停用，
+	 * 避免以不明帳號送出請求。
+	 */
+	userId: string | null;
 	/** GET／寫入收到 401 時呼叫；選擇器傳入 session 的 refresh。 */
 	onUnauthorized: () => void;
 }
@@ -61,17 +66,32 @@ function deriveStatus(
 	return "synced";
 }
 
+const NO_PLAYERS: Player[] = [];
+
 export function useRemoteRosterStore({
 	enabled,
+	userId,
 	onUnauthorized,
 }: UseRemoteRosterStoreOptions): UseRosterStoreResult {
-	const [players, setPlayers] = useState<Player[]>([]);
+	// 同 status：effect 開頭要清空前一個世代的名單，用 reducer 避開 react-hooks/set-state-in-effect
+	const [players, setPlayers] = useReducer(
+		(_current: Player[], next: Player[]): Player[] => next,
+		[],
+	);
 	// 用 reducer 取代 useState：effect 開頭要把狀態重設為 loading，dispatch 不會觸發
 	// react-hooks/set-state-in-effect（沿用 useRemoteScoreboardStore 的寫法）
 	const [status, setStatus] = useReducer(
 		(_current: SyncStatus, next: SyncStatus): SyncStatus => next,
 		"loading",
 	);
+	// 目前名單屬於哪個帳號：render 時與 userId 不同代表 effect 還沒換世代，
+	// 此時不能把前一帳號的名單交給畫面，操作也一律不送出（design Decision 7）
+	const [owner, setOwner] = useReducer(
+		(_current: string | null, next: string | null): string | null => next,
+		null,
+	);
+	const active = enabled && userId !== null;
+	const mismatched = active && owner !== userId;
 	// 變更操作要用「目前」名單算出新值並同步送進佇列，不能等 render 之後才讀到 state
 	const playersRef = useRef<Player[]>([]);
 	// false 代表尚未取得雲端版本（載入中、載入失敗、衝突重載中、重置進行中、已收到 401）：
@@ -89,8 +109,11 @@ export function useRemoteRosterStore({
 	}, []);
 
 	useEffect(() => {
-		if (!enabled) return;
-		// StrictMode 與 enabled 切換都會重跑本 effect：舊一輪在途的 GET 以 cancelled 忽略，
+		if (!enabled || userId === null) return;
+		// 世代內的每個請求（載入、儲存、重試、重置、衝突重載）都用這個帳號，不在送出當下改讀其他來源：
+		// 否則舊世代的待送值可能帶著新帳號的標頭通過伺服器守衛
+		const expectedUserId = userId;
+		// StrictMode、enabled 與 userId 切換都會重跑本 effect：舊一輪在途的 GET 以 cancelled 忽略，
 		// 舊一輪的 saver 由 disposeAll 釋放
 		let cancelled = false;
 		let stopped = false;
@@ -107,6 +130,9 @@ export function useRemoteRosterStore({
 		const savers = new Map<string, LatestWinsSaver<Payload>>();
 
 		readyRef.current = false;
+		// 不殘留前一個世代的名單
+		replacePlayers([]);
+		setOwner(expectedUserId);
 		setStatus("loading");
 
 		function updateReady(): void {
@@ -135,7 +161,7 @@ export function useRemoteRosterStore({
 		}
 
 		async function load(afterConflict: boolean): Promise<void> {
-			const result = await fetchRemotePlayers();
+			const result = await fetchRemotePlayers(expectedUserId);
 			if (cancelled) return;
 			if (result.kind === "unauthorized") {
 				handleUnauthorized();
@@ -195,7 +221,7 @@ export function useRemoteRosterStore({
 		async function send(id: string, payload: Payload): Promise<SaveOutcome> {
 			const sentEpoch = epoch;
 			if (payload.op === "delete") {
-				const result = await deleteRemotePlayer(id);
+				const result = await deleteRemotePlayer(expectedUserId, id);
 				if (result.kind !== "ok") {
 					handleStaleOutcome(sentEpoch, result.kind);
 					return result.kind;
@@ -204,7 +230,7 @@ export function useRemoteRosterStore({
 				return "ok";
 			}
 			// 在這裡才讀版本：同一人排隊的第二次 PUT 要帶第一次成功後的新版本
-			const result = await putRemotePlayer(payload.player, versions.get(id) ?? 0);
+			const result = await putRemotePlayer(expectedUserId, payload.player, versions.get(id) ?? 0);
 			if (result.kind !== "ok") {
 				handleStaleOutcome(sentEpoch, result.kind);
 				return result.kind;
@@ -260,7 +286,7 @@ export function useRemoteRosterStore({
 			updateReady();
 			// 送出前就停止所有佇列：POST 在途期間退避計時器仍會到期，重試的 PUT 會讓已被重置的參賽者復活
 			disposeAll();
-			const result = await resetRemoteMatchmaker();
+			const result = await resetRemoteMatchmaker(expectedUserId);
 			// 重置在途時可能已收到 401（stopped）：此時不得再重開，也不再發布狀態
 			if (cancelled || stopped) return;
 			resetting = false;
@@ -296,11 +322,11 @@ export function useRemoteRosterStore({
 			disposeAll();
 			controllerRef.current = null;
 		};
-	}, [enabled, replacePlayers]);
+	}, [enabled, userId, replacePlayers]);
 
 	function addPlayer(input: AddPlayerInput): void {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) return;
+		if (mismatched || controller === null || !readyRef.current) return;
 		const id = crypto.randomUUID();
 		const next = addPlayerToRoster(playersRef.current, input, {
 			id,
@@ -314,7 +340,7 @@ export function useRemoteRosterStore({
 
 	function applyChange(id: string, compute: (roster: Player[]) => Player[]): void {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) return;
+		if (mismatched || controller === null || !readyRef.current) return;
 		if (!playersRef.current.some((player) => player.id === id)) return;
 		const next = compute(playersRef.current);
 		const changed = next.find((player) => player.id === id);
@@ -333,7 +359,7 @@ export function useRemoteRosterStore({
 
 	function removePlayer(id: string): void {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) return;
+		if (mismatched || controller === null || !readyRef.current) return;
 		if (!playersRef.current.some((player) => player.id === id)) return;
 		replacePlayers(removePlayerFromRoster(playersRef.current, id));
 		controller.enqueue(id, { op: "delete" });
@@ -341,24 +367,31 @@ export function useRemoteRosterStore({
 
 	function resetRoster(): void {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) return;
+		if (mismatched || controller === null || !readyRef.current) return;
 		controller.reset();
 	}
 
 	function applyRemotePlayers(items: RemotePlayerItem[]): void {
 		const controller = controllerRef.current;
-		if (controller === null || !readyRef.current) return;
+		if (mismatched || controller === null || !readyRef.current) return;
 		controller.apply(items);
 	}
 
 	function reloadRemotePlayers(): void {
 		const controller = controllerRef.current;
-		if (controller === null) return;
+		if (mismatched || controller === null) return;
 		controller.reload();
 	}
 
+	let syncStatus: SyncStatus = status;
+	if (!active) {
+		syncStatus = "local";
+	} else if (mismatched) {
+		syncStatus = "loading";
+	}
+
 	return {
-		players,
+		players: mismatched ? NO_PLAYERS : players,
 		droppedCount: 0,
 		addPlayer,
 		updatePlayer,
@@ -367,6 +400,6 @@ export function useRemoteRosterStore({
 		resetRoster,
 		applyRemotePlayers,
 		reloadRemotePlayers,
-		syncStatus: enabled ? status : "local",
+		syncStatus,
 	};
 }

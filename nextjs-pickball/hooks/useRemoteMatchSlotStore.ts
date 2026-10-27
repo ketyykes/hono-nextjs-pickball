@@ -18,6 +18,11 @@ export interface UseRemoteMatchSlotStoreOptions {
 	/** false 時不發任何請求，且對外同步狀態恆為 local。 */
 	enabled: boolean;
 	matchId: string;
+	/**
+	 * 目前登入的帳號。換帳號即結束舊世代並重新載入；為 null 時視同停用，
+	 * 避免以不明帳號送出請求。
+	 */
+	userId: string | null;
 	/** GET／PUT 收到 401 時呼叫；選擇器傳入 session 的 refresh。 */
 	onUnauthorized: () => void;
 }
@@ -34,6 +39,10 @@ function trackedReducer(current: TrackedState, action: Action): TrackedState {
 	const next = scoreboardReducer(current.state, action);
 	return { state: next, dirty: action.type !== "HYDRATE" };
 }
+
+// 換帳號的那一幀、effect 還沒重設狀態前使用：呼叫端拿到的 dispatch 不得改到前一帳號的資料
+const IGNORE_ACTION: Dispatch<Action> = () => {};
+const INITIAL_SLOT_STATE = createInitialState();
 
 type StatusAction =
 	| { type: "set"; status: SyncStatus }
@@ -71,6 +80,7 @@ function statusReducer(current: SyncStatus, action: StatusAction): SyncStatus {
 export function useRemoteMatchSlotStore({
 	enabled,
 	matchId,
+	userId,
 	onUnauthorized,
 }: UseRemoteMatchSlotStoreOptions): readonly [
 	ScoreboardState,
@@ -89,6 +99,14 @@ export function useRemoteMatchSlotStore({
 		"pending",
 	);
 
+	// 目前狀態屬於哪個帳號：render 時與 userId 不同代表 effect 還沒換世代，
+	// 此時不能把前一帳號的資料交給畫面（design Decision 7）
+	const [owner, setOwner] = useReducer(
+		(_current: string | null, next: string | null): string | null => next,
+		null,
+	);
+	const active = enabled && userId !== null;
+
 	// null 代表不可寫入：尚未取得雲端版本（載入中、載入失敗、已收到 401）或分槽已失效（missing）
 	const versionRef = useRef<number | null>(null);
 	const saverRef = useRef<ReturnType<typeof createLatestWinsSaver<ScoreboardState>> | null>(
@@ -101,16 +119,22 @@ export function useRemoteMatchSlotStore({
 	}, [onUnauthorized]);
 
 	useEffect(() => {
-		if (!enabled) return;
-		// StrictMode 與 enabled 切換都會重跑本 effect：每次都重建 saver 並於 cleanup 釋放，
+		if (!enabled || userId === null) return;
+		// 世代內的每個請求都用這個帳號，不在送出當下改讀其他來源：
+		// 否則舊世代的待送值可能帶著新帳號的標頭通過伺服器守衛
+		const expectedUserId = userId;
+		// StrictMode、enabled、matchId 與 userId 切換都會重跑本 effect：每次都重建 saver 並於 cleanup 釋放，
 		// 舊的在途結果以 cancelled 旗標忽略
 		let cancelled = false;
 		versionRef.current = null;
+		// 不殘留前一個世代的分槽；HYDRATE 不標 dirty，不會寫回雲端
+		dispatch({ type: "HYDRATE", state: createInitialState() });
+		setOwner(expectedUserId);
 		dispatchStatus({ type: "set", status: "loading" });
 		dispatchBinding("pending");
 
 		async function loadSlot(afterConflict: boolean): Promise<void> {
-			const result = await fetchRemoteSlot(matchId);
+			const result = await fetchRemoteSlot(expectedUserId, matchId);
 			if (cancelled) return;
 			if (result.kind === "unauthorized") {
 				versionRef.current = null;
@@ -139,7 +163,7 @@ export function useRemoteMatchSlotStore({
 			const version = versionRef.current;
 			// 分槽的 matchId 以 path 為準；payload 理論上已帶同一個值，這裡重申以符合 MatchSlot 型別
 			const slot: MatchSlot = { ...payload, matchId };
-			const result = await putRemoteSlot(matchId, slot, version ?? 0);
+			const result = await putRemoteSlot(expectedUserId, matchId, slot, version ?? 0);
 			if (result.kind !== "ok") return result.kind;
 			if (result.value === undefined) return "failed";
 			versionRef.current = result.value.version;
@@ -170,7 +194,7 @@ export function useRemoteMatchSlotStore({
 			saver.dispose();
 			saverRef.current = null;
 		};
-	}, [enabled, matchId]);
+	}, [enabled, matchId, userId]);
 
 	useEffect(() => {
 		if (!tracked.dirty) return;
@@ -179,10 +203,7 @@ export function useRemoteMatchSlotStore({
 		saverRef.current?.save(tracked.state);
 	}, [tracked]);
 
-	return [
-		tracked.state,
-		dispatch,
-		enabled ? binding : "pending",
-		enabled ? status : "local",
-	] as const;
+	if (!active) return [tracked.state, dispatch, "pending", "local"] as const;
+	if (owner !== userId) return [INITIAL_SLOT_STATE, IGNORE_ACTION, "pending", "loading"] as const;
+	return [tracked.state, dispatch, binding, status] as const;
 }

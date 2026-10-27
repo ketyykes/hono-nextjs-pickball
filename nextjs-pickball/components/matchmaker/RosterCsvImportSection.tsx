@@ -8,7 +8,7 @@ import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
 import { useSession } from "@/hooks/useSession";
-import { importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
+import { REMOTE_TRANSFER_MESSAGES, importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
 import { readRoster } from "@/lib/matchmaker/storage";
 import { writeRosterPlayers } from "@/lib/matchmaker/transfer-storage";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
@@ -38,7 +38,11 @@ export function RosterCsvImportSection() {
 	const [message, setMessage] = useState<string | null>(null);
 	// 雲端匯入先 GET 再 POST，往返期間若可重複點擊，每次都會產生新的 UUID 而附加重複參賽者
 	const [isImporting, setIsImporting] = useState(false);
-	const isRemote = resolveStorageMode(useSession()) === "remote";
+	const session = useSession();
+	const isRemote = resolveStorageMode(session) === "remote";
+	// 以觸發當下畫面所見的帳號送出（匯入前的 GET 與匯入的 POST 共用）；
+	// 帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
+	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 
 	function handleFileText(text: string) {
 		const parsed = parseRosterCsv(text);
@@ -55,14 +59,19 @@ export function RosterCsvImportSection() {
 
 	// 雲端分支：名單在雲端，不讀寫本機 roster；成功後比照本機分支 reload，頁面重載會重新 GET。
 	async function handleRemoteConfirm(parsed: Extract<ParseRosterCsvResult, { ok: true }>) {
+		if (userId === null) {
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
 		const ids = parsed.rows.map(() => crypto.randomUUID());
 		const now = new Date().toISOString();
 		setIsImporting(true);
-		const imported = await importRemoteRoster(parsed, { ids, now });
+		const imported = await importRemoteRoster(userId, parsed, { ids, now });
 		if (!imported.ok) {
 			// 失敗時恢復可按；成功會 reload，不需要恢復
 			setIsImporting(false);
 			setMessage(imported.message);
+			if (imported.unauthorized) void session.refresh();
 			return;
 		}
 		location.reload();

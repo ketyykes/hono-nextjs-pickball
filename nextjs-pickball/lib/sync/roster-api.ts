@@ -19,28 +19,30 @@ function playerPath(id: string): string {
 	return `${PLAYERS_PATH}/${encodeURIComponent(id)}`;
 }
 
-export function fetchRemotePlayers() {
-	return requestJson("GET", PLAYERS_PATH, { schema: PlayerListResponseSchema });
+export function fetchRemotePlayers(expectedUserId: string) {
+	return requestJson("GET", PLAYERS_PATH, { schema: PlayerListResponseSchema, expectedUserId });
 }
 
-export function putRemotePlayer(player: Player, version: number) {
+export function putRemotePlayer(expectedUserId: string, player: Player, version: number) {
 	return requestJson("PUT", playerPath(player.id), {
 		body: { data: player, version },
 		schema: PUT_PLAYER_RESPONSE_SCHEMA,
+		expectedUserId,
 	});
 }
 
-export function deleteRemotePlayer(id: string) {
-	return requestJson("DELETE", playerPath(id), { schema: NO_CONTENT_SCHEMA });
+export function deleteRemotePlayer(expectedUserId: string, id: string) {
+	return requestJson("DELETE", playerPath(id), { schema: NO_CONTENT_SCHEMA, expectedUserId });
 }
 
-export function importRemotePlayers(players: Player[]) {
+export function importRemotePlayers(expectedUserId: string, players: Player[]) {
 	return requestJson("POST", `${PLAYERS_PATH}/import`, {
 		body: { players },
 		schema: PlayerListResponseSchema,
+		expectedUserId,
 	});
 }
 
-export function resetRemoteMatchmaker() {
-	return requestJson("POST", "/api/matchmaker/reset", { schema: NO_CONTENT_SCHEMA });
+export function resetRemoteMatchmaker(expectedUserId: string) {
+	return requestJson("POST", "/api/matchmaker/reset", { schema: NO_CONTENT_SCHEMA, expectedUserId });
 }

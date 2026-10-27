@@ -4,6 +4,7 @@ import { ScoreboardStateSchema } from "@pickball/core/scoreboard/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { localAuth } from "../auth/local-auth-middleware";
+import { requireExpectedUser } from "../auth/require-expected-user";
 import { requireSession, type SessionAppEnv } from "../auth/require-session";
 import { getDb } from "../db/client";
 import { invalidBodyHook, userDataOnError } from "../http/invalid-body";
@@ -12,8 +13,8 @@ import { getCurrent, putCurrent } from "../scoreboard/repository";
 const putBodySchema = versionedWriteSchema(ScoreboardStateSchema);
 
 export const scoreboardRoutes = new Hono<SessionAppEnv>()
-	// 整個 sub-app 一律先過停用閘門與 session 驗證，新增端點時不可能漏掛授權
-	.use("*", localAuth, requireSession)
+	// 整個 sub-app 一律先過停用閘門、session 與預期帳號驗證，新增端點時不可能漏掛授權
+	.use("*", localAuth, requireSession, requireExpectedUser)
 	.onError(userDataOnError)
 	.get("/current", async (c) => {
 		const current = await getCurrent(getDb(c.env), c.var.user.id);

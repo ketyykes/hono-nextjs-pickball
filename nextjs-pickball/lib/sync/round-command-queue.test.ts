@@ -8,6 +8,7 @@ import {
 	createRoundCommandQueue,
 	type RoundCommand,
 	type RoundCommandQueue,
+	type RoundCommandQueueOptions,
 } from "./round-command-queue";
 
 // 佇列只搬運回合，不解讀其內容；測試用最小的假回合，以 log 記錄套用過哪些命令
@@ -80,16 +81,16 @@ const PLAYERS = [{ id: "p1" }] as unknown as Player[];
 
 interface Harness {
 	queue: RoundCommandQueue;
-	putRound: ReturnType<typeof vi.fn<typeof putRemoteRound>>;
-	submitScore: ReturnType<typeof vi.fn<typeof submitRemoteScore>>;
+	putRound: ReturnType<typeof vi.fn<RoundCommandQueueOptions["putRound"]>>;
+	submitScore: ReturnType<typeof vi.fn<RoundCommandQueueOptions["submitScore"]>>;
 	events: SaverEvent[];
 	onConfirmed: ReturnType<typeof vi.fn>;
 	onSubmitted: ReturnType<typeof vi.fn>;
 }
 
 function setup(initial: FakeRound = { log: [] }, version = 1): Harness {
-	const putRound = vi.fn<typeof putRemoteRound>();
-	const submitScore = vi.fn<typeof submitRemoteScore>();
+	const putRound = vi.fn<RoundCommandQueueOptions["putRound"]>();
+	const submitScore = vi.fn<RoundCommandQueueOptions["submitScore"]>();
 	const events: SaverEvent[] = [];
 	const onConfirmed = vi.fn();
 	const onSubmitted = vi.fn();
