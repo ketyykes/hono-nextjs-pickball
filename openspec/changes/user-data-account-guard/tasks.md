@@ -101,43 +101,56 @@ Depends on: §4
 
 Depends on: §2（§6～§8 由同一位 Implementer 以同一張派工單連續完成，見 execution-plan）
 
-- [ ] 6.1 RED（TDD）：`lib/sync/api-client.test.ts` 新增「每個請求帶 X-Expected-User-Id 標頭，有 body 時與 Content-Type 並存」「requestJson 只使用呼叫端給的 expectedUserId，不讀 session store」「401 ACCOUNT_MISMATCH 同樣分類為 unauthorized」；
+- [x] 6.1 RED（TDD）：`lib/sync/api-client.test.ts` 新增「每個請求帶 X-Expected-User-Id 標頭，有 body 時與 Content-Type 並存」「requestJson 只使用呼叫端給的 expectedUserId，不讀 session store」「401 ACCOUNT_MISMATCH 同樣分類為 unauthorized」；
   `roster-api.test.ts`、`round-api.test.ts` 各新增「包裝把 expectedUserId 交給 requestJson」。確認紅燈並貼輸出；
   **「401 ACCOUNT_MISMATCH 同樣分類為 unauthorized」預期先綠——點名標 regression guard**
-- [ ] 6.2 GREEN（TDD）：`requestJson` 新增必填 `expectedUserId` 與標頭；`roster-api.ts`、`round-api.ts` 以第一參數接收；`round-command-queue.ts` options 改為已綁定帳號的函式型別（design Decision 6）；
+  → RED commit `efecf73`（紅燈輸出留在已中斷的 leader session，未能貼出；以 RED／GREEN 分開 commit 為證）
+- [x] 6.2 GREEN（TDD）：`requestJson` 新增必填 `expectedUserId` 與標頭；`roster-api.ts`、`round-api.ts` 以第一參數接收；`round-command-queue.ts` options 改為已綁定帳號的函式型別（design Decision 6）；
   同步更新允許清單內既有測試的呼叫處（只加參數）。6.1 全綠。**前端 tsc 此時預期仍紅**（hook 與元件呼叫處在 §7～§8 補），不在此交件
+  → GREEN commit `da09cc2`
 
 ## 7. 前端：雲端 hook 的帳號世代
 
 Depends on: §6
 
-- [ ] 7.1 RED（TDD）：四支雲端 hook 測試新增 spec「雲端 store 以登入帳號為界」中屬 hook 的 it——
+- [x] 7.1 RED（TDD）：四支雲端 hook 測試新增 spec「雲端 store 以登入帳號為界」中屬 hook 的 it——
   `useRemoteScoreboardStore.test.tsx`：「userId 變更時丟棄前一帳號的待送變更並以新帳號重新載入」「每個世代的請求一律帶該世代的帳號」「userId 變更的那一次 render 起不回傳前一帳號的資料」「enabled 為 true 但 userId 為 null 時不發出任何請求」；
   `useRemoteRosterStore.test.tsx`：同上四個；
   `useRemoteRoundStore.test.tsx`：「userId 變更時丟棄前一帳號的命令佇列並以新帳號重新載入」「userId 變更的那一次 render 起不回傳前一帳號的資料」「enabled 為 true 但 userId 為 null 時不發出任何請求」「換帳號後才回來的送出比分結果不呼叫 applyRemotePlayers」；
   `useRemoteMatchSlotStore.test.tsx`：「userId 變更時丟棄前一帳號的待送變更並以新帳號重新載入」「enabled 為 true 但 userId 為 null 時不發出任何請求」。確認紅燈並貼輸出
-- [ ] 7.2 GREEN（TDD）：四支 hook 加 `userId` option、主 effect 依賴加 `userId`、世代閉包帶 `expectedUserId`（含 saver、命令佇列綁定函式、衝突重載、reset）、擁有者標記與 render 期判斷、舊世代結果不呼叫 port（design Decision 7）；
+  → RED commit `e983fb8`（紅燈輸出同 6.1，未能貼出）
+- [x] 7.2 GREEN（TDD）：四支 hook 加 `userId` option、主 effect 依賴加 `userId`、世代閉包帶 `expectedUserId`（含 saver、命令佇列綁定函式、衝突重載、reset）、擁有者標記與 render 期判斷、舊世代結果不呼叫 port（design Decision 7）；
   既有 hook it 的呼叫處補 `userId`（同一 commit）。7.1 全綠、四支 hook 既有 it 全綠
-- [ ] 7.3 REFACTOR：四支 hook 的擁有者判斷若重複，抽 `lib/sync/` 小工具（並為其補單元測試或以既有 hook it 覆蓋說明）；否則 skipped
+  → GREEN commit `e7cd9a0`；lint 修正 `e30eb0f`（名單 hook 的 players 改 reducer，與 status／owner 同寫法）
+- [x] 7.3 REFACTOR：四支 hook 的擁有者判斷若重複，抽 `lib/sync/` 小工具（並為其補單元測試或以既有 hook it 覆蓋說明）；否則 skipped
+  → skipped：四支 hook 的擁有者判斷各為兩行 reducer＋一行比較，未抽工具
 
 ## 8. 前端：選擇器與一次性雲端操作
 
 Depends on: §7
 
-- [ ] 8.1 RED（TDD）：`useScoreboardStore.test.tsx`、`useRosterStore.test.tsx`、`useRoundStore.test.tsx` 各新增「選擇器把 session 的 user id 傳給雲端 hook」；
+- [x] 8.1 RED（TDD）：`useScoreboardStore.test.tsx`、`useRosterStore.test.tsx`、`useRoundStore.test.tsx` 各新增「選擇器把 session 的 user id 傳給雲端 hook」；
   `lib/matchmaker/remote-transfer.test.ts` 新增「雲端匯入與備份的每個請求都帶呼叫端給的帳號」「雲端匯入與備份遇到 401 時以機器可讀欄位標示未授權」；
   `components/matchmaker/CourtCard.test.tsx` 新增 `vi.mock("@/hooks/useSession", …)`、`vi.mock("@/lib/sync/round-api", …)` 與「雲端建立分槽帶入目前帳號且未授權時刷新 session 並不導向」（design Open Questions 3）。確認紅燈並貼輸出
-- [ ] 8.2 GREEN（TDD）：三個選擇器傳入 `userId`；`remote-transfer.ts` 以第一參數接收 `expectedUserId` 並加未授權欄位；`CourtCard` 以 `useSession()` 的 user id 呼叫 `putRemoteSlot`、未授權時 `refresh()`＋既有錯誤且不導向。8.1 全綠
-- [ ] 8.3 例外層（元件呼叫）：`RosterCsvImportSection`、`JsonBackupSection` 以 `useSession()` 的 user id 呼叫 `importRemoteRoster`／`buildRemoteBackupSnapshot`，結果帶未授權欄位時呼叫 `refresh()`（design Decision 8、Open Questions 1；以 Stage 2 閱讀驗收）
-- [ ] 8.4 驗收（指令）：持鎖 `pnpm test:web` 全綠；`pnpm -r exec tsc --noEmit` exit 0；`pnpm lint` 0 errors；`git diff main -- nextjs-pickball/hooks nextjs-pickball/lib nextjs-pickball/components` 的既有測試檔只見允許改動（C10 前端部分）
+  → RED commit `d0e0d81`（紅燈輸出同 6.1，未能貼出）
+- [x] 8.2 GREEN（TDD）：三個選擇器傳入 `userId`；`remote-transfer.ts` 以第一參數接收 `expectedUserId` 並加未授權欄位；`CourtCard` 以 `useSession()` 的 user id 呼叫 `putRemoteSlot`、未授權時 `refresh()`＋既有錯誤且不導向。8.1 全綠
+  → GREEN commit `e7d506a`
+- [x] 8.3 例外層（元件呼叫）：`RosterCsvImportSection`、`JsonBackupSection` 以 `useSession()` 的 user id 呼叫 `importRemoteRoster`／`buildRemoteBackupSnapshot`，結果帶未授權欄位時呼叫 `refresh()`（design Decision 8、Open Questions 1；以 Stage 2 閱讀驗收）
+  → commit `b1cc1a7`
+- [x] 8.4 驗收（指令）：持鎖 `pnpm test:web` 全綠；`pnpm -r exec tsc --noEmit` exit 0；`pnpm lint` 0 errors；`git diff main -- nextjs-pickball/hooks nextjs-pickball/lib nextjs-pickball/components` 的既有測試檔只見允許改動（C10 前端部分）
+  → 2026-10-27 coordinator 持鎖實跑：tsc（-r、hono、core）皆 exit 0；lint 0 errors／3 warnings；test 前端 100 files／1010、後端 22／157、核心 6／13 全綠
 
 ## 9. E2E 轉綠、文件與收尾
 
 Depends on: §4、§5、§8
 
-- [ ] 9.1 驗收（指令）C4：持鎖 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data` 全數 passed、0 skipped（§4.5 的七條轉綠，貼輸出；`roster-sync.spec.ts`、`round-sync.spec.ts`、`scoreboard-sync.spec.ts` 原樣通過）
-- [ ] 9.2 驗收（指令）C9：WebKit／Safari 手動走一次登入態計分板（keepalive GET＋自訂標頭）並把結果記入本 task
-- [ ] 9.3 設定層（文件）：`hono-pickball/CLAUDE.md`「使用者資料 API」改為 `use("*", localAuth, requireSession, requireExpectedUser)`、授權覆蓋表改四類、curl 範例帶 `X-Expected-User-Id`、`db:seed:local` 會建立兩個帳號、「後續 change 須知」加入 B8／B9 的守衛樣本表；
+- [x] 9.1 驗收（指令）C4：持鎖 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data` 全數 passed、0 skipped（§4.5 的七條轉綠，貼輸出；`roster-sync.spec.ts`、`round-sync.spec.ts`、`scoreboard-sync.spec.ts` 原樣通過）
+  → 2026-10-27 coordinator 持鎖實跑：`34 passed (1.4m)`，0 skipped（含 `account-switch.spec.ts` 七條）
+- [x] 9.2 驗收（指令）C9：WebKit／Safari 手動走一次登入態計分板（keepalive GET＋自訂標頭）並把結果記入本 task
+  → **未手動操作**：coordinator 無法在真實 Safari 手動操作，改以 2026-10-27 持鎖實跑的 webkit（44＋41＋48 passed、12 skipped）與 mobile-safari（44＋41＋48 passed、12 skipped）E2E 代證；登入態計分板的 keepalive GET＋自訂標頭在 WebKit 上的實機手動驗證留給 S2 本機完整驗收
+- [x] 9.3 設定層（文件）：`hono-pickball/CLAUDE.md`「使用者資料 API」改為 `use("*", localAuth, requireSession, requireExpectedUser)`、授權覆蓋表改四類、curl 範例帶 `X-Expected-User-Id`、`db:seed:local` 會建立兩個帳號、「後續 change 須知」加入 B8／B9 的守衛樣本表；
   `nextjs-pickball/CLAUDE.md` 的 `lib/sync` 與雲端 hook 實作要點（`requestJson` 的 `expectedUserId`、`userId` 世代與擁有者標記、一次性操作 refresh）、E2E 第二帳號與 `expectedUserHeaders()`
-- [ ] 9.4 驗收（指令）：README 部署前檢查清單 lint → tsc（C1）→ 前端 unit → 核心 unit → 後端 unit（C6）→ 完整 E2E（C5，含 user-data）→ build（C7）→ `DO_NOT_TRACK=1 openspec validate user-data-account-guard --strict`（C8）；C10 全量 `git diff` 檢查。
+  → commit `cc35496`
+- [x] 9.4 驗收（指令）：README 部署前檢查清單 lint → tsc（C1）→ 前端 unit → 核心 unit → 後端 unit（C6）→ 完整 E2E（C5，含 user-data）→ build（C7）→ `DO_NOT_TRACK=1 openspec validate user-data-account-guard --strict`（C8）；C10 全量 `git diff` 檢查。
   runbook 由 coordinator 更新（leader 不得改 runbook）
+  → 2026-10-27 coordinator 持鎖實跑：lint 0 errors／3 warnings；tsc（-r、hono、core）exit 0；unit 前端 1010、核心 13、後端 157 全綠；完整 E2E chromium 145、firefox 133＋12 skipped、mobile-chrome 143＋2 skipped、user-data 34、webkit 133＋12 skipped、mobile-safari 133＋12 skipped，合計 721 passed／38 skipped／0 failed；`pnpm build` exit 0；`openspec validate --strict` valid
