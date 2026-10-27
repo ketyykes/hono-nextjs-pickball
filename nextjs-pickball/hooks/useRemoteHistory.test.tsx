@@ -303,4 +303,25 @@ describe("useRemoteHistory", () => {
 		expect(second.result.current.total).toBe(1);
 		expect(second.result.current.syncStatus).toBe("synced");
 	});
+
+	// regression guard：加入時即為綠燈（實作已具備），補 mutation 驗證發現的兩個缺口（enabled 依賴、onUnauthorized 取最新函式）
+	it("regression guard：enabled 由 false 改為 true 時開始載入，onUnauthorized 以最新的函式呼叫", async () => {
+		enqueue(401);
+		const first = vi.fn();
+		const second = vi.fn();
+		const { rerender } = renderHistory({
+			enabled: false,
+			userId: "user-a",
+			range: "today",
+			onUnauthorized: first,
+		});
+		await settle();
+		expect(fetchMock).not.toHaveBeenCalled();
+
+		// 同一次 rerender 換掉 onUnauthorized：請求送出後收到 401 要呼叫新的函式
+		rerender({ enabled: true, userId: "user-a", range: "today", onUnauthorized: second });
+		await waitFor(() => expect(second).toHaveBeenCalledTimes(1));
+		expect(first).not.toHaveBeenCalled();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
 });
