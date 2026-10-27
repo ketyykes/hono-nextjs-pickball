@@ -121,6 +121,7 @@
 6. （apply §3，leader 裁定 2026-10-27）§3 Implementer（sonnet）：1995cff RED（5 紅＋守衛列舉真紅；先綠：停用 404、未登入 401、守衛「不符」「缺少或空白」「未登入／停用優先」）→ 54b03f1 GREEN → 3d4e239（3.3 skipped）。Stage 1（sonnet）PASS；Stage 2（opus，41 條變異全殺、4 條等價對照綠）PASS。
    Stage 2 實測：`data` 欄位若為非 JSON 文字，drizzle json mode 讀取時即拋錯 → 整個端點 500，歷史頁、統計頁與兩種匯出全部失效，與 Decision 2「略過並計數」的目的相反；
    spec 字面「每一列的 data MUST 以 MatchHistoryEntrySchema 驗證：不合法者 … 計入 droppedCount」可涵蓋此情形。**裁定**：在 §3 追加 task 3.4（新增 Scenario「雲端歷史：data 不是合法 JSON 的列同樣被略過並計數」），以 `sql` 片段取原始文字再 `JSON.parse`。
+   3.4 完成：8984613 RED（`expected 500 to be 200`，真紅）→ 2488400 GREEN；Stage 1 由 leader 對照 Scenario 逐條核對 diff，Stage 2（opus，9 條非等價變異全殺、3 條等價對照綠）PASS。後端全套 23 檔／165 it 綠。§3 完成。
 
 ## apply §1 查證紀錄（2026-10-27）
 
