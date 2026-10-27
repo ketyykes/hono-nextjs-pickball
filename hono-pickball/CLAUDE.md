@@ -17,7 +17,7 @@
 - `pnpm dev` — `wrangler dev --env local`（http://localhost:8787）；走 `--env local` 才有本機 D1 binding（`DB`）
 - `pnpm db:generate` — `drizzle-kit generate`，由 `src/db/schema.ts` 產生 `drizzle/` 下的 migration；commit 前執行必須不產生新檔案（schema 與 migration 不得漂移）
 - `pnpm db:migrate:local` — `wrangler d1 migrations apply DB --local --env local`；首次 clone 或 `drizzle/` 變更後執行一次。**任何指令都不得帶 `--remote`**，遠端 D1 的建立與 migration 屬後續 G1
-- `pnpm db:seed:local` — `node scripts/seed-test-account.ts`（Node 22 內建 type stripping，不需 `tsx`）；把 `.dev.vars` 的 `TEST_ACCOUNT_*` 寫入本機 D1。只讀 `.dev.vars`（以 `parseEnv` 解析，shell 已 export 的同名變數不影響）、只寫本機 D1（`--local --env local`），**不得帶 `--remote`**；重複執行會先刪除同 email 的 user（cascade 刪其 session）再重建。可在 `wrangler dev` 執行中跑，結果立即可見
+- `pnpm db:seed:local` — `node scripts/seed-test-account.ts`（Node 22 內建 type stripping，不需 `tsx`）；把 `.dev.vars` 的 `TEST_ACCOUNT_*` 寫入本機 D1。只讀 `.dev.vars`（以 `parseEnv` 解析，shell 已 export 的同名變數不影響）、只寫本機 D1（`--local --env local`），**不得帶 `--remote`**；重複執行會先刪除同 email 的 user（cascade 刪其 session）再重建。會建立**兩個帳號**：`TEST_ACCOUNT_EMAIL` 與由 `deriveSwitchAccountEmail()` 衍生的換帳號測試用第二帳號（plus addressing、同密碼；B7.5）。可在 `wrangler dev` 執行中跑，結果立即可見
 - `pnpm test` — Vitest（在真正的 workerd runtime 中執行）；單檔用 `pnpm --filter ./hono-pickball test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）
 - `pnpm typecheck` — `tsc --noEmit` + `tsc --noEmit -p test/tsconfig.json`（**兩段都要**：workspace tsconfig 的 include 不含 test/，root 的 `pnpm typecheck` 與 Stop hook 也都查不到 test/ 的型別）
 - `pnpm build` — `tsc --noEmit && wrangler deploy --dry-run`；兩段互補：前者抓型別但抓不到打包錯，後者走真 esbuild 打包並驗證 wrangler.jsonc 但不做型別檢查
@@ -74,14 +74,15 @@
   - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`ENVIRONMENT` 非 `"development"`）回 404，不建立 auth、不碰 D1**
   - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
 - **使用者資料 API**（B5 起；新 feature 如 B6～B9 一律照此做）：
-  - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
+  - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
+  - **預期帳號守衛**（B7.5，`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 13 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
   - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
   - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
   - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`，共用實作為 `src/http/invalid-body.ts` 的 `userDataOnError`（搭配 zValidator 的 `invalidBodyHook`），新 sub-app 直接沿用、不要另寫
-  - **授權覆蓋表**：每個端點須有三類測試——未登入 401、他人資料不可見／不可改、帳號停用 404
+  - **授權覆蓋表**：每個端點須有四類測試——未登入 401、他人資料不可見／不可改、帳號停用 404、預期帳號缺少／不符 401（第四類由 `test/expected-user-guard.test.ts` 的列舉 it 統一覆蓋）
 - **matchmaker 名單 API**（B6，`src/routes/matchmaker.ts`、`src/matchmaker/players-repository.ts`）：
   - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409）；`POST /reset`（`db.batch()` 一次刪除 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表）
-  - 掛 `localAuth, requireSession`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
+  - 掛 `localAuth, requireSession, requireExpectedUser`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
   - 多筆契約要點：複合主鍵 `(user_id, id)`；`sort_order = coalesce(max,-1)+1`；`GET` 依 `sort_order, rowid` 排序；只有主鍵衝突判 409，其他約束違規為 500（`isConstraintError` 只認 `SQLITE_CONSTRAINT_PRIMARYKEY` 與 `UNIQUE constraint failed`，並沿 cause 鏈查找）
 - **matchmaker 回合、場次分槽與送出比分 API**（B7，同在 `src/routes/matchmaker.ts`；`src/matchmaker/{round,slots,score}-repository.ts`）：
   - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序是 coordinator 裁定維持的行為（符合 spec 字面），舊回合裝置重排時會先得到 400 而非 409，不要自行對調
@@ -92,7 +93,8 @@
     1. **B8**：`matchmaker_history` 已有 `played_at`（ms）與主鍵，讀取端點只需 GET；追加順序以 `rowid` 保存。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 已含該表。前端 `useRemoteRoundStore` 的 `history` 恆為空陣列，B8 改讀雲端後，前端 `resetLocalMatchProgress()` 刪除、`buildRemoteBackupSnapshot()` 的 `history` 改取雲端
     2. **B9**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
     3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`
-       （現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
+    4. **B7.5 預期帳號守衛**（詳見 openspec change `user-data-account-guard` design「交接給 B8／B9」）：B8 的 `GET /api/matchmaker/history` 在 matchmaker sub-app 內自動受守衛保護，但守衛樣本表 MUST 補一條；B9 的 `src/routes/import.ts` 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)` 且樣本表補 `POST /api/import`
+       （第 3 點現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
