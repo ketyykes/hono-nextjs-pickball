@@ -65,9 +65,12 @@ describe("history API 契約", () => {
     expect(HistoryListResponseSchema.safeParse(makeResponse({ total: -1 })).success).toBe(false);
     expect(HistoryListResponseSchema.safeParse(makeResponse({ droppedCount: -1 })).success).toBe(false);
     expect(HistoryListResponseSchema.safeParse(makeResponse({ total: 1.5 })).success).toBe(false);
+    expect(HistoryListResponseSchema.safeParse(makeResponse({ droppedCount: 1.5 })).success).toBe(false);
     const badWinner = { items: [{ data: makeEntry("nobody"), version: 1 }] };
     expect(HistoryListResponseSchema.safeParse(makeResponse(badWinner)).success).toBe(false);
     const badVersion = { items: [{ data: makeEntry("draw"), version: 0 }] };
     expect(HistoryListResponseSchema.safeParse(makeResponse(badVersion)).success).toBe(false);
+    const fractionalVersion = { items: [{ data: makeEntry("draw"), version: 1.5 }] };
+    expect(HistoryListResponseSchema.safeParse(makeResponse(fractionalVersion)).success).toBe(false);
   });
 });

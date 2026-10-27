@@ -40,7 +40,11 @@ Depends on: §1
 
 - [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/matchmaker/history-range-bounds.test.ts`（兩個 it）與 `test/api/history.test.ts`（一個 it）。確認紅燈
   - 紅燈紀錄：`history-range-bounds.test.ts` 2 個 it 皆紅（`TypeError: rangeBounds is not a function`）；`history.test.ts` 整檔紅（`Cannot find module '../../src/api/history'`，1 個 it 無法載入）。無先綠者，無 regression guard。
-- [ ] 2.2 GREEN（TDD）：`src/matchmaker/history-range.ts` 新增 `rangeBounds`（既有函式不改，`git diff` 只見新增）；新增 `src/api/history.ts`；`CORE_MODULES` 加 `api/history`
+- [x] 2.2 GREEN（TDD）：`src/matchmaker/history-range.ts` 新增 `rangeBounds`（既有函式不改，`git diff` 只見新增）；新增 `src/api/history.ts`；`CORE_MODULES` 加 `api/history`
+  - 綠燈紀錄：3 個 it 轉綠；`module-boundary.test.ts` 仍綠；core typecheck 兩段與 `pnpm -r exec tsc --noEmit` 皆 exit 0；`history-range.ts` diff 僅 +33 行新增。
+  - 變異驗證（Implementer 自跑，harness 在 /tmp/b8tools，不入 repo）：共 37 次，34 次預期轉紅且皆轉紅（rangeBounds 五區間各界線 12 條含 `today.to`→`now.getTime()`、`earlier.from`→非 null；`from < to` 拿掉／改 `<=`；`from` regex 改回 `z.coerce.number()`（空字串樣本轉紅）、拿掉錨點、拿掉安全整數檢查；`order` 拿掉 asc／desc／改任意字串／改必填；`from`／`to` 改必填；`total`／`droppedCount` 可負、可小數、移除欄位；`version` 可為 0、可小數；`data`／`items` 不驗證；`matchmaker/history.ts` entry `winner` 拿掉 `draw`），2 次等價對照（改 refine 訊息、交換 switch case 順序）如預期仍綠；另 1 次 `today.to` null→Infinity（isInBounds 下判定等價，但 `toBeNull` 斷言轉紅，證明「無界」以 null 表達被釘住）；每次還原後 `git status --porcelain` 與基線一致。
+  - 測試強化：mutation 前自行發現 `droppedCount`／`version` 的小數樣本缺漏，已在同一 it 內補 `droppedCount: 1.5`、`version: 1.5`（it 名稱不變，隨 GREEN commit 一併提交）。
+  - 設計選擇：回應 `version` 比照 `api/players.ts` 用 `z.number().int().positive()`；`order` 為 optional 且 schema 不帶預設值（預設 `desc` 由 handler 處理）。
 
 ## 3. 後端：歷史讀取 API
 

@@ -114,3 +114,36 @@ export function filterHistoryByRange(
 		.sort((a, b) => recordTime(b) - recordTime(a))
 		.filter((entry) => rangeOfTime(recordTime(entry), now) === range);
 }
+
+/**
+ * `rangeBounds()` 的回傳形狀：半開區間 `[from, to)` 的毫秒界線，`null` 表示該端無界。
+ */
+export interface RangeBounds {
+	from: number | null;
+	to: number | null;
+}
+
+/**
+ * 取得某個歷史區間的毫秒界線，供雲端歷史 API 以 `played_at` 篩選。
+ *
+ * 界線由前端以本函式計算、後端只收毫秒數：Workers 以 UTC 執行，若讓後端自行
+ * 算切點，「今天 00:00」會是 UTC 午夜而非使用者的當地午夜（design Decision 1）。
+ * 界線一律取自 `computeRangeCutoffs()`，使五個區間的定義仍只有一份，
+ * 與 `rangeOfTime()` 的等價由測試守住。今日上界與更早下界皆為 `null`（無界）。
+ */
+export function rangeBounds(range: HistoryRange, now: Date): RangeBounds {
+	const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
+
+	switch (range) {
+		case "today":
+			return { from: c0, to: null };
+		case "thisWeek":
+			return { from: c1, to: c0 };
+		case "thisMonth":
+			return { from: c2, to: c1 };
+		case "lastMonth":
+			return { from: c3, to: c2 };
+		case "earlier":
+			return { from: null, to: c3 };
+	}
+}
