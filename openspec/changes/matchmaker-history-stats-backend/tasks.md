@@ -44,6 +44,7 @@ Depends on: §1
   - 綠燈紀錄：3 個 it 轉綠；`module-boundary.test.ts` 仍綠；core typecheck 兩段與 `pnpm -r exec tsc --noEmit` 皆 exit 0；`history-range.ts` diff 僅 +33 行新增。
   - 變異驗證（Implementer 自跑，harness 在 /tmp/b8tools，不入 repo）：共 37 次，34 次預期轉紅且皆轉紅（rangeBounds 五區間各界線 12 條含 `today.to`→`now.getTime()`、`earlier.from`→非 null；`from < to` 拿掉／改 `<=`；`from` regex 改回 `z.coerce.number()`（空字串樣本轉紅）、拿掉錨點、拿掉安全整數檢查；`order` 拿掉 asc／desc／改任意字串／改必填；`from`／`to` 改必填；`total`／`droppedCount` 可負、可小數、移除欄位；`version` 可為 0、可小數；`data`／`items` 不驗證；`matchmaker/history.ts` entry `winner` 拿掉 `draw`），2 次等價對照（改 refine 訊息、交換 switch case 順序）如預期仍綠；另 1 次 `today.to` null→Infinity（isInBounds 下判定等價，但 `toBeNull` 斷言轉紅，證明「無界」以 null 表達被釘住）；每次還原後 `git status --porcelain` 與基線一致。
   - 測試強化：mutation 前自行發現 `droppedCount`／`version` 的小數樣本缺漏，已在同一 it 內補 `droppedCount: 1.5`、`version: 1.5`（it 名稱不變，隨 GREEN commit 一併提交）。
+  - Stage 2 補件（regression guard，加入時皆為綠，非 RED）：在 `history.test.ts` 同一 it 內補 `{ to: "200" }` 通過、`{ from: "0", to: "0" }` 失敗／`{ from: "0", to: "1" }` 通過、`from`／`to` 兩個 key 皆跑完整非法樣本（新增 `"1.0"`）、回應缺 `total`／`droppedCount`／`items` 與 item 缺 `version`／`data` 要失敗；條件式 `if (success)` 斷言改為先斷言 success 再以 `data?.` 取值。補件後重跑 N1、N2、N3、X3、N5、N6、N9、X5、X6 共 9 條存活變異全數轉紅，等價對照 E4（refine 運算元交換）仍綠。
   - 設計選擇：回應 `version` 比照 `api/players.ts` 用 `z.number().int().positive()`；`order` 為 optional 且 schema 不帶預設值（預設 `desc` 由 handler 處理）。
 
 ## 3. 後端：歷史讀取 API

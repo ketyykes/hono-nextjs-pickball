@@ -36,23 +36,29 @@ describe("history API 契約", () => {
     // 合法查詢，且 from 轉為數字
     const ascending = HistoryQuerySchema.safeParse({ from: "100", order: "asc" });
     expect(ascending.success).toBe(true);
-    if (ascending.success) {
-      expect(ascending.data.from).toBe(100);
-      expect(ascending.data.order).toBe("asc");
-    }
+    expect(ascending.data?.from).toBe(100);
+    expect(ascending.data?.order).toBe("asc");
     const bothBounds = HistoryQuerySchema.safeParse({ from: "100", to: "200", order: "desc" });
     expect(bothBounds.success).toBe(true);
-    if (bothBounds.success) {
-      expect(bothBounds.data.to).toBe(200);
-    }
+    expect(bothBounds.data?.to).toBe(200);
     expect(HistoryQuerySchema.safeParse({}).success).toBe(true);
 
+    // 只帶 to 是合法的（rangeBounds("earlier") 只有 to）；refine 不可因缺 from 而拒絕
+    const onlyTo = HistoryQuerySchema.safeParse({ to: "200" });
+    expect(onlyTo.success).toBe(true);
+    expect(onlyTo.data?.to).toBe(200);
+    // 0 為合法界線：refine 不可用 truthy 判斷略過
+    expect(HistoryQuerySchema.safeParse({ from: "0", to: "0" }).success).toBe(false);
+    expect(HistoryQuerySchema.safeParse({ from: "0", to: "1" }).success).toBe(true);
+
     // 只含十進位數字的字串才合法：不可使用 z.coerce.number() 的寬鬆轉換
-    for (const from of ["", " ", " 12 ", "1e3", "0x10", "-1", "1.5", "99999999999999999999"]) {
-      expect(HistoryQuerySchema.safeParse({ from }).success, `from=${JSON.stringify(from)}`).toBe(false);
+    const invalidMilliseconds = ["", " ", " 12 ", "1e3", "0x10", "-1", "1.5", "1.0", "99999999999999999999"];
+    for (const key of ["from", "to"]) {
+      for (const value of invalidMilliseconds) {
+        const result = HistoryQuerySchema.safeParse({ [key]: value });
+        expect(result.success, `${key}=${JSON.stringify(value)}`).toBe(false);
+      }
     }
-    expect(HistoryQuerySchema.safeParse({ to: "" }).success).toBe(false);
-    expect(HistoryQuerySchema.safeParse({ to: "0x10" }).success).toBe(false);
     expect(HistoryQuerySchema.safeParse({ order: "random" }).success).toBe(false);
 
     // 回應接受 winner 為 draw 的紀錄
@@ -66,6 +72,18 @@ describe("history API 契約", () => {
     expect(HistoryListResponseSchema.safeParse(makeResponse({ droppedCount: -1 })).success).toBe(false);
     expect(HistoryListResponseSchema.safeParse(makeResponse({ total: 1.5 })).success).toBe(false);
     expect(HistoryListResponseSchema.safeParse(makeResponse({ droppedCount: 1.5 })).success).toBe(false);
+
+    // 必填欄位缺漏要失敗：total、droppedCount、items，以及 item 的 version、data
+    const { total: _total, ...withoutTotal } = makeResponse();
+    expect(HistoryListResponseSchema.safeParse(withoutTotal).success).toBe(false);
+    const { droppedCount: _droppedCount, ...withoutDroppedCount } = makeResponse();
+    expect(HistoryListResponseSchema.safeParse(withoutDroppedCount).success).toBe(false);
+    const { items: _items, ...withoutItems } = makeResponse();
+    expect(HistoryListResponseSchema.safeParse(withoutItems).success).toBe(false);
+    const missingVersion = { items: [{ data: makeEntry("draw") }] };
+    expect(HistoryListResponseSchema.safeParse(makeResponse(missingVersion)).success).toBe(false);
+    const missingData = { items: [{ version: 1 }] };
+    expect(HistoryListResponseSchema.safeParse(makeResponse(missingData)).success).toBe(false);
     const badWinner = { items: [{ data: makeEntry("nobody"), version: 1 }] };
     expect(HistoryListResponseSchema.safeParse(makeResponse(badWinner)).success).toBe(false);
     const badVersion = { items: [{ data: makeEntry("draw"), version: 0 }] };
