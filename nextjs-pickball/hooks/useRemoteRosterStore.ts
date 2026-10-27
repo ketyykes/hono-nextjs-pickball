@@ -1,7 +1,7 @@
 // hooks/useRemoteRosterStore.ts
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
 	addPlayer as addPlayerToRoster,
 	updatePlayer as updatePlayerInRoster,
@@ -73,7 +73,11 @@ export function useRemoteRosterStore({
 	userId,
 	onUnauthorized,
 }: UseRemoteRosterStoreOptions): UseRosterStoreResult {
-	const [players, setPlayers] = useState<Player[]>([]);
+	// 同 status：effect 開頭要清空前一個世代的名單，用 reducer 避開 react-hooks/set-state-in-effect
+	const [players, setPlayers] = useReducer(
+		(_current: Player[], next: Player[]): Player[] => next,
+		[],
+	);
 	// 用 reducer 取代 useState：effect 開頭要把狀態重設為 loading，dispatch 不會觸發
 	// react-hooks/set-state-in-effect（沿用 useRemoteScoreboardStore 的寫法）
 	const [status, setStatus] = useReducer(
