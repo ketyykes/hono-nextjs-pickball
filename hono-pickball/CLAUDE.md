@@ -90,7 +90,7 @@
   - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
   - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
   - **後續 change 須知**（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）：
-    1. **B8（已完成）**：讀取端點 `GET /api/matchmaker/history` 已提供（見上方「matchmaker 歷史讀取 API」）；前端 `resetLocalMatchProgress()` 已刪除、`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加
+    1. **B8（已完成）**：讀取端點 `GET /api/matchmaker/history` 已提供（見下方「matchmaker 歷史讀取 API」）；前端 `resetLocalMatchProgress()` 已刪除、`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加
     2. **B9**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
     3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`
     4. **B7.5 預期帳號守衛**（詳見 openspec change `user-data-account-guard` design「交接給 B8／B9」）：B8 的 `GET /api/matchmaker/history` 在 matchmaker sub-app 內自動受守衛保護，但守衛樣本表 MUST 補一條；B9 的 `src/routes/import.ts` 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)` 且樣本表補 `POST /api/import`

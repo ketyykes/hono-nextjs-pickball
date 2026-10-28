@@ -151,7 +151,7 @@ Depends on: §7
 
 - [x] 8.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「歷史讀取待 B8」敘述（登入後歷史、統計、匯出皆讀雲端；區間界線由前端以 `rangeBounds` 計算）、hooks 歸屬加 `useRemoteHistory`、`lib/sync/history-api.ts`；
   `hono-pickball/CLAUDE.md` 路由約定加 `GET /api/matchmaker/history` 與「後端不計算區間（UTC）」說明；design「交接給 B9」三點寫入適當段落
-  - 完成（commit `10b91ee`）：`nextjs-pickball/CLAUDE.md`（`/matchmaker/data` 登入態、歷史頁與統計頁的模式分支、儲存分流段改寫為登入後歷史以雲端為準、交接給 B9 三點、hooks 歸屬 `useRemoteHistory`、`lib/sync/history-api.ts`、新元件）；`hono-pickball/CLAUDE.md`（範圍例外、守衛樣本 13→14、路由約定新增歷史讀取 API 與「後端不計算區間（UTC）」、後續 change 須知改寫並新增交接給 B9）。`rg resetLocalMatchProgress nextjs-pickball` 無輸出（exit 1）；函式名僅留在 `hono-pickball/CLAUDE.md` 交接第 3 點原文。
+  - 完成（commit `10b91ee`）：`nextjs-pickball/CLAUDE.md`（`/matchmaker/data` 登入態、歷史頁與統計頁的模式分支、儲存分流段改寫為登入後歷史以雲端為準、交接給 B9 三點、hooks 歸屬 `useRemoteHistory`、`lib/sync/history-api.ts`、新元件）；`hono-pickball/CLAUDE.md`（範圍例外、守衛樣本 13→14、路由約定新增歷史讀取 API 與「後端不計算區間（UTC）」、後續 change 須知改寫並新增交接給 B9）。`rg resetLocalMatchProgress nextjs-pickball` 無輸出（exit 1）；函式名僅出現在 `hono-pickball/CLAUDE.md`「後續 change 須知」第 1 點與第 5 點（交接給 B9）③，不在 `rg` 的搜尋範圍內。§8 Stage 1（sonnet）PASS；依其建議修正該檔「見上方」為「見下方」。
 - [x] 8.2 regression guard（平局）：單獨執行 `lib/matchmaker/player-stats.test.ts` 與 `components/matchmaker/PlayerStatsTable.test.tsx`，貼出 draw-followups 四個 it 皆 passed 的輸出
   - 輸出（`test --run lib/matchmaker/player-stats.test.ts components/matchmaker/PlayerStatsTable.test.tsx --reporter=verbose`，2 檔／27 passed）：
     `✓ player-stats.test.ts > computePlayerStats > 出場數、勝場與敗場依歷史紀錄正確加總`、`✓ … > 平局紀錄計為和局而非雙方各一敗場`、`✓ … > 出場數為零時勝率為零而非 NaN`、`✓ PlayerStatsTable.test.tsx > PlayerStatsTable > 勝負和欄依序顯示勝場敗場與和局三個數字`。
