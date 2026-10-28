@@ -240,4 +240,79 @@ describe("RemoteStatsContent", () => {
 			expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
 		});
 	});
+
+	// 以下為 Stage 2 補的 regression guard：元件實作已存在，加入即綠（非 RED），用來殺 mutation 存活的分支。
+	describe("regression guard：同步狀態優先序、篩選與空區間", () => {
+		it("regression guard：名單 load-failed 而歷史 loading 時以名單狀態為準", () => {
+			mockReadySession();
+			mockRoster({ players: [], syncStatus: "load-failed" });
+			mockHistory({ syncStatus: "loading", items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			// 兩邊都阻斷時名單優先；優先順序對調會顯示「正在載入」而非失敗提示
+			expect(screen.getByRole("status").textContent).toBe("無法載入雲端資料，請重新整理頁面");
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("load-failed");
+		});
+
+		it("regression guard：名單可用而歷史 load-failed 時以歷史狀態為準", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()], syncStatus: "synced" });
+			mockHistory({ syncStatus: "load-failed", items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			expect(screen.getByRole("status").textContent).toBe("無法載入雲端資料，請重新整理頁面");
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("load-failed");
+		});
+
+		it("regression guard：兩邊皆非阻斷時 data-sync-status 取歷史狀態而非名單狀態", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()], syncStatus: "synced" });
+			mockHistory({ syncStatus: "local", items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			// 名單為 synced、歷史為 local：取名單狀態或寫死 synced 都會得到 synced
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("local");
+			expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
+		});
+
+		it("regression guard：切換區間後篩選的選取狀態跟著走", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			mockHistory({ items: [], total: 5 });
+			render(<RemoteStatsContent />);
+
+			await user.click(screen.getByRole("radio", { name: "本月" }));
+
+			// 篩選的 value 若寫死為今日，點擊後選取狀態不會移動
+			expect(screen.getByRole("radio", { name: "本月" }).getAttribute("aria-checked")).toBe("true");
+			expect(screen.getByRole("radio", { name: "今日" }).getAttribute("aria-checked")).toBe("false");
+		});
+
+		it("regression guard：total 為 0 時不顯示區間篩選", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			mockHistory({ items: [], total: 0 });
+
+			render(<RemoteStatsContent />);
+
+			expect(screen.queryByRole("radiogroup")).toBeNull();
+		});
+
+		it("regression guard：total 為 5 而 items 為空時名單成員出場為 0、勝負和為 0 - 0 - 0", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer({ id: "p1", name: "王小明" })] });
+			mockHistory({ items: [], total: 5 });
+
+			render(<RemoteStatsContent />);
+
+			// 欄位順序依 PlayerStatsTable：第 4 欄出場、第 5 欄勝負和（以 0 次出場對齊 spec「名單成員皆為出場 0」）
+			const cells = within(screen.getByTestId("player-stat-row-p1")).getAllByRole("cell");
+			expect(cells[3].textContent).toBe("0");
+			expect(cells[4].textContent).toBe("0 - 0 - 0");
+		});
+	});
 });
