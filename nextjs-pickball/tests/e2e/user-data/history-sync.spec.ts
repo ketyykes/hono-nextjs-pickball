@@ -177,9 +177,9 @@ function trackApiRequests(page: Page): Request[] {
 	return requests;
 }
 
-// 依序切換五個區間，每次都等該次雲端歷史請求完成且畫面回到 synced
+// 依序切換五個區間（含最後切回預設的今日），每次都等該次雲端歷史請求完成且畫面回到 synced
 async function switchThroughAllRanges(page: Page) {
-	for (const label of RANGE_LABELS.slice(1)) {
+	for (const label of [...RANGE_LABELS.slice(1), RANGE_LABELS[0]]) {
 		await Promise.all([
 			page.waitForResponse((response) => isHistoryGet(response) && response.ok()),
 			page.getByRole("radio", { name: label }).click(),
@@ -252,6 +252,7 @@ test.describe("matchmaker 歷史與統計雲端同步", () => {
 
 		await page.goto(STATS_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByRole("heading", { name: "球員統計", level: 1 })).toBeVisible();
 		const rows = page.locator('[data-testid^="player-stat-row-"]');
 		await expect(rows).toHaveCount(2);
 		for (let index = 0; index < 2; index++) {
