@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   LocalImportRequestSchema,
   LocalImportResponseSchema,
+  type LocalImportRequest,
 } from "../../src/api/import";
 import { createInitialState } from "../../src/scoreboard/reducer";
 
@@ -259,5 +260,58 @@ describe("本機資料匯入 API 契約", () => {
     expect(LocalImportResponseSchema.safeParse({}).success).toBe(false);
     const { history: _omitted, ...withoutHistory } = base.imported;
     expect(LocalImportResponseSchema.safeParse({ imported: withoutHistory }).success).toBe(false);
+  });
+
+  // Stage 2 補強（regression guard）：以下斷言對既有實作加入即綠，用來釘住存活的變異。
+  it("LocalImportRequestSchema 的邊界輸入：僅回合、id 去重鍵、空字串 matchId 與缺漏段落", () => {
+    // 只有回合（場次皆完成），其餘四段皆空：非空匯入，合法
+    expect(
+      LocalImportRequestSchema.safeParse({
+        version: 1,
+        players: [],
+        currentRound: makeRound([makeRoundMatch("m1", "completed")]),
+        history: [],
+        scoreboard: { current: null, matches: [] },
+      }).success,
+    ).toBe(true);
+
+    // 重複判斷看 id：id 相同但 name 不同仍要拒絕
+    expect(
+      LocalImportRequestSchema.safeParse(
+        makeValidRequest({ players: [makePlayer("a"), { ...makePlayer("b"), id: "a" }] }),
+      ).success,
+    ).toBe(false);
+
+    // current 的 matchId 為空字串也屬於「綁定場次」，不可當成 null 放行
+    expect(
+      LocalImportRequestSchema.safeParse(
+        makeValidRequest({ scoreboard: { current: makeSlot(""), matches: [] } }),
+      ).success,
+    ).toBe(false);
+
+    // scoreboard 兩個欄位皆為必填，缺任一個即格式錯誤
+    expect(
+      LocalImportRequestSchema.safeParse(makeValidRequest({ scoreboard: { matches: [] } })).success,
+    ).toBe(false);
+    expect(
+      LocalImportRequestSchema.safeParse(makeValidRequest({ scoreboard: { current: null } })).success,
+    ).toBe(false);
+
+    // 分槽的 matchId 型別必須是 string（改用不限 matchId 的 ScoreboardStateSchema 時，這行在 typecheck 轉紅）
+    expectTypeOf<LocalImportRequest["scoreboard"]["matches"][number]["matchId"]>().toEqualTypeOf<string>();
+  });
+
+  it("LocalImportResponseSchema 的欄位皆為必填且筆數為非負整數", () => {
+    const imported: Record<string, unknown> = { players: 3, round: true, slots: 1, history: 3, scoreboardCurrent: "imported" };
+    // 五個 key 逐一省略皆要被拒
+    for (const key of Object.keys(imported)) {
+      const { [key]: _omitted, ...rest } = imported;
+      expect(LocalImportResponseSchema.safeParse({ imported: rest }).success, `省略 ${key}`).toBe(false);
+    }
+    // 三個筆數欄位：小數與負數皆拒絕
+    for (const key of ["players", "slots", "history"]) {
+      expect(LocalImportResponseSchema.safeParse({ imported: { ...imported, [key]: 1.5 } }).success, `${key}=1.5`).toBe(false);
+      expect(LocalImportResponseSchema.safeParse({ imported: { ...imported, [key]: -1 } }).success, `${key}=-1`).toBe(false);
+    }
   });
 });
