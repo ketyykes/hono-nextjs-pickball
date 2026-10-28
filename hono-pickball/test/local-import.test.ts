@@ -185,6 +185,7 @@ describe("POST /api/import 本機資料匯入", () => {
 		const startedAt = Date.now();
 
 		const result = await importOk(cookie, payload);
+		const finishedAt = Date.now();
 
 		expect(result).toEqual({
 			imported: { players: 3, round: true, slots: 1, history: 3, scoreboardCurrent: "imported" },
@@ -195,6 +196,9 @@ describe("POST /api/import 本機資料匯入", () => {
 		expect(await getJson(cookie, "/slots")).toEqual({
 			items: [{ data: payload.scoreboard.matches[0], version: 1 }],
 		});
+		// 分槽的 match_id 欄位是主鍵的一部分，單筆讀取以它定位
+		expect(await getJson(cookie, "/slots/m1")).toEqual({ data: payload.scoreboard.matches[0], version: 1 });
+		expect((await rowsOf("matchmaker_match_slots", userId)).map((row) => row.match_id)).toEqual(["m1"]);
 		const history = await getJson<{ items: Array<Item<MatchHistoryEntry>> }>(cookie, "/history?order=asc");
 		expect(history.items.map((item) => item.data.matchId)).toEqual(["h1", "h2", "h3"]);
 		expect(history.items.map((item) => item.version)).toEqual([1, 1, 1]);
@@ -221,6 +225,7 @@ describe("POST /api/import 本機資料匯入", () => {
 				expect(row.version, table).toBe(1);
 				// updated_at 取伺服器時間；寫成 0 或沿用資料內的時間都會讓雲端列的更新時間失真
 				expect(row.updated_at as number, table).toBeGreaterThanOrEqual(startedAt);
+				expect(row.updated_at as number, table).toBeLessThanOrEqual(finishedAt);
 			}
 		}
 		expect(await rowsOf("sync_batch_guards", userId)).toEqual([]);
@@ -402,7 +407,30 @@ describe("POST /api/import 本機資料匯入", () => {
 		const playerRows = await rowsOf("matchmaker_players", userId);
 		expect(playerRows).toHaveLength(300);
 		expect(playerRows.map((row) => row.sort_order)).toEqual(players.map((_, index) => index));
-		expect(await rowsOf("matchmaker_history", userId)).toHaveLength(2000);
+		const historyRows = await rowsOf("matchmaker_history", userId);
+		expect(historyRows).toHaveLength(2000);
+		// 2000 筆 playedAt 相同，rowid 順序即插入順序；bulk-h-10 的字串序在 bulk-h-2 之前，能分辨排序依據
+		expect(historyRows.map((row) => row.match_id)).toEqual(history.map((entry) => entry.matchId));
+
+		// 單一段落的 JSON 參數超過 D1 的 2MB 上限時整批回滾回 500，不可被誤分類成 409，也不可留下部分寫入
+		const oversizedCookie = await seedAndSignIn("import-oversize@example.com");
+		const oversizedId = await userIdOf("import-oversize@example.com");
+		const oversizedHistory = ["a", "b", "c"].map((suffix) => {
+			const entry = makeHistoryEntry(`oversize-${suffix}`);
+			entry.teamA.players[0].name = "x".repeat(800_000);
+			return entry;
+		});
+		const oversized = await postImport(
+			oversizedCookie,
+			makePayload({
+				players: [makePlayer("oversize-p")],
+				currentRound: null,
+				history: oversizedHistory,
+				scoreboard: { current: null, matches: [] },
+			}),
+		);
+		expect(oversized.status).toBe(500);
+		await expectNoRows([oversizedId]);
 	});
 
 	it("預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入", async () => {
@@ -427,11 +455,15 @@ describe("POST /api/import 本機資料匯入", () => {
 
 	it("匯入的歷史可被歷史端點依區間與兩種排序讀回", async () => {
 		const cookie = await seedAndSignIn("import-history-read@example.com");
+		const userId = await userIdOf("import-history-read@example.com");
+		// 特殊字元的姓名：JSON 經參數綁定與 json_extract 往返後必須逐字相同
+		const h1 = historyAt("h1", T1);
+		h1.teamA.players[0].name = 'Q"uote\\back\nline\ttab 😀 中文';
 		const payload = makePayload({
 			players: [],
 			currentRound: null,
 			scoreboard: { current: null, matches: [] },
-			history: [historyAt("h1", T1), historyAt("h2", T2), historyAt("h3", T2)],
+			history: [h1, historyAt("h2", T2), historyAt("h3", T2)],
 		});
 		await importOk(cookie, payload);
 		const t2 = Date.parse(T2);
@@ -447,6 +479,10 @@ describe("POST /api/import 本機資料匯入", () => {
 		expect(idsOf(fromT2)).toEqual(["h2", "h3"]);
 		expect(idsOf(toT2)).toEqual(["h1"]);
 		expect(asc.items.map((item) => item.data)).toEqual(payload.history);
+		// 直接讀表：played_at 必須精確等於 Date.parse(playedAt)，差 1 毫秒會讓 from／to 的邊界判斷偏移
+		const rows = await rowsOf("matchmaker_history", userId);
+		expect(rows.map((row) => row.match_id)).toEqual(["h1", "h2", "h3"]);
+		expect(rows.map((row) => row.played_at)).toEqual([Date.parse(T1), Date.parse(T2), Date.parse(T2)]);
 		expect(asc.items.map((item) => item.version)).toEqual([1, 1, 1]);
 	});
 });
