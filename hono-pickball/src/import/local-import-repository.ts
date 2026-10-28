@@ -70,6 +70,7 @@ export async function importLocalData(db: Db, userId: string, input: LocalImport
 			releaseBatchGuard(db, userId),
 		]);
 
+		// batch 的第 6 條（索引 5）是獨立計分板的 INSERT ... RETURNING；調整陳述式順序時必須同步這個索引
 		const scoreboardRows = results[5];
 		let scoreboardResult: LocalImportResponse["imported"]["scoreboardCurrent"] = "none";
 		if (input.scoreboard.current !== null) {
