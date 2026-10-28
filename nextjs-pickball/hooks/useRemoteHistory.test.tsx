@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
-import { rangeBounds, type HistoryRange } from "@pickball/core/matchmaker/history-range";
+import { HISTORY_RANGES, rangeBounds, type HistoryRange } from "@pickball/core/matchmaker/history-range";
 import type { SyncStatus } from "@/lib/sync/sync-status";
-import { useRemoteHistory } from "./useRemoteHistory";
+import { useRemoteHistory, type UseRemoteHistoryResult } from "./useRemoteHistory";
 
 const HISTORY_PATH = "/api/matchmaker/history";
 
@@ -323,5 +323,110 @@ describe("useRemoteHistory", () => {
 		await waitFor(() => expect(second).toHaveBeenCalledTimes(1));
 		expect(first).not.toHaveBeenCalled();
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	// 以下四個 it 為 regression guard：加入時即為綠燈（實作已具備），補 Stage 2 mutation 找到的存活變異缺口
+	it("regression guard：五個區間的請求界線皆等於 rangeBounds 且無界的一端不送出", async () => {
+		// 逐一 rerender 五個區間，涵蓋單一區間測不到的「無界端不送」與各區間切點
+		for (let i = 0; i < HISTORY_RANGES.length; i++) enqueue(200, listBody([]));
+		const { result, rerender } = renderHistory({
+			enabled: true,
+			userId: "user-a",
+			range: HISTORY_RANGES[0],
+		});
+
+		for (let i = 0; i < HISTORY_RANGES.length; i++) {
+			const range = HISTORY_RANGES[i];
+			if (i > 0) rerender({ enabled: true, userId: "user-a", range });
+			await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(i + 1));
+			await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+
+			const url = new URL(String(fetchMock.mock.calls[i][0]), "http://localhost");
+			const { from, to } = rangeBounds(range, FAKE_NOW);
+			// 無界的一端不得送出（不能退化成 from=null 之類的字串）
+			expect(url.searchParams.has("from")).toBe(from !== null);
+			expect(url.searchParams.has("to")).toBe(to !== null);
+			expect(url.searchParams.get("from")).toBe(from === null ? null : String(from));
+			expect(url.searchParams.get("to")).toBe(to === null ? null : String(to));
+		}
+	});
+
+	it("regression guard：換帳號的每一次 render 的 droppedCount 皆為 0，不沿用前一帳號的損毀筆數", async () => {
+		// A 的 droppedCount 刻意非 0，才能分辨「沿用前一帳號」與「重設為 0」
+		enqueue(200, listBody(["a-1"], 3, 2));
+		enqueueDeferred();
+		const renders: Array<{ userId: string | null; value: UseRemoteHistoryResult }> = [];
+		const { result, rerender } = renderHook(
+			(props: HookProps) => {
+				const value = useRemoteHistory({
+					enabled: props.enabled,
+					userId: props.userId,
+					range: props.range,
+					onUnauthorized: vi.fn(),
+				});
+				renders.push({ userId: props.userId, value });
+				return value;
+			},
+			{ initialProps: { enabled: true, userId: "user-a", range: "today" } as HookProps },
+		);
+		await waitFor(() => expect(result.current.droppedCount).toBe(2));
+
+		rerender({ enabled: true, userId: "user-b", range: "today" });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+		// B 的回應到達前，B 世代的每一次 render（含 effect 尚未重設狀態的那一幀）都是乾淨的載入中結果
+		const bRenders = renders.filter((snapshot) => snapshot.userId === "user-b");
+		expect(bRenders.length).toBeGreaterThan(0);
+		for (const snapshot of bRenders) {
+			expect(snapshot.value).toEqual({ items: [], total: 0, droppedCount: 0, syncStatus: "loading" });
+		}
+	});
+
+	it("regression guard：userId 變為 null、停用或卸載後才到達的 401 不呼叫 onUnauthorized", async () => {
+		// 這三種情況都不會遞增請求序號，只有 cancelled 旗標能擋下結束世代後才到的 401
+		const releaseNull = enqueueDeferred();
+		const onNull = vi.fn();
+		const nulled = renderHistory({ enabled: true, userId: "user-a", range: "today", onUnauthorized: onNull });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		nulled.rerender({ enabled: true, userId: null, range: "today", onUnauthorized: onNull });
+		await act(async () => {
+			releaseNull(401, {});
+		});
+		await settle();
+		expect(onNull).not.toHaveBeenCalled();
+		nulled.unmount();
+
+		const releaseDisabled = enqueueDeferred();
+		const onDisabled = vi.fn();
+		const disabled = renderHistory({ enabled: true, userId: "user-a", range: "today", onUnauthorized: onDisabled });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		disabled.rerender({ enabled: false, userId: "user-a", range: "today", onUnauthorized: onDisabled });
+		await act(async () => {
+			releaseDisabled(401, {});
+		});
+		await settle();
+		expect(onDisabled).not.toHaveBeenCalled();
+		disabled.unmount();
+
+		const releaseUnmounted = enqueueDeferred();
+		const onUnmounted = vi.fn();
+		const unmounted = renderHistory({ enabled: true, userId: "user-a", range: "today", onUnauthorized: onUnmounted });
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+		unmounted.unmount();
+		await act(async () => {
+			releaseUnmounted(401, {});
+		});
+		await settle();
+		expect(onUnmounted).not.toHaveBeenCalled();
+	});
+
+	it("regression guard：401 之後 syncStatus 維持 loading", async () => {
+		// 401 交給 session refresh 重新驗證，不能落入 load-failed 讓畫面誤報載入失敗
+		enqueue(401);
+		const onUnauthorized = vi.fn();
+		const { result } = renderHistory({ enabled: true, userId: "user-a", range: "today", onUnauthorized });
+		await waitFor(() => expect(onUnauthorized).toHaveBeenCalledTimes(1));
+		await settle();
+		expect(result.current.syncStatus).toBe("loading");
 	});
 });
