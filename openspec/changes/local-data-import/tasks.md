@@ -55,6 +55,10 @@ Depends on: §1
   - mutation（對 `src/api/import.ts`，單檔測試，每次還原且 `git status` 乾淨）：14 條必轉紅全數轉紅——重複參賽者 id／重複歷史 matchId／重複分槽 matchId／孤兒分槽／已完成場次分槽／currentRound 為 null 略過分槽檢查／
     空匯入檢查移除／空匯入漏判獨立計分板／`version` 放寬（request 層 `version: z.number()`，另在 `transfer-types.ts` 改 `z.number()` 亦轉紅）／`current` 允許非 null matchId／回應 `scoreboardCurrent` 列舉少 `skipped`、少 `none`／回應 `players` 允許負數／回應 `round` 改 `z.any()`。
     等價對照 3 條皆維持綠：`Array.from(new Set(...)).length` 改寫、`isEmpty` 條件順序對調、`isEmpty` 拿掉「分槽為空」（等價：有分槽必有 currentRound 或已因孤兒被拒）。
+  - Stage 2 缺口與修補（commit 見本節下方 test 補強 commit，regression guard，加入即綠，`src/api/import.ts` 未改）：Stage 2 判 FAIL，12 條非等價變異存活。補強前以 mutation harness 實測全數存活（測試不轉紅），補強後全數轉紅：
+    S9b 空匯入漏判 currentRound、S18 去重鍵改 name、S12 current 放寬為 `!state.matchId`、S14 缺 current 放行、S16 缺 matches 放行、R2／R5 回應 players／slots 允許小數、R6 history 允許負數、R10a／b／c／e 回應 key 省略（R10d 補強前即已被既有斷言殺死）。
+    新增 it（既有 it 未改）：「LocalImportRequestSchema 的邊界輸入：僅回合、id 去重鍵、空字串 matchId 與缺漏段落」「LocalImportResponseSchema 的欄位皆為必填且筆數為非負整數」；並加 `expectTypeOf` 斷言 `matches[i].matchId` 為 `string`
+    （matches 改用 `ScoreboardStateSchema` 的變異補強前即因 src 內 `openMatchIds.has(slot.matchId)` 型別錯誤使 typecheck 轉紅，測試檔斷言為第二道防線）。等價對照 E1、E2 仍維持綠。核心全套、核心 typecheck、`pnpm -r exec tsc --noEmit` 皆 exit 0。
 
 ## 3. 後端：匯入 API
 
