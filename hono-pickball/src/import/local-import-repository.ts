@@ -1,11 +1,22 @@
 import type { LocalImportRequest, LocalImportResponse } from "@pickball/core/api/import";
-import { sql } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound, scoreboardCurrent } from "../db/schema";
 import { insertBatchGuard, isBatchGuardViolation, releaseBatchGuard } from "../matchmaker/batch-guard";
 
 /** conflict 對應 409：雲端的四張對戰分配機表任一已有本人的資料。 */
 export type ImportOutcome = { kind: "ok"; value: LocalImportResponse["imported"] } | { kind: "conflict" };
+
+/**
+ * 把 JSON 陣列在資料庫內展開成待插入的列：user_id、依序抽出的欄位、version 1、updated_at。
+ * ORDER BY key（陣列索引）集中在這裡，各段不可能漏掉而讓 rowid 失去追加順序；
+ * WHERE true 是 drizzle 的 insert().select() 搭配 ON CONFLICT 子句時避免解析歧義的必要寫法。
+ * fields 只接受程式碼內的常數路徑，不可傳入使用者輸入。
+ */
+function selectFromJsonEach(userId: string, fields: readonly string[], json: string, updatedAt: number): SQL {
+	const extracted = fields.map((field) => sql.raw(`json_extract(value, '$.${field}')`));
+	return sql`SELECT ${userId}, ${sql.join(extracted, sql`, `)}, 1, ${updatedAt} FROM json_each(${json}) WHERE true ORDER BY key`;
+}
 
 /**
  * 把本機資料一次寫入空的雲端。整個 batch 固定 7 條陳述式，不隨筆數增加：
@@ -39,24 +50,20 @@ export async function importLocalData(db: Db, userId: string, input: LocalImport
 		const results = await db.batch([
 			// 第一條：必須在任何寫入之前，否則會看到自己剛寫入的列而永遠失敗
 			insertBatchGuard(db, userId, guardCondition, now),
-			db.insert(matchmakerPlayers).select(
-				sql`SELECT ${userId}, json_extract(value, '$.id'), json_extract(value, '$.data'), json_extract(value, '$.sortOrder'), 1, ${updatedAt} FROM json_each(${playersJson}) WHERE true ORDER BY key`,
-			),
-			db.insert(matchmakerRound).select(
-				sql`SELECT ${userId}, json_extract(value, '$.data'), 1, ${updatedAt} FROM json_each(${roundJson}) WHERE true ORDER BY key`,
-			),
-			db.insert(matchmakerMatchSlots).select(
-				sql`SELECT ${userId}, json_extract(value, '$.matchId'), json_extract(value, '$.data'), 1, ${updatedAt} FROM json_each(${slotsJson}) WHERE true ORDER BY key`,
-			),
-			db.insert(matchmakerHistory).select(
-				sql`SELECT ${userId}, json_extract(value, '$.matchId'), json_extract(value, '$.playedAt'), json_extract(value, '$.data'), 1, ${updatedAt} FROM json_each(${historyJson}) WHERE true ORDER BY key`,
-			),
+			db
+				.insert(matchmakerPlayers)
+				.select(selectFromJsonEach(userId, ["id", "data", "sortOrder"], playersJson, updatedAt)),
+			db.insert(matchmakerRound).select(selectFromJsonEach(userId, ["data"], roundJson, updatedAt)),
+			db
+				.insert(matchmakerMatchSlots)
+				.select(selectFromJsonEach(userId, ["matchId", "data"], slotsJson, updatedAt)),
+			db
+				.insert(matchmakerHistory)
+				.select(selectFromJsonEach(userId, ["matchId", "playedAt", "data"], historyJson, updatedAt)),
 			// 雲端已有獨立計分板時略過、不覆寫；RETURNING 有無列即「寫入」或「略過」
 			db
 				.insert(scoreboardCurrent)
-				.select(
-					sql`SELECT ${userId}, json_extract(value, '$.data'), 1, ${updatedAt} FROM json_each(${currentJson}) WHERE true ORDER BY key`,
-				)
+				.select(selectFromJsonEach(userId, ["data"], currentJson, updatedAt))
 				.onConflictDoNothing()
 				.returning({ userId: scoreboardCurrent.userId }),
 			// 最後一條：使守衛表在 batch 結束後恆為空
