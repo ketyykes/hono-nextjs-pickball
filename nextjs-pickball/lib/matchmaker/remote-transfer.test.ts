@@ -6,7 +6,13 @@ import { defaultGradient } from "./colors";
 import { applyRosterImport, parseRosterCsv } from "./roster-csv";
 import type { ParseRosterCsvResult } from "./roster-csv";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "./storage-keys";
-import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot, importRemoteRoster } from "./remote-transfer";
+import { historyToCsv } from "./history-csv";
+import {
+	REMOTE_TRANSFER_MESSAGES,
+	buildRemoteBackupSnapshot,
+	buildRemoteHistoryCsv,
+	importRemoteRoster,
+} from "./remote-transfer";
 
 type OkPreview = Extract<ParseRosterCsvResult, { ok: true }>;
 
@@ -58,7 +64,7 @@ function makeRound(): Round {
 	};
 }
 
-function makeHistoryEntry(matchId: string): MatchHistoryEntry {
+function makeHistoryEntry(matchId: string, overrides: Partial<MatchHistoryEntry> = {}): MatchHistoryEntry {
 	return {
 		format: "singles",
 		matchId,
@@ -69,8 +75,33 @@ function makeHistoryEntry(matchId: string): MatchHistoryEntry {
 		scoreA: 11,
 		scoreB: 7,
 		winner: "teamA",
-	};
+		...overrides,
+	} as MatchHistoryEntry;
 }
+
+function historyResponse(entries: MatchHistoryEntry[]): Response {
+	const items = entries.map((data) => ({ data, version: 1 }));
+	return new Response(JSON.stringify({ items, total: entries.length, droppedCount: 0 }), { status: 200 });
+}
+
+const HISTORY_ASC_PATH = "/api/matchmaker/history?order=asc";
+// 雲端兩筆：姓名與比分各不相同，順序反轉或改用本機歷史時 CSV 內容必然不同
+const CLOUD_HISTORY = [
+	makeHistoryEntry("c-1", {
+		playedAt: "2026-08-16T01:00:00.000Z",
+		teamA: { rating: 5, players: [{ id: "c1", name: "雲端甲", ratingBefore: 5, ratingAfter: 5.2 }] },
+		teamB: { rating: 4, players: [{ id: "c2", name: "雲端乙", ratingBefore: 4, ratingAfter: 3.8 }] },
+		scoreA: 11,
+		scoreB: 7,
+	}),
+	makeHistoryEntry("c-2", {
+		playedAt: "2026-08-16T02:00:00.000Z",
+		teamA: { rating: 4, players: [{ id: "c2", name: "雲端乙", ratingBefore: 3.8, ratingAfter: 4.1 }] },
+		teamB: { rating: 5, players: [{ id: "c1", name: "雲端甲", ratingBefore: 5.2, ratingAfter: 5.0 }] },
+		scoreA: 11,
+		scoreB: 9,
+	}),
+];
 
 function listResponse(players: Player[]): Response {
 	const items = players.map((data) => ({ data, version: 1 }));
@@ -235,20 +266,34 @@ describe("remote-transfer", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("雲端備份快照的參賽者與回合取自雲端、歷史取自本機", async () => {
+	it("雲端備份快照的參賽者、回合與歷史皆取自雲端", async () => {
 		const cloudRound = { ...makeRound(), roundNumber: 7 };
 		const localRound = makeRound();
-		const fetchMock = vi.fn().mockImplementation(async (path: string) => {
-			if (path === "/api/matchmaker/round") {
-				return new Response(JSON.stringify({ data: cloudRound, version: 3 }), { status: 200 });
-			}
-			return listResponse(CLOUD_PLAYERS);
-		});
+		const cloudHistory = [
+			makeHistoryEntry("c-1"),
+			makeHistoryEntry("c-2"),
+			makeHistoryEntry("c-3"),
+			makeHistoryEntry("c-4"),
+		];
+		// 依路徑回應；history 傳 undefined 代表沿用雲端四筆正常回應
+		const routeFetch = (overrides: {
+			players?: () => Response;
+			round?: () => Response;
+			history?: () => Response;
+		}) =>
+			vi.fn().mockImplementation(async (path: string) => {
+				if (path === "/api/matchmaker/round") {
+					return overrides.round?.() ?? new Response(JSON.stringify({ data: cloudRound, version: 3 }), { status: 200 });
+				}
+				if (path === HISTORY_ASC_PATH) return overrides.history?.() ?? historyResponse(cloudHistory);
+				return overrides.players?.() ?? listResponse(CLOUD_PLAYERS);
+			});
+		const fetchMock = routeFetch({});
 		vi.stubGlobal("fetch", fetchMock);
-		const history = [makeHistoryEntry("m-1"), makeHistoryEntry("m-2"), makeHistoryEntry("m-3")];
+		const localHistory = [makeHistoryEntry("m-1"), makeHistoryEntry("m-2"), makeHistoryEntry("m-3")];
 		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [makePlayer({ id: "guest" })] }));
 		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ version: 1, round: localRound }));
-		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: history }));
+		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: localHistory }));
 
 		const result = await buildRemoteBackupSnapshot("user-a");
 
@@ -257,57 +302,160 @@ describe("remote-transfer", () => {
 		expect(result.snapshot.players).toEqual(CLOUD_PLAYERS);
 		expect(result.snapshot.currentRound).toEqual(cloudRound);
 		expect(result.snapshot.currentRound).not.toEqual(localRound);
-		expect(result.snapshot.history).toEqual(history);
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(result.snapshot.history).toEqual(cloudHistory);
+		expect(result.snapshot.history).not.toEqual(localHistory);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
 		expect(fetchMock.mock.calls.every(([, init]) => init.method === "GET")).toBe(true);
+		// history 以 order=asc 請求（完成順序）；不帶 order 或改 desc 都會拿到相反的順序
 		expect(fetchMock.mock.calls.map(([path]) => path).sort()).toEqual([
+			HISTORY_ASC_PATH,
 			"/api/matchmaker/players",
 			"/api/matchmaker/round",
 		]);
 
 		// 雲端沒有進行中的回合（data 為 null）時，currentRound 為 null，不可退回本機的回合
-		vi.stubGlobal(
-			"fetch",
-			vi.fn().mockImplementation(async (path: string) => {
-				if (path === "/api/matchmaker/round") return new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
-				return listResponse(CLOUD_PLAYERS);
-			}),
-		);
+		vi.stubGlobal("fetch", routeFetch({ round: () => new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 }) }));
 		const noRound = await buildRemoteBackupSnapshot("user-a");
 		expect(noRound.ok).toBe(true);
 		if (noRound.ok) expect(noRound.snapshot.currentRound).toBeNull();
 
-		// 回合讀取失敗（5xx、204 無內容、401）時回傳錯誤、不回傳快照，即使名單讀取成功
-		const roundFails = async (response: () => Response, expected: string) => {
-			vi.stubGlobal(
-				"fetch",
-				vi.fn().mockImplementation(async (path: string) => {
-					if (path === "/api/matchmaker/round") return response();
-					return listResponse(CLOUD_PLAYERS);
-				}),
-			);
-			expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: expected });
-		};
-		await roundFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
-		await roundFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
-		await roundFails(() => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized);
+		// 雲端沒有歷史時 history 為空陣列，不可退回本機的歷史
+		vi.stubGlobal("fetch", routeFetch({ history: () => historyResponse([]) }));
+		const noHistory = await buildRemoteBackupSnapshot("user-a");
+		expect(noHistory.ok).toBe(true);
+		if (noHistory.ok) expect(noHistory.snapshot.history).toEqual([]);
 
-		// 名單讀取失敗而回合讀取成功時同樣不回傳快照（兩條讀取各自獨立判斷，不能互相掩護）
-		const playersFails = async (response: () => Response, expected: string) => {
-			vi.stubGlobal(
-				"fetch",
-				vi.fn().mockImplementation(async (path: string) => {
-					if (path === "/api/matchmaker/round") {
-						return new Response(JSON.stringify({ data: cloudRound, version: 3 }), { status: 200 });
-					}
-					return response();
-				}),
+		// 三條讀取各自失敗（5xx、204 無內容、400 被拒絕、回應結構不合法、401）時回傳錯誤、不回傳快照，
+		// 即使另外兩條讀取成功（三條各自獨立判斷，不能互相掩護）
+		const failures: Array<[string, () => Response, string]> = [
+			["5xx", () => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed],
+			["204", () => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed],
+			["400", () => new Response("x", { status: 400 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed],
+			["壞結構", () => new Response(JSON.stringify({ items: "x" }), { status: 200 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed],
+			["401", () => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized],
+		];
+		for (const [, response, expected] of failures) {
+			for (const source of ["round", "players", "history"] as const) {
+				vi.stubGlobal("fetch", routeFetch({ [source]: response }));
+				expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: expected });
+			}
+		}
+	});
+
+	it("雲端歷史 CSV 以雲端歷史依完成順序產生", async () => {
+		const fetchMock = vi.fn().mockImplementation(async () => historyResponse(CLOUD_HISTORY));
+		vi.stubGlobal("fetch", fetchMock);
+		const localHistory = [makeHistoryEntry("m-1"), makeHistoryEntry("m-2"), makeHistoryEntry("m-3")];
+		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: localHistory }));
+
+		const result = await buildRemoteHistoryCsv("user-a");
+
+		expect(result).toEqual({ ok: true, csv: historyToCsv(CLOUD_HISTORY) });
+		// 對照組：順序反轉或改用本機歷史產生的 CSV 與期望值不同，斷言才有鑑別力
+		expect(historyToCsv([...CLOUD_HISTORY].reverse())).not.toBe(historyToCsv(CLOUD_HISTORY));
+		expect(historyToCsv(localHistory)).not.toBe(historyToCsv(CLOUD_HISTORY));
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(fetchMock.mock.calls[0][0]).toBe(HISTORY_ASC_PATH);
+		expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+
+		// 雲端沒有歷史時仍是成功，CSV 只有標題列，不可退回本機歷史
+		vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => historyResponse([])));
+		expect(await buildRemoteHistoryCsv("user-a")).toEqual({ ok: true, csv: historyToCsv([]) });
+
+		// 讀取失敗（5xx、204 無內容、400 被拒絕、回應結構不合法、連線失敗）時回傳錯誤、不產生 CSV
+		const failureResponses: Array<() => Promise<Response>> = [
+			async () => new Response("x", { status: 500 }),
+			async () => new Response(null, { status: 204 }),
+			async () => new Response("x", { status: 400 }),
+			async () => new Response(JSON.stringify({ items: "x" }), { status: 200 }),
+			async () => {
+				throw new Error("network down");
+			},
+		];
+		for (const respond of failureResponses) {
+			vi.stubGlobal("fetch", vi.fn().mockImplementation(respond));
+			const failed = await buildRemoteHistoryCsv("user-a");
+			expect(failed).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.historyCsvFetchFailed });
+			expect(REMOTE_TRANSFER_MESSAGES.historyCsvFetchFailed).toBe(
+				"無法取得雲端的歷史賽果，未產生 CSV 檔。請確認網路連線後再試一次。",
 			);
-			expect(await buildRemoteBackupSnapshot("user-a")).toEqual({ ok: false, message: expected });
-		};
-		await playersFails(() => new Response("x", { status: 500 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
-		await playersFails(() => new Response(null, { status: 204 }), REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
-		await playersFails(() => new Response("x", { status: 401 }), REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+	});
+
+	it("雲端歷史匯出的每個請求帶呼叫端給的帳號且 401 時標示未授權", async () => {
+		function expectedUsers(fetchMock: ReturnType<typeof vi.fn>): Array<string | null> {
+			return fetchMock.mock.calls.map(([, init]) =>
+				new Headers((init as RequestInit).headers).get("X-Expected-User-Id"),
+			);
+		}
+		const roundBody = () => new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
+		const routeFetch = (overrides: { players?: () => Response; round?: () => Response; history?: () => Response }) =>
+			vi.fn().mockImplementation(async (path: string) => {
+				if (path === "/api/matchmaker/round") return overrides.round?.() ?? roundBody();
+				if (path === HISTORY_ASC_PATH) return overrides.history?.() ?? historyResponse(CLOUD_HISTORY);
+				return overrides.players?.() ?? listResponse(CLOUD_PLAYERS);
+			});
+
+		// 備份的名單、回合、歷史三個 GET 與 CSV 的歷史 GET 皆帶呼叫端給的帳號
+		const backupFetch = routeFetch({});
+		vi.stubGlobal("fetch", backupFetch);
+		await buildRemoteBackupSnapshot("user-a");
+		expect(expectedUsers(backupFetch)).toEqual(["user-a", "user-a", "user-a"]);
+
+		const csvFetch = routeFetch({});
+		vi.stubGlobal("fetch", csvFetch);
+		await buildRemoteHistoryCsv("user-a");
+		expect(expectedUsers(csvFetch)).toEqual(["user-a"]);
+
+		// 歷史 GET 回 401：兩者的失敗結果皆帶機器可讀的未授權標示
+		const history401 = () => new Response("x", { status: 401 });
+		vi.stubGlobal("fetch", routeFetch({ history: history401 }));
+		const backup401 = await buildRemoteBackupSnapshot("user-a");
+		expect(backup401.ok).toBe(false);
+		if (!backup401.ok) {
+			expect(backup401.unauthorized).toBe(true);
+			expect(backup401.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+		const csv401 = await buildRemoteHistoryCsv("user-a");
+		expect(csv401.ok).toBe(false);
+		if (!csv401.ok) {
+			expect(csv401.unauthorized).toBe(true);
+			expect(csv401.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+
+		// 先判斷有無 401 再判斷其他失敗：名單或回合 500、歷史 401 時仍標示未授權
+		for (const source of ["players", "round"] as const) {
+			vi.stubGlobal("fetch", routeFetch({ [source]: () => new Response("x", { status: 500 }), history: history401 }));
+			const mixed = await buildRemoteBackupSnapshot("user-a");
+			expect(mixed.ok).toBe(false);
+			if (!mixed.ok) {
+				expect(mixed.unauthorized).toBe(true);
+				expect(mixed.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			}
+		}
+		// 反向：歷史 500、名單 401 同樣標示未授權
+		vi.stubGlobal(
+			"fetch",
+			routeFetch({ history: () => new Response("x", { status: 500 }), players: () => new Response("x", { status: 401 }) }),
+		);
+		const reversed = await buildRemoteBackupSnapshot("user-a");
+		expect(reversed.ok).toBe(false);
+		if (!reversed.ok) expect(reversed.unauthorized).toBe(true);
+
+		// 歷史 GET 回 500：不帶未授權標示，訊息各用各的
+		vi.stubGlobal("fetch", routeFetch({ history: () => new Response("x", { status: 500 }) }));
+		const backup500 = await buildRemoteBackupSnapshot("user-a");
+		expect(backup500.ok).toBe(false);
+		if (!backup500.ok) {
+			expect(backup500.unauthorized).toBeUndefined();
+			expect(backup500.message).toBe(REMOTE_TRANSFER_MESSAGES.backupFetchFailed);
+		}
+		const csv500 = await buildRemoteHistoryCsv("user-a");
+		expect(csv500.ok).toBe(false);
+		if (!csv500.ok) {
+			expect(csv500.unauthorized).toBeUndefined();
+			expect(csv500.message).toBe(REMOTE_TRANSFER_MESSAGES.historyCsvFetchFailed);
+		}
 	});
 
 	it("雲端備份快照取得名單失敗時回傳錯誤、不產生快照", async () => {
@@ -336,17 +484,18 @@ describe("remote-transfer", () => {
 		expect(importFetch.mock.calls.map(([, init]) => init.method)).toEqual(["GET", "POST"]);
 		expect(expectedUsers(importFetch)).toEqual(["user-a", "user-a"]);
 
-		// 備份：名單與回合兩個 GET 用同一個帳號
+		// 備份：名單、回合與歷史三個 GET 用同一個帳號
 		const backupFetch = vi.fn().mockImplementation(async (path: string) => {
 			if (path === "/api/matchmaker/round") {
 				return new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
 			}
+			if (path.startsWith("/api/matchmaker/history")) return historyResponse([]);
 			return listResponse(CLOUD_PLAYERS);
 		});
 		vi.stubGlobal("fetch", backupFetch);
 		await buildRemoteBackupSnapshot("user-a");
-		expect(backupFetch).toHaveBeenCalledTimes(2);
-		expect(expectedUsers(backupFetch)).toEqual(["user-a", "user-a"]);
+		expect(backupFetch).toHaveBeenCalledTimes(3);
+		expect(expectedUsers(backupFetch)).toEqual(["user-a", "user-a", "user-a"]);
 	});
 
 	it("雲端匯入與備份遇到 401 時以機器可讀欄位標示未授權", async () => {
