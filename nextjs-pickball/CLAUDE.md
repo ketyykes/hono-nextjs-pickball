@@ -33,9 +33,11 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   各場地色塊的「進入計分板」入口導向 `/scoreboard?match=<matchId>` 時，兩隊名稱行會顯示該隊球員姓名與雙色漸層色塊（milestone M12 = matchmaker-scoreboard-team-labels change）；獨立開啟 `/scoreboard`（無 `match` 參數）維持「我方」／「對方」純文字，零行為變更
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
 - `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
-  - `/matchmaker/data` 登入態差異（B6／B7）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），歷史取自本機（B8 前）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
+  - `/matchmaker/history` 登入態（B8）：`app/matchmaker/history/page.tsx` 維持 server component，由 client 小元件 `HistoryModeSwitch` 依 `resolveStorageMode` 擇一渲染；remote 掛 `RemoteHistoryView`（經 `useRemoteHistory` 讀雲端），其餘仍是原樣未改的 `HistoryView`（本機）。區間界線由前端以核心 `rangeBounds` 計算後傳給後端，後端不推算區間
+  - `/matchmaker/data` 登入態差異（B6／B7）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），history 取自雲端（`GET /api/matchmaker/history?order=asc`，B8）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 登入時改讀雲端（`buildRemoteHistoryCsv`，B8），清除本機資料不變
   - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後不清除任何本機 key（B8 起過渡用的本機歷史清除函式已刪除，本機資料是訪客時期的資料，留給之後的匯入）；雲端的名單、回合、分槽與歷史由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜（milestone M11 = matchmaker-player-stats change），同樣不在全站 navbar。
+  統計頁入口（B8）：`app/matchmaker/stats/page.tsx` 依 `resolveStorageMode` 擇一渲染，登入時為 `RemoteStatsContent`（經 `useRemoteHistory` 讀雲端歷史），訪客與 session 載入中為 `LocalStatsContent`（原樣搬出的本機內容，一行未改）；兩者共用下列計算與呈現元件。
   統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`
   （球員範圍為「目前名單」與「歷史紀錄」的**聯集**，回傳已排序完成），呈現層為
   `components/matchmaker/PlayerStatsTable.tsx`（九欄）。區間篩選與空狀態**重用 M7 的既有元件**
@@ -52,9 +54,10 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
 - 訪客（含 auth 停用、session 載入中）仍全走 LocalStorage
 - 登入後**參賽者名單**以雲端為準（B6：`/api/matchmaker/*`，選擇器 `useRosterStore` 依 `resolveStorageMode` 切換）
 - 登入後**回合與場次分槽**以雲端為準（B7：`useRoundStore` 選擇器切 `useRemoteRoundStore`；計分板帶 `?match=` 時 `useScoreboardStore` 切 `useRemoteMatchSlotStore`）；**送出比分由後端權威**（`POST /api/matchmaker/round/matches/:matchId/score`，評分、回合完成狀態、歷史、刪除分槽在同一個 batch，前端不逐人 PUT 評分）
-- 歷史讀取（歷史頁、統計頁、歷史 CSV）仍在本機，待 B8；過渡期登入時歷史寫入雲端但畫面讀本機，`useRemoteRoundStore` 的 `history` 恆為空陣列
+- 登入後**歷史讀取**以雲端為準（B8：歷史頁、統計頁、歷史 CSV、JSON 匯出的 history 皆讀 `GET /api/matchmaker/history`）；區間界線由前端以核心 `rangeBounds(range, now)` 以使用者裝置時區算成毫秒（`from` 含、`to` 不含）後傳給後端，後端不計算區間（Workers 為 UTC，在後端算「今日」會讓台灣使用者到早上 8 點才換日）。歷史改由 `useRemoteHistory` 讀取，`useRemoteRoundStore` 的 `history` 仍恆為空陣列（該 hook 不讀歷史，畫面一律改由 `useRemoteHistory` 取得）；雲端略過的損毀列由 `droppedCount` 提示，不刪除
 - 雲端模式下使用者操作不會改動本機 `matchmaker:roster:v1`（該 key 保留訪客時期名單，作為 B9 匯入來源）；但選擇器仍會掛載本機 hook（hooks 不可條件式呼叫），mount 時依既有逐筆降級規則讀取並寫回同一份名單
 - 後續 change 須知：登入態 JSON 還原目前停用，B9 決定其去留；過渡用的本機歷史清除函式已於 B8 刪除，`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）
+- **交接給 B9**（openspec change `matchmaker-history-stats-backend` design）：① 匯入的歷史 MUST 寫入 `played_at`（`Date.parse(playedAt)`），否則 B8 的區間查詢會漏掉；② 匯入的歷史以 `asc` 讀回時順序為 `played_at` 加插入順序，匯入時 MUST 依本機的追加順序插入，同時間的紀錄才會維持原順序；③ 登入時重置不碰本機，本機五個 key 皆保留，都可作為匯入來源（過渡用的本機歷史清除函式已刪除）
 
 ### shadcn/ui
 
@@ -85,7 +88,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
 以下路徑皆相對 `nextjs-pickball/`：
 
 - `app/` — 各路由進入點（見「架構總覽」）＋ `layout.tsx`、`globals.css`
-- `components/` — 依功能分子目錄：`ui/`（shadcn）、`auth/`（`LoginForm`）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（`SiteNavbar`、`AccountEntry`、`navItemStyles`——SiteNavbar 連結與 AccountEntry 共用內距與配色）、`matchmaker/`、`quiz/`、`scoreboard/`、`sync/`（`SyncStatusNotice`，同步狀態單行提示）、`tour/`
+- `components/` — 依功能分子目錄：`ui/`（shadcn）、`auth/`（`LoginForm`）、`guide/`（指南區塊，共用小元件在 `guide/shared/`）、`layout/`（`SiteNavbar`、`AccountEntry`、`navItemStyles`——SiteNavbar 連結與 AccountEntry 共用內距與配色）、`matchmaker/`（歷史與統計的雲端／本機分支元件：`HistoryModeSwitch`、`RemoteHistoryView`、`RemoteStatsContent`、`LocalStatsContent`）、`quiz/`、`scoreboard/`、`sync/`（`SyncStatusNotice`，同步狀態單行提示）、`tour/`
   - `guide/HeroTourCta` 是 **server component 例外**（其餘 guide 元件皆標 `"use client"`）；其行為由 **tour-experience** capability 規範，不屬 pickleball-guide-page
 - `hooks/` — 依 capability 分組。跨 capability 歸屬清單的**單一來源**是 `openspec/specs/pickleball-guide-page/spec.md` 的「互動行為由三支 hooks 提供且各有 smoke test」Requirement——**任何** capability 新增 hook 時，其 change 須一併更新該清單（歷史上曾漏更新導致規格失真）：
   - pickleball-guide-page：`useScrollShadow`、`useScrollSpy`、`useScrolledPast`
@@ -93,6 +96,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - scoreboard：`useScoreboardStore`、`useFullscreen`、`useOrientation`、`useFocusMode`
   - tour-experience：`useEnterAnimationProgress`、`useReducedMotion`
   - auth：`useSession`
+  - matchmaker 歷史雲端讀取（B8）：`useRemoteHistory`（歸 match-history 清單；唯讀，收 `enabled`、`userId`、`range`、`onUnauthorized`，依 `rangeBounds` 算界線並帶 `expectedUserId` 請求，換帳號即換世代、以擁有者標記擋前一帳號的資料；回傳 `items`、`total`、`droppedCount`、`syncStatus`）。使用端為 `RemoteHistoryView`、`RemoteStatsContent`；`HistoryModeSwitch` 與統計頁入口負責本機與雲端擇一
   - scoreboard 雲端同步（B5）：`useRemoteScoreboardStore`（歸 scoreboard 清單；由 `useScoreboardStore` 這個**選擇器 hook** 依 `resolveStorageMode` 在本機與雲端實作間切換，本機 hook 不改動；新增雲端 feature 比照此慣例，並同步更新上述主 spec 清單）
     - **帳號世代（B7.5，四支雲端 hook 共通）**：hook 收 `userId` option，主 effect 依賴含 `userId`；一個世代內所有請求（載入、儲存、重試、重置、衝突重載）都帶該世代的 `expectedUserId`，換帳號即丟棄舊世代的待送變更並重新載入；以 reducer 保存的擁有者標記（`owner`）與 `userId` 不同時，render 期就不回傳前一帳號的資料、操作不送出；`userId` 為 `null` 時不發任何請求。一次性雲端操作（`CourtCard` 建立分槽、JSON 備份、CSV 匯入）以觸發當下 `useSession()` 的 user id 呼叫，未授權時 `refresh()`
     - 雲端 hook 實作要點：`HYDRATE`（載入雲端資料）不寫回；`createLatestWinsSaver` 於 effect 內建立；`Scoreboard.tsx` 在雲端載入中／失敗時以 `loading`／`load-failed` 取代畫面，`data-sync-status` 屬性只在非 local 模式渲染
@@ -107,8 +111,9 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - `lib/sync/api-client.ts` 的 `requestJson`：**必填 `expectedUserId`**，每個請求帶 `X-Expected-User-Id`（B7.5）；只用呼叫端給的值、不讀 session store，401（含 `ACCOUNT_MISMATCH`）分類為 `unauthorized`。API 包裝（`roster-api`、`round-api`、`remote-transfer`）一律以 `expectedUserId` 為第一參數
   - `lib/sync/roster-api.ts`：名單 API 薄包裝，一律經 `requestJson`
   - `lib/sync/round-api.ts`：回合、場次分槽、送出比分的路徑字串與回應 schema 的唯一來源，一律經 `requestJson`，hook 不自行拼路徑
+  - `lib/sync/history-api.ts`：歷史路徑字串與回應 schema 的唯一來源（`fetchRemoteHistory(expectedUserId, { from, to, order })`），一律經 `requestJson`，hook 與 `remote-transfer` 不自行拼路徑
   - `lib/sync/round-command-queue.ts`：回合命令佇列（無 React 相依，由 `useRemoteRoundStore` 持有），單一在途、先進先出
-  - `lib/matchmaker/remote-transfer.ts`：資料頁雲端分支，含 `importRemoteRoster`、`buildRemoteBackupSnapshot`、`buildRemoteHistoryCsv`、`REMOTE_TRANSFER_MESSAGES`
+  - `lib/matchmaker/remote-transfer.ts`：資料頁雲端分支（備份快照與歷史 CSV 的歷史皆經 `fetchRemoteHistory({ order: "asc" })` 取自雲端），含 `importRemoteRoster`、`buildRemoteBackupSnapshot`、`buildRemoteHistoryCsv`、`REMOTE_TRANSFER_MESSAGES`
   - **18 個純邏輯模組已移至核心套件 `@pickball/core`**（`scoreboard/{types,rules,reducer}`、`matchmaker/{types,allocation-types,allocation,candidates,duplication,pairing,rating-math,rating-types,rating,labels,round-types,round,history,history-range,transfer-types}`），這裡的舊路徑已不存在，且不留 re-export 轉址殼；一律從 `@pickball/core/<area>/<module>` 匯入。**它們的單元測試刻意留在 `lib/{scoreboard,matchmaker}/*.test.ts` 原位**（主 spec 以測試檔路徑為驗收錨點），不是漏搬。`next.config.ts` 以 `transpilePackages: ["@pickball/core"]` 讓 Next 轉譯該套件的 `.ts` 原始碼。新增純邏輯模組是否放核心套件，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔

@@ -5,7 +5,7 @@
 > ⚠️ 範圍例外：計分板（`/scoreboard`）已部分上雲（B5：登入且未綁定場次時以雲端為準，路由見 `src/routes/scoreboard.ts`）；
 > matchmaker（對戰分配機）的**參賽者名單已上雲**（B6：`src/routes/matchmaker.ts`，表 `matchmaker_players`），
 > **回合、場次分槽與送出比分（含歷史寫入）也已上雲**（B7：表 `matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history`）。
-> **歷史的讀取端點尚未提供，歷史頁與統計頁仍讀前端 LocalStorage**，待 B8，在那之前不是待搬進來的「後端邏輯」；
+> **歷史的讀取端點也已提供**（B8：`GET /api/matchmaker/history`），登入時歷史頁、統計頁與歷史 CSV 皆讀雲端；
 > 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
@@ -75,7 +75,7 @@
   - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
 - **使用者資料 API**（B5 起；新 feature 如 B6～B9 一律照此做）：
   - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
-  - **預期帳號守衛**（B7.5，`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 13 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
+  - **預期帳號守衛**（B7.5，`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 14 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
   - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
   - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
   - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`，共用實作為 `src/http/invalid-body.ts` 的 `userDataOnError`（搭配 zValidator 的 `invalidBodyHook`），新 sub-app 直接沿用、不要另寫
@@ -90,11 +90,18 @@
   - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
   - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
   - **後續 change 須知**（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）：
-    1. **B8**：`matchmaker_history` 已有 `played_at`（ms）與主鍵，讀取端點只需 GET；追加順序以 `rowid` 保存。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加；`USER_DATA_TABLES` 與 reset batch 已含該表。前端 `useRemoteRoundStore` 的 `history` 恆為空陣列，B8 改讀雲端後，前端 `resetLocalMatchProgress()` 刪除、`buildRemoteBackupSnapshot()` 的 `history` 改取雲端
+    1. **B8（已完成）**：讀取端點 `GET /api/matchmaker/history` 已提供（見上方「matchmaker 歷史讀取 API」）；前端 `resetLocalMatchProgress()` 已刪除、`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加
     2. **B9**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
     3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`
     4. **B7.5 預期帳號守衛**（詳見 openspec change `user-data-account-guard` design「交接給 B8／B9」）：B8 的 `GET /api/matchmaker/history` 在 matchmaker sub-app 內自動受守衛保護，但守衛樣本表 MUST 補一條；B9 的 `src/routes/import.ts` 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)` 且樣本表補 `POST /api/import`
        （第 3 點現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
+    5. **B8 交接給 B9**（openspec change `matchmaker-history-stats-backend` design「交接給 B9」）：① 匯入的歷史 MUST 寫入 `played_at`（`Date.parse(playedAt)`），否則 `GET /history` 的區間查詢會漏掉；② 匯入的歷史以 `asc` 讀回時順序為 `played_at` 加 `rowid`，匯入時 MUST 依本機的追加順序插入，同時間的紀錄才會維持原順序；③ 前端 `resetLocalMatchProgress()` 已刪除，登入時重置不碰本機，本機五個 key 皆可作為匯入來源
+- **matchmaker 歷史讀取 API**（B8，同在 `src/routes/matchmaker.ts`；`src/matchmaker/history-repository.ts`，查詢契約在 `@pickball/core/api/history`）：
+  - `GET /api/matchmaker/history?from=&to=&order=`：皆選填的毫秒界線，**`from` 含、`to` 不含**（`played_at >= from AND played_at < to`），同時給兩者時 `from` 必須小於 `to`；格式不合（非十進位整數、`from >= to`、`order` 不是 `desc`／`asc`）回 400 `INVALID_BODY`。`order` 預設 `desc`（`ORDER BY played_at DESC, rowid ASC`），`asc` 為 `played_at ASC, rowid ASC`；`rowid` 即追加順序，與前端 `filterHistoryByRange` 的穩定排序一致
+  - 回應 `{ items: [{ data, version }], total, droppedCount }`：`total` 為本人**全部**筆數（不受界線影響，讓前端分得出「完全沒有歷史」與「此區間沒有」）；`droppedCount` 為本次範圍內被略過的列數
+  - **損毀列只略過、不刪除**：`data` 以 sql 片段取原始文字後逐列 `JSON.parse` 再過 `MatchHistoryEntrySchema.safeParse`，語法錯誤（非 JSON 文字）或 schema 不符都略過並計入 `droppedCount`。不可改用 drizzle json mode 直接讀取——單列非 JSON 會讓整個查詢 500。保留原列是為了日後能以新版 schema 救回（與本機的「回寫清理」刻意不同）
+  - **後端不計算區間**：Workers 的時區為 UTC，在後端算「今日」「本週」會讓台灣使用者到早上 8 點才換日；區間界線由前端以核心 `rangeBounds(range, now)` 依使用者裝置時區算成毫秒後傳入，後端只比較毫秒，切點只有核心一份實作
+  - 歷史只增不改，沒有 PUT；掛在 matchmaker sub-app 內自動受預期帳號守衛保護，守衛樣本表已含 `GET /api/matchmaker/history`
 - 現有測試端點：
   - `GET /api/health` — 部署冒煙測試，驗證 Next.js → service binding → Hono 的通路正常
   - `GET /api/cookie-check` — 驗證 Set-Cookie 能經 service binding 原樣穿透回瀏覽器（呼叫兩次即可確認來回都通；better-auth 的 session cookie 依賴此行為，已由 `nextjs-pickball/tests/e2e/specs/auth-proxy.spec.ts` 驗證）
