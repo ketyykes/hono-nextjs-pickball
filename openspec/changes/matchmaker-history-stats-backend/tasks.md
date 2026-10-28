@@ -89,6 +89,7 @@ Depends on: §3
 - [x] 4.4 GREEN（TDD）：新增 `hooks/useRemoteHistory.ts`（design Decision 3、7：`{ enabled, userId, range, onUnauthorized }`、擁有者標記、請求序號只採最後一次、`userId` 為 null 視同停用）
   - 綠燈紀錄（commit `d3f7be3`）：2026-10-28 重跑單檔 `useRemoteHistory.test.tsx` 綠；四個檔逐檔 eslint exit 0。
   - regression guard（commit `25f1215`，加入即綠，非 RED）：it「regression guard：enabled 由 false 改為 true 時開始載入，onUnauthorized 以最新的函式呼叫」——前一任 mutation 發現主 effect 依賴拿掉 `enabled`、`onUnauthorizedRef` 不更新兩條變異存活而補；既有 4 個 it 未動。
+  - §4 Stage 2 補件（commit `9464cad`，regression guard，加入即綠，非 RED）：四個 it「regression guard：五個區間的請求界線皆等於 rangeBounds 且無界的一端不送出」「regression guard：換帳號的每一次 render 的 droppedCount 皆為 0，不沿用前一帳號的損毀筆數」「regression guard：userId 變為 null、停用或卸載後才到達的 401 不呼叫 onUnauthorized」「regression guard：401 之後 syncStatus 維持 loading」；`useRemoteHistory.ts` 未改，既有 it 只動兩行 import（新增匯入名稱）。單檔 9/9 綠。
 - [x] 4.5 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteHistory` 未列入主 spec 而**真的轉紅**，貼出輸出
   - **4.6 commit 前未留存紅燈輸出**（前一任 session 因關機中斷，輸出遺失；4.6 已 commit，無法再自然重現，且不得改回主 spec 偽造紅燈）。
     佐證：`git show f46b053^:openspec/specs/pickleball-guide-page/spec.md | grep -c useRemoteHistory` 為 0，而 `d3f7be3` 起 `hooks/useRemoteHistory.ts` 已存在——同步前守衛「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」的前提必然不成立。

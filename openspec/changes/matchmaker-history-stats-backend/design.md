@@ -123,6 +123,10 @@
    spec 字面「每一列的 data MUST 以 MatchHistoryEntrySchema 驗證：不合法者 … 計入 droppedCount」可涵蓋此情形。**裁定**：在 §3 追加 task 3.4（新增 Scenario「雲端歷史：data 不是合法 JSON 的列同樣被略過並計數」），以 `sql` 片段取原始文字再 `JSON.parse`。
    3.4 完成：8984613 RED（`expected 500 to be 200`，真紅）→ 2488400 GREEN；Stage 1 由 leader 對照 Scenario 逐條核對 diff，Stage 2（opus，9 條非等價變異全殺、3 條等價對照綠）PASS。後端全套 23 檔／165 it 綠。§3 完成。
 
+7. （apply §4，2026-10-28 接任 leader）§4 由前一任完成 edbe859／d47f318／1256905／d3f7be3／25f1215／f46b053 後因關機中斷；接任後以 `git show <commit>^:<path>` 機械複驗兩個 RED（實作檔於 RED^ 與 RED 皆不存在），tasks 補勾並註記「shell 紅燈輸出遺失，以 RED／GREEN 分開的 commit 作證」；4.5 守衛紅燈輸出在 4.6 commit 前未留存，照實註記、未重現（禁止改回主 spec 偽造）。
+   Stage 1（sonnet）PASS。Stage 2（opus）第一輪 FAIL（產品程式碼正確；非等價存活：thisWeek／earlier 界線、`from` 為 null 仍送出、換帳號當幀 `droppedCount` 沿用、只拿掉 `cancelled`（結束世代後的 401 仍呼叫 onUnauthorized）、401 後狀態）→ 9464cad 四個 regression guard → 複審 PASS（8 條存活全紅、3 條等價對照綠、抽查 11 條仍紅）。
+   Stage 2 判定：`requestSeqRef` 比對與 `cancelled` 重疊——只拿掉序號比對為等價變異（下一次 effect 前必先跑 cleanup），屬 Decision 7 要求的縱深防禦，保留。§4 完成。
+
 ## apply §1 查證紀錄（2026-10-27）
 
 **1.1 環境**：見 environment.md Verification（baseline 前端 100／1010、後端 22／157、核心 6／13；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 34；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` exit 0）。
