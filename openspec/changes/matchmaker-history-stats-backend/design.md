@@ -141,6 +141,7 @@
 13. （Final Code Review，2026-10-28）Final Code Reviewer（opus）FAIL，必修 M1：`computeRangeCutoffs` 以逐層 `min()` 刻意產生空區間（週一的「本週」、本週一落在上個月時的「本月」，`from === to`），但 `HistoryQuerySchema` 要求 `from < to` → 後端 400 → 雲端歷史頁、統計頁在這些日期顯示載入失敗，且因 `load-failed` 取代整段內容而篩選器消失、無法切回（OQ9 因此加重）。單元測試未抓到：hook 的 FAKE_NOW 為週三月中，核心 schema 測試未接 `rangeBounds` 的真實輸出；8.8 E2E 實跑日為週三。
     裁定（leader，比照 3.4 追加 task 8.10～8.12）：refine 放寬為 `from <= to`（`[x, x)` 為合法空集合，回空 `items`、`total` 照算，前端走既有區間空狀態，與本機一致）；`from=300&to=200` 仍 400。不採前端短路（空區間不發請求會拿不到 `total`，分不出「完全沒有歷史」與「此區間沒有」）。delta spec 對應句改寫並新增兩個 Scenario。
     Final 其他建議（非必修，轉 coordinator）：匯出（備份、CSV）略過損毀列時未告知 `droppedCount`；`packages/pickball-core/CLAUDE.md`「CORE_MODULES 目前 23 項」在 main 即已過時（main 24、本 change 後 25）；`nextjs-pickball/CLAUDE.md` API 包裝第一參數清單未列 `history-api`；`backend-scoring-runbook-b1-b9.md` 狀態快照仍為「B8 apply 中斷」。
+    M1 修正：bdeb124 RED（三處真紅）→ 32a3c0a GREEN → e0cbcb9 文件 → 8acce25 tasks 紀錄；Final Code Reviewer（opus）複審 **PASS**（RED 以讀碼確認在舊 refine 下必紅、名稱逐字一致、`from=300&to=200` 仍 400、文件無殘留、上次必修清單全數消除）。後端全套 23 檔／166、核心 8 檔／17。M1 只放寬後端查詢驗證，8.8 E2E（週三實跑）未重跑。
 
 ## apply §1 查證紀錄（2026-10-27）
 
