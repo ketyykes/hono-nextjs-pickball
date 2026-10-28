@@ -113,8 +113,22 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：新增 `lib/sync/local-import.test.ts`，spec 該檔的五個 it（以 happy-dom 的 localStorage seed 五個 key；斷言「呼叫前後逐字相同」時使用不含損毀資料的 seed）。確認紅燈
-- [ ] 4.2 GREEN（TDD）：新增 `lib/sync/local-import.ts`（design Decision 3、4、4.5；請求經 `requestJson`；`importLocalData(expectedUserId, payload)` 以第一參數原樣交給 `requestJson`）
+- [x] 4.1 RED（TDD）：新增 `lib/sync/local-import.test.ts`，spec 該檔的五個 it（以 happy-dom 的 localStorage seed 五個 key；斷言「呼叫前後逐字相同」時使用不含損毀資料的 seed）。確認紅燈
+  - 完成（RED commit `dc37269`）：五個 it 名稱與 delta spec 逐字一致；以 happy-dom localStorage seed 五個 key（key 取自 reader 的 `storage-keys` 常數），`importLocalData` 測試 stub 全域 `fetch`（經真實 `requestJson`），斷言 200／409／401／500 與 400、不符 schema 的 200、204、網路錯誤。
+    紅燈輸出：`pnpm --filter ./nextjs-pickball test --run lib/sync/local-import.test.ts` → `Error: Failed to resolve import "./local-import" from "lib/sync/local-import.test.ts"`，`Test Files 1 failed (1) / Tests no tests`。
+    機械複驗：`git show dc37269^:nextjs-pickball/lib/sync/local-import.ts` → `fatal: path ... does not exist in 'dc37269^'`；`git show dc37269^:nextjs-pickball/lib/sync/local-import.test.ts` 亦不存在，紅燈成立（模組不存在，非斷言偽造）。
+    先綠者：RED 當下五個 it 皆無法載入，無先綠者。GREEN 後 mutation 發現存活變異 S4（未完成但無分槽的場次仍被納入），補強 commit `56df8f5`（phase 2 回合加入無分槽的 m4）寫入即綠，**標 regression guard**，非 TDD 紅燈。
+- [x] 4.2 GREEN（TDD）：新增 `lib/sync/local-import.ts`（design Decision 3、4、4.5；請求經 `requestJson`；`importLocalData(expectedUserId, payload)` 以第一參數原樣交給 `requestJson`）
+  - 完成（GREEN commit `384d6df`）：`lib/sync/local-import.ts` 匯出 `buildLocalImportPayload`、`importLocalData`、`backupToImportRequest`、`hasImportableLocalData` 與型別 `LocalImportSummary`／`LocalImportPreview`／`LocalImportOutcome`；型別來自 `@pickball/core/api/import`。`/api/import` 路徑字串只在本檔。
+    單檔 5/5 綠；前端全套（持共用鎖）106 檔 1059 tests 全綠；`pnpm -r exec tsc --noEmit` exit 0；新檔 ESLint 無 error。REFACTOR：skipped（無壞味道）。
+    - 實作取捨：`hasImportableLocalData` 以 `!buildLocalImportPayload().isEmpty` 判斷而非檢查 key 是否存在——元件掛載時的 write effect 會寫出只含空陣列的容器，單看 key 會讓沒有資料的訪客也看到提示。`summary` 欄位為 `{ players, round, slots, history, scoreboardCurrent, duplicateHistorySkipped }`。`importLocalData` 回傳 `imported`（含回應 `imported`）／`cloud-not-empty`／`unauthorized`／`failed`，`rejected`、不符 schema 的 200、204、網路錯誤皆歸 `failed`。
+    - mutation（harness：`src.count(old)==1`、`new!=old`、`git diff --stat` 有輸出、每次還原並確認 `git status` 乾淨）共 71 次（含 S4 補強後重跑）：
+      分槽（讀已完成場次、只收 pending、讀所有本機分槽含孤兒、matchId 取 state 內的值、缺值仍納入、略過 current）、歷史（不去重、保留最後一筆、重複數常數 0／1、summary 用未去重筆數）、
+      `isEmpty`（漏判名單／回合／歷史／獨立計分板、恆 true、恆 false）、`oversize`（門檻 2,000,000、`>` 改 `>=`、漏判名單／歷史／分槽、三段加總、全部或各段改字元數、恆 false）、
+      清除本機（成功後清除五個 key 各一次、409 後清除、失敗後清除）、分類（409→failed、401→failed、409→unauthorized、rejected→imported、failed→unauthorized、204 不判失敗、筆數固定）、
+      `expectedUserId`（固定字串、空字串）、路徑／方法／body（路徑改錯、PUT、不帶 body、body 被改、schema 寬鬆）、`backupToImportRequest`（current 非 null、matches 非空、漏帶 players／currentRound／history／scoreboard、version 2）、
+      `hasImportableLocalData`（漏判名單／回合／歷史／獨立計分板、改用 key 存在、恆 true、恆 false）、payload／summary 欄位（version 2、漏帶 currentRound、round／scoreboardCurrent／players 常數）。
+      **68 次轉紅**；3 次未轉紅：S4 首輪存活（已補強後重跑轉紅）、等價對照 E5（`isEmpty` 加判分槽）與 I5（`hasImportableLocalData` 加判分槽）——有分槽必有未完成場次、即必有回合，故分槽段無法單獨使 `isEmpty` 為 false，此即「`isEmpty` 漏判分槽」無法成為可殺變異的原因，兩條等價對照如預期維持綠燈。
 
 ## 5. E2E 與畫面接線
 
