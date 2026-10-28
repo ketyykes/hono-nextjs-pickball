@@ -151,3 +151,5 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
    ③ `roster-sync.spec.ts` 與 `history-sync.spec.ts` 的 `JSON_RESTORE_DISABLED_TEXT` 常數改為雲端匯入說明文字並改名（四個 test 的同步點，斷言位置與語意不變）。
 5. **（apply §1）`data-transfer`「登入時 JSON 還原停用」沿用標題、內容改寫**：理由見查證紀錄 1.2；替代方案 REMOVED＋ADDED 整條 Requirement（9 個 Scenario、移到主 spec 末尾）成本高於收益，不選。若 coordinator 要求改名，需另開 change。
 6. Open Questions 3（參賽者頁提示在 `load-failed` 時）：維持建議——提示只在名單 `synced` 時渲染；`loading`／`load-failed` 時參賽者頁本來就以 `SyncStatusNotice` 取代整段內容，提示自然不出現。
+7. （apply §2，2026-10-28）Implementer（sonnet）：132090c RED（模組不存在，2 個 it 皆真紅、無先綠）→ 9e3a76a GREEN（`api/import.ts`、`CORE_MODULES`）→ 5dc4637 tasks 註記；REFACTOR skipped。Stage 1（sonnet）PASS。
+   Stage 2（opus）第一輪 FAIL（src 無缺陷；12 條非等價存活：空匯入漏判 currentRound、去重鍵改 name、current 的 matchId 放寬為 falsy、current／matches 可省略、回應筆數小數／負數、回應欄位可省略）→ 2e327c0 regression guard（新增兩個 it 與 `expectTypeOf`）→ 複審 PASS（12 條全紅、抽查 10 條仍紅、4 條等價對照綠）。§2 完成。
