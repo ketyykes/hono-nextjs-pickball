@@ -31,6 +31,7 @@ export const CORE_MODULES = [
   "api/players",
   "api/round",
   "api/headers",
+  "api/history",
 ];
 
 const SRC_DIR = path.resolve(import.meta.dirname, "../src");

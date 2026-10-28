@@ -9,7 +9,6 @@ import {
 	togglePlayerActive as togglePlayerActiveInRoster,
 } from "@/lib/matchmaker/roster";
 import type { AddPlayerInput, UpdatePlayerPatch } from "@/lib/matchmaker/roster";
-import { resetLocalMatchProgress } from "@/lib/matchmaker/storage";
 import {
 	deleteRemotePlayer,
 	fetchRemotePlayers,
@@ -296,8 +295,6 @@ export function useRemoteRosterStore({
 				sticky = null;
 				updateReady();
 				publish();
-				// 只清本次活動的本機進度，本機名單是訪客時期的資料，不能動
-				resetLocalMatchProgress();
 				return;
 			}
 			if (result.kind === "unauthorized") {

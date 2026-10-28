@@ -15,6 +15,11 @@
 「JSON 完整備份的匯出內容」表中 `players`、`currentRound` 與 `history` 的來源（`matchmaker:roster:v1`、`matchmaker:round:v1`、`matchmaker:history:v1`），以及「歷史賽果的 CSV 匯出」的資料來源，在雲端模式下以本表為準；`buildBackup` 本身仍是純函式、不變。
 雲端分支的資料讀取 MUST 經 `nextjs-pickball/lib/matchmaker/remote-transfer.ts`，元件層只負責選檔、下載與顯示。
 
+歷史的兩個匯出都是 `user-data-sync`「雲端 store 以登入帳號為界」所稱的**一次性雲端操作**：`buildRemoteBackupSnapshot(expectedUserId)` 的名單、回合與歷史三個 GET MUST 使用同一個 `expectedUserId`；
+雲端歷史 CSV 函式 MUST 以 `expectedUserId` 為第一參數。任一 GET 回 401（含 `ACCOUNT_MISMATCH`）時，失敗結果 MUST 帶既有的機器可讀未授權標示（訊息為 `REMOTE_TRANSFER_MESSAGES.unauthorized`）；
+`HistoryCsvSection` 的雲端分支 MUST 以點擊當下 `useSession()` 的 user id 呼叫，失敗時顯示訊息、不下載，結果為未授權時 MUST 呼叫 `useSession().refresh()`。
+雲端歷史 CSV 讀取失敗（非未授權）時的訊息為「無法取得雲端的歷史賽果，未產生 CSV 檔。請確認網路連線後再試一次。」；雲端備份快照的任一讀取失敗沿用既有 `backupFetchFailed`。
+
 JSON 還原停用的理由：還原是「以檔案覆寫全部資料」，雲端模式下等同覆寫雲端名單，其語意（覆寫、合併或拒絕）屬 B9「匯入本機資料」的決策範圍，本 change 不預先決定。
 
 #### Scenario: 雲端備份快照的來源
@@ -25,14 +30,21 @@ JSON 還原停用的理由：還原是「以檔案覆寫全部資料」，雲端
 - **AND** 三個雲端讀取任一失敗時回傳錯誤、不回傳快照
 - **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端備份快照的參賽者、回合與歷史皆取自雲端」
 
-#### Scenario: 雲端歷史 CSV 的資料來源
+#### Scenario: 登入資料工具：雲端歷史 CSV 的資料來源
 
 - **GIVEN** 雲端有 2 筆歷史；本機有 3 筆不同的歷史
 - **WHEN** 呼叫雲端歷史 CSV 函式
 - **THEN** 回傳的 CSV 等於以雲端那 2 筆（完成順序）呼叫 `historyToCsv` 的結果；讀取失敗時回傳錯誤
 - **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端歷史 CSV 以雲端歷史依完成順序產生」
 
-#### Scenario: 登入時歷史 CSV 匯出來自雲端
+#### Scenario: 登入資料工具：歷史匯出帶呼叫端給的帳號且 401 時標示未授權
+
+- **WHEN** 以 `"user-a"` 呼叫雲端備份快照函式與雲端歷史 CSV 函式；另以歷史 GET 回 401 各呼叫一次
+- **THEN** 每一個請求（備份的名單、回合、歷史 GET；CSV 的歷史 GET）的 `X-Expected-User-Id` 皆為 `user-a`
+- **AND** 歷史 GET 回 401 時兩者的失敗結果皆帶未授權標示、訊息為 `REMOTE_TRANSFER_MESSAGES.unauthorized`；歷史 GET 回 500 時不帶該標示
+- **驗收**：`nextjs-pickball/lib/matchmaker/remote-transfer.test.ts`，it 名稱「雲端歷史匯出的每個請求帶呼叫端給的帳號且 401 時標示未授權」
+
+#### Scenario: 登入資料工具：登入時歷史 CSV 匯出來自雲端
 
 - **GIVEN** 以測試帳號登入，雲端有一筆剛完成的歷史；本機 `matchmaker:history:v1` 有一筆不同的訪客歷史
 - **WHEN** 在資料頁按歷史 CSV 匯出並讀取下載的檔案

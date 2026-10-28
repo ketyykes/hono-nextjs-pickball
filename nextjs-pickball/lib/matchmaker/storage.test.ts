@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readRoster, writeRoster, resetMatchmakerData, resetLocalMatchProgress, STORAGE_KEY } from "./storage";
+import { readRoster, writeRoster, resetMatchmakerData, STORAGE_KEY } from "./storage";
 // 取 scoreboard 實際匯出的 key 而非硬編碼 "scoreboard:current:v1"——若 scoreboard 日後改 key 名，
 // 硬編碼的測試會繼續綠燈但保護的是不存在的 key；跨模組 import 則會編譯失敗、強迫同步更新。
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "../scoreboard/storage";
@@ -128,30 +128,5 @@ describe("storage", () => {
 		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
-	});
-
-	it("resetLocalMatchProgress 只移除本機歷史，保留名單、回合、分槽與獨立計分板", () => {
-		const roster = JSON.stringify({ version: 1, players: [makePlayer()] });
-		localStorage.setItem(STORAGE_KEY, roster);
-		localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify({ round: true }));
-		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ history: true }));
-		localStorage.setItem(MATCH_SLOTS_KEY, JSON.stringify({ "match-1": { untouched: true } }));
-		localStorage.setItem(SCOREBOARD_STORAGE_KEY, JSON.stringify({ untouched: true }));
-
-		resetLocalMatchProgress();
-
-		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
-		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe(JSON.stringify({ round: true }));
-		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe(JSON.stringify({ "match-1": { untouched: true } }));
-		expect(localStorage.getItem(STORAGE_KEY)).toBe(roster);
-		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
-	});
-
-	it("resetLocalMatchProgress 在沒有 localStorage 的環境（SSR）不拋例外", () => {
-		vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
-			throw new Error("localStorage 不可用（例如私密模式）");
-		});
-
-		expect(() => resetLocalMatchProgress()).not.toThrow();
 	});
 });

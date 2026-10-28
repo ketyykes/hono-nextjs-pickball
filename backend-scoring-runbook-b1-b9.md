@@ -11,7 +11,7 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-27，**B7.5 已合併，下一棒 B8**）
+## 狀態快照（最後更新 2026-10-27，**B8 apply 中斷，待續**）
 
 | 項目 | 值 |
 |---|---|
@@ -22,7 +22,7 @@
 | apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；**下一棒 B8** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
-| 工作位置 | 主 repo `main`，工作樹乾淨 |
+| 工作位置 | 主 repo 分支 `change/matchmaker-history-stats-backend`，工作樹乾淨。**B8 leader 於 2026-10-27 19:4x 因使用者關機被停止（不可續派，重開新 leader）**：已完成 §1（delta 補 player-roster 兩 Scenario、落實 B7.5 守衛交接）、§2 核心、§3 後端、§4.1～§4.4（`useRemoteHistory` GREEN `d3f7be3`、補守護 `25f1215`）；tasks.md 勾選落後於 commit（以 `git log main..HEAD` 為準補勾，教訓 #3）；§3 完成紀錄未寫入 design。新 leader 從 §4.5 起接續，續派前先跑 `pnpm -r exec tsc --noEmit` 確認 |
 
 ## 使用者已定案（2026-10-21）
 

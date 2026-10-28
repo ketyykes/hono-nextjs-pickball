@@ -386,7 +386,7 @@ describe("useRemoteRosterStore", () => {
 		expect(result.current.syncStatus).toBe("local");
 	});
 
-	it("resetRoster 成功後清空名單並只清除本機歷史", async () => {
+	it("resetRoster 成功後清空名單且不清除任何本機資料", async () => {
 		for (const key of [
 			ROSTER_STORAGE_KEY,
 			ROUND_STORAGE_KEY,
@@ -415,7 +415,7 @@ describe("useRemoteRosterStore", () => {
 		expect(posts[0][0]).toBe("/api/matchmaker/reset");
 		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBe("x");
 		expect(localStorage.getItem(ROUND_STORAGE_KEY)).toBe("x");
-		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBe("x");
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe("x");
 		expect(localStorage.getItem(SCOREBOARD_CURRENT_KEY)).toBe("x");
 	});
