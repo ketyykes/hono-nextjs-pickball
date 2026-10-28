@@ -24,16 +24,20 @@
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/local-data-import`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/local-data-import`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   `pnpm test` baseline、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md 並 commit
-- [ ] 1.2 對齊 B5～B8 實際落地：`hono-pickball/src/matchmaker/{batch-guard,score-repository,history-repository}.ts`、`src/scoreboard/repository.ts`、`src/index.ts`、`test/d1-batch-guard.test.ts`；
+  - 完成（commit `b5945ed`）：見 environment.md Verification。
+- [x] 1.2 對齊 B5～B8 實際落地：`hono-pickball/src/matchmaker/{batch-guard,score-repository,history-repository}.ts`、`src/scoreboard/repository.ts`、`src/index.ts`、`test/d1-batch-guard.test.ts`；
   核心 `api/{round,history}.ts`、`matchmaker/transfer-types.ts`；`nextjs-pickball/lib/sync/*`、`lib/matchmaker/remote-transfer.ts`、`components/matchmaker/JsonBackupSection.tsx`、`app/matchmaker/{data,players}/page.tsx`；
   `tests/e2e/user-data/*`（含 `clearTestAccountUserData()`）；B7／B8 design Open Questions。
   比對本 change 的 MODIFIED Requirement（`data-transfer`「登入時的資料工具頁」，B8 版本）與目前主 spec；**若原文不同，以主 spec 為底重新套用本 change 的增修並 commit**
-- [ ] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/llmstxt/developers_cloudflare_d1_llms-full_txt`（limits：綁定參數、單一參數大小、每次呼叫 query 數與 batch 的計數方式；`json_each`）；
+  - 完成（commit `a4b3a0b`）：MODIFIED 以 B8 版主 spec 為底重新套用；B7.5／B8／B7 交接逐項落實於 delta、design（Decision 4.5、「交接與對齊」）、tasks、test-plan；`validate --strict` 通過；授權修改的既有測試見 design OQ4。
+- [x] 1.3 Context7 查證（MUST，附 library ID 記入 design.md「apply §1 查證紀錄」）：`/llmstxt/developers_cloudflare_d1_llms-full_txt`（limits：綁定參數、單一參數大小、每次呼叫 query 數與 batch 的計數方式；`json_each`）；
   `/drizzle-team/drizzle-orm-docs`（`db.batch` 中 `db.all(sql)` 取 RETURNING、`insert().select(sql)`）；`/websites/sqlite_docs`（`json_each` 的 `key` 欄位與 `ORDER BY key`、`json_extract` 對物件的回傳型別）。差異記入 Open Questions
-- [ ] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行 design Decision 2 的 `json_each` 插入（含 `ORDER BY key` 與 `rowid` 順序）與 Decision 1 的 `ON CONFLICT DO NOTHING RETURNING`；
+  - 完成（commit `a4b3a0b`）：三個 library ID 的查證記入 design「apply §1 查證紀錄」1.3；與 design 假設的差異（`db.all(sql)` 不可用於 batch、`WHERE true`）已改寫 Decision 2 並記入 OQ1。
+- [x] 1.4 一次性實測（不 commit）：在 workerd 測試中以 drizzle 執行 design Decision 2 的 `json_each` 插入（含 `ORDER BY key` 與 `rowid` 順序）與 Decision 1 的 `ON CONFLICT DO NOTHING RETURNING`；
   確認 `json_extract(value, '$.data')` 寫入後以 drizzle 讀回與原物件深度相等（design Open Questions 1、2）
+  - 完成（未 commit 的探針測試已刪除）：結果記入 design 查證紀錄 1.4；OQ1、OQ2 定案。
 
 ## 2. 核心套件：匯入契約
 
