@@ -132,6 +132,8 @@
 9. **（apply §5，待 coordinator 裁定，非阻擋）換區間時鍵盤焦點遺失**：`useRemoteHistory` 每次 `range` 改變都回到 `loading`（Decision 7 的 `begin`），而 spec「`syncStatus` 為 `loading`／`load-failed` 時以 `SyncStatusNotice` 取代內容」使 `HistoryRangeFilter` 卸載再掛載。Stage 2 以 happy-dom 實測：以鍵盤（Enter）或點擊選「本月」後 `activeElement` 變為 `BODY`，回應到達後仍為 `BODY`，再按 Tab 從「今日」重新開始；本機頁不會如此。
    與 player-stats「區間篩選控制項 MUST 可由鍵盤操作」不構成字面衝突（每次掛載後仍可操作），但屬焦點管理的退步。本 change 照 spec 字面實作，未改；可選方案：(a) 接受並列為已知限制；(b) 另開 change 修改 spec 為「只在首次載入或失敗時取代整段，換區間載入中保留篩選」。
 
+10. （apply §6，2026-10-28）Implementer（sonnet）：88c46de RED（4 個真紅＋B7.5 授權 it 隨行為變更而紅）→ a8a2380 GREEN（含 `nextjs-pickball/CLAUDE.md` 三處、`storage.test.ts` 另刪同函式的 SSR it）。Stage 1（sonnet）PASS。Stage 2（opus）第一輪 FAIL（名單 401＋回合 500、回合 401＋名單 500 的優先序未守住）→ 256b6f4 → 複審 PASS。§6 完成。
+
 ## apply §1 查證紀錄（2026-10-27）
 
 **1.1 環境**：見 environment.md Verification（baseline 前端 100／1010、後端 22／157、核心 6／13；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 34；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` exit 0）。

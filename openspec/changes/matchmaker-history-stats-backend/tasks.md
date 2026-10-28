@@ -113,10 +113,18 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 改寫 B7 的快照 it 為「雲端備份快照的參賽者、回合與歷史皆取自雲端」並新增「雲端歷史 CSV 以雲端歷史依完成順序產生」「雲端歷史匯出的每個請求帶呼叫端給的帳號且 401 時標示未授權」，
+- [x] 6.1 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 改寫 B7 的快照 it 為「雲端備份快照的參賽者、回合與歷史皆取自雲端」並新增「雲端歷史 CSV 以雲端歷史依完成順序產生」「雲端歷史匯出的每個請求帶呼叫端給的帳號且 401 時標示未授權」，
   同檔 B7.5 it「雲端匯入與備份的每個請求都帶呼叫端給的帳號」依檔頭授權調整備份段（預期因呼叫次數 2 而紅，**屬既有 it 隨行為變更而紅，非 RED 證據**，紀錄中分開列）；
   `hooks/useRemoteRosterStore.test.tsx` 改寫為「resetRoster 成功後清空名單且不清除任何本機資料」；`lib/matchmaker/storage.test.ts` 刪除 `resetLocalMatchProgress` 的 it（commit 訊息載明原因與 spec 出處）。確認三個新／改寫的 it 紅燈
-- [ ] 6.2 GREEN（TDD）：`remote-transfer.ts`（design Decision 4、7：歷史匯出函式以 `expectedUserId` 為第一參數，401 回既有未授權標示；先判斷三個讀取中有無 401 再判斷其他失敗）；`useRemoteRosterStore` 的重置成功分支不再呼叫任何本機清除；刪除 `resetLocalMatchProgress()`（`rg resetLocalMatchProgress` 無結果）。6.1 全綠
+  - 紅燈紀錄（真紅，commit `88c46de`）：三檔合跑 5 failed／60 passed。RED 證據 4 個 it：「雲端備份快照的參賽者、回合與歷史皆取自雲端」（history 取到本機 `m-3`、預期雲端 `c-4`，且只發 2 個 GET）；「雲端歷史 CSV 以雲端歷史依完成順序產生」（`TypeError: buildRemoteHistoryCsv is not a function`）；「雲端歷史匯出的每個請求帶呼叫端給的帳號且 401 時標示未授權」（備份只有 2 個帶帳號的 GET，預期 3）；「resetRoster 成功後清空名單且不清除任何本機資料」（`expected null to be 'x'`，舊實作移除 `matchmaker:history:v1`）。無先綠者。
+    機械複驗：`git show 88c46de^:nextjs-pickball/lib/matchmaker/remote-transfer.ts` 不含 `buildRemoteHistoryCsv`；Stage 2 另把三個產品檔暫換回 88c46de 版本、跑 HEAD 測試，重現同樣 5 failed。
+  - **既有 it 隨行為變更而紅（非 RED 證據）**：B7.5「雲端匯入與備份的每個請求都帶呼叫端給的帳號」（called 2 times，預期 3）；依檔頭授權只改備份段三處，匯入段一字不動。
+  - `storage.test.ts` 刪除兩個 it：檔頭點名的「resetLocalMatchProgress 只移除本機歷史…」，以及同函式的「resetLocalMatchProgress 在沒有 localStorage 的環境（SSR）不拋例外」——後者只呼叫已刪除的函式，留著無法編譯，依 design Decision 5「刪除函式與其 it」一併刪除（Stage 1 判定與授權一致）。
+- [x] 6.2 GREEN（TDD）：`remote-transfer.ts`（design Decision 4、7：歷史匯出函式以 `expectedUserId` 為第一參數，401 回既有未授權標示；先判斷三個讀取中有無 401 再判斷其他失敗）；`useRemoteRosterStore` 的重置成功分支不再呼叫任何本機清除；刪除 `resetLocalMatchProgress()`（`rg resetLocalMatchProgress` 無結果）。6.1 全綠
+  - 綠燈紀錄（commit `a8a2380`）：三檔 65 tests 綠；前端全套（持鎖）104 檔／1049 tests 綠；`pnpm -r exec tsc --noEmit` exit 0；`rg resetLocalMatchProgress nextjs-pickball` 無輸出（exit 1）；本機路徑（`backup.ts`、`transfer-storage.ts`、`history-csv.ts`、`round-storage.ts`、`HistoryView.tsx`）對 main 零 diff。
+    同 commit 改 `nextjs-pickball/CLAUDE.md` 三處移除對已刪函式的敘述（否則 `rg … nextjs-pickball` 會命中該檔），其餘「歷史讀取待 B8」敘述留給 8.1。
+  - 變異驗證（Implementer 自跑，/tmp/b8tools/s6）：47 次，43 條非等價全紅、4 條等價對照綠。Stage 2（opus，58 條）發現名單與回合交叉時「401 先於其他失敗」兩條存活 → commit `256b6f4` regression guard（加入即綠，非 RED）「regression guard：名單與回合交叉時 401 先於其他失敗判斷」→ 複審 PASS。
+  - REFACTOR：skipped（無壞味道）。
 
 ## 7. E2E 與頁面接線
 
