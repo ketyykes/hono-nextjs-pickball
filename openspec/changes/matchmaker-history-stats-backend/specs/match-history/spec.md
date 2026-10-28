@@ -86,7 +86,7 @@ LocalStorage 不可用（SSR、私密模式）或無資料時 SHALL 顯示空狀
 | 參數 | 規格 |
 |---|---|
 | `from` | 非負整數毫秒；只回 `played_at >= from` 的列 |
-| `to` | 非負整數毫秒；只回 `played_at < to` 的列；同時給 `from` 時 MUST `from < to` |
+| `to` | 非負整數毫秒；只回 `played_at < to` 的列；同時給 `from` 時 MUST `from <= to`；`from === to` 為合法的空區間（`rangeBounds` 在週一的「本週」、本週一落在上個月時的「本月」會產生），MUST 回 200、`items` 為空、`total` 照算 |
 | `order` | `desc`（預設）或 `asc` |
 
 回應 MUST 為 `200 { items: [{ data: MatchHistoryEntry, version: 1 }], total: <本人全部歷史列數>, droppedCount: <本次範圍內略過的列數> }`。
@@ -160,6 +160,13 @@ hook MUST 記錄目前結果所屬的 `userId`（擁有者標記），render 時
 - **THEN** 五者皆回 400 `INVALID_BODY`
 - **驗收**：`hono-pickball/test/matchmaker-history.test.ts`，it 名稱「from、to 或 order 不合法時回 400」
 
+#### Scenario: 雲端歷史：from 等於 to 時為空區間
+
+- **GIVEN** `played_at` 為 100、200、300 的三筆
+- **WHEN** 以 `from=200&to=200` GET
+- **THEN** 回 200 `{ items: [], total: 3, droppedCount: 0 }`——與本機在該區間顯示空狀態一致，SHALL NOT 回 400
+- **驗收**：`hono-pickball/test/matchmaker-history.test.ts`，it 名稱「from 等於 to 時回 200、items 為空且 total 為全部筆數」
+
 #### Scenario: 雲端歷史：損毀列被略過並計數但不刪除
 
 - **GIVEN** 以 SQL 直接插入一筆 `data` 缺少 `winner` 的列與一筆合法列
@@ -187,11 +194,18 @@ hook MUST 記錄目前結果所屬的 `userId`（擁有者標記），render 時
 - **THEN** `today.from === thisWeek.to`、`thisWeek.from === thisMonth.to`、`thisMonth.from === lastMonth.to`、`lastMonth.from === earlier.to`；`today.to` 與 `earlier.from` 為 `null`
 - **驗收**：`packages/pickball-core/test/matchmaker/history-range-bounds.test.ts`，it 名稱「五個區間的 rangeBounds 首尾相接且兩端無界」
 
+#### Scenario: 雲端歷史：rangeBounds 產生的界線皆為合法查詢
+
+- **GIVEN** 固定的 `now` 樣本（含週一——本週為空區間——與跨月週——本月為空區間）
+- **WHEN** 對每個 `now` 與五個區間，把 `rangeBounds` 的非 `null` 界線轉為十進位字串交給 `HistoryQuerySchema`
+- **THEN** 全部解析成功（前端送出的任何區間查詢都不會被後端以 400 拒絕）
+- **驗收**：`packages/pickball-core/test/matchmaker/history-range-bounds.test.ts`，it 名稱「rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema」
+
 #### Scenario: 雲端歷史：共用的歷史查詢與回應 schema
 
 - **WHEN** 以 `HistoryQuerySchema` 解析 `{ from: "300", to: "200" }` 與 `{ from: "100", order: "asc" }`，以 `HistoryListResponseSchema` 解析含 `winner: "draw"` 的回應
 - **THEN** 前者失敗；後兩者通過且 `from` 轉為數字 100
-- **驗收**：`packages/pickball-core/test/api/history.test.ts`，it 名稱「HistoryQuerySchema 要求 from 小於 to 且 HistoryListResponseSchema 接受平局紀錄」
+- **驗收**：`packages/pickball-core/test/api/history.test.ts`，it 名稱「HistoryQuerySchema 拒絕 from 大於 to 且 HistoryListResponseSchema 接受平局紀錄」
 
 #### Scenario: 雲端歷史：歷史 API 包裝的請求形狀
 

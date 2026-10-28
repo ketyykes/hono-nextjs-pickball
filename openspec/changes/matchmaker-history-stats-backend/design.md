@@ -71,7 +71,7 @@
 
 ### Decision 6：核心 `api/history.ts`
 
-**Choice**：`HistoryQuerySchema`（`from`／`to` 以 `z.string().regex(/^\d+$/)` 轉數字並要求安全整數——apply §1 實測 `z.coerce.number()` 對空字串得 0，見查證紀錄；`order` 列舉、`from < to` 的 refine）、`HistoryListResponseSchema`；`CORE_MODULES` 加一項。
+**Choice**：`HistoryQuerySchema`（`from`／`to` 以 `z.string().regex(/^\d+$/)` 轉數字並要求安全整數——apply §1 實測 `z.coerce.number()` 對空字串得 0，見查證紀錄；`order` 列舉、`from <= to` 的 refine——`from === to` 為合法空區間，見 Open Questions 13）、`HistoryListResponseSchema`；`CORE_MODULES` 加一項。
 
 ### Decision 7：對齊 B7.5 預期帳號守衛（apply §1 追加）
 
@@ -137,6 +137,10 @@
 11. （apply §7，2026-10-28）Implementer（sonnet）：ef1bd62 RED（6 failed、無先綠）→ f139623 GREEN（含對 §5 `RemoteStatsContent` 加標題的偏差，理由見 tasks 7.2）。Stage 1（sonnet）PASS。Stage 2（opus）PASS 但列 4 條非等價存活；leader 依硬規則將 `HistoryCsvSection` 未授權 `refresh()` 與失敗不下載改列必修 → 13a20d3、3f8d690 → 複審 PASS。OQ2 由既有 `roster-sync.spec.ts` 守住（名單 load-failed 優先）。§7 完成。
 12. **（apply §7 Stage 2 觀察，待 coordinator 知悉，非阻擋）session 載入中本機 `HistoryView` 先掛載的副作用**：`resolveStorageMode` 在 session 載入中回 `local`（user-data-sync 主 spec），登入使用者開歷史頁時本機 `HistoryView` 會先掛載一瞬，其 effect 內 `readHistory()` 若遇到含損毀項的本機歷史，會依既有逐筆降級規則回寫清理（Stage 2 以暫時性探針實測 `unchanged=false`）。合法本機歷史不受影響（E2E「登入時瀏覽歷史頁只發出 GET 且不改動本機歷史」的 GIVEN 為合法資料）。
    與 delta「雲端模式下…SHALL NOT 讀寫 `matchmaker:history:v1`」字面有張力，但載入中的那一刻定義上屬本機模式，與統計頁本機 store 的等值回寫同類。本 change 未處理；可選方案：(a) 接受；(b) 另開 change 讓歷史頁在 session 載入中不掛本機元件。
+
+13. （Final Code Review，2026-10-28）Final Code Reviewer（opus）FAIL，必修 M1：`computeRangeCutoffs` 以逐層 `min()` 刻意產生空區間（週一的「本週」、本週一落在上個月時的「本月」，`from === to`），但 `HistoryQuerySchema` 要求 `from < to` → 後端 400 → 雲端歷史頁、統計頁在這些日期顯示載入失敗，且因 `load-failed` 取代整段內容而篩選器消失、無法切回（OQ9 因此加重）。單元測試未抓到：hook 的 FAKE_NOW 為週三月中，核心 schema 測試未接 `rangeBounds` 的真實輸出；8.8 E2E 實跑日為週三。
+    裁定（leader，比照 3.4 追加 task 8.10～8.12）：refine 放寬為 `from <= to`（`[x, x)` 為合法空集合，回空 `items`、`total` 照算，前端走既有區間空狀態，與本機一致）；`from=300&to=200` 仍 400。不採前端短路（空區間不發請求會拿不到 `total`，分不出「完全沒有歷史」與「此區間沒有」）。delta spec 對應句改寫並新增兩個 Scenario。
+    Final 其他建議（非必修，轉 coordinator）：匯出（備份、CSV）略過損毀列時未告知 `droppedCount`；`packages/pickball-core/CLAUDE.md`「CORE_MODULES 目前 23 項」在 main 即已過時（main 24、本 change 後 25）；`nextjs-pickball/CLAUDE.md` API 包裝第一參數清單未列 `history-api`；`backend-scoring-runbook-b1-b9.md` 狀態快照仍為「B8 apply 中斷」。
 
 ## apply §1 查證紀錄（2026-10-27）
 

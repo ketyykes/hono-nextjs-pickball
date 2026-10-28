@@ -173,3 +173,12 @@ Depends on: §7
     `history-sync.spec.ts` 6 個 test 全 passed（登入時瀏覽歷史頁只發出 GET 且不改動本機歷史／登入後完成的對戰由雲端顯示在歷史頁且不寫入本機／雲端歷史載入失敗時歷史頁顯示錯誤提示／登入時計時回合的平局在統計頁計為和局／登入時瀏覽統計頁只發出名單與歷史的讀取請求／登入時歷史 CSV 匯出的內容來自雲端）；既有 34 個 user-data test 原樣通過。
 - [x] 8.9 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict` 通過
   - `DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict`（repo root）：`Change 'matchmaker-history-stats-backend' is valid`，exit 0。
+
+## 8A. Final Code Review 必修 M1：空區間（leader 追加，比照 3.4）
+
+Depends on: §8（Final Code Review 結果見 design Open Questions 13）
+
+- [ ] 8.10 RED（TDD）：核心 `test/matchmaker/history-range-bounds.test.ts` 新增 it「rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema」（沿用檔內 now 樣本，含週一與跨月週）；
+  後端 `test/matchmaker-history.test.ts` 新增 it「from 等於 to 時回 200、items 為空且 total 為全部筆數」；核心 `test/api/history.test.ts` 本 change 新增的 it 改名為「HistoryQuerySchema 拒絕 from 大於 to 且 HistoryListResponseSchema 接受平局紀錄」，`{ from: "0", to: "0" }` 的斷言改為通過並補一條 `{ from: "1", to: "0" }` 失敗（該 it 為本 change §2 新增，非 main 既有 it）。各自單檔實跑貼紅燈
+- [ ] 8.11 GREEN（TDD）：`packages/pickball-core/src/api/history.ts` 的 refine 改為 `from <= to`（含 JSDoc 與錯誤訊息）；三檔單檔綠、後端與核心全套綠（持鎖）、三段 typecheck exit 0
+- [ ] 8.12 設定層（文件）：`hono-pickball/CLAUDE.md` 的「同時給兩者時 `from` 必須小於 `to`」「`from >= to`」改為不大於／`from > to`；`openspec validate --strict` 通過

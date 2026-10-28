@@ -45,10 +45,12 @@
 | data 不是合法 JSON 的歷史列同樣被略過並計數而不使端點失敗 | 雲端歷史：data 不是合法 JSON 的列同樣被略過並計數 | 200；items 只有合法那筆；droppedCount 1；total 2；原始文字不變 | apply §3 Stage 2 實測：drizzle json mode 讀取時 `JSON.parse` 拋錯 → 整個端點 500 → 紅 | integration |
 | （既有，B7.5，改樣本表）每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變；缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變 | 雲端歷史：預期帳號缺少或不符時歷史端點回 401 且不回傳歷史 | `SAMPLES` 補 `GET /api/matchmaker/history` 後兩個 it 對該路由逐變體 401＋快照不變 | 守衛在 sub-app 層；**路由不存在時 sub-app 的 `use("*")` 仍先回 401，預期先綠 → regression guard** | integration |
 | （既有，B7.5，**授權修改**）列舉出的使用者資料路由恰與守衛樣本表一致 | 同上 AND | 列舉＝樣本鍵；`toHaveLength(13)` 改 14 | 樣本先補、路由未加 → 列舉 13 ≠ 樣本 14 → **真紅** | integration |
+| from 等於 to 時回 200、items 為空且 total 為全部筆數 | 雲端歷史：from 等於 to 時為空區間 | 200；items 空；total 3；droppedCount 0 | Final Code Review M1：原 refine `from < to` 使週一「本週」、跨月週「本月」回 400 → **真紅** | integration |
+| rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema | 雲端歷史：rangeBounds 產生的界線皆為合法查詢 | 所有 now 樣本 × 五區間皆 success | 前後端契約的整合點；週一與跨月週樣本 → **真紅** | unit |
 | 不合 schema 的歷史列被略過並計入 droppedCount 且不被刪除 | 雲端歷史：損毀列被略過並計數但不刪除 | 兩次 GET 一致；表仍兩列 | 雲端降級與本機的差異點 | integration |
 | rangeBounds 與 rangeOfTime 對任意時間判定一致 | 雲端歷史：同名 | 全部樣本一致 | 區間定義只有一份的證據；函式不存在 → 紅 | unit |
 | 五個區間的 rangeBounds 首尾相接且兩端無界 | 雲端歷史：五個區間的界線首尾相接 | 四個等式＋兩個 null | 互斥且完整覆蓋 | unit |
-| HistoryQuerySchema 要求 from 小於 to 且 HistoryListResponseSchema 接受平局紀錄 | 雲端歷史：共用的歷史查詢與回應 schema | 前者失敗、後兩者通過、轉數字 | 契約先定；平局不可回退 | unit |
+| HistoryQuerySchema 拒絕 from 大於 to 且 HistoryListResponseSchema 接受平局紀錄 | 雲端歷史：共用的歷史查詢與回應 schema | 前者失敗、後兩者通過、轉數字 | 契約先定；平局不可回退 | unit |
 | 歷史 API 包裝以正確的查詢字串呼叫 requestJson | 雲端歷史：歷史 API 包裝的請求形狀 | 三個路徑；每次 `expectedUserId` 皆為第一參數 `"user-a"` | 路徑集中一處 | unit |
 | 依 range 以 rangeBounds 的界線載入雲端歷史並在 range 改變時重新載入 | 雲端歷史：依區間載入雲端歷史 | 兩次 GET 的界線與 `X-Expected-User-Id: user-a`；狀態序列 | hook golden path | hook |
 | range 快速切換時只採用最後一次請求的結果 | 雲端歷史：只採用最後一次請求的結果 | items 為第二次回應 | 競態 | hook |
