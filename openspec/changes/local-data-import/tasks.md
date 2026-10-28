@@ -94,6 +94,15 @@ Depends on: §2
     helper 拿掉 `WHERE true`（含計分板 ON CONFLICT 段）仍綠：本版 drizzle／D1 不受解析歧義影響，等價；`WHERE true` 依 apply §1.3 的 Context7 查證保留。
     另放對照組 `updatedAt` 改用 `Date.now()`、`fields: readonly string[]` 改 `string[]`、`const now = new Date(Date.now())` 皆維持綠。
   - 後端全套（持鎖）24 檔 177 tests 全綠（baseline 23／166）；`pnpm --filter ./hono-pickball db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空（No schema changes）。
+  - Stage 2 缺口與補強（test commit `fd2ccda`、註解 refactor `c9386e2`；regression guard，加入即綠，`src` 邏輯未改）：Stage 2 判 FAIL，6 條非等價變異存活。補強前以 harness 對 HEAD 測試實測存活、補強後轉紅：
+    L21（`ORDER BY` 改依 `matchId`）、L26（歷史 `match_id` 欄位寫錯，另以「附加尾碼」變異 L26b 對照）→ bulk it 比對 `rowsOf` 依 rowid 的 `match_id` 等於輸入順序（`bulk-h-10` 字串序在 `bulk-h-2` 前）、讀回 it 比對 `match_id` 為 `h1`／`h2`／`h3`；
+    L34（`played_at` 加 1）→ 讀回 it 直接讀表，`played_at` 精確等於 `Date.parse(T1／T2／T2)`；
+    L49（分槽 `match_id` 欄位寫錯，含附加尾碼 L49b）→ golden it 加 `GET /slots/m1` 與 `match_id` 欄位斷言；
+    L50（`updated_at` 改未來 +1 天）→ golden it 補上界 `finishedAt`；
+    L60（catch 一律回 conflict）→ bulk it 內另以新使用者匯入 3 筆各含 800KB 姓名（單段 JSON 參數 > 2MB）的合法資料，實測 D1 拋錯、回 500，且該使用者每張使用者資料表（含 `sync_batch_guards`）零列（對應 `57bbd75` 補在 delta 的 AND）。
+    另新增讀回 it 的特殊字元姓名（`"`、`\`、換行、tab、emoji、中文）往返斷言，額外變異 L61（emoji 被替換）、L62（反斜線被替換）補前存活、補後轉紅。
+    補前存活／補後轉紅：L21、L26、L26b、L34、L49b、L50、L60、L61、L62 九條皆「補前 11/11 綠、補後轉紅」；L49（欄位取 `data.scores.us`）在 13ccdf0 的 30 分槽下補前已被 bulk it 殺死，補後再加兩條斷言。
+    等價對照 3 條（`updatedAt` 改 `Date.now()`、`fields` 型別放寬、歷史 `match_id` 取 `data.matchId` 同值路徑）補前補後皆維持綠。`results[5]` 以註解標明與陳述式順序耦合（`c9386e2`，僅註解）。
 - [x] 3.3 REFACTOR：三條 `json_each` 插入的組裝是否值得抽成 helper；`hono-pickball/CLAUDE.md` 後續須知第 3 點（第二個守衛 batch 呼叫端出現時抽 `guardedBatch`）是否現在處理；無壞味道則註記 skipped
   - 完成（commit `af57946`）：實際為五條（參賽者、回合、分槽、歷史、獨立計分板）`json_each` 插入，user_id、`version` 1、`updated_at`、`WHERE true`、`ORDER BY key` 各重複五份，抽成同檔私有函式 `selectFromJsonEach(userId, fields, json, updatedAt)`，行為不變；`ORDER BY key` 與 `version` 因此只剩一處。
     `fields` 以 `sql.raw` 組路徑，只接受程式碼內常數（函式註解已註明）。重構後 `local-import`＋`expected-user-guard` 17/17 全綠、兩段 typecheck exit 0；上列 mutation 重構後重跑，結果見 3.2 註記。
