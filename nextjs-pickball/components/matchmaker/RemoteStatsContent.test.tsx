@@ -1,16 +1,21 @@
 // components/matchmaker/RemoteStatsContent.test.tsx
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { useRemoteHistory } from "@/hooks/useRemoteHistory";
 import type { UseRemoteHistoryResult } from "@/hooks/useRemoteHistory";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import type { UseRosterStoreResult } from "@/hooks/useRosterStore";
+import { useRoundStore } from "@/hooks/useRoundStore";
 import { useSession } from "@/hooks/useSession";
+import type { UseSessionResult } from "@/hooks/useSession";
 import { RemoteStatsContent } from "./RemoteStatsContent";
 
 vi.mock("@/hooks/useRemoteHistory", () => ({ useRemoteHistory: vi.fn() }));
 vi.mock("@/hooks/useRosterStore", () => ({ useRosterStore: vi.fn() }));
+vi.mock("@/hooks/useRoundStore", () => ({ useRoundStore: vi.fn() }));
 vi.mock("@/hooks/useSession", () => ({ useSession: vi.fn() }));
 
 function buildPlayer(overrides: Partial<Player> = {}): Player {
@@ -26,6 +31,29 @@ function buildPlayer(overrides: Partial<Player> = {}): Player {
 		isActive: true,
 		createdAt: "2026-08-23T00:00:00.000Z",
 		...overrides,
+	};
+}
+
+function mockReadySession(refresh = vi.fn()): void {
+	vi.mocked(useSession).mockReturnValue({
+		status: "ready",
+		authEnabled: true,
+		user: { id: "user-a", email: "a@example.com", name: "A" },
+		refresh,
+	});
+}
+
+function buildDrawEntry(): MatchHistoryEntry {
+	return {
+		matchId: "m1",
+		courtNumber: 1,
+		playedAt: "2026-03-18T01:00:00.000Z",
+		format: "singles",
+		teamA: { players: [{ id: "p1", name: "王小明", ratingBefore: 3, ratingAfter: 3 }], rating: 3 },
+		teamB: { players: [{ id: "p2", name: "陳小華", ratingBefore: 3, ratingAfter: 3 }], rating: 3 },
+		scoreA: 9,
+		scoreB: 9,
+		winner: "draw",
 	};
 }
 
@@ -84,5 +112,132 @@ describe("RemoteStatsContent", () => {
 		expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
 		expect(screen.getByTestId("player-stat-row-p1")).not.toBeNull();
 		expect(screen.getByTestId("player-stat-row-p2")).not.toBeNull();
+	});
+
+	// 以下為 regression guard：元件實作已存在，加入即綠（非 RED），用來鎖住 mutation 殺不掉的分支。
+	describe("統計內容", () => {
+		it("雲端歷史中的平局在排行榜計為和局而非敗場", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer({ id: "p1", name: "王小明" }), buildPlayer({ id: "p2", name: "陳小華" })] });
+			mockHistory({ items: [{ data: buildDrawEntry(), version: 1 }], total: 1 });
+
+			render(<RemoteStatsContent />);
+
+			for (const id of ["p1", "p2"]) {
+				const row = screen.getByTestId(`player-stat-row-${id}`);
+				expect(within(row).getByText("0 - 0 - 1")).not.toBeNull();
+			}
+		});
+
+		it("不掛載 useRoundStore", () => {
+			mockReadySession();
+			mockRoster();
+			mockHistory({ items: [], total: 5 });
+
+			render(<RemoteStatsContent />);
+
+			expect(vi.mocked(useRoundStore)).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("useRemoteHistory 的參數", () => {
+		it("以 ready 快照的 user id 與 refresh 啟用雲端歷史並預設今日區間", () => {
+			const refresh = vi.fn();
+			mockReadySession(refresh);
+			mockRoster();
+			mockHistory({ items: [], total: 5 });
+
+			render(<RemoteStatsContent />);
+
+			expect(vi.mocked(useRemoteHistory)).toHaveBeenLastCalledWith({
+				enabled: true,
+				userId: "user-a",
+				range: "today",
+				onUnauthorized: refresh,
+			});
+		});
+
+		it("session 尚未 ready 或沒有 user 時 userId 為 null", () => {
+			mockRoster();
+			mockHistory();
+			// 刻意塞入帶 user 的 loading 快照（型別上不會出現）：鎖住「只認 ready」的判定
+			vi.mocked(useSession).mockReturnValue({
+				status: "loading",
+				user: { id: "user-a", email: "a@example.com", name: "A" },
+				refresh: vi.fn(),
+			} as unknown as UseSessionResult);
+			const { rerender } = render(<RemoteStatsContent />);
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].userId).toBeNull();
+
+			vi.mocked(useSession).mockReturnValue({
+				status: "ready",
+				authEnabled: true,
+				user: null,
+				refresh: vi.fn(),
+			});
+			rerender(<RemoteStatsContent />);
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].userId).toBeNull();
+		});
+
+		it("切換區間後把新區間傳給 useRemoteHistory", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			mockRoster();
+			mockHistory({ items: [], total: 5 });
+			render(<RemoteStatsContent />);
+
+			await user.click(screen.getByRole("radio", { name: "上月" }));
+
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("lastMonth");
+		});
+	});
+
+	describe("同步狀態", () => {
+		const LOADING_MESSAGE = "正在載入雲端資料…";
+		const LOAD_FAILED_MESSAGE = "無法載入雲端資料，請重新整理頁面";
+
+		it.each([
+			["loading", LOADING_MESSAGE],
+			["load-failed", LOAD_FAILED_MESSAGE],
+		] as const)("歷史 syncStatus 為 %s 時以提示取代內容並標示 data-sync-status", (status, message) => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			mockHistory({ syncStatus: status, items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			expect(screen.getByRole("status").textContent).toBe(message);
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
+			expect(screen.queryByRole("table")).toBeNull();
+			expect(screen.queryByRole("radiogroup")).toBeNull();
+		});
+
+		it.each([
+			["loading", LOADING_MESSAGE],
+			["load-failed", LOAD_FAILED_MESSAGE],
+		] as const)("名單 syncStatus 為 %s 時以提示取代內容並標示 data-sync-status", (status, message) => {
+			mockReadySession();
+			mockRoster({ players: [], syncStatus: status });
+			mockHistory({ syncStatus: "synced", items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			expect(screen.getByRole("status").textContent).toBe(message);
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
+			expect(screen.queryByRole("table")).toBeNull();
+			expect(screen.queryByRole("radiogroup")).toBeNull();
+		});
+
+		it("名單與歷史皆可用時顯示內容並標示 data-sync-status", () => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			mockHistory({ syncStatus: "synced", items: [], total: 5 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("synced");
+			expect(screen.getByRole("radiogroup", { name: "歷史區間" })).not.toBeNull();
+			expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
+		});
 	});
 });

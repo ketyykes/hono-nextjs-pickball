@@ -6,6 +6,7 @@ import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import { useRemoteHistory } from "@/hooks/useRemoteHistory";
 import type { UseRemoteHistoryResult } from "@/hooks/useRemoteHistory";
 import { useSession } from "@/hooks/useSession";
+import type { UseSessionResult } from "@/hooks/useSession";
 import { RemoteHistoryView } from "./RemoteHistoryView";
 
 vi.mock("@/hooks/useRemoteHistory", () => ({ useRemoteHistory: vi.fn() }));
@@ -89,5 +90,89 @@ describe("RemoteHistoryView", () => {
 		await user.click(screen.getByRole("radio", { name: "本月" }));
 		expect(screen.queryByTestId("empty-history")).toBeNull();
 		expect(screen.getByTestId("empty-history-range").textContent).toBe("本月目前沒有任何對戰紀錄。");
+	});
+
+	// 以下為 regression guard：元件實作已存在，加入即綠（非 RED），用來鎖住 mutation 殺不掉的分支。
+	describe("useRemoteHistory 的參數", () => {
+		it("以 ready 快照的 user id 與 refresh 啟用雲端歷史並預設今日區間", () => {
+			const refresh = vi.fn();
+			vi.mocked(useSession).mockReturnValue({
+				status: "ready",
+				authEnabled: true,
+				user: { id: "user-a", email: "a@example.com", name: "A" },
+				refresh,
+			});
+			mockHistory();
+
+			render(<RemoteHistoryView />);
+
+			expect(vi.mocked(useRemoteHistory)).toHaveBeenLastCalledWith({
+				enabled: true,
+				userId: "user-a",
+				range: "today",
+				onUnauthorized: refresh,
+			});
+		});
+
+		it("session 尚未 ready 或沒有 user 時 userId 為 null", () => {
+			mockHistory();
+			// 刻意塞入帶 user 的 loading 快照（型別上不會出現）：鎖住「只認 ready」的判定
+			vi.mocked(useSession).mockReturnValue({
+				status: "loading",
+				user: { id: "user-a", email: "a@example.com", name: "A" },
+				refresh: vi.fn(),
+			} as unknown as UseSessionResult);
+			const { rerender } = render(<RemoteHistoryView />);
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].userId).toBeNull();
+
+			vi.mocked(useSession).mockReturnValue({
+				status: "ready",
+				authEnabled: true,
+				user: null,
+				refresh: vi.fn(),
+			});
+			rerender(<RemoteHistoryView />);
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].userId).toBeNull();
+		});
+
+		it("切換區間後把新區間傳給 useRemoteHistory", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			mockHistory({ items: [], total: 5 });
+			render(<RemoteHistoryView />);
+
+			await user.click(screen.getByRole("radio", { name: "上月" }));
+
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("lastMonth");
+		});
+	});
+
+	describe("同步狀態", () => {
+		it.each([
+			["loading", "正在載入雲端資料…"],
+			["load-failed", "無法載入雲端資料，請重新整理頁面"],
+		] as const)("syncStatus 為 %s 時以提示取代內容並標示 data-sync-status", (status, message) => {
+			mockReadySession();
+			mockHistory({ syncStatus: status, items: [{ data: buildEntry("m1"), version: 1 }], total: 3, droppedCount: 2 });
+
+			const { container } = render(<RemoteHistoryView />);
+
+			expect(screen.getByRole("status").textContent).toBe(message);
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
+			expect(screen.queryByRole("radiogroup")).toBeNull();
+			expect(screen.queryByRole("alert")).toBeNull();
+			expect(screen.queryByTestId("history-record-m1")).toBeNull();
+		});
+
+		it("syncStatus 為 synced 時顯示內容並標示 data-sync-status", () => {
+			mockReadySession();
+			mockHistory({ syncStatus: "synced", items: [{ data: buildEntry("m1"), version: 1 }], total: 1 });
+
+			const { container } = render(<RemoteHistoryView />);
+
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("synced");
+			expect(screen.getByRole("radiogroup", { name: "歷史區間" })).not.toBeNull();
+			expect(screen.getByTestId("history-record-m1")).not.toBeNull();
+		});
 	});
 });
