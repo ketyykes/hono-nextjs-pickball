@@ -191,8 +191,16 @@ describe("local-import", () => {
 		expect(snapshotKeys()).toEqual(before);
 		expect(LocalImportRequestSchema.safeParse(result.payload).success).toBe(true);
 
-		// 進行中（scoring）也算未完成；分槽的 matchId 以場次 id 為準，不信任 state 內的值
-		seedRound(makeRound([makeRoundMatch({ id: "m1" }), makeRoundMatch({ id: "m3", status: "scoring" }), makeCompletedMatch("m2", 2)]));
+		// 進行中（scoring）也算未完成；分槽的 matchId 以場次 id 為準，不信任 state 內的值；
+		// 未完成但沒有分槽的場次（m4）不產生分槽
+		seedRound(
+			makeRound([
+				makeRoundMatch({ id: "m1" }),
+				makeRoundMatch({ id: "m3", status: "scoring" }),
+				makeCompletedMatch("m2", 2),
+				makeRoundMatch({ id: "m4" }),
+			]),
+		);
 		seedSlots({ m1: makeSlot(null, 3), m2: makeSlot("m2", 8), m3: makeSlot("m3", 6), m9: makeSlot("m9", 9) });
 
 		const second = buildLocalImportPayload();
