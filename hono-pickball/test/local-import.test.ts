@@ -87,7 +87,7 @@ function postImportWithHeaders(headers: Record<string, string>, body: unknown): 
 		new Request(IMPORT_URL, {
 			method: "POST",
 			headers: { Origin: origin, "Content-Type": "application/json", ...headers },
-			body: JSON.stringify(body),
+			body: typeof body === "string" ? body : JSON.stringify(body),
 		}),
 	);
 }
@@ -362,6 +362,15 @@ describe("POST /api/import 本機資料匯入", () => {
 			expect(await res.json(), name).toEqual({ error: API_ERROR_CODES.INVALID_BODY });
 			await expectNoRows([userId]);
 		}
+
+		// JSON 語法錯誤由 Hono 拋 HTTPException(400)，須經 sub-app 的 onError 轉成 INVALID_BODY
+		const malformed = await postImportWithHeaders(
+			{ Cookie: cookie, [EXPECTED_USER_ID_HEADER]: userId },
+			"{not json",
+		);
+		expect(malformed.status, "JSON 語法錯誤").toBe(400);
+		expect(await malformed.json(), "JSON 語法錯誤").toEqual({ error: API_ERROR_CODES.INVALID_BODY });
+		await expectNoRows([userId]);
 	});
 
 	it("300 位參賽者與 2000 筆歷史可一次匯入", async () => {
@@ -369,19 +378,24 @@ describe("POST /api/import 本機資料匯入", () => {
 		const userId = await userIdOf("import-bulk@example.com");
 		const players = Array.from({ length: 300 }, (_, index) => makePlayer(`bulk-p-${index}`));
 		const history = Array.from({ length: 2000 }, (_, index) => makeHistoryEntry(`bulk-h-${index}`));
+		// 30 個分槽：單一陳述式的參數上限是 100，逐筆展開的分槽寫入在這個量級就會失敗
+		const matchIds = Array.from({ length: 30 }, (_, index) => `bulk-m-${index}`);
+		const currentRound = makeRound(matchIds.map((id) => makeMatch(id)));
+		const slots = matchIds.map((id) => makeSlot(id));
 
 		const result = await importOk(
 			cookie,
-			makePayload({ players, history, currentRound: null, scoreboard: { current: null, matches: [] } }),
+			makePayload({ players, history, currentRound, scoreboard: { current: null, matches: slots } }),
 		);
 
 		expect(result.imported).toEqual({
 			players: 300,
-			round: false,
-			slots: 0,
+			round: true,
+			slots: 30,
 			history: 2000,
 			scoreboardCurrent: "none",
 		});
+		expect(await rowsOf("matchmaker_match_slots", userId)).toHaveLength(30);
 		const playerRows = await rowsOf("matchmaker_players", userId);
 		expect(playerRows).toHaveLength(300);
 		expect(playerRows.map((row) => row.sort_order)).toEqual(players.map((_, index) => index));
