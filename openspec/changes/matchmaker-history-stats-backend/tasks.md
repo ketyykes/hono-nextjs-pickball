@@ -101,8 +101,13 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 RED（TDD）：新增 `components/matchmaker/RemoteHistoryView.test.tsx`（兩個 it）與 `components/matchmaker/RemoteStatsContent.test.tsx`（一個 it）；mock `useRemoteHistory`、`useRosterStore` 與 `@/hooks/useSession`。確認紅燈
-- [ ] 5.2 GREEN（TDD）：新增 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`（重用 `HistoryRangeFilter`、`HistoryRecordCard`、`EmptyHistory`、`PlayerStatsTable`、`computePlayerStats`；損毀提示文案與本機逐字相同）
+- [x] 5.1 RED（TDD）：新增 `components/matchmaker/RemoteHistoryView.test.tsx`（兩個 it）與 `components/matchmaker/RemoteStatsContent.test.tsx`（一個 it）；mock `useRemoteHistory`、`useRosterStore` 與 `@/hooks/useSession`。確認紅燈
+  - 紅燈紀錄（真紅，commit `304a507`）：兩檔合跑 `Test Files 2 failed (2)`、`Tests no tests`，原因 `Failed to resolve import "./RemoteHistoryView"`／`"./RemoteStatsContent"`；三個 it 皆無法執行，無先綠者。機械複驗：`git show 304a507^:nextjs-pickball/components/matchmaker/RemoteHistoryView.tsx`／`RemoteStatsContent.tsx` 皆不存在。
+- [x] 5.2 GREEN（TDD）：新增 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`（重用 `HistoryRangeFilter`、`HistoryRecordCard`、`EmptyHistory`、`PlayerStatsTable`、`computePlayerStats`；損毀提示文案與本機逐字相同）
+  - 綠燈紀錄（commit `36fc099`）：3 個 it 轉綠；前端全套（持鎖）104 檔／1039 tests 綠；`pnpm -r exec tsc --noEmit` exit 0；四檔 eslint exit 0；本機元件與 `app/`、`player-stats.ts` 對 main 零 diff。
+  - 變異驗證（Implementer 自跑，harness 在 /tmp/b8tools/s5，不入 repo）：46 次；第一輪 33 條存活 → commit `159e51e` 補 regression guard（加入即綠，非 RED：hook 參數、userId 推導、區間傳遞、歷史／名單的 loading 與 load-failed、data-sync-status、平局計為和局、不掛 useRoundStore）→ 40 條非等價全紅、6 條等價對照綠。
+  - Stage 2 補件（commit `759b548`，regression guard，加入即綠，非 RED）：紀錄卡片各自渲染且保留後端順序、損毀提示 class 與本機相同、切換區間後篩選選取狀態、狀態優先序（名單阻斷優先、非阻斷取歷史）、`local` 狀態的 data-sync-status、`total === 0` 時不顯示篩選、`total` 5 而 `items` 空時名單成員出場 0。既有 it 只動 import 與 `buildEntry` 加選用參數。兩檔 29/29 綠。
+  - REFACTOR：skipped（`useSession → userId` 接線只有兩處，不抽共用）。
 
 ## 6. 前端：資料頁與重置
 

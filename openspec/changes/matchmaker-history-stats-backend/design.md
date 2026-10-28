@@ -127,6 +127,11 @@
    Stage 1（sonnet）PASS。Stage 2（opus）第一輪 FAIL（產品程式碼正確；非等價存活：thisWeek／earlier 界線、`from` 為 null 仍送出、換帳號當幀 `droppedCount` 沿用、只拿掉 `cancelled`（結束世代後的 401 仍呼叫 onUnauthorized）、401 後狀態）→ 9464cad 四個 regression guard → 複審 PASS（8 條存活全紅、3 條等價對照綠、抽查 11 條仍紅）。
    Stage 2 判定：`requestSeqRef` 比對與 `cancelled` 重疊——只拿掉序號比對為等價變異（下一次 effect 前必先跑 cleanup），屬 Decision 7 要求的縱深防禦，保留。§4 完成。
 
+8. （apply §5，2026-10-28）Implementer（sonnet）：304a507 RED（真紅）→ 36fc099 GREEN → 159e51e regression guard。Stage 1（sonnet）PASS。Stage 2（opus）第一輪 FAIL（產品程式碼正確；10 條非等價存活：卡片資料與筆數、提示 class、篩選 `value`、狀態優先序、`total === 0` 時隱藏篩選、內容分支 data-sync-status）→ 759b548 → 複審 PASS（10 條全紅、4 條等價對照綠、抽查 13 條仍紅）。
+   實作選擇（Stage 1 判定與 spec 無衝突）：`RemoteStatsContent` 名單 `loading`／`load-failed` 優先於歷史狀態，兩邊皆非阻斷時 `data-sync-status` 取歷史狀態；根元素為 `<div>`（`<main>` 由 §7 頁面提供）；`total === 0` 時統計頁不顯示區間篩選（與本機統計頁一致）。
+9. **（apply §5，待 coordinator 裁定，非阻擋）換區間時鍵盤焦點遺失**：`useRemoteHistory` 每次 `range` 改變都回到 `loading`（Decision 7 的 `begin`），而 spec「`syncStatus` 為 `loading`／`load-failed` 時以 `SyncStatusNotice` 取代內容」使 `HistoryRangeFilter` 卸載再掛載。Stage 2 以 happy-dom 實測：以鍵盤（Enter）或點擊選「本月」後 `activeElement` 變為 `BODY`，回應到達後仍為 `BODY`，再按 Tab 從「今日」重新開始；本機頁不會如此。
+   與 player-stats「區間篩選控制項 MUST 可由鍵盤操作」不構成字面衝突（每次掛載後仍可操作），但屬焦點管理的退步。本 change 照 spec 字面實作，未改；可選方案：(a) 接受並列為已知限制；(b) 另開 change 修改 spec 為「只在首次載入或失敗時取代整段，換區間載入中保留篩選」。
+
 ## apply §1 查證紀錄（2026-10-27）
 
 **1.1 環境**：見 environment.md Verification（baseline 前端 100／1010、後端 22／157、核心 6／13；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 34；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` exit 0）。
