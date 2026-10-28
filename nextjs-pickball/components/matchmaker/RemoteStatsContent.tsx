@@ -60,6 +60,11 @@ export function RemoteStatsContent() {
 
 	return (
 		<div data-sync-status={displayStatus} className="flex flex-col gap-6">
+			{/* 標題只在有可信資料時顯示，與本機統計頁「載入中或失敗時整頁以提示取代」一致 */}
+			<div>
+				<h1 className="text-2xl font-bold">球員統計</h1>
+				<p className="text-sm text-muted-foreground">依區間排名每位球員的表現與強度消長。</p>
+			</div>
 			{total === 0 ? (
 				// 以 total 判定「完全沒有紀錄」而非 items：否則使用者在「上月」沒有紀錄時
 				// 會被誤導成從未打過（player-stats 空狀態的呈現 Requirement）
