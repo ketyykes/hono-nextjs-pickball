@@ -124,6 +124,19 @@ describe("/api/matchmaker/history 雲端歷史", () => {
 		expect(fromBeyond.body).toEqual({ items: [], total: 3, droppedCount: 0 });
 	});
 
+	it("from 等於 to 時回 200、items 為空且 total 為全部筆數", async () => {
+		const cookie = await seedAndSignIn("history-empty-range@example.com");
+		const userId = await userIdOf("history-empty-range@example.com");
+		await seedHistory(userId, entryAt("e100", 100));
+		await seedHistory(userId, entryAt("e200", 200));
+		await seedHistory(userId, entryAt("e300", 300));
+
+		const res = await request(cookie, "GET", "/history?from=200&to=200");
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ items: [], total: 3, droppedCount: 0 });
+	});
+
 	it("from、to 或 order 不合法時回 400", async () => {
 		const cookie = await seedAndSignIn("history-invalid@example.com");
 		const userId = await userIdOf("history-invalid@example.com");

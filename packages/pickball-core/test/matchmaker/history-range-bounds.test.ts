@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { HistoryQuerySchema } from "../../src/api/history";
 import {
   HISTORY_RANGES,
   computeRangeCutoffs,
@@ -70,6 +71,26 @@ describe("rangeBounds", () => {
       expect(lastMonth.from).toBe(earlier.to);
       expect(today.to).toBeNull();
       expect(earlier.from).toBeNull();
+    }
+  });
+
+  it("rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema", () => {
+    for (const now of NOW_SAMPLES) {
+      for (const range of HISTORY_RANGES) {
+        const { from, to } = rangeBounds(range, now);
+        // null 代表該端無界，查詢字串中不帶該鍵
+        const query: Record<string, string> = {};
+        if (from !== null) {
+          query.from = String(from);
+        }
+        if (to !== null) {
+          query.to = String(to);
+        }
+
+        const result = HistoryQuerySchema.safeParse(query);
+
+        expect(result.success, `now=${now.toISOString()} range=${range} query=${JSON.stringify(query)}`).toBe(true);
+      }
     }
   });
 });

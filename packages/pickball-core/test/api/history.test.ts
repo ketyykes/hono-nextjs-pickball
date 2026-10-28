@@ -27,10 +27,10 @@ function makeResponse(overrides: Record<string, unknown> = {}) {
 }
 
 describe("history API 契約", () => {
-  it("HistoryQuerySchema 要求 from 小於 to 且 HistoryListResponseSchema 接受平局紀錄", () => {
-    // from 必須小於 to
+  it("HistoryQuerySchema 拒絕 from 大於 to 且 HistoryListResponseSchema 接受平局紀錄", () => {
+    // from 不得大於 to；相等為合法空區間
     expect(HistoryQuerySchema.safeParse({ from: "300", to: "200" }).success).toBe(false);
-    expect(HistoryQuerySchema.safeParse({ from: "100", to: "100" }).success).toBe(false);
+    expect(HistoryQuerySchema.safeParse({ from: "100", to: "100" }).success).toBe(true);
     expect(HistoryQuerySchema.safeParse({ from: "100", to: "200" }).success).toBe(true);
 
     // 合法查詢，且 from 轉為數字
@@ -48,7 +48,8 @@ describe("history API 契約", () => {
     expect(onlyTo.success).toBe(true);
     expect(onlyTo.data?.to).toBe(200);
     // 0 為合法界線：refine 不可用 truthy 判斷略過
-    expect(HistoryQuerySchema.safeParse({ from: "0", to: "0" }).success).toBe(false);
+    expect(HistoryQuerySchema.safeParse({ from: "0", to: "0" }).success).toBe(true);
+    expect(HistoryQuerySchema.safeParse({ from: "1", to: "0" }).success).toBe(false);
     expect(HistoryQuerySchema.safeParse({ from: "0", to: "1" }).success).toBe(true);
 
     // 只含十進位數字的字串才合法：不可使用 z.coerce.number() 的寬鬆轉換
