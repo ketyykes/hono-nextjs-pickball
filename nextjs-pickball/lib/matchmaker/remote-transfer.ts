@@ -1,10 +1,11 @@
 import type { Player } from "@pickball/core/matchmaker/types";
+import { fetchRemoteHistory } from "../sync/history-api";
 import { fetchRemoteRound } from "../sync/round-api";
 import { fetchRemotePlayers, importRemotePlayers } from "../sync/roster-api";
 import type { BackupSnapshot } from "./backup";
+import { historyToCsv } from "./history-csv";
 import { applyRosterImport } from "./roster-csv";
 import type { ApplyRosterImportContext, ParseRosterCsvResult } from "./roster-csv";
-import { readSnapshot } from "./transfer-storage";
 
 /** 雲端分支的繁體中文訊息；風格比照 TRANSFER_MESSAGES：什麼失敗、資料有沒有動、建議怎麼做。 */
 export const REMOTE_TRANSFER_MESSAGES = {
@@ -15,6 +16,7 @@ export const REMOTE_TRANSFER_MESSAGES = {
 	unauthorized: "登入狀態已失效，本次沒有匯入或匯出任何資料。請重新登入後再試一次。",
 	previewHasErrors: "預覽仍有錯誤的資料列，本次沒有匯入任何資料。請先修正 CSV 後重新選檔。",
 	backupFetchFailed: "無法取得雲端的參賽者名單，未產生備份檔。請確認網路連線後再試一次。",
+	historyCsvFetchFailed: "無法取得雲端的歷史賽果，未產生 CSV 檔。請確認網路連線後再試一次。",
 } as const;
 
 /**
@@ -32,6 +34,8 @@ export type RemoteImportResult = { readonly ok: true } | RemoteTransferFailure;
 export type RemoteBackupSnapshotResult =
 	| { readonly ok: true; readonly snapshot: BackupSnapshot }
 	| RemoteTransferFailure;
+
+export type RemoteHistoryCsvResult = { readonly ok: true; readonly csv: string } | RemoteTransferFailure;
 
 // 以不可列舉屬性標示未授權：結果的列舉形狀（ok、message）維持原樣，
 // 既有以整個結果物件做比對或序列化的呼叫端不受影響，讀取 result.unauthorized 仍為 true。
@@ -79,19 +83,29 @@ export async function importRemoteRoster(
 }
 
 /**
- * 雲端備份快照：參賽者與回合取自雲端，歷史仍取自本機（歷史尚未上雲）。
- * 任一雲端讀取失敗時不回傳快照，避免使用者下載到缺名單或缺回合的備份而誤以為完整。
+ * 雲端備份快照：參賽者、回合與歷史皆取自雲端，歷史以完成順序（order=asc）請求，
+ * 與本機歷史的追加順序一致，buildBackup 不需任何改動。
+ * 任一雲端讀取失敗時不回傳快照，避免使用者下載到缺名單、缺回合或缺歷史的備份而誤以為完整。
  */
 export async function buildRemoteBackupSnapshot(expectedUserId: string): Promise<RemoteBackupSnapshotResult> {
-	const [players, round] = await Promise.all([
+	const [players, round, history] = await Promise.all([
 		fetchRemotePlayers(expectedUserId),
 		fetchRemoteRound(expectedUserId),
+		fetchRemoteHistory(expectedUserId, { order: "asc" }),
 	]);
-	if (players.kind === "unauthorized" || round.kind === "unauthorized") {
+	// 先看三個讀取有無 401 再看其他失敗：否則某一條先失敗會掩蓋另一條的 401，呼叫端就不會刷新 session
+	if (players.kind === "unauthorized" || round.kind === "unauthorized" || history.kind === "unauthorized") {
 		return unauthorizedFailure();
 	}
 	// 204 沒有內容（value 為 undefined）不該出現，當失敗；雲端尚無回合時 data 為 null，那是合法的空值。
-	if (players.kind !== "ok" || players.value === undefined || round.kind !== "ok" || round.value === undefined) {
+	if (
+		players.kind !== "ok" ||
+		players.value === undefined ||
+		round.kind !== "ok" ||
+		round.value === undefined ||
+		history.kind !== "ok" ||
+		history.value === undefined
+	) {
 		return { ok: false, message: REMOTE_TRANSFER_MESSAGES.backupFetchFailed };
 	}
 
@@ -100,7 +114,20 @@ export async function buildRemoteBackupSnapshot(expectedUserId: string): Promise
 		snapshot: {
 			players: players.value.items.map((item) => item.data),
 			currentRound: round.value.data,
-			history: readSnapshot().history,
+			history: history.value.items.map((item) => item.data),
 		},
 	};
+}
+
+/**
+ * 雲端歷史 CSV：歷史取自雲端（完成順序），欄位與格式交給既有的 historyToCsv。
+ * 讀取失敗時不產生 CSV，避免使用者下載到空檔而誤以為沒有賽果。
+ */
+export async function buildRemoteHistoryCsv(expectedUserId: string): Promise<RemoteHistoryCsvResult> {
+	const history = await fetchRemoteHistory(expectedUserId, { order: "asc" });
+	if (history.kind === "unauthorized") return unauthorizedFailure();
+	if (history.kind !== "ok" || history.value === undefined) {
+		return { ok: false, message: REMOTE_TRANSFER_MESSAGES.historyCsvFetchFailed };
+	}
+	return { ok: true, csv: historyToCsv(history.value.items.map((item) => item.data)) };
 }

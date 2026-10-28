@@ -34,7 +34,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
 - `/matchmaker/players` — 參賽者名單（milestone M1 = add-player-roster change，見 openspec archive）。**不在全站 navbar**，由 matchmaker 區段導覽抵達
 - `/matchmaker/history`（M7）、`/matchmaker/data`（M8）— 歷史賽果與資料匯入匯出，同樣不在全站 navbar
   - `/matchmaker/data` 登入態差異（B6／B7）：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），歷史取自本機（B8 前）；JSON 還原停用，改顯示說明；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 與清除本機資料不變
-  - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後只清本機歷史（`resetLocalMatchProgress()`，B7 後只移除 `matchmaker:history:v1`），保留本機 roster key；雲端的回合與分槽由後端 reset batch 一併刪除
+  - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後不清除任何本機 key（B8 起過渡用的本機歷史清除函式已刪除，本機資料是訪客時期的資料，留給之後的匯入）；雲端的名單、回合、分槽與歷史由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜（milestone M11 = matchmaker-player-stats change），同樣不在全站 navbar。
   統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`
   （球員範圍為「目前名單」與「歷史紀錄」的**聯集**，回傳已排序完成），呈現層為
@@ -54,7 +54,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
 - 登入後**回合與場次分槽**以雲端為準（B7：`useRoundStore` 選擇器切 `useRemoteRoundStore`；計分板帶 `?match=` 時 `useScoreboardStore` 切 `useRemoteMatchSlotStore`）；**送出比分由後端權威**（`POST /api/matchmaker/round/matches/:matchId/score`，評分、回合完成狀態、歷史、刪除分槽在同一個 batch，前端不逐人 PUT 評分）
 - 歷史讀取（歷史頁、統計頁、歷史 CSV）仍在本機，待 B8；過渡期登入時歷史寫入雲端但畫面讀本機，`useRemoteRoundStore` 的 `history` 恆為空陣列
 - 雲端模式下使用者操作不會改動本機 `matchmaker:roster:v1`（該 key 保留訪客時期名單，作為 B9 匯入來源）；但選擇器仍會掛載本機 hook（hooks 不可條件式呼叫），mount 時依既有逐筆降級規則讀取並寫回同一份名單
-- 後續 change 須知：登入態 JSON 還原目前停用，B9 決定其去留；B8 讓歷史頁與統計頁改讀雲端後，刪除 `resetLocalMatchProgress()`，`buildRemoteBackupSnapshot()` 的 `history` 改取雲端（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）
+- 後續 change 須知：登入態 JSON 還原目前停用，B9 決定其去留；過渡用的本機歷史清除函式已於 B8 刪除，`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）
 
 ### shadcn/ui
 
@@ -108,8 +108,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - `lib/sync/roster-api.ts`：名單 API 薄包裝，一律經 `requestJson`
   - `lib/sync/round-api.ts`：回合、場次分槽、送出比分的路徑字串與回應 schema 的唯一來源，一律經 `requestJson`，hook 不自行拼路徑
   - `lib/sync/round-command-queue.ts`：回合命令佇列（無 React 相依，由 `useRemoteRoundStore` 持有），單一在途、先進先出
-  - `lib/matchmaker/remote-transfer.ts`：資料頁雲端分支，含 `importRemoteRoster`、`buildRemoteBackupSnapshot`、`REMOTE_TRANSFER_MESSAGES`
-  - `lib/matchmaker/storage.ts` 的 `resetLocalMatchProgress()`：登入時重置只清本機歷史（回合與分槽已在雲端，由後端 reset batch 刪除）
+  - `lib/matchmaker/remote-transfer.ts`：資料頁雲端分支，含 `importRemoteRoster`、`buildRemoteBackupSnapshot`、`buildRemoteHistoryCsv`、`REMOTE_TRANSFER_MESSAGES`
   - **18 個純邏輯模組已移至核心套件 `@pickball/core`**（`scoreboard/{types,rules,reducer}`、`matchmaker/{types,allocation-types,allocation,candidates,duplication,pairing,rating-math,rating-types,rating,labels,round-types,round,history,history-range,transfer-types}`），這裡的舊路徑已不存在，且不留 re-export 轉址殼；一律從 `@pickball/core/<area>/<module>` 匯入。**它們的單元測試刻意留在 `lib/{scoreboard,matchmaker}/*.test.ts` 原位**（主 spec 以測試檔路徑為驗收錨點），不是漏搬。`next.config.ts` 以 `transpilePackages: ["@pickball/core"]` 讓 Next 轉譯該套件的 `.ts` 原始碼。新增純邏輯模組是否放核心套件，見 [`packages/pickball-core/CLAUDE.md`](../packages/pickball-core/CLAUDE.md)
   - **瀏覽器 I/O 擺放慣例**（M9 Final Review F-4 的 repo 級收斂，2026-09-03 定案）：`localStorage` 讀寫放 `lib/`（如 `matchmaker/round-storage.ts`、`scoreboard/storage.ts`）；`Blob`／`<a download>`／`File.text()` 等下載與選檔樣板放**元件層**（M8 design Decision 7，如 `components/matchmaker/downloadTextFile.ts`、`FileTextPicker.tsx`）。唯一例外：`lib/matchmaker/scene-canvas.ts`——canvas 繪製與 Blob 下載不可分割，理由見下方 TDD 例外清單與該檔檔頭
 - `data/` — `guide/`、`quiz/`、`tour/` 純 TS 資料檔
