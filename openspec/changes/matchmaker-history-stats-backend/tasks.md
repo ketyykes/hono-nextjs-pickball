@@ -78,13 +78,23 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：新增 `lib/sync/history-api.test.ts`（一個 it；`fetchRemoteHistory(expectedUserId, query)`，斷言 `expectedUserId` 原樣交給 `requestJson`）。確認紅燈
-- [ ] 4.2 GREEN（TDD）：新增 `lib/sync/history-api.ts`
-- [ ] 4.3 RED（TDD）：新增 `hooks/useRemoteHistory.test.tsx`（四個 it：spec 的三個＋B7.5 交接的「userId 變更時以新帳號重新載入歷史且不顯示前一帳號的歷史」；假時鐘固定 `now`；斷言 `X-Expected-User-Id`）。確認紅燈
-- [ ] 4.4 GREEN（TDD）：新增 `hooks/useRemoteHistory.ts`（design Decision 3、7：`{ enabled, userId, range, onUnauthorized }`、擁有者標記、請求序號只採最後一次、`userId` 為 null 視同停用）
-- [ ] 4.5 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteHistory` 未列入主 spec 而**真的轉紅**，貼出輸出
-- [ ] 4.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec 的對應句，只動這一句（B3／B5～B7 前例）；
+- [x] 4.1 RED（TDD）：新增 `lib/sync/history-api.test.ts`（一個 it；`fetchRemoteHistory(expectedUserId, query)`，斷言 `expectedUserId` 原樣交給 `requestJson`）。確認紅燈
+  - 紅燈紀錄（commit `edbe859`）：shell 原始輸出隨前一任 session 遺失，以 RED／GREEN 分開的 commit 作證；commit 訊息載有當時摘要：整檔載入失敗（`Failed to resolve import ./history-api`，`Test Files 1 failed`），1 個 it 無法執行，無先綠者。
+    機械複驗（2026-10-28 leader）：`git cat-file -e edbe859:nextjs-pickball/lib/sync/history-api.test.ts` 存在且 `import { fetchRemoteHistory } from "./history-api"`；`edbe859^` 與 `edbe859` 皆無 `lib/sync/history-api.ts`。
+- [x] 4.2 GREEN（TDD）：新增 `lib/sync/history-api.ts`
+  - 綠燈紀錄（commit `d47f318`）：2026-10-28 重跑單檔 `history-api.test.ts` 1/1 綠。
+- [x] 4.3 RED（TDD）：新增 `hooks/useRemoteHistory.test.tsx`（四個 it：spec 的三個＋B7.5 交接的「userId 變更時以新帳號重新載入歷史且不顯示前一帳號的歷史」；假時鐘固定 `now`；斷言 `X-Expected-User-Id`）。確認紅燈
+  - 紅燈紀錄（commit `1256905`）：shell 原始輸出隨前一任 session 遺失，以 RED／GREEN 分開的 commit 作證；commit 訊息載有當時摘要：整檔載入失敗（`Failed to resolve import ./useRemoteHistory`），4 個 it 皆無法執行，無先綠者。
+    機械複驗（2026-10-28 leader）：`1256905:nextjs-pickball/hooks/useRemoteHistory.test.tsx` 含四個 it（名稱與 spec 錨點逐字一致）且 `import { useRemoteHistory } from "./useRemoteHistory"`；`1256905^` 與 `1256905` 皆無 `hooks/useRemoteHistory.ts`。
+- [x] 4.4 GREEN（TDD）：新增 `hooks/useRemoteHistory.ts`（design Decision 3、7：`{ enabled, userId, range, onUnauthorized }`、擁有者標記、請求序號只採最後一次、`userId` 為 null 視同停用）
+  - 綠燈紀錄（commit `d3f7be3`）：2026-10-28 重跑單檔 `useRemoteHistory.test.tsx` 綠；四個檔逐檔 eslint exit 0。
+  - regression guard（commit `25f1215`，加入即綠，非 RED）：it「regression guard：enabled 由 false 改為 true 時開始載入，onUnauthorized 以最新的函式呼叫」——前一任 mutation 發現主 effect 依賴拿掉 `enabled`、`onUnauthorizedRef` 不更新兩條變異存活而補；既有 4 個 it 未動。
+- [x] 4.5 RED（既有守衛）：跑 `hooks/hooksInventory.test.ts`，確認因 `useRemoteHistory` 未列入主 spec 而**真的轉紅**，貼出輸出
+  - **4.6 commit 前未留存紅燈輸出**（前一任 session 因關機中斷，輸出遺失；4.6 已 commit，無法再自然重現，且不得改回主 spec 偽造紅燈）。
+    佐證：`git show f46b053^:openspec/specs/pickleball-guide-page/spec.md | grep -c useRemoteHistory` 為 0，而 `d3f7be3` 起 `hooks/useRemoteHistory.ts` 已存在——同步前守衛「hooks 目錄下每支 hook 都能在規格的歸屬清單中找到」的前提必然不成立。
+- [x] 4.6 GREEN（授權的主 spec 同步）：**本 task 明文授權**把 delta `specs/pickleball-guide-page/spec.md` 已定稿的歸屬清單句子原樣搬進主 spec 的對應句，只動這一句（B3／B5～B7 前例）；
   commit 訊息 `docs(openspec): 主 spec 歸屬清單同步 useRemoteHistory（B8 §4）`。重跑 4.5 轉綠。archive 時此段 MODIFIED 應為 no-op
+  - 完成（commit `f46b053`）：主 spec diff 僅該一句（+1／−1，插入 `` `useRemoteHistory` → match-history ``）。2026-10-28 重跑 `hooksInventory.test.ts` 綠（與 history-api、useRemoteHistory 合跑 3 檔／8 tests passed）。
 
 ## 5. 前端：雲端歷史與統計內容元件
 
