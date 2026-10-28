@@ -458,6 +458,40 @@ describe("remote-transfer", () => {
 		}
 	});
 
+	// 既有行為的 regression guard，加入即綠、非 RED：既有測試只涵蓋歷史與另兩個來源的交叉，
+	// 名單與回合互相交叉時若 401 判斷晚於另一方的失敗判斷，會誤回一般失敗而非未授權
+	it("regression guard：名單與回合交叉時 401 先於其他失敗判斷", async () => {
+		const routeFetch = (overrides: { players?: () => Response; round?: () => Response }) =>
+			vi.fn().mockImplementation(async (path: string) => {
+				if (path === "/api/matchmaker/round") {
+					return overrides.round?.() ?? new Response(JSON.stringify({ data: null, version: 0 }), { status: 200 });
+				}
+				if (path === HISTORY_ASC_PATH) return historyResponse(CLOUD_HISTORY);
+				return overrides.players?.() ?? listResponse(CLOUD_PLAYERS);
+			});
+		const crossings = [
+			{ unauthorizedSource: "players", failedSource: "round" },
+			{ unauthorizedSource: "round", failedSource: "players" },
+		] as const;
+
+		for (const { unauthorizedSource, failedSource } of crossings) {
+			vi.stubGlobal(
+				"fetch",
+				routeFetch({
+					[unauthorizedSource]: () => new Response("x", { status: 401 }),
+					[failedSource]: () => new Response("x", { status: 500 }),
+				}),
+			);
+
+			const crossed = await buildRemoteBackupSnapshot("user-a");
+
+			// 先擋掉成功分支，避免後續斷言被條件式跳過
+			if (crossed.ok) throw new Error("來源失敗時不應回傳快照");
+			expect(crossed.unauthorized).toBe(true);
+			expect(crossed.message).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+		}
+	});
+
 	it("雲端備份快照取得名單失敗時回傳錯誤、不產生快照", async () => {
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("x", { status: 500 })));
 		const result = await buildRemoteBackupSnapshot("user-a");
