@@ -13,7 +13,14 @@
 > 測試帳密不得寫進任何會被 commit 的檔案或訊息。it／test 名稱 MUST 與 delta spec「驗收」錨點逐字一致；測試一律顯式匯入。
 > **使用者定案（不得變更）**：匯入成功後**保留**本機資料；後端已有對戰分配機資料時**拒絕並提示**（不覆寫、不合併）；重複匯入不得產生重複歷史。
 > **訪客路徑零迴歸**：本機 reader（`roster`／`round-storage`／`match-slots`／`scoreboard/storage`）、`backup.ts`、`transfer-storage.ts`、`JsonBackupSection` 的本機分支一行不改；
-> 既有 it／test 的名稱與斷言一律不得修改，**唯一例外**：`tests/e2e/user-data/roster-sync.spec.ts` 刪除 B6 的「登入時 JSON 還原停用並顯示說明」（行為依本 change 改變）。
+> 既有 it／test 的名稱與斷言一律不得修改，**例外（僅限下列，皆為本 change 行為的必然結果，見 design Open Questions 4）**：
+> ① `tests/e2e/user-data/roster-sync.spec.ts` 刪除 B6 的「登入時 JSON 還原停用並顯示說明」（行為依本 change 改變）；
+> ② `hono-pickball/test/expected-user-guard.test.ts` 的 `SAMPLES` 補 `"POST /api/import"` 一條（合法匯入 body）、「列舉出的使用者資料路由恰與守衛樣本表一致」的 `toHaveLength(14)` 改為 15（B7.5 刻意設計的交接紅燈）；
+> ③ `packages/pickball-core/test/module-boundary.test.ts` 的 `CORE_MODULES` 加 `"api/import"`；
+> ④ `tests/e2e/user-data/roster-sync.spec.ts` 與 `tests/e2e/user-data/history-sync.spec.ts` 的常數 `JSON_RESTORE_DISABLED_TEXT` 改名為 `JSON_CLOUD_IMPORT_HINT_TEXT`、值改為 `data-transfer` delta 表格中雲端 JSON 匯入的說明文字（四個 test 以它作為「已切到雲端分支」的同步點，斷言的位置與語意不變；其餘斷言一行不改）。
+>
+> **預期帳號（B7.5 交接）**：`src/routes/import.ts` 開頭 `use("*", localAuth, requireSession, requireExpectedUser)`；前端 `importLocalData(expectedUserId, payload)`（第一參數）；元件以點擊當下 `useSession()` 的 user id 呼叫、`unauthorized` 時 `refresh()`；
+> E2E 直接打 API 時一律帶 `tests/e2e/helpers/user-data.ts` 的 `expectedUserHeaders()`。後端新測試的登入 seed 用 `test/helpers/matchmaker-fixtures.ts`（不再複製 `seedAndSignIn`）。
 
 ## 1. 對齊 main＋Context7 查證（不寫產品程式碼）
 
@@ -39,19 +46,21 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `test/local-import.test.ts`，spec「本機資料匯入雲端的 API」中該檔的全部 9 個 it。確認紅燈並貼出輸出；
-  **「auth 停用…回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**
+- [ ] 3.1 RED（TDD）：新增 `test/local-import.test.ts`，spec「本機資料匯入雲端的 API」中該檔的全部 11 個 it（含 apply §1 新增的「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」「匯入的歷史可被歷史端點依區間與兩種排序讀回」）；
+  同時依檔頭例外 ② 修改 `test/expected-user-guard.test.ts`（`SAMPLES` 補 `POST /api/import`、`toHaveLength(14)` → 15）。確認紅燈並貼出輸出；
+  **「auth 停用…回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**；守衛檔三個 it 以實跑結果點名真紅／先綠
 - [ ] 3.2 GREEN（TDD）：新增 `src/import/local-import-repository.ts`（design Decision 1、2；守衛沿用 B7 `batch-guard.ts`，SHALL NOT 另寫一份守衛或錯誤分類）、
-  `src/routes/import.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession)`、`zValidator` hook 回 400）；`src/index.ts` 以 `app.route("/api/import", importRoutes)` 掛載。
+  `src/routes/import.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession, requireExpectedUser)`、`onError(userDataOnError)`、`zValidator` 以 `invalidBodyHook` 回 400）；`src/index.ts` 以 `app.route("/api/import", importRoutes)` 掛載。
+  json_each 插入以 `db.insert(<table>).select(sql\`… FROM json_each(${json}) WHERE true ORDER BY key\`)` 撰寫（不可用 `db.run`／`db.all`，見 design Decision 2）；獨立計分板以 `onConflictDoNothing().returning({ userId })`。
   3.1 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
-- [ ] 3.3 REFACTOR：四條 `json_each` 插入的組裝是否值得抽成 helper；無壞味道則註記 skipped
+- [ ] 3.3 REFACTOR：三條 `json_each` 插入的組裝是否值得抽成 helper；`hono-pickball/CLAUDE.md` 後續須知第 3 點（第二個守衛 batch 呼叫端出現時抽 `guardedBatch`）是否現在處理；無壞味道則註記 skipped
 
 ## 4. 前端：匯入內容與結果分類
 
 Depends on: §3
 
 - [ ] 4.1 RED（TDD）：新增 `lib/sync/local-import.test.ts`，spec 該檔的五個 it（以 happy-dom 的 localStorage seed 五個 key；斷言「呼叫前後逐字相同」時使用不含損毀資料的 seed）。確認紅燈
-- [ ] 4.2 GREEN（TDD）：新增 `lib/sync/local-import.ts`（design Decision 3、4；請求經 `requestJson`）
+- [ ] 4.2 GREEN（TDD）：新增 `lib/sync/local-import.ts`（design Decision 3、4、4.5；請求經 `requestJson`；`importLocalData(expectedUserId, payload)` 以第一參數原樣交給 `requestJson`）
 
 ## 5. E2E 與畫面接線
 
@@ -59,11 +68,12 @@ Depends on: §4
 
 - [ ] 5.1 RED（E2E）：新增 `tests/e2e/user-data/local-import.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()` 並清空本機 storage），
   spec 錨點的全部 5 個 test（本機資料以 `page.addInitScript` 或 `page.evaluate` 在開啟頁面前寫入；JSON 備份檔以 fixture 產生，不含任何帳密）；
-  同時**刪除** `roster-sync.spec.ts` 的「登入時 JSON 還原停用並顯示說明」（commit 訊息載明原因與 spec 出處）。
+  同時**刪除** `roster-sync.spec.ts` 的「登入時 JSON 還原停用並顯示說明」（commit 訊息載明原因與 spec 出處），並依檔頭例外 ④ 改寫兩檔的同步點常數；
+  另新增兩個元件單元測試（RED，TDD）：`components/matchmaker/LocalDataImportSection.test.tsx`「匯入以點擊當下的帳號送出且未授權時刷新 session」、`components/matchmaker/JsonBackupSection.test.tsx`「雲端 JSON 匯入以點擊當下的帳號送出且未授權時刷新 session」，以單檔 vitest 確認紅燈。
   以單檔執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/local-import.spec.ts`（前後清殘留 dev server），貼出輸出
 - [ ] 5.2 GREEN（例外層：I/O 樣板元件與頁面，以 5.1 驗收）：新增 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`（本機讀取在 effect 內）；
   `app/matchmaker/data/page.tsx` 掛載區塊（雲端模式）、`app/matchmaker/players/page.tsx` 掛載提示（雲端模式）；`JsonBackupSection.tsx` 雲端分支改為匯入（本機分支不動）。
-  5.1 全綠；不得以 `waitForTimeout` 取代狀態等待
+  5.1 全綠（E2E 5 條、元件 2 個 it，以及授權改寫同步點的既有 4 條 E2E）；不得以 `waitForTimeout` 取代狀態等待
 - [ ] 5.3 REFACTOR：兩個元件的結果文案是否集中為具名常數（比照 `TRANSFER_MESSAGES`）；無壞味道則註記 skipped
 
 ## 6. 文件同步與總驗收
@@ -78,5 +88,5 @@ Depends on: §5
 - [ ] 6.5 驗收（指令）C4：`pnpm build` exit 0
 - [ ] 6.6 驗收（指令）C5：`db:generate` 無新檔
 - [ ] 6.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
-  既有 test 全數原樣通過（扣除 5.1 授權刪除的 1 條），新增 5 個 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
+  既有 test 全數通過（扣除 5.1 授權刪除的 1 條），新增 5 個 test 全 passed（user-data 40 − 1 + 5 = 44），無因缺帳密 skip。依 project 分開跑（webkit、mobile-safari 各分 3 shard）。結果寫在本 task 後方；失敗不得自行判定為雜訊
 - [ ] 6.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate local-data-import --strict` 通過

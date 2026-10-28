@@ -9,9 +9,9 @@
 >
 > **後端 API 授權覆蓋表**：
 >
-> | 端點 | 未登入 401 | 他人資料被拒 | auth 停用 404 |
-> |------|-----------|--------------|---------------|
-> | `POST /api/import` | 未登入呼叫匯入端點回 401 | B 的匯入不受 A 的資料影響且不改動 A | auth 停用且無 DB binding 時匯入端點回 404 |
+> | 端點 | 未登入 401 | 他人資料被拒 | auth 停用 404 | 預期帳號缺少／不符 401 |
+> |------|-----------|--------------|---------------|------------------------|
+> | `POST /api/import` | 未登入呼叫匯入端點回 401 | B 的匯入不受 A 的資料影響且不改動 A | auth 停用且無 DB binding 時匯入端點回 404 | 預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入（`local-import.test.ts`）；`expected-user-guard.test.ts` 的「每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變」「缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變」「列舉出的使用者資料路由恰與守衛樣本表一致」（樣本表補 `POST /api/import`，14 → 15） |
 
 ## user-data-sync
 
@@ -27,7 +27,10 @@
 | 同一份資料重複匯入時第二次回 409 且歷史不重複 | 重複匯入同一份資料 | 200 → 409；歷史筆數不變 | 冪等 | integration |
 | 雲端已有獨立計分板時略過該段且不覆寫 | 雲端已有獨立計分板時略過該段 | `skipped`；原值與 version 4；名單已寫入 | 拒絕範圍的界線 | integration |
 | 重複 id、孤兒分槽、空匯入或版本不符的請求回 400 且不寫入 | 不合法的匯入請求 | 七者 400；無寫入 | 錯誤路徑 | integration |
-| 300 位參賽者與 2000 筆歷史可一次匯入 | 大量資料以常數個陳述式匯入 | 200；筆數相符 | 100 參數上限下逐筆展開必失敗——`json_each` 的證據 | integration |
+| 300 位參賽者與 2000 筆歷史可一次匯入 | 大量資料以常數個陳述式匯入 | 200；筆數相符 | 100 參數上限下逐筆展開必失敗——`json_each` 的證據（apply §1.4 實測：一次 200 筆 `values` 即拋錯） | integration |
+| 預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入 | 匯入 API：預期帳號與 session 不符時匯入回 401 且雲端不寫入 | 三種標頭皆 401＋body；A、B 每張使用者資料表零列 | B7.5 交接；寫錯帳號的後果最大。sub-app 不存在時回 404 ≠ 401，真紅 | integration |
+| 匯入的歷史可被歷史端點依區間與兩種排序讀回 | 匯入 API：匯入的歷史可依區間與排序讀回 | desc／asc 順序；from／to 篩選；data 深度相等、version 1 | B8 交接：`played_at` 與插入順序；`played_at` 寫 0 或拿掉 `ORDER BY key` 時轉紅 | integration |
+| （既有，授權擴充樣本）每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變；缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變；列舉出的使用者資料路由恰與守衛樣本表一致 | 匯入 API：守衛樣本表含匯入端點 | 新樣本 401；列舉 15 條 | 「列舉…一致」因列舉 14 ≠ 樣本 15 而**真紅**；另兩個 it 對新樣本預期先綠（路由不存在時 404 ≠ 401，實際應紅——以實跑為準，先綠者點名標 regression guard） | integration |
 | LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入 | 共用的匯入請求 schema | 只有合法請求通過 | 契約先定；模組不存在 → 紅 | unit |
 
 ## data-transfer
@@ -37,7 +40,8 @@
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
 | （既有，B6～B8）雲端備份快照的參賽者、回合與歷史皆取自雲端；雲端歷史 CSV 以雲端歷史依完成順序產生；登入時歷史 CSV 匯出的內容來自雲端；登入時 JSON 匯出的參賽者來自雲端 | 對應 Scenario | 原樣通過 | regression guard | unit |
-| 登入時以 JSON 備份匯入到空的雲端且不寫入本機 | 登入時以 JSON 備份匯入到空的雲端 | 成功訊息；參賽者頁 2 位；本機名單不變 | 取代 B6 的「JSON 還原停用」（tasks 授權刪除該 test） | e2e |
+| 登入時以 JSON 備份匯入到空的雲端且不寫入本機 | 登入時 JSON 還原停用（改寫）；登入資料工具：以 JSON 備份匯入到空的雲端 | `json-backup-import-input` 不存在、B6 說明不存在、`json-backup-cloud-import-input` 與新說明存在；成功訊息；參賽者頁 2 位；本機名單不變 | 取代 B6 的「JSON 還原停用」（tasks 授權刪除該 test） | e2e |
+| 雲端 JSON 匯入以點擊當下的帳號送出且未授權時刷新 session | 登入資料工具：雲端 JSON 匯入以點擊當下的帳號送出且未授權時刷新 session | 標頭為 A；未授權訊息；`refresh` 一次；本機不變 | B7.5 一次性操作規則；雲端分支目前是停用說明 → 真紅 | unit（元件，happy-dom） |
 
 ### Requirement: 登入後匯入本機資料到雲端
 
@@ -52,6 +56,7 @@
 | 重複匯入時顯示雲端已有資料且歷史不重複 | 重複匯入被拒絕且不產生重複歷史 | 拒絕文案；歷史筆數不變 | 冪等的端到端證據 | e2e |
 | 雲端名單為空且本機有資料時參賽者頁顯示匯入提示 | 同名 | 第一次顯示、匯入後不顯示 | 入口 | e2e |
 | 本機沒有資料時匯入區塊不提供匯入按鈕 | 本機沒有資料時不提供匯入按鈕 | 說明文字；無按鈕 | 空狀態 | e2e |
+| 匯入以點擊當下的帳號送出且未授權時刷新 session | 匯入本機資料：匯入以點擊當下的帳號送出且未授權時刷新 session | 標頭為 A；未授權訊息；`refresh` 一次；本機五 key 不變 | B7.5 一次性操作規則；元件不存在 → 紅 | unit（元件，happy-dom） |
 
 ## 指令驗收（非 Vitest，tasks 中標為「驗收（指令）」）
 
@@ -62,13 +67,13 @@
 | C3 | （單元） | `pnpm test` | 三組皆綠；數字寫在 tasks |
 | C4 | （建置） | `pnpm build` | exit 0 |
 | C5 | （migration） | `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空 | 無新檔（本 change 不改 schema） |
-| C6 | （E2E） | 依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project） | 既有 test 全數原樣通過（扣除授權刪除的 1 條）；user-data 新增 5 條（`local-import.spec.ts`）全 passed；無因缺帳密 skip |
+| C6 | （E2E） | 依 project 分開跑：`pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p>`（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`） | 既有 test 全數通過（扣除授權刪除的 1 條；授權修改同步點常數的 4 條照常通過）；user-data 新增 5 條（`local-import.spec.ts`）全 passed，總數 40 − 1 + 5 = 44；五個 browser project 各 145 不變；無因缺帳密 skip |
 | C7 | （規格） | `DO_NOT_TRACK=1 openspec validate local-data-import --strict` | valid |
 
 ## Checklist
 
 - [x] 每個 Requirement 至少一列
 - [x] 每個 Scenario 至少一列（既有 Scenario 以「（既有）」列合併）
-- [x] 新端點三類授權測試皆列於覆蓋表
+- [x] 新端點四類授權測試皆列於覆蓋表（apply §1 補第四欄：預期帳號缺少／不符）
 - [x] 使用者定案（保留本機、拒絕不覆寫不合併、冪等）各有至少一個 integration 與一個 e2e 守住
-- [x] 允許刪除的既有 test 只有一條（B6 的 JSON 還原停用），標明原因
+- [x] 允許刪除的既有 test 只有一條（B6 的 JSON 還原停用），標明原因；授權修改的既有測試見 design Open Questions 4
