@@ -149,14 +149,23 @@ Depends on: §6
 
 Depends on: §7
 
-- [ ] 8.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「歷史讀取待 B8」敘述（登入後歷史、統計、匯出皆讀雲端；區間界線由前端以 `rangeBounds` 計算）、hooks 歸屬加 `useRemoteHistory`、`lib/sync/history-api.ts`；
+- [x] 8.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 改寫「歷史讀取待 B8」敘述（登入後歷史、統計、匯出皆讀雲端；區間界線由前端以 `rangeBounds` 計算）、hooks 歸屬加 `useRemoteHistory`、`lib/sync/history-api.ts`；
   `hono-pickball/CLAUDE.md` 路由約定加 `GET /api/matchmaker/history` 與「後端不計算區間（UTC）」說明；design「交接給 B9」三點寫入適當段落
-- [ ] 8.2 regression guard（平局）：單獨執行 `lib/matchmaker/player-stats.test.ts` 與 `components/matchmaker/PlayerStatsTable.test.tsx`，貼出 draw-followups 四個 it 皆 passed 的輸出
-- [ ] 8.3 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 8.4 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 8.5 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
-- [ ] 8.6 驗收（指令）C4：`pnpm build` exit 0
-- [ ] 8.7 驗收（指令）C5：`db:generate` 無新檔
+  - 完成（commit `10b91ee`）：`nextjs-pickball/CLAUDE.md`（`/matchmaker/data` 登入態、歷史頁與統計頁的模式分支、儲存分流段改寫為登入後歷史以雲端為準、交接給 B9 三點、hooks 歸屬 `useRemoteHistory`、`lib/sync/history-api.ts`、新元件）；`hono-pickball/CLAUDE.md`（範圍例外、守衛樣本 13→14、路由約定新增歷史讀取 API 與「後端不計算區間（UTC）」、後續 change 須知改寫並新增交接給 B9）。`rg resetLocalMatchProgress nextjs-pickball` 無輸出（exit 1）；函式名僅留在 `hono-pickball/CLAUDE.md` 交接第 3 點原文。
+- [x] 8.2 regression guard（平局）：單獨執行 `lib/matchmaker/player-stats.test.ts` 與 `components/matchmaker/PlayerStatsTable.test.tsx`，貼出 draw-followups 四個 it 皆 passed 的輸出
+  - 輸出（`test --run lib/matchmaker/player-stats.test.ts components/matchmaker/PlayerStatsTable.test.tsx --reporter=verbose`，2 檔／27 passed）：
+    `✓ player-stats.test.ts > computePlayerStats > 出場數、勝場與敗場依歷史紀錄正確加總`、`✓ … > 平局紀錄計為和局而非雙方各一敗場`、`✓ … > 出場數為零時勝率為零而非 NaN`、`✓ PlayerStatsTable.test.tsx > PlayerStatsTable > 勝負和欄依序顯示勝場敗場與和局三個數字`。
+- [x] 8.3 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - `pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`（兩段）、`packages/pickball-core typecheck`（兩段）皆 exit 0。
+- [x] 8.4 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
+  - `pnpm lint`（持鎖）exit 0：0 errors／3 warnings（`useQuiz.ts:33`、`useRosterStore.ts:130`、`useScoreboardStore.ts:50` 的 no-unused-vars），與基線相同。
+- [x] 8.5 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
+  - `pnpm test`（持鎖）exit 0：前端 105 檔／1054（基線 100／1010，+5／+44）；後端 23 檔／165（基線 22／157，+1／+8）；核心 8 檔／16（基線 6／13，+2／+3）。
+- [x] 8.6 驗收（指令）C4：`pnpm build` exit 0
+  - `pnpm build`（持鎖）exit 0：前端 Compiled successfully、12/12 靜態頁；後端 `tsc --noEmit && wrangler deploy --dry-run`（Total Upload 2420.92 KiB／gzip 405.47 KiB，`--dry-run: exiting now.`）。
+- [x] 8.7 驗收（指令）C5：`db:generate` 無新檔
+  - `db:generate`：「No schema changes, nothing to migrate」；`git status --porcelain hono-pickball/drizzle` 為空。
 - [ ] 8.8 驗收（指令）C6：`.dev.vars` 齊備下，依 test-plan C6 依 project 分開執行（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`；持高負載鎖），前後清殘留 dev server；
   既有 test 全數原樣通過，新增 6 個 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 8.9 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict` 通過
+- [x] 8.9 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict` 通過
+  - `DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict`（repo root）：`Change 'matchmaker-history-stats-backend' is valid`，exit 0。
