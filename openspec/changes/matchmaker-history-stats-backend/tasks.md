@@ -165,7 +165,11 @@ Depends on: §7
   - `pnpm build`（持鎖）exit 0：前端 Compiled successfully、12/12 靜態頁；後端 `tsc --noEmit && wrangler deploy --dry-run`（Total Upload 2420.92 KiB／gzip 405.47 KiB，`--dry-run: exiting now.`）。
 - [x] 8.7 驗收（指令）C5：`db:generate` 無新檔
   - `db:generate`：「No schema changes, nothing to migrate」；`git status --porcelain hono-pickball/drizzle` 為空。
-- [ ] 8.8 驗收（指令）C6：`.dev.vars` 齊備下，依 test-plan C6 依 project 分開執行（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`；持高負載鎖），前後清殘留 dev server；
+- [x] 8.8 驗收（指令）C6：`.dev.vars` 齊備下，依 test-plan C6 依 project 分開執行（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`；持高負載鎖），前後清殘留 dev server；
   既有 test 全數原樣通過，新增 6 個 test 全 passed，無因缺帳密 skip。結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - 結果（2026-10-28，HEAD `10b91ee` 的程式碼；每次 run 各自持鎖、load 4.2～9.0、前後清殘留）：`--list` 五個 browser project 各 145（17 檔）與基線相符，user-data 40（5 檔）＝基線 34＋6。
+    chromium 145 passed；firefox 133 passed／12 skipped；mobile-chrome 143 passed／2 skipped；user-data 40 passed；webkit 1/3 44＋5 skip、2/3 41＋7 skip、3/3 48；mobile-safari 1/3 44＋5 skip、2/3 41＋7 skip、3/3 48。**全部 failed 0、flaky 0**；webkit `quiz.spec.ts:49` 亦 passed。
+    skip 皆為 spec 內既有的「只在 chromium 跑一次」條件（api-health 2、auth-proxy 2、auth-session 1、navbar-rwd 7），無因缺帳密 skip；chromium 的 auth-proxy 兩條 passed。
+    `history-sync.spec.ts` 6 個 test 全 passed（登入時瀏覽歷史頁只發出 GET 且不改動本機歷史／登入後完成的對戰由雲端顯示在歷史頁且不寫入本機／雲端歷史載入失敗時歷史頁顯示錯誤提示／登入時計時回合的平局在統計頁計為和局／登入時瀏覽統計頁只發出名單與歷史的讀取請求／登入時歷史 CSV 匯出的內容來自雲端）；既有 34 個 user-data test 原樣通過。
 - [x] 8.9 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict` 通過
   - `DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict`（repo root）：`Change 'matchmaker-history-stats-backend' is valid`，exit 0。
