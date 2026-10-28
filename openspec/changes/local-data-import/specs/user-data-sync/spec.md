@@ -93,7 +93,8 @@ D1 每條陳述式最多 100 個參數、每個參數最多 2MB（design Decisio
 #### Scenario: 匯入 API：大量資料以常數個陳述式匯入
 
 - **WHEN** 匯入 300 位參賽者與 2,000 筆歷史
-- **THEN** 回 200；兩表筆數分別為 300 與 2,000
+- **THEN** 回 200；兩表筆數分別為 300 與 2,000，且列的順序與 `match_id` 依陣列順序
+- **AND** 另一次匯入的單段 JSON 參數超過 D1 單一參數上限（2MB）時回 500，且該使用者在各使用者資料表與 `sync_batch_guards` 皆無任何列（整批回滾；非守衛錯誤不被分類為 409）
 - **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「300 位參賽者與 2000 筆歷史可一次匯入」
 
 #### Scenario: 匯入 API：共用的匯入請求 schema

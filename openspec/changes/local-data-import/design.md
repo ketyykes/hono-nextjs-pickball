@@ -153,3 +153,6 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
 6. Open Questions 3（參賽者頁提示在 `load-failed` 時）：維持建議——提示只在名單 `synced` 時渲染；`loading`／`load-failed` 時參賽者頁本來就以 `SyncStatusNotice` 取代整段內容，提示自然不出現。
 7. （apply §2，2026-10-28）Implementer（sonnet）：132090c RED（模組不存在，2 個 it 皆真紅、無先綠）→ 9e3a76a GREEN（`api/import.ts`、`CORE_MODULES`）→ 5dc4637 tasks 註記；REFACTOR skipped。Stage 1（sonnet）PASS。
    Stage 2（opus）第一輪 FAIL（src 無缺陷；12 條非等價存活：空匯入漏判 currentRound、去重鍵改 name、current 的 matchId 放寬為 falsy、current／matches 可省略、回應筆數小數／負數、回應欄位可省略）→ 2e327c0 regression guard（新增兩個 it 與 `expectTypeOf`）→ 複審 PASS（12 條全紅、抽查 10 條仍紅、4 條等價對照綠）。§2 完成。
+8. （apply §3，2026-10-28）Implementer（sonnet）：fac4d74 RED（local-import 10 真紅、先綠 1：停用 404；守衛檔 4 真紅）→ 7cb53dd GREEN → 13ccdf0、31a0c1e regression guard → af57946 REFACTOR（抽 `selectFromJsonEach`；回合與獨立計分板也走 json_each 使 batch 恆為 7 條；`guardedBatch` 不抽，理由見 tasks 3.3）。Stage 1（sonnet）PASS。
+   Stage 2（opus，84 條變異）第一輪 FAIL：6 條非等價存活（歷史 `ORDER BY matchId`、歷史／分槽 `match_id` 欄位寫錯、`played_at` +1ms、`updated_at` 無上界、catch 一律回 conflict 使 500 被吞成 409）。等價判定：拿掉 `ORDER BY key`（json_each 原生依索引輸出，保留為防禦寫法）、歷史依 playedAt 排序、分槽 key DESC。
+   **leader 裁定**：「500 不被吞成 409」併入既有 it「300 位參賽者與 2000 筆歷史可一次匯入」，delta Scenario「匯入 API：大量資料以常數個陳述式匯入」補一行 AND（單段 JSON > 2MB 回 500 且整批回滾），與 design Risks 一致，不新增 it 名稱。
