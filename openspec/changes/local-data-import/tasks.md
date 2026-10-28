@@ -43,8 +43,18 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/import.test.ts`，it「LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入」。確認紅燈
-- [ ] 2.2 GREEN（TDD）：新增 `src/api/import.ts`（design Decision 6）；`CORE_MODULES` 加 `api/import`
+- [x] 2.1 RED（TDD）：新增 `packages/pickball-core/test/api/import.test.ts`，it「LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入」。確認紅燈
+  - 完成（RED commit `132090c`）：單檔 `pnpm --filter ./packages/pickball-core test --run test/api/import.test.ts` 紅燈輸出：
+    `FAIL test/api/import.test.ts` / `Error: Cannot find module '../../src/api/import' imported from .../test/api/import.test.ts` / `Test Files 1 failed (1)` / `Tests no tests`。
+  - 機械複驗：`git show 132090c^:packages/pickball-core/test/api/import.test.ts` 與 `git show 132090c^:packages/pickball-core/src/api/import.ts` 皆 fatal（RED 前兩檔均不存在），紅燈為真。
+  - 兩個 it：「LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入」（錨點 it，涵蓋 spec 全部拒絕條件、只有獨立計分板與完成場次無分槽等合法請求）；
+    另加「LocalImportResponseSchema 只接受固定的回應形狀」（回應 schema 斷言）。兩者在模組不存在時整檔無法載入，無先綠者（無 regression guard）。
+- [x] 2.2 GREEN（TDD）：新增 `src/api/import.ts`（design Decision 6）；`CORE_MODULES` 加 `api/import`
+  - 完成（GREEN commit `9e3a76a`）：`src/api/import.ts` 重用 `BackupSchema`／`MatchSlotSchema`／`ScoreboardStateSchema`；`CORE_MODULES` 加 `api/import`（檔頭例外 ③）。
+    核心全套 9 檔 19 tests 全綠；`pnpm --filter ./packages/pickball-core typecheck` 與 `pnpm -r exec tsc --noEmit` 皆 exit 0。REFACTOR：無壞味道，skipped。
+  - mutation（對 `src/api/import.ts`，單檔測試，每次還原且 `git status` 乾淨）：14 條必轉紅全數轉紅——重複參賽者 id／重複歷史 matchId／重複分槽 matchId／孤兒分槽／已完成場次分槽／currentRound 為 null 略過分槽檢查／
+    空匯入檢查移除／空匯入漏判獨立計分板／`version` 放寬（request 層 `version: z.number()`，另在 `transfer-types.ts` 改 `z.number()` 亦轉紅）／`current` 允許非 null matchId／回應 `scoreboardCurrent` 列舉少 `skipped`、少 `none`／回應 `players` 允許負數／回應 `round` 改 `z.any()`。
+    等價對照 3 條皆維持綠：`Array.from(new Set(...)).length` 改寫、`isEmpty` 條件順序對調、`isEmpty` 拿掉「分槽為空」（等價：有分槽必有 currentRound 或已因孤兒被拒）。
 
 ## 3. 後端：匯入 API
 
