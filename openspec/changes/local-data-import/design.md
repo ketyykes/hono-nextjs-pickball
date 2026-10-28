@@ -156,3 +156,5 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
 8. （apply §3，2026-10-28）Implementer（sonnet）：fac4d74 RED（local-import 10 真紅、先綠 1：停用 404；守衛檔 4 真紅）→ 7cb53dd GREEN → 13ccdf0、31a0c1e regression guard → af57946 REFACTOR（抽 `selectFromJsonEach`；回合與獨立計分板也走 json_each 使 batch 恆為 7 條；`guardedBatch` 不抽，理由見 tasks 3.3）。Stage 1（sonnet）PASS。
    Stage 2（opus，84 條變異）第一輪 FAIL：6 條非等價存活（歷史 `ORDER BY matchId`、歷史／分槽 `match_id` 欄位寫錯、`played_at` +1ms、`updated_at` 無上界、catch 一律回 conflict 使 500 被吞成 409）。等價判定：拿掉 `ORDER BY key`（json_each 原生依索引輸出，保留為防禦寫法）、歷史依 playedAt 排序、分槽 key DESC。
    **leader 裁定**：「500 不被吞成 409」併入既有 it「300 位參賽者與 2000 筆歷史可一次匯入」，delta Scenario「匯入 API：大量資料以常數個陳述式匯入」補一行 AND（單段 JSON > 2MB 回 500 且整批回滾），與 design Risks 一致，不新增 it 名稱。
+   → fd2ccda regression guard（歷史 `match_id` 依 rowid 順序、`played_at` 精確值、`GET /slots/m1`、`updated_at` 上界、單段 >2MB 回 500 且零列、data 特殊字元往返）＋ c9386e2（`results[5]` 註解）→ 複審 PASS（6 條全紅、抽查 14 條仍紅、等價對照綠）。
+   編號對照（fd2ccda 訊息與 tasks 3.2 註記沿用 Implementer 自編號）：Implementer L26＝Reviewer L50（歷史 `match_id`）、Implementer L34＝Reviewer L26（`played_at` +1）、Implementer L50＝Reviewer L34（`updated_at`）；其餘同號。§3 完成。後端全套 24 檔／177。
