@@ -178,7 +178,15 @@ Depends on: §7
 
 Depends on: §8（Final Code Review 結果見 design Open Questions 13）
 
-- [ ] 8.10 RED（TDD）：核心 `test/matchmaker/history-range-bounds.test.ts` 新增 it「rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema」（沿用檔內 now 樣本，含週一與跨月週）；
+- [x] 8.10 RED（TDD）：核心 `test/matchmaker/history-range-bounds.test.ts` 新增 it「rangeBounds 產生的每個區間界線皆通過 HistoryQuerySchema」（沿用檔內 now 樣本，含週一與跨月週）；
   後端 `test/matchmaker-history.test.ts` 新增 it「from 等於 to 時回 200、items 為空且 total 為全部筆數」；核心 `test/api/history.test.ts` 本 change 新增的 it 改名為「HistoryQuerySchema 拒絕 from 大於 to 且 HistoryListResponseSchema 接受平局紀錄」，`{ from: "0", to: "0" }` 的斷言改為通過並補一條 `{ from: "1", to: "0" }` 失敗（該 it 為本 change §2 新增，非 main 既有 it）。各自單檔實跑貼紅燈
-- [ ] 8.11 GREEN（TDD）：`packages/pickball-core/src/api/history.ts` 的 refine 改為 `from <= to`（含 JSDoc 與錯誤訊息）；三檔單檔綠、後端與核心全套綠（持鎖）、三段 typecheck exit 0
-- [ ] 8.12 設定層（文件）：`hono-pickball/CLAUDE.md` 的「同時給兩者時 `from` 必須小於 `to`」「`from >= to`」改為不大於／`from > to`；`openspec validate --strict` 通過
+  - 完成（commit `bdeb124`）：三個變動皆真紅，無 regression guard。核心 `history-range-bounds.test.ts`（3 tests／1 failed）：`AssertionError: now=2026-08-01T02:30:00.000Z range=thisMonth query={"from":"1785081600000","to":"1785081600000"}: expected false to be true`；
+    核心 `api/history.test.ts`（1 failed）：`test/api/history.test.ts:33`（`{ from: "100", to: "100" }` 斷言改為 true 處）`expected false to be true`（同一個 it 先在 100／100 失敗，後面的 `"0","0"` 與 `"1","0"` 斷言因此尚未執行；為補齊契約一併把 100／100 由 false 改 true，否則 GREEN 後與放寬後的行為矛盾）；
+    後端 `matchmaker-history.test.ts`（9 tests／1 failed）：`× from 等於 to 時回 200、items 為空且 total 為全部筆數`，`AssertionError: expected 400 to be 200`。
+- [x] 8.11 GREEN（TDD）：`packages/pickball-core/src/api/history.ts` 的 refine 改為 `from <= to`（含 JSDoc 與錯誤訊息）；三檔單檔綠、後端與核心全套綠（持鎖）、三段 typecheck exit 0
+  - 完成（commit `32a3c0a`）：`src/api/history.ts` refine 改 `from <= to`，JSDoc 與錯誤訊息改為「from 不得大於 to」（`rg "from 必須小於 to"` 全 repo 無其他引用）。三檔單檔綠（核心 3／1 tests、後端 9 tests）；
+    持鎖全套：後端 23 檔／166（原 165，+1）、核心 8 檔／17（原 16，+1）；`pnpm -r exec tsc --noEmit`、hono typecheck、core typecheck 皆 exit 0；鎖已 release。REFACTOR skipped（無壞味道）。
+    變異驗證（harness 在 /tmp，不入 repo；每條皆過 `src.count(old)==1`、`new != old`、`git diff --stat` 有輸出，還原後 `git status --porcelain` 為空）：
+    改回 `<`：range-bounds 紅、api/history 紅；改 `>=`：range-bounds 紅、api/history 紅；拿掉 refine 條件（改為 `true`）：range-bounds 綠、api/history 紅（`from=300&to=200` 擋不住）；等價對照（只改錯誤訊息）：兩檔皆綠。
+- [x] 8.12 設定層（文件）：`hono-pickball/CLAUDE.md` 的「同時給兩者時 `from` 必須小於 `to`」「`from >= to`」改為不大於／`from > to`；`openspec validate --strict` 通過
+  - 完成（commit `e0cbcb9`）：`hono-pickball/CLAUDE.md` 改為「`from` 不得大於 `to`（相等為合法的空區間…）」與「`from > to`」；`rg "from < to|from >= to|小於 .?to"` 於兩份 CLAUDE.md 與核心 `src` 無輸出（exit 1）；`DO_NOT_TRACK=1 openspec validate matchmaker-history-stats-backend --strict` 通過。
