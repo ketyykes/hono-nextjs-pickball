@@ -64,14 +64,41 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `test/local-import.test.ts`，spec「本機資料匯入雲端的 API」中該檔的全部 11 個 it（含 apply §1 新增的「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」「匯入的歷史可被歷史端點依區間與兩種排序讀回」）；
+- [x] 3.1 RED（TDD）：新增 `test/local-import.test.ts`，spec「本機資料匯入雲端的 API」中該檔的全部 11 個 it（含 apply §1 新增的「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」「匯入的歷史可被歷史端點依區間與兩種排序讀回」）；
   同時依檔頭例外 ② 修改 `test/expected-user-guard.test.ts`（`SAMPLES` 補 `POST /api/import`、`toHaveLength(14)` → 15）。確認紅燈並貼出輸出；
   **「auth 停用…回 404」在路由不存在時同樣是 404，預期先綠——點名並標 regression guard**；守衛檔三個 it 以實跑結果點名真紅／先綠
-- [ ] 3.2 GREEN（TDD）：新增 `src/import/local-import-repository.ts`（design Decision 1、2；守衛沿用 B7 `batch-guard.ts`，SHALL NOT 另寫一份守衛或錯誤分類）、
+  - 完成（RED commit `fac4d74`）：新增 `test/local-import.test.ts` 11 個 it（名稱與 delta spec 驗收錨點逐字一致）；`expected-user-guard.test.ts` 的 `SAMPLES` 補 `POST /api/import`（合法最小匯入 body；B 已有資料，若被放行會回 409，401 斷言仍可分辨）、`toHaveLength(14)` → 15，其餘斷言一行未改。
+  - 紅燈（單檔實跑，`/api/import` 尚未存在回 404）：`local-import.test.ts` 11 個 it 中 **10 紅、1 先綠**（`Tests 10 failed | 1 passed`）。
+    **先綠（regression guard）**：「auth 停用且無 DB binding 時匯入端點回 404」（路由不存在同樣 404）。真紅：未登入 401（`expected 404 to be 401`）、B 的匯入不受 A、五段資料與順序、四表任一有資料 409、重複匯入 409、skipped、七種 400、300／2000 大量資料、ACCOUNT_MISMATCH（`expected 404 to be 401`）、歷史讀回（匯入回 404）。
+    `expected-user-guard.test.ts`：6 個 it 中 **4 紅 2 先綠**（`Tests 4 failed | 2 passed`）。真紅：「每條…帳號不符…」（`POST /api/import（他人的帳號） 狀態碼: expected 404 to be 401`）、「缺少或空白的預期帳號標頭…」（同型）、「列舉出的使用者資料路由恰與守衛樣本表一致」（列舉 14 ≠ 樣本 15）、「未登入回 UNAUTHORIZED、停用回 404…」（`POST /api/import 未登入狀態碼: expected 404 to be 401`）；先綠（未改動、與新樣本無關）：「標頭與 session 相符時…」「非使用者資料路由不要求預期帳號標頭」。
+  - 機械複驗：`git show fac4d74^:hono-pickball/test/local-import.test.ts` 回 `exists on disk, but not in 'fac4d74^'`（檔案新增）；`git show fac4d74^:hono-pickball/test/expected-user-guard.test.ts` 中 `POST /api/import` 0 筆、`toHaveLength(14)` 1 筆。紅燈成立。
+- [x] 3.2 GREEN（TDD）：新增 `src/import/local-import-repository.ts`（design Decision 1、2；守衛沿用 B7 `batch-guard.ts`，SHALL NOT 另寫一份守衛或錯誤分類）、
   `src/routes/import.ts`（`SessionAppEnv` sub-app、`use("*", localAuth, requireSession, requireExpectedUser)`、`onError(userDataOnError)`、`zValidator` 以 `invalidBodyHook` 回 400）；`src/index.ts` 以 `app.route("/api/import", importRoutes)` 掛載。
   json_each 插入以 `db.insert(<table>).select(sql\`… FROM json_each(${json}) WHERE true ORDER BY key\`)` 撰寫（不可用 `db.run`／`db.all`，見 design Decision 2）；獨立計分板以 `onConflictDoNothing().returning({ userId })`。
   3.1 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
-- [ ] 3.3 REFACTOR：三條 `json_each` 插入的組裝是否值得抽成 helper；`hono-pickball/CLAUDE.md` 後續須知第 3 點（第二個守衛 batch 呼叫端出現時抽 `guardedBatch`）是否現在處理；無壞味道則註記 skipped
+  - 完成（GREEN commit `7cb53dd`）：`src/import/local-import-repository.ts`、`src/routes/import.ts`、`src/index.ts` 掛載；守衛沿用 `batch-guard.ts` 的 `insertBatchGuard`／`releaseBatchGuard`／`isBatchGuardViolation`，未另寫守衛或錯誤分類。
+    batch 固定 7 條：守衛（四張表皆無本人列，條件全在 SQL 內）→ 參賽者 → 回合 → 分槽 → 歷史 → 獨立計分板（`onConflictDoNothing().returning({ userId })`）→ 釋放守衛。
+    **空陣列處理**：回合與獨立計分板最多一列，也以 `json_each` 展開 0 或 1 個元素的陣列（`[]` 或 `[{ data }]`），空陣列插入 0 列；因此 7 條陳述式與資料有無無關，不需要條件式 batch，守衛與釋放永遠存在。
+    獨立計分板段為 `insert().select(sql…json_each…)` 接 `.onConflictDoNothing().returning(...)`（apply §1.4 只驗證過 `values`，此寫法於本次實測可行：skipped 與 imported 兩分支皆有測試覆蓋）。
+    回應 `scoreboardCurrent`：請求無獨立計分板為 `none`，有則依 returning 是否有列為 `imported`／`skipped`。
+  - 綠燈：`local-import.test.ts` 11/11、`expected-user-guard.test.ts` 6/6（GREEN 時；追加測試後見下）；`pnpm --filter ./hono-pickball typecheck` 與 `pnpm -r exec tsc --noEmit` 皆 exit 0。
+  - 追加的 regression guard（加入即綠，非 TDD 紅燈）：`13ccdf0`「300 位參賽者與 2000 筆歷史可一次匯入」加 30 個分槽（使分槽改逐筆 values 時超過 100 參數上限而轉紅）、「…七者…400」追加 JSON 語法錯誤須回 400 `INVALID_BODY`（證明 `onError` 有掛；此為 spec「七者」之外的超集斷言，it 名稱不變）；
+    `31a0c1e` golden path 加 `updated_at >=` 請求前時間（殺死 `updated_at` 寫 0 的變異）。
+  - mutation（`src/import/local-import-repository.ts`、`src/routes/import.ts`、守衛樣本表；harness 三重落地檢查，每次變異後還原並確認 `git status` 乾淨；每次跑 `local-import.test.ts`＋`expected-user-guard.test.ts` 共 17 個 it）：
+    44 條（含等價對照），**除下列等價者外全數轉紅**——守衛少 `matchmaker_players`／`round`／`match_slots`／`history` 各一（皆由「四張對戰分配機表任一有資料時回 409…」殺死）；守衛加入 `scoreboard_current`（「雲端已有獨立計分板時略過…」）；四個守衛子句各自拿掉 `user_id` 條件（「B 的匯入不受 A…」等 6 個 it）；
+    守衛移到 batch 最後（7 個 it）；完全拿掉守衛（4）；拿掉釋放守衛（2）；參賽者／歷史／分槽三段各自改逐筆 `values`（各轉紅於「300 位參賽者與 2000 筆歷史可一次匯入」）；`played_at` 改 0（「匯入的歷史可被歷史端點…」）；獨立計分板改 `onConflictDoUpdate`（「雲端已有獨立計分板時略過…」）；
+    `user_id` 改錯（重構前五段各一、重構後 helper 一）；`version` 改 0（重構前五段各一、重構後 helper 一）；`updated_at` 改 0（補斷言後轉紅）；`sort_order` 改常數（SQL 端與 JSON 端各一）；歷史／分槽欄位順序對調；
+    sub-app 拿掉 `requireSession`（12 個 it）、拿掉 `requireExpectedUser`（3）、拿掉 `localAuth`（14）；樣本表拿掉 `POST /api/import`（「列舉出的…恰與守衛樣本表一致」）；`skipped`／`imported` 對調；`none` 分支改 `skipped`；本機有計分板時一律 `imported`；409 改 500、改 200；`zValidator` 拿掉；`onError` 拿掉；
+    `isBatchGuardViolation` 判斷拿掉（409 變 500，兩個 it 轉紅）；回應 `players`／`slots`／`history` 筆數改常數、`round` 恆 true。
+    **存活者（等價）**：歷史／參賽者／全部各段拿掉 `ORDER BY key`——SQLite 的 `json_each` 本就依 key（陣列索引）順序輸出列，行為上等價；保留是為了不依賴實作細節的穩健寫法，無法以測試區分。
+    helper 拿掉 `WHERE true`（含計分板 ON CONFLICT 段）仍綠：本版 drizzle／D1 不受解析歧義影響，等價；`WHERE true` 依 apply §1.3 的 Context7 查證保留。
+    另放對照組 `updatedAt` 改用 `Date.now()`、`fields: readonly string[]` 改 `string[]`、`const now = new Date(Date.now())` 皆維持綠。
+  - 後端全套（持鎖）24 檔 177 tests 全綠（baseline 23／166）；`pnpm --filter ./hono-pickball db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空（No schema changes）。
+- [x] 3.3 REFACTOR：三條 `json_each` 插入的組裝是否值得抽成 helper；`hono-pickball/CLAUDE.md` 後續須知第 3 點（第二個守衛 batch 呼叫端出現時抽 `guardedBatch`）是否現在處理；無壞味道則註記 skipped
+  - 完成（commit `af57946`）：實際為五條（參賽者、回合、分槽、歷史、獨立計分板）`json_each` 插入，user_id、`version` 1、`updated_at`、`WHERE true`、`ORDER BY key` 各重複五份，抽成同檔私有函式 `selectFromJsonEach(userId, fields, json, updatedAt)`，行為不變；`ORDER BY key` 與 `version` 因此只剩一處。
+    `fields` 以 `sql.raw` 組路徑，只接受程式碼內常數（函式註解已註明）。重構後 `local-import`＋`expected-user-guard` 17/17 全綠、兩段 typecheck exit 0；上列 mutation 重構後重跑，結果見 3.2 註記。
+  - `guardedBatch`：**不抽**。`score-repository` 的 batch 為可變長度、catch 另把歷史主鍵衝突分類為 conflict；匯入為固定 7 條且需取回計分板 `RETURNING` 結果，共用包裝需要泛型與額外分類參數，複雜度高於兩處各數行的重複，且會改動已驗收的 B7 程式碼。
+    `hono-pickball/CLAUDE.md`「後續須知」第 3 點的現況描述（`guardedBatch` 不是具名函式）仍成立，本節未改該文件（文件更新屬後續 task）。
 
 ## 4. 前端：匯入內容與結果分類
 
