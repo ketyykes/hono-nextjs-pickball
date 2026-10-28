@@ -182,6 +182,7 @@ describe("POST /api/import 本機資料匯入", () => {
 		const cookie = await seedAndSignIn("import-golden@example.com");
 		const userId = await userIdOf("import-golden@example.com");
 		const payload = makePayload();
+		const startedAt = Date.now();
 
 		const result = await importOk(cookie, payload);
 
@@ -218,6 +219,8 @@ describe("POST /api/import 本機資料匯入", () => {
 			expect(rows.length, table).toBeGreaterThan(0);
 			for (const row of rows) {
 				expect(row.version, table).toBe(1);
+				// updated_at 取伺服器時間；寫成 0 或沿用資料內的時間都會讓雲端列的更新時間失真
+				expect(row.updated_at as number, table).toBeGreaterThanOrEqual(startedAt);
 			}
 		}
 		expect(await rowsOf("sync_batch_guards", userId)).toEqual([]);
