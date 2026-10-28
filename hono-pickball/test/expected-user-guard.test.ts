@@ -97,6 +97,12 @@ const SAMPLES: Record<string, Sample> = {
 		body: { scoreA: "11", scoreB: "7", roundVersion: 1 },
 	},
 	"GET /api/matchmaker/history": { method: "GET", path: "/api/matchmaker/history" },
+	// B 已有名單等資料，若守衛被放行會回 409 而非 401，因此狀態碼斷言仍能分辨守衛是否生效
+	"POST /api/import": {
+		method: "POST",
+		path: "/api/import",
+		body: { version: 1, players: [makePlayer("imp-1")], currentRound: null, history: [], scoreboard: { current: null, matches: [] } },
+	},
 	// reset 會清空整個使用者的資料，排在最後：守衛被整條拿掉時，前面的 PUT／score 快照斷言才能先獨立轉紅
 	"POST /api/matchmaker/reset": { method: "POST", path: "/api/matchmaker/reset" },
 };
@@ -230,7 +236,7 @@ describe("使用者資料請求的預期帳號守衛", () => {
 		const enumerated = listUserDataRouteKeys();
 
 		expect(enumerated).toEqual(Object.keys(SAMPLES).sort());
-		expect(enumerated).toHaveLength(14);
+		expect(enumerated).toHaveLength(15);
 		for (const [routeKey, sample] of Object.entries(SAMPLES)) {
 			expect(routeKey.startsWith(`${sample.method} `), `${routeKey} 的樣本方法`).toBe(true);
 		}
