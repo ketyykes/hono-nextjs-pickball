@@ -10,15 +10,15 @@ const MillisecondsParamSchema = z
   .transform(Number)
   .pipe(z.number().int());
 
-/** GET 歷史清單的查詢參數：皆選填；同時給 from 與 to 時 from 必須小於 to。 */
+/** GET 歷史清單的查詢參數：皆選填；同時給 from 與 to 時 from 不得大於 to（相等為合法的空區間）。 */
 export const HistoryQuerySchema = z
   .object({
     from: MillisecondsParamSchema.optional(),
     to: MillisecondsParamSchema.optional(),
     order: z.enum(["desc", "asc"]).optional(),
   })
-  .refine(({ from, to }) => from === undefined || to === undefined || from < to, {
-    message: "from 必須小於 to",
+  .refine(({ from, to }) => from === undefined || to === undefined || from <= to, {
+    message: "from 不得大於 to",
     path: ["from"],
   });
 
