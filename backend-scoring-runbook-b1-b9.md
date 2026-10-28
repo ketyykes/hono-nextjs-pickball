@@ -11,18 +11,18 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-27，**B8 apply 中斷，待續**）
+## 狀態快照（最後更新 2026-10-28，**B8 已合併，下一棒 B9**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `f366f23`（B7.5 archive） |
+| `main` HEAD | `329e77d`（B8 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；**下一棒 B8** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；**下一棒 B9** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
-| 工作位置 | 主 repo 分支 `change/matchmaker-history-stats-backend`，工作樹乾淨。**B8 leader 於 2026-10-27 19:4x 因使用者關機被停止（不可續派，重開新 leader）**：已完成 §1（delta 補 player-roster 兩 Scenario、落實 B7.5 守衛交接）、§2 核心、§3 後端、§4.1～§4.4（`useRemoteHistory` GREEN `d3f7be3`、補守護 `25f1215`）；tasks.md 勾選落後於 commit（以 `git log main..HEAD` 為準補勾，教訓 #3）；§3 完成紀錄未寫入 design。新 leader 從 §4.5 起接續，續派前先跑 `pnpm -r exec tsc --noEmit` 確認 |
+| 工作位置 | 主 repo `main`，工作樹乾淨 |
 
 ## 使用者已定案（2026-10-21）
 
@@ -133,7 +133,7 @@ main@1e5e517
 | B6 | matchmaker-roster-backend | 名單／球員 CRUD API＋`useRosterStore` 切換 | 中 | change/matchmaker-roster-backend | 已合併 `b1dbff8`、archive `11a2dbf` |
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
 | B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已合併 `46c392a`、archive `f366f23` |
-| B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已 propose，未 apply |
+| B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已合併 `932d932`、archive `329e77d` |
 | B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
 
@@ -617,6 +617,17 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - **B8／B9 §1 必做（交接）**：除 B7 後的 validate 失敗外，依 B7.5 design「交接給 B8／B9」：
   B8 `GET /api/matchmaker/history` 補守衛樣本、授權覆蓋表加第四欄、`history-api` 以 `expectedUserId` 為第一參數、`useRemoteHistory` 加 `userId` 世代與擁有者標記（hook RED 多一個換帳號 it）、歷史匯出與 `HistoryCsvSection` 雲端分支以點擊時 user id 呼叫且未授權 refresh、E2E 用 `expectedUserHeaders()`；
   B9 `src/routes/import.ts` 開頭 `use("*", localAuth, requireSession, requireExpectedUser)`、樣本表補 `POST /api/import`、`user-data-sync` 加「預期帳號與 session 不符時匯入回 401 且雲端不寫入」Scenario、`importLocalData(expectedUserId, payload)`、未授權 refresh、授權覆蓋表第四欄。
+
+### B8 紀錄（2026-10-28，合併 `932d932`，archive `329e77d` → `2026-10-28-matchmaker-history-stats-backend`；改 `data-transfer`／`match-history`／`player-roster`／`player-stats`，`pickleball-guide-page` 歸屬清單於 4.6 授權同步，archive 時 no-op）
+- 34 tasks（原 31，追加 3.4 非 JSON 歷史列略過計數、8.10～8.12 M1）。leader 兩任：第一任 2026-10-27 因使用者關機停止；其遺留的 §4 Implementer 在 leader 停止後仍完成 4.6 才因電腦睡眠中斷（教訓：停 leader 前先確認其子 agent 也停了）。第二任接續完成。
+- §4.1／§4.3／§4.5 紅燈輸出隨第一任遺失，tasks 以 RED／GREEN 分開的 commit 機械複驗作證；coordinator 抽查 `304a507`、`1256905`、`bdeb124` 皆為實作不存在／舊條件下的真紅。
+- Final Code Review（opus）首輪 FAIL 必修 M1：`computeRangeCutoffs` 刻意產生空區間（週一的「本週」、跨月週的「本月」，`from === to`），schema 要求 `from < to` → 後端 400、雲端頁載入失敗。改為 `from <= to`（相等回空 `items`、`total` 照算），複審 PASS。
+- 測試：前端 105/1054、後端 23/166、核心 8/17；lint 0/3；build、validate 通過；無新相依。E2E（coordinator 持鎖、load 6～9）chromium 145、firefox 133、mobile-chrome 143、user-data 40、webkit 44＋41＋47（1 failed）、mobile-safari 44＋41＋48。
+- **唯一失敗＝既有 navbar 競態，非 B8 回歸**：webkit `scoreboard.spec.ts:22` 點 navbar「計分板」後網址未變（與 B7 `quiz.spec.ts:49` 同一族：`AccountEntry` 載入後 navbar 位移）。隔離重跑整份 17/17；`:22 --repeat-each=30` 分支 1/30 失敗、**main 同指令同樣 1/30 失敗**；B8 未改 navbar／layout／首頁。site-navbar 預留入口寬度的後續 change 仍待開。
+- coordinator 裁定：OQ3（player-roster「resetLocalMatchProgress 只清除本次活動的進度」沿用舊標題、內容改為函式已刪除）接受；**OQ9 換區間鍵盤焦點遺失、載入失敗時篩選器消失 → 後續 change（載入中與失敗時保留篩選器）**；OQ12 session 載入中本機 `HistoryView` 先掛載、可能依既有降級規則清掉損毀本機歷史 → 接受。
+- 後續（非必修）：匯出略過損毀列未告知 `droppedCount`；`packages/pickball-core/CLAUDE.md` 的 `CORE_MODULES` 數量過時；`nextjs-pickball/CLAUDE.md` API 包裝第一參數清單缺 `history-api`；`backupFetchFailed` 文案只提名單。
+- **B9 §1 必做**：`openspec validate local-data-import --strict` 失敗——`data-transfer` MODIFIED「登入時的資料工具頁」缺四個 Scenario：「登入時 JSON 還原停用」（B6）＋ B8 新增「登入資料工具：雲端歷史 CSV 的資料來源」「登入資料工具：歷史匯出帶呼叫端給的帳號且 401 時標示未授權」「登入資料工具：登入時歷史 CSV 匯出來自雲端」。
+  另依 B8 design「交接給 B9」：匯入歷史 MUST 寫 `played_at`（`Date.parse(playedAt)`）；MUST 依本機追加順序插入；`resetLocalMatchProgress()` 已刪除、本機五個 key 皆可為匯入來源；以及 B7.5 交接的 B9 項（見 B7.5 紀錄）。
 
 ## commit footer 慣例
 
