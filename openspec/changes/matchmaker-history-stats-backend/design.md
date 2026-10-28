@@ -134,6 +134,10 @@
 
 10. （apply §6，2026-10-28）Implementer（sonnet）：88c46de RED（4 個真紅＋B7.5 授權 it 隨行為變更而紅）→ a8a2380 GREEN（含 `nextjs-pickball/CLAUDE.md` 三處、`storage.test.ts` 另刪同函式的 SSR it）。Stage 1（sonnet）PASS。Stage 2（opus）第一輪 FAIL（名單 401＋回合 500、回合 401＋名單 500 的優先序未守住）→ 256b6f4 → 複審 PASS。§6 完成。
 
+11. （apply §7，2026-10-28）Implementer（sonnet）：ef1bd62 RED（6 failed、無先綠）→ f139623 GREEN（含對 §5 `RemoteStatsContent` 加標題的偏差，理由見 tasks 7.2）。Stage 1（sonnet）PASS。Stage 2（opus）PASS 但列 4 條非等價存活；leader 依硬規則將 `HistoryCsvSection` 未授權 `refresh()` 與失敗不下載改列必修 → 13a20d3、3f8d690 → 複審 PASS。OQ2 由既有 `roster-sync.spec.ts` 守住（名單 load-failed 優先）。§7 完成。
+12. **（apply §7 Stage 2 觀察，待 coordinator 知悉，非阻擋）session 載入中本機 `HistoryView` 先掛載的副作用**：`resolveStorageMode` 在 session 載入中回 `local`（user-data-sync 主 spec），登入使用者開歷史頁時本機 `HistoryView` 會先掛載一瞬，其 effect 內 `readHistory()` 若遇到含損毀項的本機歷史，會依既有逐筆降級規則回寫清理（Stage 2 以暫時性探針實測 `unchanged=false`）。合法本機歷史不受影響（E2E「登入時瀏覽歷史頁只發出 GET 且不改動本機歷史」的 GIVEN 為合法資料）。
+   與 delta「雲端模式下…SHALL NOT 讀寫 `matchmaker:history:v1`」字面有張力，但載入中的那一刻定義上屬本機模式，與統計頁本機 store 的等值回寫同類。本 change 未處理；可選方案：(a) 接受；(b) 另開 change 讓歷史頁在 session 載入中不掛本機元件。
+
 ## apply §1 查證紀錄（2026-10-27）
 
 **1.1 環境**：見 environment.md Verification（baseline 前端 100／1010、後端 22／157、核心 6／13；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 34；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` exit 0）。

@@ -130,12 +130,20 @@ Depends on: §5
 
 Depends on: §6
 
-- [ ] 7.1 RED（E2E）：新增 `tests/e2e/user-data/history-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 6 個 test。
+- [x] 7.1 RED（E2E）：新增 `tests/e2e/user-data/history-sync.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()`），spec 錨點的全部 6 個 test。
   直接打 API（如讀回雲端歷史）時帶 `expectedUserHeaders()`。
   以單檔執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/history-sync.spec.ts`（前後清殘留 dev server），貼出輸出；先綠者逐一點名標 regression guard
-- [ ] 7.2 GREEN（例外層：頁面與 I/O 樣板元件，以 7.1 驗收）：`app/matchmaker/history/page.tsx`、`app/matchmaker/stats/page.tsx` 依 `resolveStorageMode(useSession())` 擇一渲染本機或雲端元件；
+  - 紅燈紀錄（真紅，commit `ef1bd62`，持鎖單檔 user-data）：6 failed／0 passed，無先綠者。原因：歷史頁與統計頁從未發出 `GET /api/matchmaker/history`（`waitForResponse` 逾時，兩條唯讀 test）；本機 `HistoryView` 無 `data-sync-status="synced"`；本機元件不顯示雲端錯誤文案；統計頁讀本機歷史、排行榜 0 列；CSV 內容為本機訪客歷史。
+    第一版平局 test 的比分文字斷言寫錯（實為 `9:9平手`），於 commit 前修正為 `toContainText` 後才取得行為紅燈（Stage 1 判定為誠實揭露）。機械複驗：`ef1bd62^` 無該 spec；`ef1bd62^` 的歷史頁只渲染 `HistoryView`、`HistoryCsvSection` 無雲端分支；`ef1bd62` 與 `f139623` 之間 spec 未變。
+- [x] 7.2 GREEN（例外層：頁面與 I/O 樣板元件，以 7.1 驗收）：`app/matchmaker/history/page.tsx`、`app/matchmaker/stats/page.tsx` 依 `resolveStorageMode(useSession())` 擇一渲染本機或雲端元件；
   `components/matchmaker/HistoryCsvSection.tsx` 加雲端分支（本機分支不動；以點擊當下 `useSession()` 的 user id 呼叫、失敗顯示訊息不下載、未授權時 `refresh()`）。7.1 全綠；不得以 `waitForTimeout` 取代狀態等待
-- [ ] 7.3 REFACTOR：歷史頁與統計頁的模式分支是否值得抽成小元件；無壞味道則註記 skipped
+  - 綠燈紀錄（commit `f139623`）：歷史頁新增 client 元件 `HistoryModeSwitch`（page 維持 server component）；統計頁本機內容原樣搬到 `LocalStatsContent.tsx`（`git show -M -C` 辨識為 copy、similarity 98%，只改檔頭路徑註解與匯出名稱）；`HistoryCsvSection` 加雲端分支（本機分支零刪除行）。
+    history-sync 6 passed；`--project=user-data` 全部 40 passed；chromium 訪客迴歸（matchmaker-history、player-stats、matchmaker-data-transfer、matchmaker-local-mode）40 passed；前端單元 104 檔／1050 綠；tsc exit 0。
+    偏差：`RemoteStatsContent.tsx`（§5）非阻擋分支加 h1「球員統計」與說明句——既有 E2E `roster-sync.spec.ts`「雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容」要求載入失敗時標題不存在，標題放在 page 會殘留（第一次跑 user-data 39 passed／1 failed 即此，移入元件後 40 passed）。§5 單元測試未改、仍綠。Stage 1 判定合理。
+    OQ2 實測：名單 `load-failed` 優先，`SyncStatusNotice` 取代內容（含標題），`data-sync-status="load-failed"`。
+  - 變異驗證：Implementer 8 次（頁面本機也渲染雲端元件兩頁皆紅、雲端內容掛 `useRoundStore` 紅、CSV 雲端分支讀本機紅、固定 user id 紅、兩頁反向皆紅；2 條等價對照綠）。Stage 2（opus）獨立 22 次：非等價存活 M7（失敗仍下載）、M10（未授權不 `refresh()`）、M14（雲端統計標題消失）、M17（未切回今日）→ leader 依「每個 401／授權分支都要有會轉紅的變異」列為必修 → commit `13a20d3`（`HistoryCsvSection.test.tsx` 4 個 regression guard，加入即綠、非 RED）、`3f8d690`（平局 test 內新增 h1 斷言、`switchThroughAllRanges` 最後切回今日；test 名稱與原有斷言不變）→ 複審 PASS（四條皆紅、M9 與兩條等價對照綠）。
+- [x] 7.3 REFACTOR：歷史頁與統計頁的模式分支是否值得抽成小元件；無壞味道則註記 skipped
+  - skipped：歷史頁分支已是 15 行的 `HistoryModeSwitch`，統計頁分支為 page 內 20 行，無重複可抽。
 
 ## 8. 文件同步與總驗收
 
