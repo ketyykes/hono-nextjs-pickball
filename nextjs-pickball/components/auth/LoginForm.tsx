@@ -31,7 +31,7 @@ export function LoginForm() {
 	}
 
 	if (session.user !== null) {
-		// 窄螢幕 navbar 不顯示帳號入口，登出只能在此頁；停留原頁，refresh 後自然回到表單。
+		// navbar 與本頁皆可登出；停留原頁，refresh 後自然回到表單。
 		async function handleSignOut() {
 			await signOut();
 			await session.refresh();

@@ -14,11 +14,11 @@ interface AccountEntryProps {
 
 // 版面 class 三種狀態共用同一份：佔位元素與登入／登出入口寬度必須一致，
 // 日後只改其中一個分支就會悄悄產生寬度差。
-// < sm 隱藏：320px 實測入口會把視口撐出 10px，窄螢幕改由 /login 登入登出。
-// 圖示化、名稱放 aria-label／title 不佔寬度。
+// 入口圖示化、名稱放 aria-label／title，只佔一格圖示加內距的寬度；
+// 窄螢幕能顯示，靠 NAV_ITEM_BASE 與 navbar 容器間距讓出空間，這裡不可再用斷點隱藏。
 function entryLayoutClass(solid: boolean): string {
 	return cn(
-		"hidden shrink-0 items-center sm:inline-flex",
+		"inline-flex shrink-0 items-center",
 		NAV_ITEM_BASE,
 		navItemTone(solid),
 	);
