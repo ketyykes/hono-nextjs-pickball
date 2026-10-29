@@ -11,18 +11,18 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-28，**B9 apply 中斷，待續**）
+## 狀態快照（最後更新 2026-10-29，**B9 已合併，下一步 S2 本機全功能驗收**）
 
 | 項目 | 值 |
 |---|---|
-| `main` HEAD | `329e77d`（B8 archive） |
+| `main` HEAD | `9f089bb`（B9 archive） |
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；**下一棒 B9** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；B9 已合併並 archive；**下一步 S2** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
-| 工作位置 | 主 repo 分支 `change/local-data-import`，工作樹乾淨。**B9 第二任 leader 於 2026-10-29 16:23 因使用者關機被停止（不可續派，重開新 leader）**：§1～§4.2 已完成（第一任至 `f75e681`）；第二任補做 §4 Stage 2 審查與複審補強（`5055ac9`、`ca5938a`、`cb38be2`、`1a616ed`、`c3fe35e`），停止時正要派「§4 Stage 2 複審（第二輪）」——新 leader 先重跑一次 §4 Stage 2 確認無存活變異、在 design 記錄 §4 審查結果，再從 §5.1 接續。續派前先核對 tasks 勾選與 `git log main..HEAD`、跑 `pnpm -r exec tsc --noEmit` |
+| 工作位置 | 主 repo `main`，工作樹乾淨 |
 
 ## 使用者已定案（2026-10-21）
 
@@ -134,7 +134,7 @@ main@1e5e517
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
 | B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已合併 `46c392a`、archive `f366f23` |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已合併 `932d932`、archive `329e77d` |
-| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | apply 中（中斷於 §4.2 之後） |
+| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已合併 `a82aa3c`、archive `9f089bb` |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
 
 「預估」以 M 系列經驗粗估（50 task ≈ 一棒）；propose 後依 tasks 數改寫成實數。
@@ -628,6 +628,20 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - 後續（非必修）：匯出略過損毀列未告知 `droppedCount`；`packages/pickball-core/CLAUDE.md` 的 `CORE_MODULES` 數量過時；`nextjs-pickball/CLAUDE.md` API 包裝第一參數清單缺 `history-api`；`backupFetchFailed` 文案只提名單。
 - **B9 §1 必做**：`openspec validate local-data-import --strict` 失敗——`data-transfer` MODIFIED「登入時的資料工具頁」缺四個 Scenario：「登入時 JSON 還原停用」（B6）＋ B8 新增「登入資料工具：雲端歷史 CSV 的資料來源」「登入資料工具：歷史匯出帶呼叫端給的帳號且 401 時標示未授權」「登入資料工具：登入時歷史 CSV 匯出來自雲端」。
   另依 B8 design「交接給 B9」：匯入歷史 MUST 寫 `played_at`（`Date.parse(playedAt)`）；MUST 依本機追加順序插入；`resetLocalMatchProgress()` 已刪除、本機五個 key 皆可為匯入來源；以及 B7.5 交接的 B9 項（見 B7.5 紀錄）。
+
+### B9 紀錄（2026-10-29，合併 `a82aa3c`，archive `9f089bb` → `2026-10-29-local-data-import`；改 `data-transfer`／`user-data-sync`）
+- 22 tasks、52 commits。leader 四任：第一、二任因使用者關機停止；第三任脈絡交回；第四任完成 §5 Stage 2 補強、§6、Final Code Review（opus）APPROVE。
+- §4 Stage 2＋四次複審共五輪（皆測試鑑別力不足，`local-import.ts` 邏輯未改；第二次複審後 Implementer 升 opus），最終 96 條變異 85 紅／11 等價或規格未定義。
+  §5 Stage 2 首輪 FAIL（null 未授權訊息、雲端 JSON parseBackup 失敗分支、摘要三欄無鑑別力），補測試後複審 PASS。
+- coordinator 抽查 RED commit `132090c`、`fac4d74`、`dc37269`、`cfe7bf3`：對應實作在 RED 當下皆不存在。commit 訊息零 attribution。
+- 測試：前端 109/1068、後端 24/177、核心 9/21；lint 0/3；build、validate 通過；無新相依。E2E（coordinator 雙鎖、0 failed 0 flaky）chromium 145、firefox 133＋12 skip、mobile-chrome 143＋2 skip、user-data 44、webkit 44＋41＋48、mobile-safari 44＋41＋48。
+- 使用者定案落實：匯入後保留本機；四張 matchmaker 表任一有本人資料 409 整份不寫；計分板已存在略過 `skipped`；重複匯入不產生重複歷史；登入時 JSON 還原改為「從 JSON 備份匯入到雲端」（同端點同規則）。
+- coordinator 接受 leader 裁定：H07（oversize 時仍提示，帶到資料頁看說明）、F08／B04／G04／Y03（前端照送、後端 400）、N07（分槽 matchId 以場次 id 為準）、U07／J12（409／failed 也 refresh）；§5 多出 `LocalImportResultMessage.tsx`、`local-import-view.ts` 已補入 proposal Impact。
+- **G1 前必修**：oversize 門檻餘裕不足——前端量原始陣列 UTF-8（門檻 1,900,000 B），後端 `json_each` 參數另有包裝（歷史每筆約 +80 B），實測前端 1,880,596 B → 後端 2,100,131 B，超過正式 D1 單一參數 2MB（本機 miniflare 不擋）。失敗安全（整批回滾、籠統失敗訊息），只是邊緣資料看不到 oversize 說明；改以後端包裝形狀量測或降低門檻。
+- 低優先後續：JSON 雲端匯入無送出中防護（連選兩次送兩請求，第二個 409，不重複寫入）；後端補「只有獨立計分板」與「playedAt 帶時區位移回 400」專屬 it；`history-spec.ts:294` 過時註解。
+- **coordinator 教訓**：第三任 leader 交回時其 §5 Stage 2 reviewer 仍活著（只是兩次工具呼叫之間無 process），coordinator 誤判已停而清掉它的 dev server、釋放它的鎖，鎖隨即被 mini4wd 取走；reviewer 自行重取鎖重跑受影響變異，結論未受影響。
+  **判斷子 agent 已停只能以它的 hand-back／完成通知為準**，不能只看 ps。另：zsh 不拆變數字串，`H="python3 heavy.py ..."; $H cmd` 會 exit 127，雙鎖指令要寫全或用 bash 腳本。
+- **共用鎖（2026-10-29 起）**：三個 session（nextjspickball、mini4wd、blender）統一「先 `/tmp/heavy-lock.sh acquire`、再 `python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label <名稱> -- <指令>`、最後 release」；禁止 heavy.py 內再包 heavy.py。
 
 ## commit footer 慣例
 
