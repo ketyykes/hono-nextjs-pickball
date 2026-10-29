@@ -112,10 +112,10 @@ SiteNavbar SHALL 在所有斷點維持 5 個導航連結全部可見，SHALL NOT
 > 「窄螢幕下對戰分配連結亦可見」一條。兩條合起來即為「5 個全部可見」。
 
 窄螢幕的空間 SHALL 由下列方式讓出：logo 文字（「匹克球指南」）於 `sm` 斷點以下收合、只保留
-`LogoMark` 符號；容器間距由 `gap-6 px-6` 縮為 `gap-3 px-4`；連結水平內距由 `px-3` 縮為 `px-2`。
+`LogoMark` 符號；容器間距由 `gap-6 px-6` 縮為 `gap-1 px-4`；連結水平內距由 `px-3` 縮為 `px-1.5`。
 
 視口寬度 **< 375px** 時 SHALL 再讓出一層空間：logo 整個隱藏（含 `LogoMark` 符號）；容器水平內距由
-`px-4` 縮為 `px-3`；連結水平內距由 `px-2` 縮為 `px-1.5`。實作 MUST 以 Tailwind 的
+`px-4` 縮為 `px-3`；連結水平內距由 `px-1.5` 縮為 `px-1`。實作 MUST 以 Tailwind 的
 `max-[375px]:` variant 表達（對應 `@media (width < 375px)`），SHALL NOT 以 JS 量測視口寬度。
 視口寬度 ≥ 375px 時 SHALL 維持上一段的呈現，零差異。
 
@@ -127,6 +127,13 @@ SiteNavbar SHALL 在所有斷點維持 5 個導航連結全部可見，SHALL NOT
 >
 > **為什麼 375px**：375px（iPhone SE 2／3、iPhone mini）以上 362px 的內容放得下，
 > 且既有 390px 的 Scenario 全數落在 ≥ 375px 側而不受影響。
+
+> **為什麼 `< sm` 的間距再縮一階**（change `site-navbar-account-entry`）：帳號入口改為在所有寬度顯示
+> （見「navbar 帳號入口於各寬度可見且預留固定寬度」），窄螢幕須在五個連結之後再放下一格圖示寬度。
+> 舊值下 320px 只剩 18px、375px 只剩 17px 餘裕，入口（圖示 16px＋內距）加上容器間距 12px 放不下（B3 實測 320px 超出 10px、375px 超出 11px）。
+> 改為連結內距 `px-1.5`（`< 375px` 為 `px-1`）、容器間距 `gap-1` 後，估算餘裕為 320px 10px、375px 13px、390px 28px。
+> 連結內距 MUST 經 `nextjs-pickball/components/layout/navItemStyles.ts` 的 `NAV_ITEM_BASE` 單一來源表達（帳號入口共用），
+> SHALL NOT 在 `SiteNavbar` 或 `AccountEntry` 內另寫一份內距。`>= sm` 的 `gap-6`、`px-6`、`px-3` 零變更。
 
 logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Requirement 的核心** ——
 實測發現真正的破口不是橫向溢出，而是文字在固定 `h-14`（56px）的 bar 內斷成兩行。
@@ -188,6 +195,13 @@ logo 與所有導航連結 MUST 套用 `whitespace-nowrap`。**這是本 Require
 - **THEN** logo 連結恢復為 visible（只顯示 `LogoMark` 符號，「匹克球指南」文字仍依 `sm` 斷點 hidden）
 - **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-rwd.spec.ts`，test 名稱「小於 375px 時隱藏 logo、375px 起恢復」
 
+#### Scenario: 窄螢幕導航呈現：連結內距與容器間距依斷點遞減
+
+- **WHEN** 渲染 `SiteNavbar`
+- **THEN** 五個導航連結的 class 皆含 `px-1.5`、`max-[375px]:px-1`、`sm:px-3`，且不含 `px-2`、`max-[375px]:px-1.5`
+- **THEN** header 內層容器的 class 含 `gap-1` 與 `sm:gap-6`，且不含 `gap-3`
+- **驗收**：`nextjs-pickball/components/layout/SiteNavbar.test.tsx`，it 名稱「窄螢幕下導航連結內距與容器間距依斷點遞減」
+
 ### Requirement: 專注模式下隱藏
 
 `document.documentElement` 帶有 `sb-focus` class 時，SiteNavbar SHALL 隱藏（`display: none`）；class 移除後 SHALL 恢復顯示。
@@ -246,41 +260,54 @@ SHALL NOT 列入。
 - **THEN** 導向 `/matchmaker` 並顯示對戰頁的場次舞台區域
 - **驗收**：`nextjs-pickball/tests/e2e/specs/match-stage.spec.ts`，test 名稱「從首頁點擊 Navbar 的對戰分配連結進入對戰頁」
 
-### Requirement: navbar 顯示帳號入口
+### Requirement: navbar 帳號入口於各寬度可見且預留固定寬度
 
-`SiteNavbar` SHALL 在 `<nav>` 之後渲染 `nextjs-pickball/components/layout/AccountEntry.tsx`，依 `useSession` 呈現三種狀態：
+`SiteNavbar` SHALL 在 `<nav>` 之後渲染 `nextjs-pickball/components/layout/AccountEntry.tsx`。`AccountEntry` 在**任何狀態**下都 MUST 渲染恰好一個根元素，
+且該元素的水平尺寸在各狀態之間 MUST 相同——`/api/session` 回應前後、登入前後，五個導航連結的位置 SHALL NOT 改變。依 `useSession` 呈現四種狀態：
 
-- `status === "loading"` 或 `authEnabled === false`：**不渲染任何元素**（不佔寬度）。正式站與沒有 `.dev.vars` 的環境因此與本 change 之前逐像素相同。
-- 啟用且未登入：一個指向 `/login` 的連結，內容為 `lucide-react` 的 `LogIn` 圖示，可及名稱（accessible name）為「登入」。
+- `status === "loading"` 或 `authEnabled === false`：一個**隱形佔位元素**（`<span>`），class MUST 為登入連結的 class 再加上 `invisible`，
+  MUST 帶 `aria-hidden="true"`，內含一個與圖示同尺寸（`size-4`）的空元素；SHALL NOT 含任何連結、按鈕或可聚焦元素。
+  `data-account-entry` 屬性分別為 `loading` 與 `disabled`（供 E2E 判斷 session 已回應）。
+- 啟用且未登入：一個指向 `/login` 的連結，內容為 `lucide-react` 的 `LogIn` 圖示，可及名稱為「登入」，`transitionTypes={["nav-forward"]}`。
 - 已登入：一個按鈕，內容為 `lucide-react` 的 `LogOut` 圖示，可及名稱為「登出」，`title` 為「已登入：<name>」。
-  點擊後呼叫 `signOut()`，再呼叫 store 的 `refresh()`；停留在目前頁面。
+  點擊後呼叫 `signOut()`，再呼叫 store 的 `refresh()`（`signOut` 失敗時亦同）；停留在目前頁面。
+
+三種元素 MUST 共用同一組版面 class：`inline-flex`、`shrink-0`、`items-center` 與 `NAV_ITEM_BASE`（含 `whitespace-nowrap` 與內距階梯，見「窄螢幕導航呈現」）。
+帳號入口在**所有視口寬度**皆 MUST 顯示（佔位狀態為佔位但不可見），SHALL NOT 套用任何斷點隱藏（`hidden`、`sm:inline-flex` 等）。
+圖示 MUST 為 `aria-hidden`，可及名稱由 `aria-label` 提供（`emoji-free-ui`：通用記號用 `lucide-react`）。
 
 帳號入口 SHALL NOT 列入 `NAV_LINKS`，`/login` 亦 SHALL NOT 列入（`NAV_LINKS` 僅含公開內容路由的既有約束不變）。
-入口元素 MUST 套用 `whitespace-nowrap` 與 `shrink-0`，圖示 MUST 為 `aria-hidden`，可及名稱由 `aria-label` 提供（`emoji-free-ui`：通用記號用 `lucide-react`）。
-
-視口寬度 **< `sm`（640px）** 時帳號入口 MUST 隱藏（以 Tailwind 的 `hidden sm:inline-flex` 表達，SHALL NOT 以 JS 量測視口寬度），`>= sm` 時顯示。
-窄螢幕下的登入與登出改由直接造訪 `/login` 提供（見 `auth`「本機測試帳號登入頁」）。
-「窄螢幕導航呈現」Requirement 的五個連結呈現（可見性、不換行、320px 完整落在視口內、`< 375px` 隱藏 logo）與其 className **零變更**。
-
-> **為什麼窄螢幕隱藏入口**（2026-10-21 人類裁決，design Open Questions 第 9 條）：實測 320px 下入口超出視口 10px、375px 超出 11px、
-> 390px 只剩 4px；要塞進去就得改動既有五個連結的間距或內距。框架標準斷點 `sm` 比自訂 390px 穩定。
-> 行動裝置的登入入口記為 G1 待辦（G1 改為 Google 登入時重新設計），本 change 不處理。
-
 專注模式（`html.sb-focus`）下入口隨 header 一起隱藏，不需額外處理。
 
-#### Scenario: 載入中或未啟用時不渲染
+> **為什麼未啟用時也佔寬度**：auth 是否啟用只有 `/api/session` 回應後才知道。若只在 `loading` 佔位、`disabled` 時移除，
+> 正式站（auth 停用）每次整頁載入都會在回應後**向右**位移——等於把目前只在開發環境出現的位移搬到正式站。
+> 代價是正式站 navbar 右側多一格看不見的寬度（`>= sm` 時五個連結整體左移 64px）；G1 上線後該格即由登入入口填滿。
+>
+> **為什麼取代舊版 `< sm` 隱藏**：舊版（2026-10-21 裁決）因 320／375px 擠不下而在 `< sm` 隱藏入口，手機只能自行輸入 `/login`。
+> 本版改由「窄螢幕導航呈現」縮小 `< sm` 的連結內距與容器間距讓出空間，入口在所有寬度顯示。
+
+#### Scenario: 帳號入口：載入中或未啟用時渲染隱形佔位元素
 
 - **GIVEN** `useSession` 分別回傳 `{ status: "loading" }` 與 `{ status: "ready", authEnabled: false, user: null }`
 - **WHEN** 渲染 `AccountEntry`
-- **THEN** 兩種情況的 container 皆為空（無任何子元素）
-- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「載入中或未啟用時不渲染任何元素」
+- **THEN** 兩種情況的 container 皆恰有一個子元素，其 `aria-hidden` 為 `"true"`、class 含 `invisible`、`data-account-entry` 分別為 `loading` 與 `disabled`
+- **THEN** 不存在任何 link 或 button role，且該元素內含一個 class 含 `size-4` 的子元素
+- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「載入中或未啟用時渲染隱形佔位元素且不含互動元素」
 
-#### Scenario: 帳號入口於 sm 以下隱藏
+#### Scenario: 帳號入口：佔位元素與登入入口共用同一組版面 class
+
+- **GIVEN** 以相同的 `solid` 分別渲染 loading、啟用且未登入、已登入三種狀態
+- **WHEN** 比較三者根元素的 class token 集合
+- **THEN** 佔位元素的 token 集合等於登入連結的 token 集合再加上 `invisible`；登出按鈕的 token 集合等於登入連結的 token 集合
+- **THEN** 三者的 token 集合皆包含 `NAV_ITEM_BASE` 的每一個 token（內距只有 `NAV_ITEM_BASE` 一個來源）
+- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「佔位元素、登入連結與登出按鈕共用同一組版面 class」
+
+#### Scenario: 帳號入口：登入連結與登出按鈕於所有寬度顯示
 
 - **GIVEN** `useSession` 分別回傳啟用且未登入、已登入
 - **WHEN** 渲染 `AccountEntry`
-- **THEN** 登入連結與登出按鈕的 class 皆含 `hidden` 與 `sm:inline-flex`
-- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「登入連結與登出按鈕在 sm 以下隱藏」
+- **THEN** 登入連結與登出按鈕的 class token 皆含 `inline-flex`，且不含 `hidden`、`sm:inline-flex`
+- **驗收**：`nextjs-pickball/components/layout/AccountEntry.test.tsx`，it 名稱「登入連結與登出按鈕不在任何斷點隱藏」
 
 #### Scenario: 未登入時顯示登入連結
 
@@ -310,10 +337,27 @@ SHALL NOT 列入。
 - **THEN** 導向 `/login` 並顯示「電子郵件」欄位
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「未登入時 navbar 顯示登入入口並可前往登入頁」
 
-#### Scenario: 窄螢幕下隱藏帳號入口且不影響既有導航連結
+#### Scenario: 帳號入口：session 回應前後導航連結位置不變
 
-- **GIVEN** `.dev.vars` 齊備，瀏覽器為訪客（啟用且未登入）
-- **WHEN** viewport 分別為 320px、375px、390px，再改為 640px 與 1280px
-- **THEN** 前三種寬度下 header 內「登入」連結為 hidden，「首頁」「完整體驗」「計分板」「測驗」「對戰分配」五個連結皆以 `toBeInViewport({ ratio: 1 })` 完整落在視口內，且高度不高於 1280px 下的高度＋4px；
-  640px 與 1280px 下「登入」連結可見、完整落在視口內，且右緣不小於「對戰分配」右緣（位於 `<nav>` 之後）
-- **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下隱藏帳號入口且五個導航連結皆完整落在視口內」
+- **GIVEN** 以 `page.route` 攔住 `/api/session`，使頁面停在 loading；瀏覽器為各 E2E project 的預設視口
+- **WHEN** 等 `document.fonts.ready` 後量測五個導航連結與帳號入口根元素（header 內層容器中 `<nav>` 之後的元素）的 bounding box，再依序以 `{ authEnabled: true, user: null }`、
+  `{ authEnabled: true, user: { id, email, name } }`、`{ authEnabled: false, user: null }` 三種回應之一放行，等到對應狀態出現（「登入」連結、「登出」按鈕、`data-account-entry="disabled"`）並再等 `document.fonts.ready` 後再量一次
+- **THEN** 三種回應下，五個導航連結與帳號入口根元素的 `x` 與 `width` 前後差皆 ≤ 0.5px
+- **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-account-entry.spec.ts`，test 名稱「帳號入口載入前後導航連結位置不變」
+
+#### Scenario: 帳號入口：各寬度下入口與五個導航連結皆完整落在視口內
+
+- **GIVEN** 以 `page.route` 回應 `/api/session` 為啟用且未登入，及已登入兩種狀態
+- **WHEN** viewport 寬度分別為 320、375、390、640、1280px
+- **THEN** 帳號入口（「登入」連結或「登出」按鈕）與「首頁」「完整體驗」「計分板」「測驗」「對戰分配」五個連結皆以 `toBeInViewport({ ratio: 1 })` 完整落在視口內
+- **THEN** 五個連結的高度不高於 1280px 下的高度＋4px（不換行）；帳號入口右緣不小於「對戰分配」右緣（位於 `<nav>` 之後）
+- **THEN** header 內層容器 `scrollWidth <= clientWidth`，且 `document.documentElement.scrollWidth <= window.innerWidth`（頁面無水平溢出）
+- ⚠️ 兩條 `scrollWidth` 斷言為輔助：header 是 `fixed` 的 flex 容器，溢出通常撐不大 document；主要把關是 `toBeInViewport({ ratio: 1 })`
+- **驗收**：`nextjs-pickball/tests/e2e/specs/navbar-account-entry.spec.ts`，test 名稱「各寬度下帳號入口與五個導航連結皆完整落在視口內且不溢出」
+
+#### Scenario: 帳號入口：窄螢幕下可由 navbar 前往登入頁
+
+- **GIVEN** 前後端 dev server 皆已啟動、`.dev.vars` 齊備，瀏覽器為訪客，viewport 寬度 390px
+- **WHEN** 開啟 `/` 並點擊 header 內的「登入」
+- **THEN** 導向 `/login` 並顯示「電子郵件」欄位
+- **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下 navbar 登入入口可前往登入頁」

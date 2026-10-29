@@ -360,7 +360,7 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 - `loading`：不顯示表單（避免閃現）。
 - `authEnabled === false`：顯示「此環境未開放登入」，SHALL NOT 顯示任何輸入欄位。
 - 已登入：顯示「已登入：<name>」、回首頁的連結與「登出」按鈕，不顯示表單。點擊「登出」後呼叫 `signOut()`，再呼叫 store 的 `refresh()`，停留在 `/login`
-  （窄螢幕下 navbar 不顯示帳號入口，登出由本頁提供，見 `site-navbar`「navbar 顯示帳號入口」）。
+  （navbar 的帳號入口於所有寬度皆提供登出，見 `site-navbar`「navbar 帳號入口於各寬度可見且預留固定寬度」；本頁的「登出」按鈕保留為第二個入口）。
 - 啟用且未登入：顯示「電子郵件」「密碼」兩個欄位與「登入」按鈕。送出期間按鈕 MUST 為 disabled。
   - 成功 → 呼叫 store 的 `refresh()` 後以 `router.replace("/")` 導向首頁；
   - `invalid-credentials` → 顯示「帳號或密碼錯誤」，保留 email、清空密碼；
@@ -463,7 +463,8 @@ server snapshot MUST 固定為 `{ status: "loading" }`——伺服器端與 hydr
 
 - **GIVEN** 前後端 dev server 皆已啟動，`.dev.vars` 齊備，瀏覽器為訪客（獨立的新 session），viewport 寬度 390px
 - **WHEN** 開啟 `/login` 以測試帳號登入；再開啟 `/login` 按「登出」
-- **THEN** 登入後導向 `/` 且 navbar 不顯示帳號入口；回到 `/login` 時顯示「已登入：<name>」與「登出」按鈕；登出後顯示「電子郵件」欄位，重新整理後仍為登入表單
+- **THEN** 登入後導向 `/` 且 header 內顯示名稱為「登出」的按鈕、不顯示「登入」連結；回到 `/login` 時 `main` 內顯示「已登入：<name>」與「登出」按鈕；按 `main` 內的「登出」後顯示「電子郵件」欄位，重新整理後仍為登入表單
+- 斷言 MUST 以 `main` 或 `header` 限定範圍：登入頁已登入時 header 與 `main` 各有一個「登出」按鈕，未限定範圍會同時比對到兩個
 - **驗收**：`nextjs-pickball/tests/e2e/specs/auth-session.spec.ts`，test 名稱「窄螢幕下可經由登入頁登入與登出」
 
 ### Requirement: 換帳號用的衍生測試帳號
