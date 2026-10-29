@@ -213,11 +213,17 @@ Depends on: §5
   - 完成（設定層，文件；本 commit）：`nextjs-pickball/CLAUDE.md` 新增「本機資料匯入雲端（B9）」段（入口、JSON 還原在登入時的語意、使用者定案、一次性雲端操作與共用文案模組）、`lib/sync/local-import.ts` 條目；
     改寫舊敘述「JSON 還原停用，改顯示說明」「登入態 JSON 還原目前停用，B9 決定其去留」為 B9 定案語意，「交接給 B9」標註已落實，一次性雲端操作清單補本機資料匯入與雲端 JSON 匯入。
     `hono-pickball/CLAUDE.md` 新增「本機資料匯入 API」段（`POST /api/import` 的 sub-app、固定 7 條陳述式的 batch 與守衛範圍、409／500 分類、大量插入用 `json_each` 使陳述式數量為常數）；守衛樣本表條數 14 → 15；後續須知第 2 點標已完成、第 3 點補「B9 評估後不抽 `guardedBatch`」。
-- [ ] 6.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 6.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
-- [ ] 6.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
-- [ ] 6.5 驗收（指令）C4：`pnpm build` exit 0
-- [ ] 6.6 驗收（指令）C5：`db:generate` 無新檔
+- [x] 6.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 完成（2026-10-29，HEAD `546f7fd`，持雙鎖）：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`（含 `test/tsconfig.json`）、`pnpm --filter ./packages/pickball-core typecheck`（含 `test/tsconfig.json`）皆 exit 0。
+- [x] 6.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
+  - 完成：`pnpm lint` exit 0，`✖ 3 problems (0 errors, 3 warnings)`；三條 warning 與基線逐字相同（`useQuiz.ts` `_correctIndex`、`useRosterStore.ts` `_arg`、`useScoreboardStore.ts` `_arg`），無新增。
+- [x] 6.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
+  - 完成（持雙鎖）：`pnpm test` exit 0。前端 109 檔／1068（基線 105／1054，+4 檔／+14：`lib/sync/local-import.test.ts`、`LocalDataImportSection.test.tsx`、`JsonBackupSection.test.tsx`、`local-import-view.test.ts`）；
+    後端 24 檔／177（基線 23／166，+1 檔／+11：`test/local-import.test.ts`）；核心 9 檔／21（基線 8／17，+1 檔／+4：`test/api/import.test.ts`）。
+- [x] 6.5 驗收（指令）C4：`pnpm build` exit 0
+  - 完成（持雙鎖）：`pnpm build` exit 0（核心 `tsc --noEmit`、後端 `tsc --noEmit && wrangler deploy --dry-run`、前端 Next build 皆成功）；建置後 `git status --porcelain` 為空。
+- [x] 6.6 驗收（指令）C5：`db:generate` 無新檔
+  - 完成：`pnpm --filter ./hono-pickball db:generate` 輸出 `No schema changes, nothing to migrate`；`git status --porcelain hono-pickball/drizzle` 為空。
 - [ ] 6.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
   既有 test 全數通過（扣除 5.1 授權刪除的 1 條），新增 5 個 test 全 passed（user-data 40 − 1 + 5 = 44），無因缺帳密 skip。依 project 分開跑（webkit、mobile-safari 各分 3 shard）。結果寫在本 task 後方；失敗不得自行判定為雜訊
 - [ ] 6.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate local-data-import --strict` 通過
