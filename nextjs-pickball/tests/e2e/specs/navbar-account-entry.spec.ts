@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 
 // 帳號入口在 /api/session 回應前後，五個導航連結與入口根元素的水平位置必須不變。
 // 入口是否啟用只有回應後才知道，因此 guest、user、disabled 三種回應都要驗；
@@ -94,7 +94,7 @@ async function holdSession(page: Page, body: SessionBody) {
 	const gate = new Promise<void>((resolve) => {
 		release = resolve;
 	});
-	const handler = async (route: import("@playwright/test").Route) => {
+	const handler = async (route: Route) => {
 		await gate;
 		try {
 			await route.fulfill({ json: body });
@@ -154,7 +154,11 @@ test.describe("帳號入口位移", () => {
 					const before = await measure(page);
 
 					held.release();
+					// waitReady 是 soft 斷言；等待失敗時頁面還停在 loading，前後量測會相同而全部通過，
+					// 因此以錯誤數是否增加判斷等待是否成功，失敗就不做位移比較。
+					const errorsBefore = test.info().errors.length;
 					await branch.waitReady();
+					if (test.info().errors.length > errorsBefore) return;
 					const after = await measure(page);
 
 					expectStable(before, after);

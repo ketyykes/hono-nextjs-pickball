@@ -71,13 +71,15 @@ function expectInvisiblePlaceholder(
 ) {
 	expect(container.childElementCount).toBe(1);
 	const root = container.firstElementChild as HTMLElement;
+	expect(root.tagName).toBe("SPAN");
 	expect(root.getAttribute("aria-hidden")).toBe("true");
 	expect(root.className.split(/\s+/)).toContain("invisible");
 	expect(root.getAttribute("data-account-entry")).toBe(state);
 	// hidden: true 讓 aria-hidden 的元素也納入查詢，確認真的沒有互動元素。
 	expect(screen.queryAllByRole("link", { hidden: true })).toHaveLength(0);
 	expect(screen.queryAllByRole("button", { hidden: true })).toHaveLength(0);
-	expect(root.querySelector("a, button, input, [tabindex]")).toBeNull();
+	// 對 container 查詢才會涵蓋根元素本身；只查 root 的子孫，根元素加 tabindex 會漏掉。
+	expect(container.querySelector("a, button, input, [tabindex]")).toBeNull();
 	const icon = root.firstElementChild;
 	expect(icon).not.toBeNull();
 	expect(icon?.className.split(/\s+/)).toContain("size-4");
