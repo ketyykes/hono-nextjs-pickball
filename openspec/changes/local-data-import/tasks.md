@@ -224,6 +224,11 @@ Depends on: §5
   - 完成（持雙鎖）：`pnpm build` exit 0（核心 `tsc --noEmit`、後端 `tsc --noEmit && wrangler deploy --dry-run`、前端 Next build 皆成功）；建置後 `git status --porcelain` 為空。
 - [x] 6.6 驗收（指令）C5：`db:generate` 無新檔
   - 完成：`pnpm --filter ./hono-pickball db:generate` 輸出 `No schema changes, nothing to migrate`；`git status --porcelain hono-pickball/drizzle` 為空。
-- [ ] 6.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
+- [x] 6.7 驗收（指令）C6：`.dev.vars` 齊備下，依 runbook「每開一個新 change 的標準流程」第 4 步的 E2E 指令執行（含 user-data project），前後清殘留 dev server；
   既有 test 全數通過（扣除 5.1 授權刪除的 1 條），新增 5 個 test 全 passed（user-data 40 − 1 + 5 = 44），無因缺帳密 skip。依 project 分開跑（webkit、mobile-safari 各分 3 shard）。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 6.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate local-data-import --strict` 通過
+  - 完成（2026-10-29 21:33～21:49，HEAD `26467b6`，`.dev.vars` 齊備；每個 project 各自取共用鎖＋heavy.py、前後以 lsof／ps 清殘留（皆無殘留））。指令 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p> [--shard=n/3]`（repo root cwd）：
+    user-data **44 passed**（40 − 1 + 5，0 skipped、0 failed）；chromium 145 passed；firefox 133 passed＋12 skipped；mobile-chrome 143 passed＋2 skipped；
+    webkit 1/3 44＋5 skipped、2/3 41＋7 skipped、3/3 48（合計 145）；mobile-safari 1/3 44＋5 skipped、2/3 41＋7 skipped、3/3 48（合計 145）。**全部 0 failed、0 flaky、無重跑**。
+    skip 全為既有 spec 內「只需在 chromium 執行一次」的瀏覽器條件（`api-health`、`auth-proxy`（依 project 名稱，故 mobile-chrome 亦 skip）、`auth-session` 窄螢幕、`navbar-rwd`），**無因缺帳密 skip**；`git diff main -- nextjs-pickball/tests/e2e/specs nextjs-pickball/playwright.config.ts` 為空。
+- [x] 6.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate local-data-import --strict` 通過
+  - 完成：`DO_NOT_TRACK=1 openspec validate local-data-import --strict` → `Change 'local-data-import' is valid`（HEAD 含 6.1～6.7 紀錄）。
