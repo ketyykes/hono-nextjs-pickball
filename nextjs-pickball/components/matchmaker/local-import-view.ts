@@ -31,14 +31,11 @@ export interface ImportResultView {
 
 /** 本機資料的筆數摘要，匯入前顯示給使用者確認。 */
 export function describeLocalSummary(summary: LocalImportSummary): string {
-	const base =
+	return (
 		`本機資料：${summary.players} 位參賽者、${summary.history} 筆歷史、` +
 		`${summary.round ? 1 : 0} 個回合、${summary.slots} 個場次計分板、` +
-		`${summary.scoreboardCurrent ? 1 : 0} 場獨立計分板`;
-	if (summary.duplicateHistorySkipped > 0) {
-		return `${base}（另有 ${summary.duplicateHistorySkipped} 筆重複歷史將略過）`;
-	}
-	return base;
+		`${summary.scoreboardCurrent ? 1 : 0} 場獨立計分板`
+	);
 }
 
 /** 把匯入結果轉成畫面文案；是否刷新 session 由呼叫端依 outcome.kind 決定，這裡不碰。 */
