@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 vi.mock("@/hooks/useScrolledPast", () => ({
 	useScrolledPast: vi.fn(() => false),
@@ -132,6 +132,30 @@ describe("SiteNavbar", () => {
 		for (const link of links) {
 			expect(link.className.split(/\s+/)).toContain("whitespace-nowrap");
 		}
+	});
+
+	it("窄螢幕下導航連結內距與容器間距依斷點遞減", () => {
+		const { container } = render(<SiteNavbar />);
+
+		// 帳號入口改為窄螢幕也顯示，空間靠連結內距與容器間距逐階讓出；
+		// 以精確 token 比對，避免 px-1.5 與 max-[375px]:px-1.5 之類的子字串互相誤判。
+		const navLinks = within(screen.getByRole("navigation")).getAllByRole("link");
+		expect(navLinks).toHaveLength(5);
+		for (const link of navLinks) {
+			const tokens = link.className.split(/\s+/);
+			expect(tokens).toContain("px-1.5");
+			expect(tokens).toContain("max-[375px]:px-1");
+			expect(tokens).toContain("sm:px-3");
+			expect(tokens).not.toContain("px-2");
+			expect(tokens).not.toContain("max-[375px]:px-1.5");
+		}
+
+		const wrapper = container.querySelector("header > div");
+		expect(wrapper).not.toBeNull();
+		const wrapperTokens = (wrapper?.className ?? "").split(/\s+/);
+		expect(wrapperTokens).toContain("gap-1");
+		expect(wrapperTokens).toContain("sm:gap-6");
+		expect(wrapperTokens).not.toContain("gap-3");
 	});
 
 	it("logo 以 LogoMark 符號呈現而非 emoji", () => {

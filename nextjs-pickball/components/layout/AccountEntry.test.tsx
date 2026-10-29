@@ -186,19 +186,23 @@ describe("AccountEntry", () => {
 		);
 	});
 
-	it("登入連結與登出按鈕在 sm 以下隱藏", () => {
+	it("登入連結與登出按鈕不在任何斷點隱藏", () => {
 		mockLoggedOut();
 		const loggedOut = render(<AccountEntry solid={true} />);
-		const linkClass = screen.getByRole("link", { name: "登入" }).className;
-		expect(linkClass).toContain("hidden");
-		expect(linkClass).toContain("sm:inline-flex");
+		const linkTokens = screen.getByRole("link", { name: "登入" }).className.split(/\s+/);
+		expect(linkTokens).toContain("inline-flex");
+		expect(linkTokens).not.toContain("hidden");
+		expect(linkTokens).not.toContain("sm:inline-flex");
 		loggedOut.unmount();
 
 		mockLoggedIn();
 		render(<AccountEntry solid={true} />);
-		const buttonClass = screen.getByRole("button", { name: "登出" }).className;
-		expect(buttonClass).toContain("hidden");
-		expect(buttonClass).toContain("sm:inline-flex");
+		const buttonTokens = screen
+			.getByRole("button", { name: "登出" })
+			.className.split(/\s+/);
+		expect(buttonTokens).toContain("inline-flex");
+		expect(buttonTokens).not.toContain("hidden");
+		expect(buttonTokens).not.toContain("sm:inline-flex");
 	});
 
 	it("登出請求失敗時仍重新取得 session", async () => {
