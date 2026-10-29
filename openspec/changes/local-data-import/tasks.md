@@ -183,10 +183,19 @@ Depends on: §4
     紅燈輸出（`playwright test --workers=1 --project=user-data local-import.spec.ts roster-sync.spec.ts history-sync.spec.ts`）：`9 failed, 13 passed`。local-import 5 條全紅（找不到雲端匯入說明文字／匯入按鈕／`local-import-notice`／「本機沒有可匯入的資料」）；改常數的 4 條同步點 test（roster-sync「登入時 CSV 匯入的參賽者寫入雲端」「登入時 CSV 匯入確認中不可重複送出」「登入時 JSON 匯出的參賽者來自雲端」、history-sync「登入時歷史 CSV 匯出的內容來自雲端」）全紅（`getByText(JSON_CLOUD_IMPORT_HINT_TEXT)` 找不到）；其餘 13 條既有 test 原樣通過。
     機械複驗：`git show cfe7bf3^:` 查 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`tests/e2e/user-data/local-import.spec.ts`、`JsonBackupSection.test.tsx` 皆 `fatal: path … does not exist`；`JsonBackupSection.tsx` 在 `cfe7bf3^` 不含 `json-backup-cloud-import-input`（`grep -c` 為 0）。
     先綠者：無（5 個 E2E、2 個 it、4 個同步點 test 寫入當下皆紅）。
-- [ ] 5.2 GREEN（例外層：I/O 樣板元件與頁面，以 5.1 驗收）：新增 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`（本機讀取在 effect 內）；
+- [x] 5.2 GREEN（例外層：I/O 樣板元件與頁面，以 5.1 驗收）：新增 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`（本機讀取在 effect 內）；
   `app/matchmaker/data/page.tsx` 掛載區塊（雲端模式）、`app/matchmaker/players/page.tsx` 掛載提示（雲端模式）；`JsonBackupSection.tsx` 雲端分支改為匯入（本機分支不動）。
   5.1 全綠（E2E 5 條、元件 2 個 it，以及授權改寫同步點的既有 4 條 E2E）；不得以 `waitForTimeout` 取代狀態等待
-- [ ] 5.3 REFACTOR：兩個元件的結果文案是否集中為具名常數（比照 `TRANSFER_MESSAGES`）；無壞味道則註記 skipped
+  - 完成（GREEN commit `1ed7494`；`42a356d` 移除 spec 未要求的重複歷史摘要文案；`8e0046d` 補強斷言）：新增 `LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`LocalImportResultMessage.tsx`、`local-import-view.ts`（兩個入口共用的文案常數與結果轉換）；`data/page.tsx` 掛區塊、`players/page.tsx` 在 `synced` 且名單為空時掛提示；`JsonBackupSection.tsx` 雲端分支改為匯入（本機分支一行未改，`git diff main -- nextjs-pickball/lib/matchmaker nextjs-pickball/lib/scoreboard` 為空）。未新增 hook、未新增相依。
+    驗證：單檔 vitest 兩個元件 it 綠；`playwright --project=user-data local-import.spec.ts` 5 passed；`--project=user-data` 全數 44 passed（40 − 1 + 5）；改常數的 4 條同步點 test 全綠；訪客守護 `--project=chromium matchmaker-data-transfer／matchmaker-local-mode／player-roster` 23 passed；`pnpm -r exec tsc --noEmit`、hono-pickball typecheck、pickball-core typecheck 皆 exit 0；`eslint components/matchmaker app/matchmaker tests/e2e/user-data` exit 0；前端全套 vitest 108 檔／1061 個 passed。
+    **先綠者（regression guard，`8e0046d`）**：GREEN 後 mutation 發現存活變異而補強的斷言，寫入當下即綠：兩個元件測試的 guest 階段與「user id 殘缺不送出」階段、`local-import.spec.ts` 的結果整句斷言／摘要與說明逐字斷言／JSON 重複匯入顯示雲端已有資料且不 reload／提示連結導到 `#local-import`／訪客不顯示提示。5.1 的 5 個 E2E、2 個 it、4 個同步點 test 皆為真紅後轉綠。
+    Mutation（Implementer 自跑，共 43 條；harness 三重落地檢查 `src.count(old)==1`、`new != old`、`git diff --stat` 有輸出，每次還原後 `git status` 乾淨；元件層用單檔 vitest（輸出須含 `Test Files`），需要 E2E 者用 `--project=user-data local-import.spec.ts`）：
+    - 元件 it 層 15 條（14 條 + E22）：匯入區塊固定／過期 user id、user id 為 null 仍送出、未授權不 refresh、本機模式也渲染（`LocalDataImportSection` 的「匯入以點擊當下…」）；JSON 雲端匯入固定／過期 user id、null 仍送出、未授權不 refresh、**雲端分支寫入本機**、**清除本機名單**、區塊在本機模式也走雲端分支（`JsonBackupSection` 的「雲端 JSON 匯入以點擊當下…」）；`describeImportOutcome` 的 401 分類成失敗文案（E22）——**全部轉紅**；等價對照 U14（標題 className）如預期存活。
+    - E2E 層 27 條中 24 條轉紅：參賽者頁在雲端名單非空仍顯示提示（E01，「雲端名單為空且本機有資料時…」）、提示不限雲端模式（E02，同 test 的訪客階段）、提示在本機無資料時顯示（E03、E04，同 test 的第一階段）、送出期間按鈕未停用（E05，「重複匯入時…」）、409 分類成失敗（E06）、失敗文案換成 409 文案（E07）、skipped 文案永不出現／非 skipped 也出現（E08、E09）、`isEmpty`／`oversize` 不顯示說明或仍渲染按鈕（E10～E13，「本機沒有資料時…」）、成功後清除本機名單／清除獨立計分板／寫入本機歷史（E14～E16，「登入後匯入本機資料…並保留本機資料」）、成功後 reload（E17）、JSON 雲端匯入成功後 reload（E18，「登入時以 JSON 備份匯入…」）、JSON 忽略錯誤結果（U12，同 test 的重複匯入階段）、說明文字／成功文案回合數／payload 少歷史（E19～E21）、JSON 說明文字（E24）、提示連結指向錯誤頁／錨點 id 改名（E25、E26）。
+    - 存活 3 條皆為預期：E23 等價對照（錯誤訊息 className）；E27 與 U05 同一變異（本機模式也渲染匯入區塊），E2E 層看不到（登入態 spec 不跑訪客頁），由 U05 在元件 it 層轉紅；E22 在 E2E 層存活（401 無法在 E2E 內自然觸發），改由元件 it 層轉紅。
+    - 說明：`userId === null` 的防線在真實 `resolveStorageMode` 下只有 session 資料殘缺（已登入但 `user.id` 缺失）才走得到，所以兩個元件 it 以型別轉型模擬殘缺 session 來殺 U03／U08。
+- [x] 5.3 REFACTOR：兩個元件的結果文案是否集中為具名常數（比照 `TRANSFER_MESSAGES`）；無壞味道則註記 skipped
+  - skipped（無壞味道）：兩個入口的結果文案與結果轉換已在 5.2 直接集中於 `components/matchmaker/local-import-view.ts` 的 `LOCAL_IMPORT_MESSAGES`／`describeImportOutcome`（比照 `TRANSFER_MESSAGES`／`REMOTE_TRANSFER_MESSAGES`），`LocalDataImportSection` 與 `JsonBackupSection` 沒有各自內嵌的文案字串；無額外重構。
 
 ## 6. 文件同步與總驗收
 
