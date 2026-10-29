@@ -702,6 +702,10 @@ describe("local-import", () => {
 		expect(JSON.parse(fetchMock.mock.calls[11][1]?.body as string)).toEqual(
 			JSON.parse(JSON.stringify(requestWithInactive)),
 		);
+
+		// 前面的快照比對時送出的請求都等於本機內容，寫回也看不出差異；
+		// 與本機不同的請求（JSON 備份匯入的情境）送出後再比一次，才能抓到把請求寫回本機
+		expect(snapshotKeys()).toEqual(before);
 	});
 
 	it("JSON 備份轉為匯入請求時計分板為空", () => {
