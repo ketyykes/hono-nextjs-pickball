@@ -1,5 +1,10 @@
 # 計分機制後端化 B1～B9 執行手冊（runbook）
 
+> 📌 **歷史紀錄（2026-10-30 歸檔）。** 原位於 repo root；B1～B9（含 B7.5）已全部合併並 archive、S1／S2 本機驗收通過，
+> 依 prd.md 的「歸檔不刪除」慣例搬至 `docs/`。現行行為以 `openspec/specs/` 與各 workspace 的 `CLAUDE.md` 為準；
+> 已封存 change 文件（`openspec/changes/archive/`）引用的「`backend-scoring-runbook-b1-b9.md`」即本檔。
+> 唯一未做的 **G1（Google 登入與上線）** 仍以本檔「G1 暫緩」一節與各棒紀錄中的「G1 前必修」為依據；開 G1 時請另立新手冊，本檔不再更新。
+
 > 給接手的 coordinator agent。目標：把**計分板（`/scoreboard`）與對戰分配機（`/matchmaker`）**
 > 目前存在瀏覽器 LocalStorage 的資料與計分邏輯，搬到 `hono-pickball`（Cloudflare Workers + D1），
 > 以登入使用者為單位保存。正式登入方式為 **Google 登入，但 Google 端設定暫緩**（見「G1 暫緩」）；

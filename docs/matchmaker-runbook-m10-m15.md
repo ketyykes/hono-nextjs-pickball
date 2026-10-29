@@ -1,5 +1,8 @@
 # Matchmaker M10～M15 apply 執行手冊（runbook）
 
+> 📌 **歷史紀錄（2026-10-30 歸檔）。** 原位於 repo root；M10～M15 已全部 apply／verify／archive，本檔零待辦，
+> 依 prd.md 的「歸檔不刪除」慣例搬至 `docs/`。已封存 change 文件引用的「`matchmaker-runbook-m10-m15.md`」即本檔。
+
 ## 🏁 全流程結束：apply、merge、verify、archive 皆已完成（2026-09-11）
 
 **matchmaker M10～M15 六個 change 全部 apply、合併、verify、archive 完畢，本檔已無待辦事項。**
