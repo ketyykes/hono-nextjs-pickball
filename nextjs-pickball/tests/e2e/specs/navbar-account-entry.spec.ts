@@ -107,7 +107,7 @@ async function holdSession(page: Page, body: SessionBody) {
 		release,
 		async dispose() {
 			release();
-			await page.unroute("**/api/session", handler, { behavior: "ignoreErrors" });
+			await page.unroute("**/api/session", handler);
 		},
 	};
 }
