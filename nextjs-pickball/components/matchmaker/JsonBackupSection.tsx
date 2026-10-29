@@ -19,18 +19,17 @@ import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 import { backupToImportRequest, importLocalData } from "@/lib/sync/local-import";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
-// JSON 完整備份區塊（M8 §8.4／§8.9）：涵蓋匯出（Blob + <a download>）與匯入
+// JSON 完整備份區塊：涵蓋匯出（Blob + <a download>）與匯入
 // （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
 // 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker，「Blob → 下載」的樣板抽到
-// 共用函式 downloadTextFile，與 HistoryCsvSection 共用，見 Final Review m2）。
+// 共用函式 downloadTextFile，與 HistoryCsvSection 共用）。
 // Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在元件層（design Decision 7），
 // lib/matchmaker/backup.ts 與 transfer-storage.ts 只回傳純資料或可判讀的結果物件。
 //
 // exportedAt MUST 直接來自 new Date().toISOString()（spec「JSON 完整備份的匯出內容」），
 // SHALL NOT 由使用者輸入或其他來源取得。
 //
-// parseBackup／writeBackup 的失敗分支只有 message，沒有機器可讀的 code（M8 §3 Stage 2
-// review m4 的交棒記錄）：語法／版本／結構三種失敗一律原樣顯示 message，不做分類、
+// parseBackup／writeBackup 的失敗分支只有 message，沒有機器可讀的 code：語法／版本／結構三種失敗一律原樣顯示 message，不做分類、
 // 不用字串比對 message 內容判斷類別。
 export function JsonBackupSection() {
 	const [message, setMessage] = useState<string | null>(null);

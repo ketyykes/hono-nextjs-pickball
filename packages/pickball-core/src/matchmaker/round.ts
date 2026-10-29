@@ -1,8 +1,7 @@
-// 產生本輪對戰與休息結算。本段的對外入口為 createRound()：把 M2 allocateRound() 的
+// 產生本輪對戰與休息結算。本段的對外入口為 createRound()：把 allocateRound() 的
 // in-memory 輸出（Match 內嵌完整 Player）投影成可持久化的 Round／RoundMatch，
 // 並推導出下一輪要用的重複比對基準與休息次數 patch。本檔 SHALL NOT 重新實作
-// allocateRound 已負責的排序、配對或重複迴避（matchmaker-allocation-engine design
-// Decision 1、tasks 4.7）。
+// allocateRound 已負責的排序、配對或重複迴避。
 
 import { allocateRound } from "./allocation";
 import { EMPTY_SIGNATURE_INDEX, PLAYERS_PER_MATCH } from "./allocation-types";
@@ -27,7 +26,7 @@ import type {
 } from "./round-types";
 
 /**
- * 失敗代碼，具名常數（tasks 4.10）：三種空狀態（名單為空／人數不足／全員暫停）與場地數
+ * 失敗代碼，具名常數：三種空狀態（名單為空／人數不足／全員暫停）與場地數
  * 不合法各自獨立，訊息與修正方式互不相同（spec「無參賽者與人數不足時的邊界行為」）。
  */
 export const ROUND_FAILURE_CODE = {
@@ -65,9 +64,9 @@ export interface CreateRoundInput {
 	readonly newMatchId: () => string;
 	/** 本輪的目標分數，省略時採 DEFAULT_TARGET_SCORE。預設值落在本層而非 schema 層：
 	 * RoundSchema 刻意不帶 .default()，否則一份 targetScore 損壞的回合資料會被靜默補成 11
-	 * 而不是被判為損壞（design Decision 4）。 */
+	 * 而不是被判為損壞。 */
 	readonly targetScore?: RoundTargetScore;
-	/** 本輪的計時長度，省略或為 null 時採不計時（design Decision 1：計時比照目標分數的
+	/** 本輪的計時長度，省略或為 null 時採不計時（計時比照目標分數的
 	 * 每輪設定模式）。與 targetScore 不同，這裡刻意允許顯式傳入 null——「不計時」是
 	 * RoundTimerDurationMinutes 值域外的合法選項，不能用「省略」與「顯式選擇不計時」
 	 * 共用同一種表達。 */
@@ -101,15 +100,14 @@ function toRoundTeam(team: Team): RoundTeam {
 }
 
 // playerRatings[].before 於建立回合時就填入（prd.md 6.1「每輪需保存……賽前分數」），
-// after 固定為 null——本函式不判定勝負也不呼叫評分模組，該欄位要等 §6 送出比分時才填入
-// （design Decision 3）。
+// after 固定為 null——本函式不判定勝負也不呼叫評分模組，該欄位要等送出比分時才填入。
 function toPlayerRatings(match: Match): PlayerRating[] {
 	return match.teams.flatMap((team) => team.players.map((p) => ({ playerId: p.id, before: p.rating, after: null })));
 }
 
 // courtNumber 由呼叫端指定而非直接取 match.courtNumber：createRound 沿用 allocateRound
 // 指派的 1 起算連續編號，重排則必須避開保留場次已佔用的編號（見 takeFreeCourtNumbers）。
-// 兩處共用同一份投影，SHALL NOT 各寫一份（tasks 5.7）。
+// 兩處共用同一份投影，SHALL NOT 各寫一份。
 function toRoundMatch(match: Match, id: string, courtNumber: number): RoundMatch {
 	const teams: [RoundTeam, RoundTeam] = [toRoundTeam(match.teams[0]), toRoundTeam(match.teams[1])];
 
@@ -193,14 +191,14 @@ function toSignatureMatch(match: RoundMatch): Match {
 
 // 一組 RoundMatch 的簽章索引：先投影成簽章專用的 stand-in Match，再交給 duplication.ts。
 // createRound（上一輪自身簽章）與 resetIncompleteMatches（被丟棄的原始組合）共用這一份，
-// 兩處 SHALL NOT 各寫一遍 map(toSignatureMatch)（tasks 5.7）。
+// 兩處 SHALL NOT 各寫一遍 map(toSignatureMatch)。
 function signatureIndexOf(matches: readonly RoundMatch[]): SignatureIndex {
 	return buildSignatureIndex(matches.map(toSignatureMatch));
 }
 
 // 上一輪自身的 completed／scoring 場次建出的索引——這就是新回合要保存的 seenSignatures
 // （scenario「上一輪已完成與進行中的場次納入重複比對基準」）。pending 場次一律略過：
-// 那些對戰從未發生，當成已配過會無謂限制新一輪的配對空間（design Decision 2）。
+// 那些對戰從未發生，當成已配過會無謂限制新一輪的配對空間。
 function previousRoundOwnSignatures(previousRound: Round | null): SignatureIndex {
 	if (previousRound === null) {
 		return EMPTY_SIGNATURE_INDEX;
@@ -212,11 +210,11 @@ function previousRoundOwnSignatures(previousRound: Round | null): SignatureIndex
 }
 
 // 餵給 allocateRound() 的暫時性避讓基準：上一輪自身的場次簽章（ownSignatures，即將成為
-// 本輪要保存的 seenSignatures），再併入上一輪回合自身攜帶的 seenSignatures（tasks 4.4）。
+// 本輪要保存的 seenSignatures），再併入上一輪回合自身攜帶的 seenSignatures。
 // 這個併入刻意只影響「本次呼叫 allocateRound 用來避開重複的候選集合」，不進入本輪要保存
 // 的 seenSignatures 欄位——若把它也存進本輪的欄位，下一輪建立時又會把「已經包含上上輪
 // 東西」的本輪欄位再併入*下一輪*的避讓基準，如此遞迴下去，三輪前（以上）的簽章會透過
-// 這條路徑無限傳遞，等同真的在累積全部歷史，違反 design Decision 2「基準只取上一輪，
+// 這條路徑無限傳遞，等同真的在累積全部歷史，違反「基準只取上一輪，
 // 不累積更早的回合」。
 // 這個分岔讓兩種東西的深度不同，且兩者都是刻意的：本函式回傳的「避讓基準」依 spec 正文
 // 「併入上一輪回合物件本身攜帶的 seenSignatures」刻意橫跨兩輪（上一輪自身 ownSignatures
@@ -233,7 +231,7 @@ function avoidanceBasis(previousRound: Round | null, ownSignatures: SignatureInd
 	return mergeSignatureIndexes(ownSignatures, toSets(previousRound.seenSignatures));
 }
 
-// ---- 休息次數結算（design Decision 1：本輪結束＝產生新一輪的那一刻） ----
+// ---- 休息次數結算（本輪結束＝產生新一輪的那一刻） ----
 
 // 只讀上一輪的 restingPlayerIds，不重新推導「誰該休息」——那是 candidates.ts 的職責，
 // 這裡只負責把「已經決定要休息的人」各自的目前 restCount 讀出來 +1。暫停出場者
@@ -259,7 +257,7 @@ function computeRestSettlements(players: readonly Player[], previousRound: Round
 
 /**
  * 產生本輪對戰：呼叫 allocateRound() 並把結果投影成可持久化的 Round，同時回傳上一輪
- * 休息名單的 restCount 結算 patch。「本輪結束」＝呼叫本函式的那一刻（design Decision 1）：
+ * 休息名單的 restCount 結算 patch。「本輪結束」＝呼叫本函式的那一刻：
  * 結算與取代目前回合須在 useRoundStore 的同一次 reducer action 內一併套用，本函式
  * 只負責一次算出兩者，不負責套用。
  */
@@ -275,8 +273,8 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		timerDurationMinutes = null,
 	} = input;
 
-	// 邊界檢查集中於此一處（tasks 4.10）：allocateRound 對名單相關的邊界不拋錯而是自然
-	// 回傳空 matches（M2 的既有行為，見 allocation.ts 頂端註解），本函式是唯一呼叫端，
+	// 邊界檢查集中於此一處：allocateRound 對名單相關的邊界不拋錯而是自然
+	// 回傳空 matches（allocation.ts 的既有行為，見該檔頂端註解），本函式是唯一呼叫端，
 	// 必須自己判斷、拒絕建立一個沒有任何場次的空回合。三種空狀態的判斷順序刻意由窄到寬：
 	// 先分辨「完全沒有名單」與「名單非空但全員暫停」（兩者的可用人數同為 0，但修正方式不同、
 	// 訊息 MUST 不同），最後才是「可用人數非 0 但不足以組成任何一場」。
@@ -309,8 +307,8 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		});
 	} catch {
 		// 名單相關的邊界已在上方擋下，執行到這裡時 allocateRound 唯一可能拋出的原因是
-		// 場地數不合法（M2 的 assertValidCourtCount）。本函式是唯一呼叫端，MUST 接住這個
-		// Error 轉為同一種可判讀的失敗結果，SHALL NOT 讓例外穿透到 UI 層（tasks 4.9）。
+		// 場地數不合法（allocation.ts 的 assertValidCourtCount）。本函式是唯一呼叫端，MUST 接住這個
+		// Error 轉為同一種可判讀的失敗結果，SHALL NOT 讓例外穿透到 UI 層。
 		return { ok: false, code: ROUND_FAILURE_CODE.INVALID_COURT_COUNT, message: INVALID_COURT_COUNT_MESSAGE };
 	}
 
@@ -325,7 +323,7 @@ export function createRound(input: CreateRoundInput): CreateRoundResult {
 		matches,
 		restingPlayerIds: allocation.resting.map((p) => p.id),
 		seenSignatures: toArrays(ownSignatures),
-		// 產生本輪一律給全新的 timer（design Decision 4）：即使沿用與上一輪相同的
+		// 產生本輪一律給全新的 timer：即使沿用與上一輪相同的
 		// durationMinutes，startedAt 仍固定為 null，不沿用上一輪 timer 物件的倒數狀態。
 		timer: timerDurationMinutes === null ? null : { durationMinutes: timerDurationMinutes, startedAt: null },
 	};
@@ -382,7 +380,7 @@ export function setTargetScore(round: Round, targetScore: RoundTargetScore): Set
 	return { ok: true, round: { ...round, targetScore } };
 }
 
-// ---- 計時設定：每輪設定，開始計分後鎖定（design Decision 1，鎖定條件比照 setTargetScore） ----
+// ---- 計時設定：每輪設定，開始計分後鎖定（鎖定條件比照 setTargetScore） ----
 
 /**
  * setTimerDuration 的失敗代碼。與 SET_TARGET_SCORE_FAILURE_CODE 分開宣告的理由相同：
@@ -413,7 +411,7 @@ export type SetTimerDurationResult = SetTimerDurationSuccess | SetTimerDurationF
  * 更改該輪的計時長度：鎖定條件與 setTargetScore 完全相同（該輪所有場次仍為 pending 時才
  * 允許），否則回傳失敗結果且原回合 SHALL NOT 被修改（純函式，回傳新回合由呼叫端套用）。
  *
- * 成功時一律回傳全新的 timer 物件、startedAt 重置為 null（design Decision 3）：變更計時
+ * 成功時一律回傳全新的 timer 物件、startedAt 重置為 null：變更計時
  * 長度代表使用者想要一段新的倒數，沿用舊的 startedAt 會讓剩餘時間依新長度立即重新計算，
  * 等同在使用者不知情的情況下悄悄跳秒。
  */
@@ -474,7 +472,7 @@ export function startTimer(round: Round, now: string): StartTimerResult {
 	return { ok: true, round: { ...round, timer: { ...round.timer, startedAt: now } } };
 }
 
-// ---- 重設與重排未完成場次（prd.md 6.2、design Decision 5） ----
+// ---- 重設與重排未完成場次（prd.md 6.2） ----
 
 /**
  * resetIncompleteMatches 的失敗代碼。兩種前置條件不成立的情境分開表達：UI 對「還沒產生
@@ -499,7 +497,7 @@ const NO_ROUND_MESSAGE = "目前沒有進行中的回合可以重排，請先產
 const NO_PENDING_MATCH_MESSAGE = "本輪已經沒有尚未開始的場次可以重排，如要換一批對戰組合請產生新一輪。";
 
 /**
- * 新場次的 id 來源。命名沿用 tasks 5.4 的 `ids`，內容與 CreateRoundInput.newMatchId 同一種
+ * 新場次的 id 來源，內容與 CreateRoundInput.newMatchId 同一種
  * 注入方式（純函式，本檔不呼叫 crypto.randomUUID()）。包成具名物件而非裸函式參數：
  * 第三個位置放一個匿名 () => string 在呼叫端讀起來只是個不明所以的引數，
  * `{ newMatchId }` 則自我說明。
@@ -545,11 +543,11 @@ function takeFreeCourtNumbers(count: number, occupied: ReadonlySet<number>): num
 
 /**
  * 重排本輪尚未比賽的人：保留 completed 與 scoring 場次原封不動，把 pending 場次全部丟棄，
- * 以「本輪尚未比賽者」重新跑一次完整的分配優先序（design Decision 5）。純函式——回傳新回合，
+ * 以「本輪尚未比賽者」重新跑一次完整的分配優先序。純函式——回傳新回合，
  * 原回合與 players 皆 SHALL NOT 被就地修改。
  *
- * 回傳值刻意不含任何 restCount patch：休息次數只在「產生新一輪」時結算，重排不是本輪結束
- * （design Decision 1）。這也是採用該方案的直接好處——重排會換掉休息名單成員，若本輪已經
+ * 回傳值刻意不含任何 restCount patch：休息次數只在「產生新一輪」時結算，重排不是本輪結束。
+ * 這也是採用該方案的直接好處——重排會換掉休息名單成員，若本輪已經
  * 先加過一次，這裡就得反過來撤銷。
  *
  * round 收 `Round | null` 而非要求呼叫端先自行判斷：「目前沒有回合」是 spec 明列的前置條件
@@ -580,7 +578,7 @@ export function resetIncompleteMatches(
 	// 候選池＝目前名單中不在保留場次裡的人。spec 把它寫成「pending 場次的球員 ∪ 本輪休息
 	// 名單成員」，在名單未變動時兩者是同一個集合；名單變動時取補集才是「本輪尚未比賽者」的
 	// 正確讀法——剛加入或剛恢復出場的人不可能出現在本輪的 pending 場次或 restingPlayerIds 裡，
-	// 而那正是主持人按下重排最常見的兩個動機（design Decision 5），照字面取聯集會讓重排
+	// 而那正是主持人按下重排最常見的兩個動機，照字面取聯集會讓重排
 	// 對這兩種情境完全無效。取補集另有兩個附帶好處：pending 場次只存 playerIds，要拿回
 	// Player 物件本來就得回名單查；補集連查表都省了，也不會因為某人已被刪除而查無此人。
 	// 暫停出場者不需要在這裡過濾，selectPlaying 已保證 isActive === false 者不進候選池。
@@ -588,12 +586,12 @@ export function resetIncompleteMatches(
 	const candidates = players.filter((player) => !occupiedPlayerIds.has(player.id));
 
 	// 已知行為（記錄用，不改動）：若 candidates 為空或人數不足以組成任何一場，下方
-	// allocateRound 依其既有邊界行為（M2）回傳空的 matches 陣列，本函式不會因此判定失敗——
+	// allocateRound 依其既有邊界行為回傳空的 matches 陣列，本函式不會因此判定失敗——
 	// 結果是 pending 場次被靜默丟棄且不補回，回合可能因此變成 0 場次、或只剩保留下來的
 	// completed／scoring 場次。這不是本函式的邊界檢查職責：spec「SHALL NOT 建立沒有場次的
 	// 空回合」那兩條 MUST 屬於「無參賽者與人數不足」Requirement，作用對象是 createRound
 	// 的建立回合路徑，不是這裡的重排路徑；本組 spec 未規範重排時候選池不足的行為，故非違規。
-	// 是否要在按鈕層擋下（例如禁用重排按鈕）留給後續 milestone 決定。
+	// 是否要在按鈕層擋下（例如禁用重排按鈕）尚未決定。
 
 	// 一場佔一個場地，所以直接扣場次數，而不是「相異 courtNumber 的個數」——後者在編號重複的
 	// 損壞資料上會少扣，排出比實際空場地更多的場次。
@@ -601,7 +599,7 @@ export function resetIncompleteMatches(
 
 	// 重排的避讓基準＝原回合已攜帶的基準（createRound 存進去的上一輪自身簽章）∪ 本次被丟棄的
 	// 原始 pending 組合。少了後者，輸入完全沒變時 allocateRound 會原封不動排出同一組人
-	// （prd.md 5.6 明列「重設前的原始對戰組合」為需記錄的項目，design Decision 5）。
+	// （prd.md 5.6 明列「重設前的原始對戰組合」為需記錄的項目）。
 	// 保留場次的簽章不必併入：那些人已被排除於候選池之外，新場次根本組不出含他們的組合。
 	const basis = mergeSignatureIndexes(toSets(round.seenSignatures), signatureIndexOf(discardedMatches));
 
@@ -676,7 +674,7 @@ export type ValidateScoreFailureCode = (typeof VALIDATE_SCORE_FAILURE_CODE)[keyo
 const EMPTY_FIELD_MESSAGE = "兩隊比分皆須填寫，請輸入完整比分後再試一次。";
 const INVALID_NUMBER_MESSAGE = "比分須為有效的整數，請重新輸入。";
 const NEGATIVE_SCORE_MESSAGE = "比分不可為負數，請輸入 0 或以上的整數。";
-// 訊息 MUST 指出「非計時回合」：本 change 之後平局在計時回合是合法送出的，只說
+// 訊息 MUST 指出「非計時回合」：平局在計時回合是合法送出的，只說
 // 「無法判定勝方」會讓使用者以為平局一律不可送出，而看不出修正方式其實是改設定為計時制。
 // 只改訊息、不動上方的 TIE 代碼字串：代碼描述的是觸發條件（兩隊比分相同），這件事不因
 // 計時制而改變；會隨回合設定改變的是「為什麼這次不准」，那屬於訊息的職責。另立一個
@@ -700,18 +698,18 @@ export interface ValidateScoreFailure {
 export type ValidateScoreResult = ValidateScoreSuccess | ValidateScoreFailure;
 
 // 比分欄位只接受「（可選負號）＋一或多個 ASCII 數字」，前後空白先 trim 再比對格式
-// （RoundMatchSchema 的 scores 約束與 tasks 6.2 的邊界決定）：
+// （RoundMatchSchema 的 scores 約束）：
 // - 接受前後空白（" 11 "）：使用者打字最常見的失手（誤觸空白鍵、觸控鍵盤誤觸），
 //   trim 後仍是合法整數格式時不該被當成錯誤輸入。
 // - 不接受小數（"1.5"）或科學記號（"1e3"）：RoundMatchSchema 的 scores 是
 //   z.number().int().nonnegative()，接受這兩種格式會在寫回 Round 時才被 schema 拒絕，
 //   等於把「輸入驗證」的責任推給 schema 事後爆炸，而不是在使用者送出當下就擋下並說明。
-//   同理不接受超出安全整數範圍的值（"99999999999999999999"，B6）：Number() 轉換後會
+//   同理不接受超出安全整數範圍的值（"99999999999999999999"）：Number() 轉換後會
 //   得到 1e20 這種遠超 Number.MAX_SAFE_INTEGER 的值，一樣會在寫回 Round 時才被 schema
 //   的整數上限拒絕——而且 Round 是單一物件，屆時無筆可救，整份回合會被判定損壞清除。
 // - 不接受全形數字（"１１"）：行動裝置的數字鍵盤不會產生全形字元，接受它需要額外的
 //   locale-aware 正規化邏輯，超出「使用者打字失手」這個要處理的範圍。
-// SHALL NOT 單獨用 Number() 或 parseInt() 判斷（tasks 6.2）：Number("") 為 0、
+// SHALL NOT 單獨用 Number() 或 parseInt() 判斷：Number("") 為 0、
 // Number("   ") 為 0、parseInt("1a") 為 1、Number("NaN") 為 NaN，四者都會被其中一個
 // 函式單獨使用時靜默放行。這裡先用正規表示式判斷格式是否合法，Number() 只在格式已確定
 // 合法之後才用來取值，不構成「單獨判斷」。
@@ -738,7 +736,7 @@ function parseScoreField(raw: string): ScoreFieldParseResult {
 	}
 
 	const value = Number(trimmed);
-	// B6：超出安全整數範圍的值一律視為格式不合法，而非放行後在 RoundMatchSchema 事後爆炸
+	// 超出安全整數範圍的值一律視為格式不合法，而非放行後在 RoundMatchSchema 事後爆炸
 	// （見上方註解）。此檢查須在負數判斷之前，理由與其餘三種拒絕原因相同——都是「格式」
 	// 而非「數值範圍」層級的問題，回報的失敗代碼是 INVALID_NUMBER，不是 NEGATIVE_SCORE。
 	if (!Number.isSafeInteger(value)) {
@@ -755,7 +753,7 @@ function parseScoreField(raw: string): ScoreFieldParseResult {
  * MUST 拒絕（spec「比分驗證」），拒絕時回傳可判讀的失敗結果而非拋出例外或只回布林值。
  * 純函式，不修改傳入的 match。
  *
- * isTimedRound 由呼叫端注入（design Decision 2），本函式刻意不收整個 Round：這裡需要的
+ * isTimedRound 由呼叫端注入，本函式刻意不收整個 Round：這裡需要的
  * 資訊只有「是不是計時回合」這一個布林值，收下整個回合等於宣稱本函式可能會用到回合的
  * 其他欄位，且既有呼叫點的 fixture 全部得跟著改造。為 true 時平局改走成功路徑
  * （計時制沒有打到目標分數才停的機制，時間到就是平手，見 spec「比分驗證」）。
@@ -808,9 +806,9 @@ export const SUBMIT_SCORE_FAILURE_CODE = {
 export type SubmitScoreFailureCode = ValidateScoreFailureCode | (typeof SUBMIT_SCORE_FAILURE_CODE)[keyof typeof SUBMIT_SCORE_FAILURE_CODE];
 
 const MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
-// defence-in-depth（tasks 6.6，spec 無對應 Scenario）：M3 的 updateRatings 對四類不合法
+// defence-in-depth（spec 無對應 Scenario）：rating.ts 的 updateRatings 對四類不合法
 // 輸入會 throw（隊伍人數不符、rating 超出 1～8、gamesPlayed 非非負整數、同場重複 id）。
-// 送進 updateRatings 的資料已由上面的 validateScoreInput（§6.2）與 resolveTeamPlayers
+// 送進 updateRatings 的資料已由上面的 validateScoreInput 與 resolveTeamPlayers
 // 的球員存在性間接把關過，正常路徑不會觸發這四類例外；但這裡仍以 try/catch 接住，
 // 轉為同一種失敗結果而非讓例外穿透到 UI，是防禦措施而非本函式預期的正常分支。
 const SCORING_FAILED_MESSAGE = "評分計算發生非預期錯誤，請重新整理頁面後再試一次。";
@@ -825,7 +823,7 @@ export interface SubmitScoreInput {
 	readonly now: string;
 }
 
-// 回傳 patch 而非整份新名單（design Decision 6）：submitScore 不擁有名單，回傳整份
+// 回傳 patch 而非整份新名單：submitScore 不擁有名單，回傳整份
 // Player[] 等於宣稱它有權決定名單裡沒被這場比賽影響到的其他人。patch 形狀
 // { id, rating, gamesPlayed } 與 roster.ts 的 updatePlayer(id, patch) 直接對接，
 // 呼叫端逐筆套用即可，不需要自己 diff 出「這場比賽到底改了誰」。
@@ -835,7 +833,7 @@ export interface ScorePlayerPatch {
 	readonly gamesPlayed: number;
 }
 
-// 本次送出的一次性觸界訊息（design Decision 6）：SHALL NOT 進回合物件、SHALL NOT 持久化。
+// 本次送出的一次性觸界訊息：SHALL NOT 進回合物件、SHALL NOT 持久化。
 // 「這個人現在在評分上限／下限」是可以直接從其 rating 讀出的衍生資訊，若額外存一份
 // boundaryHit 標記，就會有兩份可能不同步的真相（例如日後又贏了一場但沒觸界，
 // 舊的持久化標記卻沒被清掉）。它只是這一次 submitScore 呼叫要回報給 UI 顯示
@@ -864,20 +862,18 @@ export type SubmitScoreResult = SubmitScoreSuccess | SubmitScoreFailure;
 
 // 送出當下該員在名單中的資料（rating／gamesPlayed／name），依名單（players）的順序取出；
 // 本函式不保證與 playerIds 同序，索引配對之所以成立是因為下方 toHistoryEntry／submitScore
-// 用來配對的 changes 也源自同一個 players 陣列（B5-a：本段原註解宣稱「依 playerIds 的
-// 順序取出」與事實相反——players.filter(...) 保留的是名單原有順序，非 playerIds 的順序；
-// 例如 team.playerIds = ["p2","p1"] 而名單為 [p1,p2,…] 時，本函式回傳 [p1,p2]。功能上
-// 無 bug，只是敘述錯誤，特此更正）。
+// 用來配對的 changes 也源自同一個 players 陣列。players.filter(...) 保留的是名單原有順序，
+// 非 playerIds 的順序：例如 team.playerIds = ["p2","p1"] 而名單為 [p1,p2,…] 時，本函式回傳 [p1,p2]。
 // 用 filter 而非逐一 find＋在此拋錯：找不到的球員（已被移除，roster.ts 的 removePlayer
 // 不禁止移除仍在進行中場次裡的人）直接被排除在外，讓結果陣列長度變少而非在這裡處理
 // 「查無此人」的例外情境。這不是靜默放行——人數不足會在下方餵給 updateRatings 時被
-// M3 自己的 assertValidInput 擋下（「隊伍人數需為 N 人」），與 6.6 的防禦性 try/catch
+// rating.ts 自己的 assertValidInput 擋下（「隊伍人數需為 N 人」），與 submitScore 的防禦性 try/catch
 // 是同一條路徑，不需要在這裡重新實作一次「球員是否存在」的檢查。
 function resolveTeamPlayers(playerIds: readonly string[], players: readonly Player[]): Player[] {
 	return players.filter((player) => playerIds.includes(player.id));
 }
 
-// RoundMatch → MatchHistoryEntry 的唯一投影實作（tasks 6.7）。
+// RoundMatch → MatchHistoryEntry 的唯一投影實作。
 // teamA／teamB 的 rating 取「送出當下」兩位球員 ratingBefore（即 changes[].before）的和，
 // 與 per-player 的賽前分數定義一致——spec 對 per-player 明文要求「賽前分數 MUST 取送出
 // 當下該員在名單中的 rating」，而 HistoryTeam.rating 定義為「該隊的隊伍分數（賽前，單打
@@ -885,7 +881,7 @@ function resolveTeamPlayers(playerIds: readonly string[], players: readonly Play
 // SHALL NOT 沿用 match.teams[i].rating（createRound 建立本場次時寫入的隊伍分數快照）：
 // 兩者在「本輪進行中沒有人手動改分」時剛好相同，但 roster.ts 的 UpdatePlayerPatch
 // （Partial<Omit<Player,"id"|"createdAt">>）明確允許使用者中途 patch 某人的 rating——
-// design Decision 3 的論證前提正是「使用者在本輪進行中手動改了某人的分數」這個情境。
+// 賽前分數取送出當下值，正是為了「使用者在本輪進行中手動改了某人的分數」這個情境。
 // 沿用建立回合快照會讓同一筆歷史內部自相矛盾（teamA.rating ≠ Σ ratingBefore），而歷史是
 // 自足的快照，內部矛盾無從自我修復。加總後以 roundRating（rating-math.ts）正規化，
 // 與既有 Team.rating 的表示法一致（pairing.ts 的 buildTeam、duplication.ts 的
@@ -937,7 +933,7 @@ function toHistoryEntry(
 	// ...(format === "doubles" ? { doublesComposition } : {})）。這裡退回 "general"
 	// 純粹是為了在型別上收斂（DoublesComposition 沒有「未知」這個合法值可用），不代表
 	// 本函式認為缺值是正常情況——若真的發生，代表回合資料已經損壞，而本函式不是資料
-	// 完整性的把關點（那是 round-storage.ts 的 §7 職責）。
+	// 完整性的把關點（那是 round-storage.ts 的職責）。
 	if (match.format === "doubles") {
 		const doublesComposition = match.doublesComposition ?? "general";
 		return { ...base, format: "doubles", doublesComposition };
@@ -948,7 +944,7 @@ function toHistoryEntry(
 /**
  * 送出一場比分：驗證 → 呼叫評分 API → 標記完成 → 建立歷史紀錄 → 結算 gamesPlayed，
  * 依固定順序完成一場對戰（spec「比分送出的完成流程」）。純函式，回傳新回合與待套用的
- * 歷史／名單 patch，不直接操作任何 store（design Decision 6：三份資料的更新若各自散在
+ * 歷史／名單 patch，不直接操作任何 store（三份資料的更新若各自散在
  * side effect 裡，任一個丟例外就會留下部分更新且無法自我修復）。
  *
  * 原子性由「失敗時不回傳任何可寫入的東西」保證：validateScoreInput 在最前面、任何計算
@@ -964,9 +960,9 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 	}
 
 	// 「本輪是否為計時制」只看 timer 是否存在，與倒數是否已開始（startedAt）或是否已到期
-	// 皆無關：M14 明訂時間到 MUST NOT 自動變更任何場次狀態，到期與否是呼叫端即時算出的
+	// 皆無關：spec 明訂時間到 MUST NOT 自動變更任何場次狀態，到期與否是呼叫端即時算出的
 	// 衍生資訊、不落地為欄位，拿它當送出條件會讓同一份回合資料在不同時刻有不同的驗證結果。
-	// 唯一的推導點（design Decision 2）：validateScoreInput 只收布林值，不接觸 timer 欄位。
+	// 唯一的推導點：validateScoreInput 只收布林值，不接觸 timer 欄位。
 	const isTimedRound = round.timer !== null;
 
 	const validated = validateScoreInput(match, rawScoreA, rawScoreB, isTimedRound);
@@ -975,7 +971,7 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 	}
 	const { scoreA, scoreB } = validated;
 
-	// 勝方判定的唯一實作位置（tasks 6.7）：比分相同只可能在計時回合走到這裡（非計時回合
+	// 勝方判定的唯一實作位置：比分相同只可能在計時回合走到這裡（非計時回合
 	// 已被上面的驗證擋下），此時勝方為 "draw"。
 	const winner: "teamA" | "teamB" | "draw" = scoreA === scoreB ? "draw" : scoreA > scoreB ? "teamA" : "teamB";
 
@@ -992,7 +988,7 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 	let ratingResult: RatingUpdateResult;
 	try {
 		// 見上方 SCORING_FAILED_MESSAGE 的註解：本 try/catch 是防禦性的
-		// defence-in-depth（tasks 6.6），正常路徑（§6.2 已驗證的合法輸入、球員確實存在
+		// defence-in-depth，正常路徑（validateScoreInput 已驗證的合法輸入、球員確實存在
 		// 於名單）不會讓 updateRatings 拋出例外。
 		ratingResult = updateRatings({
 			format: match.format,
@@ -1057,11 +1053,11 @@ export function submitScore(input: SubmitScoreInput): SubmitScoreResult {
 	};
 }
 
-// ---- 臨時換人（球員與休息名單互換，prd.md 6.3、matchmaker-player-swap change，M13） ----
+// ---- 臨時換人（球員與休息名單互換，prd.md 6.3） ----
 
 /**
  * swapMatchPlayer 的失敗代碼：五種前置條件各自獨立（以函式名為前綴命名，比照
- * SET_TARGET_SCORE_FAILURE_CODE 的既有模式，不重蹈 M3 ROUND_FAILURE_CODE 未以函式名
+ * SET_TARGET_SCORE_FAILURE_CODE 的既有模式，不重蹈 ROUND_FAILURE_CODE 未以函式名
  * 命名的教訓）。
  */
 export const SWAP_MATCH_PLAYER_FAILURE_CODE = {
@@ -1087,18 +1083,18 @@ export interface SwapMatchPlayerFailure {
 
 export type SwapMatchPlayerResult = SwapMatchPlayerSuccess | SwapMatchPlayerFailure;
 
-// tasks 2.4：呼叫端可能持有過期的 matchId（場次已被重排移除），與 submitScore 的
-// MATCH_NOT_FOUND 同類防線，但訊息各自具名（design Decision 7）——不沿用 submitScore 的
+// 呼叫端可能持有過期的 matchId（場次已被重排移除），與 submitScore 的
+// MATCH_NOT_FOUND 同類防線，但訊息各自具名——不沿用 submitScore 的
 // MATCH_NOT_FOUND_MESSAGE 常數，避免兩個獨立失敗情境共用同一份文案而互相耦合。
 const SWAP_MATCH_NOT_FOUND_MESSAGE = "找不到指定的場次，畫面可能已過期，請重新整理頁面後再試一次。";
-// tasks 2.6：已完成場次的結果不可回溯更動、已開始計分者換人會讓正在進行的實體比賽與資料
+// 已完成場次的結果不可回溯更動、已開始計分者換人會讓正在進行的實體比賽與資料
 // 脫節（spec「臨時換人（球員與休息名單互換）」）。
 const SWAP_MATCH_NOT_PENDING_MESSAGE = "該場次已開始計分或已完成，無法臨時換人。";
-// tasks 2.6：呼叫端傳入不屬於該場的球員 id（例如 UI 狀態過期）。
+// 呼叫端傳入不屬於該場的球員 id（例如 UI 狀態過期）。
 const SWAP_OUT_PLAYER_NOT_IN_MATCH_MESSAGE = "指定要換出的球員不在這場對戰中，請重新整理頁面後再試一次。";
-// tasks 2.6：防止「換入一個已經在場上的人」造成同一人出現在兩個位置。
+// 防止「換入一個已經在場上的人」造成同一人出現在兩個位置。
 const SWAP_IN_PLAYER_NOT_RESTING_MESSAGE = "指定要換入的球員目前不在本輪休息名單中，請重新選擇。";
-// tasks 2.6：休息名單成員可能在換人當下已被使用者於名單頁切換為暫停出場，這是兩個獨立
+// 休息名單成員可能在換人當下已被使用者於名單頁切換為暫停出場，這是兩個獨立
 // 時刻的資料，換人操作以當下狀態為準。
 const SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE = "指定要換入的球員目前為暫停出場狀態，請先恢復其出場狀態後再試一次。";
 
@@ -1109,15 +1105,14 @@ const SWAP_IN_PLAYER_NOT_ACTIVE_MESSAGE = "指定要換入的球員目前為暫�
  *
  * 五項前置條件（matchId 存在、場次為 pending、outPlayerId 屬該場、inPlayerId 屬休息
  * 名單、inPlayerId 解析出的 isActive 為 true）任一不成立即拒絕並回傳可判讀的失敗結果，
- * 原 round SHALL NOT 被修改（tasks 2.6）。
+ * 原 round SHALL NOT 被修改。
  *
- * 成功時依序完成：替換 playerIds、重算該隊隊伍分數（design Decision 2：沿用 pairing.ts
+ * 成功時依序完成：替換 playerIds、重算該隊隊伍分數（沿用 pairing.ts
  * buildTeam 的既有算法——隊內成員 rating 總和，經 roundRating 正規化）、雙打場次重算組成
- * 標示（design Decision 3：重用已匯出的 pairing.ts labelDoublesComposition，以換人後兩隊
+ * 標示（重用已匯出的 pairing.ts labelDoublesComposition，以換人後兩隊
  * 共四位球員呼叫；labelDoublesComposition 只讀性別集合、不讀順序，故解析用
- * resolveTeamPlayers 即可，不需另外保序。design Decision 9：任一位無法從 players 解析時
- * 維持換人前的值，不拋例外也不退回 "general"）、休息名單互換（design Decision 8：
- * outPlayerId 附加於陣列尾端）。
+ * resolveTeamPlayers 即可，不需另外保序；任一位無法從 players 解析時
+ * 維持換人前的值，不拋例外也不退回 "general"）、休息名單互換（outPlayerId 附加於陣列尾端）。
  */
 export function swapMatchPlayer(
 	round: Round,
@@ -1161,17 +1156,17 @@ export function swapMatchPlayer(
 	const team = match.teams[teamIndex];
 
 	const newPlayerIds = team.playerIds.map((id) => (id === outPlayerId ? inPlayerId : id));
-	// 隊伍分數重算沿用「總和」算法（design Decision 2）：resolveTeamPlayers 已是 submitScore
+	// 隊伍分數重算沿用「總和」算法：resolveTeamPlayers 已是 submitScore
 	// 沿用的既有球員解析函式，此處重用而非另寫一份，遇缺員時同樣寬容降級（略過而非拋錯）。
 	const newTeamPlayers = resolveTeamPlayers(newPlayerIds, players);
 	const newRating = roundRating(newTeamPlayers.reduce((sum, player) => sum + player.rating, 0));
 	const newTeam: RoundTeam = { playerIds: newPlayerIds, rating: newRating };
 	const newTeams: [RoundTeam, RoundTeam] = teamIndex === 0 ? [newTeam, match.teams[1]] : [match.teams[0], newTeam];
 
-	// 雙打組成標示重算（design Decision 3、9）：唯一一處計算，單打分支完全不觸碰
+	// 雙打組成標示重算：唯一一處計算，單打分支完全不觸碰
 	// doublesComposition 欄位（match 本身即無此欄位）。resolveTeamPlayers 已是 submitScore
 	// 沿用的既有球員解析函式，此處重用而非另寫一份；labelDoublesComposition 只讀性別集合、
-	// 不讀順序（design Decision 3 的「以 teamA 在前、teamB 在後組出 tuple」純粹是呼叫慣例，
+	// 不讀順序（「以 teamA 在前、teamB 在後組出 tuple」純粹是呼叫慣例，
 	// 不是判定所需的順序保證），resolveTeamPlayers 依 players 陣列原有順序 filter 完全足夠。
 	let doublesComposition = match.doublesComposition;
 	if (match.format === "doubles") {
@@ -1192,8 +1187,7 @@ export function swapMatchPlayer(
 	};
 	const matches = round.matches.map((m, index) => (index === matchIndex ? updatedMatch : m));
 
-	// 休息名單互換：inPlayerId 移除、outPlayerId 附加於陣列尾端（design Decision 8，
-	// SHALL NOT 依 restCount 重新排序）。
+	// 休息名單互換：inPlayerId 移除、outPlayerId 附加於陣列尾端（SHALL NOT 依 restCount 重新排序）。
 	const restingPlayerIds = [...round.restingPlayerIds.filter((id) => id !== inPlayerId), outPlayerId];
 
 	return { ok: true, round: { ...round, matches, restingPlayerIds } };

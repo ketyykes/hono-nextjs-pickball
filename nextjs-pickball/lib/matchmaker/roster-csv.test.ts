@@ -55,8 +55,8 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：性別對照表的九種常見寫法逐一覆蓋，
-	 * 避免只測其中三四個造成查表其餘分支零覆蓋（Stage 2 mutation 教訓）。
+	 * 補充測試：性別對照表的九種常見寫法逐一覆蓋，
+	 * 避免只測其中三四個造成查表其餘分支零覆蓋。
 	 */
 	it("性別對照表的每個常見寫法都能正確對應", () => {
 		const cases: ReadonlyArray<{ input: string; expected: string }> = [
@@ -134,16 +134,14 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：強度分數的四種錯誤路徑——非數字（`abc`）、
+	 * 補充測試：強度分數的四種錯誤路徑——非數字（`abc`）、
 	 * 顯式空字串、只有空白（`"   "`）皆屬「需為數字」，超出下限則屬「需介於…」，
-	 * 5.7 只覆蓋了「超出範圍（高於上限）」，此處補齊另外三種，避免 rating 分支
-	 * 零覆蓋（Stage 2 mutation 教訓）。
+	 * 高於上限的「超出範圍」另有測試，此處補齊另外三種，避免 rating 分支零覆蓋。
 	 *
-	 * Stage 2 review Major M4／Minor N4／V5：原本所有 reason 斷言都只檢查
-	 * 「含中文字」，等於沒斷言——把「顏色終點」的錯誤原因寫死成「顏色起點」都能
-	 * 存活。此處改為斷言辨識性關鍵字：非數字類含「數字」，範圍類含「1.00」與
+	 * reason 斷言不只檢查「含中文字」（那等於沒斷言，把「顏色終點」的錯誤原因寫死成
+	 * 「顏色起點」都能存活），而是斷言辨識性關鍵字：非數字類含「數字」，範圍類含「1.00」與
 	 * 「8.00」，藉此同時區分兩種錯誤原因、也讓「空字串」「純空白」兩種輸入各自
-	 * 命中正確分支（V5：移除 `trimmed === ""` 判定；N4：移除 rating 的 `.trim()`）。
+	 * 命中正確分支（移除 `trimmed === ""` 判定或 rating 的 `.trim()` 都會轉紅）。
 	 */
 	it("強度分數非數字或低於下限時記為該列錯誤", () => {
 		const csv = [
@@ -170,7 +168,7 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：顏色格式錯誤是 self-review checklist 明列的
+	 * 補充測試：顏色格式錯誤是需回報的
 	 * 錯誤原因之一，此處分別驗證「起點格式錯」與「終點格式錯」兩個欄位皆會被攔下。
 	 */
 	it("顏色格式不正確時記為該列錯誤", () => {
@@ -194,12 +192,12 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Major M3：顏色 regex 原本只被「連 # 都沒有」的輸入守著
-	 * （合法樣本清一色大寫、非法樣本只有 `red`／`blue`），縮寫、過長、只收大寫
+	 * 顏色 regex 不能只靠「連 # 都沒有」的輸入守著
+	 * （合法樣本清一色大寫、非法樣本只有 `red`／`blue`），否則縮寫、過長、只收大寫
 	 * 等三種 regex 破壞方式全部零覆蓋。最要命的是「只收大寫」——`PlayerForm.tsx`
 	 * 的 `<input type="color">` 依 HTML 規範一律回傳小寫 hex，使用者從既有名單
 	 * 抄出來的顏色幾乎都是小寫，若 regex 被誤收緊只收大寫，整批小寫顏色會全部
-	 * 報錯而測試仍全綠。同時併入 Minor m2：`.trim()` 是 load-bearing 卻零覆蓋，
+	 * 報錯而測試仍全綠。同時涵蓋 `.trim()`（load-bearing，需要覆蓋），
 	 * 此處以「前後帶空白」與「只有空白視為未填」兩案例一併驗證。
 	 */
 	it("顏色格式驗證涵蓋大小寫、長度邊界與前後空白", () => {
@@ -236,7 +234,7 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：同一列可能同時觸發多個欄位錯誤，
+	 * 補充測試：同一列可能同時觸發多個欄位錯誤，
 	 * 驗證所有錯誤皆會被回報而非只回報第一個就中止該列的驗證。
 	 */
 	it("單一列同時觸發多個欄位錯誤時全部回報", () => {
@@ -275,10 +273,10 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Major M2：唯一的結構性錯誤測試只拿掉「強度分數」，
-	 * 「名稱」「性別」是否同為必填欄從未被驗證過——若日後有人不慎把「名稱」
+	 * 只拿掉「強度分數」不足以驗證必填欄：「名稱」「性別」是否同為必填欄
+	 * 也要驗證——若日後有人不慎把「名稱」
 	 * 移出必填清單，缺名稱欄的 CSV 會退化成「每一列都報一次名稱不可為空白」
-	 * （正是 5.10 早退設計要避免的刷屏），但測試不會轉紅。此處改為遍歷三個
+	 * （正是標題缺欄早退設計要避免的刷屏），但測試不會轉紅。因此遍歷三個
 	 * 必填欄，逐一拿掉一欄並斷言整份拒絕、訊息指出正確欄位名稱。
 	 */
 	it("缺少任一必填標題欄時皆整份拒絕並指出該欄位名稱", () => {
@@ -306,8 +304,8 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Major M2：把「顏色起點」誤加進必填清單會讓「只有三個必填欄、
-	 * 沒有顏色欄」的極簡 CSV 整份被拒——這條主流程從未被測過。此處補上正向測試，
+	 * 把「顏色起點」誤加進必填清單會讓「只有三個必填欄、
+	 * 沒有顏色欄」的極簡 CSV 整份被拒。此處以正向測試
 	 * 確認顏色兩欄確實是選填。
 	 */
 	it("只有三個必填標題欄、沒有顏色欄時仍可正常解析", () => {
@@ -331,7 +329,7 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Minor m3：資料列欄位數少於標題數時，缺席的欄位（非顯式空字串，
+	 * 資料列欄位數少於標題數時，缺席的欄位（非顯式空字串，
 	 * 而是陣列索引超界）MUST 視為空白，不可帶入任何非空預設值——否則會靜默偽造
 	 * 出使用者從未填寫的資料。用只有名稱一欄的資料列隔離出「性別」欄位缺席的情況。
 	 */
@@ -352,7 +350,7 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Minor m3（stage2 報告原文情境）：資料列只有三欄、尾端顏色兩欄
+	 * 資料列只有三欄、尾端顏色兩欄
 	 * 整個缺席（非顯式空字串）時，MUST 視為未填色而正常匯入，不可報錯。
 	 */
 	it("資料列只有三欄、尾端顏色欄被截斷時仍可正常匯入", () => {
@@ -369,7 +367,7 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Major M1：標題名稱前後若帶有多餘空白（使用者複製貼上／試算表
+	 * 標題名稱前後若帶有多餘空白（使用者複製貼上／試算表
 	 * 匯出時常見），現行 `indexOf` 精確比對會全部找不到，回傳「三欄全缺」的
 	 * 結構性錯誤——但使用者眼中的標題列明明白白寫著這三個欄位，訊息謊報缺欄位。
 	 * 五個儲存格值都已 trim，標題名稱理應一致處理。
@@ -413,10 +411,10 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * 補充測試（非六條必要測試之一）：顏色欄的四種組合（只給起點／只給終點／
-	 * 兩端都給／兩端都空）皆需覆蓋，5.11 只驗證了前兩種，此處補上「兩端都給」
+	 * 補充測試：顏色欄的四種組合（只給起點／只給終點／
+	 * 兩端都給／兩端都空）皆需覆蓋，「只給一端」另有測試，此處補上「兩端都給」
 	 * 與「兩端都空」，避免 addPlayer 一定會收到的 colorFrom／colorTo 賦值分支
-	 * 零覆蓋（Stage 2 mutation 教訓）。
+	 * 零覆蓋。
 	 */
 	it("顏色兩端都提供時整組帶入、兩端都空白時維持未指定", () => {
 		const csv = [
@@ -439,9 +437,9 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * Stage 2 review Blocker B1：檔案中間的空白資料列（Google Sheets／Excel 框選範圍
-	 * 匯出的常態）MUST 直接跳過，不計入 rows 也不計入 errors——若計為錯誤，§6「任一列
-	 * 有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入（design Decision 13）。
+	 * 檔案中間的空白資料列（Google Sheets／Excel 框選範圍
+	 * 匯出的常態）MUST 直接跳過，不計入 rows 也不計入 errors——若計為錯誤，「任一列
+	 * 有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入。
 	 * 同時餵 `parseCsv` 下兩種不同形狀的空白列：純空行（單一空欄位）與 Sheets 風格的
 	 * `,,,,`（欄位數正確但全空），並確認空白列之後的合法／錯誤列列號不因跳過而漂移。
 	 */
@@ -498,9 +496,9 @@ describe("parseRosterCsv", () => {
 	});
 
 	/**
-	 * §6 task 6.1：預覽所需的資訊即 `parseRosterCsv` 的回傳形狀本身——可新增人數為
+	 * 預覽所需的資訊即 `parseRosterCsv` 的回傳形狀本身——可新增人數為
 	 * `rows.length`，問題列（含列號與原因）即 `errors`，SHALL NOT 為 UI 另立第二種
-	 * 回傳型別（task 6.2）。5 筆資料中第 2 筆性別無法辨識、第 4 筆強度分數超出範圍。
+	 * 回傳型別。5 筆資料中第 2 筆性別無法辨識、第 4 筆強度分數超出範圍。
 	 */
 	it("預覽回報可新增人數與問題列的列號與原因", () => {
 		const csv = [
@@ -625,16 +623,16 @@ describe("applyRosterImport", () => {
 
 		const gradientKeys = updatedRoster.map((player) => `${player.colorFrom}/${player.colorTo}`);
 		expect(new Set(gradientKeys).size).toBe(gradientKeys.length);
-		// Stage 2 review Minor m4：spec 的 THEN 子句除了「兩兩相異」還要求「皆來自既有
-		// 預設調色盤」，此處補上顯式斷言（原本只靠建構方式保證，未被鎖住）。
+		// spec 的 THEN 子句除了「兩兩相異」還要求「皆來自既有
+		// 預設調色盤」，此處以顯式斷言鎖住（不只靠建構方式保證）。
 		updatedRoster.forEach((player) => {
 			expect(paletteIndexOf(player.colorFrom, player.colorTo)).not.toBe(-1);
 		});
 	});
 
 	/**
-	 * Stage 2 review Blocker B1（§3.2）：`context.ids.length !== parsed.rows.length` 的
-	 * throw 合約（tasks 6.4 明文要求）原本零測試覆蓋。此處補兩個方向：ids 太少（此測試）
+	 * `context.ids.length !== parsed.rows.length` 的
+	 * throw 合約需要測試覆蓋。此處涵蓋兩個方向：ids 太少（此測試）
 	 * 與 ids 太多（下一條測試），並斷言錯誤訊息內容包含可辨識的關鍵字與正確數字。
 	 */
 	it("ids 數量少於可新增列數量時拋出可判讀錯誤", () => {
@@ -670,7 +668,6 @@ describe("applyRosterImport", () => {
 	});
 
 	/**
-	 * Stage 2 review Blocker B2（§3.6）＋Major M1／M2／M3／M4（§3.4／3.5／3.7／3.11／3.12）：
 	 * 合併成一條完整欄位斷言，一次鎖住 applyRosterImport 與 addPlayer 之間的介面契約——
 	 * id 依序對應（不共用、不錯位）、createdAt 來自 context.now、gender／rating 原樣透傳
 	 * （rating 委由 addPlayer round）、手動指定的顏色原樣帶入且不跨列污染、未指定顏色的
@@ -695,23 +692,23 @@ describe("applyRosterImport", () => {
 			now: "2026-01-01T00:00:00.000Z",
 		});
 
-		// id 依序對應各列，不共用同一 id 也不錯位（殺死 M19／M20／M21）。
+		// id 依序對應各列，不共用同一 id 也不錯位。
 		expect(updated.map((player) => player.id)).toEqual(["id-a", "id-b", "id-c"]);
-		// createdAt 皆來自注入的 context.now（殺死 M22／M23）。
+		// createdAt 皆來自注入的 context.now。
 		expect(updated.every((player) => player.createdAt === "2026-01-01T00:00:00.000Z")).toBe(true);
-		// gender 原樣透傳（殺死 M16）。
+		// gender 原樣透傳。
 		expect(updated.map((player) => player.gender)).toEqual(["male", "female", "other"]);
-		// rating 原樣透傳並委由 addPlayer round，非本模組自行處理（殺死 M17／M35）。
+		// rating 原樣透傳並委由 addPlayer round，非本模組自行處理。
 		expect(updated[0].rating).toBe(4.57);
-		// 手動指定的顏色原樣帶入 addPlayer（殺死 M15／M32）。
+		// 手動指定的顏色原樣帶入 addPlayer。
 		expect(updated[0].colorFrom).toBe("#123456");
 		expect(updated[0].colorTo).toBe("#654321");
-		// 未指定顏色的列仍落在既有預設調色盤內、未被第一列的手動顏色跨列污染（殺死 M34）。
+		// 未指定顏色的列仍落在既有預設調色盤內、未被第一列的手動顏色跨列污染。
 		expect(paletteIndexOf(updated[1].colorFrom, updated[1].colorTo)).not.toBe(-1);
 		expect(paletteIndexOf(updated[2].colorFrom, updated[2].colorTo)).not.toBe(-1);
 		expect(updated[1].colorFrom).not.toBe(updated[0].colorFrom);
 		expect(updated[1].colorFrom).not.toBe(updated[2].colorFrom);
-		// 新成員的預設欄位初值皆委派 addPlayer 設定，本模組不覆寫（殺死 M30／M31）。
+		// 新成員的預設欄位初值皆委派 addPlayer 設定，本模組不覆寫。
 		updated.forEach((player) => {
 			expect(player.restCount).toBe(0);
 			expect(player.gamesPlayed).toBe(0);
@@ -719,7 +716,7 @@ describe("applyRosterImport", () => {
 		});
 	});
 
-	/** Stage 2 review Minor m1（§3.9）：成功匯入後，原 roster 參數本身不被就地修改。 */
+	/** 成功匯入後，原 roster 參數本身不被就地修改。 */
 	it("成功匯入後原 roster 陣列本身不被就地修改", () => {
 		const csv = [HEADER_LINE, "甲,male,5.0,,"].join("\r\n");
 		const parsed = parseRosterCsv(csv);
@@ -739,7 +736,7 @@ describe("applyRosterImport", () => {
 	});
 
 	/**
-	 * Stage 2 review Minor m2（§3.8）：CSV 合法但無可新增資料（只有標題列，無資料列）
+	 * CSV 合法但無可新增資料（只有標題列，無資料列）
 	 * 屬合法邊界，MUST 正常回傳與原名單相等的結果，不可拋錯。
 	 */
 	it("CSV 合法但無可新增資料時正常回傳與原名單相等的結果", () => {
@@ -760,7 +757,7 @@ describe("applyRosterImport", () => {
 	});
 
 	/**
-	 * Stage 2 review Minor m3（§3.1）：錯誤路徑（`parsed.errors` 非空）回傳的是原名單的
+	 * 錯誤路徑（`parsed.errors` 非空）回傳的是原名單的
 	 * 複本而非同一參考——regression guard，鎖住現行「即使沒有變動也回傳新參考」的選擇，
 	 * 避免未來被靜默改成別名語意。
 	 */

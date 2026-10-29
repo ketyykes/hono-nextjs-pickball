@@ -14,7 +14,7 @@ export interface RangeCutoffs {
 
 /**
  * 歷史頁五個區間的具名鍵值，由近至遠排列，供 `rangeOfTime()` 回傳型別、
- * 以及 UI 端逐一渲染分頁時共用同一份順序（design Decision 8）。
+ * 以及 UI 端逐一渲染分頁時共用同一份順序。
  *
  * 順序本身有語意：`rangeOfTime()` 以索引對應切點序列，調整排列會改變區間判定結果。
  */
@@ -38,7 +38,7 @@ function startOfLocalDay(year: number, month: number, day: number): number {
  * 四個候選切點（今天、本週一、當月 1 日、上月 1 日）逐層套用 min()：
  * c1 = min(本週一, c0)、c2 = min(當月 1 日, c1)、c3 = min(上月 1 日, c2)。
  * 少了任一層 min()，跨月週會讓「本月」變成左端大於右端的空洞區間，
- * 且與「本週」重疊（design Decision 1）。
+ * 且與「本週」重疊。
  */
 export function computeRangeCutoffs(now: Date): RangeCutoffs {
 	const year = now.getFullYear();
@@ -57,7 +57,7 @@ export function computeRangeCutoffs(now: Date): RangeCutoffs {
 	const c2 = Math.min(firstOfMonth, c1);
 
 	// month - 1 天然處理跨年：1 月（month === 0）時 month - 1 = -1，
-	// new Date() 會自動正規化成去年 12 月（design Decision 2）。
+	// new Date() 會自動正規化成去年 12 月。
 	const firstOfLastMonth = startOfLocalDay(year, month - 1, 1);
 	const c3 = Math.min(firstOfLastMonth, c2);
 
@@ -67,11 +67,11 @@ export function computeRangeCutoffs(now: Date): RangeCutoffs {
 /**
  * 判定某時間點所屬的歷史區間。由新到遠單向掃描：一旦命中即回傳，
  * 最後一個分支無條件回傳 "earlier"，因此不存在 undefined 或 throw 的路徑，
- * 完整覆蓋是控制流的必然結果而非額外保證（design Decision 8）。
+ * 完整覆蓋是控制流的必然結果而非額外保證。
  *
  * 今日刻意不設上界（`>= c0` 即成立），SHALL NOT 改用「現在」當上界——
  * 裝置時鐘超前或紀錄時間有毫秒級誤差時，會讓晚於「現在」的紀錄找不到區間，
- * 違反「完整覆蓋」的硬性要求（design Decision 3）。
+ * 違反「完整覆蓋」的硬性要求。
  */
 export function rangeOfTime(time: number, now: Date): HistoryRange {
 	const { c0, c1, c2, c3 } = computeRangeCutoffs(now);
@@ -91,7 +91,7 @@ export function rangeOfTime(time: number, now: Date): HistoryRange {
 }
 
 /**
- * 對戰時間的唯一取值點：M4 欄位命名的唯一對齊點（design Decision 4）。
+ * 對戰時間的唯一取值點：與歷史紀錄欄位命名的唯一對齊點。
  *
  * `filterHistoryByRange` 依此欄位判定歸屬區間與排序順序，若日後 `playedAt`
  * 改名或改型別，只需改這一個函式，不必到呼叫端逐一尋找散落的欄位讀取。
@@ -127,7 +127,7 @@ export interface RangeBounds {
  * 取得某個歷史區間的毫秒界線，供雲端歷史 API 以 `played_at` 篩選。
  *
  * 界線由前端以本函式計算、後端只收毫秒數：Workers 以 UTC 執行，若讓後端自行
- * 算切點，「今天 00:00」會是 UTC 午夜而非使用者的當地午夜（design Decision 1）。
+ * 算切點，「今天 00:00」會是 UTC 午夜而非使用者的當地午夜。
  * 界線一律取自 `computeRangeCutoffs()`，使五個區間的定義仍只有一份，
  * 與 `rangeOfTime()` 的等價由測試守住。今日上界與更早下界皆為 `null`（無界）。
  */

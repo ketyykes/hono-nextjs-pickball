@@ -35,7 +35,7 @@ describe("RoundTimerBanner", () => {
 	});
 
 	// durationMinutes 特意用 20（而非沿用上一個測試的 10），避免「忽略該欄位、
-	// 寫死到期秒數」這種恆真實作矇混過關（本 change 已知的恆真形態之一）。
+	// 寫死到期秒數」這種恆真實作矇混過關（已知的恆真形態之一）。
 	it("時間到時顯示帶 role alert 的時間到大字與繁體中文提示文案", () => {
 		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
 		const timer: RoundTimer = {
@@ -57,7 +57,7 @@ describe("RoundTimerBanner", () => {
 		expect(within(alert).getByText(ROUND_TIMER_EXPIRED_MESSAGE)).not.toBeNull();
 	});
 
-	// M15 之後計時回合的同分可直接送出並記為平手，舊文案的「平手請再打一球」是錯誤指示
+	// 計時回合的同分可直接送出並記為平手，舊文案的「平手請再打一球」是錯誤指示
 	// （會讓最終送出的比分不再是時間到當下的比分）。斷言用語意片段而非整句逐字比對，
 	// 是為了不讓下次微調用字時整條測試失效，同時仍能擋住「改回含『再打一球』舊文案」這個退化。
 	it("時間到提示文案說明同分可直接送出平手而非再打一球", () => {

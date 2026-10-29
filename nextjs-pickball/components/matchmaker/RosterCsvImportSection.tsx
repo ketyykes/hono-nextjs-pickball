@@ -20,7 +20,7 @@ type PreviewState =
 	| { readonly status: "structuralError"; readonly message: string }
 	| { readonly status: "ready"; readonly result: Extract<ParseRosterCsvResult, { ok: true }> };
 
-// 參賽者名單 CSV 匯入區塊（M8 §8.6／§8.9）：選檔 → parseRosterCsv → 顯示預覽
+// 參賽者名單 CSV 匯入區塊：選檔 → parseRosterCsv → 顯示預覽
 // （可新增人數＋問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
 // 確認後 applyRosterImport → 寫入 → 檢查寫入結果後才 reload。
 // 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker；File.text() 等瀏覽器 I/O
@@ -31,8 +31,7 @@ type PreviewState =
 // 寫入改用 transfer-storage.ts 的 writeRosterPlayers（而非 storage.ts 的
 // writeRoster）：後者靜默吞掉例外且回傳 void，配額滿／localStorage 不可用時
 // 會讓使用者看到名單沒變、卻沒有任何錯誤訊息。writeRosterPlayers 回傳可判讀的
-// WriteBackupResult，失敗時顯示訊息且不 reload（比照 JsonBackupSection 既有作法，
-// Final Review M2）。
+// WriteBackupResult，失敗時顯示訊息且不 reload（比照 JsonBackupSection 既有作法）。
 export function RosterCsvImportSection() {
 	const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
 	const [message, setMessage] = useState<string | null>(null);

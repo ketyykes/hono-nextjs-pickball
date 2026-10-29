@@ -4,7 +4,7 @@ import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
-// 本機資料匯入雲端（B9）。所有等待都以 data-sync-status、元素或 response 為依據，不用固定延遲：
+// 本機資料匯入雲端。所有等待都以 data-sync-status、元素或 response 為依據，不用固定延遲：
 // 已登入者在 /api/session 回應前會先看到本機（訪客）畫面，必須等雲端分支的元素出現再操作。
 
 const ROSTER_KEY = "matchmaker:roster:v1";
@@ -25,7 +25,7 @@ const HISTORY_CARDS = '[data-testid^="history-record-"][data-slot="card"]';
 
 const JSON_CLOUD_IMPORT_HINT_TEXT =
 	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
-// B6 在登入時停用 JSON 還原所顯示的說明；B9 起不得再出現
+// 已廢止的「登入時停用 JSON 還原」說明，現行版本不得再出現
 const LEGACY_JSON_RESTORE_DISABLED_TEXT =
 	"登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能";
 const EMPTY_TEXT = "本機沒有可匯入的資料";

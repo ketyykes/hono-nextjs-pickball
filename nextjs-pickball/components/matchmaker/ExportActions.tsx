@@ -23,8 +23,8 @@ export interface ExportActionsProps {
 }
 
 // 對戰頁的匯出入口（spec「對戰頁的匯出入口與可用狀態」）：兩顆按鈕、觸發匯出、被擋提示。
-// 資料與注入點一律走 props，本元件不 import 任何 store（沿用 M5 對戰頁「store 只在 page 層」
-// 的既有分層），也不做任何比分／勝方／姓名的字串組裝——那些全在 ExportScene 內完成
+// 資料與注入點一律走 props，本元件不 import 任何 store（沿用對戰頁「store 只在 page 層」
+// 的分層），也不做任何比分／勝方／姓名的字串組裝——那些全在 ExportScene 內完成
 // （design Decision 2：ExportScene 是唯一的內容真相來源）。
 export function ExportActions({ scene, fileName, exportJpg, printer }: ExportActionsProps) {
 	// 列印被阻擋時的提示訊息；null 代表目前沒有提示，MUST 在每次點擊列印時重新判定
@@ -57,7 +57,7 @@ export function ExportActions({ scene, fileName, exportJpg, printer }: ExportAct
 
 	function handlePrint() {
 		// 判定 MUST 委派 requestPrint（lib/matchmaker/print-guard.ts），本元件不另寫
-		// try/catch 判定或另寫訊息文案（tasks 5.4）。
+		// try/catch 判定或另寫訊息文案。
 		const result = requestPrint(printer ?? window.print?.bind(window));
 		if (result.ok) {
 			setPrintMessage(null);

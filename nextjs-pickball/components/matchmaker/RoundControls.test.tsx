@@ -13,10 +13,10 @@ import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 測試專用預設 props：settings 給合法初始值，其餘 callback 一律用 vi.fn()——
 // 本元件不持有任何 store（design Decision 9），測試因此不需要 mock 任何東西。
-// matchSlots／setTargetScore 為 8.6 新增的必填 props：matchSlots 預設空集合
+// matchSlots／setTargetScore 為必填 props：matchSlots 預設空集合
 // （無任何場次開始場邊計分），setTargetScore 預設 vi.fn()——多數既有測試不涉及
 // 目標分數鎖定判定或變更委派，給這兩個預設值即可，需要的測試再各自 override。
-// setTimerDuration／startTimer 為 M14 §10 新增的必填 props，理由與上述兩個相同：
+// setTimerDuration／startTimer 同為必填 props，理由與上述兩個相同：
 // 既有測試都不涉及計時，一律給 vi.fn() 預設值，涉及計時的測試再各自 override。
 function buildProps(overrides: Partial<RoundControlsProps> = {}): RoundControlsProps {
 	return {
@@ -75,7 +75,7 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 		matches: [buildMatch()],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 的 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -143,9 +143,8 @@ describe("RoundControls", () => {
 		expect(screen.queryByText(/本輪已鎖定/)).toBeNull();
 	});
 
-	// match-stage delta 的 MODIFIED「目標分數選擇器」（8.5①）：M5 的舊規則是「有回合就
-	// 鎖」，本 change 放寬為「本輪已開始計分才鎖」——鎖定與否 MUST 委派 §5.10 的
-	// isTargetScoreLocked(round, matchSlots)。此處以「計分板槽非 setup」這個新增的
+	// 目標分數選擇器的鎖定規則是「本輪已開始計分才鎖」（而非「有回合就鎖」）——
+	// 鎖定與否 MUST 委派 isTargetScoreLocked(round, matchSlots)。此處以「計分板槽非 setup」這個新增的
 	// OR 條件觸發鎖定（場次本身仍為 pending），驗證元件確實把 matchSlots 一併考慮進去，
 	// 而不是只看回合是否存在。
 	it("本輪已開始計分時目標分數選擇器 disabled 並顯示鎖定原因", () => {
@@ -165,7 +164,7 @@ describe("RoundControls", () => {
 		expect(screen.getByText("本輪已開始計分，目標分數不可更改。")).not.toBeNull();
 	});
 
-	// Stage 2 mutation 補洞：isTargetScoreLocked 的兩個鎖定條件是 OR，本檔原本只以
+	// isTargetScoreLocked 的兩個鎖定條件是 OR，本檔原本只以
 	// 「計分板槽非 setup」觸發過鎖定，另一條（任一場次非 pending）在本元件層零覆蓋——
 	// 把傳入的 round.matches 換成空陣列，本檔所有測試仍全綠（只有 match-stage.spec.ts
 	// 的 e2e 會轉紅）。這條補上「有已完成場次但完全沒有計分板槽」的情境，讓兩個條件
@@ -192,7 +191,7 @@ describe("RoundControls", () => {
 		expect(screen.getByText("本輪已開始計分，目標分數不可更改。")).not.toBeNull();
 	});
 
-	// 8.5②：本次放寬的唯一可觀察差異——回合存在但尚未開始計分時仍可更改，
+	// 回合存在但尚未開始計分時仍可更改，
 	// 變更委派回合 capability 的 setTargetScore（而非 onSettingsChange，那是給
 	// 「尚無回合」情境下的未來設定值用的）。
 	it("回合存在但尚未開始計分時目標分數選擇器 enabled 且變更委派 setTargetScore", async () => {
@@ -378,12 +377,9 @@ describe("RoundControls", () => {
 		expect(onSettingsChange).toHaveBeenCalledTimes(4);
 	});
 
-	// 8.5 的必要連帶調整（非官方列出的三項之一，見本次交付說明）：這條 M5 既有 it
-	// 原本斷言「有回合就鎖」，M5 的固定資料剛好是 matches: []。MODIFIED 規則改為
-	// isTargetScoreLocked(round, matchSlots)——沒有任何場次即代表「所有場次皆為
+	// 鎖定規則為 isTargetScoreLocked(round, matchSlots)——沒有任何場次即代表「所有場次皆為
 	// pending」與「沒有任何槽離開 setup」皆 vacuously 成立，依 spec 的放寬條件應為
-	// 未鎖定。若不更新此斷言，8.6 SHALL NOT 在元件內以「round !== null」判斷鎖定的
-	// 要求將無法達成（該要求與此斷言互斥，兩者不可能同時成立）。
+	// 未鎖定。元件 SHALL NOT 以「round !== null」判斷鎖定，故回合存在不等於鎖定。
 	it("回合存在但尚無場次時目標分數未鎖定（所有條件 vacuously 成立）", () => {
 		const round = buildRound({ matches: [] });
 		render(<RoundControls {...buildProps({ round })} />);
@@ -395,23 +391,22 @@ describe("RoundControls", () => {
 		});
 		expect(screen.queryByText(/本輪已開始計分/)).toBeNull();
 		// 沒有任何場次時「重設／再排」入口本就不該顯示（hasIncompleteMatch 與鎖定判定
-		// 是各自獨立的判斷，此斷言不受本次鎖定規則放寬影響）。
+		// 是各自獨立的判斷，此斷言不受鎖定規則影響）。
 		expect(screen.queryByRole("button", { name: "重設／再排" })).toBeNull();
 	});
 
-	// tasks 11 裁決 2：真實鍵盤路徑無法命中 handleTargetScoreKeyDown 內的 if (locked) return;
+	// 真實鍵盤路徑無法命中 handleTargetScoreKeyDown 內的 if (locked) return;
 	// ——鎖定時三顆 radio 皆 disabled，Tab 進不去容器，方向鍵事件根本不會發生。E2E（
 	// match-stage.spec.ts 的「目標分數 radiogroup」測試）因此只驗 disabled／aria-checked，
 	// 這條防線本身改由這裡的 fireEvent.keyDown 直接對容器派發事件覆蓋——RTL 的 fireEvent
 	// 不受「disabled 元素不可聚焦」限制，能真正命中 handler 內部邏輯。
 	it("目標分數鎖定時方向鍵不得呼叫 onSettingsChange 或 setTargetScore，也不改變選取（覆蓋 if (locked) return; 防線）", () => {
-		// 8.5 的必要連帶調整：round 本身不再等於鎖定（MODIFIED 規則），此處額外帶一個
+		// round 本身不等於鎖定，此處額外帶一個
 		// 非 setup 的計分板槽讓本輪確實「已開始計分」，維持這條 it 原本要驗證的
 		// 「鎖定時方向鍵無效」意圖不變。
 		//
-		// Stage 2 mutation 補洞：M5 時代 round 存在即走 onSettingsChange，故「不得呼叫
-		// onSettingsChange」足以殺掉「拿掉 if (locked) return;」的變異。8.6 把回合存在時的
-		// 變更改為委派 setTargetScore 後，這條路徑不再經過 onSettingsChange，原斷言變成恆真
+		// 回合存在時的變更委派 setTargetScore、不經過 onSettingsChange，
+		// 只斷言「不得呼叫 onSettingsChange」會變成恆真
 		// （aria-checked 也不會變，因為 setTargetScore 是 spy、不會真的改動 round）——
 		// 必須連 setTargetScore 一起釘住，這條防線才重新有偵測力。
 		const round = buildRound({ targetScore: 15 });
@@ -456,7 +451,7 @@ describe("RoundControls", () => {
 		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, targetScore: 15 });
 	});
 
-	// M14 §10：計時設定控制項。選項清單為「不計時」＋ round-lifecycle 匯出的
+	// 計時設定控制項。選項清單為「不計時」＋ round-lifecycle 匯出的
 	// ROUND_TIMER_DURATION_OPTIONS（10／15／20），元件內 SHALL NOT 另寫一份
 	// [10, 15, 20]；此處只釘住畫面上的四個選項、其可用性與預設選中項。
 	it("計時選項為不計時／10／15／20 分鐘且預設選中不計時", () => {
@@ -571,7 +566,7 @@ describe("RoundControls", () => {
 		expect(setTimerDuration).not.toHaveBeenCalled();
 	});
 
-	// §10.5 mutation 補洞（不對應 spec 驗收錨點，為 regression guard、加入即綠）：
+	// 不對應 spec 驗收錨點，為 regression guard（加入即綠）：
 	// 上述五條 spec 測試都沒有點過計時選項，因此「回合存在時仍走 onSettingsChange」與
 	// 「尚無回合時改走 setTimerDuration」兩種接線反轉都測不出來。比照既有的
 	// 「onSettingsChange 契約」與「回合存在但尚未開始計分時……委派 setTargetScore」兩條
@@ -630,7 +625,7 @@ describe("RoundControls", () => {
 		expect(onSettingsChangeWithRound).not.toHaveBeenCalled();
 	});
 
-	// §10.5 mutation 補洞（regression guard）：比照目標分數既有的同款測試——鎖定時四顆
+	// regression guard：比照目標分數既有的同款測試——鎖定時四顆
 	// radio 皆 disabled，真實鍵盤路徑進不了容器，handleTimerKeyDown 內的 if (locked) return;
 	// 只能用 fireEvent 直接對容器派發事件才命中得到。
 	it("計時鎖定時方向鍵不得呼叫 setTimerDuration 或 onSettingsChange，也不改變選取（覆蓋 if (locked) return; 防線）", () => {
@@ -656,11 +651,11 @@ describe("RoundControls", () => {
 		expect(checked[0].textContent).toBe("10 分鐘");
 	});
 
-	// Stage 2 mutation 補洞（regression guard，加入即綠）：handleTimerKeyDown 的起算索引
+	// regression guard（加入即綠）：handleTimerKeyDown 的起算索引
 	// MUST 取自「畫面上選中的值」（displayedTimerDuration），SHALL NOT 取自 settings——
 	// 回合已產生後 settings.timerDurationMinutes 不再被同步（page.tsx 只在無回合時才寫回
 	// settings），兩者會分歧，以 settings 起算會讓方向鍵從畫面上看不到的位置開始移動。
-	// 把起算值換成 settings.timerDurationMinutes 時本檔原有 22 條全綠，這條補上偵測力。
+	// 把起算值換成 settings.timerDurationMinutes 時本檔其他測試全綠，這條補上偵測力。
 	// 起算刻意用 ArrowLeft：從畫面選中的「20 分鐘」（index 3）往左為 15，而以 settings
 	// 的 null（index 0）起算往左會循環到 20，兩者結果不同才測得出來。
 	it("計時方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算", () => {

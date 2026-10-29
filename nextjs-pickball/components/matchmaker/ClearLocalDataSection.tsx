@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ClearLocalDataDialog } from "@/components/matchmaker/ClearLocalDataDialog";
 import { clearAllLocalData } from "@/lib/matchmaker/transfer-storage";
 
-// 清除本機資料區塊（M8 §8.8）：清除本 app 寫入的全部 LocalStorage key
+// 清除本機資料區塊：清除本 app 寫入的全部 LocalStorage key
 // （`lib/matchmaker/transfer-storage.ts` 的 `CLEAR_ALL_KEYS`／`clearAllLocalData`）。
 // 二次確認對話框（`ClearLocalDataDialog`）比照既有 `ResetRosterDialog` 的
 // AlertDialog + destructive 模式，確認後才呼叫 clearAllLocalData()。

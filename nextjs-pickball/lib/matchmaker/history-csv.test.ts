@@ -9,8 +9,7 @@ const HEADER_LINE =
 	"日期,時間,對戰方式,雙打組成,場地,第一隊球員,第二隊球員,比分,勝方,賽前分數,賽後分數";
 
 /**
- * 本組測試一律指定台北時區斷言，不依賴執行機器的預設時區
- * （Stage 2 review B1／design.md Decision 12）。
+ * 本組測試一律指定台北時區斷言，不依賴執行機器的預設時區。
  */
 const TAIPEI_TIME_ZONE = "Asia/Taipei";
 
@@ -102,10 +101,10 @@ describe("history-csv", () => {
 
 	it("雙打歷史輸出日期時間、雙方球員與各員賽前賽後分數", () => {
 		// UTC 16:30 對台北是隔天 00:30——刻意跨日，證明日期／時間確實換算為呼叫端
-		// 指定的時區，而非直接切割 UTC 字串（Stage 2 review B1／design.md Decision 12）。
+		// 指定的時區，而非直接切割 UTC 字串。
 		// 改用 parseCsv 而非 naive split(",") 讀回資料列，並以 toEqual 一次斷言全部
 		// 11 個欄位——naive split 對「跳脫是否生效」沒有驗證力，整列斷言才能同時
-		// 補齊對戰方式／雙打組成／場地／比分／勝方這幾欄（Stage 2 review B2／J2）。
+		// 補齊對戰方式／雙打組成／場地／比分／勝方這幾欄。
 		const entry = makeDoublesEntry({ playedAt: "2026-08-23T16:30:00.000Z" });
 
 		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
@@ -126,13 +125,12 @@ describe("history-csv", () => {
 		]);
 	});
 
-	// regression guard：以下為 4.4 完成當下已正確、Stage 2 review 指出零斷言的分支／欄位，
-	// 補上斷言讓這些欄位有測試保護（非新行為，因此不強求先看紅燈；已用 mutation
-	// 驗證偵測力，見本次回報 impl-s4-fix.md 的 22 組複驗表）。
+	// regression guard：以下分支／欄位的實作先於測試存在，
+	// 補上斷言讓這些欄位有測試保護（非新行為，因此不強求先看紅燈）。
 
 	it("單打歷史輸出完整欄位且雙打組成留空", () => {
 		// 單打分支型別上根本沒有 doublesComposition，第 4 欄 MUST 為空字串
-		// （spec 明文；Stage 2 review B3 指出這條約束原本零覆蓋）。
+		// （spec 明文）。
 		const entry = makeSinglesEntry({ winner: "teamB" });
 
 		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
@@ -159,7 +157,7 @@ describe("history-csv", () => {
 		["mixed", "混雙"],
 		["general", "一般雙打"],
 	])("雙打組成 %s 顯示為「%s」", (doublesComposition, label) => {
-		// Stage 2 review B3：mens／womens／general 三個值從未被建構過，M34／M35／M36 全綠。
+		// 逐一建構每個雙打組成，避免只覆蓋 mixed 而漏掉其他值的對照。
 		const entry = makeDoublesEntry({ doublesComposition });
 
 		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
@@ -172,7 +170,7 @@ describe("history-csv", () => {
 		["teamA", "第一隊"],
 		["teamB", "第二隊"],
 	])("勝方 %s 顯示為「%s」", (winner, label) => {
-		// Stage 2 review B3：winner 只餵過 teamA，teamB 從未被建構過，M19（勝負反轉）綠。
+		// 兩個勝方都要建構過，否則勝負反轉的實作也不會被抓到。
 		const entry = makeDoublesEntry({ winner });
 
 		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
@@ -182,7 +180,7 @@ describe("history-csv", () => {
 	});
 
 	it("平局歷史的勝方欄輸出平手而非任一隊隊名", () => {
-		// M15 matchmaker-timed-draw：既有 entry.winner === "teamA" ? TEAM_LABELS[0] :
+		// 既有 entry.winner === "teamA" ? TEAM_LABELS[0] :
 		// TEAM_LABELS[1] 是二元判斷，會把 "draw" 誤判為 TEAM_LABELS[1]（第二隊獲勝）。
 		const entry = makeDoublesEntry({ winner: "draw" });
 
@@ -193,8 +191,8 @@ describe("history-csv", () => {
 	});
 
 	it("多筆歷史依原順序逐列輸出，且列數與筆數一致", () => {
-		// Stage 2 review J1：3 條既有測試分別餵 1、1、0 筆，M47（只留第一筆）與
-		// M48（列順序反轉）皆存活。這裡改餵 3 筆，以場地號作為可回查原輸入的唯一欄位。
+		// 只餵 0～1 筆時，「只留第一筆」與「列順序反轉」的實作都會存活。
+		// 這裡餵 3 筆，以場地號作為可回查原輸入的唯一欄位。
 		const entries = [
 			makeSinglesEntry({ matchId: "m-1", courtNumber: 1 }),
 			makeDoublesEntry({ matchId: "m-2", courtNumber: 2 }),
@@ -228,9 +226,8 @@ describe("history-csv", () => {
 		["2026-08-23T01:02:03.000Z", "含毫秒"],
 		["2026-08-23T01:02:03Z", "不含毫秒"],
 	])("playedAt 為 %s（%s）時輸出的日期時間一致", (playedAt) => {
-		// Stage 2 review J3：兩條非空測試皆用含毫秒的 ...000Z，不含毫秒的 Z 字串從未被餵過；
-		// 但 history.ts 的 playedAt: z.iso.datetime() 接受不含毫秒的字串，備份匯入
-		// （§2／§3）正是以這組 schema 驗證，使用者手改過的備份可能帶入這種輸入。
+		// 含毫秒的 ...000Z 之外也要餵不含毫秒的 Z 字串：history.ts 的 playedAt: z.iso.datetime()
+		// 接受不含毫秒的字串，備份匯入正是以這組 schema 驗證，使用者手改過的備份可能帶入這種輸入。
 		const entry = makeDoublesEntry({ playedAt });
 
 		const csvText = historyToCsv([entry], { timeZone: TAIPEI_TIME_ZONE });
@@ -240,11 +237,9 @@ describe("history-csv", () => {
 		expect(rows[1]?.[1]).toBe("09:02:03");
 	});
 
-	// regression guard：寫入當下即為綠燈（4.4 的實作本就無條件輸出標題列，
-	// entries 為空時 map 結果自然是空陣列，不需要另外的空歷史分支）。已用「改壞
-	// historyToCsv、令空歷史回傳空字串」的方式驗證偵測力：mutation 後本測試轉紅
-	// （expected 0 to be greater than 0），還原後轉綠，證明本測試確實能攔住
-	// 「空歷史回傳空字串」這種退化（M8 §4.5／4.6 回報）。
+	// regression guard：寫入當下即為綠燈（實作本就無條件輸出標題列，
+	// entries 為空時 map 結果自然是空陣列，不需要另外的空歷史分支）。
+	// 本測試用來攔住「空歷史回傳空字串」這種退化。
 	it("歷史為空時仍輸出只有標題列的 CSV", () => {
 		const csvText = historyToCsv([]);
 		const lines = stripBom(csvText).split("\r\n");
@@ -254,8 +249,7 @@ describe("history-csv", () => {
 	});
 
 	// HistoryCsvSection.tsx 原本把檔名衍生邏輯內聯（`matchmaker-history-${...}.csv`），
-	// 與 backup.ts 的 backupFileName 各做一套。比照 backupFileName 的既有測試樣板
-	// （Final Review M3）：注入固定的 exportedAt，SHALL NOT 由本函式內部呼叫 new Date()。
+	// 與 backup.ts 的 backupFileName 各做一套。比照 backupFileName 的既有測試樣板：注入固定的 exportedAt，SHALL NOT 由本函式內部呼叫 new Date()。
 	it("historyCsvFileName 依注入時間產生含日期的檔名", () => {
 		expect(historyCsvFileName("2026-08-23T01:02:03.000Z")).toBe("matchmaker-history-2026-08-23.csv");
 	});

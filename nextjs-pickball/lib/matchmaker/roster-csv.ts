@@ -1,8 +1,8 @@
 // 參賽者名單 CSV 的解析與逐列驗證。序列化的底層規則（BOM、跳脫、換行）一律委派 csv.ts
-// 的 parseCsv，本模組只負責「欄位對應」與「逐列驗證」（design.md Decision 1）。
+// 的 parseCsv，本模組只負責「欄位對應」與「逐列驗證」。
 //
 // 顏色與 rating 的寫入邏輯（round、自動配色）刻意不在此模組實作，一律交由 roster.ts 的
-// addPlayer 處理（design.md Decision 9）；本模組只負責「篩出可餵給 addPlayer 的輸入」。
+// addPlayer 處理；本模組只負責「篩出可餵給 addPlayer 的輸入」。
 
 import { parseCsv } from "./csv";
 import { addPlayer } from "./roster";
@@ -50,7 +50,7 @@ const GENDER_LOOKUP: Record<string, Gender> = {
 /**
  * 依標題名稱找出各欄位在資料列中的索引；找不到則為 -1。
  * 標題列若有重複欄名（例如兩個「名稱」），`indexOf` 只會取第一個，第二欄的值
- * 靜默丟棄——這是刻意的取捨（Stage 2 review Minor m4）：重複標題本身已是使用者
+ * 靜默丟棄——這是刻意的取捨：重複標題本身已是使用者
  * 誤填，本模組不額外偵測，行為與「多一個未知欄位」一致（忽略而非報錯）。
  */
 function findHeaderIndex(headerRow: readonly string[], headerName: string): number {
@@ -60,7 +60,7 @@ function findHeaderIndex(headerRow: readonly string[], headerName: string): numb
 /** Hex 色碼格式，與 types.ts 的 HexColorSchema 相同規則。 */
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-/** 必填標題欄，顏色兩欄選填不在此列——缺漏才需整份拒絕（design「必填標題欄缺漏」）。 */
+/** 必填標題欄，顏色兩欄選填不在此列——缺漏才需整份拒絕。 */
 const REQUIRED_HEADERS: readonly string[] = [
 	ROSTER_CSV_HEADERS.name,
 	ROSTER_CSV_HEADERS.gender,
@@ -104,12 +104,12 @@ function validateGender(raw: string): FieldValidation<Gender> {
  * `.trim()` 不是為了讓 `Number()` 正確解析（`Number()` 本就忽略前後空白），
  * 而是為了讓純空白輸入（如 `"   "`）命中下面的 `trimmed === ""` 分支、回報
  * 「需為數字」，而非讓 `Number("   ")` 的值 0 落入下面的範圍檢查、誤報成
- * 「需介於…之間」（Stage 2 review Minor m1）。
+ * 「需介於…之間」。
  *
  * 另外 `Number()` 的寬鬆語法會一併接受 `"0x5"`／`"+5"`／`"5."` 等非十進位或
  * 非常規寫法（皆會被轉為落在合法範圍內的數字），與「強度分數需為數字」的
  * 使用者心智模型有落差，但因結果仍落在合法範圍內故無實害，故不額外收緊
- * （Simplicity First；Stage 2 review Minor m6）。
+ * （Simplicity First）。
  */
 function validateRating(raw: string): FieldValidation<number> {
 	const trimmed = raw.trim();
@@ -128,7 +128,7 @@ function validateRating(raw: string): FieldValidation<number> {
 
 /**
  * 顏色欄（起點／終點共用）：選填，空字串視為「未提供」而非錯誤——
- * 是否要因為「只給一端」而整組回退為未指定，由呼叫端依 design Decision 9 判斷，
+ * 是否要因為「只給一端」而整組回退為未指定，由呼叫端判斷，
  * 本函式只負責「有填時格式是否合法」。
  */
 function validateOptionalHexColor(raw: string, invalidReason: string): FieldValidation<string> {
@@ -163,12 +163,12 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 	const table = parseCsv(text);
 	// 標題名稱與五個儲存格值一樣一律 trim：使用者複製貼上或試算表匯出時，標題欄
 	// 前後帶空白是常態，不 trim 會讓 indexOf 精確比對全部落空，回傳「整份缺欄位」
-	// 這種與畫面所見矛盾的訊息（Stage 2 review Major M1）。
+	// 這種與畫面所見矛盾的訊息。
 	const headerRow = (table[0] ?? []).map((header) => header.trim());
 
 	// 必填標題欄檢查 MUST 在逐列解析之前執行：缺欄位時直接整份拒絕，
 	// 不進入逐列迴圈——否則每一列都會各自產生同一個「找不到欄位」的錯誤，
-	// 刷出上百則重複訊息（design.md 對應風險）。
+	// 刷出上百則重複訊息。
 	const missingHeaders = REQUIRED_HEADERS.filter(
 		(header) => !headerRow.includes(header),
 	);
@@ -195,8 +195,8 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 		const spreadsheetRow = dataIndex + 2;
 
 		// 空白資料列（Google Sheets／Excel 框選範圍匯出時夾帶的常態）直接跳過，
-		// 不計入 rows 也不計入 errors（design.md Decision 13）：若計為錯誤，
-		// §6「任一列有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入。
+		// 不計入 rows 也不計入 errors：若計為錯誤，
+		// 「任一列有錯即整份不匯入」會讓夾帶空白列的正常檔案完全無法匯入。
 		// 判定方式為「五個已對應到的欄位 trim 後皆為空字串」，涵蓋 parseCsv 的兩種
 		// 空白列形狀——純空行（`[""]`）與 Sheets 風格全空列（`,,,,`，欄位數正確但全空）。
 		// dataIndex 不受跳過影響，後續列的 spreadsheetRow 依然是 `資料索引 + 2`，不會漂移。
@@ -252,7 +252,7 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 			gender: gender as Gender,
 			rating: rating as number,
 		};
-		// 顏色兩端同進同出（design Decision 9）：只給一端時兩端皆不帶入，
+		// 顏色兩端同進同出：只給一端時兩端皆不帶入，
 		// 交由 addPlayer 走自動配色，不在本模組另寫顏色判定。
 		if (colorFrom !== "" && colorTo !== "") {
 			row.colorFrom = colorFrom;
@@ -266,13 +266,13 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
 
 /** applyRosterImport 所需的注入值：id 陣列與統一的建立時間，皆由呼叫端（未來的 useRosterStore）提供。 */
 export interface ApplyRosterImportContext {
-	/** 依序對應 parsed.rows 每一列的 id，長度須與 parsed.rows 相等（design Decision 9）。 */
+	/** 依序對應 parsed.rows 每一列的 id，長度須與 parsed.rows 相等。 */
 	readonly ids: readonly string[];
 	readonly now: string;
 }
 
 /**
- * 將 CSV 解析結果套用到既有名單，寫入採**附加**模式（design Decision 9；prd.md 9.3.2）。
+ * 將 CSV 解析結果套用到既有名單，寫入採**附加**模式（prd.md 9.3.2）。
  *
  * 第二個參數直接複用 `parseRosterCsv` 的成功回傳形狀（`{ rows, errors }`），
  * SHALL NOT 為此函式另立第二種只服務本函式的型別（task 6.2／6.4）。
@@ -284,9 +284,9 @@ export interface ApplyRosterImportContext {
  * （每次呼叫都看到前一列寫入後的結果）：rating 的兩位小數 round、顏色兩端同進同出
  * 判定、自動配色的「最小未使用 palette index」皆委派 `addPlayer` 處理，本函式
  * SHALL NOT 自行組裝 `Player` 物件。也因為是逐列疊加而非固定名單，同一次匯入內
- * 多列未提供顏色時會各自取得互不相同的預設漸層（design Decision 9）。
+ * 多列未提供顏色時會各自取得互不相同的預設漸層。
  *
- * `id`／`now` 由呼叫端注入（design Decision 4／9），本函式不呼叫
+ * `id`／`now` 由呼叫端注入，本函式不呼叫
  * `crypto.randomUUID()` 或 `new Date()`。`context.ids.length` 與 `parsed.rows.length`
  * 不符視為呼叫端錯誤，直接 throw 可判讀的訊息。
  */

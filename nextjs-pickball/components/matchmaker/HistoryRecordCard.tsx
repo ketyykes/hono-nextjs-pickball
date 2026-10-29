@@ -51,7 +51,7 @@ function TeamBlock({
 				)}
 				{/* 平局（僅計時回合可能出現）不得為任一隊顯示「勝」，改顯示平手標籤——
 				    色彩不得為唯一資訊來源（prd.md 12.5），視覺權重比照上方「勝」Badge
-				    共用同一套樣式 class（M15 matchmaker-timed-draw change，design Decision 7）。 */}
+				    共用同一套樣式 class。 */}
 				{isDraw && (
 					<Badge variant="outline" className="border-current bg-transparent text-current">
 						{DRAW_LABEL}
@@ -71,7 +71,7 @@ function TeamBlock({
 }
 
 // 單筆歷史紀錄卡片：呈現 prd.md 8.2 全部欄位（spec「歷史紀錄的顯示欄位」）。
-// 分數（賽前／賽後、比分）與勝方一律照 M4 寫入值原樣顯示，本元件不重新計算。
+// 分數（賽前／賽後、比分）與勝方一律照寫入值原樣顯示，本元件不重新計算。
 export function HistoryRecordCard({ entry }: HistoryRecordCardProps) {
 	return (
 		<Card data-testid={`history-record-${entry.matchId}`} className="gap-3 py-4">

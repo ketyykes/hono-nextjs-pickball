@@ -1,15 +1,13 @@
-// JPG 匯出檔名組成（design Decision 6／7）。
+// JPG 匯出檔名組成。
 //
-// 格式刻意與 M8 的 backup.ts backupFileName（`matchmaker-backup-<YYYY-MM-DD>.json`）
-// 對齊同一套「呼叫端注入 exportedAt、取 ISO 前 10 碼」慣例，但**不跨 change import**：
-// M8 與本 change 並行開發，本 change 的 worktree 從不含 M8 的 main 開出，import 一個
-// 當時不存在的模組會讓整批 task 建立在幻想的介面上。本檔是 repo 內第三個採同一 idiom
-// 的檔名函式（另兩個為 backup.ts 的 backupFileName、history-csv.ts 的 historyCsvFileName），
-// 這種重複是已知且可接受的——格式決策各自屬於自己的 capability，日後 JPG 想在檔名帶
-// 場地數也不該去動備份檔名。
+// 格式刻意與 backup.ts 的 backupFileName（`matchmaker-backup-<YYYY-MM-DD>.json`）
+// 對齊同一套「呼叫端注入 exportedAt、取 ISO 前 10 碼」慣例，但**不 import 它**：
+// 本檔是 repo 內第三個採同一 idiom 的檔名函式（另兩個為 backup.ts 的 backupFileName、
+// history-csv.ts 的 historyCsvFileName），這種重複是已知且可接受的——格式決策各自屬於
+// 自己的 capability，日後 JPG 想在檔名帶場地數也不該去動備份檔名。
 //
 // 已知取捨：取 ISO 字串前 10 碼等於一律採 UTC 日期。台灣（UTC+8）在當地時間 08:00
-// 前匯出會得到前一天的日期。仍採此法，因為「與 M8 一致」比「日期在午夜前後絕對精確」
+// 前匯出會得到前一天的日期。仍採此法，因為「與 backupFileName 一致」比「日期在午夜前後絕對精確」
 // 重要——檔名日期的用途是排序與辨識，不是稽核憑證。
 
 /** 檔名前綴：`matchmaker-round-<回合編號>-<日期>` 的固定字首。 */

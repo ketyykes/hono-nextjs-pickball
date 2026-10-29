@@ -175,7 +175,7 @@ describe("RoundSchema", () => {
 	});
 
 	it("回合資料缺少 timer 欄位時以 null 通過驗證，向後相容既有資料", () => {
-		// 模擬 M14 之前寫入的既有 matchmaker:round:v1 資料：不含 timer 欄位。
+		// 模擬加入 timer 欄位之前寫入的既有 matchmaker:round:v1 資料：不含 timer 欄位。
 		const roundWithoutTimer: Record<string, unknown> = { ...makeRound() };
 		delete roundWithoutTimer.timer;
 
@@ -185,7 +185,7 @@ describe("RoundSchema", () => {
 			expect(result.data.timer).toBeNull();
 		}
 
-		// 除了「完全缺少欄位」，M14 之後由本 capability 寫入、明確帶 timer: null
+		// 除了「完全缺少欄位」，現在由本 capability 寫入、明確帶 timer: null
 		// 的「不計時」資料也必須通過驗證——這一段語意由 .nullable() 負責，
 		// 與「完全缺少欄位」時由 .default(null) 補值是兩件不同的事。
 		const explicitNullResult = RoundSchema.safeParse(
@@ -198,7 +198,7 @@ describe("RoundSchema", () => {
 	});
 
 	it("timer 為物件時 startedAt 未開始為 null、開始後為 ISO 字串", () => {
-		// Stage 2 mutation 補洞：上面兩個 it 只建構過 timer 為 null 或完全缺欄位的回合，
+		// 上面兩個 it 只建構過 timer 為 null 或完全缺欄位的回合，
 		// RoundTimerObjectSchema 的兩個欄位因此零覆蓋——把 startedAt 的 .nullable()
 		// 拿掉、或把 RoundSchema 的 timer 換成別的 schema，測試都不會轉紅。
 		const notStarted = RoundSchema.safeParse(
@@ -285,9 +285,9 @@ describe("RoundSchema", () => {
 	});
 
 	it("winner 欄位仍接受 teamA、teamB 兩個既有勝方值", () => {
-		// Stage 2 mutation 補洞（regression guard，非 TDD 紅燈）：既有測試只在「預期失敗」的
+		// regression guard，非 TDD 紅燈：既有測試只在「預期失敗」的
 		// 案例裡帶過 winner: "teamA"，"teamB" 則從未出現過，因此把列舉縮寫成 ["draw"] 時
-		// 整個 lib/matchmaker 仍全綠。M15 把本列舉擴為三值後更需要把另外兩個值釘住，
+		// 整個 lib/matchmaker 仍全綠。本列舉有三個值，更需要把另外兩個值釘住，
 		// 否則日後誤刪任一個既有勝方值都不會有測試轉紅。
 		const completedPlayerRatings = [
 			{ playerId: "p1", before: 5, after: 6 },

@@ -104,7 +104,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 有 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -124,7 +124,7 @@ function makeIdGenerator(prefix: string): () => string {
 // 用來算「期望簽章字串」的最小 Match fixture——直接呼叫 duplication.ts 的真實
 // teammateKeys／opponentKeys／fullMatchKey，不在本檔重新拼出分隔符與排序邏輯
 // （避免重複實作既有邏輯）。吃 id 陣列而非單一 id：單打隊伍傳 1 個 id、雙打隊伍傳 2 個，
-// 由呼叫端決定人數（reviewer B1：既有版本恆為單打，teammateKeys 恆為 []）。
+// 由呼叫端決定人數（單打時 teammateKeys 恆為 []）。
 function makeSignatureTeam(ids: readonly string[]): Team {
 	return { players: ids.map((id) => makePlayer({ id })), rating: 0 };
 }
@@ -138,8 +138,8 @@ function makeSignatureMatch(teamAIds: readonly string[], teamBIds: readonly stri
 	return { courtNumber: 1, format: "singles", teams: [makeSignatureTeam(teamAIds), makeSignatureTeam(teamBIds)] };
 }
 
-// submitScore 測試用的隊伍與賽前分數樣板（N6：§6 測試中 { playerIds, rating } 與
-// { playerId, before, after: null } 兩種字面量原本各自複製貼上超過 10 次）。
+// submitScore 測試用的隊伍與賽前分數樣板（避免 { playerIds, rating } 與
+// { playerId, before, after: null } 兩種字面量在測試中各自複製貼上）。
 function makeTeamFixture(playerIds: readonly string[], rating: number): { playerIds: string[]; rating: number } {
 	return { playerIds: [...playerIds], rating };
 }
@@ -201,7 +201,7 @@ describe("createRound", () => {
 		expect(result.round.roundNumber).toBe(4);
 		// not.toBe(previousRound) 近似恆真——createRound 永遠回傳新物件字面量，這個斷言
 		// 幾乎不可能轉紅。改為能實際證明「取代」的斷言：createdAt 等於本次注入的時間、
-		// 且所有場次皆為 pending，只有「真的用新輸入重新產生」才會同時成立（reviewer N3）。
+		// 且所有場次皆為 pending，只有「真的用新輸入重新產生」才會同時成立。
 		expect(result.round.createdAt).toBe(FIXED_NOW);
 		expect(result.round.matches.every((m) => m.status === "pending")).toBe(true);
 	});
@@ -292,8 +292,8 @@ describe("createRound", () => {
 
 	it("上一輪已完成與進行中的場次納入重複比對基準", () => {
 		// 8 人雙打、courtCount: 2：兩場都是雙打（2 人一隊），讓 teammateKeys 非空。若沿用
-		// 單打 fixture，teammateKeys 恆為 []，spec 明寫的「隊友」子句會空洞成立、零斷言
-		// （reviewer B1）。這同時是套件內唯一一次讓 createRound 成功走過 format: "doubles"
+		// 單打 fixture，teammateKeys 恆為 []，spec 明寫的「隊友」子句會空洞成立、零斷言。
+		// 這同時是套件內唯一一次讓 createRound 成功走過 format: "doubles"
 		// 的測試，一併覆蓋 toRoundMatch 的 doublesComposition 分支，以及簽章 shim
 		// （toSignaturePlayer／toSignatureTeam／toSignatureMatch）處理 2-id 隊伍的路徑。
 		const players = [
@@ -418,12 +418,12 @@ describe("createRound", () => {
 		for (const key of opponentKeys(pendingMatch)) {
 			expect(seenSignatures.opponentKeys).not.toContain(key);
 		}
-		// createRound 不具備寫入歷史的能力（那是 §6 submitScore 的職責，本函式完全不
+		// createRound 不具備寫入歷史的能力（那是 submitScore 的職責，本函式完全不
 		// import history.ts、不碰 localStorage）——回傳形狀本身就是這個保證的證據：
 		// 成功結果只有 { ok, round, restSettlements } 三個欄位，不含任何歷史相關欄位。
 		// 用單一結構斷言取代兩個各別的 not.toHaveProperty：後者只證明「這個特定名稱不存在」，
 		// 對任何未列出的屬性名稱都恆真；直接比對完整鍵集合才是真的把「只有這三個欄位」
-		// 斷言出來，等價於原本兩條再加上「沒有其他意料外欄位」（reviewer N7）。
+		// 斷言出來，等價於原本兩條再加上「沒有其他意料外欄位」。
 		expect(Object.keys(result).sort()).toEqual(["ok", "restSettlements", "round"]);
 	});
 
@@ -443,7 +443,7 @@ describe("createRound", () => {
 		if (!round1Result.ok) return;
 
 		// 手動把第一輪唯一一場標記為已完成，模擬「第一輪有一場已完成」的既有條件，
-		// 不透過 §6 尚未實作的 submitScore（不在本組範圍）。
+		// 不透過 submitScore（不在本組範圍）。
 		const round1Completed: Round = {
 			...round1Result.round,
 			matches: round1Result.round.matches.map((match) => ({
@@ -497,12 +497,12 @@ describe("createRound", () => {
 		];
 		// 上一輪的休息名單直接以 fixture 指定 c、d，不透過 selectPlaying 實際跑一輪去湊出
 		// 這個名單——本測試只關心 createRound 如何消費 restingPlayerIds，不關心「誰該休息」
-		// 這個排序決策（那是 candidates.ts 的職責，見 4.7 的職責邊界）。
+		// 這個排序決策（那是 candidates.ts 的職責）。
 		const previousRound = makeRound({ roundNumber: 1, restingPlayerIds: ["c", "d"] });
-		// tasks 4.6／design Decision 1 的核心約束：createRound SHALL NOT 修改任何 Player
-		// 物件（休息次數的結算只回傳 patch，套用是呼叫端的職責）。這一點先前沒有測試守門，
-		// 這裡補上 regression guard，同時對應 spec Scenario 的「上一輪出場者的 restCount
-		// 不變」（reviewer N4）。
+		// 核心約束：createRound SHALL NOT 修改任何 Player
+		// 物件（休息次數的結算只回傳 patch，套用是呼叫端的職責）。
+		// 這是 regression guard，同時對應 spec Scenario 的「上一輪出場者的 restCount
+		// 不變」。
 		const playersSnapshot = structuredClone(players);
 
 		const result = createRound({
@@ -648,7 +648,7 @@ describe("createRound", () => {
 
 	it("單打不足 2 人或雙打不足 4 人時不建立回合", () => {
 		// 所需人數比 PLAYERS_PER_MATCH 少 1（唯一人數來源，測試檔也適用——不得另行寫死
-		// 2／4 反推的字面量陣列，reviewer N2）。
+		// 2／4 反推的字面量陣列）。
 		const singlesResult = createRound({
 			players: Array.from({ length: PLAYERS_PER_MATCH.singles - 1 }, (_, i) => makePlayer({ id: `p${i + 1}` })),
 			format: "singles",
@@ -706,7 +706,7 @@ describe("createRound", () => {
 	it("產生失敗時既有回合與 restCount 皆不受影響", () => {
 		const previousRound = makeRound({ roundNumber: 2 });
 		// 深拷貝快照沿用 codebase 既有慣例（見 allocation.test.ts、rating.test.ts）：
-		// structuredClone 不像 JSON 往返需要型別斷言（JSON.parse 回傳 any），reviewer N1。
+		// structuredClone 不像 JSON 往返需要型別斷言（JSON.parse 回傳 any）。
 		const previousRoundSnapshot = structuredClone(previousRound);
 		// 全員暫停：確保會走到失敗路徑。
 		const players = [makePlayer({ id: "p1", isActive: false }), makePlayer({ id: "p2", isActive: false })];
@@ -791,9 +791,9 @@ describe("createRound", () => {
 		expect(explicitNull.round.timer).toBeNull();
 	});
 
-	// regression guard（design Decision 4）：createRound 逐欄列舉回傳物件，timer 這一行
-	// 是本 change 在 round.ts 唯一需要主動加程式碼才能滿足此規則的地方（見 4.2）；
-	// 本 it 專門釘住「即使兩輪長度相同也不能沿用上一輪 timer 物件」，這是 test-plan 點名
+	// regression guard：createRound 逐欄列舉回傳物件，timer 這一行
+	// 是 round.ts 唯一需要主動加程式碼才能滿足此規則的地方；
+	// 本 it 專門釘住「即使兩輪長度相同也不能沿用上一輪 timer 物件」，這是
 	// 最容易被誤實作成「反正一樣就不用重建」的地方。
 	it("產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null", () => {
 		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
@@ -868,7 +868,7 @@ describe("setTimerDuration", () => {
 
 		expect(changed.ok).toBe(true);
 		if (!changed.ok) return;
-		// 即使變更前已開始計時（startedAt 非 null），變更後仍重置為 null（design Decision 3）。
+		// 即使變更前已開始計時（startedAt 非 null），變更後仍重置為 null。
 		expect(changed.round.timer).toEqual({ durationMinutes: 20, startedAt: null });
 		// 「其餘欄位不變」：把 timer 改回原值後應與原回合完全相等，寫法與理由同 setTargetScore
 		// 的同款斷言——逐欄只證明「列出來的那幾個欄位沒變」，也擋不住漏寫 ...round 的實作。
@@ -1292,7 +1292,7 @@ describe("resetIncompleteMatches", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 
-		// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）；重排不是本輪結束，
+		// 「本輪結束」＝產生新一輪的那一刻；重排不是本輪結束，
 		// 因此回傳形狀裡根本沒有可以攜帶 restCount patch 的位置——比對完整鍵集合即為證據
 		// （單獨的 not.toHaveProperty 對任何未列出的欄位名稱都恆真）。
 		expect(Object.keys(result).sort()).toEqual(["ok", "round"]);
@@ -1300,7 +1300,7 @@ describe("resetIncompleteMatches", () => {
 		expect(players).toEqual(playersSnapshot);
 	});
 
-	// regression guard（design Decision 4）：resetIncompleteMatches 以
+	// regression guard：resetIncompleteMatches 以
 	// `{ ...round, matches, restingPlayerIds, seenSignatures }` 展開建構回傳值，
 	// timer 欄位不在展開時被覆寫的欄位清單內，這條規則在程式碼不變的情況下已自然成立，
 	// 本 it 純粹釘住此行為，避免日後改寫展開方式時悄悄破壞它。
@@ -1360,11 +1360,11 @@ describe("validateScoreInput", () => {
 	it("比分非有效數字時拒絕送出", () => {
 		const match = makeRoundMatch();
 
-		// 除 test-plan 列出的 "abc"／"1a"／"NaN" 外，一併涵蓋 RoundMatchSchema 的 scores
-		// 約束（z.number().int().nonnegative()）與 tasks 6.2 訂下的邊界決定：小數
+		// 除 "abc"／"1a"／"NaN" 外，一併涵蓋 RoundMatchSchema 的 scores
+		// 約束（z.number().int().nonnegative()）與邊界決定：小數
 		// （"1.5"）與科學記號（"1e3"）會讓該約束驗證失敗，故本函式先行拒絕；全形數字
 		// （"１１"）不是行動裝置數字鍵盤會產生的輸入，同樣不接受，以維持解析規則單純；
-		// 超出安全整數範圍的值（"99999999999999999999"）同理不接受（B6）——放行會讓
+		// 超出安全整數範圍的值（"99999999999999999999"）同理不接受——放行會讓
 		// scoreA/scoreB 變成 1e20，寫回 Round 時才被 RoundMatchSchema 的
 		// Number.MAX_SAFE_INTEGER 上限拒絕，一份無筆可救的單一物件整份被判定損壞。
 		for (const rawScoreA of ["abc", "1a", "NaN", "1.5", "1e3", "１１", "99999999999999999999"]) {
@@ -1392,7 +1392,7 @@ describe("validateScoreInput", () => {
 			expect(zeroValid.scoreB).toBe(11);
 		}
 
-		// tasks 6.2 的邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
+		// 邊界決定：接受欄位前後的空白（trim 後仍是合法整數格式），
 		// 這是使用者打字最常見的失手，不應被當成錯誤輸入拒絕。
 		const trimmed = validateScoreInput(match, " 0 ", " 11 ", false);
 		expect(trimmed.ok).toBe(true);
@@ -1447,8 +1447,8 @@ describe("submitScore", () => {
 			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		const round = makeRound({ matches: [match] });
-		// B4：純函式的不可變性——只有失敗路徑有測試守著，成功路徑改為就地修改傳入的
-		// round 仍會全數綠燈（打穿 design Decision 6 的純函式承諾與 store 的 state
+		// 純函式的不可變性：只靠失敗路徑的測試，成功路徑改為就地修改傳入的
+		// round 仍會全數綠燈（打穿純函式承諾與 store 的 state
 		// identity），故在此另存一份快照供送出後比對。
 		const roundSnapshot = structuredClone(round);
 
@@ -1463,13 +1463,13 @@ describe("submitScore", () => {
 		expect(updated?.winner).toBe("teamA");
 		expect(updated?.completedAt).toBe(FIXED_NOW);
 
-		// B4：傳入的 round 必須維持原樣，回傳的必須是另一個物件。
+		// 傳入的 round 必須維持原樣，回傳的必須是另一個物件。
 		expect(round).toEqual(roundSnapshot);
 		expect(result.round).not.toBe(round);
 
-		// B3（regression guard，非紅燈——實測目前行為已正確）：spec「比分驗證」正文只列
-		// 5 種拒絕原因，scoring 不在其中；design Decision 10 明文要求所有讀取路徑都要有
-		// 單元測試守住這些分支。後續 milestone（計分板）唯一會送出的就是 scoring 場次，
+		// regression guard（非紅燈，目前行為已正確）：spec「比分驗證」正文只列
+		// 5 種拒絕原因，scoring 不在其中，且所有讀取路徑都要有
+		// 單元測試守住這些分支。計分板唯一會送出的就是 scoring 場次，
 		// 若這裡誤拒（例如把完成判斷寫成 `!== "pending"`），不會有任何既有測試轉紅。
 		const scoringMatch = makeRoundMatch({
 			id: "m-2",
@@ -1495,8 +1495,8 @@ describe("submitScore", () => {
 
 	it("完成場次的 playerRatings 逐一對應該場每位球員的賽前與賽後分數", () => {
 		// 雙打：4 人。teamA（p1、p2）與 teamB（p3、p4）送出當下的實際 rating 總和
-		// （7、5）刻意設成與 match.teams[i].rating 這份「建立回合快照」（6、8）不同——這是
-		// B5-b 的紅燈證據：若 toHistoryEntry 仍沿用建立回合快照（舊實作），teamA.rating／
+		// （7、5）刻意設成與 match.teams[i].rating 這份「建立回合快照」（6、8）不同。
+		// 若 toHistoryEntry 沿用建立回合快照，teamA.rating／
 		// teamB.rating 會分別算成 6、8（與正確值 7、5 皆不符）；只有改成「送出當下」兩位
 		// 球員 ratingBefore 的和才會算出正確的 7、5。
 		const doublesPlayers = [
@@ -1542,13 +1542,13 @@ describe("submitScore", () => {
 		const doublesPatchesById = new Map(doublesResult.playerPatches.map((p) => [p.id, p]));
 		for (const rating of doublesUpdated?.playerRatings ?? []) {
 			expect(rating.before).toBe(doublesBeforeById.get(rating.playerId));
-			// B2：與 playerPatches 交叉比對，取代零鑑別力的 typeof 斷言——fixture 中無人
+			// 與 playerPatches 交叉比對，取代零鑑別力的 typeof 斷言——fixture 中無人
 			// 觸界，賽後分數必定與賽前不同。
 			expect(rating.after).toBe(doublesPatchesById.get(rating.playerId)?.rating);
 			expect(rating.after).not.toBe(rating.before);
 		}
 
-		// B1：historyEntry 投影的欄位級斷言（原本零覆蓋，7 個 mutation 皆存活）。
+		// historyEntry 投影的欄位級斷言。
 		// 一行同時關掉「雙打漏帶 doublesComposition」與所有形狀類 mutation（DU 兩分支皆
 		// .strict()）。
 		expect(MatchHistoryEntrySchema.safeParse(doublesResult.historyEntry).success).toBe(true);
@@ -1565,14 +1565,14 @@ describe("submitScore", () => {
 
 		const doublesRatingsById = new Map((doublesUpdated?.playerRatings ?? []).map((r) => [r.playerId, r]));
 		for (const player of [...doublesResult.historyEntry.teamA.players, ...doublesResult.historyEntry.teamB.players]) {
-			// 姓名快照 MUST 為名單中的姓名，不是 id（Decision 3 的核心承諾）。
+			// 姓名快照 MUST 為名單中的姓名，不是 id（歷史自足快照的核心承諾）。
 			expect(player.name).toBe(doublesPlayers.find((p) => p.id === player.id)?.name);
 			const matched = doublesRatingsById.get(player.id);
 			expect(player.ratingBefore).toBe(matched?.before);
 			expect(player.ratingAfter).toBe(matched?.after);
 		}
 
-		// B5-b：teamA／teamB 的隊伍分數不相等，且各自等於該隊兩人 ratingBefore 的和
+		// teamA／teamB 的隊伍分數不相等，且各自等於該隊兩人 ratingBefore 的和
 		// （送出當下），不是建立回合時寫入的快照（6、8）。
 		expect(doublesResult.historyEntry.teamA.rating).not.toBe(doublesResult.historyEntry.teamB.rating);
 		expect(doublesResult.historyEntry.teamA.rating).toBe(7);
@@ -1603,7 +1603,7 @@ describe("submitScore", () => {
 		expect(singlesUpdated?.playerRatings).toHaveLength(PLAYERS_PER_MATCH.singles);
 		expect(new Set(singlesUpdated?.playerRatings.map((r) => r.playerId))).toEqual(new Set(["p1", "p2"]));
 
-		// B1：對單打分支重複同一組 historyEntry 欄位級斷言。
+		// 對單打分支重複同一組 historyEntry 欄位級斷言。
 		expect(MatchHistoryEntrySchema.safeParse(singlesResult.historyEntry).success).toBe(true);
 		expect(singlesResult.historyEntry.matchId).toBe("m-s");
 		expect(singlesResult.historyEntry.courtNumber).toBe(1);
@@ -1647,7 +1647,7 @@ describe("submitScore", () => {
 		expect(result.playerPatches.map((p) => p.id).sort()).toEqual(["p1", "p2"]);
 		const p1Patch = result.playerPatches.find((p) => p.id === "p1");
 		const p2Patch = result.playerPatches.find((p) => p.id === "p2");
-		// p1（勝方）分數應上升，p2（敗方）分數應下降——零和結構（rating.ts design Decision 4）。
+		// p1（勝方）分數應上升，p2（敗方）分數應下降——零和結構。
 		expect(p1Patch?.rating).toBeGreaterThan(3);
 		expect(p2Patch?.rating).toBeLessThan(3);
 		expect(result.playerPatches.some((p) => p.id === "bystander")).toBe(false);
@@ -1700,7 +1700,7 @@ describe("submitScore", () => {
 		// 為 8.00 者，atUpperBound = true 但 clamped = false」描述的情境，能真正分辨
 		// 實作用的是哪一個旗標。不寫死字面量 8／1，改用 RATING_MAX／RATING_MIN
 		// （唯一來源，rating-types.ts）。p2 對稱地觸底，同一個 fixture 可一併覆蓋
-		// Scenario 標題的「或觸底」（N5）。
+		// Scenario 標題的「或觸底」。
 		const players = [
 			makePlayer({ id: "p1", rating: RATING_MAX, gamesPlayed: 0 }),
 			makePlayer({ id: "p2", rating: RATING_MIN, gamesPlayed: 0 }),
@@ -1725,7 +1725,7 @@ describe("submitScore", () => {
 		// 這條斷言會轉紅。
 		const p1Hit = result.boundaryHits.find((hit) => hit.playerId === "p1");
 		expect(p1Hit?.atUpperBound).toBe(true);
-		// N5：p2 對稱地觸底，成本為零地覆蓋 Scenario 標題的「或觸底」。
+		// p2 對稱地觸底，成本為零地覆蓋 Scenario 標題的「或觸底」。
 		const p2Hit = result.boundaryHits.find((hit) => hit.playerId === "p2");
 		expect(p2Hit?.atLowerBound).toBe(true);
 	});
@@ -1747,12 +1747,12 @@ describe("submitScore", () => {
 		expect(result.ok).toBe(false);
 		expect(round).toEqual(roundSnapshot);
 		expect(players).toEqual(playersSnapshot);
-		// 原子性由「失敗時不回傳任何可寫入的東西」保證（design Decision 6）：失敗結果沒有
+		// 原子性由「失敗時不回傳任何可寫入的東西」保證：失敗結果沒有
 		// historyEntry／playerPatches／boundaryHits 欄位可讓呼叫端誤用來產生部分更新——
 		// 用完整鍵集合比對取代逐一檢查每個欄位不存在。
 		expect(Object.keys(result).sort()).toEqual(["code", "message", "ok"]);
 
-		// N1：MATCH_NOT_FOUND 與防禦性 catch 兩條失敗路徑原本零覆蓋，於此零成本補上。
+		// MATCH_NOT_FOUND 與防禦性 catch 兩條失敗路徑，於此零成本覆蓋。
 		const notFoundResult = submitScore({ round, players, matchId: "not-exist", rawScoreA: "11", rawScoreB: "7", now: FIXED_NOW });
 		expect(notFoundResult.ok).toBe(false);
 		if (!notFoundResult.ok) {
@@ -1784,7 +1784,7 @@ describe("submitScore", () => {
 			playerRatings: [makePendingPlayerRating("p1", 3), makePendingPlayerRating("p2", 3)],
 		});
 		// startedAt 刻意留 null：「本輪為計時制」只由 timer 是否存在決定，與倒數是否已開始、
-		// 是否已到期無關（M14 明訂時間到不自動變更任何場次狀態）。若實作額外要求 startedAt
+		// 是否已到期無關（時間到不自動變更任何場次狀態）。若實作額外要求 startedAt
 		// 已寫入，這個 fixture 會直接轉紅。
 		const round = makeRound({ matches: [match], timer: { durationMinutes: 15, startedAt: null } });
 
@@ -1862,11 +1862,10 @@ describe("submitScore", () => {
 		expect(result.playerPatches.map((patch) => patch.gamesPlayed)).toEqual([1, 1, 1, 1]);
 	});
 
-	// regression guard（Stage 2 補；行為早已成立，寫入當下即綠，非 TDD 紅燈）：
-	// 計時制放寬的只有「比分相同也能送出」，勝負判定本身不因回合計時而改變。原本
-	// 「計時回合」的斷言全部集中在平局，獨立 mutation 測試因此發現兩個存活變異——
-	// 把勝方改成「計時回合一律 draw」（不看比分）、以及把非平局分支塌陷成永遠 "teamA"，
-	// 全套測試皆維持全綠。teamB 獲勝的計時場次一次釘住這兩條：勝方既不得被誤判為平局，
+	// regression guard（行為早已成立，寫入當下即綠，非 TDD 紅燈）：
+	// 計時制放寬的只有「比分相同也能送出」，勝負判定本身不因回合計時而改變。若「計時回合」的
+	// 斷言全部集中在平局，把勝方改成「計時回合一律 draw」（不看比分），或把非平局分支
+	// 塌陷成永遠 "teamA"，測試都仍會全綠。teamB 獲勝的計時場次一次釘住這兩條：勝方既不得被誤判為平局，
 	// 也不得忽略比分方向。
 	it("計時回合比分不同時仍依比分判定勝方", () => {
 		const players = [makePlayer({ id: "p1", rating: 3, gamesPlayed: 0 }), makePlayer({ id: "p2", rating: 3, gamesPlayed: 0 })];
@@ -1968,7 +1967,7 @@ describe("submitScore", () => {
 		expect(resetResult.ok).toBe(true);
 		if (!resetResult.ok) return;
 
-		// resetIncompleteMatches 的簽章裡根本沒有歷史陣列這個參數（見本檔 §5 的既有型別），
+		// resetIncompleteMatches 的簽章裡根本沒有歷史陣列這個參數（見 resetIncompleteMatches 的型別），
 		// 結構上就不可能修改它；這裡仍實際比對內容，留下可執行的證據而非只靠「型別上
 		// 不可能」空談。
 		expect(history).toEqual(historySnapshot);
@@ -1980,7 +1979,7 @@ describe("submitScore", () => {
 	});
 });
 
-// swapMatchPlayer：臨時換人（round-lifecycle spec「臨時換人（球員與休息名單互換）」，M13）。
+// swapMatchPlayer：臨時換人（round-lifecycle spec「臨時換人（球員與休息名單互換）」）。
 describe("swapMatchPlayer", () => {
 	it("換人成功時以休息名單球員取代該場的在場球員", () => {
 		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" })];
@@ -2074,7 +2073,7 @@ describe("swapMatchPlayer", () => {
 	});
 
 	it("換出者附加於休息名單尾端且既有休息者的相對順序不變", () => {
-		// design Decision 8：休息名單的原始順序來自 candidates.ts 的休息次數優先排序，
+		// 休息名單的原始順序來自 candidates.ts 的休息次數優先排序，
 		// 換人 SHALL NOT 依 restCount 重新排序，換出者一律附加於尾端。上一個 it 用
 		// toContain 只驗「有沒有」，驗不出位置，故本 it 以完整陣列比對釘住尾端語意。
 		const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
@@ -2166,7 +2165,7 @@ describe("swapMatchPlayer", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		// SwapMatchPlayerSuccess 的形狀裡本來就沒有任何名單 patch 欄位——本函式不擁有名單，
-		// 也不重算休息次數（design：restCount 只在產生新一輪時結算）。
+		// 也不重算休息次數（restCount 只在產生新一輪時結算）。
 		expect(result).not.toHaveProperty("playerPatches");
 		expect(result.round.seenSignatures).toEqual(seenSignaturesSnapshot);
 	});

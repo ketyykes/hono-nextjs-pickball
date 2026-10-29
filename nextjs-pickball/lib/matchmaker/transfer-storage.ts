@@ -1,8 +1,8 @@
-// 快照的讀取／寫入／清除（design Decision 1／2；tasks §7）。
+// 快照的讀取／寫入／清除。
 //
 // 本檔 SHALL NOT 編輯 storage.ts／storage-keys.ts／lib/scoreboard/**，只 import
-// 既有匯出後在此組出自己的 CLEAR_ALL_KEYS 與 writeBackup（design Decision 2：
-// storage.ts 的 RESET_KEYS 是 M4 並行擴充的對象，兩邊同時編輯同一段常數必然衝突）。
+// 既有匯出後在此組出自己的 CLEAR_ALL_KEYS 與 writeBackup（
+// storage.ts 的 RESET_KEYS 用途不同，不與本檔共用同一段常數）。
 
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalStorage } from "./storage-keys";
 // scoreboard 的兩個 key 常數取自各自的具名匯出模組（storage.ts 的獨立槽 key、
@@ -19,13 +19,12 @@ import type { BackupSnapshot } from "./backup";
 import type { Player } from "@pickball/core/matchmaker/types";
 
 /**
- * 「清除本機資料」涵蓋的全部 LocalStorage key（design Decision 2／5；tasks §0.6 對照表，
- * 共 5 個）。每一個成員皆 import 自其宣告模組，SHALL NOT 在本檔硬編字面值——
+ * 「清除本機資料」涵蓋的全部 LocalStorage key（共 5 個）。每一個成員皆 import 自其宣告模組，SHALL NOT 在本檔硬編字面值——
  * 「涵蓋本 app 全部 key」才是承諾，日後新增資料域忘了在此補列，會是「merge 全綠、
  * 測試全綠，但使用者清除後資料整批殘留」的無聲失敗。
  *
  * `scoreboard:hint-dismissed`（OrientationHint.tsx）用的是 sessionStorage，
- * 依 tasks §0.5 明文 SHALL NOT 列入。
+ * SHALL NOT 列入。
  */
 export const CLEAR_ALL_KEYS = [
 	ROSTER_STORAGE_KEY,
@@ -40,7 +39,7 @@ export const CLEAR_ALL_KEYS = [
  *
  * 刻意逐一呼叫 `removeItem`，而非呼叫 Web Storage 全域的整批清除方法：後者會一併刪除
  * 本 app 從未寫入的 key（同網域的其他來源、未來的純顯示偏好），使用者無從檢視被刪掉了什麼；
- * 列舉清單則強制在新增任何資料域時主動決定它是否屬於清除範圍（design Decision 2／5，
+ * 列舉清單則強制在新增任何資料域時主動決定它是否屬於清除範圍（
  * 比照 `storage.ts` 既有的 `resetMatchmakerData()`）。
  */
 export function clearAllLocalData(): void {
@@ -76,7 +75,7 @@ export type WriteBackupResult = { readonly ok: true } | { readonly ok: false; re
  * 將已驗證的備份寫入名單／回合／歷史三個 key。
  *
  * 參數型別只接受 `Backup`（`parseBackup` 成功後才產得出來的型別），驗證與寫入在型別上
- * 就無法對調順序（design Decision 1「原子性由型別強制」）——呼叫端不可能把未驗證的
+ * 就無法對調順序（原子性由型別強制）——呼叫端不可能把未驗證的
  * `unknown` 傳進來。
  *
  * SHALL NOT 委派 `round-storage.ts` 的 `writeRound`／`writeHistory`：那兩個函式會
@@ -98,7 +97,7 @@ export function writeBackup(backup: Backup): WriteBackupResult {
 }
 
 /**
- * 將名單寫入 localStorage 並回報結果（Final Review M2）。
+ * 將名單寫入 localStorage 並回報結果。
  *
  * RosterCsvImportSection.tsx 原本用 storage.ts 的 writeRoster() 寫入 CSV 匯入結果，
  * 但該函式的文件註解已明寫「若 localStorage 不可用或寫入失敗則靜默忽略」且回傳

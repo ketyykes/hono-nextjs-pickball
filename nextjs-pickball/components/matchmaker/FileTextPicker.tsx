@@ -17,7 +17,7 @@ interface FileTextPickerProps {
 }
 
 // 四個資料頁區塊中，JSON 完整備份與參賽者名單 CSV 匯入皆需要「選檔 → File.text()
-// 讀出文字 → 交給呼叫端解析」這段共同樣板（M8 §8.9 REFACTOR）。本元件只負責選檔與
+// 讀出文字 → 交給呼叫端解析」這段共同樣板。本元件只負責選檔與
 // 讀出文字，不知道 parseBackup／parseRosterCsv 等任何網域邏輯，解析結果的顯示
 // （預覽、錯誤訊息）留在各自呼叫端——沿用 design Decision 7：Blob／File.text() 等
 // 瀏覽器 I/O 只出現在元件層，lib/ 的純函式維持不變。

@@ -8,10 +8,9 @@
 // 呼叫 Web Audio API」，不是「聲音對不對」，沒有意義。
 // 故本檔改以後續群組驗收：`RoundTimerBanner.test.tsx` 以 `vi.fn()` 注入替換本函式，
 // 驗證「音效函式被呼叫幾次」；E2E 則以 `addInitScript` stub `window.AudioContext`，
-// 驗證「真實頁面確實觸發建構」（比照 `scene-canvas.ts` 的既有分層先例，見 design
-// Decision 6、M9 Decision 7）。
+// 驗證「真實頁面確實觸發建構」（比照 `scene-canvas.ts` 的既有分層先例）。
 //
-// 與 `useRoundTimer.ts` 的分工邊界（design Decision 6）：`useRoundTimer.ts` 是
+// 與 `useRoundTimer.ts` 的分工邊界：`useRoundTimer.ts` 是
 // 「持續的時間來源」（`setInterval`／`Date` 驅動的倒數 tick），本檔是「一次性的
 // 副作用」（時間到那一刻的音效播放）。兩者性質不同、測試手法也不同
 // （前者用 `vi.useFakeTimers()`，後者無法在 happy-dom 下真的發聲），混在同一個
@@ -98,7 +97,7 @@ export function playTimerExpiredChime(): void {
 	// （`currentTime` 不前進），排程時間永遠到不了，`ended` 不會觸發、本 context 不會被
 	// close。影響有上限——去重旗標讓每次時間到最多只建一個 context，且不加
 	// `state === "suspended"` 分支或 `resume()`：前者會在零分支決策的例外層長出行為分支，
-	// 後者在無使用者手勢時只會得到一個被拒絕的 Promise（design Risks：不做解鎖音訊的處理）。
+	// 後者在無使用者手勢時只會得到一個被拒絕的 Promise（刻意不做解鎖音訊的處理）。
 	oscillator.onended = () => {
 		void audioContext.close();
 	};

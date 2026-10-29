@@ -1,11 +1,11 @@
-// 回合計時器的倒數與到期判定——純函式（M14，spec round-lifecycle「回合計時器」）。
+// 回合計時器的倒數與到期判定——純函式（spec round-lifecycle「回合計時器」）。
 // 「現在時間」一律由呼叫端以 ISO 字串（nowIso）注入，本檔 SHALL NOT 取用當下時間
-// 或設定計時器（禁用清單見 5.3 REFACTOR 的 grep 檢查）：高頻率（每秒）呼叫端才能
-// 各自決定何時取樣，且同一組輸入必須產生同一份輸出以利測試（design Decision 5、6）。
+// 或設定計時器：高頻率（每秒）呼叫端才能
+// 各自決定何時取樣，且同一組輸入必須產生同一份輸出以利測試。
 //
 // 三個函式的參數只有 timer／nowIso／seconds，刻意不接受 Round 或 RoundMatch[]——
 // 「時間到不自動結束任何場次」是 spec 的 MUST NOT 條款，讓型別簽章上就沒有 matches
-// 可碰，比「寫測試斷言沒有被改動」更強的保證（design Decision 5）。
+// 可碰，比「寫測試斷言沒有被改動」更強的保證。
 
 import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 
@@ -52,7 +52,7 @@ export function isExpired(timer: RoundTimer, nowIso: string): boolean {
 
 /**
  * 剩餘秒數格式化為兩位數的 mm:ss。padStart 只保證兩位數，未防禦 minutes 超過
- * 99 的情況——本 change 的計時長度上限為 20 分鐘（ROUND_TIMER_DURATION_OPTIONS），
+ * 99 的情況——計時長度上限為 20 分鐘（ROUND_TIMER_DURATION_OPTIONS），
  * 而 seconds 的唯一來源 remainingSeconds 兩端都夾值，回傳值必落在 [0, 1200] 秒內
  * （本檔的「不防三位數分鐘」與「夾住剩餘秒數上限」兩個決策互相依賴），不會產生三位數分鐘，
  * 額外防呆屬於臆測需求（working-principles Rule 2：不做超出範圍的推測性功能）。

@@ -7,7 +7,7 @@ import { relations, sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // 欄位對應 better-auth 1.6 核心 schema（account 不含 1.7 才新增的 issuer）。
-// B2 接上 adapter 若發現欄位不符，以新增 migration 修正，不改寫 0000。
+// 欄位若與 adapter 不符，以新增 migration 修正，不改寫 0000。
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),

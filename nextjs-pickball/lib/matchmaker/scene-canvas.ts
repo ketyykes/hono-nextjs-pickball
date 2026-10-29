@@ -6,8 +6,7 @@
 // 沒有實作 2D context，硬要在單元測試裡驗證就得自造一個假 ctx 錄下呼叫序列——那驗證的是
 // 「我有沒有照我自己寫的順序呼叫 canvas API」，不是「圖對不對」，沒有意義。
 // 故本檔改以 E2E 驗收（tests/e2e/specs/visual-export.spec.ts），驗證「有沒有真的產出一張
-// 非空的 JPEG」；「畫了什麼內容」由 export-scene.test.ts 的純函式單元測試涵蓋
-// （design Decision 7、Decision 9）。
+// 非空的 JPEG」；「畫了什麼內容」由 export-scene.test.ts 的純函式單元測試涵蓋。
 //
 // Cloudflare Workers（OpenNext）部署注意：本檔所有瀏覽器 API（document／window／canvas）
 // 呼叫 MUST 只在函式內部觸發，模組層級零觸碰，否則 SSR／prerender 階段會在 workerd 內炸掉。
@@ -23,7 +22,7 @@ import {
 import type { ExportCourt, ExportScene, ExportTile } from "./export-scene";
 
 // 位圖縮放倍率：canvas 的 CSS 尺寸與位圖尺寸分離，位圖取 2 倍讓文字在高解析螢幕與列印時
-// 不糊（design Decision 9）。
+// 不糊。
 //
 // 不採 `window.devicePixelRatio`：那會讓同一輪在不同裝置匯出得到不同尺寸的檔案，違反
 // 「同一份輸入產生同一份輸出」的一貫要求（同一份 ExportScene 不論在哪台裝置匯出，
@@ -31,7 +30,7 @@ import type { ExportCourt, ExportScene, ExportTile } from "./export-scene";
 const EXPORT_BITMAP_SCALE = 2;
 
 // JPEG 編碼品質：0.9 以下在大面積漸層（球員色塊正是大面積漸層）上會出現可見色帶，
-// 1.0 則檔案暴增而肉眼無差，0.92 是常見的平衡點（design Decision 9）。
+// 1.0 則檔案暴增而肉眼無差，0.92 是常見的平衡點。
 const EXPORT_JPEG_QUALITY = 0.92;
 
 // 每個球員格內縮的留白（logical px），讓相鄰格之間留出可辨識的間隙，避免色塊互相貼合。
@@ -100,7 +99,7 @@ function drawTile(ctx: CanvasRenderingContext2D, tile: ExportTile, courtTilesTop
 	// 水平漸層：由格子左緣到右緣，colorFrom → colorTo。
 	// 這是刻意的選擇而非疏漏：畫面版 tile-style.ts 用 135 度（對角）漸層，但 canvas 的
 	// createLinearGradient 是取兩個座標點而非角度，在球員格這種窄格內把對角漸層換算成
-	// 座標點的收益極低（design Risks 已接受手繪版與畫面版漸層方向可以不同）。
+	// 座標點的收益極低（已接受手繪版與畫面版漸層方向可以不同）。
 	const gradient = ctx.createLinearGradient(rectX, rectY, rectX + rectWidth, rectY);
 	gradient.addColorStop(0, tile.colorFrom);
 	gradient.addColorStop(1, tile.colorTo);
@@ -113,8 +112,7 @@ function drawTile(ctx: CanvasRenderingContext2D, tile: ExportTile, courtTilesTop
 	ctx.textBaseline = "middle";
 	// 第四個參數 maxWidth：canvas 原生的「壓縮至不超過此寬度」語意，是畫面版
 	// PlayerTile.tsx 的 truncate + overflow-hidden 在手繪版的對應物。PlayerSchema
-	// 對姓名沒有長度上限，沒有這個參數，極長姓名會不換行、不裁切地衝出畫布並覆蓋鄰格
-	// （design Decision 3、matchmaker-visual-export tasks §7 Major-3）。
+	// 對姓名沒有長度上限，沒有這個參數，極長姓名會不換行、不裁切地衝出畫布並覆蓋鄰格。
 	ctx.fillText(
 		tile.name,
 		rectX + rectWidth / 2,
@@ -135,7 +133,7 @@ function drawCourt(ctx: CanvasRenderingContext2D, court: ExportCourt, courtY: nu
 
 /**
  * 依 ExportScene 逐項翻譯為 canvas 繪製呼叫。繪製順序：先以 scene.background 填滿整張
- * 畫布（JPEG 無 alpha 通道，未先填底色會讓透明區在部分瀏覽器編碼成黑色，design Decision 9），
+ * 畫布（JPEG 無 alpha 通道，未先填底色會讓透明區在部分瀏覽器編碼成黑色），
  * 再畫標題，最後依序畫每個場地區塊。
  */
 function drawScene(ctx: CanvasRenderingContext2D, scene: ExportScene): void {
@@ -150,7 +148,7 @@ function drawScene(ctx: CanvasRenderingContext2D, scene: ExportScene): void {
 	for (const court of scene.courts) {
 		drawCourt(ctx, court, courtY, fontFamily);
 		// 區塊高度直接取自 scene，不由 tiles 反推對戰方式再套公式——推導屬行為邏輯，
-		// 不該住在例外層，且反推在 tiles 為空時會靜默給出錯誤答案（§7 Stage 2 Major-2）。
+		// 不該住在例外層，且反推在 tiles 為空時會靜默給出錯誤答案。
 		courtY += court.blockHeight + COURT_BLOCK_SPACING;
 	}
 }
@@ -159,13 +157,13 @@ function drawScene(ctx: CanvasRenderingContext2D, scene: ExportScene): void {
  * 將 ExportScene 繪製為 JPEG 並觸發瀏覽器下載。
  *
  * canvas 繪製、`toBlob`、`URL.createObjectURL`、`<a download>`、`revokeObjectURL`
- * 全部留在本檔（matchmaker-visual-export tasks §7 裁決 1）：Stage 2 的分層檢查要求
+ * 全部留在本檔：分層要求
  * 「canvas 與 <a download> 只出現在 scene-canvas.ts 與 ExportActions.tsx」，若由呼叫端
  * （page.tsx）組裝下載，`<a download>` 會跑進例外層的頁面，變成三個檔案都碰瀏覽器 I/O。
  *
- * SHALL NOT import `components/matchmaker/downloadTextFile.ts`（M8 的下載樣板）：
+ * SHALL NOT import `components/matchmaker/downloadTextFile.ts`（既有的下載樣板）：
  * 它的輸入是字串，本函式的輸入是 Blob，共用會繞 `Blob → 字串 → Blob` 一圈，刻意各自
- * 持有一份（tasks §7 裁決 1）。
+ * 持有一份。
  */
 export async function downloadSceneAsJpeg(scene: ExportScene, fileName: string): Promise<void> {
 	const canvas = document.createElement("canvas");
@@ -179,7 +177,7 @@ export async function downloadSceneAsJpeg(scene: ExportScene, fileName: string):
 	ctx.scale(EXPORT_BITMAP_SCALE, EXPORT_BITMAP_SCALE);
 
 	// 繪製前 MUST 等字型就緒，否則 Noto Sans TC 尚未載入時 fillText 會以 fallback 字型
-	// 繪出，中文姓名的字寬與字形都會走樣（design Decision 9）。
+	// 繪出，中文姓名的字寬與字形都會走樣。
 	await document.fonts.ready;
 
 	drawScene(ctx, scene);

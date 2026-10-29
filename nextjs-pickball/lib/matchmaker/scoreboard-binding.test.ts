@@ -33,7 +33,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 有 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -70,7 +70,7 @@ describe("scoreboard-binding", () => {
 		// targetScore 同理取 15 而非預設的 11。
 		const round = makeRound({ targetScore: 15, format: "doubles" });
 		const match = makeMatch({ id: "match-1", format: "singles", status: "pending" });
-		// M12：buildMatchSlotSeed 新增必填的 players 第三參數，match 預設的 teams
+		// buildMatchSlotSeed 有必填的 players 第三參數，match 預設的 teams
 		// 已帶 playerIds（p1~p4），故必須提供對應名單，否則以下整體比對會因
 		// teamPlayers 從「未提供」變成「查無此人」而失真。
 		const players: Player[] = [
@@ -115,7 +115,7 @@ describe("scoreboard-binding", () => {
 	});
 
 	it("多場次時 seed 取該場自己的場地編號，而非回合的第一場", () => {
-		// Stage 2 mutation 補強：round.matches 為空陣列時，「誤取 round.matches[0]」的
+		// fixture 需有多場：若 round.matches 為空陣列，「誤取 round.matches[0]」的
 		// mutation 只是因為讀到 undefined 才轉紅，並非真的分辨得出「該場」與「第一場」。
 		const first = makeMatch({ id: "match-1", courtNumber: 1 });
 		const second = makeMatch({ id: "match-2", courtNumber: 4 });
@@ -128,7 +128,7 @@ describe("scoreboard-binding", () => {
 	it("已有進度的場次再次進入時保留既有進度不覆蓋", () => {
 		const existing = {
 			// courtNumber 給非 null 值：兩邊都是 null 時，ensureMatchSlot 在回傳既有槽時
-			// 把 courtNumber 抹成 null 的 mutation 不會轉紅（Stage 2 mutation 補強）。
+			// 把 courtNumber 抹成 null 的 mutation 不會轉紅。
 			...createInitialState({
 				targetScore: 15,
 				mode: "doubles",
@@ -158,8 +158,8 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("match-1")?.scores).toEqual({ us: 8, them: 5 });
 	});
 
-	// 額外補（不在 test-plan 內）：ensureMatchSlot 的「無條目 → 寫入 seed」分支
-	// 在既有兩個 it 裡都沒被執行到——4.1 未呼叫 ensureMatchSlot，4.3 一律先寫入既有進度
+	// ensureMatchSlot 的「無條目 → 寫入 seed」分支
+	// 在其他 it 裡都沒被執行到——它們或未呼叫 ensureMatchSlot，或一律先寫入既有進度
 	// 再呼叫，只會走「已有條目」分支。缺這個 it 會讓寫入分支零覆蓋。
 	it("尚無條目時 ensureMatchSlot 寫入 seed 並回傳 seed", () => {
 		const round = makeRound({ targetScore: 21, format: "singles" });
@@ -174,10 +174,10 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("match-2")).toEqual(seed);
 	});
 
-	// 額外補（不在 test-plan 內）：Stage 2 的零覆蓋盤點發現，readMatchSlot 與
-	// writeMatchSlot 各自的 SSR 降級雖已在 §1 測過，但兩者「組合起來」在本模組零覆蓋。
+	// readMatchSlot 與 writeMatchSlot 各自的 SSR 降級雖已單獨測過，
+	// 但兩者「組合起來」也需要覆蓋。
 	// ensureMatchSlot 在 SSR 下會讀到 null 而走寫入路徑，寫入又是 no-op——必須回傳 seed
-	// 且不 throw，否則 §8 的入口在 server render 期間會直接炸掉。寫法比照
+	// 且不 throw，否則入口在 server render 期間會直接炸掉。寫法比照
 	// lib/scoreboard/match-slots.test.ts 的同性質 SSR 情境。
 	it("SSR（無 window）時 ensureMatchSlot 不寫入也不 throw，仍回傳 seed", () => {
 		const seed = buildMatchSlotSeed(makeRound(), makeMatch({ id: "match-3" }), []);
@@ -195,8 +195,8 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("match-3")).toBeNull();
 	});
 
-	// M12：三個新 it 共用的名單資料。姓名互不相同、每位球員的 colorFrom／colorTo
-	// 互不相同且兩者相異（tasks.md 第 9 節的測試資料前置要求）——資料對稱會讓隊伍對調、
+	// 數個 it 共用的名單資料。姓名互不相同、每位球員的 colorFrom／colorTo
+	// 互不相同且兩者相異——資料對稱會讓隊伍對調、
 	// 姓名誤取 id、色碼對調等竄改變成偵測不到的等價變異。p1／p2 刻意取極淺色，
 	// 使 pickTextColor 選出深色前景，與「前景色寫死 #FFFFFF」的竄改區隔開。
 	function makeDistinctPlayers(): Player[] {
@@ -259,13 +259,13 @@ describe("scoreboard-binding", () => {
 		const seed = buildMatchSlotSeed(round, match, players);
 
 		const badge = seed.teamPlayers?.us[0];
-		// 色碼本身也一併釘住：M3（colorFrom／colorTo 對調）若只靠 foreground 判斷可能存活。
+		// 色碼本身也一併釘住：colorFrom／colorTo 對調若只靠 foreground 判斷可能存活。
 		expect(badge?.colorFrom).toBe("#F5F5F5");
 		expect(badge?.colorTo).toBe("#E5E5E5");
 		// 不硬寫顏色字串：直接呼叫 pickTextColor 比對，確保未來公式調整時本斷言自動跟進。
 		expect(badge?.foreground).toBe(pickTextColor("#F5F5F5", "#E5E5E5"));
 
-		// Stage 2 補：them 側的色碼原本沒有任何斷言比對（只比對過姓名），實測
+		// them 側的色碼也要斷言（不能只比對姓名），否則
 		// 「只讓 them 的 colorFrom 被固定字串覆寫」的竄改會全綠存活。兩隊套用同一個
 		// 解析函式、無隊伍別分支，但缺了斷言就等於缺了偵測力，故 them 側同樣釘住三欄。
 		const opponentBadge = seed.teamPlayers?.them[0];
@@ -275,7 +275,7 @@ describe("scoreboard-binding", () => {
 	});
 
 	it("名單中找不到該球員時球員顯示資訊以替代文字呈現且不拋錯", () => {
-		// p2 從名單移除，但仍出現在 match.teams 的 playerIds 中（M4 的回合只存 id，
+		// p2 從名單移除，但仍出現在 match.teams 的 playerIds 中（回合只存 id，
 		// 使用者可在回合中刪人——見 spec「隊伍球員顯示資訊」）。
 		const players = makeDistinctPlayers().filter((player) => player.id !== "p2");
 		const round = makeRound({ format: "doubles" });
@@ -382,9 +382,8 @@ describe("scoreboard-binding", () => {
 		expect(result).toEqual([{ matchId: "m1", scores: { first: 11, second: 7 } }]);
 	});
 
-	// 額外補（不在 test-plan 內）：Stage 2 的 mutation 盤點發現「迴圈提早 break」「回傳前重新
-	// 排序」「只回傳第一筆」三種竄改全數存活——既有三個 it 的預期結果都只有 0 或 1 筆，
-	// 無從分辨。此 it 釘住「一次回傳全部符合者」與「維持槽的走訪順序」。
+	// 若預期結果都只有 0 或 1 筆，「迴圈提早 break」「回傳前重新
+	// 排序」「只回傳第一筆」三種竄改全數存活，無從分辨。此 it 釘住「一次回傳全部符合者」與「維持槽的走訪順序」。
 	it("多個符合條件的槽一次全數回傳且維持走訪順序", () => {
 		const round = makeRound({
 			matches: [makeMatch({ id: "m1" }), makeMatch({ id: "m2" }), makeMatch({ id: "m3" })],
@@ -401,7 +400,7 @@ describe("scoreboard-binding", () => {
 		]);
 	});
 
-	// 額外補（不在 test-plan 內）：槽的鍵與槽內容自帶的 matchId 是兩個來源，既有測試中
+	// 槽的鍵與槽內容自帶的 matchId 是兩個來源，既有測試中
 	// 兩者恆等，因此「改用 slot.matchId」的竄改存活。鍵才是槽位的真實來源
 	// （writeMatchSlot 以 seed.matchId 為鍵寫入），舊資料內容若不同步不應污染送出對象。
 	it("待送出清單的 matchId 取自槽的鍵而非槽內容", () => {
@@ -415,7 +414,7 @@ describe("scoreboard-binding", () => {
 		]);
 	});
 
-	// 額外補（不在 test-plan 內）：spec 的三個回填條件不含任何比分條件，但既有測試的
+	// spec 的三個回填條件不含任何比分條件，但既有測試的
 	// finished 槽比分恆為一勝一負，因此「誤加平手排除」這類第四條件會存活。同時補上
 	// slots 為空物件的路徑（迴圈零次），既有 it 均未涵蓋。
 	it("槽為 0-0 卻已 finished 仍列入，slots 為空時回傳空清單", () => {
@@ -430,7 +429,7 @@ describe("scoreboard-binding", () => {
 		expect(collectFinishedSubmissions(round, {})).toEqual([]);
 	});
 
-	// 額外補（不在 test-plan 內）：條件三是「尚未完成」，不是「必須為 pending」。既有測試
+	// 條件三是「尚未完成」，不是「必須為 pending」。既有測試
 	// 只有 pending 與 completed 兩種場次，把條件三收緊成 `!== "pending"` 會存活——那會讓
 	// scoring 場次（MatchStatus 的第三個合法值）永遠回填不了。
 	it("場次為 scoring 尚未完成時仍列入待送出清單", () => {
@@ -533,7 +532,7 @@ describe("scoreboard-binding", () => {
 		expect(backfillResult.round.matches[0].winner).toBe("teamA");
 	});
 
-	// 額外補（不在 test-plan 內）：上一個 it 只透過 submitScore 的結果間接觀察橋接，
+	// 上一個 it 只透過 submitScore 的結果間接觀察橋接，
 	// round 只有一場時「matchId 改取 round.matches[0].id」的竄改會存活。此 it 直接比對
 	// toSubmitScoreInput 的完整輸出，六個欄位各自被釘住。
 	it("toSubmitScoreInput 的六個欄位分別取自 submission 與 context", () => {
@@ -617,7 +616,7 @@ describe("scoreboard-binding", () => {
 		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
 	});
 
-	// 額外補（不在 test-plan 內）：既有四個 lock 的 it 都只有一場或一個槽，因此
+	// 既有四個 lock 的 it 都只有一場或一個槽，因此
 	// 「只檢查第一場」「只檢查第一個槽」的竄改全數存活。兩個 some() 都必須掃完全部。
 	it("鎖定判定掃描全部場次與全部槽而非只看第一筆", () => {
 		const laterCompleted = makeRound({
@@ -650,7 +649,7 @@ describe("scoreboard-binding", () => {
 		expect(isTargetScoreLocked(allPending, finishedSlot).locked).toBe(true);
 	});
 
-	// 額外補（不在 test-plan 內）：collectFinishedSubmissions 會略過「已不在回合中」的孤兒槽，
+	// collectFinishedSubmissions 會略過「已不在回合中」的孤兒槽，
 	// isTargetScoreLocked 則刻意不做這道檢查——鎖定判定的錯誤方向是不對稱的：誤鎖只是使用者
 	// 改不了分制，誤放行則讓同輪各場地打不同分制。此 it 釘住這個 fail-closed 的取捨，
 	// 日後若有人「順手補上一致性」會被抓到，需先回到 spec 討論。
@@ -666,7 +665,7 @@ describe("scoreboard-binding", () => {
 		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
 	});
 
-	// M36（Stage 2 升級、leader 已核可）：isTargetScoreLocked 的第一條與 setTargetScore
+	// isTargetScoreLocked 的第一條與 setTargetScore
 	// 的拒絕條件（round.ts 的 `status !== "pending"`）方向必須一致，差集精確等於
 	// `status === "scoring"`。此 it 釘住 scoring 場次也視為已開始計分。
 	it("場次為 scoring 時目標分數鎖定", () => {
@@ -714,8 +713,8 @@ describe("scoreboard-binding", () => {
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 
-	// regression guard（6.5）：6.4 已讓 resetMatchmakerData() 把整個 MATCH_SLOTS_KEY
-	// 移除，此 it 寫下當下即綠——偵測力以 mutation 驗證（見 tasks.md 6.5 的記錄），
+	// regression guard：resetMatchmakerData() 已把整個 MATCH_SLOTS_KEY
+	// 移除，此 it 寫下當下即綠，
 	// 不在此另寫一次清空呼叫（清除範圍只能有一處定義，見 spec SHALL NOT 條款）。
 	it("重置名單清除全部場次槽但保留獨立槽", () => {
 		const m1Slot = { ...createInitialState({ matchId: "m1" }), status: "finished" as const, scores: { us: 11, them: 7 }, matchId: "m1" };
@@ -731,7 +730,7 @@ describe("scoreboard-binding", () => {
 		expect(localStorage.getItem(SCOREBOARD_STORAGE_KEY)).toBe(JSON.stringify({ untouched: true }));
 	});
 
-	// Stage 2 補（不在 test-plan 內）：既有 it 只有「一場」被丟棄（m2），
+	// 既有 it 只有「一場」被丟棄，
 	// 「只處理第一筆」「只處理最後一筆」兩類變異因此完全偵測不到。
 	// 本 it 讓三場同時被丟棄，殺 clearMatchSlots(discardedMatchIds.slice(0, 1))
 	// 與 .slice(-1) 的變異。
@@ -764,7 +763,7 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("kept")).toEqual(keptSlot);
 	});
 
-	// Stage 2 補（不在 test-plan 內）：清除範圍的定義是「兩份回合比對出消失的 matchId」，
+	// 清除範圍的定義是「兩份回合比對出消失的 matchId」，
 	// SHALL NOT 在本函式再依 match.status 判定一次（那會變成第二個「決定清哪些槽」的地方）。
 	// 本 it 讓被丟棄的場次為 scoring 而非 pending，殺
 	// 「.filter((match) => match.status === "pending")」這類補上多餘 guard 的變異。
@@ -784,7 +783,7 @@ describe("scoreboard-binding", () => {
 		expect(readMatchSlot("kept")).toEqual(keptSlot);
 	});
 
-	// Stage 2 補（不在 test-plan 內）：邊界——沒有任何場次消失時不得清掉任何槽，
+	// 邊界——沒有任何場次消失時不得清掉任何槽，
 	// 殺 filter 恆真（.filter(() => true)）與「來源取反」的變異。
 	it("沒有場次被丟棄時不清除任何槽", () => {
 		const m1 = makeMatch({ id: "m1", status: "pending" });

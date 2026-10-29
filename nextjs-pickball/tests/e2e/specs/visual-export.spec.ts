@@ -1,16 +1,16 @@
-// Minor-2：同 repo 既有風格勝出——tests/e2e/specs/matchmaker-data-transfer.spec.ts 第 1 行
+// 同 repo 既有風格：tests/e2e/specs/matchmaker-data-transfer.spec.ts 第 1 行
 // 即是 `import { Buffer } from "node:buffer";`，本檔沿用而非依賴全域 Buffer。
 import { Buffer } from "node:buffer";
 import { test, expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
 // 對戰頁（/matchmaker）匯出 JPG／列印 PDF 兩個入口的 E2E 驗收。
-// 對應 matchmaker-visual-export change tasks §7 的 test-plan：入口可見性、
+// 涵蓋：入口可見性、
 // 匯出 JPG 的下載行為與檔案本體（JPEG 位元組標記）。
 //
-// 種資料與「已有回合」狀態的建立方式沿用 M5 match-stage.spec.ts 的既有 helper
+// 種資料與「已有回合」狀態的建立方式沿用 match-stage.spec.ts 的既有 helper
 // （seedRoster／buildTestPlayer／trackConsoleIssues），「已有回合」一律用 UI 操作
-// （點「產生本輪對戰」）達成，不種 matchmaker:round:v1（M5 design Decision 10 既有裁決）。
+// （點「產生本輪對戰」）達成，不種 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有裁決）。
 
 const ROSTER_STORAGE_KEY = "matchmaker:roster:v1";
 const ROUND_STORAGE_KEY = "matchmaker:round:v1";
@@ -19,7 +19,7 @@ const HISTORY_STORAGE_KEY = "matchmaker:history:v1";
 // 已知的 dev-only 噪音，不視為本測試的失敗（沿用 match-stage.spec.ts 的既有記憶）。
 const KNOWN_DEV_ONLY_NOISE = /ChunkLoadError.*(hmr-client|global-error)/;
 
-// Major-1 (A)：JPEG 位圖尺寸期望值推導。
+// JPEG 位圖尺寸期望值推導。
 //
 // 本測試的種子資料為 2 位球員（seedRoster(page, 2)），「產生本輪對戰」點擊時使用
 // app/matchmaker/page.tsx 的 createRoundSettings() 預設值——
@@ -48,7 +48,7 @@ const EXPECTED_JPEG_BITMAP_HEIGHT = (96 + 1 * (56 + 1 * 88) + (1 + 1) * 24) * 2;
 const WHITE_CORNER_THRESHOLD = 240;
 
 /**
- * 從 JPEG 位元組讀出 SOF（Start Of Frame）標記內記錄的寬高（Major-1 (A)）。
+ * 從 JPEG 位元組讀出 SOF（Start Of Frame）標記內記錄的寬高。
  *
  * JPEG 結構：FFD8（SOI）之後是一連串 segment，每個 segment 為
  * `FF <marker> <2 bytes length，big-endian，含這兩個 length 位元組本身> <payload>`；
@@ -105,7 +105,7 @@ function readJpegSize(buffer: Buffer): { width: number; height: number } {
 }
 
 /**
- * 在瀏覽器內把 JPEG buffer 解碼並讀出四個角落的像素 RGB 值（Major-1 (B)）。
+ * 在瀏覽器內把 JPEG buffer 解碼並讀出四個角落的像素 RGB 值。
  * SHALL NOT 在 Node 端引入任何影像解碼套件——瀏覽器原生的 Image + canvas 已足夠。
  */
 async function readCornerPixels(
@@ -217,18 +217,18 @@ async function snapshotLocalStorage(page: Page): Promise<Record<string, string>>
 	});
 }
 
-// §9 tasks 9.3：把「種名單 + 產生一輪」這段各 test 重複的前置動作收斂為單一 helper。
-// 回合格式來源為 M4 的 `matchmaker:round:v1`，改動請同步。
+// 把「種名單 + 產生一輪」這段各 test 重複的前置動作收斂為單一 helper。
+// 回合格式來源為 `matchmaker:round:v1`，改動請同步。
 // 能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態（球員名單本身沒有
 // 對應的 UI 建立流程）才種資料——「已有回合」一律靠點擊「產生本輪對戰」達成，
-// 不直接寫入 matchmaker:round:v1（沿用 M5 design Decision 10 既有裁決）。
+// 不直接寫入 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有裁決）。
 async function gotoMatchmakerWithRound(page: Page, count: number): Promise<void> {
 	await seedRoster(page, count);
 	await page.goto("/matchmaker");
 	await page.getByRole("button", { name: "產生本輪對戰" }).click();
 }
 
-// §9 tasks 9.1：以鍵盤 Tab 走訪，而非直接呼叫 locator.focus()——後者會繞過瀏覽器真實的
+// 以鍵盤 Tab 走訪，而非直接呼叫 locator.focus()——後者會繞過瀏覽器真實的
 // 鍵盤走訪順序，測不出「使用者只用鍵盤是否真的到得了這裡」（spec：MUST 可由鍵盤操作）。
 // 逐次按 Tab 後才檢查是否已聚焦（而非先檢查再按），因為起始焦點在 body，需要先移動一次
 // 才可能命中任何元素。
@@ -269,9 +269,8 @@ test.describe("/matchmaker 匯出功能", () => {
 	});
 
 	test("匯出 JPG 會下載檔名含回合編號與日期的 JPEG 檔案", async ({ page }) => {
-		// Minor-1：本組唯一的 SSR 防線是「模組層級 window 觸碰 → SSR 500」的 console 斷言，
-		// 實測顯示它只在第一個 test 有掛，第二個 test（下載那條）漏掉了——補上，
-		// 讓本測試也能偵測到 scene-canvas.ts／page.tsx 若不慎在模組層級碰 window／document。
+		// 本組唯一的 SSR 防線是「模組層級 window 觸碰 → SSR 500」的 console 斷言，
+		// 下載這條同樣要掛，讓本測試也能偵測到 scene-canvas.ts／page.tsx 若不慎在模組層級碰 window／document。
 		const consoleIssues = trackConsoleIssues(page);
 
 		await gotoMatchmakerWithRound(page, 2);
@@ -288,7 +287,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		const stream = await download.createReadStream();
 		expect(stream).not.toBeNull();
 		const chunks: Buffer[] = [];
-		// Minor-7：上一行 `expect(stream).not.toBeNull()` 已經是邏輯上的斷言，但 Playwright 的
+		// 上一行 `expect(stream).not.toBeNull()` 已經是邏輯上的斷言，但 Playwright 的
 		// expect 沒有 TypeScript type predicate，型別系統看不到那個斷言，`stream` 在此仍是
 		// `ReadStream | null`。這個 `if` 是型別窄化需要，不是重複的防禦性邏輯——
 		// 維持現寫法，不改用 non-null assertion（repo 內未見該用法）。
@@ -304,7 +303,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		expect(buffer[1]).toBe(0xd8);
 		expect(buffer[2]).toBe(0xff);
 
-		// Major-1 (A)：JPEG 位圖尺寸恰等於 scene.width/height * EXPORT_BITMAP_SCALE。
+		// JPEG 位圖尺寸恰等於 scene.width/height * EXPORT_BITMAP_SCALE。
 		// 殺掉「EXPORT_BITMAP_SCALE 2 → 1」與「拿掉 ctx.scale(...)」這兩種會讓輸出尺寸
 		// 偏離期望值、但既有斷言（下載成功＋JPEG magic bytes）測不出來的存活 mutant。
 		const jpegSize = readJpegSize(buffer);
@@ -313,10 +312,10 @@ test.describe("/matchmaker 匯出功能", () => {
 			height: EXPECTED_JPEG_BITMAP_HEIGHT,
 		});
 
-		// Major-1 (B)：四個角落像素皆應接近白色。這條擋的是「忘了先填不透明底色」——
-		// JPEG 無 alpha，透明區會被編碼成黑色，整張圖變黑底白字（design Decision 9）。
+		// 四個角落像素皆應接近白色。這條擋的是「忘了先填不透明底色」——
+		// JPEG 無 alpha，透明區會被編碼成黑色，整張圖變黑底白字。
 		// 拿掉 scene-canvas.ts 的 `ctx.fillRect(0, 0, scene.width, scene.height)` 後，
-		// Stage 2 實測角落像素會變成 [0, 0, 0, 255]（純黑），本斷言可清楚偵測到。
+		// 實測角落像素會變成 [0, 0, 0, 255]（純黑），本斷言可清楚偵測到。
 		const corners = await readCornerPixels(page, buffer);
 		for (const corner of Object.values(corners)) {
 			expect(corner.r).toBeGreaterThan(WHITE_CORNER_THRESHOLD);
@@ -330,7 +329,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		).toEqual([]);
 	});
 
-	// §8：列印流程與 print CSS（tasks 8.1）。
+	// 列印流程與 print CSS。
 
 	test("點擊列印 PDF 會呼叫瀏覽器列印一次", async ({ page }) => {
 		const consoleIssues = trackConsoleIssues(page);
@@ -367,12 +366,12 @@ test.describe("/matchmaker 匯出功能", () => {
 		// 先在**螢幕媒體**下確認這些元素都真的存在——Playwright 的 role 查詢會把
 		// display:none 的元素排除在無障礙樹外，切到 print 之後 getByRole 一律回 0 個，
 		// 屆時 toBeHidden() 對「元素根本不存在」同樣通過，只寫後者會讓「把整塊刪掉」
-		// 的實作也綠燈（Stage 2 Minor-4）。故存在性一律在切換媒體前確認。
+		// 的實作也綠燈。故存在性一律在切換媒體前確認。
 		const pageHeading = page.getByRole("heading", { name: "對戰分配", exact: true });
 		const exportJpgButton = page.getByRole("button", { name: "匯出 JPG" });
 		const printPdfButton = page.getByRole("button", { name: "列印 PDF" });
-		// 「產生本輪對戰」是 RoundControls 內的按鈕（Stage 2 Major-2）：原本四條斷言裡
-		// 「匯出 JPG」與「列印 PDF」同屬 ExportActions，等於 ExportActions 驗兩次、
+		// 「產生本輪對戰」是 RoundControls 內的按鈕：其餘斷言裡
+		// 「匯出 JPG」與「列印 PDF」同屬 ExportActions，少了它等於 ExportActions 驗兩次、
 		// RoundControls 那層包裝一次都沒驗——拿掉它的 data-print="hide" 測試照樣全綠。
 		const generateButton = page.getByRole("button", { name: "產生本輪對戰" });
 		const stageRegion = page.getByTestId("match-stage-region");
@@ -385,7 +384,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		// 全站導覽（app/layout.tsx 的 SiteNavbar，渲染出 body 直接子節點 <header>）。
 		await expect(page.locator("body > header")).toBeHidden();
 
-		// M7／M8 之後的區段導覽（裁決 3）：nav 本身與其四個分頁連結（對戰／參賽者／
+		// 區段導覽：nav 本身與其中四個分頁連結（對戰／參賽者／
 		// 歷史／資料）逐一斷言，而非只驗 nav 元素本身——nav 隱藏不代表連結本身
 		// 沒有各自被其他規則影響到可見性。
 		const sectionNav = page.locator('nav[aria-label="對戰分配區段導覽"]');
@@ -415,8 +414,8 @@ test.describe("/matchmaker 匯出功能", () => {
 		await expect(page.locator('[data-print="sheet"]')).toBeVisible();
 
 		// 列印版的內容 MUST 來自與 JPG 相同的那一份 ExportScene（spec：PDF 以瀏覽器
-		// 列印流程輸出）。Stage 2 實測：把 scene 換成另外組出來的物件（例如改掉 title）
-		// 測試照樣全綠——同源這件事完全沒有驗收。這裡以列印版標題必須逐字等於
+		// 列印流程輸出）。實測：只驗可見性時，把 scene 換成另外組出來的物件（例如改掉 title）
+		// 測試照樣全綠——同源這件事等於沒有驗收。這裡以列印版標題必須逐字等於
 		// buildExportScene 組出的標題來釘住：App 名稱常數、回合編號、對戰方式三者
 		// 任一被另一份來源覆寫都會轉紅。
 		await expect(page.locator('[data-print="sheet"] h1')).toHaveText(
@@ -429,7 +428,7 @@ test.describe("/matchmaker 匯出功能", () => {
 
 		await page.emulateMedia({ media: "print" });
 
-		// 逐一驗**每個**場地區塊，而非只驗第一個（Stage 2 Minor-3）：規則若被寫成
+		// 逐一驗**每個**場地區塊，而非只驗第一個：規則若被寫成
 		// 只作用於首個區塊（例如誤用 :first-child），只驗第一個會完全看不出來。
 		const courts = page.locator('[data-print="court"]');
 		const courtCount = await courts.count();
@@ -442,9 +441,9 @@ test.describe("/matchmaker 匯出功能", () => {
 		}
 	});
 
-	// Stage 2 Major-1：spec 明訂「列印版內容 MUST 顯示（**螢幕上則 MUST 隱藏**）」，
+	// spec 明訂「列印版內容 MUST 顯示（**螢幕上則 MUST 隱藏**）」，
 	// 但「螢幕上隱藏」的唯一防線是 globals.css 那條 @media print 之外的基礎規則
-	// `[data-print="sheet"] { display: none }`，而它被拿掉時**全套 E2E 都不會紅**。
+	// `[data-print="sheet"] { display: none }`，沒有本測試時它被拿掉**全套 E2E 都不會紅**。
 	// 這條就是那道防線。
 	test("列印版內容在螢幕媒體下隱藏，只有列印時才顯示", async ({ page }) => {
 		await gotoMatchmakerWithRound(page, 2);
@@ -471,7 +470,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		await expect(page.locator("body > header")).toBeVisible();
 	});
 
-	// §9：匯出 SHALL 為唯讀操作——匯出流程 MUST NOT 改動目前回合或任何 LocalStorage 資料
+	// 匯出 SHALL 為唯讀操作——匯出流程 MUST NOT 改動目前回合或任何 LocalStorage 資料
 	// （spec「匯出為純前端唯讀操作」）。
 	test("匯出 JPG 後目前回合與本機資料保持不變", async ({ page }) => {
 		await gotoMatchmakerWithRound(page, 2);
@@ -507,7 +506,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		expect(await snapshotLocalStorage(page)).toEqual(storageBeforeExport);
 	});
 
-	// §9：匯出 MUST 完全在瀏覽器本機完成，不得將參賽者資料送往後端或第三方服務
+	// 匯出 MUST 完全在瀏覽器本機完成，不得將參賽者資料送往後端或第三方服務
 	// （spec「匯出為純前端唯讀操作」；prd.md 12.4）。
 	test("匯出過程不發出任何網路請求", async ({ page }) => {
 		// 列印用 stub，避免真的呼叫瀏覽器原生列印對話框卡住測試（沿用既有列印測試的既有裁決）。
@@ -523,7 +522,7 @@ test.describe("/matchmaker 匯出功能", () => {
 
 		// 用 URL 黑名單而非 resourceType 白名單。spec 的 THEN 雖只列 fetch 與 XHR，
 		// 但 Requirement 正文是「SHALL NOT 將**任何**參賽者資料送往後端或第三方服務」，
-		// 且 design Decision 1 明言「這條 e2e 就是那個決策的自動化防線」。審查實測：
+		// 且這條 e2e 就是「匯出純前端」這個設計決策的自動化防線。實測：
 		// 只認 fetch／xhr 的話，navigator.sendBeacon（resourceType 為 **ping**，POST，
 		// body 可夾帶全部姓名與比分）與 new Image().src（resourceType 為 image）
 		// 這兩種最常見的外洩手法可以直接繞過防線。
@@ -557,7 +556,7 @@ test.describe("/matchmaker 匯出功能", () => {
 		).toEqual([]);
 	});
 
-	// §9：兩個匯出入口 MUST 具備可辨識的文字或 aria-label，且 MUST 可由鍵盤操作
+	// 兩個匯出入口 MUST 具備可辨識的文字或 aria-label，且 MUST 可由鍵盤操作
 	// （spec「匯出入口的可用性與無障礙」；prd.md 12.3、12.5）。
 	test("匯出入口具備可存取名稱且可由鍵盤操作", async ({ page }) => {
 		await gotoMatchmakerWithRound(page, 2);

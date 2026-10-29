@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 // /matchmaker/history 歷史頁的 E2E 驗收。
-// 對應 matchmaker-history-page change §4 的 test-plan：直接開啟路由、預設區間、
-// 切換區間、8.2 欄位呈現、賽前／賽後分數、空狀態（引導型與跨月週）。
+// 涵蓋：直接開啟路由、預設區間、
+// 切換區間、完整欄位呈現、賽前／賽後分數、空狀態（引導型與跨月週）。
 //
 // 歷史資料存在 localStorage["matchmaker:history:v1"]，容器形狀為
 // { version: 1, entries: [...] }（見 lib/matchmaker/round-storage.ts 的 writeHistory），
@@ -469,7 +469,7 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 
 		// 此時鐘下今日（8/1）、上月（7/1～7/26）與更早（7/1 之前）也都是空區間，
 		// 三者各自的文案 MUST 不同：只驗其中一個區間時，把 range 參數忽略、寫死成
-		// 單一文案照樣全綠（§3 出現過同型缺口）。
+		// 單一文案照樣全綠（曾出現過同型缺口）。
 		for (const [rangeName, expectedText] of [
 			["今日", "今日目前沒有任何對戰紀錄。"],
 			["上月", "上月沒有任何對戰紀錄。"],
@@ -486,7 +486,7 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 			await expect(page.getByTestId(`history-record-e2e-history-crossmonth-${day}`)).toBeVisible();
 		}
 
-		// design Decision 7：「現在」只在 hydration 取樣一次，之後的 render SHALL NOT
+		// 「現在」只在 hydration 取樣一次，之後的 render SHALL NOT
 		// 再取時鐘。把假時鐘推到 2026-08-10（週一）——若元件在 render 期間重取，
 		// 7/27～7/31 會被改判為「上月」，本週隨即變成空狀態而在此轉紅。
 		await page.clock.setFixedTime(new Date(2026, 7, 10, 12, 0, 0));
@@ -500,7 +500,7 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 	test("瀏覽與切換區間後 matchmaker:history:v1 內容不變", async ({ page }) => {
 		// 種入的兩筆皆為合法紀錄（buildEntry 產出符合 schema 的形狀）：readHistory()
 		// 只在 droppedCount > 0 時才會回寫清理後的歷史（round-storage.ts 第 142～147
-		// 行），全數合法即可避免踩到 M4 的回寫路徑而讓「內容不變」誤判失守。
+		// 行），全數合法即可避免踩到該回寫路徑而讓「內容不變」誤判失守。
 		const entries = [
 			buildEntry({
 				matchId: "e2e-history-readonly-1",
@@ -561,7 +561,7 @@ test.describe("/matchmaker/history 對戰歷史頁", () => {
 		await expect(alert).toBeVisible();
 		// 損毀筆數刻意種 2 筆（而非 1 筆），並在本 test 末尾再以另一個筆數重讀一次：
 		// 只種 1 筆時，把 {hydrated.droppedCount} 插值寫死成常數 1 照樣全綠
-		// （Stage 2 mutation 實測確認此退化會存活），兩個相異取值才擋得住寫死——
+		// （mutation 實測確認此退化會存活），兩個相異取值才擋得住寫死——
 		// 沿用本檔「8.2 全部欄位」那個 test 的相異值慣例（單一取值等於零保護）。
 		await expect(alert).toContainText("2");
 		await expect(alert).toContainText("損毀");

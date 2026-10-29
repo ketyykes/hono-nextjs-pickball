@@ -60,7 +60,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 有 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -130,7 +130,7 @@ describe("buildExportScene", () => {
 				expect(tile.name.length).toBeGreaterThan(0);
 			}
 		}
-		// 用能真正辨識球員身分的姓名＋teamIndex 序列比對，取代原本恆真的
+		// 用能真正辨識球員身分的姓名＋teamIndex 序列比對，而非恆真的
 		// expect([0, 1]).toContain(tile.teamIndex)：teamIndex 寫死 0 或兩隊對調都會被此斷言抓到。
 		expect(scene.courts[0].tiles.map((tile) => [tile.name, tile.teamIndex])).toEqual([
 			["小明", 0],
@@ -214,7 +214,7 @@ describe("buildExportScene", () => {
 
 		const scene = buildExportScene(round, players);
 
-		// 升級為完整字串（順序敏感）比對，取代原本的 toContain 組合：
+		// 以完整字串（順序敏感）比對，而非 toContain 組合：
 		// 比分兩數對調、或勝方恆取第一隊都會被此斷言抓到。全形空白為 STATUS_SEPARATOR。
 		expect(scene.courts[0].statusText).toBe("11 : 7　第一隊獲勝");
 	});
@@ -277,7 +277,7 @@ describe("buildExportScene", () => {
 		expect(scene.courts[0].statusText).not.toContain(TEAM_LABELS[1]);
 
 		// 11:11 兩數相同，單靠上面的斷言分不出比分是真的取自 scores，還是把「11」乃至
-		// 整串「11 : 11　平手」寫死（Stage 2 mutation 實測兩種 mutant 皆存活）。再取一組
+		// 整串「11 : 11　平手」寫死（兩種 mutant 都會存活）。再取一組
 		// 不同的平手比分作對照才釘得住；0:0 是計時回合時間到即結束的合法平局比分。
 		const zeroScene = buildExportScene(drawRound(0), players);
 		expect(zeroScene.courts[0].statusText).toBe("0 : 0　平手");
@@ -338,7 +338,7 @@ describe("buildExportScene", () => {
 				}),
 			],
 		});
-		// 只驗 pending 時，把守衛放寬成 status !== "pending" 的 mutant 會存活（Stage 2 實測）：
+		// 只驗 pending 時，把守衛放寬成 status !== "pending" 的 mutant 會存活：
 		// 三種 status 裡 scoring 才是「非 completed 也非 pending」的那一種，帶著比分與勝方
 		// 一起驗到，才真的釘住本測試名稱宣稱的「completed 是唯一放行條件」。
 		const scoringRound = makeRound({
@@ -549,8 +549,7 @@ describe("buildExportScene", () => {
 
 	it("每個場地區塊自帶 blockHeight，單打與雙打各為公式推導出的固定值", () => {
 		// blockHeight 存在的理由是讓 scene-canvas.ts 直接累加下一個場地的起點 y，
-		// 而不必由 tiles 反推對戰方式再套公式——推導屬行為邏輯，不該住在例外層
-		// （§7 Stage 2 Major-2）。這條把「本檔一併算好」這件事釘住：欄位漏填、
+		// 而不必由 tiles 反推對戰方式再套公式——推導屬行為邏輯，不該住在例外層。這條把「本檔一併算好」這件事釘住：欄位漏填、
 		// 填成 0、或單打與雙打填成同值都會轉紅。
 		// 期望值＝COURT_HEADER_HEIGHT(56) + 該對戰方式的球員列數 × TILE_ROW_HEIGHT(88)：
 		// 單打 56 + 1×88 = 144；雙打 56 + 2×88 = 232。
@@ -691,7 +690,7 @@ describe("buildExportScene", () => {
 		expect(scene.background).not.toMatch(/rgba/i);
 		// 6 碼 hex（不含 alpha），對齊 codebase 既有 HexColorSchema 的格式慣例。
 		expect(scene.background).toMatch(/^#[0-9a-fA-F]{6}$/);
-		// design Decision 9 要的是「白」而非任意不透明色——單靠上面三條斷言無法排除
+		// 底色要的是「白」而非任意不透明色——單靠上面三條斷言無法排除
 		// 例如 #000000 這種同樣不透明、同樣是合法 6 碼 hex 的錯誤底色。
 		expect(scene.background.toUpperCase()).toBe("#FFFFFF");
 	});

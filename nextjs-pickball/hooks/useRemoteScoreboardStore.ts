@@ -75,7 +75,7 @@ function statusReducer(current: SyncStatus, action: StatusAction): SyncStatus {
 
 /**
  * 登入時獨立計分板的雲端實作：載入、最新優先儲存、版本衝突時以雲端為準。
- * 回傳 [state, dispatch, syncStatus]，B6 之後的雲端 hook 可照此形態。
+ * 回傳 [state, dispatch, syncStatus]，其他雲端 hook 依此形態實作。
  */
 export function useRemoteScoreboardStore({
 	enabled,

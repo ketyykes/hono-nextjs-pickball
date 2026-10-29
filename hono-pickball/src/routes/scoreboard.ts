@@ -26,7 +26,7 @@ export const scoreboardRoutes = new Hono<SessionAppEnv>()
 		zValidator("json", putBodySchema, invalidBodyHook),
 		async (c) => {
 			const { data, version } = c.req.valid("json");
-			// current 只存獨立計分板；綁定場次的狀態在 B7 前一律留在本機
+			// current 只存獨立計分板；綁定場次的狀態存於 matchmaker 場次分槽（/api/matchmaker/slots）
 			if (data.matchId !== null) {
 				return c.json({ error: API_ERROR_CODES.INVALID_BODY }, 400);
 			}

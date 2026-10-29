@@ -7,9 +7,9 @@ import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY, hasLocalSto
 import { MATCH_SLOTS_KEY } from "../scoreboard/match-slots";
 import type { Player } from "@pickball/core/matchmaker/types";
 
-// re-export（非改名）：M1 既有的匯入點（hooks/useRosterStore.ts 等）與既有測試
+// re-export（非改名）：既有的匯入點（hooks/useRosterStore.ts 等）與既有測試
 // 都是 import { STORAGE_KEY } from "./storage"，key 本體已搬到 storage-keys.ts
-// 單一來源（見 design Decision 8），保留這行 re-export 讓那些既有匯入點不必改動。
+// 單一來源，保留這行 re-export 讓那些既有匯入點不必改動。
 export const STORAGE_KEY = ROSTER_STORAGE_KEY;
 
 /**
@@ -17,8 +17,8 @@ export const STORAGE_KEY = ROSTER_STORAGE_KEY;
  * 陣列元素刻意用 z.unknown() 不驗——逐筆驗證交給 readRoster() 內部處理。
  *
  * 這是刻意與 RosterSchema（完整驗證，寫入時使用）分開的兩段式設計：
- * 名單是使用者逐筆手建的資料，單筆壞掉不該連累整份被清空（見 Decision 3）。
- * version 不符則視為結構層級損壞，走「無筆可救」路徑（見 Decision 9）。
+ * 名單是使用者逐筆手建的資料，單筆壞掉不該連累整份被清空。
+ * version 不符則視為結構層級損壞，走「無筆可救」路徑。
  */
 const RosterContainerSchema = z.object({
 	version: z.literal(1),
@@ -38,7 +38,7 @@ export interface ReadRosterResult {
  * - JSON 解析失敗 → 清除損壞資料並回空名單（無筆可救）
  * - 外層結構不合法（含 version 不符）→ 清除損壞資料並回空名單（無筆可救）
  * - 外層合法但個別 player 不合法 → 保留合法者、捨棄不合法者，回報 droppedCount，
- *   key 不移除（逐筆降級，見 Decision 3）
+ *   key 不移除（逐筆降級）
  */
 export function readRoster(): ReadRosterResult {
 	if (!hasLocalStorage()) return { players: [], droppedCount: 0 };

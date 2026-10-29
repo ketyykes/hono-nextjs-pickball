@@ -1,5 +1,5 @@
 // 名單 CRUD 純函式。所有函式皆為不可變操作，回傳新陣列，不就地修改傳入的 roster。
-// id 與 createdAt 一律由呼叫端注入（design Decision 4），本模組不呼叫
+// id 與 createdAt 一律由呼叫端注入，本模組不呼叫
 // crypto.randomUUID() 或 new Date()，確保回傳值可被確定性斷言。
 
 import { defaultGradient, paletteIndexOf, PALETTE_SIZE } from "./colors";
@@ -33,14 +33,14 @@ export interface AddPlayerContext {
  * 依指定 id 更新參賽者的部分欄位；id／createdAt 不可透過 patch 變更。
  *
  * ⚠️ `updatePlayer` 是**覆寫**語意，不是累加語意：`patch.restCount`／`patch.gamesPlayed`
- * 等欄位會直接取代既有值，而非疊加。M2（分配演算法）／M4（評分更新）若要遞增這類
+ * 等欄位會直接取代既有值，而非疊加。分配演算法／評分更新若要遞增這類
  * 累計欄位，呼叫端必須自行讀出既有值再算出新值（例如 `{ restCount: player.restCount + 1 }`），
  * 否則等於用常數蓋掉既有累計值。若這類遞增呼叫散落多處，屆時應改為新增專門的
  * increment 函式，而非讓每個呼叫端各自重算。
  */
 export type UpdatePlayerPatch = Partial<Omit<Player, "id" | "createdAt">>;
 
-// rating 的唯一寫入前 round 點（design Decision 7）：強度分數存 number，
+// rating 的唯一寫入前 round 點：強度分數存 number，
 // 寫入前一律 round 至兩位小數，避免浮點數誤差累積或顯示過多小數位。
 function roundRating(rating: number): number {
 	return Math.round(rating * 100) / 100;

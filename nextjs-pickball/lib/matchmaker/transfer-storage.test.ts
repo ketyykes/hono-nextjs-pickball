@@ -65,7 +65,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 有 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -120,14 +120,14 @@ describe("transfer-storage", () => {
 
 	afterEach(() => {
 		// vi.spyOn(window, "localStorage" / "setItem", ...) 用過就必須還原，
-		// 否則會污染同檔後續測試（見 M8 §7 派工的硬性要求）。
+		// 否則會污染同檔後續測試。
 		vi.restoreAllMocks();
 		localStorage.clear();
 	});
 
 	it("clearAllLocalData 移除本 app 寫入的全部 LocalStorage key", () => {
 		// expectedKeys 由來源模組 import 組成，SHALL NOT 在測試內抄字面值
-		// （§0.5／0.6 對照表列出的全部 5 個 key）。
+		// （涵蓋全部 5 個 key）。
 		const expectedKeys = [
 			ROSTER_STORAGE_KEY,
 			ROUND_STORAGE_KEY,
@@ -172,16 +172,15 @@ describe("transfer-storage", () => {
 		const historyBefore = localStorage.getItem(HISTORY_STORAGE_KEY);
 
 		// 監看 setItem 從此刻起是否被呼叫過——讓「驗證失敗時沒有寫入路徑可走」這件事
-		// 從「型別系統保證但測試沒觀察到」變成可被斷言觀察到的事實（M8 §7 兩階段
-		// 審查 Blocker B1：原本 `if (parsed.ok)` 恆為 false，`writeBackup` 從未被
-		// 呼叫，卻沒有任何斷言明確指出這件事）。
+		// 從「型別系統保證但測試沒觀察到」變成可被斷言觀察到的事實（驗證失敗時 `if (parsed.ok)` 恆為 false，
+		// `writeBackup` 不會被呼叫，需要有斷言明確指出這件事）。
 		const setItemSpy = vi.spyOn(window.localStorage, "setItem");
 
 		const parsed = parseBackup("{ 不是合法 JSON");
 		// 明確斷言驗證失敗——這個分支不再是「靜默略過」，而是本測試的核心錨點。
 		expect(parsed.ok).toBe(false);
-		// 型別上就無法對驗證失敗的結果呼叫 writeBackup（design Decision 1「原子性由
-		// 型別強制」）：parsed.ok 為 false 時 parsed 沒有 backup 欄位，下面這段
+		// 型別上就無法對驗證失敗的結果呼叫 writeBackup（原子性由
+		// 型別強制）：parsed.ok 為 false 時 parsed 沒有 backup 欄位，下面這段
 		// 不會執行，三個 key 因此原封不動。
 		if (parsed.ok) {
 			writeBackup(parsed.backup);
@@ -228,8 +227,8 @@ describe("transfer-storage", () => {
 	});
 
 	it("readSnapshot 在 localStorage 可用時回傳名單／回合／歷史的真實內容", () => {
-		// M8 §7 兩階段審查 Blocker B2：readSnapshot 的 happy path（storage 可用時真正
-		// 讀出資料）先前完全零覆蓋，guard 條件反轉、拿掉任一來源函式、entries→history
+		// readSnapshot 的 happy path（storage 可用時真正
+		// 讀出資料）需要覆蓋，否則 guard 條件反轉、拿掉任一來源函式、entries→history
 		// 欄位改名錯置皆不會被發現。本測試以真實 localStorage 內容（非 mock）逐欄位鎖住。
 		const player = makePlayer();
 		const round = makeRound();
@@ -254,7 +253,7 @@ describe("transfer-storage", () => {
 	});
 
 	it("writeBackup 成功寫入後可用既有讀取函式還原名單／回合／歷史（round-trip）", () => {
-		// M8 §7 兩階段審查 Blocker B3：writeBackup 的 happy path 先前完全零覆蓋，
+		// writeBackup 的 happy path 需要覆蓋，否則
 		// 移除任一 setItem、容器 version／欄位名改壞皆不會被發現（寫入端與
 		// readRoster／readRound／readHistory 的讀取端 schema 是否對齊，只有透過
 		// round-trip 才能同時鎖住兩端）。
@@ -269,7 +268,7 @@ describe("transfer-storage", () => {
 	});
 
 	it("clearAllLocalData 對單一 key 的 removeItem 拋例外時仍不拋出且其餘 key 正常清除", () => {
-		// M8 §7 兩階段審查 Major M1：逐 key 的 try/catch 先前零覆蓋，拿掉這層防護
+		// 逐 key 的 try/catch 需要覆蓋，否則拿掉這層防護
 		// 仍全綠。本測試讓其中一個 key（ROUND_STORAGE_KEY）的 removeItem 拋例外，
 		// 驗證例外被靜默吞掉、不中斷迴圈，其餘 key 依然被正確清除。
 		for (const key of CLEAR_ALL_KEYS) {
@@ -300,7 +299,7 @@ describe("transfer-storage", () => {
 	});
 
 	it("clearAllLocalData 在 localStorage 不可用時不拋出例外", () => {
-		// M8 §7 兩階段審查 Minor m2：localStorage 不可用時的 no-op 分支先前零覆蓋。
+		// localStorage 不可用時的 no-op 分支。
 		vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
 			throw new Error("localStorage 不可用（例如私密模式）");
 		});
@@ -308,7 +307,7 @@ describe("transfer-storage", () => {
 		expect(() => clearAllLocalData()).not.toThrow();
 	});
 
-	// M8 §7 兩階段審查 Minor m1：design.md「Risks / Trade-offs」明文記錄「三個 key
+	// 已知取捨：「三個 key
 	// 的寫入不是真正的原子操作」——第二次 setItem 撞到配額時，第一次已成功寫入的
 	// 資料不會被回滾（回滾本身也是寫入，同樣可能失敗）。這是已知且已記錄的取捨，
 	// SHALL NOT 因此修改 writeBackup 加回滾機制；本測試把這個行為轉成明確標註意圖
@@ -340,7 +339,7 @@ describe("transfer-storage", () => {
 		setItemSpy.mockRestore();
 	});
 
-	// Final Review M2：RosterCsvImportSection.tsx 原本用 storage.ts 的 writeRoster()
+	// RosterCsvImportSection.tsx 原本用 storage.ts 的 writeRoster()
 	// 寫入 CSV 匯入結果，但該函式靜默吞掉例外且回傳 void，元件卻無條件 location.reload()——
 	// 配額滿／localStorage 不可用時使用者看不到任何錯誤訊息。writeRosterPlayers 比照
 	// writeBackup，自行 setItem + try/catch 並回傳同一個 WriteBackupResult 形狀，

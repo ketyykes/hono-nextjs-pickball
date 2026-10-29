@@ -2,20 +2,17 @@ import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-// M8 §8 修正輪（Stage 2 review B3）：歷史 CSV 標題列 MUST 直接比對 lib 層的單一真相來源，
+// 歷史 CSV 標題列 MUST 直接比對 lib 層的單一真相來源，
 // SHALL NOT 在本檔另抄一份「日期,時間,對戰方式,…」字面值——常數改了測試也要一起改。
 import { HISTORY_CSV_HEADERS } from "@/lib/matchmaker/history-csv";
-// Final Review m3：roster CSV 標題列原本在本檔另抄一份「名稱,性別,強度分數,…」字面值，
-// 與上面 HISTORY_CSV_HEADERS 的 import 慣例不一致——同一條 SHALL NOT 規則沒有一致套用。
-// 改為與歷史標題列同樣 import 單一真相來源。
+// roster CSV 標題列比照上面 HISTORY_CSV_HEADERS，同樣 import 單一真相來源，
+// 不在本檔另抄一份「名稱,性別,強度分數,…」字面值——同一條 SHALL NOT 規則一致套用。
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
 
-// /matchmaker/data 資料工具頁的 E2E 驗收（M8 §8）。
-// §8.1 只涵蓋兩個入口驗收 test；§8.3 起補上 JSON／CSV 匯出入與清除本機資料的實際行為，
-// 對應 delta spec `openspec/changes/matchmaker-data-transfer/specs/data-transfer/spec.md`
-// 的各 Scenario。
+// /matchmaker/data 資料工具頁的 E2E 驗收：兩個入口驗收 test，以及 JSON／CSV 匯出入與
+// 清除本機資料的實際行為，對應 `openspec/specs/data-transfer/spec.md` 的各 Scenario。
 //
-// §8.1 的兩個 test 皆不讀寫 localStorage；§8.3 起新增的 test 會讀寫
+// 入口驗收的兩個 test 皆不讀寫 localStorage；其餘 test 會讀寫
 // matchmaker:roster:v1／matchmaker:round:v1／matchmaker:history:v1，比照
 // matchmaker-history.spec.ts／player-roster.spec.ts 的既有慣例，只清除本 capability
 // 的 key，不使用 localStorage.clear()。
@@ -162,7 +159,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("完整還原請使用 JSON", { exact: false })).toBeVisible();
 	});
 
-	// §8.3／8.4：JSON 完整備份的匯入（spec「匯入成功後參賽者、回合與歷史一併還原」）。
+	// JSON 完整備份的匯入（spec「匯入成功後參賽者、回合與歷史一併還原」）。
 	test("匯入合法 JSON 備份後參賽者與歷史一併還原", async ({ page }) => {
 		await clearMatchmakerStorage(page);
 
@@ -200,12 +197,12 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByTestId(`history-record-${matchId}`)).toBeVisible();
 	});
 
-	// §8.5／8.6：參賽者名單 CSV 匯入的預覽、取消與確認
+	// 參賽者名單 CSV 匯入的預覽、取消與確認
 	// （spec「於預覽取消時不寫入任何資料」／「確認預覽後名單新增匯入的參賽者」）。
 	test("在 CSV 匯入預覽按取消後名單維持不變", async ({ page }) => {
 		await clearMatchmakerStorage(page);
 		// 保留種子物件本身（而非只記文字姓名），以便取消後能與 LocalStorage 逐字元比對
-		// （M8 §8 修正輪 Stage 1 review A2：只比姓名＋人數不足以證明性別／強度分數／
+		// （只比姓名＋人數不足以證明性別／強度分數／
 		// 顏色等欄位未被誤動）。
 		const existingPlayers = [buildPlayerFixture({ id: "p-csv-cancel-existing", name: "CSV取消既有員" })];
 		await seedRoster(page, existingPlayers);
@@ -271,7 +268,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("共 3 位參賽者")).toBeVisible();
 	});
 
-	// §8.7／8.8：清除本機資料的二次確認（spec「清除本機資料與其確認流程」）。
+	// 清除本機資料的二次確認（spec「清除本機資料與其確認流程」）。
 	test("清除本機資料的確認提示載明無法復原、建議先匯出並說明備份不含計分進度", async ({ page }) => {
 		await page.goto(DATA_PAGE);
 
@@ -299,7 +296,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await alert.getByRole("button", { name: "取消" }).click();
 		await expect(alert).toBeHidden();
 
-		// 逐字元比對整個 matchmaker:roster:v1（M8 §8 修正輪 Stage 1 review A2），
+		// 逐字元比對整個 matchmaker:roster:v1，
 		// 比只驗姓名＋人數更嚴格。
 		const storedRosterAfterCancel = await page.evaluate(
 			(key) => window.localStorage.getItem(key),
@@ -330,8 +327,8 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("清除確認員", { exact: true })).toHaveCount(0);
 	});
 
-	// M8 §8 修正輪（Stage 2 review Blocker B1）：JSON 匯入失敗（parseBackup 回 ok:false）
-	// 完全零覆蓋，含「是否誤 reload」。餵入語法錯誤的 JSON，斷言錯誤訊息顯示、名單不變、
+	// JSON 匯入失敗（parseBackup 回 ok:false）的分支，含「是否誤 reload」。
+	// 餵入語法錯誤的 JSON，斷言錯誤訊息顯示、名單不變、
 	// 且沒有誤觸發 location.reload()——若誤 reload，component state（message）會被清空，
 	// 畫面上的 alert 會消失，故等待一段時間後再次確認 alert 仍可見即可證明沒有誤 reload。
 	// 用 `p[role="alert"]` 而非 `getByRole("alert")`：Next.js 的
@@ -369,15 +366,15 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
 	});
 
-	// M8 §8 修正輪（Stage 2 review Blocker B1，mutant M3）：writeBackup 回 ok:false
-	// （LocalStorage 寫入拋例外，如配額超出）的分支同樣零覆蓋。以
+	// writeBackup 回 ok:false
+	// （LocalStorage 寫入拋例外，如配額超出）的分支。以
 	// Storage.prototype.setItem 抽換成拋例外版本，模擬 writeBackup 內
 	// try/catch 捕捉到的邊界情境；此抽換只存在於目前的 page context（page.evaluate，
 	// 非 addInitScript），若元件誤觸發 location.reload() 會產生全新 document、
 	// 抽換自動失效，之後的 page.goto 用的是原生 setItem，不影響後續斷言的可靠性。
 	//
 	// ⚠️ 抽換點 MUST 是 `Storage.prototype.setItem`，SHALL NOT 寫成
-	// `window.localStorage.setItem = ...`（M8 §9.7 全瀏覽器實跑抓到）：`Storage` 定義了
+	// `window.localStorage.setItem = ...`（全瀏覽器實跑抓到）：`Storage` 定義了
 	// named property setter，Firefox／WebKit 會把對 localStorage 實例的屬性指派解讀為
 	// 「寫入一筆 key 為 setItem 的資料」，而不是遮蔽該方法——原生 setItem 依然生效，
 	// 匯入會意外成功、alert 永不出現，測試只在 Chromium 綠。
@@ -424,8 +421,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByText("共 1 位參賽者")).toBeVisible();
 	});
 
-	// M8 §8 修正輪（Stage 2 review Blocker B2）：JSON 匯出功能完全零覆蓋。
-	// 點擊「匯出 JSON」，以 waitForEvent("download") 攔截下載，驗證檔名格式與
+	// JSON 匯出：點擊「匯出 JSON」，以 waitForEvent("download") 攔截下載，驗證檔名格式與
 	// 內容的四個頂層欄位，且 players 與先前種入的名單一致。
 	test("匯出 JSON 產生內容正確的備份檔案", async ({ page }) => {
 		await clearMatchmakerStorage(page);
@@ -459,8 +455,8 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		expect(content.players).toEqual(existingPlayers);
 	});
 
-	// M8 §8 修正輪（Stage 2 review Blocker B3）：HistoryCsvSection（歷史賽果 CSV 匯出）
-	// 完全零覆蓋。此 describe 固定裝置時區為 Asia/Taipei（UTC+8），並選一個在 UTC 與
+	// HistoryCsvSection（歷史賽果 CSV 匯出）：
+	// 此 describe 固定裝置時區為 Asia/Taipei（UTC+8），並選一個在 UTC 與
 	// Asia/Taipei 屬於不同曆日的 playedAt（世界協調時 18:30 → 台北時間已跨入隔日
 	// 02:30），用來驗證 Decision 12（時區必須注入本地時區，SHALL NOT 用 UTC）——
 	// 斷言方式刻意不直接比對某個字面值時區換算結果（測試機時區會造成假紅燈），
@@ -538,8 +534,8 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		});
 	});
 
-	// M8 §8 修正輪（Stage 2 review Blocker B4）：parseRosterCsv 回 ok:false
-	// （缺必填標題欄）的分支在元件層完全零覆蓋。餵入只有「名稱,性別」兩欄的 CSV
+	// parseRosterCsv 回 ok:false
+	// （缺必填標題欄）的元件層分支。餵入只有「名稱,性別」兩欄的 CSV
 	// （缺「強度分數」），斷言結構性錯誤訊息顯示且含缺少的欄位名稱、確認匯入按鈕維持 disabled。
 	test("CSV 標題列缺少必填欄位時顯示結構性錯誤且確認匯入按鈕維持 disabled", async ({ page }) => {
 		await clearMatchmakerStorage(page);
@@ -557,10 +553,10 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
 	});
 
-	// M8 §8 修正輪（Stage 2 review Major J1 + Minor N1，合併一條）：含錯誤列的預覽畫面
-	// 從未被渲染過。CSV 混 3 列合法＋1 列強度分數超出範圍，斷言「可新增 3 人」、
+	// 含錯誤列的預覽畫面：
+	// CSV 混 3 列合法＋1 列強度分數超出範圍，斷言「可新增 3 人」、
 	// 錯誤列表含正確的試算表列號（第 5 列：標題列第 1 列＋4 筆資料）、欄位名稱與
-	// 繁體中文原因，並且（N1）「確認匯入」按鈕在此狀態為 disabled。
+	// 繁體中文原因，並且「確認匯入」按鈕在此狀態為 disabled。
 	test("CSV 匯入預覽同時顯示可新增人數與錯誤列且確認匯入按鈕 disabled", async ({ page }) => {
 		await clearMatchmakerStorage(page);
 		await page.goto(DATA_PAGE);
@@ -588,7 +584,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 		await expect(page.getByRole("button", { name: "確認匯入" })).toBeDisabled();
 	});
 
-	// Final Review M2：CSV 匯入原本用會靜默吞例外的 writeRoster() 寫入，配額滿／
+	// CSV 匯入 SHALL NOT 用會靜默吞例外的 writeRoster() 寫入，否則配額滿／
 	// localStorage 不可用時無訊息且照常 reload。比照既有「LocalStorage 寫入失敗時
 	// JSON 匯入不誤 reload 且顯示訊息」的寫法：以 Storage.prototype.setItem 抽換成
 	// 拋出例外版本，確認 CSV 匯入確認後顯示訊息、不誤 reload、既有名單不受影響。

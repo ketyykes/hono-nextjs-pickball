@@ -73,7 +73,7 @@ function isPlayerPut(response: Response) {
 	return response.url().includes(`${PLAYERS_API}/`) && response.request().method() === "PUT";
 }
 
-// B7 起登入時送出比分改為 POST /api/matchmaker/round/matches/:matchId/score，評分由後端在同一個 batch 內寫入
+// 登入時送出比分走 POST /api/matchmaker/round/matches/:matchId/score，評分由後端在同一個 batch 內寫入
 function isScorePost(response: Response) {
 	return /\/api\/matchmaker\/round\/matches\/[^/]+\/score$/.test(new URL(response.url()).pathname) && response.request().method() === "POST";
 }
@@ -237,7 +237,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 		await expect(page.getByLabel("第一隊比分").first()).toBeVisible();
 
-		// 逐場送出（雙打 1 場地即一場）。B7 起評分由後端在送出比分的 batch 內寫入（delta player-roster
+		// 逐場送出（雙打 1 場地即一場）。評分由後端在送出比分的 batch 內寫入（player-roster spec
 		// 「送出比分的評分寫回雲端名單」：前端不逐人 PUT），所以等送出比分的 POST 完成再等 synced，
 		// 並記錄送出期間的參賽者 PUT，最後斷言一個都沒有
 		const playerPutUrls: string[] = [];
@@ -283,7 +283,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await expect(page.getByRole("button", { name: "新增參賽者" })).toHaveCount(0);
 	});
 
-	// regression guard：寫入時即綠（§7.2 已讓三頁接線），補上先前只有參賽者頁受保護的缺口
+	// regression guard：寫入時即綠（三頁皆已接線），讓對戰頁與統計頁也受保護，不只參賽者頁
 	test("雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容", async ({ page }) => {
 		await page.route(`**${PLAYERS_API}`, async (route) => {
 			if (route.request().method() === "GET") {

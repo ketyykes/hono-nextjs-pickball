@@ -2,14 +2,12 @@ import { z } from "zod";
 import type { DoublesComposition, MatchFormat } from "./allocation-types";
 import { MIN_COURT_COUNT, MAX_COURT_COUNT } from "./allocation-types";
 
-// prd.md 6.1、5.6 都提到「進行中」的場次，但「進行中」要等場邊計分接上（M6）才會真的出現。
-// 這裡先把狀態訂為三值列舉 pending｜scoring｜completed：本 change 的寫入路徑只會產生
-// pending 與 completed，但未完成判定、基準納入、重排排除、目標分數鎖定等讀取路徑都已
-// 一併處理 scoring，不留到 M6 才擴充列舉值。
-// 不採「先兩值、M6 再擴充」的理由是 M1 已經付過一次學費：restCount／gamesPlayed
-// 當初就是為了避免破壞性遷移才提前納入 schema。狀態列舉一旦擴值，所有使用者瀏覽器裡
-// 既有的 matchmaker:round:v1 都要跨版本處理，而本產品沒有後端也沒有遷移視窗，
-// 唯一補救辦法是清掉使用者進行中的回合。
+// prd.md 6.1、5.6 都提到「進行中」的場次。狀態訂為三值列舉 pending｜scoring｜completed：
+// 寫入路徑只會產生 pending 與 completed（場邊計分的進度存於計分板分槽），但未完成判定、
+// 基準納入、重排排除、目標分數鎖定等讀取路徑都已一併處理 scoring。
+// 預先納入 scoring 而非日後再擴值，與 restCount／gamesPlayed 提前納入 schema 的理由相同：
+// 避免破壞性遷移。狀態列舉一旦擴值，所有使用者瀏覽器裡既有的 matchmaker:round:v1 都要
+// 跨版本處理，而本機資料沒有遷移視窗，唯一補救辦法是清掉使用者進行中的回合。
 export const MatchStatusSchema = z.enum(["pending", "scoring", "completed"]);
 
 // 對戰方式：沿用 allocation-types.ts 的 MatchFormat。
@@ -38,7 +36,7 @@ export const RoundTeamSchema = z.object({
 // 才抓——否則使用者在回合進行中手動改了某人的分數，賽前分數就會變成「改完之後的值」，
 // 與當時實際發生的分差記錄不符。
 // after 未完成時為 null：RoundMatch 一次帶齊 prd.md 6.1／6.5／8.2 列舉的全部欄位，
-// 即使本 change 有些欄位只會寫 null，理由同樣是避免破壞性遷移。
+// 即使建立回合時有些欄位只會寫 null，理由同樣是避免破壞性遷移。
 export const PlayerRatingSchema = z.object({
 	playerId: z.string(),
 	before: z.number(),
@@ -52,11 +50,11 @@ export const RoundMatchSchema = z
 		format: RoundFormatSchema,
 		// doublesComposition 刻意維持 optional() 而非 allocation-types.ts 的 discriminated
 		// union：(1) spec 沒有對應 Scenario／測試——改成 DU 是新增「單打 MUST 不帶／雙打
-		// MUST 帶」的可觀察行為，依 TDD 硬規則需要先有紅燈測試，而 test-plan §1 沒有這一列；
+		// MUST 帶」的可觀察行為，依 TDD 硬規則需要先有紅燈測試；
 		// (2) Match（in-memory）與 RoundMatch（persisted）的權衡不同：Match 只活在一次
 		// 分配呼叫裡，DU 的編譯期保證零成本；RoundMatch 要從 LocalStorage 反序列化，DU
 		// 在資料損壞時只吐 invalid_union、無法指出哪個欄位壞了，與「損壞降級要可診斷」的
-		// 訴求相衝；(3) M5～M8 的實際消費形態是「就地更新單一場次」（matches.map(m =>
+		// 訴求相衝；(3) 呼叫端的實際消費形態是「就地更新單一場次」（matches.map(m =>
 		// m.id === id ? { ...m, status: "completed", ... } : m)），對 DU 做 spread 更新
 		// 在 TS 下會反覆需要收窄或斷言，與 playerRatings[].after「未完成時 null」的鬆散
 		// 表達哲學一致。
@@ -69,7 +67,7 @@ export const RoundMatchSchema = z
 				teamB: z.number().int().nonnegative(),
 			})
 			.nullable(),
-		// "draw"（M15 新增）僅可能出現於計時回合：兩隊比分相同時計時回合允許判定平局，
+		// "draw" 僅可能出現於計時回合：兩隊比分相同時計時回合允許判定平局，
 		// 見 round-lifecycle 的「比分驗證」——非計時回合 SHALL NOT 產生 "draw"。
 		winner: z.enum(["teamA", "teamB", "draw"]).nullable(),
 		completedAt: z.iso.datetime().nullable(),
@@ -77,7 +75,7 @@ export const RoundMatchSchema = z
 	})
 	.superRefine((data, ctx) => {
 		// completed 場次必須帶齊 scores、winner、completedAt，且所有 playerRatings[].after
-		// 必須為數字。用 superRefine 而非交由呼叫端自律：tasks 1.2 明寫「不靠呼叫端自律」，
+		// 必須為數字。用 superRefine 而非交由呼叫端自律：
 		// 跨欄位一致性寫成 refinement 才擋得住「標成完成卻沒有比分」的損壞資料，而這種
 		// 資料會從 LocalStorage 經同一個 schema 回讀。
 		if (data.status === "completed") {
@@ -132,7 +130,7 @@ export const SeenSignaturesSchema = z.object({
 // 這個值決定整輪所有場地的分制，靜默改值是使用者無從察覺的錯誤。
 // 既有先例：allocation-types.ts 的 MatchFormat 與 scoreboard 的 Mode 同為
 // "singles" | "doubles"，該檔註解明訂「分屬不同 capability、語意不同，不要合併」。
-// 但值域必須一致（M6 會把回合的目標分數直接交給計分板），因此耦合放在測試層：
+// 但值域必須一致（場邊計分會把回合的目標分數直接交給計分板），因此耦合放在測試層：
 // round-types.test.ts 比對兩者的可接受值集合，值域漂移會轉紅，兩個 capability
 // 的執行期程式碼則互不 import。
 export const RoundTargetScoreSchema = z.union([
@@ -152,7 +150,7 @@ export const TARGET_SCORE_OPTIONS: readonly RoundTargetScore[] =
 // 確保這裡的字面量不會脫離合法值域，同時仍保留字面量型別 11 而非收斂為 number。
 export const DEFAULT_TARGET_SCORE = 11 satisfies RoundTargetScore;
 
-// 計時長度僅接受 10 | 15 | 20 分鐘（M14 新增，prd.md 6.1／6.5 之外的每輪設定）。
+// 計時長度僅接受 10 | 15 | 20 分鐘（prd.md 6.1／6.5 之外的每輪設定）。
 // 與 RoundTargetScoreSchema 同樣定義為固定字面量 union，理由相同：值域一旦擴充，
 // 依賴 ROUND_TIMER_DURATION_OPTIONS 的呼叫端要能被同步提醒，而不是各自寫死一份。
 export const RoundTimerDurationMinutesSchema = z.union([
@@ -181,11 +179,10 @@ export const RoundTimerObjectSchema = z.object({
 	startedAt: z.iso.datetime().nullable(),
 });
 
-// Round.timer 以 .nullable().default(null) 定義：null 代表「不計時」（M14 的預設值），
-// 同時讓不含本欄位的既有 matchmaker:round:v1 資料（M14 之前寫入）在 safeParse 時
-// 自動補上 null 而非被判為損壞——與 scoreboard capability 的「向後相容策略」及 M6
-// 對 courtNumber 的 delta 是同一手法，因此本 change SHALL NOT 因新增本欄位而
-// bump storage key 版本。
+// Round.timer 以 .nullable().default(null) 定義：null 代表「不計時」（預設值），
+// 同時讓不含本欄位的既有 matchmaker:round:v1 資料（加入計時前寫入）在 safeParse 時
+// 自動補上 null 而非被判為損壞——與 scoreboard capability 的「向後相容策略」及
+// courtNumber 的處理是同一手法，因此 SHALL NOT 因本欄位而 bump storage key 版本。
 export const RoundTimerSchema = RoundTimerObjectSchema.nullable().default(
 	null,
 );

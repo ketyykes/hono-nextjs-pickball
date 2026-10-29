@@ -127,7 +127,7 @@ export function RoundControls({
 
 	// 回合存在時（且未鎖定，見下方 disabled 與 handleTargetScoreKeyDown 的 guard）變更
 	// 委派 setTargetScore（round.ts 的純函式，經 useRoundStore 接線），SHALL NOT 直接
-	// 改寫回合物件；回合尚不存在時沿用 M4 既有行為，變更僅影響「產生本輪對戰」的預備設定。
+	// 改寫回合物件；回合尚不存在時變更僅影響「產生本輪對戰」的預備設定。
 	function handleTargetScoreChange(targetScore: RoundTargetScore) {
 		if (round !== null) {
 			commitTargetScore(targetScore);
@@ -154,10 +154,10 @@ export function RoundControls({
 	// 自行改寫回合物件，因此回合已存在時選到「不計時」只能不作為。
 	//
 	// ⚠️ 下面那行 `if (durationMinutes === null) return;` 是**暫行處置，不是漏實作**：
-	// 「本輪已產生後能否改回不計時」在 M14 是已知缺口、已升級給人類裁決，尚未定案。
+	// 「本輪已產生後能否改回不計時」是已知缺口，尚未定案。
 	// 目前的使用者可見後果是「不計時」這顆 radio 看起來可按、按下去卻毫無反應也不解釋
-	// （aria-checked 不變），這正是待裁決的部分——補 round-lifecycle 的 clearTimer 入口、
-	// 或改為在回合存在時 disable 這顆選項並說明原因，都要等裁決結果，SHALL NOT 在此自行決定。
+	// （aria-checked 不變），這正是待定案的部分——補 round-lifecycle 的 clearTimer 入口、
+	// 或改為在回合存在時 disable 這顆選項並說明原因，定案前 SHALL NOT 在此自行決定。
 	function handleTimerDurationChange(durationMinutes: RoundTimerDurationMinutes | null) {
 		if (round !== null) {
 			if (durationMinutes === null) return;

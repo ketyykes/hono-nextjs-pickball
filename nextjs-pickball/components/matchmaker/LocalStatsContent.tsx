@@ -38,8 +38,8 @@ export function LocalStatsContent() {
 	// 的空狀態分支，時鐘取值根本不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
 	// 「統計頁載入後無 console error」即為此推論的實證。
 	//
-	// 與 HistoryView.tsx 的差異是刻意留下的、而非疏漏（Stage 2 review 裁決）：該元件
-	// 自己呼叫 readHistory()，故 M7 design Decision 7 要求它把「現在」在 hydration
+	// 與 HistoryView.tsx 的差異是刻意留下的、而非疏漏：該元件
+	// 自己呼叫 readHistory()，故需要它把「現在」在 hydration
 	// 取樣一次並存進 state，matchmaker-history.spec.ts 也以 page.clock 實測鎖住那個
 	// 「只取樣一次」的保證。本頁的 history 由 store 注入，不需要那條保證，因此每次
 	// render 重取時鐘——代價是本頁跨午夜後的下一次 render 會把「今日」重新判定，

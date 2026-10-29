@@ -22,7 +22,7 @@ interface HydratedHistory {
 // 規則會擋下「在 effect 內同步呼叫 useState setter」，但不適用於 useReducer 的 dispatch
 // （沿用 hooks/useRosterStore.ts、app/matchmaker/page.tsx 的既有寫法）。
 //
-// droppedCount 的潛在陷阱（M10 §3，已實測排除）：readHistory() 在 droppedCount > 0 時會把
+// droppedCount 的潛在陷阱（已實測排除）：readHistory() 在 droppedCount > 0 時會把
 // 清理後的歷史回寫 localStorage（round-storage.ts），第二次呼叫會讀到 droppedCount: 0；
 // 若 React StrictMode 讓 hydration 的 useEffect 跑兩次，第二次 dispatch 理論上會把已偵測到
 // 的損毀筆數蓋回 0。實測（於 `pnpm dev` 下以 Node 端 console listener 計數）此 effect

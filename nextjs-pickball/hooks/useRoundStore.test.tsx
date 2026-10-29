@@ -111,7 +111,7 @@ describe("useRoundStore", () => {
 	// 與本 hook，但該 Requirement 五個 Scenario 的驗收全部指向 round.test.ts——那些只驗
 	// createRound 回傳值裡的 restSettlements 算得對不對，驗不到 hook 有沒有把它套用出去。
 	// 審查時實測把 hook 內整段 restSettlements → updatePlayer 的接線刪光，全套測試仍然全綠，
-	// 等於這條 MUST 的唯一實作處毫無保護。做法採 design Decision 7 尾段預告的方式：
+	// 等於這條 MUST 的唯一實作處毫無保護。做法採 design Decision 7 的方式：
 	// 以受控的 players 陣列與 updatePlayer spy 直接斷言被套用的 patch。
 	it("產生新一輪時把上一輪的休息結算交給 roster port，並以上一輪為基準遞增輪次", () => {
 		// GIVEN：localStorage 已有第 1 輪（6 人單打 1 場，故有 4 人休息）與一筆歷史。
@@ -181,9 +181,8 @@ describe("useRoundStore", () => {
 		expect(readRound()?.roundNumber).toBe(2);
 	});
 
-	// regression guard：Stage 2 對本檔跑 mutation testing，11/12 存活——tasks 11.6 接上的
-	// submitScore／resetIncompleteMatches／history 持久化 effect 除了既有的 hydration
-	// 測試外完全無保護。以下補五組，逐條對應存活的變異點（見各 it 內註解殺的是哪一種）。
+	// regression guard：submitScore／resetIncompleteMatches／history 持久化 effect 除了
+	// hydration 測試外原本完全無保護。以下五組逐條對應會存活的變異點（見各 it 內註解殺的是哪一種）。
 	it("submitScore 成功時把新回合、比分與球員 patch 正確套用到 roster port（殺不 dispatch／只套一位球員／patch 值算錯等變異）", () => {
 		const players: Player[] = [makePlayer({ id: "p1", rating: 3 }), makePlayer({ id: "p2", rating: 3 })];
 		const updatePlayer = vi.fn();
@@ -383,8 +382,7 @@ describe("useRoundStore", () => {
 		expect(readMatchSlot(originalMatchId)).toBeNull();
 	});
 
-	// 8.6：setTargetScore 是 M4 早已存在但全庫零非測試呼叫端的懸空純函式，本 change
-	// 首次接上 hook 層——比照 resetIncompleteMatches 的「呼叫純函式 → 判 ok → dispatch」
+	// setTargetScore 是 round.ts 的純函式，由 hook 層接上——比照 resetIncompleteMatches 的「呼叫純函式 → 判 ok → dispatch」
 	// 形態。失敗情境用「已完成一場」（已開始計分）觸發 round.ts 的 SCORING_STARTED 拒絕，
 	// round 參考需維持不變（toBe，非 toEqual，殺「失敗仍 dispatch」變異）。
 	it("setTargetScore 成功時套用新目標分數、已開始計分時拒絕且 round 參考不變", () => {
@@ -430,8 +428,8 @@ describe("useRoundStore", () => {
 		expect(result.current.round).toBeNull();
 	});
 
-	// M13：swapMatchPlayer 是 round.ts 第四個「純函式回傳 ok/失敗 → hook 判 ok → dispatch」
-	// 家族成員（§2 已完成並通過審查），本測試比照 resetIncompleteMatches／setTargetScore
+	// swapMatchPlayer 是 round.ts 的「純函式回傳 ok/失敗 → hook 判 ok → dispatch」
+	// 家族成員，本測試比照 resetIncompleteMatches／setTargetScore
 	// 既有形態驗證接線。成功情境用 3 位單打（1 場出賽、1 人休息）換人，斷言換入者出現在
 	// 該場、換出者出現在休息名單（而非只看 ok，殺參數順序互換與 players 被換成空陣列兩類
 	// 變異）；失敗情境用過期 matchId（round 已存在但場次不存在）觸發純函式的 MATCH_NOT_FOUND，
@@ -488,8 +486,8 @@ describe("useRoundStore", () => {
 		expect(updatePlayer).not.toHaveBeenCalled();
 	});
 
-	// M14：startTimer 是 round.ts 第五個「純函式回傳 ok/失敗 → hook 判 ok → dispatch」家族
-	// 成員（§4 已完成並通過審查）。本測試特意透過 hook 自己的 generateRound／startTimer
+	// startTimer 是 round.ts 的「純函式回傳 ok/失敗 → hook 判 ok → dispatch」家族
+	// 成員。本測試特意透過 hook 自己的 generateRound／startTimer
 	// 方法（而非直接呼叫 round.ts 純函式後手動 writeRound）產生已開始計時的回合，
 	// 目的是連帶驗證「開始計時後真的經由既有 write effect 持久化」——若只用純函式組出
 	// 持久化資料再單獨 mount 一次（如上方「重新掛載後還原目前回合與歷史」的做法），

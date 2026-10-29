@@ -1,5 +1,5 @@
 // 歷史賽果 → CSV 列（9.3.1 的欄位對應）。序列化（BOM、跳脫、換行）一律委派 csv.ts 的
-// toCsv，本模組完全不知道那些規則的存在（design.md Decision 1）。
+// toCsv，本模組完全不知道那些規則的存在。
 
 import { toCsv } from "./csv";
 import { DOUBLES_COMPOSITION_LABEL, DRAW_LABEL, FORMAT_LABEL, TEAM_LABELS } from "@pickball/core/matchmaker/labels";
@@ -15,7 +15,7 @@ const MULTI_VALUE_SEPARATOR = "、";
 /**
  * 比分欄（scoreA／scoreB）的分隔符。SHALL NOT 用半形冒號 `:`——`11:7` 符合 Excel／
  * Google Sheets 的 `h:mm` 時間樣式，匯入時會被自動轉型成時間值（顯示成 `11:07`），
- * 且轉型後原始文字不可逆（Stage 2 review J4）。也 SHALL NOT 用 `-` 或 `/`，
+ * 且轉型後原始文字不可逆。也 SHALL NOT 用 `-` 或 `/`，
  * 那兩者會被誤判為日期（例如 11 月 7 日）。全形冒號不是任何 locale 的時間或日期
  * 分隔符，試算表會當成純文字，也符合繁體中文排版慣例。
  */
@@ -32,7 +32,7 @@ const RATING_DECIMAL_PLACES = 2;
  * 建立換算 playedAt（UTC 瞬間）用的 Intl 格式化器。時區由呼叫端注入（見 historyToCsv
  * 的 options.timeZone），而非讀執行環境的預設時區——使用者匯出與檢視 App 是在同一台
  * 裝置、同一個時區，CSV 與畫面（HistoryRecordCard.tsx）的數字必須一致；注入時區也讓
- * 測試能以固定值斷言，不必依賴跑測試的機器時區（design.md Decision 12）。
+ * 測試能以固定值斷言，不必依賴跑測試的機器時區。
  *
  * 用 `formatToParts` 而非 `Date` 的 `getHours()` 等 getter，是因為那些 getter 一律讀
  * 「執行行程」的本地時區、無法注入指定時區；`hourCycle: "h23"` 確保 00:00 一律輸出
@@ -83,7 +83,7 @@ function doublesCompositionLabel(entry: MatchHistoryEntry): string {
 
 /**
  * 單一列組裝時共用的上下文：playedAtParts 在 historyToCsv 的 row 迴圈內每列只算一次，
- * 「日期」「時間」兩欄共用同一份結果，不必各自重算（m4：原本每列會被格式化兩次）。
+ * 「日期」「時間」兩欄共用同一份結果，不必各自重算（避免每列被格式化兩次）。
  */
 interface HistoryRowContext {
 	entry: MatchHistoryEntry;
@@ -96,10 +96,10 @@ interface HistoryRowContext {
  *
  * 球員姓名與賽前／賽後分數一律取自歷史紀錄本身的快照欄位（players[].name／
  * ratingBefore／ratingAfter），SHALL NOT 以 id 回查目前名單——歷史被設計成自足快照，
- * 正是為了讓球員被刪除或改名後仍能完整呈現（design.md「與 M4 的介面對齊」）。
+ * 正是為了讓球員被刪除或改名後仍能完整呈現。
  *
  * 賽前／賽後分數欄的球員順序為「先第一隊全員、再第二隊全員」，與第 6／7 欄的球員順序
- * 一致，此約定同時記錄於 design.md Decision 12。
+ * 一致。
  */
 const HISTORY_CSV_COLUMNS: ReadonlyArray<{
 	header: string;
@@ -125,7 +125,7 @@ const HISTORY_CSV_COLUMNS: ReadonlyArray<{
 		getValue: ({ entry }) => `${entry.scoreA}${SCORE_SEPARATOR}${entry.scoreB}`,
 	},
 	{
-		// 三分支窮舉 winner 的全部合法值（M15 matchmaker-timed-draw）：teamA／teamB
+		// 三分支窮舉 winner 的全部合法值：teamA／teamB
 		// 各自輸出對應隊名，"draw" MUST 輸出 DRAW_LABEL，SHALL NOT 用二元判斷把
 		// "draw" 靜默誤判為任一隊獲勝。
 		header: "勝方",
@@ -159,7 +159,7 @@ export interface HistoryToCsvOptions {
 	/**
 	 * 日期／時間欄換算用的時區（IANA 名稱，例如 "Asia/Taipei"）。預設取
 	 * `Intl.DateTimeFormat().resolvedOptions().timeZone`（執行裝置的本地時區），
-	 * 與 HistoryRecordCard.tsx 的畫面顯示對齊（design.md Decision 12）。
+	 * 與 HistoryRecordCard.tsx 的畫面顯示對齊。
 	 */
 	timeZone?: string;
 }
@@ -168,7 +168,7 @@ export interface HistoryToCsvOptions {
  * 依注入的 exportedAt 產生匯出檔名。比照 backup.ts 的 backupFileName——
  * SHALL NOT 內部呼叫 new Date()，內部產生會使回傳值每次不同，測試只能寬鬆斷言
  * 而失去驗證力。HistoryCsvSection.tsx 原本把這段邏輯內聯在元件裡，與 backup.ts
- * 已建立且有測試的作法各做一套（Final Review M3 裁決），故下沉到本模組。
+ * 已建立且有測試的作法各做一套，故下沉到本模組。
  */
 export function historyCsvFileName(exportedAt: string): string {
 	const date = exportedAt.slice(0, 10);

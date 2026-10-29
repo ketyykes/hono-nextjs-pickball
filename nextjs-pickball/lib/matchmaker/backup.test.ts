@@ -56,7 +56,7 @@ function makeRound(overrides: Partial<Round> = {}): Round {
 			opponentKeys: [],
 			fullMatchKeys: [],
 		},
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 有 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -189,7 +189,7 @@ describe("backup", () => {
 	it("簽章以字串陣列寫入備份，JSON 往返後內容不變", () => {
 		const round = makeRound();
 		// 三個欄位皆給非空且插入順序與字母序不同的內容，才驗得出「有沒有真的排序」——
-		// 若只餵本來就已排序的值，拿掉 .sort() 測試仍會全綠（M8 §2 Stage 2 實測發現）。
+		// 若只餵本來就已排序的值，拿掉 .sort() 測試仍會全綠。
 		const snapshot: BackupSnapshot = {
 			...makeSnapshot(),
 			currentRound: {
@@ -285,17 +285,15 @@ describe("backup", () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			// MUST 用 toEqual，SHALL NOT 比較 JSON 字串：MatchHistoryEntrySchema 是
-			// discriminatedUnion，zod 重建物件後鍵序與輸入不同，字串比較會產生假紅燈
-			// （M8 §2 Stage 2 交棒記錄）。
+			// discriminatedUnion，zod 重建物件後鍵序與輸入不同，字串比較會產生假紅燈。
 			expect(result.backup).toEqual(backup);
 		}
 	});
 
 	it("備份內回合或歷史含平局的 winner 為 draw 時仍通過驗證", () => {
-		// M15 matchmaker-timed-draw design Decision 5：backup.ts／transfer-types.ts
-		// 零程式碼修改，"draw" 透過 RoundSchema／MatchHistoryEntrySchema 的擴增
-		// 自動傳導到 BackupSchema——此測試是這個結構性假設的機械證據，寫入當下即綠
-		// （regression guard，非新行為）。
+		// backup.ts／transfer-types.ts 無需為平局另外處理，"draw" 透過 RoundSchema／
+		// MatchHistoryEntrySchema 的擴增自動傳導到 BackupSchema——此測試是這個結構性假設的
+		// 機械證據，寫入當下即綠（regression guard，非新行為）。
 		const drawMatch: Round["matches"][number] = {
 			id: "match-draw",
 			courtNumber: 2,
@@ -331,7 +329,7 @@ describe("backup", () => {
 	it("JSON 語法錯誤時回傳繁體中文失敗訊息而非拋錯", () => {
 		let result: ReturnType<typeof parseBackup> | undefined;
 
-		// SHALL NOT 拋出例外——拋例外會讓整頁白畫面，是最糟的失敗模式（design Risks）。
+		// SHALL NOT 拋出例外——拋例外會讓整頁白畫面，是最糟的失敗模式。
 		expect(() => {
 			result = parseBackup("{ 不是合法 JSON");
 		}).not.toThrow();
@@ -340,8 +338,7 @@ describe("backup", () => {
 		if (result && !result.ok) {
 			expect(result.message).toMatch(/JSON/);
 			expect(result.message).toMatch(/[一-鿿]/);
-			// 失敗分支恰為 { ok, message } 兩個欄位，不多不少——這是可執行的斷言，
-			// 不是型別上「無法斷言」的事（M8 §3 Stage 2 review J3）。
+			// 失敗分支恰為 { ok, message } 兩個欄位，不多不少，直接斷言即可。
 			expect(Object.keys(result).sort()).toEqual(["message", "ok"]);
 		}
 	});
@@ -379,8 +376,7 @@ describe("backup", () => {
 		if (!result.ok) {
 			expect(result.message).toContain("參賽者");
 			// 「不保留另外兩位」不只是型別上的推論，這裡直接斷言失敗結果恰為
-			// { ok, message } 兩個欄位、沒有夾帶任何 players／backup 相關欄位
-			// （M8 §3 Stage 2 review J3：此前的註解宣稱這件事「無法斷言」是錯的）。
+			// { ok, message } 兩個欄位、沒有夾帶任何 players／backup 相關欄位。
 			expect(Object.keys(result).sort()).toEqual(["message", "ok"]);
 		}
 	});
@@ -389,8 +385,7 @@ describe("backup", () => {
 		const backup = buildBackup(makeSnapshot(), { exportedAt: "2026-08-23T01:02:03.000Z" });
 
 		// version 型別本身就不對（null／布林／字串）時，這是結構問題而非版本問題——
-		// 「版本不支援」的訊息只該在我們真的讀到一個不受支援的版本號時出現
-		// （M8 §3 Stage 2 review m2 裁決）。
+		// 「版本不支援」的訊息只該在我們真的讀到一個不受支援的版本號時出現。
 		const structurallyInvalidVersions: unknown[] = [null, true, "1"];
 		for (const version of structurallyInvalidVersions) {
 			const result = parseBackup(JSON.stringify({ ...backup, version }));
@@ -413,7 +408,7 @@ describe("backup", () => {
 
 	it("備份缺少 version 欄位時歸類為結構不合法", () => {
 		// 完全沒有 version 鍵時，前置的版本檢查不該誤判為某個特定版本——
-		// 應直接落入結構不合法（M8 §3 Stage 2 review J1）。
+		// 應直接落入結構不合法。
 		const text = JSON.stringify({ players: [], currentRound: null, history: [] });
 
 		const result = parseBackup(text);
@@ -425,8 +420,7 @@ describe("backup", () => {
 	});
 
 	it("parseBackup 對非物件的合法 JSON 一律回傳失敗結果而不拋出例外", () => {
-		// 涵蓋「JSON 語法合法但內容不是物件」的各種形狀——這條路徑此前從未被餵過
-		// （M8 §3 Stage 2 review Blocker B1）。
+		// 涵蓋「JSON 語法合法但內容不是物件」的各種形狀。
 		const inputs = ["", "null", "[]", "123", '"x"', "true", "{}"];
 
 		for (const input of inputs) {
@@ -446,7 +440,7 @@ describe("backup", () => {
 	it("parseBackup 回傳 zod 正規化後的資料，會剝除多餘欄位並套用欄位預設值", () => {
 		// 手改過的 JSON 文字：頂層與 players[0] 皆帶不明欄位，且 players[0] 刻意缺
 		// restCount／gamesPlayed——驗證成功分支回傳的是 parsed.data（經 zod 正規化），
-		// 不是把原始 json 直接轉型回傳（M8 §3 Stage 2 review Blocker B2）。
+		// 不是把原始 json 直接轉型回傳。
 		const text = JSON.stringify({
 			version: 1,
 			extraTopLevelField: "不明頂層欄位",
@@ -479,17 +473,17 @@ describe("backup", () => {
 	});
 
 	it("所有錯誤訊息為繁體中文且各自包含可採取的修正方式", () => {
-		// 遍歷整張表而非手抄清單——§7 之後會再往 TRANSFER_MESSAGES 追加訊息，
-		// 手抄清單會讓新訊息漏檢查也不會紅（design Decision 1）。
+		// 遍歷整張表而非手抄清單——日後往 TRANSFER_MESSAGES 追加訊息時，
+		// 手抄清單會讓新訊息漏檢查也不會紅。
 		//
-		// 原本的 /請[^。]*[。]?/ 幾乎恆真（[。]? 是 optional、[^。]* 可為空，等價於
-		// 「字串裡有一個請字」），退化成 "JSON。請"、"請"、"參賽者。請" 之類的殘缺
-		// 訊息也會通過。改為四項可執行的斷言（M8 §3 Stage 2 review J2 裁決）：
+		// 不用 /請[^。]*[。]?/ 這類幾乎恆真的 regex（[。]? 是 optional、[^。]* 可為空，等價於
+		// 「字串裡有一個請字」），否則 "JSON。請"、"請"、"參賽者。請" 之類的殘缺
+		// 訊息也會通過。改用四項可執行的斷言：
 		//
 		// TRANSFER_MESSAGES.missingRosterCsvHeaders 是函式（依缺欄清單產生訊息），
 		// Object.values 取出的是函式本身而非字串，故先過濾出純字串成員，
 		// 再以代表性參數呼叫該函式、把產生的字串一併納入遍歷
-		// （Final Review M1 裁決：不納入就會逃過本 guard 的檢查）。
+		// （不納入就會逃過本 guard 的檢查）。
 		const messages: string[] = [];
 		for (const value of Object.values(TRANSFER_MESSAGES)) {
 			if (typeof value === "string") {
@@ -509,7 +503,7 @@ describe("backup", () => {
 			expect(segments[segments.length - 1]?.startsWith("請")).toBe(true);
 			// (c) 避免退化為單純的關鍵字堆砌。
 			expect(message.length).toBeGreaterThanOrEqual(30);
-			// (d) 不含未翻譯的 zod 原始 issue 字串（§11：不得只顯示技術錯誤碼）。
+			// (d) 不含未翻譯的 zod 原始 issue 字串（不得只顯示技術錯誤碼）。
 			expect(message).not.toMatch(/Invalid input|Expected|Required/i);
 		}
 	});

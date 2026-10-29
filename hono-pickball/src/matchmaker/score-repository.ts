@@ -40,7 +40,7 @@ const INVALID_BODY_CODES: readonly string[] = [
 
 /**
  * 後端權威的送出比分：讀回合與名單 → 核心 submitScore → 單一 batch 寫入。
- * batch 的結構（B9 可照抄）：守衛 → 各項寫入 → 刪守衛。
+ * batch 的結構（其他多表寫入依此形態）：守衛 → 各項寫入 → 刪守衛。
  * 影響 0 列的 UPDATE 不會回滾，所以版本條件全部放進守衛，由守衛在資料庫內對目前內容比較。
  */
 export async function submitScoreForUser(

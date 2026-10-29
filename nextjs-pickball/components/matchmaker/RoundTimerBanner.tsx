@@ -14,7 +14,7 @@ export interface RoundTimerBannerProps {
 	/**
 	 * 時間到提示音的注入點；省略時使用 playTimerExpiredChime（design Decision 6）。
 	 *
-	 * 「可選注入 prop」這個角色比照 M9 ExportActions 的 `printer?` 先例，但型別刻意收窄為
+	 * 「可選注入 prop」這個角色比照 ExportActions 的 `printer?` 先例，但型別刻意收窄為
 	 * `() => void` 而非該處的 `unknown`：`printer` 用 `unknown` 是為了讓「呼叫端傳入非函式值」
 	 * 這條路徑留在 requestPrint 的執行期判定裡（收窄型別會讓那條路徑變成型別錯誤而測不到），
 	 * 本 prop 沒有對應的執行期判定、只是直接呼叫並列入依賴陣列，用精確型別才是同一個先例的
@@ -80,7 +80,7 @@ export function RoundTimerBanner({
 
 	// remainingSeconds 為 null 代表「無法計算」而非「剩餘 0 秒」（round-timer.ts 的既有
 	// 語意）。走到這裡 timer 與 startedAt 皆已非 null 且尚未到期，remainingSeconds
-	// 理論上不會是 null；`?? 0` 只是型別收斂用的防線（task 11.2 明文如此寫法），
+	// 理論上不會是 null；`?? 0` 只是型別收斂用的防線，
 	// 實際執行不會被觸發。
 	return <p>{formatRemaining(remainingSeconds ?? 0)}</p>;
 }

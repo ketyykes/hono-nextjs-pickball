@@ -256,7 +256,7 @@ describe("useRemoteMatchSlotStore", () => {
 		expect(disabled.result.current[3]).toBe("local");
 	});
 
-	// 以下為 regression guard：實作先於測試存在，寫入當下即綠燈（B7 §8 自跑 mutation 後補）
+	// 以下為 regression guard：實作先於測試存在，寫入當下即綠燈
 	it("regression guard：分槽儲存的同步狀態轉換與保留規則", async () => {
 		enqueue(200, { data: slotWithScores(0, 0), version: 4 });
 		const { result, unmount } = renderSlot({ enabled: true });
@@ -408,7 +408,7 @@ describe("useRemoteMatchSlotStore", () => {
 		expect(first).not.toHaveBeenCalled();
 	});
 
-	// 以下為 Stage 2 審查的 mutation（H12、H42、H38、H10）發現缺口後補的 regression guard，寫入當下即綠燈
+	// 以下為針對變異測試發現的缺口補的 regression guard，寫入當下即綠燈
 	it("regression guard：衝突後重新 GET 回 401 時呼叫 onUnauthorized，之後 dispatch 不再送出 PUT", async () => {
 		enqueue(200, { data: slotWithScores(0, 0), version: 4 });
 		const { result, onUnauthorized } = renderSlot({ enabled: true });

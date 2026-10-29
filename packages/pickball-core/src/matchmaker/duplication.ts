@@ -1,19 +1,19 @@
 // 重複配對簽章、重複偵測與受限交換。純函式、決定性、不修改輸入——
 // avoidRepeats 只能重排既有球員在場地／隊伍間的位置，型別上與邏輯上都拿不到「新增或移除球員」
 // 的能力，確保 5.6 的迴避不會意外違反「不得改變出場與休息名單成員」的約束
-// （design Decision 1、PRD 5.1、5.6）。
+// （PRD 5.1、5.6）。
 
 import { roundRating } from "./rating-math";
 import type { Match, SignatureIndex, Team } from "./allocation-types";
 import type { Player } from "./types";
 
 // 隊內（同隊隊友）與隊間（交叉對手／完整比賽）分隔符，皆非 crypto.randomUUID() 會產生的字元，
-// 不會與 id 本身的字元混淆（design Decision 4）。
+// 不會與 id 本身的字元混淆。
 const TEAMMATE_SEPARATOR = "|";
 const OPPONENT_SEPARATOR = "#";
 
 // 將一組 player id 以字典序排序後用指定分隔符串接——三個簽章函式共用的正規化核心，
-// 確保簽章與球員列出的先後順序無關（tasks 6.4）。用內建 .sort()（依 UTF-16 code unit 比較）
+// 確保簽章與球員列出的先後順序無關。用內建 .sort()（依 UTF-16 code unit 比較）
 // 而非 localeCompare：id 只是不透明字串，不需要語系排序，且能避開 CLAUDE.md 記錄過的
 // locale-aware 排序在中文環境下不穩定的地雷。
 function sortedJoin(ids: readonly string[], separator: string): string {
@@ -23,7 +23,7 @@ function sortedJoin(ids: readonly string[], separator: string): string {
 // 一支隊伍的原始簽章：不論人數皆回傳。fullMatchKey 需要它——即使單打隊伍只有 1 人，
 // 仍代表「這一側是誰」，與是否有隊友無關。teamTeammateSignature 在人數足夠時直接沿用本函式，
 // 三個匯出的簽章函式（teammateKeys／opponentKeys／fullMatchKey）因此共用同一套 id
-// 正規化邏輯（sortedJoin + 本函式），不各自重算一次（tasks 6.4 refactor）。
+// 正規化邏輯（sortedJoin + 本函式），不各自重算一次。
 function teamRawSignature(team: Team): string {
 	return sortedJoin(
 		team.players.map((p) => p.id),
@@ -43,7 +43,7 @@ function teamTeammateSignature(team: Team): string | undefined {
 
 /**
  * 同隊隊友組合簽章：每支隊伍一筆，僅隊伍人數 >= 2（雙打）時產生，單打隊伍無隊友可言故略過。
- * 回傳陣列已排序，與兩隊列出的先後順序、隊內排列順序皆無關（design Decision 4）。
+ * 回傳陣列已排序，與兩隊列出的先後順序、隊內排列順序皆無關。
  */
 export function teammateKeys(match: Match): string[] {
 	return match.teams
@@ -79,7 +79,7 @@ export function fullMatchKey(match: Match): string {
 	return `${first}${OPPONENT_SEPARATOR}${second}`;
 }
 
-/** 由一組對戰建立簽章索引，供 countRepeats／avoidRepeats 比對歷史紀錄使用（tasks 6.3）。 */
+/** 由一組對戰建立簽章索引，供 countRepeats／avoidRepeats 比對歷史紀錄使用。 */
 export function buildSignatureIndex(matches: readonly Match[]): SignatureIndex {
 	const teammateKeySet = new Set<string>();
 	const opponentKeySet = new Set<string>();
@@ -119,15 +119,15 @@ function matchHitsSeen(match: Match, seen: SignatureIndex): boolean {
 }
 
 /**
- * 回傳 matches 中與 seen 有重複命中的**場次數**（tasks 7.2）——是「有命中的場次數」，
+ * 回傳 matches 中與 seen 有重複命中的**場次數**——是「有命中的場次數」，
  * 不是「命中次數」：一場對戰即使同時命中隊友與對手兩類簽章，仍只計 1（見
  * duplication.test.ts「一場同時命中隊友與對手組合仍只算一次重複」）。
  *
- * 這個計數語意是 `avoidRepeats` 對「完全重複的雙打場次」束手無策的已知盲點（非 bug，design
- * 「不追求全域最優」的明文取捨）：單次交換通常只能拆掉一支隊伍，另一支隊伍的隊友簽章仍命中，
+ * 這個計數語意是 `avoidRepeats` 對「完全重複的雙打場次」束手無策的已知盲點（非 bug，
+ * 「不追求全域最優」的明文設計取捨）：單次交換通常只能拆掉一支隊伍，另一支隊伍的隊友簽章仍命中，
  * 「有命中的場次數」因而不變，`avoidRepeats` 的嚴格 `repeats < current.repeats` 判準會拒絕該
  * 交換——即使場上可能存在能讓 repeats／spread 同時歸零的其他重排方式，貪婪逐步改善法也不會
- * 找到（第 3 批 code review 已用 3000 組隨機情境實測反例，記錄於
+ * 找到（已用 3000 組隨機情境實測反例，記錄於
  * `.claude/agent-memory/code-reviewer-readonly/project_matchmaker_allocation_engine.md`）。
  */
 export function countRepeats(matches: readonly Match[], seen: SignatureIndex): number {
@@ -148,7 +148,7 @@ function toRatingCents(rating: number): number {
 	return Math.round(rating * CENTS_PER_RATING_UNIT);
 }
 
-/** 強度差距：單打為每場雙方 rating 差絕對值總和，雙打為每場兩隊總和差絕對值總和（design Decision 5）。 */
+/** 強度差距：單打為每場雙方 rating 差絕對值總和，雙打為每場兩隊總和差絕對值總和。 */
 export function ratingSpread(matches: readonly Match[]): number {
 	const totalCents = matches.reduce((sum, match) => {
 		const [teamA, teamB] = match.teams;
@@ -158,7 +158,7 @@ export function ratingSpread(matches: readonly Match[]): number {
 	return totalCents / CENTS_PER_RATING_UNIT;
 }
 
-// ---- 受限交換（avoidRepeats，design Decision 6） ----
+// ---- 受限交換（avoidRepeats） ----
 
 // 一名球員在對戰陣列中的位置：場次索引、隊伍索引（0 或 1）、隊內索引。
 // 用位置而非球員參照，讓 swapPlayers 每次都從「當下」的 matches 讀取球員，
@@ -175,15 +175,14 @@ function playerAt(matches: readonly Match[], slot: Slot): Player {
 
 // 重建單一場次：把 teamIndex／playerIndex 位置的球員換成 replacement，重新計算該隊分數。
 // 注意：雙打場次的 doublesComposition 是純顯示標示，換人後可能不再符合新組成；
-// 本函式維持原標示不變——依 design Decision 1 的職責邊界，duplication.ts 只負責「重排既有
+// 本函式維持原標示不變——依模組的職責邊界，duplication.ts 只負責「重排既有
 // 球員」，不重新推導顯示用標示，該標示已由 allocation.ts 在串接 avoidRepeats 之後重算
 // （見該檔 relabelDoublesComposition）。
 function rebuildMatch(match: Match, teamIndex: 0 | 1, playerIndex: number, replacement: Player): Match {
 	const players = match.teams[teamIndex].players.slice();
 	players[playerIndex] = replacement;
 	const sum = players.reduce((total, p) => total + p.rating, 0);
-	// 與 pairing.ts 的 buildTeam 共用同一份四捨五入邏輯（rating-math.ts 的 roundRating，
-	// reviewer M6 抽出，取代原本兩處各自一行 Math.round(sum * 100) / 100）：PRD 的 rating
+	// 與 pairing.ts 的 buildTeam 共用同一份四捨五入邏輯（rating-math.ts 的 roundRating）：PRD 的 rating
 	// 為兩位小數，浮點加總在十進位小數上會有誤差（如 2.01 + 1.01 在 IEEE754 下得到
 	// 3.0199999999999996，而非數學上相等的 3.02）。若本函式不四捨五入，「被交換過的隊伍」
 	// 會帶浮點雜訊、「未被交換的隊伍」乾淨，兩者一起被第 3 段寫進 LocalStorage 時表示法不一致
@@ -220,7 +219,7 @@ function slotsOfMatch(matches: readonly Match[], matchIndex: number): Slot[] {
 }
 
 // 階段①：跨場地換人。列舉所有相異場次配對（依場次索引遞增），各自的所有位置做笛卡兒積——
-// 掃描順序固定，確保決定性（design Decision 6、tasks 7.7）。
+// 掃描順序固定，確保決定性。
 function crossCourtSwapCandidates(matches: readonly Match[]): Array<readonly [Slot, Slot]> {
 	const pairs: Array<readonly [Slot, Slot]> = [];
 
@@ -288,8 +287,8 @@ interface TrialState {
 	readonly spread: number;
 }
 
-// 試探並回退的共用結構（tasks 7.7）：依序嘗試每個候選交換，只在「重複數下降且強度差距
-// 總和未增加」時採納，否則捨棄該候選、狀態不變（design Decision 6）。三個階段共用本函式，
+// 試探並回退的共用結構：依序嘗試每個候選交換，只在「重複數下降且強度差距
+// 總和未增加」時採納，否則捨棄該候選、狀態不變。三個階段共用本函式，
 // 避免各自重寫一份試探迴圈。
 function runStage(state: TrialState, seen: SignatureIndex, candidates: Array<readonly [Slot, Slot]>): TrialState {
 	let current = state;
@@ -311,7 +310,7 @@ function runStage(state: TrialState, seen: SignatureIndex, candidates: Array<rea
  * 受限交換：依 5.6 三階段依序試探（跨場地換人 → 隊內換隊友 → 相鄰強度重排），
  * 只重排既有球員在場地／隊伍間的位置，無法新增或移除任何人——出場名單成員在調整前後
  * 完全相同（PRD 5.1 優先序的核心承諾）。人數過少或無交換可行時，三階段皆不產生任何
- * 可被採納的候選，回傳與輸入相同的對戰組合，照常接受重複（tasks 7.5、7.6）。
+ * 可被採納的候選，回傳與輸入相同的對戰組合，照常接受重複。
  */
 export function avoidRepeats(matches: readonly Match[], seen: SignatureIndex): Match[] {
 	let state: TrialState = {

@@ -1,5 +1,5 @@
 // 匯出內容的組裝——由「目前回合 + 參賽者名單」推導出單一份 ExportScene，
-// JPG 與 PDF 兩條匯出路徑共用這同一份內容，不各自組裝（design Decision 2）。
+// JPG 與 PDF 兩條匯出路徑共用這同一份內容，不各自組裝。
 // 本檔為純函式：零 window／document／Blob／canvas 引用、零 new Date()，
 // ExportScene 為可序列化純資料（無函式、無 class 實例）。
 
@@ -37,7 +37,7 @@ const WINNER_SUFFIX = "獲勝";
 /** 未完成場次（pending／scoring 皆算未完成）的狀態文字，SHALL NOT 留白（spec：比分或未完成狀態）。 */
 const INCOMPLETE_STATUS_TEXT = "未完成";
 
-/** 名單中找不到該球員時的替代文字（design Decision 8：輸出替代文字，不跳過該格、不拋錯）。 */
+/** 名單中找不到該球員時的替代文字（輸出替代文字，不跳過該格、不拋錯）。 */
 const MISSING_PLAYER_NAME = "已離開名單";
 
 /** 替代文字球員的中性色（灰階），與真實球員的漸層調色盤區隔，一眼可辨識該格是佔位。 */
@@ -49,13 +49,12 @@ const PLACEHOLDER_GENDER: Gender = "other";
 const PLACEHOLDER_RATING = 1;
 const PLACEHOLDER_CREATED_AT = "1970-01-01T00:00:00.000Z";
 
-/** 匯出畫布底色：不透明白色。JPEG 無 alpha 通道，透明底在部分瀏覽器會編碼成黑色（design Decision 9）。 */
+/** 匯出畫布底色：不透明白色。JPEG 無 alpha 通道，透明底在部分瀏覽器會編碼成黑色。 */
 const EXPORT_BACKGROUND_COLOR = "#FFFFFF";
 
 /**
- * 匯出畫布寬度（邏輯像素，未乘 2 倍縮放；縮放由 scene-canvas.ts 處理，見 design Decision 9）。
- * 對 scene-canvas.ts 而言是唯一內容真相來源需要匯出的幾何常數之一（matchmaker-visual-export
- * tasks §7 裁決 2）：本檔負責「場地區塊高度／畫布高度只算一次」，scene-canvas.ts 只能引用、
+ * 匯出畫布寬度（邏輯像素，未乘 2 倍縮放；縮放由 scene-canvas.ts 處理）。
+ * 對 scene-canvas.ts 而言是唯一內容真相來源需要匯出的幾何常數之一：本檔負責「場地區塊高度／畫布高度只算一次」，scene-canvas.ts 只能引用、
  * SHALL NOT 自行重算。
  */
 export const CANVAS_WIDTH = 800;
@@ -75,7 +74,7 @@ export const TILE_ROW_HEIGHT = 88;
 /**
  * 場地區塊內，球員格固定切兩欄（單打／雙打皆是——teamIndex 0／1 各佔一欄，
  * 雙打同隊兩人再往下一列展開，見 stage-layout.ts buildCourtTiles 的既有版面規則）。
- * 幾何的唯一真相來源在本檔（matchmaker-visual-export tasks §7 Minor-4），scene-canvas.ts
+ * 幾何的唯一真相來源在本檔，scene-canvas.ts
  * 只能引用、SHALL NOT 自行持有一份。
  *
  * ⚠️ 隱含假設：本常數為 2 隱含 `stage-layout.ts` 的 `buildCourtTiles` 只會輸出
@@ -115,14 +114,14 @@ export interface ExportCourt {
 	 * 之所以放進 ExportScene 而不讓消費端自己算：scene-canvas.ts 需要它來累加下一個場地的
 	 * 起點 y，但該檔是 TDD 例外層（「所有決策已在 ExportScene 內定死、本檔無推導」）。
 	 * 由本檔一併算好，例外層才真的只剩「把 scene 逐項翻成 canvas 呼叫」，
-	 * 也維持 tasks 2.9 的「場地區塊高度的計算只有一處」。
+	 * 也維持「場地區塊高度的計算只有一處」。
 	 */
 	readonly blockHeight: number;
 }
 
 /**
  * 匯出內容：JPG 與 PDF 兩條匯出路徑共用的唯一內容真相來源。
- * 刻意不含任何 CSS 或 canvas 概念——只有色碼、文字、座標與尺寸（design Decision 2）。
+ * 刻意不含任何 CSS 或 canvas 概念——只有色碼、文字、座標與尺寸。
  */
 export interface ExportScene {
 	readonly background: string;
@@ -141,7 +140,7 @@ function buildTitle(roundNumber: number, format: MatchFormat): string {
 /**
  * 依 id 於名單中查找球員；找不到時（該員已被刪除）回傳灰階佔位 Player，
  * 使該格照常進入版面推導並顯示替代文字，SHALL NOT 跳過該格、SHALL NOT 拋錯
- * （design Decision 8：跳過會讓雙打場地缺一格，造成版面錯位）。
+ * （跳過會讓雙打場地缺一格，造成版面錯位）。
  */
 function resolvePlayer(playerId: string, players: readonly Player[]): Player {
 	const found = players.find((player) => player.id === playerId);
@@ -164,7 +163,7 @@ function resolvePlayer(playerId: string, players: readonly Player[]): Player {
 }
 
 /**
- * 場次狀態文字，互斥且窮舉 `winner` 全部合法值的三個分支（M15 matchmaker-timed-draw）：
+ * 場次狀態文字，互斥且窮舉 `winner` 全部合法值的三個分支：
  * 未完成場次（pending／scoring 一律視為未完成，不為 scoring 另立第三種文案）顯示
  * 可判讀的「未完成」文字，SHALL NOT 留白；已完成場次的 `winner` 為 `"teamA"`／`"teamB"`
  * 時顯示比分與對應隊伍的勝方文案；`winner` 為 `"draw"` 時顯示比分與 `DRAW_LABEL`，
@@ -215,7 +214,7 @@ function buildExportCourt(match: RoundMatch, players: readonly Player[]): Export
 /**
  * 場地區塊高度：固定的表頭部分（場地編號＋狀態文字）加上該對戰方式的球員列數 ×
  * 每列高度。單打與雙打共用同一條公式，差異只在於 TILE_ROWS_BY_FORMAT 的列數——
- * SHALL NOT 為兩種對戰方式各寫一份公式（tasks 2.9）。
+ * SHALL NOT 為兩種對戰方式各寫一份公式。
  * 不對外匯出：唯一的外部消費端 scene-canvas.ts 已改為直接讀 `ExportCourt.blockHeight`，
  * 「場地區塊高度只算一處」因此收斂在本檔內。
  */

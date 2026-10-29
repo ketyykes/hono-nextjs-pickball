@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
-// /matchmaker 對戰頁的回合計時器 E2E 驗收（M14，spec match-stage
+// /matchmaker 對戰頁的回合計時器 E2E 驗收（spec match-stage
 // 「計時器顯示與時間到提示」的兩個 Scenario）。
 //
 // 本檔驗的是單元測試驗不到的兩件事：① 真實瀏覽器的 setInterval tick 真的會把畫面推進到

@@ -74,7 +74,7 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 		matches: [buildMatch()],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
+		// Round 的 timer 欄位（null 代表不計時）；本檔既有案例都不涉及計時，
 		// 一律給不計時，避免既有斷言被無關的計時狀態干擾。
 		timer: null,
 		...overrides,
@@ -83,7 +83,7 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 
 // 測試專用預設 props：match／players 給合法單打初始值，其餘 callback 一律用 vi.fn()——
 // CourtCard 不持有任何 store（design Decision 9），測試不需要 mock 任何東西。
-// round／matchSlot 為 8.2 新增的必填 props：round 給合法預設值，matchSlot 預設 null
+// round／matchSlot 為必填 props：round 給合法預設值，matchSlot 預設 null
 // （尚未開始場邊計分），既有測試皆不涉及計分板接線，不受影響。
 function buildProps(overrides: Partial<CourtCardProps> = {}): CourtCardProps {
 	return {
@@ -217,7 +217,7 @@ describe("CourtCard", () => {
 
 		expect(teamAInput.getAttribute("inputmode")).toBe("numeric");
 		expect(teamBInput.getAttribute("inputmode")).toBe("numeric");
-		// 未完成場次不得預先鎖住欄位——與 8.5 的「已完成場次才 disabled」互為對照組。
+		// 未完成場次不得預先鎖住欄位——與「已完成場次才 disabled」互為對照組。
 		expect(teamAInput.disabled).toBe(false);
 		expect(teamBInput.disabled).toBe(false);
 	});
@@ -559,7 +559,7 @@ describe("CourtCard", () => {
 		expect(tileStyle.filter).toBe("");
 	});
 
-	// M13（matchmaker-player-swap）§4：場地區塊的換人操作。以下六個 it 對應
+	// 場地區塊的換人操作。以下六個 it 對應
 	// specs/match-stage/spec.md「場地區塊的換人操作」Requirement 的六個 Scenario。
 
 	it("pending 且未開始計分的場次每位球員格皆提供換人操作", () => {
@@ -671,7 +671,7 @@ describe("CourtCard", () => {
 		]);
 	});
 
-	// M15（matchmaker-timed-draw）§7：平局場次（僅計時回合可能出現）不得為任一隊顯示
+	// 平局場次（僅計時回合可能出現）不得為任一隊顯示
 	// 「勝」文字標籤，MUST 改顯示「平手」文字標籤——色彩不得為唯一資訊來源（prd.md 12.5），
 	// 且顯示任一隊「勝」會誤導使用者以為該隊真的獲勝。
 	it("平局場次不顯示任一隊勝方標籤而顯示平手標籤", () => {
@@ -732,7 +732,7 @@ describe("CourtCard", () => {
 		tieScoreView.unmount();
 	});
 
-	// M15（matchmaker-timed-draw）§7：UI 層 SHALL NOT 複製「兩隊比分相同是否可送出」這條
+	// UI 層 SHALL NOT 複製「兩隊比分相同是否可送出」這條
 	// 驗證規則（design Decision 6）——一律原樣往上傳，由 round-lifecycle 的
 	// validateScoreInput 決定是否接受平局。這條測試證明 CourtCard 本身沒有這種複製。
 	it("兩隊比分相同時 UI 仍照常委派送出而不自行攔截", async () => {

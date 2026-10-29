@@ -177,7 +177,7 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 	}
 
 	// 委派 resetMatchmakerData() 而非 clearRoster()：前者清除 RESET_KEYS 列舉的所有 key，
-	// M2／M6 把 rounds 與 history 加進該清單後，本函式不需改動（見 storage 的 Decision 6）。
+	// rounds 與 history 加進該清單後，本函式不需改動（見 storage 的 Decision 6）。
 	function resetRoster(): void {
 		resetMatchmakerData();
 		dispatch({ type: "RESET" });

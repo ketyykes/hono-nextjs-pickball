@@ -47,7 +47,7 @@ describe("allocateRound", () => {
 		expect(match?.format).toBe("doubles");
 		// 斷言具體值而非只驗證「有值」——makePlayer 預設 gender 為 male，p1～p4 皆出場，
 		// 標示 MUST 為男雙；把 labelDoublesComposition 改成恆回傳 "general" 也會讓
-		// toBeDefined() 全綠（reviewer 小項），改用 toBe 才能抓到。
+		// toBeDefined() 全綠，改用 toBe 才能抓到。
 		expect(match?.doublesComposition).toBe("mens");
 		expect(match?.teams).toHaveLength(2);
 		for (const team of match?.teams ?? []) {
@@ -75,12 +75,10 @@ describe("allocateRound", () => {
 	});
 
 	it("相同輸入產生相同輸出", () => {
-		// ⚠️ mutation 測試更正（reviewer M2）：原 fixture 8 人 rating 為 `8 - i * 0.5`，8 個值
-		// 互不相同；restCount 雖以 `i % 3` 製造 tie，但 compareCandidates 先比 restCount，
-		// restCount 不等時直接用它決勝負，只有「restCount 與 rating 皆相等」才會落到穩定排序
-		// 分支——原 fixture 從未命中這個分支，故 sortCandidates 若在該分支改回傳
-		// `Math.random() - 0.5`（破壞穩定性）仍會全綠（實測：73 tests 全數存活）。
-		// 改為讓 p2、p8 的 restCount（1）與 rating（7.5）皆相同，確保穩定排序分支真的被行使：
+		// 讓 p2、p8 的 restCount（1）與 rating（7.5）皆相同，確保穩定排序分支真的被行使：
+		// compareCandidates 先比 restCount，restCount 不等時直接用它決勝負，只有「restCount 與
+		// rating 皆相等」才會落到穩定排序分支；fixture 若沒有這種 tie，sortCandidates 在該分支
+		// 改回傳 `Math.random() - 0.5`（破壞穩定性）仍會全綠。
 		// 雙打 2 場地容量 8 剛好等於總人數，8 人全部出場（沒有出場／休息的邊界可用），但
 		// pairDoubles 仍會依 rating 對 `playing` 重新排序組隊，p2／p8 進入 pairDoubles 前的
 		// 相對次序若被隨機打亂，兩隊的隊員陣列順序就可能不同，使兩次呼叫的輸出不再相等。
@@ -130,14 +128,11 @@ describe("allocateRound", () => {
 	});
 
 	it("僅性別不同時出場名單與隊伍組成完全一致", () => {
-		// ⚠️ mutation 測試更正（reviewer M1）：原 fixture 5 人 rating 全相異（8.0/7.0/6.0/5.0/4.0）、
-		// restCount 全為 0，compareCandidates 的「restCount 與 rating 皆相等」分支從未被執行過
-		// 一次——那正是本測試該守的分支（性別當 tiebreak 才是真實的外洩路徑：日後有人為了
-		// 「排序確定性」隨手替 compareCandidates 加一個性別 tiebreak，正好是本測試該擋而擋不住
-		// 的情況）。實測：`compareCandidates` 在相等分支加上
-		// `return a.gender.localeCompare(b.gender);` 後，73 tests 全數存活。
-		// 改為讓 p4、p5 的 restCount（0）與 rating（5.0）皆相同，且恰好落在雙打 1 場地
+		// 讓 p4、p5 的 restCount（0）與 rating（5.0）皆相同，且恰好落在雙打 1 場地
 		// （容量 4）的出場／休息分界上——p4 出場、p5 休息（stable sort 保留輸入相對次序）。
+		// compareCandidates 的「restCount 與 rating 皆相等」分支正是本測試該守的分支：
+		// 性別當 tiebreak 才是真實的外洩路徑（日後有人為了「排序確定性」隨手替 compareCandidates
+		// 加一個性別 tiebreak，正好是本測試該擋的情況），fixture 沒有這種 tie 就擋不住。
 		// playersB 刻意讓 p4＝male、p5＝female：若真的混入性別 tiebreak，
 		// "male".localeCompare("female") > 0 會讓 p5 排到 p4 前面，變成 p5 出場、p4 休息，
 		// 與 playersA（性別不影響排序）的結果不同，測試就會抓到。
@@ -255,7 +250,7 @@ describe("allocateRound", () => {
 	});
 
 	it("avoidRepeats 換人後雙打組成標示會依實際成員重新推導", () => {
-		// 這是 §7（duplication.ts）留白、§8 整合責任的補齊項（非 spec 驗收錨點，見
+		// 這是 duplication.ts 留白、由 allocation 整合補齊的項目（非 spec 驗收錨點，見
 		// duplication.ts 的 rebuildMatch 註解）。
 		// p1~p4（皆男性）依 rating 形成 court1（標示 mens），p5~p8（皆女性）形成 court2（標示
 		// womens）。歷史紀錄只重現 p3 對 p4 這組交叉對手（用不相干的填充球員 zA/zB 湊出隊伍，
@@ -420,8 +415,8 @@ describe("allocateRound", () => {
 
 		it("場地數非整數時拒絕輸入而非靜默向下取整（reviewer M7，防禦性 guard，spec 無對應 Scenario）", () => {
 			// courtCount: 1.5 + 雙打 → capacity 6 → 若靜默向下取整為 4，會悄悄只產生 1 場，
-			// 使用者設定錯誤（例如 LocalStorage 回讀損壞值）不會被察覺。§10 只做了範圍檢查
-			// （1～8），未檢查整數性，courtCount 為 1.5 時目前會通過範圍檢查、不拋錯。
+			// 使用者設定錯誤（例如 LocalStorage 回讀損壞值）不會被察覺，
+			// 因此輸入檢查須同時涵蓋整數性與範圍（1～8）。
 			const players = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" }), makePlayer({ id: "p3" }), makePlayer({ id: "p4" })];
 
 			expect(() =>

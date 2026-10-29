@@ -241,7 +241,7 @@ describe("平局評分更新", () => {
 describe("零和的成立條件", () => {
 	it("平局時勢均力敵雙方 E 與 S 皆為 0.5 而變動值為零", () => {
 		// rating 皆 4.00、gamesPlayed 皆 0：E = 0.5、S = 0.5，(S - E) 恰為 0，
-		// 是本 change 新增的唯一「雙方變動皆為零」邊界情境（既有 win/lose 路徑
+		// 是唯一的「雙方變動皆為零」邊界情境（既有 win/lose 路徑
 		// 因 S ∈ {0,1} 與 E ∈ (0,1) 永遠不會讓 S - E 恰為 0）。
 		const teams = makeSinglesTeams(4.0, 4.0);
 
@@ -278,10 +278,10 @@ describe("零和的成立條件", () => {
 		expect(Math.abs(highScorerDelta)).toBe(Math.abs(lowScorerDelta));
 	});
 
-	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
+	// regression guard：寫入當下即綠，非 TDD 紅燈。
 	// 上一條的「兩者絕對值相等」是在四捨五入到兩位小數之後才比較，掩蓋得住 1e-17 等級的不對稱：
-	// 實測把 rating.ts 的 1 - expectedScoreA 改寫成 expectedScore(avgRatingB, avgRatingA) 後，
-	// 三條平局測試依然全綠（mutation 存活）——而 spec 明訂同場雙方 MUST 共用同一個 E
+	// 把 rating.ts 的 1 - expectedScoreA 改寫成 expectedScore(avgRatingB, avgRatingA) 後，
+	// 三條平局測試依然全綠——而 spec 明訂同場雙方 MUST 共用同一個 E
 	// （一方為 E、另一方為 1 - E）。故改以未經四捨五入的 expectedScores 直接比對完全相等，
 	// 才真正守住平局方向保證所倚賴的浮點對稱性。
 	it("平局時雙方共用同一個 E，第二隊的預測勝率恰為 1 減第一隊", () => {
@@ -298,7 +298,7 @@ describe("零和的成立條件", () => {
 		expect(result.expectedScores[1]).not.toBe(expectedScore(4.0, 6.0));
 	});
 
-	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
+	// regression guard：寫入當下即綠，非 TDD 紅燈。
 	// spec 的「零和的成立條件」明文把不守恆延伸至平局（雙方 K_eff 不同時總分變動同樣不必守恆，
 	// 且 SHALL NOT 為了守恆而調整），但既有測試只涵蓋勝負路徑的 K_eff 不同情境。
 	// 平局時雙方的 (S - E) 恆互為相反數，唯有 K_eff 也相同時總分才會守恆；
@@ -463,12 +463,12 @@ describe("邊界 clamp 與觸界標示", () => {
 		expect(result.changes[0].clamped).toBe(false);
 	});
 
-	// regression guard（M15 Stage 2 補洞）：寫入當下即綠，非 TDD 紅燈。
-	// design Risks 點名平局讓觸界旗標出現全新的語意組合：過去「賽後停在界上」只發生於
+	// regression guard：寫入當下即綠，非 TDD 紅燈。
+	// 平局讓觸界旗標出現全新的語意組合：過去「賽後停在界上」只發生於
 	// 勝方被夾在上限或敗方被夾在下限（clamped 必為 true），平局讓「停在界上但完全沒被夾」
 	// 成為可達情境——E 為 0.5 時 delta 恰為 0，分數原地不動卻仍在界上。
-	// 實測 mutation：把旗標改成 roundedAfter > RATING_MAX（即「只有真被夾才算觸界」）後
-	// 全套測試依然全綠，代表此組合無人看守，故補上本條。
+	// 若把旗標改成 roundedAfter > RATING_MAX（即「只有真被夾才算觸界」），
+	// 其他測試依然全綠，此組合無人看守，故有本條。
 	// 另註：平局永遠不會讓 clamped 為 true——(S - E) 的推力恆小於與邊界的距離
 	// （1.00～8.00 全域掃描實測無一例外），因此本條刻意不去斷言平局會被夾值。
 	it("平局時已在邊界者停在界上，觸界旗標為真但未被夾值", () => {
@@ -742,7 +742,7 @@ describe("輸入驗證", () => {
 
 describe("純函式契約", () => {
 	it("評分更新不修改輸入的球員物件", () => {
-		// 鎖住「輸入唯讀」特性，防止日後最佳化或 M4 接線改動 updateRatings 讓它就地修改輸入
+		// 鎖住「輸入唯讀」特性，防止日後最佳化或回合流程接線改動 updateRatings 讓它就地修改輸入
 		const teams = makeSinglesTeams(4.0, 5.5, 10);
 		const teamsBefore = structuredClone(teams);
 
@@ -762,7 +762,7 @@ describe("純函式契約", () => {
 	});
 
 	it("相同輸入產生相同輸出", () => {
-		// 鎖住決定性：純函式無亂數、無時間、無 I/O，同一份輸入必產相同結果。M4 的回合重播依此特性。
+		// 鎖住決定性：純函式無亂數、無時間、無 I/O，同一份輸入必產相同結果。回合重播依此特性。
 		const teams = makeUnevenDoublesTeams();
 
 		const result1 = updateRatings({
@@ -781,7 +781,7 @@ describe("純函式契約", () => {
 	});
 
 	it("評分更新不累加 gamesPlayed 與 restCount", () => {
-		// 防止 M4 接線誤把 gamesPlayed 新值混進輸出，也鎖住「累加由 M4 負責、本段不動它」的設計邊界
+		// 防止回合流程接線誤把 gamesPlayed 新值混進輸出，也鎖住「累加由回合流程負責、本段不動它」的設計邊界
 		const teams: readonly [Side, Side] = [
 			[makeRatingPlayer("A1", 4.0, 20), makeRatingPlayer("A2", 4.5, 20)],
 			[makeRatingPlayer("B1", 3.5, 20), makeRatingPlayer("B2", 4.0, 20)],

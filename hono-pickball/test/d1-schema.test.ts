@@ -160,7 +160,7 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		});
 	});
 
-	// 以下四個 it 對應 scoreboard_current（B5 新增的第一張使用者資料表）。
+	// 以下四個 it 對應 scoreboard_current（第一張使用者資料表）。
 	it("scoreboard_current 可由 migration 建立並寫入讀回", async () => {
 		const db = getTestDb();
 		await insertUser(db, "sc-rw-user", "sc-rw@example.com");
@@ -238,7 +238,7 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		).toBe(0);
 	});
 
-	// 以下四個 it 對應 matchmaker_players（B6 新增，複合主鍵 (user_id, id)）。
+	// 以下四個 it 對應 matchmaker_players（複合主鍵 (user_id, id)）。
 	it("matchmaker_players 可由 migration 建立並寫入讀回", async () => {
 		const db = getTestDb();
 		await insertUser(db, "mp-rw-user", "mp-rw@example.com");
@@ -336,7 +336,7 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 		).rejects.toThrow(/NOT NULL/);
 	});
 
-	// 以下四個 it 對應 B7 新增的 matchmaker_round／matchmaker_match_slots／matchmaker_history／sync_batch_guards。
+	// 以下四個 it 對應 matchmaker_round／matchmaker_match_slots／matchmaker_history／sync_batch_guards。
 	it("matchmaker_round、matchmaker_match_slots、matchmaker_history 與 sync_batch_guards 可由 migration 建立並寫入讀回", async () => {
 		const db = getTestDb();
 		const userId = "b7-rw-user";

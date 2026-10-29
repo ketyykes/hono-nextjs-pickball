@@ -173,7 +173,7 @@ describe("useScoreboardStore", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
-	// §7.0b：帶 matchId 時判定發生在 read effect（paint 之後），若初值直接設為
+	// 帶 matchId 時判定發生在 read effect（paint 之後），若初值直接設為
 	// missing，合法綁定場次會先閃一幀「場次已失效」畫面。此 test 在 render 階段
 	// （effect 執行前）同步記錄 bindingStatus，藉此驗證首次 render 的暫定值。
 	it("帶 matchId 時首次 render 的綁定狀態為 pending 而非 missing", () => {
@@ -190,10 +190,9 @@ describe("useScoreboardStore", () => {
 		expect(renderedStatuses[0]).toBe("pending");
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現初值三元的 standalone
-	// 半邊零覆蓋——把初值改為恆 "pending" 後全套仍綠，因為 read effect 事後補設
-	// standalone 把它掩蓋掉了。7.0c 明文要求「未帶 matchId 時初值維持 standalone
-	// 逐字不變」，需要一條在 render 階段（effect 執行前）取值的斷言才釘得住。
+	// 補充測試：初值三元的 standalone 半邊若無覆蓋——把初值改為恆 "pending" 後全套仍綠，
+	// 因為 read effect 事後補設 standalone 會把它掩蓋掉。規格要求「未帶 matchId 時初值維持
+	// standalone 逐字不變」，需要一條在 render 階段（effect 執行前）取值的斷言才釘得住。
 	it("未帶 matchId 時首次 render 的綁定狀態為 standalone", () => {
 		const renderedStatuses: ScoreboardBindingStatus[] = [];
 		renderHook(() => {
@@ -220,9 +219,8 @@ describe("useScoreboardStore", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現拿掉 hook 邊界的空字串
-	// 正規化後全套仍綠——storage.ts 那一層的正規化只讓「寫哪個槽」正確，bindingStatus
-	// 仍會被判成 bound／missing，使 `/scoreboard?match=` 這種空 query param 在 §7 顯示
+	// 補充測試：拿掉 hook 邊界的空字串正規化後若全套仍綠——storage.ts 那一層的正規化
+	// 只讓「寫哪個槽」正確，bindingStatus 仍會被判成 bound／missing，使 `/scoreboard?match=` 這種空 query param 顯示
 	// 場次失效畫面。正規化在 hook 與 storage 各做一次，兩處都需要各自的偵測力。
 	it("matchId 為空字串時沿用獨立槽並回報 standalone", () => {
 		const seed = {
@@ -250,10 +248,10 @@ describe("useScoreboardStore", () => {
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBeNull();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現「綁定模式下打到
-	// finished、再 UNDO」這條 hook + storage 端到端路徑零覆蓋——§2 只在 reducer 層驗過
-	// UNDO 保留 matchId。兩個 mutation 因此存活／僅由 reducer 單元測試擋下：
-	// ① writeMatchSlot 對 finished 狀態誤加早退 guard（§5 的待送出清單全部落空）；
+	// 補充測試：「綁定模式下打到 finished、再 UNDO」這條 hook + storage 端到端路徑
+	// 若無覆蓋——reducer 層只驗過 UNDO 保留 matchId。下列兩種變異會因此存活／僅由 reducer
+	// 單元測試擋下：
+	// ① writeMatchSlot 對 finished 狀態誤加早退 guard（待送出清單全部落空）；
 	// ② UNDO replay 掉 matchId（design Decision 6 的洞：同時失去綁定並把整場比賽
 	//    寫進獨立槽 scoreboard:current:v1）——hook 層原本沒有第二道防線。
 	it("綁定模式下打到結束並 UNDO 後仍只寫回該槽", () => {
@@ -289,9 +287,8 @@ describe("useScoreboardStore", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 read effect cleanup 的
-	// `hasHydratedRef.current = false` 改成 true 後全套仍綠——那正是 design Context 指名
-	// 要守住的 Strict Mode 二次 mount 競態：write effect 會以初始 state（0-0）覆蓋
+	// 補充測試：read effect cleanup 的 `hasHydratedRef.current = false` 改成 true 後
+	// 若全套仍綠——那正是需要守住的 Strict Mode 二次 mount 競態：write effect 會以初始 state（0-0）覆蓋
 	// localStorage 中已儲存的進度。既有測試全都在非 Strict Mode 下 render，碰不到這條路徑。
 	it("React Strict Mode 二次 mount 不以初始 state 覆蓋既有進度", () => {
 		const seed = {
@@ -474,7 +471,7 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
-	// regression guard：實作先於測試存在，寫入當下即綠燈（B7 §8 自跑 mutation 後補）
+	// regression guard：實作先於測試存在，寫入當下即綠燈
 	it("regression guard：帶 matchId 的雲端分槽 GET 回 401 時呼叫 session.refresh", async () => {
 		const refresh = vi.fn();
 		vi.mocked(useSession).mockReturnValue({ ...loggedIn, refresh });

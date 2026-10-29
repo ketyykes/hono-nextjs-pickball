@@ -177,7 +177,7 @@ export default function MatchmakerPage() {
 		setSwapError(result.ok ? null : { matchId, message: result.message });
 	}
 
-	// buildExportScene 的唯一呼叫點（design Decision 2）：JPG 與（未來的）列印稿共用
+	// buildExportScene 的唯一呼叫點（design Decision 2）：JPG 與列印稿共用
 	// 同一份內容真相來源，不各自組裝。round／players 變動時才重算。
 	const exportScene: ExportScene | null = useMemo(
 		() => (round === null ? null : buildExportScene(round, players)),
@@ -185,7 +185,7 @@ export default function MatchmakerPage() {
 	);
 
 	// 傳給 ExportActions 的 fileName prop。exportedAt 取 round.createdAt（本輪產生的時間）
-	// 而非 new Date()，有兩個理由（leader 於 §7 的裁決，覆寫「點擊當下取時間」的原始指示）：
+	// 而非 new Date()，有兩個理由：
 	// ① 在 render 期間呼叫 new Date() 會讓 render 變成不純函式，同一份 props 在不同時刻
 	//    render 出不同結果，是 SSR／hydration 不一致的典型成因；
 	// ② 檔名日期的用途是「排序與辨識」（design Decision 6），而「這一輪是哪天排的」比
@@ -221,16 +221,16 @@ export default function MatchmakerPage() {
 			className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
 		>
 			<SyncStatusNotice status={syncStatus} />
-			{/* §8：頁面標題區在列印時隱藏——PrintSheet 已自帶一個 <h1>{scene.title}</h1>，
-			    若不隱藏會讓紙本同頁出現兩個 <h1>（leader 裁決 1）。 */}
+			{/* 頁面標題區在列印時隱藏——PrintSheet 已自帶一個 <h1>{scene.title}</h1>，
+			    若不隱藏會讓紙本同頁出現兩個 <h1>。 */}
 			<div data-print="hide">
 				<h1 className="text-2xl font-bold">對戰分配</h1>
 				<p className="text-sm text-muted-foreground">安排場地、產生本輪對戰並記錄比分。</p>
 			</div>
 
-			{/* §8：匯出入口是操作控制項，列印時應隱藏，改由紙本自己的列印版取代（裁決 5）。
+			{/* 匯出入口是操作控制項，列印時應隱藏，改由紙本自己的列印版取代。
 			    ExportActions 本身不接受 className／data 屬性，故以包裝 div 承載
-			    data-print="hide"，而非改動 ExportActions.tsx（不在本組可動檔案清單內）。 */}
+			    data-print="hide"，而非改動 ExportActions.tsx。 */}
 			<div data-print="hide">
 				<ExportActions scene={exportScene} fileName={exportFileName} exportJpg={downloadSceneAsJpeg} />
 			</div>
@@ -245,16 +245,15 @@ export default function MatchmakerPage() {
 				</div>
 			)}
 
-			{/* tasks 11 裁決 3：「產生本輪對戰」與「重設／再排」是 spec 明訂的主要操作
+			{/* 「產生本輪對戰」與「重設／再排」是 spec 明訂的主要操作
 			    入口，手機斷點 MUST ≥44px；場地數加減與對戰方式／目標分數的 radio
-			    是次要控制項，本 change 刻意不擴大範圍（leader 裁決）。RoundControls.tsx
-			    不在可動檔案清單內，改由本層以 CSS 選擇器精準只挑出「無 role 也無
+			    是次要控制項，刻意不擴大範圍。RoundControls.tsx 不為此加 className，
+			    改由本層以 CSS 選擇器精準只挑出「無 role 也無
 			    aria-label」的按鈕——這正好排除所有 radio（帶 role="radio"）與圖示按鈕
 			    （帶 aria-label），只命中「產生本輪對戰」「重設／再排」這兩顆。
-			    M14 新增的「開始計時」同樣無 role 也無 aria-label，因此一併被命中而取得
+			    「開始計時」同樣無 role 也無 aria-label，因此一併被命中而取得
 			    ≥44px 觸控目標——它是一次性主要操作，這個順帶結果符合原意，故不調整選擇器。
-			    §8：這顆包裝 div 同時也是 RoundControls 的操作控制項容器，列印時隱藏
-			    （裁決 5）。 */}
+			    這顆包裝 div 同時也是 RoundControls 的操作控制項容器，列印時隱藏。 */}
 			<div
 				data-print="hide"
 				className="max-md:[&_button:not([role]):not([aria-label])]:min-h-11"
@@ -273,21 +272,21 @@ export default function MatchmakerPage() {
 				/>
 			</div>
 
-			{/* M14 design Decision 8：倒數是「整輪共用的單一計時」，不屬於任何一張場地卡片，
-			    故獨立掛載於本層而非塞進 MatchStage／CourtCard（沿用 M9 的 ExportActions／
+			{/* 倒數是「整輪共用的單一計時」，不屬於任何一張場地卡片，
+			    故獨立掛載於本層而非塞進 MatchStage／CourtCard（與 ExportActions／
 			    PrintSheet 同一條理由）。本層只負責掛載與傳值：倒數取樣、到期判定與提示音
 			    去重全在 RoundTimerBanner 與其委派的 hook／純函式內，SHALL NOT 在頁面層
 			    重複一份。
 			    不包一層 `round !== null &&` 條件式：RoundTimerBanner 自行處理 timer 為 null
 			    與尚未開始兩種早退並回傳 null（畫面結果相同），而包了條件式會在回合有無之間
 			    製造 unmount／remount，把「同一次到期只播一次」所倚賴的 useRef 旗標清掉。
-			    §8：倒數是螢幕上的操作輔助資訊，列印時隱藏，包裝方式比照上下兩區。 */}
+			    倒數是螢幕上的操作輔助資訊，列印時隱藏，包裝方式比照上下兩區。 */}
 			<div data-print="hide">
 				<RoundTimerBanner timer={round?.timer ?? null} />
 			</div>
 
-			{/* §8：舞台區是螢幕版的對戰畫面（比分輸入等互動），列印時由下方的 PrintSheet
-			    取代，故隱藏（裁決 5）。 */}
+			{/* 舞台區是螢幕版的對戰畫面（比分輸入等互動），列印時由下方的 PrintSheet
+			    取代，故隱藏。 */}
 			<div data-testid="match-stage-region" data-print="hide">
 				{round === null ? (
 					<EmptyStage hasActivePlayers={hasActivePlayers} onGenerate={() => handleGenerate(settings)} />
@@ -306,7 +305,7 @@ export default function MatchmakerPage() {
 				)}
 			</div>
 
-			{/* §8：列印版內容，與 JPG 匯出共用同一份 exportScene（design Decision 2）。
+			{/* 列印版內容，與 JPG 匯出共用同一份 exportScene（design Decision 2）。
 			    螢幕上預設隱藏、列印時顯示，由 app/globals.css 的 @media print 區塊負責。
 			    exportScene 為 null（尚無回合）時 PrintSheet 的 scene prop 為必填，故此處
 			    不掛入。 */}

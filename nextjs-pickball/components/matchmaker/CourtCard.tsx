@@ -158,7 +158,7 @@ export function CourtCard({
 
 	// 雙打上下分排（design Decision 4）：色塊列 0／1 分別落在 grid 第 2、4 列，
 	// 讓第 1、5 列可以貼隊伍標籤、第 3 列放比分區這個「網」；單打只有一排色塊，
-	// 直接排第 1 列，標籤改用格線外的左右並列（單打左右分置本就正確，不受本次調整影響）。
+	// 直接排第 1 列，標籤改用格線外的左右並列（單打左右分置本就正確，不受雙打分排影響）。
 	function tileGridRow(tileRow: number): number {
 		if (!isDoubles) {
 			return 1;
@@ -222,8 +222,7 @@ export function CourtCard({
 				<span>{TEAM_LABELS[index]}</span>
 				{/* match.winner === winnerKey 在 winnerKey 為 "teamA"／"teamB" 時對 "draw"
 				    自然為 false，不需要為平局另外新增分支；「平手」標籤改顯示於已完成場次的
-				    比分列（見下方 data-testid="court-${match.id}-score" 附近），不在這裡
-				    （M15 matchmaker-timed-draw change，design Decision 7）。 */}
+				    比分列（見下方 data-testid="court-${match.id}-score" 附近），不在這裡。 */}
 				{completed && match.winner === winnerKey && (
 					<Badge variant="outline" className="border-current bg-transparent text-current">
 						勝
@@ -337,7 +336,7 @@ export function CourtCard({
 									<span>{match.scores.teamB}</span>
 									{/* 平局（僅計時回合可能出現）不得為任一隊顯示「勝」，改在此處以
 									    平手標籤標示——色彩不得為唯一資訊來源（prd.md 12.5），視覺權重
-									    比照 renderTeamLabel 既有的「勝」Badge（M15 design Decision 7）。 */}
+									    比照 renderTeamLabel 既有的「勝」Badge。 */}
 									{match.winner === "draw" && (
 										<Badge variant="outline" className="border-current bg-transparent text-current">
 											{DRAW_LABEL}

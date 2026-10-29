@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-// /matchmaker/stats 球員統計與排行榜頁的 E2E 驗收（M11 §6、§8）。
-// 對應 test-plan 的五條 e2e 錨點：空狀態、直接開啟路由載入表格、切換區間後只反映該區間、
+// /matchmaker/stats 球員統計與排行榜頁的 E2E 驗收。
+// 涵蓋五條 e2e 錨點：空狀態、直接開啟路由載入表格、切換區間後只反映該區間、
 // 支援寬度下限不橫向溢出、瀏覽不改動持久化資料。
 //
 // 本頁屬 TDD 例外層（app/**/page.tsx 不強制單元 TDD，見 nextjs-pickball/CLAUDE.md），
@@ -97,7 +97,7 @@ function buildRound(matchId: string, teamAId: string, teamBId: string) {
 		],
 		restingPlayerIds: [],
 		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
-		// M14 為 Round 新增 timer 欄位（null 代表不計時）。種子資料 MUST 與目前 schema
+		// Round 含 timer 欄位（null 代表不計時）。種子資料 MUST 與目前 schema
 		// 序列化後的形狀一致——「瀏覽統計頁不改動任何持久化資料」是逐位元組比對，
 		// 少了這個欄位，hydrate 時 zod 的 .default(null) 會補上它、write effect 隨即
 		// 把正規化後的形狀寫回，該測試就會在「回寫內容與種入內容不同」上轉紅
@@ -268,9 +268,9 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 			],
 		});
 
-		// 頁面標題區（tasks 6.3：標題與說明文字為繁體中文且不與其他 matchmaker 頁面
+		// 頁面標題區（標題與說明文字為繁體中文且不與其他 matchmaker 頁面
 		// 重複措辭）。沿用 matchmaker-history.spec.ts 對 h1 的既有斷言慣例——沒有這兩條
-		// 時，把整個標題區刪掉本檔照樣全綠（Stage 2 mutation 實測確認此退化會存活）。
+		// 時，把整個標題區刪掉本檔照樣全綠（mutation 實測確認此退化會存活）。
 		await expect(page.getByRole("heading", { name: "球員統計" })).toBeVisible();
 		await expect(page.getByText("依區間排名每位球員的表現與強度消長。")).toBeVisible();
 
@@ -363,7 +363,7 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	// 非錨點補強：鎖住空狀態判定用的是「未篩選的 history」而非「篩選後的 filteredHistory」。
 	// 兩者只在「整份歷史有資料、但目前區間內沒有」時才分岔，上面三條錨點 test 的每個
 	// 斷言時點都落在「目前區間有資料」，因此把 history.length 換成 filteredHistory.length
-	// 照樣全綠（Stage 2 mutation 實測確認此退化會存活）。
+	// 照樣全綠（mutation 實測確認此退化會存活）。
 	//
 	// 引導型空狀態的語意是「從沒打過」（EmptyHistory 的 range === null 分支文案），
 	// 空區間顯示它會謊稱使用者從未有過任何紀錄——這正是本條要擋下的退化。
@@ -448,8 +448,8 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	});
 
 	test("排行榜表格於支援寬度下限不造成整頁橫向溢出", async ({ page }) => {
-		// 九欄 × 四位球員 × 多筆紀錄，姓名刻意取較長的中文：欄位數是本 change 唯一的
-		// 橫向溢出風險點（design Decision 7），資料太少會讓表格自然放得下而測不到任何事。
+		// 九欄 × 四位球員 × 多筆紀錄，姓名刻意取較長的中文：欄位數是本頁唯一的
+		// 橫向溢出風險點，資料太少會讓表格自然放得下而測不到任何事。
 		// 三筆的兩隊配對逐筆輪換，讓「最常搭檔」「最常對手」兩欄在每一列都填得出實際
 		// 姓名而非佔位符號——那兩欄是九欄裡最寬的，用佔位符號會低估真實欄寬壓力。
 		await openStatsPage(page, {
@@ -533,7 +533,7 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 	// 它沒有證明什麼：本頁確實會經由 useRosterStore／useRoundStore 的 write effect
 	// 把三個 key 重新序列化寫回。那兩個 hook 的 write effect 以 hasHydratedRef 守門，
 	// mount 時跳過，但 hydrate effect 一 dispatch HYDRATE，state 就變動、write effect
-	// 隨即觸發 writeRoster／writeRound／writeHistory。這是 M4／M5 既有的 hydration
+	// 隨即觸發 writeRoster／writeRound／writeHistory。這是兩個 store 既有的 hydration
 	// pattern，不是本頁引入的（/matchmaker 對戰頁同樣如此）。本 test 之所以能逐字
 	// 相同，是因為種入的資料已經是 schema 序列化後的正規化形狀（欄位順序與
 	// PlayerSchema／RoundSchema／MatchHistoryEntrySchema 的 shape 一致，真實使用者

@@ -8,7 +8,7 @@ import type { Page, Locator } from "@playwright/test";
 // 種資料格式沿用既有 player-roster.spec.ts 的做法：寫 matchmaker:roster:v1
 // （{ version: 1, players: [...] }，見 lib/matchmaker/storage.ts）。本檔全部
 // test 皆不需要種入 matchmaker:round:v1——所有需要「已有回合」的情境都改由 UI
-// 操作（點「產生本輪對戰」）達成，理由見 design Decision 10 的 Risks「能用 UI
+// 操作（點「產生本輪對戰」）達成，理由是「能用 UI
 // 操作產生的狀態優先用 UI 操作」；為何用 addInitScript 種 roster 見 seedRoster()。
 //
 // 為避免 localStorage 跨測試污染，beforeEach 只清除本 capability 的三個 key，
@@ -140,7 +140,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page.getByTestId("match-stage-region")).toBeVisible();
 	});
 
-	// M11（matchmaker-player-stats）：第五個分頁「統計」是否真的接上路由，而不只是
+	// 第五個分頁「統計」是否真的接上路由，而不只是
 	// 分頁清單多一筆資料。一併驗「對戰」在統計頁沒有 aria-current——/matchmaker/stats
 	// 以 /matchmaker 為前綴，active 判定若退化成前綴比對，兩個分頁會同時亮起。
 	test("可由對戰頁的區段導覽點擊進入統計頁", async ({ page }) => {
@@ -298,7 +298,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		expect(playerA.gamesPlayed).toBe(1);
 		expect(playerB.gamesPlayed).toBe(1);
 		// 方向斷言而非只驗「與初始值不同」：勝方（第一隊，playerA，11:7）評分應上升，
-		// 敗方應下降——這是 M3 評分引擎的既定語意，仍在契約內，不是重新實作評分公式。
+		// 敗方應下降——這是評分引擎的既定語意，仍在契約內，不是重新實作評分公式。
 		expect(playerA.rating).toBeGreaterThan(5);
 		expect(playerB.rating).toBeLessThan(5);
 
@@ -375,8 +375,8 @@ test.describe("/matchmaker 對戰頁", () => {
 		await page.goto("/matchmaker");
 		await page.getByRole("button", { name: "產生本輪對戰" }).click();
 
-		// tasks 11 裁決 3：「產生本輪對戰」「重設／再排」是 spec 明訂的主要操作入口，
-		// 一併納入手機觸控目標量測（次要控制項如場地數加減、radio 本 change 不擴大範圍）。
+		// 「產生本輪對戰」「重設／再排」是 spec 明訂的主要操作入口，
+		// 一併納入手機觸控目標量測（次要控制項如場地數加減、radio 不在量測範圍）。
 		const controls = [
 			page.getByLabel("第一隊比分"),
 			page.getByLabel("第二隊比分"),
@@ -518,9 +518,9 @@ test.describe("/matchmaker 對戰頁", () => {
 		expect(unnamed).toEqual([]);
 	});
 
-	// M10（matchmaker-stage-gaps）：round.matches 為空但 round 本身非 null 的狀態，
+	// round.matches 為空但 round 本身非 null 的狀態，
 	// 是已由程式碼證實可達的狀態（resetIncompleteMatches 候選池計算不過濾
-	// isActive，見 design Decision 4）——重現方式為「產生本輪對戰後，把其中一位
+	// isActive）——重現方式為「產生本輪對戰後，把其中一位
 	// 對戰中的球員設為暫停出場，再點重設／再排」，候選池即不足以組出任何一場。
 	//
 	// 頁面切換一律用區段導覽的 <Link> 點擊（client-side 軟導覽），SHALL NOT 用
@@ -545,7 +545,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page.getByTestId("empty-matches")).toBeVisible();
 		await expect(page.getByTestId("empty-matches")).toContainText("本輪目前沒有任何場次");
 		// 說明句同樣要斷言：spec 要求「SHALL NOT 只顯示技術訊息或留白」，只鎖標題的話
-		// 說明句被清空仍會全綠（Stage 2 mutation 實測存活），等於這段文案沒有守衛。
+		// 說明句被清空仍會全綠（mutation 實測存活），等於這段文案沒有守衛。
 		await expect(page.getByTestId("empty-matches")).toContainText("候選人數不足以組成任何一場比賽");
 		await expect(page.getByTestId("match-stage-courts")).toHaveCount(0);
 		const joinLink = page.getByRole("link", { name: "前往參賽者名單" });
@@ -554,7 +554,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page).toHaveURL(/\/matchmaker\/players$/);
 	});
 
-	// 版面 regression guard（Stage 2 mutation 實測補上）：把 EmptyMatches 根節點的
+	// 版面 regression guard（mutation 實測補上）：把 EmptyMatches 根節點的
 	// `flex-1` 拿掉，上面兩條 test 仍全綠——但說明卡片會縮成內容寬（1280 視窗下量得
 	// 554px 而非 680px），休息名單跟著左移 126px，整列右緣與同頁其他區塊對不齊。
 	// 改以「說明卡片與場地網格同寬」「休息名單左緣不因場次有無而位移」兩條相對關係
@@ -602,8 +602,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(page.getByTestId("empty-matches")).toHaveCount(0);
 	});
 
-	// M10（matchmaker-stage-gaps）§4：regression guard，不對應任何新的或被修改的 spec
-	// 驗收錨點（見 design Decision 3）——resetIncompleteMatches 與其 UI wiring 已由
+	// regression guard，不對應任何 spec 驗收錨點——resetIncompleteMatches 與其 UI wiring 已由
 	// lib/matchmaker/round.test.ts 與 components/matchmaker/RoundControls.test.tsx
 	// 覆蓋且正確，本測試只新增一層「真實瀏覽器 + 真實 LocalStorage」的端到端證據。
 	test("重設／再排後已完成場次保留、未完成場次重新分配且休息名單排除已比賽者", async ({ page }) => {
@@ -676,7 +675,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		if (otherMatchAfter === undefined) return;
 		expect(otherMatchAfter.id).not.toBe(pendingBefore.id);
 		// 新場次 MUST 避開保留場次已佔用的場地編號，否則畫面會出現兩張同時寫著「1 號場」的
-		// 卡片（Stage 2 mutation 實測：拿掉 takeFreeCourtNumbers 的避讓後其餘斷言全綠存活）。
+		// 卡片（mutation 實測：拿掉 takeFreeCourtNumbers 的避讓後其餘斷言全綠存活）。
 		expect(otherMatchAfter.courtNumber).not.toBe(completedAfter.courtNumber);
 
 		// 休息名單排除已比賽者：完成場次那兩位球員 SHALL NOT 出現在重排後的休息名單。
@@ -690,7 +689,7 @@ test.describe("/matchmaker 對戰頁", () => {
 		}
 
 		// 休息名單與場上球員互斥：同一個人不可能同時在比賽又在休息。這是不變量而非演算法
-		// 細節（候選排序規則調整不會使它轉紅），Stage 2 mutation 實測補上——把 restingPlayerIds
+		// 細節（候選排序規則調整不會使它轉紅），mutation 實測補上——把 restingPlayerIds
 		// 誤接成新場次的球員時，上面「筆數為 2」與「不含已比賽者」兩組斷言全數無感而測試照樣全綠。
 		const playingAfterIds = after.round.matches.flatMap((m) => m.teams.flatMap((team) => team.playerIds));
 		for (const playerId of after.round.restingPlayerIds) {
@@ -698,10 +697,10 @@ test.describe("/matchmaker 對戰頁", () => {
 		}
 	});
 
-	// M13（matchmaker-player-swap）6.1：換人操作是 shadcn Select 觸發器（role="combobox"），
+	// 換人操作是 shadcn Select 觸發器（role="combobox"），
 	// 只有 spec「場地區塊的換人操作」要求的無障礙屬性——一律含所屬球員姓名的 aria-label——
 	// 才能讓讀屏使用者在雙打四格之間逐一分辨。unit／integration 測試驗不到真實 Tab 走訪
-	// 順序與跨元素的可存取名稱唯一性，故需要這條 E2E（apply §6 tasks 6.1）。
+	// 順序與跨元素的可存取名稱唯一性，故需要這條 E2E。
 	//
 	// 種 6 人：雙打 1 場地固定用 4 人，留 2 人休息，讓四個換人觸發器皆有候選人而非
 	// disabled（disabled 元素不會落在 Tab 焦點序列內，會讓本測試測不到目標）。
@@ -736,11 +735,9 @@ test.describe("/matchmaker 對戰頁", () => {
 		expect(new Set(names).size).toBe(4);
 	});
 
-	// M13（matchmaker-player-swap）6.3（leader 於 apply §5 Stage 2 之後授權新增，非原
-	// tasks.md 項目）：封住換人整條線路完全失效（P5：handleSwapPlayer 不呼叫
-	// swapMatchPlayer；P6：onSwapPlayer 傳 no-op）或引數對調（Q2：outPlayerId／inPlayerId
-	// 對調）這三種變異——這些缺口在全套單元測試與 tsc 皆為綠燈的情況下完全不會被
-	// 發現，因為 §4 的 integration 測試只驗到 CourtCard 正確委派回呼，回呼之後的路徑
+	// 封住換人整條線路完全失效（handleSwapPlayer 不呼叫 swapMatchPlayer、
+	// onSwapPlayer 傳 no-op）或引數對調（outPlayerId／inPlayerId 對調）這三種變異——這些缺口在全套單元測試與 tsc 皆為綠燈的情況下完全不會被
+	// 發現，因為 integration 測試只驗到 CourtCard 正確委派回呼，回呼之後的路徑
 	// 無人守衛。
 	//
 	// 換人操作以 id（e2e-player-N）與姓名（測試員N）的索引一致這件事推導換入／換出者
