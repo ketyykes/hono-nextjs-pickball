@@ -169,3 +169,111 @@ test.describe("帳號入口位移", () => {
 		}
 	});
 });
+
+// 各寬度的入口可見性是排版行為，與瀏覽器引擎無關，寫法同 navbar-rwd.spec.ts。
+// 位移測試不放進這個 describe，才不會被這裡的 skip 波及。
+test.describe("帳號入口各寬度呈現", () => {
+	test.skip(
+		({ browserName }) => browserName !== "chromium",
+		"排版行為只需在 chromium 驗一次",
+	);
+
+	const NAV_LABELS = ["首頁", "完整體驗", "計分板", "測驗", "對戰分配"];
+	const WIDTHS = [320, 375, 390, 640, 1280];
+	const HEIGHT = 700;
+	// 窄螢幕連結高度以 1280px 為基準，換行會讓高度倍增；容許 4px 誤差。
+	const WRAP_TOLERANCE_PX = 4;
+
+	test("各寬度下帳號入口與五個導航連結皆完整落在視口內且不溢出", async ({
+		page,
+	}) => {
+		// 2 種狀態 × 5 種寬度、全為 soft 斷言；入口隱藏時每個 toBeInViewport 要等滿預設 5 秒，
+		// 預設 30 秒會在列出所有失敗寬度前先逾時。
+		test.setTimeout(90_000);
+		let body: SessionBody = GUEST;
+		await page.route("**/api/session", async (route: Route) => {
+			await route.fulfill({ json: body });
+		});
+
+		const states = [
+			{
+				name: "guest：未登入",
+				body: GUEST,
+				entry: () =>
+					page.locator("header").getByRole("link", { name: "登入", exact: true }),
+			},
+			{
+				name: "user：已登入",
+				body: USER,
+				entry: () => page.locator("header").getByRole("button", { name: "登出" }),
+			},
+		];
+		const navLink = (label: string) =>
+			page.locator("header nav").getByRole("link", { name: label, exact: true });
+
+		for (const state of states) {
+			await test.step(state.name, async () => {
+				body = state.body;
+				await page.setViewportSize({ width: 1280, height: HEIGHT });
+				await page.goto("/");
+				const entry = state.entry();
+				await expect(entry).toBeVisible({ timeout: SESSION_TIMEOUT });
+
+				const wideHeights: Record<string, number> = {};
+				for (const label of NAV_LABELS) {
+					wideHeights[label] = await navLink(label).evaluate(
+						(el) => el.getBoundingClientRect().height,
+					);
+				}
+
+				for (const width of WIDTHS) {
+					await test.step(`${width}px`, async () => {
+						await page.setViewportSize({ width, height: HEIGHT });
+						await fontsReady(page);
+
+						await expect.soft(entry, "帳號入口").toBeInViewport({ ratio: 1 });
+						for (const label of NAV_LABELS) {
+							const link = navLink(label);
+							await expect.soft(link, `「${label}」`).toBeInViewport({ ratio: 1 });
+							const height = await link.evaluate(
+								(el) => el.getBoundingClientRect().height,
+							);
+							expect
+								.soft(height, `「${label}」高度（不換行）`)
+								.toBeLessThanOrEqual(wideHeights[label] + WRAP_TOLERANCE_PX);
+						}
+
+						// 入口位於 <nav> 之後，右緣不應小於最後一個連結的右緣。
+						// boundingBox 找不到元素會一路等到測試逾時，先以 count 判斷，失敗才能就地記錄。
+						const entryBox =
+							(await entry.count()) === 0 ? null : await entry.boundingBox();
+						const matchmakerBox = await navLink("對戰分配").boundingBox();
+						expect.soft(entryBox, "帳號入口 boundingBox").not.toBeNull();
+						expect.soft(matchmakerBox, "對戰分配 boundingBox").not.toBeNull();
+						if (entryBox !== null && matchmakerBox !== null) {
+							expect
+								.soft(entryBox.x + entryBox.width, "入口右緣不小於對戰分配右緣")
+								.toBeGreaterThanOrEqual(matchmakerBox.x + matchmakerBox.width);
+						}
+
+						const overflow = await page.evaluate(() => {
+							const container = document.querySelector("header > div");
+							return {
+								containerScroll: container?.scrollWidth ?? -1,
+								containerClient: container?.clientWidth ?? -1,
+								pageScroll: document.documentElement.scrollWidth,
+								innerWidth: window.innerWidth,
+							};
+						});
+						expect
+							.soft(overflow.containerScroll, "header 內層容器 scrollWidth")
+							.toBeLessThanOrEqual(overflow.containerClient);
+						expect
+							.soft(overflow.pageScroll, "頁面 scrollWidth")
+							.toBeLessThanOrEqual(overflow.innerWidth);
+					});
+				}
+			});
+		}
+	});
+});
