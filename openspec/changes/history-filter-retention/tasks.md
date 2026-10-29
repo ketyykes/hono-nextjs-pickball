@@ -72,13 +72,22 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——名單雲端同步段的「對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容」指的是**名單**狀態，維持不改；
+- [x] 4.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——名單雲端同步段的「對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容」指的是**名單**狀態，維持不改；
   `/matchmaker/history` 與 `/matchmaker/stats` 條目各補一句「雲端歷史 loading／load-failed 時保留區間篩選（統計頁連同標題），只替換紀錄／排行榜區塊，焦點不遺失；失敗後改選區間即重新載入」。commit（`docs:`）
-- [ ] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
-- [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋8，後端與核心與基線相同
-- [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+  - 紀錄：`0037392`，只改 `nextjs-pickball/CLAUDE.md` 第 36、45 行條目末尾各補一句；第 114 行名單段未改。
+- [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 結果：`pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck`（後兩者含 test tsconfig 第二段）皆 exit 0。
+- [x] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
+  - 結果：雙鎖下 exit 0，`✖ 3 problems (0 errors, 3 warnings)`，與基線相同（三個皆為既有 hooks 的 unused-vars）。
+- [x] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋8，後端與核心與基線相同
+  - 結果：雙鎖下 exit 0；前端 109 檔／1078（基線 1070＋8）、後端 24／177、核心 9／21，與期望一致。
+- [x] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+  - 結果：雙鎖下 exit 0（前端 12 個 route 產出、後端 `wrangler deploy --dry-run` 通過）；建置後 `git status --porcelain` 為空。
 - [ ] 4.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋2 全 passed、0 skipped；五個 browser project 數量與基線相同、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空（訪客路徑、hook、共用元件、app、後端、核心零變更）
-- [ ] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過
+  - 進度（2026-10-30 06:31 前）：user-data 46 passed／0 skipped（基線＋2）；chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145 passed＋2 skipped；webkit 三 shard 合計 135 passed＋12 skipped；皆 0 failed、0 flaky，與基線相同。
+    mobile-safari 三個 shard 尚無有效結果：06:02 起主機系統 daemon 造成 load 暴衝（約 170～296，非本 repo process），1/3 在高負載下 `match-stage.spec.ts` 5 條逾時後被中止，屬無效執行、不計入；待 load < 20 後重跑。
+- [x] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空（訪客路徑、hook、共用元件、app、後端、核心零變更）
+  - 結果：輸出為空。
+- [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過
+  - 結果：`Change 'history-filter-retention' is valid`。
