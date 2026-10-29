@@ -54,5 +54,6 @@ runbook B9：B5～B8 讓登入後的計分板與對戰分配機全部以雲端�
   E2E 新增 `tests/e2e/user-data/local-import.spec.ts`。
 - **允許修改的既有測試**：`tests/e2e/user-data/roster-sync.spec.ts` 刪除 B6 的「登入時 JSON 還原停用並顯示說明」（行為依本 change 改變，見 `data-transfer` delta）；apply §1 追加（皆為行為的必然結果，見 design Open Questions 4）：`hono-pickball/test/expected-user-guard.test.ts` 樣本表補 `POST /api/import`（14 → 15）、`packages/pickball-core/test/module-boundary.test.ts` 的 `CORE_MODULES`、`roster-sync.spec.ts` 與 `history-sync.spec.ts` 的雲端同步點常數；其餘既有 it／test 一律不改。
 - **apply §1 追加的新測試檔**：`components/matchmaker/LocalDataImportSection.test.tsx`、`components/matchmaker/JsonBackupSection.test.tsx`（B7.5 一次性雲端操作的帳號與未授權 refresh）。
+- **apply §5 追加**（coordinator 裁定接受）：`components/matchmaker/LocalImportResultMessage.tsx`（兩個入口共用的結果訊息呈現）、`components/matchmaker/local-import-view.ts`（兩個入口共用的文案常數與結果轉換）及其測試 `local-import-view.test.ts`（Stage 2 補強的 regression guard）。
 - **相依**：**不新增任何第三方套件**。
 - **訪客／正式站**：零變更（本機模式的資料頁與參賽者頁不渲染新元件；auth 停用時新端點回 404）。

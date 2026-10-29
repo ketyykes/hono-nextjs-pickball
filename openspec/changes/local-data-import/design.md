@@ -168,3 +168,12 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
 10. （apply §5，2026-10-29，第三任 leader 中斷紀錄）Implementer（sonnet）：cfe7bf3 RED（元件 2 個 it 真紅；E2E local-import 5 條＋同步點 4 條真紅；機械複驗見 tasks 5.1）→ 1ed7494 GREEN → 42a356d refactor（移除 spec 未要求的重複歷史摘要文案）→ 8e0046d regression guard → 6600c68／8e173b7 tasks 註記；5.3 skipped（文案已集中於 `local-import-view.ts`）。
     Implementer 自報：user-data 44 passed／0 failed／0 skipped；前端全套 108 檔／1061；三段 typecheck exit 0；mutation 41 條。Stage 1（sonnet）PASS（建議：proposal Impact 補列 `LocalImportResultMessage.tsx`、`local-import-view.ts`；E2E 可補 isEmpty／oversize 時 hint 不出現的反向斷言）。
     **中斷位置**：§5 Stage 2（opus）已派出、尚未回報（審查期間可能對元件檔做暫時性變異，接手前先確認 `git status --porcelain` 為空、無殘留 dev server）。剩餘：§5 Stage 2 結果處理 → §6.1～6.8 → Final Code Review。
+11. （apply §5 Stage 2，2026-10-29，第四任 leader）Stage 2（opus，第三任派出、21 時後才送達 coordinator 轉交）判 **FAIL**：正式程式碼無缺陷，測試鑑別力缺口三組——
+    ① user id 為 `null` 時的未授權訊息未被驗到（U06、J07；第一階段 401 已留下同文字 alert）；② 雲端 JSON 匯入的 `parseBackup` 失敗分支無測試（J08、J09）；
+    ③ `describeLocalSummary` 的分槽數、回合數、獨立計分板數無鑑別力（E27、E28、E36、E37）；低：E15（isEmpty／oversize 時 hint 不應出現，即 Stage 1 建議的反向斷言）、J11（成功未清掉舊錯誤訊息）。
+    → Implementer（sonnet）`ef2becb` regression guard（加入即綠，產品檔零改動）：新增 `components/matchmaker/local-import-view.test.ts`；`JsonBackupSection.test.tsx` 新增「不合法備份檔」「先失敗後成功」兩個 it；
+    兩個元件測試的殘缺 session 階段改為 `cleanup()` 後全新 `render`；`local-import.spec.ts` 於 isEmpty／oversize 階段補 hint 計數為 0；`1310570` tasks 註記。
+    **複審（opus，獨立 harness）PASS**：上述 12 條（含 E15 三種）全數轉紅；以 `ef2becb^` 測試檔重跑 U06、J07、J08、J11 皆存活（證明由新斷言殺死）；殘缺階段改寫後的回歸變異（null 仍送出、固定／mount 當下／過期 user id、未授權不 refresh、JSON 雲端分支寫入本機）與 `describeImportOutcome` 八條分支變異全數轉紅；等價對照 6 條皆綠。
+    唯一元件層存活為「JSON 雲端匯入成功後寫入本機」，由 E2E「登入時以 JSON 備份匯入到空的雲端且不寫入本機」的本機快照殺死，不列缺口。
+    **leader 裁定**：U07／J12（409／failed 也 refresh）spec 未禁止，接受；JSON 雲端匯入無送出中防護（快速連選兩次會送兩個請求；後端守衛保證第二個 409、不會重複寫入）屬低風險觀察、spec 未要求，本 change 不處理，**待 coordinator 知悉**。
+    coordinator 裁定已落實：proposal Impact 補列 `LocalImportResultMessage.tsx`、`local-import-view.ts`（＋測試）。**§5 完成**。
