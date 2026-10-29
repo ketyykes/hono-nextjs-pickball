@@ -2,6 +2,7 @@
 import { ClearLocalDataSection } from "@/components/matchmaker/ClearLocalDataSection";
 import { HistoryCsvSection } from "@/components/matchmaker/HistoryCsvSection";
 import { JsonBackupSection } from "@/components/matchmaker/JsonBackupSection";
+import { LocalDataImportSection } from "@/components/matchmaker/LocalDataImportSection";
 import { RosterCsvImportSection } from "@/components/matchmaker/RosterCsvImportSection";
 
 // 資料工具頁入口（M8 §8.2）：集中放置 JSON 完整備份、歷史賽果 CSV 匯出、
@@ -25,6 +26,8 @@ export default function MatchmakerDataPage() {
 				</p>
 			</div>
 			<JsonBackupSection />
+			{/* 只在雲端模式渲染（元件內判斷），本機模式不輸出任何元素 */}
+			<LocalDataImportSection />
 			<HistoryCsvSection />
 			<RosterCsvImportSection />
 			<ClearLocalDataSection />

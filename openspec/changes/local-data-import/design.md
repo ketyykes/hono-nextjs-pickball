@@ -39,7 +39,9 @@
 ### Decision 2：大量插入以 `json_each` 讓陳述式數量為常數
 
 **Choice**：伺服器把驗證後的陣列整理成 `[{ id, data, sortOrder }]`、`[{ matchId, playedAt, data }]` 等 JSON 字串，各以**一個**參數綁定：
-`INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) SELECT ?, json_extract(value, '$.matchId'), json_extract(value, '$.playedAt'), json_extract(value, '$.data'), 1, ? FROM json_each(?) ORDER BY key`。
+`INSERT INTO matchmaker_history (user_id, match_id, played_at, data, version, updated_at) SELECT ?, json_extract(value, '$.matchId'), json_extract(value, '$.playedAt'), json_extract(value, '$.data'), 1, ? FROM json_each(?) WHERE true ORDER BY key`。
+drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${json}) WHERE true ORDER BY key\`)`（query builder，可放進 `db.batch`）；**不可用 `db.run(sql)`／`db.all(sql)`**——drizzle 0.45.2 的 batch 內帶參數的 raw 陳述式會失敗（`hono-pickball/CLAUDE.md`「多表寫入用整批守衛」禁止事項）。
+回合只有一列，以一般 `db.insert(matchmakerRound).values(...)` 寫入；獨立計分板以 `db.insert(scoreboardCurrent).values(...).onConflictDoNothing().returning({ userId })`（apply §1 實測，見查證紀錄）。
 前端在送出前檢查名單、歷史、分槽三段各自序列化後 ≤ 1,900,000 位元組（保留給 JSON 包裝與 UTF-8 的餘裕）。
 
 **Rationale（Context7 證據）**：
@@ -74,6 +76,13 @@
 
 **Alternatives considered**：雲端模式維持停用：使用者必須登出、還原到本機、再登入、再匯入本機資料，四步才能達成同樣結果。不選。
 
+### Decision 4.5：匯入是一次性雲端操作，帶預期帳號（B7.5 交接）
+
+**Choice**：`src/routes/import.ts` 開頭 `use("*", localAuth, requireSession, requireExpectedUser)`、`onError(userDataOnError)`；`expected-user-guard.test.ts` 樣本表補 `POST /api/import`（14 → 15）。
+前端 `importLocalData(expectedUserId, payload)`（第一參數，原樣交給 `requestJson`）；`LocalDataImportSection` 與 `JsonBackupSection` 雲端分支以點擊當下 `useSession()` 的 user id 呼叫，`null` 時不送出，`unauthorized` 時顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized` 並 `refresh()`。
+
+**Rationale**：B7.5 design「交接給 B8／B9」第 2 點；匯入寫錯帳號時整份訪客資料進入另一位使用者的雲端且無法以 API 撤回，後果在所有使用者資料端點中最大，因此除列舉測試外，本端點在自身測試檔另驗「缺少或不符時雲端不寫入」。
+
 ### Decision 5：入口——資料頁區塊＋參賽者頁提示，不新增 hook
 
 **Choice**：`LocalDataImportSection` 在資料頁雲端模式渲染；`LocalImportNotice` 在參賽者頁雲端模式、名單 `synced` 且為空、`hasImportableLocalData()` 為真時渲染。兩者的本機讀取都在 effect 內進行（hydration 安全）。
@@ -87,7 +96,7 @@
 ## Risks / Trade-offs
 
 - [Risk] 本機歷史超過約 1.9MB（數千筆）時無法一次匯入 → 前端提示並阻止送出；實際量級（單一活動每週數十場）遠低於上限。日後需要時以「同一 batch 內多個 `json_each` 參數」擴充，不改契約。
-- [Risk] Free 方案「每次呼叫 50 個 query」是否把 batch 內每條陳述式分別計數，文件未明說；本 change 的 batch 約 7 條＋2 次讀取，兩種解讀皆在上限內（§1 記錄）。
+- [Risk] Free 方案「每次呼叫 50 個 query」是否把 batch 內每條陳述式分別計數，文件未明說；本 change 的 batch 固定 7 條陳述式（不隨筆數增加）＋session 驗證的查詢，兩種解讀皆在上限內（§1 記錄）。後端不另做大小檢查：超過 2MB 的參數由 D1 拋錯、整批回滾、回 500，無部分寫入。
 - [Risk] 本機歷史的 `playedAt` 是裝置時間、雲端新歷史是伺服器時間（B7）；匯入後兩者混排，裝置時鐘偏差會影響排序 → 屬資料本身限制，不處理。
 - [Risk] 本機名單中的參賽者 id 與另一位使用者相同 → 主鍵含 `user_id`（B6），互不影響（有測試）。
 - [Trade-off] 獨立計分板已存在時靜默略過該段（回應標示 `skipped`，畫面顯示「雲端已有進行中的獨立計分板，未匯入該場」）。
@@ -97,8 +106,81 @@
 
 - 無 migration。合併後無需額外步驟。正式站零變更（auth 停用）。**不 push**（D4）。回滾：revert 合併 commit（已匯入的雲端資料保留，與一般使用產生的資料無異）。
 
+## 交接與對齊（apply §1，2026-10-28）
+
+- **B7.5**（`2026-10-27-user-data-account-guard` design「交接給 B8／B9」第 2 點）：已落實為 Decision 4.5；delta `user-data-sync` 新增「匯入 API：預期帳號與 session 不符時匯入回 401 且雲端不寫入」「匯入 API：守衛樣本表含匯入端點」；
+  `data-transfer` 新增兩個元件層 Scenario（點擊當下帳號＋未授權 refresh）；test-plan 授權覆蓋表加第四欄；E2E 直接打 API 時用 `tests/e2e/helpers/user-data.ts` 的 `expectedUserHeaders()`。
+- **B8**（`2026-10-28-matchmaker-history-stats-backend` design「交接給 B9」）：`played_at = Date.parse(playedAt)`、依本機追加順序插入（`ORDER BY key` → `rowid` 遞增），本機五個 key 皆可為來源；
+  新增 Scenario「匯入 API：匯入的歷史可依區間與排序讀回」，以 `GET /api/matchmaker/history`（`history-repository.ts`）的 desc／asc／from／to 讀回證明。
+- **B7**（`2026-10-24-matchmaker-round-score-backend` design「交接給 B8～B9」）：守衛沿用 `batch-guard.ts` 的 `insertBatchGuard`／`releaseBatchGuard`／`isBatchGuardViolation`；新測試的登入 seed 用 `test/helpers/matchmaker-fixtures.ts`（`seedAndSignIn`、`request` 的 base 為 `/api/matchmaker`，匯入端點需另以同檔 `origin` 組 URL 或 `appRequestInit`），不另複製。
+  `hono-pickball/CLAUDE.md` 後續須知第 3 點（第二個守衛 batch 呼叫端時抽 `guardedBatch`）：列為 §3.3 REFACTOR 的評估項，由 Implementer 判斷，不強制。
+
+## apply §1 查證紀錄（2026-10-28）
+
+**1.1 環境**：見 environment.md Verification（baseline 前端 105／1054、後端 23／166、核心 8／17；lint 0／3；三段 typecheck exit 0；E2E 五個 browser project 各 145、user-data 40；lockfile 零變動；`db:migrate:local` 無待套用；`db:seed:local` 成功）。
+
+**1.2 對齊 main**：
+- `data-transfer`「登入時的資料工具頁」：原 delta 以 B6 版本為底，缺 B8 的帳號段落與三個 Scenario（`validate --strict` 失敗）。已改以**目前主 spec** 為底重新套用本 change 的增修：表格 JSON 還原列改寫、加「匯入本機資料」列、B8 一次性操作段落擴及雲端 JSON 匯入、「JSON 還原停用的理由」改為 B9 定案語意；B8 四個 Scenario 原文帶入。
+  主 spec 的「登入時 JSON 還原停用」Scenario 無法丟棄（OpenSpec MODIFIED 限制，同 B7／B8 前例），**沿用標題、改寫內容**為「本機覆寫式的 JSON 還原在登入時停用（改為雲端匯入）」，驗收改指向 `local-import.spec.ts`；Scenario 內附一行說明。另新增「登入資料工具：以 JSON 備份匯入到空的雲端」。
+- 新增 Scenario 一律加 Requirement 前綴（`登入資料工具：`、`匯入本機資料：`、`匯入 API：`）；模擬 archive 後兩個 capability 皆無重複標題。it／test 名稱（驗收錨點）不變。
+- 本機 reader 實際位置：`readRoster` 在 `lib/matchmaker/storage.ts`（回 `{ players, droppedCount }`）、`readRound`／`readHistory` 在 `lib/matchmaker/round-storage.ts`、`readScoreboard` 在 `lib/scoreboard/storage.ts`；本機 key 常數在 `lib/matchmaker/storage-keys.ts` 與 `lib/scoreboard/storage-keys.ts`。
+- **既有 E2E 的同步點**：B6 的停用說明文字 `JSON_RESTORE_DISABLED_TEXT` 除了「登入時 JSON 還原停用並顯示說明」外，另被 `roster-sync.spec.ts` 三個 test 與 `history-sync.spec.ts`「登入時歷史 CSV 匯出的內容來自雲端」當作「已切到雲端分支」的同步點。B9 移除該文字後這四處必紅，
+  因此 tasks 授權：兩檔的該常數改為雲端 JSON 匯入的說明文字（常數改名 `JSON_CLOUD_IMPORT_HINT_TEXT`），同步點斷言的位置與語意不變（見 Open Questions 4）。
+
+**1.3 Context7 查證**：
+- `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`platform/limits`）：每條陳述式最多 100 個綁定參數；單一字串／BLOB／列最大 2,000,000 bytes；SQL 陳述式長度上限 100KB；每次 Worker 呼叫 query 數 1000（Paid）／50（Free）；
+  「Limits for individual queries … apply to each individual statement contained within a batch」——**batch 內每條是否各計一個 query 仍未明說**，保守以逐條計：7 條＋session 查詢遠低於 50。`D1Database.batch()`：「Batched statements are SQL transactions … the entire sequence is aborted or rolled back」——與 Decision 1 一致。
+- `/drizzle-team/drizzle-orm-docs`（`sqlite/insert`「Insert into ... select」）：`insert().select()` 可傳 SQL template tag；有 upsert 子句時 SELECT 須帶 `WHERE true` 以避免解析歧義（本 change 的 json_each 插入一律帶 `WHERE true`）。`latest-releases/drizzle-orm-v0290`：`db.batch` 可含 `insert().returning()`，回應為對應的列陣列。
+- `/websites/sqlite_docs`（`json1.html`）：`json_each` 對陣列的 `key` 為整數索引；`json_extract` 單一路徑指向物件／陣列時回「text representation」（JSON 文字），指向數字回 INTEGER／REAL。與 design 假設一致。
+
+**1.4 一次性實測（workerd，未 commit）**：以 drizzle 在單一 `db.batch` 中執行 守衛 → `insert(matchmakerPlayers).select(sql … json_each … WHERE true ORDER BY key)` → `insert(matchmakerHistory).select(...)` → 計分板 `onConflictDoNothing().returning({ userId })` → 釋放守衛：
+- 參賽者 `sort_order` 依陣列索引；`json_extract(value, '$.data')` 寫入的 `data` 為 `text`，drizzle json mode 讀回與原物件**深度相等**（含 rating `4.1`、`3.33`、`7.999999999999999`），不需 `json(...)` 包裝 → **Open Questions 2 定案**。
+- 歷史依 `ORDER BY key` 插入，`rowid` 遞增；`ORDER BY played_at, rowid` 讀回時同 `played_at` 的兩筆維持陣列順序。
+- 計分板 `RETURNING`：首次 `[{ userId }]`、已存在時 `[]` → **Open Questions 1 定案**（以 `returning` 陣列是否為空判斷 `imported`／`skipped`）。
+- 守衛條件為假時 batch 拋錯且 `isBatchGuardViolation` 為 true。
+- 300 位參賽者（JSON 66KB）＋2000 筆歷史（JSON 779KB）一次 batch 成功；改以 `insert().values()` 一次 200 筆（1200 個參數）時 miniflare 拋 `Failed query`——證實「逐筆 values」變異會在大量資料 it 轉紅。
+
 ## Open Questions
 
-1. drizzle 在 `db.batch` 中以 `db.all(sql\`… RETURNING user_id\`)` 取得獨立計分板是否寫入的實際寫法（§1 實測）。
-2. `json_extract(value, '$.data')` 寫入 `data` 欄位後，drizzle `mode: "json"` 讀回是否與 `JSON.stringify` 寫入的列等價（含數字精度，例如 rating 4.1）——§1 實測；不等價時改用 `json(json_extract(...))`。
+1. ~~drizzle 在 `db.batch` 中以 `db.all(sql…RETURNING)` 取得獨立計分板是否寫入的實際寫法~~ → **apply §1 定案**：改用 `insert().values().onConflictDoNothing().returning({ userId })`（`db.all(sql)` 帶參數在 batch 內不可用）。
+2. ~~`json_extract(value, '$.data')` 讀回是否等價~~ → **apply §1 定案**：深度相等（含 4.1、7.999999999999999），不需 `json()`。
 3. 參賽者頁提示在雲端名單 `load-failed` 時是否顯示（建議不顯示，與 B6「載入失敗以錯誤取代內容」一致）。
+4. **（apply §1，待 coordinator 知悉，非阻擋）授權修改的既有測試**：除 proposal 原列的 `roster-sync.spec.ts` 刪除「登入時 JSON 還原停用並顯示說明」外，另有三處為本 change 行為的必然結果——
+   ① `hono-pickball/test/expected-user-guard.test.ts` 的 `SAMPLES` 補 `POST /api/import`、`toHaveLength(14)` → 15（B7.5 刻意設計的交接紅燈，同 B8 前例）；
+   ② `packages/pickball-core/test/module-boundary.test.ts` 的 `CORE_MODULES` 加 `api/import`（同 B5～B8 前例）；
+   ③ `roster-sync.spec.ts` 與 `history-sync.spec.ts` 的 `JSON_RESTORE_DISABLED_TEXT` 常數改為雲端匯入說明文字並改名（四個 test 的同步點，斷言位置與語意不變）。
+5. **（apply §1）`data-transfer`「登入時 JSON 還原停用」沿用標題、內容改寫**：理由見查證紀錄 1.2；替代方案 REMOVED＋ADDED 整條 Requirement（9 個 Scenario、移到主 spec 末尾）成本高於收益，不選。若 coordinator 要求改名，需另開 change。
+6. Open Questions 3（參賽者頁提示在 `load-failed` 時）：維持建議——提示只在名單 `synced` 時渲染；`loading`／`load-failed` 時參賽者頁本來就以 `SyncStatusNotice` 取代整段內容，提示自然不出現。
+7. （apply §2，2026-10-28）Implementer（sonnet）：132090c RED（模組不存在，2 個 it 皆真紅、無先綠）→ 9e3a76a GREEN（`api/import.ts`、`CORE_MODULES`）→ 5dc4637 tasks 註記；REFACTOR skipped。Stage 1（sonnet）PASS。
+   Stage 2（opus）第一輪 FAIL（src 無缺陷；12 條非等價存活：空匯入漏判 currentRound、去重鍵改 name、current 的 matchId 放寬為 falsy、current／matches 可省略、回應筆數小數／負數、回應欄位可省略）→ 2e327c0 regression guard（新增兩個 it 與 `expectTypeOf`）→ 複審 PASS（12 條全紅、抽查 10 條仍紅、4 條等價對照綠）。§2 完成。
+8. （apply §3，2026-10-28）Implementer（sonnet）：fac4d74 RED（local-import 10 真紅、先綠 1：停用 404；守衛檔 4 真紅）→ 7cb53dd GREEN → 13ccdf0、31a0c1e regression guard → af57946 REFACTOR（抽 `selectFromJsonEach`；回合與獨立計分板也走 json_each 使 batch 恆為 7 條；`guardedBatch` 不抽，理由見 tasks 3.3）。Stage 1（sonnet）PASS。
+   Stage 2（opus，84 條變異）第一輪 FAIL：6 條非等價存活（歷史 `ORDER BY matchId`、歷史／分槽 `match_id` 欄位寫錯、`played_at` +1ms、`updated_at` 無上界、catch 一律回 conflict 使 500 被吞成 409）。等價判定：拿掉 `ORDER BY key`（json_each 原生依索引輸出，保留為防禦寫法）、歷史依 playedAt 排序、分槽 key DESC。
+   **leader 裁定**：「500 不被吞成 409」併入既有 it「300 位參賽者與 2000 筆歷史可一次匯入」，delta Scenario「匯入 API：大量資料以常數個陳述式匯入」補一行 AND（單段 JSON > 2MB 回 500 且整批回滾），與 design Risks 一致，不新增 it 名稱。
+   → fd2ccda regression guard（歷史 `match_id` 依 rowid 順序、`played_at` 精確值、`GET /slots/m1`、`updated_at` 上界、單段 >2MB 回 500 且零列、data 特殊字元往返）＋ c9386e2（`results[5]` 註解）→ 複審 PASS（6 條全紅、抽查 14 條仍紅、等價對照綠）。
+   編號對照（fd2ccda 訊息與 tasks 3.2 註記沿用 Implementer 自編號）：Implementer L26＝Reviewer L50（歷史 `match_id`）、Implementer L34＝Reviewer L26（`played_at` +1）、Implementer L50＝Reviewer L34（`updated_at`）；其餘同號。§3 完成。後端全套 24 檔／177。
+9. （apply §4，2026-10-28～29，跨三任 leader）Implementer（sonnet）：dc37269 RED（模組不存在，5 個 it 皆真紅、無先綠）→ 384d6df GREEN → 56df8f5 regression guard（S4）→ f75e681 tasks 註記；REFACTOR skipped。Stage 1 PASS。
+   Stage 2（opus）共五輪，**每輪皆為測試鑑別力缺口、`local-import.ts` 實作無缺陷**（僅 ca5938a 修正 JSDoc 用語）：
+   第一輪 FAIL 10 條（break 變異、summary 欄位來源、`hasImportableLocalData` 清 key、備份改讀本機）→ 5055ac9；第一次複審 FAIL 8 組（備份 players／currentRound 改讀本機、body 改送本機 payload、imported 由 payload 推算、isEmpty 時清 key、去重鍵）→ 1a616ed；
+   第二次複審 FAIL（名單只取啟用者／排序、歷史只取 singles、oversize 量去重前歷史）→ 8f273eb（Implementer 依 Escalation 升 opus）；第三次複審 FAIL 26 條（欄位改寫／篩選、finished 與 0:0 分槽及計分板、歷史順序、去重鍵、備份逐欄）→ 091b591；
+   第四次複審：96 條全集 85 紅／11 存活（皆為等價或規格未定義），唯一缺口 N16／N18（把請求寫回本機）→ a964a11（leader 補一行快照斷言，harness 補前存活、補後轉紅）。**§4 完成**。
+   **leader 裁定（規格未定義，維持現行行為、不補測試）**：H07 `hasImportableLocalData` 在 oversize 時仍為 true（提示帶使用者到資料頁看 oversize 說明；8f273eb 已以測試鎖定）；F08 名單不依 id 去重、B04 備份歷史不去重、G04 playedAt 原樣送出、Y03 `summary.round` 依 `currentRound !== null`——不合法者一律由後端 400 拒絕；N07 分槽 `matchId` 以場次 id 為準（現行），改採 state 自帶值只在損毀資料時可觀察，低、不阻擋。
+   **流程發現**：從非 repo cwd 執行 `pnpm --dir <repo> --filter ./nextjs-pickball test …` 會 `No projects matched` 並 exit 0（假綠燈）；第二輪起的 harness 改為 `pnpm --dir <repo>/nextjs-pickball test --run …` 並檢查輸出含 `Test Files`。早期各輪結論已由後續輪次以修正後的 harness 重跑 96 條全集覆核。
+10. （apply §5，2026-10-29，第三任 leader 中斷紀錄）Implementer（sonnet）：cfe7bf3 RED（元件 2 個 it 真紅；E2E local-import 5 條＋同步點 4 條真紅；機械複驗見 tasks 5.1）→ 1ed7494 GREEN → 42a356d refactor（移除 spec 未要求的重複歷史摘要文案）→ 8e0046d regression guard → 6600c68／8e173b7 tasks 註記；5.3 skipped（文案已集中於 `local-import-view.ts`）。
+    Implementer 自報：user-data 44 passed／0 failed／0 skipped；前端全套 108 檔／1061；三段 typecheck exit 0；mutation 41 條。Stage 1（sonnet）PASS（建議：proposal Impact 補列 `LocalImportResultMessage.tsx`、`local-import-view.ts`；E2E 可補 isEmpty／oversize 時 hint 不出現的反向斷言）。
+    **中斷位置**：§5 Stage 2（opus）已派出、尚未回報（審查期間可能對元件檔做暫時性變異，接手前先確認 `git status --porcelain` 為空、無殘留 dev server）。剩餘：§5 Stage 2 結果處理 → §6.1～6.8 → Final Code Review。
+11. （apply §5 Stage 2，2026-10-29，第四任 leader）Stage 2（opus，第三任派出、21 時後才送達 coordinator 轉交）判 **FAIL**：正式程式碼無缺陷，測試鑑別力缺口三組——
+    ① user id 為 `null` 時的未授權訊息未被驗到（U06、J07；第一階段 401 已留下同文字 alert）；② 雲端 JSON 匯入的 `parseBackup` 失敗分支無測試（J08、J09）；
+    ③ `describeLocalSummary` 的分槽數、回合數、獨立計分板數無鑑別力（E27、E28、E36、E37）；低：E15（isEmpty／oversize 時 hint 不應出現，即 Stage 1 建議的反向斷言）、J11（成功未清掉舊錯誤訊息）。
+    → Implementer（sonnet）`ef2becb` regression guard（加入即綠，產品檔零改動）：新增 `components/matchmaker/local-import-view.test.ts`；`JsonBackupSection.test.tsx` 新增「不合法備份檔」「先失敗後成功」兩個 it；
+    兩個元件測試的殘缺 session 階段改為 `cleanup()` 後全新 `render`；`local-import.spec.ts` 於 isEmpty／oversize 階段補 hint 計數為 0；`1310570` tasks 註記。
+    **複審（opus，獨立 harness）PASS**：上述 12 條（含 E15 三種）全數轉紅；以 `ef2becb^` 測試檔重跑 U06、J07、J08、J11 皆存活（證明由新斷言殺死）；殘缺階段改寫後的回歸變異（null 仍送出、固定／mount 當下／過期 user id、未授權不 refresh、JSON 雲端分支寫入本機）與 `describeImportOutcome` 八條分支變異全數轉紅；等價對照 6 條皆綠。
+    唯一元件層存活為「JSON 雲端匯入成功後寫入本機」，由 E2E「登入時以 JSON 備份匯入到空的雲端且不寫入本機」的本機快照殺死，不列缺口。
+    **leader 裁定**：U07／J12（409／failed 也 refresh）spec 未禁止，接受；JSON 雲端匯入無送出中防護（快速連選兩次會送兩個請求；後端守衛保證第二個 409、不會重複寫入）屬低風險觀察、spec 未要求，本 change 不處理，**待 coordinator 知悉**。
+    coordinator 裁定已落實：proposal Impact 補列 `LocalImportResultMessage.tsx`、`local-import-view.ts`（＋測試）。**§5 完成**。
+12. （Final Code Review，opus，2026-10-29，第四任 leader）判定 **APPROVE**（無 high）。指定跨層項目（played_at 日期／時區、空資料、重複匯入、大量資料、帳號不符、409／skipped、訪客零變更、匯入後 B8 歷史區間與順序、本機保留、四項使用者定案）皆有程式碼保證與測試守住；
+    探針（暫時測試檔，已刪除）另證：`playedAt` 帶 `+08:00` 由核心 `z.iso.datetime()` 擋為 400（`Date.parse` 不會得 NaN）；只有獨立計分板的匯入重送為 200 `skipped`、列數 1；同時送兩個匯入請求為 200＋409、歷史不重複。
+    **待 coordinator 知悉／裁定**：
+    ① （low～medium，不阻擋）前端 oversize 以原始陣列量 UTF-8 位元組（門檻 1,900,000），後端 json_each 參數另加包裝（歷史每筆約 +80 B、名單每位約 +70 B）；實測前端 1,880,596 B 的歷史段在後端為 2,100,131 B，超過 D1 文件 2MB 上限（本機 miniflare 上限約 2.1～2.2MB 仍 200）。失敗模式安全（整批回滾、顯示「匯入失敗，請稍後再試」），只是落在邊緣的資料看到籠統失敗而非 oversize 說明。建議另開後續 change（以後端包裝形狀量測或降低門檻），本 change 不改。
+    ② （medium，流程）`backend-scoring-runbook-b1-b9.md` 在本分支被前任 leader 以 `92a4093`、`4045bda` 寫入「B9 apply 中斷」狀態，內容已過時；本任依指示不得改動該檔，合併或 archive 時需由 coordinator 改寫為最終狀態。
+    ③ （low，已處理）`hono-pickball/CLAUDE.md` 開頭「範圍例外」補 B9 匯入端點、後續須知第 2 點改為完成式（本 commit）。
+    ④ （low，未處理）`nextjs-pickball/tests/e2e/user-data/history-sync.spec.ts:294` 註解「還原停用的說明只在雲端模式出現」已過時；檔頭例外 ④ 只授權改常數，故未動。後端缺「只有獨立計分板」「playedAt 帶時區位移回 400」兩條專屬 it（目前由核心 schema 測試覆蓋），列為 low 後續。

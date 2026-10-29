@@ -11,7 +11,7 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-28，**B8 已合併，下一棒 B9**）
+## 狀態快照（最後更新 2026-10-28，**B9 apply 中斷，待續**）
 
 | 項目 | 值 |
 |---|---|
@@ -22,7 +22,7 @@
 | apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；**下一棒 B9** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
-| 工作位置 | 主 repo `main`，工作樹乾淨 |
+| 工作位置 | 主 repo 分支 `change/local-data-import`，工作樹乾淨。**B9 第二任 leader 於 2026-10-29 16:23 因使用者關機被停止（不可續派，重開新 leader）**：§1～§4.2 已完成（第一任至 `f75e681`）；第二任補做 §4 Stage 2 審查與複審補強（`5055ac9`、`ca5938a`、`cb38be2`、`1a616ed`、`c3fe35e`），停止時正要派「§4 Stage 2 複審（第二輪）」——新 leader 先重跑一次 §4 Stage 2 確認無存活變異、在 design 記錄 §4 審查結果，再從 §5.1 接續。續派前先核對 tasks 勾選與 `git log main..HEAD`、跑 `pnpm -r exec tsc --noEmit` |
 
 ## 使用者已定案（2026-10-21）
 
@@ -134,7 +134,7 @@ main@1e5e517
 | B7 | matchmaker-round-score-backend | 回合儲存、後端權威送出比分（評分＋歷史 D1 batch） | 大 | change/matchmaker-round-score-backend | 已合併 `a94a741`、archive `5cdf647` |
 | B7.5 | user-data-account-guard | 跨分頁換帳號防護：使用者資料 API 一律驗 `X-Expected-User-Id`，不符回 401 `ACCOUNT_MISMATCH`；前端 `requestJson` 綁定 store 世代的 userId | 中 | change/user-data-account-guard | 已合併 `46c392a`、archive `f366f23` |
 | B8 | matchmaker-history-stats-backend | 歷史頁區間查詢、統計頁改讀後端 | 中 | change/matchmaker-history-stats-backend | 已合併 `932d932`、archive `329e77d` |
-| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | 已 propose，未 apply |
+| B9 | local-data-import | 登入後一次性匯入本機五個 key（沿用 `BackupSchema`） | 中 | change/local-data-import | apply 中（中斷於 §4.2 之後） |
 | G1 | google-oauth | Google 社群登入、遠端 D1／secrets、部署上線 | 中～大 | — | **暫緩** |
 
 「預估」以 M 系列經驗粗估（50 task ≈ 一棒）；propose 後依 tasks 數改寫成實數。

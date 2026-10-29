@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyRoster } from "@/components/matchmaker/EmptyRoster";
+import { LocalImportNotice } from "@/components/matchmaker/LocalImportNotice";
 import { PlayerForm } from "@/components/matchmaker/PlayerForm";
 import type { PlayerFormSubmitValues } from "@/components/matchmaker/PlayerForm";
 import { PlayerList } from "@/components/matchmaker/PlayerList";
@@ -70,6 +71,8 @@ export default function PlayersPage() {
 			className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8"
 		>
 			<SyncStatusNotice status={syncStatus} />
+			{/* synced 只會出現在雲端模式；名單載入完成且為空時，提示可匯入訪客時期的本機資料 */}
+			{syncStatus === "synced" && players.length === 0 && <LocalImportNotice />}
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-bold">參賽者名單</h1>

@@ -12,7 +12,7 @@ runbook B9：B5～B8 讓登入後的計分板與對戰分配機全部以雲端�
 ## What Changes
 
 **後端**
-- `POST /api/import`（新 sub-app `src/routes/import.ts`）：請求為 `BackupSchema` 擴充 `scoreboard: { current, matches }`；
+- `POST /api/import`（新 sub-app `src/routes/import.ts`，`use("*", localAuth, requireSession, requireExpectedUser)`）：請求為 `BackupSchema` 擴充 `scoreboard: { current, matches }`；
   **單一 batch**：整批守衛（四張對戰分配機表皆無本人資料）→ 參賽者、回合、分槽、歷史各一條 `INSERT … SELECT … FROM json_each(?)` → 獨立計分板 `ON CONFLICT DO NOTHING` → 刪守衛。
   任一對戰分配機表已有資料 → 409、整份不寫入；獨立計分板已存在 → 略過該段（回應標示 `skipped`）。
 - 冪等：重複匯入必被守衛拒絕；歷史主鍵 `(user_id, match_id)` 為第二道防線。
@@ -52,6 +52,8 @@ runbook B9：B5～B8 讓登入後的計分板與對戰分配機全部以雲端�
 - **前端**：新增 `lib/sync/local-import.ts`（＋測試）、`components/matchmaker/{LocalDataImportSection,LocalImportNotice}.tsx`；
   修改 `app/matchmaker/data/page.tsx`（掛載區塊）、`app/matchmaker/players/page.tsx`（掛載提示）、`components/matchmaker/JsonBackupSection.tsx`（雲端分支由「停用說明」改為匯入）；
   E2E 新增 `tests/e2e/user-data/local-import.spec.ts`。
-- **允許修改的既有測試**：`tests/e2e/user-data/roster-sync.spec.ts` 刪除 B6 的「登入時 JSON 還原停用並顯示說明」（行為依本 change 改變，見 `data-transfer` delta）；其餘既有 it／test 一律不改。
+- **允許修改的既有測試**：`tests/e2e/user-data/roster-sync.spec.ts` 刪除 B6 的「登入時 JSON 還原停用並顯示說明」（行為依本 change 改變，見 `data-transfer` delta）；apply §1 追加（皆為行為的必然結果，見 design Open Questions 4）：`hono-pickball/test/expected-user-guard.test.ts` 樣本表補 `POST /api/import`（14 → 15）、`packages/pickball-core/test/module-boundary.test.ts` 的 `CORE_MODULES`、`roster-sync.spec.ts` 與 `history-sync.spec.ts` 的雲端同步點常數；其餘既有 it／test 一律不改。
+- **apply §1 追加的新測試檔**：`components/matchmaker/LocalDataImportSection.test.tsx`、`components/matchmaker/JsonBackupSection.test.tsx`（B7.5 一次性雲端操作的帳號與未授權 refresh）。
+- **apply §5 追加**（coordinator 裁定接受）：`components/matchmaker/LocalImportResultMessage.tsx`（兩個入口共用的結果訊息呈現）、`components/matchmaker/local-import-view.ts`（兩個入口共用的文案常數與結果轉換）及其測試 `local-import-view.test.ts`（Stage 2 補強的 regression guard）。
 - **相依**：**不新增任何第三方套件**。
 - **訪客／正式站**：零變更（本機模式的資料頁與參賽者頁不渲染新元件；auth 停用時新端點回 404）。

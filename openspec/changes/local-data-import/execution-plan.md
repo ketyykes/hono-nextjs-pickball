@@ -33,13 +33,13 @@ a. **指令裡禁止 `cd`，一律用絕對路徑**（`pnpm --dir`、`git -C`、
 b. Implementer 交件前 MUST 自跑 mutation 並列出「幾次／改什麼／是否轉紅」。本 change 必做變異（依所屬群組）：
    - §2：拿掉任一 `superRefine` 檢查（重複參賽者 id、重複歷史 matchId、孤兒分槽、已完成場次的分槽、空匯入）。
    - §3：守衛條件少一張表；守衛條件加入 `scoreboard_current`；守衛移到 batch 最後；任一 `json_each` 插入改為逐筆 `values`（應在大量資料 it 轉紅）；
-     歷史插入拿掉 `ORDER BY key` 或 `played_at` 改用 0；獨立計分板改為覆寫（`DO UPDATE`）；任一插入拿掉 `user_id`；`version` 改為 0；sub-app 拿掉 `requireSession`。
-   - §4：分槽改為也讀取已完成場次；歷史不去重或保留最後一筆；`oversize` 門檻改為 2,000,000 以上；成功後清除本機任一 key；409 分類為 `failed`。
-   - §5：本機模式也渲染匯入區塊；參賽者頁在雲端名單非空時仍顯示提示；JSON 還原的雲端分支寫入本機。
+     歷史插入拿掉 `ORDER BY key` 或 `played_at` 改用 0；獨立計分板改為覆寫（`DO UPDATE`）；任一插入拿掉 `user_id`；`version` 改為 0；sub-app 拿掉 `requireSession`；sub-app 拿掉 `requireExpectedUser`；守衛樣本表拿掉 `POST /api/import`；`skipped` 與 `imported` 對調。
+   - §4：分槽改為也讀取已完成場次；歷史不去重或保留最後一筆；`oversize` 門檻改為 2,000,000 以上；成功後清除本機任一 key；409 分類為 `failed`；401 分類為 `failed`；`expectedUserId` 改為固定字串或不傳。
+   - §5：本機模式也渲染匯入區塊；參賽者頁在雲端名單非空時仍顯示提示；JSON 還原的雲端分支寫入本機；兩個元件未授權時不呼叫 `refresh()`；以固定或過期的 user id 呼叫；user id 為 `null` 時仍送出。
    - **每個拒絕條件、每個分類分支、每個使用者定案都要有至少一個會轉紅的變異。**
 c. mutation harness 三重落地檢查：`src.count(old) == 1`、替換後 `new != old`、`git --no-pager diff --stat -- <file>` 有輸出；另放一條等價變異當對照組；每次變異後還原並確認 `git status` 乾淨。
 d. Stage 2 Reviewer MUST 獨立再做 mutation、逐分支逐欄位機械盤點覆蓋率，不採信 Implementer 自述。
-e. 後端 API 每個端點 MUST 有「未登入 401」「存取他人資料被拒」「auth 停用 404」三類測試（test-plan 授權覆蓋表）。
+e. 後端 API 每個端點 MUST 有「未登入 401」「存取他人資料被拒」「auth 停用 404」「X-Expected-User-Id 缺少／不符 401 ACCOUNT_MISMATCH」四類測試（test-plan 授權覆蓋表）。
 f. 紅燈宣稱一律用 `git show <commit>^:<path>` 機械複驗；查核不過改標 regression guard。
 g. 逐 task commit；註解只寫「為什麼」。
 h. 編輯器診斷不可信，以 `pnpm -r exec tsc --noEmit` 與 `pnpm --filter ./hono-pickball typecheck` 的 exit code 為準。測試一律顯式匯入 `describe`／`it`／`expect`／`vi`。
@@ -51,7 +51,7 @@ k. **測試帳密禁止寫進任何會被 commit 的檔案或 commit 訊息**；
 l. 單檔測試 `pnpm --filter ./<workspace> test --run <path>`，**`--run` 前不可加 `--`**。
 m. **SHALL NOT 新增任何 npm 相依**；需要時回報 `BLOCKED`。
 n. **既有 it／test 的名稱與斷言一律不得修改**，唯一例外為 tasks 檔頭列出的一條 E2E；本機 reader 一行不改。
-o. Commit：Conventional Commits、繁體中文，結尾一行 `Claude-Session: <coordinator 傳下的值>`，不得加 Generated 或 Co-Authored-By。
+o. Commit：Conventional Commits、繁體中文；**commit 訊息不得加任何 attribution／footer 行**（不加 Claude-Session、Generated、Co-Authored-By；apply §1 依使用者指示修正）。
 p. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**之前**乾淨停止，狀態寫進 design.md `## Open Questions` 並 commit 後回報。
 q. **使用者定案不得變更**：匯入成功後保留本機資料；雲端已有對戰分配機資料時拒絕（不覆寫、不合併）。實作上遇到與定案衝突的需要時停止並升級。
 

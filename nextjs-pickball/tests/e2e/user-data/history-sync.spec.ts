@@ -18,8 +18,8 @@ const SYNCED = '[data-sync-status="synced"]';
 const LOAD_FAILED = '[data-sync-status="load-failed"]';
 const COURT_GRIDS = '[data-testid="match-stage-courts"] [data-testid$="-grid"]';
 const RANGE_LABELS = ["今日", "本週", "本月", "上月", "更早"] as const;
-const JSON_RESTORE_DISABLED_TEXT =
-	"登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能";
+const JSON_CLOUD_IMPORT_HINT_TEXT =
+	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
 const GUEST_PLAYER_NAME_A = "訪客歷史甲";
 const GUEST_PLAYER_NAME_B = "訪客歷史乙";
 // 統計表欄位索引：名次、球員、目前強度、出場數、勝負和
@@ -292,7 +292,7 @@ test.describe("matchmaker 歷史與統計雲端同步", () => {
 
 		await page.goto(DATA_PAGE);
 		// 還原停用的說明只在雲端模式出現，作為「session 已就緒、已切到雲端分支」的同步點
-		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
 
 		const [download] = await Promise.all([
 			page.waitForEvent("download"),

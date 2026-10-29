@@ -15,8 +15,8 @@ const PLAYERS_API = "/api/matchmaker/players";
 const SYNCED = '[data-sync-status="synced"]';
 const CONFLICT = '[data-sync-status="conflict"]';
 const LOAD_FAILED = '[data-sync-status="load-failed"]';
-const JSON_RESTORE_DISABLED_TEXT =
-	"登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能";
+const JSON_CLOUD_IMPORT_HINT_TEXT =
+	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
 
 test.use({ storageState: storageStatePath });
 test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);
@@ -350,7 +350,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 	test("登入時 CSV 匯入的參賽者寫入雲端", async ({ page }) => {
 		await page.goto(DATA_PAGE);
 		// 雲端模式才會出現這段說明；等它出現，確保 session 已解析、元件走雲端分支
-		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
 
 		await page.getByTestId("roster-csv-import-input").setInputFiles({
 			name: "roster.csv",
@@ -398,7 +398,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 		});
 
 		await page.goto(DATA_PAGE);
-		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
 		await page.getByTestId("roster-csv-import-input").setInputFiles({
 			name: "roster.csv",
 			mimeType: "text/csv",
@@ -447,7 +447,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 		);
 
 		await page.goto(DATA_PAGE);
-		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
 
 		const [download] = await Promise.all([
 			page.waitForEvent("download"),
@@ -462,12 +462,5 @@ test.describe("matchmaker 名單雲端同步", () => {
 			"雲端匯出一",
 			"雲端匯出二",
 		]);
-	});
-
-	test("登入時 JSON 還原停用並顯示說明", async ({ page }) => {
-		await page.goto(DATA_PAGE);
-		await expect(page.getByText(JSON_RESTORE_DISABLED_TEXT)).toBeVisible();
-		await expect(page.getByTestId("json-backup-import-input")).toHaveCount(0);
-		await expect(page.getByText("選擇備份檔…")).toHaveCount(0);
 	});
 });
