@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { LocalImportRequestSchema } from "@pickball/core/api/import";
+import type { LocalImportRequest } from "@pickball/core/api/import";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import { BackupSchema } from "@pickball/core/matchmaker/transfer-types";
 import type { Player } from "@pickball/core/matchmaker/types";
@@ -141,6 +142,19 @@ function seedFullLocalData() {
 	seedCurrent(makeSlot(null, 5));
 }
 
+/** 判定為空、但本機確實有 key 的兩種 seed：用來確認空資料路徑同樣不清除或改寫本機。 */
+const emptyLikeSeeds: Array<[string, () => void]> = [
+	[
+		"空容器",
+		() => {
+			seedRoster([]);
+			seedRound(null);
+			seedHistory([]);
+		},
+	],
+	["孤兒分槽", () => seedSlots({ m6: makeSlot("m6", 14) })],
+];
+
 const utf8Length = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
 beforeEach(() => {
@@ -224,6 +238,24 @@ describe("local-import", () => {
 
 		expect(third.payload.scoreboard.matches.map((slot) => slot.matchId)).toEqual(["m1", "m3"]);
 		expect(third.summary.slots).toBe(2);
+
+		// 去重鍵只有 matchId：同 matchId 但 playedAt 等欄位不同的紀錄仍是重複（送到後端會因主鍵重複回 400）；
+		// 多筆重複要逐筆計數，且保留各 matchId 的第一筆、不改原順序。
+		// 唯一筆數（4）與略過筆數（3）刻意不同，避免兩者互相頂替而不被察覺
+		const firstH5 = makeHistoryEntry("h5", 11);
+		const h6 = makeHistoryEntry("h6", 10);
+		const laterH5 = { ...makeHistoryEntry("h5", 3, "Dora"), courtNumber: 2, playedAt: "2026-08-17T02:00:00.000Z" };
+		const h7 = makeHistoryEntry("h7", 8);
+		const thirdH5 = { ...makeHistoryEntry("h5", 6), playedAt: "2026-08-18T03:00:00.000Z" };
+		const laterH7 = { ...makeHistoryEntry("h7", 2), playedAt: "2026-08-19T04:00:00.000Z" };
+		const h8 = makeHistoryEntry("h8", 12);
+		seedHistory([firstH5, h6, laterH5, h7, thirdH5, laterH7, h8]);
+
+		const fourth = buildLocalImportPayload();
+
+		expect(fourth.payload.history).toEqual([firstH5, h6, h7, h8]);
+		expect(fourth.summary.history).toBe(4);
+		expect(fourth.summary.duplicateHistorySkipped).toBe(3);
 	});
 
 	it("本機沒有資料時回報 isEmpty，任一段超過上限時回報 oversize", () => {
@@ -335,6 +367,16 @@ describe("local-import", () => {
 		segmentSeeds.history("x".repeat(1_200_000));
 		const combined = buildLocalImportPayload();
 		expect(combined.oversize).toBe(false);
+
+		// 使用者定案「保留本機資料」也涵蓋判定為空的情境：只有空容器或只有孤兒分槽時，
+		// 組請求的過程同樣不得清除或改寫任何 key（有資料情境的快照比對不涵蓋這條路徑）
+		for (const [label, seed] of emptyLikeSeeds) {
+			localStorage.clear();
+			seed();
+			const beforeEmpty = snapshotKeys();
+			expect(buildLocalImportPayload().isEmpty, `只有${label}`).toBe(true);
+			expect(snapshotKeys(), `只有${label}`).toEqual(beforeEmpty);
+		}
 	});
 
 	it("importLocalData 依回應分類為已匯入、雲端已有資料、未授權或失敗且不改動本機", async () => {
@@ -395,6 +437,38 @@ describe("local-import", () => {
 
 		// 使用者定案：任何結果都保留本機資料，五個 key 逐字不變
 		expect(snapshotKeys()).toEqual(before);
+
+		// 送出的 body 只來自第二參數：傳入與本機內容不同的請求時，不得改由本機重新組出；
+		// 回應的筆數原樣帶回，不得由請求內容推算（兩次回應的各欄刻意與請求及本機都不一致，
+		// 布林欄位則兩個方向各出現一次）
+		const distinctPayload: LocalImportRequest = {
+			version: 1,
+			players: [makePlayer({ id: "p9", name: "Ivy" })],
+			currentRound: null,
+			history: [makeHistoryEntry("h9", 1)],
+			scoreboard: { current: null, matches: [] },
+		};
+		const unrelatedCountsA = {
+			imported: { players: 7, round: true, slots: 4, history: 0, scoreboardCurrent: "skipped" },
+		};
+		respond(json(200, unrelatedCountsA));
+		expect(await importLocalData("user-a", distinctPayload)).toEqual({
+			kind: "imported",
+			imported: unrelatedCountsA.imported,
+		});
+		expect(JSON.parse(fetchMock.mock.calls[9][1]?.body as string)).toEqual(
+			JSON.parse(JSON.stringify(distinctPayload)),
+		);
+
+		const unrelatedCountsB = {
+			imported: { players: 0, round: false, slots: 0, history: 5, scoreboardCurrent: "none" },
+		};
+		respond(json(200, unrelatedCountsB));
+		expect(await importLocalData("user-a", payload)).toEqual({
+			kind: "imported",
+			imported: unrelatedCountsB.imported,
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(11);
 	});
 
 	it("JSON 備份轉為匯入請求時計分板為空", () => {
@@ -416,6 +490,22 @@ describe("local-import", () => {
 		expect(request.history).toEqual(backup.history);
 		expect(request.scoreboard).toEqual({ current: null, matches: [] });
 		expect(LocalImportRequestSchema.safeParse(request).success).toBe(true);
+
+		// 完整 seed 的名單與回合恰與備份逐欄相同，無法分辨「取自備份」與「改讀本機」；
+		// 換成逐欄都與備份不同的本機資料（分槽對應本機回合的 m7，讓改讀本機分槽時一定非空）
+		localStorage.clear();
+		seedRoster([makePlayer({ id: "p9", name: "Ivy" })]);
+		seedRound(makeRound([makeRoundMatch({ id: "m7", courtNumber: 4 })]));
+		seedSlots({ m7: makeSlot("m7", 12) });
+		seedCurrent(makeSlot(null, 13));
+		seedHistory([makeHistoryEntry("h9", 2)]);
+
+		const requestWithDistinctLocal = backupToImportRequest(backup);
+
+		expect(requestWithDistinctLocal.players).toEqual(backup.players);
+		expect(requestWithDistinctLocal.currentRound).toEqual(backup.currentRound);
+		expect(requestWithDistinctLocal.history).toEqual(backup.history);
+		expect(requestWithDistinctLocal.scoreboard).toEqual({ current: null, matches: [] });
 	});
 
 	it("hasImportableLocalData 只在任一 key 有資料時為 true", () => {
@@ -448,5 +538,14 @@ describe("local-import", () => {
 		const before = snapshotKeys();
 		expect(hasImportableLocalData()).toBe(true);
 		expect(snapshotKeys()).toEqual(before);
+
+		// 判定為沒有資料時同樣不得清除或改寫本機 key（上方快照只涵蓋有資料的情境）
+		for (const [label, seed] of emptyLikeSeeds) {
+			localStorage.clear();
+			seed();
+			const beforeEmpty = snapshotKeys();
+			expect(hasImportableLocalData(), `只有${label}`).toBe(false);
+			expect(snapshotKeys(), `只有${label}`).toEqual(beforeEmpty);
+		}
 	});
 });
