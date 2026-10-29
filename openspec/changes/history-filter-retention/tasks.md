@@ -55,13 +55,18 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`RemoteStatsContent.test.tsx` 新增三個 it——「歷史載入中與載入失敗時保留標題與區間篩選並只以提示取代排行榜」（`it.each` 兩個狀態）、
+- [x] 3.1 RED（TDD）：`RemoteStatsContent.test.tsx` 新增三個 it——「歷史載入中與載入失敗時保留標題與區間篩選並只以提示取代排行榜」（`it.each` 兩個狀態）、
   「以鍵盤切換區間時焦點在歷史載入中、載入完成與載入失敗後都留在被選取的區間選項」、「歷史載入失敗後改選其他區間會以新區間重新載入並顯示排行榜」；
   阻斷狀態 mock 用真實 hook 同形（`items: []`、`total: 0`，test-plan「mock 的共同要求」）；同一 commit 依檔頭例外 ② 刪除一行。單檔 vitest 確認新 it 全紅並貼出輸出；既有「名單 syncStatus 為 %s…」與「regression guard：total 為 0 時不顯示區間篩選」維持綠（regression guard，點名）
-- [ ] 3.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「登入時統計頁歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（攔截、收尾與斷言順序同 2.2；標題斷言同樣排在 `load-failed` 可見之後，因本機 `LocalStatsContent` 也有「球員統計」標題）。雙鎖下以單檔 E2E 確認紅燈並貼出輸出
-- [ ] 3.3 GREEN（TDD）：改 `RemoteStatsContent.tsx`——名單阻斷維持 early return；名單可用時單一 return，標題與篩選器固定位置，歷史阻斷時內容槽為 `SyncStatusNotice`，`total === 0` 時篩選器槽位為空（design Decision 3、4）；更新「標題只在有可信資料時顯示」的註解。
+  - 紀錄：`d82f93f`。單檔 vitest 紅燈 `Test Files 1 failed`、`Tests 4 failed | 17 passed (21)`，4 個失敗全為新 it（保留標題 ×2：找不到 heading「球員統計」；焦點：`expected <body> to be <button>`；改選區間：找不到 radio「本週」）。先綠（regression guard，點名）：「名單 syncStatus 為 %s…」×2（radiogroup 為 null 那行保留）、「regression guard：total 為 0 時不顯示區間篩選」與其餘既有 it。`git show d82f93f^:` 不含新 it 名稱、產品檔 RED 前後相同；Stage 1 以 RED 時產品檔實跑重現 4 failed。
+- [x] 3.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「登入時統計頁歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（攔截、收尾與斷言順序同 2.2；標題斷言同樣排在 `load-failed` 可見之後，因本機 `LocalStatsContent` 也有「球員統計」標題）。雙鎖下以單檔 E2E 確認紅燈並貼出輸出
+  - 紀錄：`c6bb1ca`。雙鎖下單檔 E2E（`-g "登入時統計頁歷史載入失敗後"`）1 failed：`load-failed` 可見後 heading「球員統計」element(s) not found；`git show c6bb1ca^:` 不含新 test 名稱。
+- [x] 3.3 GREEN（TDD）：改 `RemoteStatsContent.tsx`——名單阻斷維持 early return；名單可用時單一 return，標題與篩選器固定位置，歷史阻斷時內容槽為 `SyncStatusNotice`，`total === 0` 時篩選器槽位為空（design Decision 3、4）；更新「標題只在有可信資料時顯示」的註解。
   3.1、3.2 全綠；`RemoteStatsContent.test.tsx` 其餘既有 it 原樣綠；雙鎖下 `roster-sync.spec.ts` 的「雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容」與 `history-sync.spec.ts` 全檔綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 3.4 REFACTOR：兩個元件的阻斷判定與內容槽寫法是否一致；是否值得共用（只有兩個使用端且統計頁多一層名單判定，預期不抽）；無壞味道則註記 skipped
+  - 紀錄：`2d929a5`。單檔 vitest 21 passed；雙鎖下 `history-sync.spec.ts` 全檔 8 passed、`roster-sync.spec.ts`「雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容」1 passed；`pnpm -r exec tsc --noEmit` exit 0；三個改動檔 ESLint exit 0；C6 輸出為空。移除已無使用端的 `pickDisplayStatus`。
+    Stage 1（sonnet）PASS；Stage 2（opus）PASS——必做變異 10 條全紅（含「名單阻斷併入保留分支」由既有名單阻斷 it 轉紅、「阻斷時另一份篩選器實例／換 key／移進內容槽」由焦點 it 轉紅、「篩選器槽位只看 total」轉紅），等價對照組維持綠；覆蓋率盤點 24 條全紅，無未守住的分支。
+- [x] 3.4 REFACTOR：兩個元件的阻斷判定與內容槽寫法是否一致；是否值得共用（只有兩個使用端且統計頁多一層名單判定，預期不抽）；無壞味道則註記 skipped
+  - skipped：兩元件寫法已一致（阻斷布林、`let content: ReactNode` 的 if/else 鏈、篩選器固定槽位、單一 return）；差異僅統計頁的名單 early return 與 `showRangeFilter`，皆為規格要求；只有兩個使用端，不抽共用（Stage 2 確認成立）。
 
 ## 4. 文件同步與總驗收
 
