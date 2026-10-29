@@ -129,6 +129,14 @@ Depends on: §3
       `expectedUserId`（固定字串、空字串）、路徑／方法／body（路徑改錯、PUT、不帶 body、body 被改、schema 寬鬆）、`backupToImportRequest`（current 非 null、matches 非空、漏帶 players／currentRound／history／scoreboard、version 2）、
       `hasImportableLocalData`（漏判名單／回合／歷史／獨立計分板、改用 key 存在、恆 true、恆 false）、payload／summary 欄位（version 2、漏帶 currentRound、round／scoreboardCurrent／players 常數）。
       **68 次轉紅**；3 次未轉紅：S4 首輪存活（已補強後重跑轉紅）、等價對照 E5（`isEmpty` 加判分槽）與 I5（`hasImportableLocalData` 加判分槽）——有分槽必有未完成場次、即必有回合，故分槽段無法單獨使 `isEmpty` 為 false，此即「`isEmpty` 漏判分槽」無法成為可殺變異的原因，兩條等價對照如預期維持綠燈。
+  - Stage 2 缺口與補強（test commit `5055ac9`、註解 commit `ca5938a`；regression guard，加入即綠，非 TDD 紅燈，`local-import.ts` 邏輯未改）：Stage 2 判 FAIL，10 條非等價變異存活。補強前以 harness 對 `5055ac9^` 的舊測試實測全數存活、補強後全數轉紅：
+    M08（已完成場次 `continue` 改 `break`）、M09（無分槽 `continue` 改 `break`）→ 第一個 it 追加回合 `[completed m2, pending m5（無分槽）, pending m1, scoring m3]`，斷言分槽 matchId 為 `["m1","m3"]`；
+    S05／S06（`summary.round` 改用 `current !== null`／`matches.length > 0`）、S11／S12（`summary.scoreboardCurrent` 改用 `currentRound !== null`／`players.length > 0`）→ 第二個 it 追加「只有獨立計分板」「只有已完成場次的回合」兩組 summary `toEqual`；
+    C12（`hasImportableLocalData` 內清除本機 key）→ 以完整 seed 呼叫前後比對五個 key 逐字相同；
+    B07／B08／B09（`backupToImportRequest` 的 `scoreboard` 改讀本機 current／本機分槽／整段 payload）→ 呼叫前先 `seedFullLocalData()`，使既有的空計分板斷言有鑑別力。
+    等價對照 3 條（`dedupeHistory` 的 Set 改陣列 `includes`、`hasImportableLocalData` 加判分槽、`isEmpty` 的 `players.length === 0` 改 `!players.length`）補前補後皆維持綠。
+    自審時發現首輪 M08／M09 的 harness 寫成無條件 `break`（補前就轉紅，屬 harness 錯誤而非測試鑑別力），改為 `if (…) break;` 後重跑才得到「補前存活、補後轉紅」。
+    另修正 `buildLocalImportPayload` JSDoc：「只讀不寫」改為本模組不寫入、reader 遇損毀資料的既有清理除外（design Decision 3 已載明）。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0、ESLint 0 errors。
 
 ## 5. E2E 與畫面接線
 
