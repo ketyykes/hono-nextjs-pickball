@@ -256,6 +256,56 @@ describe("local-import", () => {
 		expect(fourth.payload.history).toEqual([firstH5, h6, h7, h8]);
 		expect(fourth.summary.history).toBe(4);
 		expect(fourth.summary.duplicateHistorySkipped).toBe(3);
+
+		// 名單原樣送出：後端的 sort_order 取自陣列索引，重排會改變參賽者頁的順序；
+		// 停用者仍是名單成員，濾掉會讓匯入後名單少人。id 刻意不依字典序排列、停用者夾在中間
+		const unorderedPlayers = [
+			makePlayer({ id: "p7", name: "Gina" }),
+			makePlayer({ id: "p2", name: "Bob", isActive: false }),
+			makePlayer({ id: "p5", name: "Eve" }),
+			makePlayer({ id: "p1", name: "Alice", isActive: false }),
+		];
+		seedRoster(unorderedPlayers);
+		// 歷史不分單打雙打都要送出：前面的歷史 seed 全是單打，看不出依 format 篩選；
+		// 雙打這筆帶 doublesComposition（reader 才不會把它當損毀資料丟掉）且由 teamB 勝
+		const doublesH11: MatchHistoryEntry = {
+			format: "doubles",
+			doublesComposition: "mixed",
+			matchId: "h11",
+			courtNumber: 2,
+			playedAt: "2026-08-20T05:00:00.000Z",
+			teamA: {
+				rating: 5,
+				players: [
+					{ id: "p7", name: "Gina", ratingBefore: 5, ratingAfter: 4.8 },
+					{ id: "p2", name: "Bob", ratingBefore: 5, ratingAfter: 4.8 },
+				],
+			},
+			teamB: {
+				rating: 6,
+				players: [
+					{ id: "p5", name: "Eve", ratingBefore: 6, ratingAfter: 6.2 },
+					{ id: "p1", name: "Alice", ratingBefore: 6, ratingAfter: 6.2 },
+				],
+			},
+			scoreA: 8,
+			scoreB: 11,
+			winner: "teamB",
+		};
+		const singlesH10 = makeHistoryEntry("h10", 11);
+		const singlesH12 = makeHistoryEntry("h12", 9);
+		seedHistory([singlesH10, doublesH11, singlesH12]);
+		const beforeFifth = snapshotKeys();
+
+		const fifth = buildLocalImportPayload();
+
+		expect(fifth.payload.players).toEqual(unorderedPlayers);
+		expect(fifth.summary.players).toBe(4);
+		expect(fifth.payload.history).toEqual([singlesH10, doublesH11, singlesH12]);
+		expect(fifth.summary.history).toBe(3);
+		// seed 全數合法：reader 沒有降級或回寫，上面的斷言才是在驗證匯入內容而非 reader 的清理
+		expect(snapshotKeys()).toEqual(beforeFifth);
+		expect(LocalImportRequestSchema.safeParse(fifth.payload).success).toBe(true);
 	});
 
 	it("本機沒有資料時回報 isEmpty，任一段超過上限時回報 oversize", () => {
@@ -377,6 +427,17 @@ describe("local-import", () => {
 			expect(buildLocalImportPayload().isEmpty, `只有${label}`).toBe(true);
 			expect(snapshotKeys(), `只有${label}`).toEqual(beforeEmpty);
 		}
+
+		// 上限量的是實際送出的歷史（去重後）：重複的那筆不會送到後端，不能讓它把可匯入的資料判成過大
+		localStorage.clear();
+		const hugeName = "x".repeat(1_000_000);
+		const rawHistory = [makeHistoryEntry("h1", 11, hugeName), makeHistoryEntry("h1", 4, hugeName)];
+		seedHistory(rawHistory);
+		expect(utf8Length(rawHistory)).toBeGreaterThan(LIMIT_BYTES);
+		const deduped = buildLocalImportPayload();
+		expect(deduped.summary.duplicateHistorySkipped).toBe(1);
+		expect(utf8Length(deduped.payload.history)).toBeLessThanOrEqual(LIMIT_BYTES);
+		expect(deduped.oversize).toBe(false);
 	});
 
 	it("importLocalData 依回應分類為已匯入、雲端已有資料、未授權或失敗且不改動本機", async () => {
@@ -547,5 +608,12 @@ describe("local-import", () => {
 			expect(hasImportableLocalData(), `只有${label}`).toBe(false);
 			expect(snapshotKeys(), `只有${label}`).toEqual(beforeEmpty);
 		}
+
+		// 資料過大仍是「本機有資料」：參賽者頁照樣提示，把使用者帶到資料頁，
+		// 由匯入區塊說明超過上限的處理方式；在這裡回 false 會讓使用者完全不知道有資料沒匯入
+		localStorage.clear();
+		seedHistory([makeHistoryEntry("h1", 11, "x".repeat(LIMIT_BYTES))]);
+		expect(buildLocalImportPayload().oversize).toBe(true);
+		expect(hasImportableLocalData()).toBe(true);
 	});
 });
