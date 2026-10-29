@@ -25,8 +25,14 @@ pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test
 
 ## Verification
 
-- **Baseline tests**：（apply tasks 1.1 實跑後回填：前端／後端／核心測試檔數與 it 數、lint、三段 typecheck、各 project 的 `playwright test --list` 數）
-- **Initial commit hash**：（apply tasks 1.1 回填 `change/site-navbar-account-entry` 分出時的 `main` HEAD；propose 時 `main` HEAD 為 `630bbd2`）
+- **Baseline tests**（2026-10-30 apply tasks 1.1 實跑，持雙鎖）：
+  - `pnpm test` exit 0：前端 109 files／1068 tests、後端 24 files／177 tests、核心 9 files／21 tests，全綠
+  - `pnpm lint` exit 0（0 errors、3 warnings，皆為既有）；`pnpm -r exec tsc --noEmit` exit 0；
+    `pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./packages/pickball-core typecheck` exit 0
+  - `playwright test --list`：chromium／firefox／webkit／mobile-chrome／mobile-safari 各 145 tests in 17 files；user-data 44 tests in 6 files
+  - `pnpm install` 後 `git status --porcelain` 為空（lockfile 零變動）；`db:migrate:local` 回報 No migrations to apply；
+    `hono-pickball/.dev.vars` 六個 key 齊備（ENVIRONMENT、BETTER_AUTH_SECRET、BETTER_AUTH_URL、TEST_ACCOUNT_EMAIL／PASSWORD／NAME）
+- **Initial commit hash**：`f568e14`（`change/site-navbar-account-entry` 分出時的 `main` HEAD；propose 時 `main` HEAD 為 `630bbd2`，其後 `f568e14` 為 propose commit）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
