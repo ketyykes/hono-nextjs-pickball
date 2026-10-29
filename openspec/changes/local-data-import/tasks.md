@@ -208,8 +208,11 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 加入匯入流程（入口、保留本機、拒絕規則、JSON 還原在登入時的語意）與 `lib/sync/local-import.ts`；
+- [x] 6.1 設定層（文件）：`nextjs-pickball/CLAUDE.md` 加入匯入流程（入口、保留本機、拒絕規則、JSON 還原在登入時的語意）與 `lib/sync/local-import.ts`；
   `hono-pickball/CLAUDE.md` 路由約定加 `POST /api/import` 與「大量插入用 `json_each`、陳述式數量為常數」
+  - 完成（設定層，文件；本 commit）：`nextjs-pickball/CLAUDE.md` 新增「本機資料匯入雲端（B9）」段（入口、JSON 還原在登入時的語意、使用者定案、一次性雲端操作與共用文案模組）、`lib/sync/local-import.ts` 條目；
+    改寫舊敘述「JSON 還原停用，改顯示說明」「登入態 JSON 還原目前停用，B9 決定其去留」為 B9 定案語意，「交接給 B9」標註已落實，一次性雲端操作清單補本機資料匯入與雲端 JSON 匯入。
+    `hono-pickball/CLAUDE.md` 新增「本機資料匯入 API」段（`POST /api/import` 的 sub-app、固定 7 條陳述式的 batch 與守衛範圍、409／500 分類、大量插入用 `json_each` 使陳述式數量為常數）；守衛樣本表條數 14 → 15；後續須知第 2 點標已完成、第 3 點補「B9 評估後不抽 `guardedBatch`」。
 - [ ] 6.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 6.3 驗收（指令）C2：`pnpm lint` 0 errors、warning 不多於基線
 - [ ] 6.4 驗收（指令）C3：`pnpm test` 全綠，記錄三個 workspace 的檔數／測試數與基線差異
