@@ -177,3 +177,10 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
     唯一元件層存活為「JSON 雲端匯入成功後寫入本機」，由 E2E「登入時以 JSON 備份匯入到空的雲端且不寫入本機」的本機快照殺死，不列缺口。
     **leader 裁定**：U07／J12（409／failed 也 refresh）spec 未禁止，接受；JSON 雲端匯入無送出中防護（快速連選兩次會送兩個請求；後端守衛保證第二個 409、不會重複寫入）屬低風險觀察、spec 未要求，本 change 不處理，**待 coordinator 知悉**。
     coordinator 裁定已落實：proposal Impact 補列 `LocalImportResultMessage.tsx`、`local-import-view.ts`（＋測試）。**§5 完成**。
+12. （Final Code Review，opus，2026-10-29，第四任 leader）判定 **APPROVE**（無 high）。指定跨層項目（played_at 日期／時區、空資料、重複匯入、大量資料、帳號不符、409／skipped、訪客零變更、匯入後 B8 歷史區間與順序、本機保留、四項使用者定案）皆有程式碼保證與測試守住；
+    探針（暫時測試檔，已刪除）另證：`playedAt` 帶 `+08:00` 由核心 `z.iso.datetime()` 擋為 400（`Date.parse` 不會得 NaN）；只有獨立計分板的匯入重送為 200 `skipped`、列數 1；同時送兩個匯入請求為 200＋409、歷史不重複。
+    **待 coordinator 知悉／裁定**：
+    ① （low～medium，不阻擋）前端 oversize 以原始陣列量 UTF-8 位元組（門檻 1,900,000），後端 json_each 參數另加包裝（歷史每筆約 +80 B、名單每位約 +70 B）；實測前端 1,880,596 B 的歷史段在後端為 2,100,131 B，超過 D1 文件 2MB 上限（本機 miniflare 上限約 2.1～2.2MB 仍 200）。失敗模式安全（整批回滾、顯示「匯入失敗，請稍後再試」），只是落在邊緣的資料看到籠統失敗而非 oversize 說明。建議另開後續 change（以後端包裝形狀量測或降低門檻），本 change 不改。
+    ② （medium，流程）`backend-scoring-runbook-b1-b9.md` 在本分支被前任 leader 以 `92a4093`、`4045bda` 寫入「B9 apply 中斷」狀態，內容已過時；本任依指示不得改動該檔，合併或 archive 時需由 coordinator 改寫為最終狀態。
+    ③ （low，已處理）`hono-pickball/CLAUDE.md` 開頭「範圍例外」補 B9 匯入端點、後續須知第 2 點改為完成式（本 commit）。
+    ④ （low，未處理）`nextjs-pickball/tests/e2e/user-data/history-sync.spec.ts:294` 註解「還原停用的說明只在雲端模式出現」已過時；檔頭例外 ④ 只授權改常數，故未動。後端缺「只有獨立計分板」「playedAt 帶時區位移回 400」兩條專屬 it（目前由核心 schema 測試覆蓋），列為 low 後續。

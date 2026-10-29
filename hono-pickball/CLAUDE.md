@@ -6,6 +6,7 @@
 > matchmaker（對戰分配機）的**參賽者名單已上雲**（B6：`src/routes/matchmaker.ts`，表 `matchmaker_players`），
 > **回合、場次分槽與送出比分（含歷史寫入）也已上雲**（B7：表 `matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history`）。
 > **歷史的讀取端點也已提供**（B8：`GET /api/matchmaker/history`），登入時歷史頁、統計頁與歷史 CSV 皆讀雲端；
+> **訪客時期的本機資料可一次匯入雲端**（B9：`POST /api/import`，`src/routes/import.ts`，見「本機資料匯入 API」）；
 > 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
@@ -91,7 +92,7 @@
   - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
   - **後續 change 須知**（詳見 openspec change `matchmaker-round-score-backend` design「交接給 B8～B9」）：
     1. **B8（已完成）**：讀取端點 `GET /api/matchmaker/history` 已提供（見下方「matchmaker 歷史讀取 API」）；前端 `resetLocalMatchProgress()` 已刪除、`buildRemoteBackupSnapshot()` 的 `history` 已改取雲端。歷史只增不改：多筆契約去掉 PUT 更新、只保留 import 式附加
-    2. **B9（已完成，見下方「本機資料匯入 API」）**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼，B9 若需區分「雲端已有資料」，以 409 搭配前端文案處理即可
+    2. **B9（已完成，見下方「本機資料匯入 API」）**：整批守衛可直接用於「雲端為空才匯入」；匯入的分槽 MUST 屬於匯入回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗。B7 不新增錯誤碼；B9 的「雲端已有資料」沿用 409 `VERSION_CONFLICT`，由前端依端點語意顯示文案
     3. B9 出現第二個守衛 batch 呼叫端時，把 `guardedBatch` 抽到 `batch-guard.ts`；B6 `isConstraintError` 可一併改用 `errorChainMatches`——**B9 評估後不抽**（匯入為固定 7 條且需取回計分板 `RETURNING` 結果，共用包裝需泛型與額外分類參數，複雜度高於兩處各數行的重複；見 openspec change `local-data-import` tasks 3.3）
     4. **B7.5 預期帳號守衛**（詳見 openspec change `user-data-account-guard` design「交接給 B8／B9」）：B8 的 `GET /api/matchmaker/history` 在 matchmaker sub-app 內自動受守衛保護，但守衛樣本表 MUST 補一條；B9 的 `src/routes/import.ts` 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)` 且樣本表補 `POST /api/import`
        （第 3 點現況：`guardedBatch` 目前**不是程式碼中的具名函式**，是 design OQ14 決定「不抽」的包裝；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在 `src/matchmaker/score-repository.ts` 的送出比分函式內。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，目前未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈）
