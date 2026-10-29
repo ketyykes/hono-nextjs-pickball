@@ -160,4 +160,9 @@ logo 與「首頁」之間的視覺距離在 375px 仍有 4（gap）＋13（餘�
    需改走旗標方案並於 Workers Builds 設定環境變數——那是 CF Dashboard 側設定，本 change 不處理。
 2. **（建議方案已採用）窄螢幕的讓位方式**：替代方案為「`< sm` 一律隱藏 logo＋縮內距」或「帳號下拉選單」（見 Decision 2）。
    若之後 G1 需要顯示姓名或更多帳號功能，屆時改為下拉選單較合適。
-3. `page.route` 能否攔截 keepalive fetch：由 tasks 1.2 實測後回填。
+3. **（已實測，2026-10-30 apply tasks 1.2）`page.route` 能否攔截 keepalive fetch：五個瀏覽器 project 皆可攔截，不需 `addInitScript` 備案。**
+   一次性 spike（未 commit、量測後已刪除）：`page.route("**/api/session")` handler 延遲 2 秒後以假使用者（name「SPIKE」）`route.fulfill({ json })`；
+   chromium／firefox／webkit／mobile-chrome／mobile-safari 皆 `intercepted=1`、延遲期間 `[data-account-entry]` 與「登出」按鈕皆不存在，
+   fulfill 後 253～365ms 內出現 title「已登入：SPIKE」的登出按鈕（證明畫面來自攔截而非真後端）。Decision 3 的做法照原案執行。
+   Context7（`/microsoft/playwright`）查證：handler 內 `await` 延遲後 `route.fulfill` 為官方範例寫法、`route.fulfill` 的 `json` 選項（v1.29+）自動設 `Content-Type`，與 Decision 3 假設一致；
+   文件仍未提及 keepalive，以本實測為準。apply 前與 `main` 對齊：分支分出點即 `main` HEAD `f568e14`，無落差。

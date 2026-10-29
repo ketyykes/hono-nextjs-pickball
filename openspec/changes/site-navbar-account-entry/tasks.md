@@ -27,9 +27,9 @@
 
 ## 1. 前置：基線與查證（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/site-navbar-account-entry`、工作樹乾淨（propose 時主 repo 尚有數個 untracked 的 `openspec/changes/*` 目錄，含本 change；coordinator 須先 commit 才能開分支）；`pnpm install` 後 lockfile 零變動；持雙鎖跑 `pnpm test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`，
+- [x] 1.1 確認分支 `change/site-navbar-account-entry`、工作樹乾淨（propose 時主 repo 尚有數個 untracked 的 `openspec/changes/*` 目錄，含本 change；coordinator 須先 commit 才能開分支）；`pnpm install` 後 lockfile 零變動；持雙鎖跑 `pnpm test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`，
   以及 `pnpm --filter ./nextjs-pickball exec playwright test --list`（記錄各 project test 數）；確認 `hono-pickball/.dev.vars` 齊備（auth E2E 不得 skip）；回填 environment.md Verification 並 commit（`docs:`）
-- [ ] 1.2 一次性 spike（不 commit，量測後刪除暫存檔）：在 chromium、firefox、webkit、mobile-chrome、mobile-safari 各驗一次 `page.route("**/api/session")` 能否攔截 `fetchSession` 的 keepalive fetch
+- [x] 1.2 一次性 spike（不 commit，量測後刪除暫存檔）：在 chromium、firefox、webkit、mobile-chrome、mobile-safari 各驗一次 `page.route("**/api/session")` 能否攔截 `fetchSession` 的 keepalive fetch
   （handler 內延遲 2 秒後 `route.fulfill({ json: { authEnabled: true, user: null } })`，確認延遲期間 `[data-account-entry]` 尚不存在於目前程式碼、2 秒後「登入」連結出現）。
   結果回填 design.md Open Questions 3；任一 project 攔不到即依 design Risk 1 改用 `page.addInitScript` 備案並在 design 記錄（`docs:` commit）
 
