@@ -36,7 +36,7 @@ test.describe("auth session", () => {
 	test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);
 	// dev server 首次編譯路由、firefox 載入偏慢，預設 30 秒在負載高的機器上不足
 	test.describe.configure({ timeout: 60_000 });
-	// 本 describe 的 Scenario 以 viewport >= 640px 為前提，固定寬螢幕。
+	// 除「窄螢幕訪客」外，各 Scenario 以 viewport >= 640px 為前提；固定寬螢幕讓 mobile project 也驗同一寬度。
 	test.use({ viewport: WIDE });
 
 	test.describe("訪客", () => {

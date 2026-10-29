@@ -256,6 +256,18 @@ test.describe("帳號入口各寬度呈現", () => {
 								.toBeGreaterThanOrEqual(matchmakerBox.x + matchmakerBox.width);
 						}
 
+						// 入口靠 nav 的 ml-auto 貼齊容器內容框右緣；內容溢出時會先吃掉容器右內距，
+						// toBeInViewport 與 scrollWidth 都還看不出來，只有右緣超出內容框才抓得到。
+						const contentRight = await page.locator("header > div").evaluate((el) => {
+							const rect = el.getBoundingClientRect();
+							return rect.right - Number.parseFloat(getComputedStyle(el).paddingRight);
+						});
+						if (entryBox !== null) {
+							expect
+								.soft(entryBox.x + entryBox.width, "入口右緣不超出容器內容框")
+								.toBeLessThanOrEqual(contentRight + TOLERANCE_PX);
+						}
+
 						const overflow = await page.evaluate(() => {
 							const container = document.querySelector("header > div");
 							return {

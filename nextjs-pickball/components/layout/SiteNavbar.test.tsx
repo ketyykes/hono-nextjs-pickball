@@ -137,7 +137,7 @@ describe("SiteNavbar", () => {
 	it("窄螢幕下導航連結內距與容器間距依斷點遞減", () => {
 		const { container } = render(<SiteNavbar />);
 
-		// 帳號入口改為窄螢幕也顯示，空間靠連結內距與容器間距逐階讓出；
+		// 帳號入口在窄螢幕也顯示，空間靠連結內距與容器間距逐階讓出；
 		// 以精確 token 比對，避免 px-1.5 與 max-[375px]:px-1.5 之類的子字串互相誤判。
 		const navLinks = within(screen.getByRole("navigation")).getAllByRole("link");
 		expect(navLinks).toHaveLength(5);
@@ -156,6 +156,10 @@ describe("SiteNavbar", () => {
 		expect(wrapperTokens).toContain("gap-1");
 		expect(wrapperTokens).toContain("sm:gap-6");
 		expect(wrapperTokens).not.toContain("gap-3");
+		// 餘裕估算以這組容器內距為基準，>= sm 的 px-6 不可變動。
+		expect(wrapperTokens).toContain("px-4");
+		expect(wrapperTokens).toContain("max-[375px]:px-3");
+		expect(wrapperTokens).toContain("sm:px-6");
 	});
 
 	it("logo 以 LogoMark 符號呈現而非 emoji", () => {
