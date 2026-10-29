@@ -733,8 +733,9 @@ UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 
 **向後相容策略**：往 `ScoreboardStateSchema` 新增欄位時 MUST 以 zod `.default()` 提供預設值，使既有的 v1 資料在缺少該欄位時被補值而非判定為損壞；SHALL NOT 因新增欄位而 bump storage key —— 兩種做法都會讓已在進行中的比賽在使用者重整頁面時分數歸零，而「清除損壞資料」的既有機制會讓這件事**靜默發生**（`safeParse` 失敗 → `removeItem` → 回 null → 以初始 state 起手），使用者只會看到分數消失，沒有任何錯誤提示。本次新增的 `matchId` 欄位 MUST 為 `z.string().nullable().default(null)`，使本次變更前寫入 `scoreboard:current:v1` 的資料被補為 `null`（即獨立計分板）而非判定為損壞。本次變更新增的 `teamPlayers` 欄位比照 `matchId`／`courtNumber` 的既有先例，同為 `.nullable().default(null)`，使本次變更前寫入的資料與獨立計分板皆被補為 `null`（不顯示球員姓名色塊）而非判定為損壞。
 
 **儲存模式**（`user-data-sync`「前端依 session 選擇儲存模式」）：本 Requirement 只規範**本機模式**的行為。
-雲端模式（已登入）下，不論 `matchId` 是否為 `null`，計分狀態皆改由「登入時獨立計分板以雲端為準」Requirement 規範，SHALL NOT 讀取或寫入
-`localStorage["scoreboard:current:v1"]` 與 `localStorage["scoreboard:matches:v1"]`——兩個 key 保留的是訪客時期的資料（之後由匯入功能處理），雲端模式寫入它們會讓登出後的訪客看到登入時的比賽。
+雲端模式（已登入）下，不論 `matchId` 是否為 `null`，計分狀態皆改由「登入時獨立計分板以雲端為準」Requirement 規範：使用者操作（dispatch）SHALL NOT 改變
+`localStorage["scoreboard:current:v1"]` 與 `localStorage["scoreboard:matches:v1"]` 的內容——兩個 key 保留的是訪客時期的資料（作為本機資料匯入雲端的來源），雲端模式把比分寫進它們會讓登出後的訪客看到登入時的比賽。
+選擇器仍會掛載本機實作（hooks 不可條件式呼叫），因此 mount 時本機實作仍依本 Requirement 讀取這兩個 key：損壞資料照既有規則清除或逐筆降級，讀到的合法狀態可能以相同內容重新序列化寫回；這些讀寫不改變使用者可見的訪客資料。
 場次分槽的生命週期與對戰回合綁定（建立、自動送出、鎖定目標分數、清除），分槽 MUST 與回合留在同一個儲存位置：本機模式皆在 LocalStorage，雲端模式皆在後端（`round-lifecycle`「回合與送出比分的雲端 API」）。
 
 實作位於 `nextjs-pickball/lib/scoreboard/storage.ts`（依 `matchId` 分派的唯一對外入口）與 `nextjs-pickball/lib/scoreboard/match-slots.ts`（分槽 key 的 schema、逐筆降級與批次清除），驗收錨點為 `nextjs-pickball/lib/scoreboard/storage.test.ts` 與 `nextjs-pickball/lib/scoreboard/match-slots.test.ts`。
