@@ -29,9 +29,13 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（apply §1.1 回填）前端／後端／核心各自的檔數與測試數；三段 typecheck exit 0；`pnpm lint` errors／warnings 數；
-  `pnpm --filter ./nextjs-pickball exec playwright test --list` 各 project 的 test 數（chromium、firefox、webkit、mobile-chrome、mobile-safari、user-data）。
-- **Initial commit hash**：（apply §1.1 回填 `change/history-filter-retention` 分出時的 `main` HEAD）
+- **Baseline tests**（2026-10-30 apply §1.1 於 `eaf1f50` 實跑，雙鎖）：
+  - `pnpm test` exit 0：前端 109 檔／1070、後端 24 檔／177、核心 9 檔／21，全綠（後端未遇 `listen EPERM`）。
+  - 三段 typecheck：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0。
+  - `pnpm lint` exit 0：0 errors／3 warnings。
+  - `playwright test --list`：共 779 tests／24 files；chromium 147、firefox 147、webkit 147、mobile-chrome 147、mobile-safari 147、user-data 44（列出數含瀏覽器條件 skip；coordinator 提供的實跑基線為 chromium 147、firefox 135＋12 skip、mobile-chrome 145＋2 skip、user-data 44、webkit 與 mobile-safari 各 135＋12 skip）。
+  - `pnpm install` 後 lockfile 零變動、`git status --porcelain` 為空；`db:migrate:local` 回報 No migrations to apply。
+- **Initial commit hash**：`eaf1f50`（`change/history-filter-retention` 分出時的 `main` HEAD；propose 時的 `630bbd2` 之後 main 只多了 `site-navbar-account-entry` 的提交）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

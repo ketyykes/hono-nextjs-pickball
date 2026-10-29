@@ -21,11 +21,17 @@
 
 ## 1. 對齊 main 與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/history-filter-retention`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/history-filter-retention`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`、兩個測試檔與 `history-sync.spec.ts` 與 propose 時（`main` `630bbd2`）的內容一致；
+  - 結果：分支正確、工作樹乾淨、lockfile 零變動、migration 無待套用；基線數字見 environment.md Verification（前端 109／1070、後端 24／177、核心 9／21；lint 0 errors／3 warnings；`--list` 各 browser project 147、user-data 44）
+- [x] 1.2 對齊 main：確認 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`、兩個測試檔與 `history-sync.spec.ts` 與 propose 時（`main` `630bbd2`）的內容一致；
   以 python difflib 比對本 change 兩個 MODIFIED Requirement（`match-history`「登入時歷史以雲端為準」、`player-stats`「統計依區間篩選」）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
+  - 結果：`git diff --stat 630bbd2 main` 對兩個元件、兩個測試檔、`history-sync.spec.ts`、`openspec/specs/match-history`、`openspec/specs/player-stats` 皆無輸出（`630bbd2..eaf1f50` 只有 `site-navbar-account-entry` 的提交）；
+    difflib 比對兩個 MODIFIED Requirement 與主 spec，差異只有本 change 刻意增修（`RemoteHistoryView` 載入中／失敗段落、改寫的「載入失敗時歷史頁顯示錯誤」THEN、新增 4＋5 個 Scenario 與統計頁「雲端模式的載入中與載入失敗」段落）；`openspec validate --strict` valid。主 spec 未被其他 change 改動，不需重新套用。
+  - Context7 查證（與 design 假設一致，無需記入 Open Questions）：`/reactjs/react.dev` preserving-and-resetting-state——同一位置同一型別跨 `if` return 保留、同一位置換型別即移除並銷毀狀態；
+    `/microsoft/playwright`——`route.fulfill({ status })`、`route.continue()`、`page.unrouteAll({ behavior: "ignoreErrors" })`（v1.41 起，本機 1.60.0）、`toBeFocused` 為 web-first 斷言；
+    `/testing-library/user-event`（本機 14.6.1）——焦點在 `<button>` 時 `keyboard("{Enter}")` 的 keypress behavior 會對該按鈕 dispatch `click`。
 
 ## 2. 雲端歷史頁保留篩選器
 
