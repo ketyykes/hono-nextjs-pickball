@@ -52,7 +52,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   頁面本身零 store setter 呼叫
 - 上述**五頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料／統計」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
   **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
-- `/login` — 本機測試帳號登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在 `< sm`（640px）隱藏（`hidden sm:inline-flex`），窄螢幕的登入／登出改由直接造訪 `/login` 提供；行動裝置的登入入口留待上線（改用 Google 登入）時補上
+- `/login` — 本機測試帳號登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在所有寬度顯示（窄螢幕的空間由 `NAV_ITEM_BASE` 的連結內距與 navbar 容器間距讓出），載入中與 auth 停用時以隱形佔位元素保留寬度，回應前後導航連結位置不變
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 
 matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍在前端或核心套件，是刻意決策，不是待搬的後端邏輯）：

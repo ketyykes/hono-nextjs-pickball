@@ -160,4 +160,16 @@ logo 與「首頁」之間的視覺距離在 375px 仍有 4（gap）＋13（餘�
    需改走旗標方案並於 Workers Builds 設定環境變數——那是 CF Dashboard 側設定，本 change 不處理。
 2. **（建議方案已採用）窄螢幕的讓位方式**：替代方案為「`< sm` 一律隱藏 logo＋縮內距」或「帳號下拉選單」（見 Decision 2）。
    若之後 G1 需要顯示姓名或更多帳號功能，屆時改為下拉選單較合適。
-3. `page.route` 能否攔截 keepalive fetch：由 tasks 1.2 實測後回填。
+3. **（已實測，2026-10-30 apply tasks 1.2）`page.route` 能否攔截 keepalive fetch：五個瀏覽器 project 皆可攔截，不需 `addInitScript` 備案。**
+   一次性 spike（未 commit、量測後已刪除）：`page.route("**/api/session")` handler 延遲 2 秒後以假使用者（name「SPIKE」）`route.fulfill({ json })`；
+   chromium／firefox／webkit／mobile-chrome／mobile-safari 皆 `intercepted=1`、延遲期間 `[data-account-entry]` 與「登出」按鈕皆不存在，
+   fulfill 後 253～365ms 內出現 title「已登入：SPIKE」的登出按鈕（證明畫面來自攔截而非真後端）。Decision 3 的做法照原案執行。
+   Context7（`/microsoft/playwright`）查證：handler 內 `await` 延遲後 `route.fulfill` 為官方範例寫法、`route.fulfill` 的 `json` 選項（v1.29+）自動設 `Content-Type`，與 Decision 3 假設一致；
+   文件仍未提及 keepalive，以本實測為準。apply 前與 `main` 對齊：分支分出點即 `main` HEAD `f568e14`，無落差。
+4. **（apply 完成，2026-10-30）Final Code Review（opus）：PASS，無 blocking。**
+   - `git diff main --stat` 12 檔皆在 proposal Impact 內；`openspec/specs/**`、後端、`packages/**`、`fetchSession`／session store、`navbar-rwd`／`quiz`／`scoreboard`／`match-stage` spec、`tests/e2e/user-data/**`、`package.json`／`pnpm-lock.yaml` 零變更；無新 hook、無新相依。
+   - delta spec 32 條驗收錨點與實際 it／test 名稱逐字吻合；`AccountEntry.tsx` 三狀態共用 `entryLayoutClass(solid)`，佔位只多 `invisible`，`hidden sm:inline-flex` 已整段移除。
+   - commit 訊息皆 Conventional Commits、無 attribution／footer。
+   - 逐 commit 型別狀態：`8e8cdef`（2.1 RED）與 `5cd934c`（2.2 RED，繼承同一錯誤）前端 tsc 不過（`navbar-account-entry.spec.ts` 的 `page.unroute` 誤帶第三參數，TS2554），`f8341e1` 起修正；其餘 commit 與 HEAD 皆 exit 0。紅燈證據來自 Playwright 執行期與 vitest，不受型別錯誤影響。未 rebase，保留歷史。
+   - 審查中採納的 non-blocking 強化：`659a556`（佔位測試加嚴、位移 E2E 等待失敗時略過比較）、`7ab0d7a`（寬度 E2E 加「入口右緣不超出容器內容框」、容器內距 token 斷言）；皆只加嚴、以 mutation 確認有咬合力。
+   - 已知限制：寬度 E2E 的 `toBeInViewport({ ratio: 1 })` 與 `scrollWidth` 抓不到「溢出吃進容器右內距」，由 `7ab0d7a` 的內容框右緣斷言補上。實測入口右緣恰貼容器內容框右緣（320→308、375→359、390→374、640→616、1280→1216），無溢出、無換行，Risk 2 未觸發。
