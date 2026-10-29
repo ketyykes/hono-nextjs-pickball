@@ -83,10 +83,11 @@ Depends on: §3
   - 結果：雙鎖下 exit 0；前端 109 檔／1078（基線 1070＋8）、後端 24／177、核心 9／21，與期望一致。
 - [x] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
   - 結果：雙鎖下 exit 0（前端 12 個 route 產出、後端 `wrangler deploy --dry-run` 通過）；建置後 `git status --porcelain` 為空。
-- [ ] 4.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
+- [x] 4.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋2 全 passed、0 skipped；五個 browser project 數量與基線相同、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 進度（2026-10-30 06:31 前）：user-data 46 passed／0 skipped（基線＋2）；chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145 passed＋2 skipped；webkit 三 shard 合計 135 passed＋12 skipped；皆 0 failed、0 flaky，與基線相同。
-    mobile-safari 三個 shard 尚無有效結果：06:02 起主機系統 daemon 造成 load 暴衝（約 170～296，非本 repo process），1/3 在高負載下 `match-stage.spec.ts` 5 條逾時後被中止，屬無效執行、不計入；待 load < 20 後重跑。
+    mobile-safari：06:02 起主機系統 daemon 造成 load 暴衝（約 170～296，非本 repo process），當時 1/3 在高負載下 `match-stage.spec.ts` 5 條逾時後被中止，屬無效執行、不計入。
+    07:56 load 降到 7 後由 leader 雙鎖重跑：1/3 45 passed＋4 skipped、2/3 41 passed＋8 skipped、3/3 49 passed，合計 135 passed＋12 skipped、0 failed，與基線相同（取鎖時 load 7.36／6.08／4.34，前後無殘留 server）。
 - [x] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空（訪客路徑、hook、共用元件、app、後端、核心零變更）
   - 結果：輸出為空。
 - [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過
