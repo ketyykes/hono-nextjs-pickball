@@ -31,6 +31,7 @@ vi.mock("next/link", () => ({
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth/session-client";
 import { AccountEntry } from "./AccountEntry";
+import { NAV_ITEM_BASE } from "./navItemStyles";
 
 const mockUseSession = vi.mocked(useSession);
 const mockSignOut = vi.mocked(signOut);
@@ -55,15 +56,42 @@ function mockLoggedIn(refresh = vi.fn(async () => {})) {
 	return refresh;
 }
 
+// 回傳根元素排序後的 class token；根元素不存在時直接失敗，不讓後續比較在空值上通過。
+function rootClassTokens(container: HTMLElement): string[] {
+	const root = container.firstElementChild;
+	expect(root).not.toBeNull();
+	return Array.from(new Set((root?.className ?? "").split(/\s+/)))
+		.filter((token) => token !== "")
+		.sort();
+}
+
+function expectInvisiblePlaceholder(
+	container: HTMLElement,
+	state: "loading" | "disabled",
+) {
+	expect(container.childElementCount).toBe(1);
+	const root = container.firstElementChild as HTMLElement;
+	expect(root.getAttribute("aria-hidden")).toBe("true");
+	expect(root.className.split(/\s+/)).toContain("invisible");
+	expect(root.getAttribute("data-account-entry")).toBe(state);
+	// hidden: true 讓 aria-hidden 的元素也納入查詢，確認真的沒有互動元素。
+	expect(screen.queryAllByRole("link", { hidden: true })).toHaveLength(0);
+	expect(screen.queryAllByRole("button", { hidden: true })).toHaveLength(0);
+	expect(root.querySelector("a, button, input, [tabindex]")).toBeNull();
+	const icon = root.firstElementChild;
+	expect(icon).not.toBeNull();
+	expect(icon?.className.split(/\s+/)).toContain("size-4");
+}
+
 describe("AccountEntry", () => {
 	afterEach(() => {
 		vi.resetAllMocks();
 	});
 
-	it("載入中或未啟用時不渲染任何元素", () => {
+	it("載入中或未啟用時渲染隱形佔位元素且不含互動元素", () => {
 		mockUseSession.mockReturnValue({ status: "loading", refresh: vi.fn() });
 		const loading = render(<AccountEntry solid={true} />);
-		expect(loading.container.childElementCount).toBe(0);
+		expectInvisiblePlaceholder(loading.container, "loading");
 		loading.unmount();
 
 		mockUseSession.mockReturnValue({
@@ -73,7 +101,31 @@ describe("AccountEntry", () => {
 			refresh: vi.fn(),
 		});
 		const disabled = render(<AccountEntry solid={true} />);
-		expect(disabled.container.childElementCount).toBe(0);
+		expectInvisiblePlaceholder(disabled.container, "disabled");
+	});
+
+	it("佔位元素、登入連結與登出按鈕共用同一組版面 class", () => {
+		mockUseSession.mockReturnValue({ status: "loading", refresh: vi.fn() });
+		const loading = render(<AccountEntry solid={true} />);
+		const placeholder = rootClassTokens(loading.container);
+		loading.unmount();
+
+		mockLoggedOut();
+		const loggedOut = render(<AccountEntry solid={true} />);
+		const loginLink = rootClassTokens(loggedOut.container);
+		loggedOut.unmount();
+
+		mockLoggedIn();
+		const loggedIn = render(<AccountEntry solid={true} />);
+		const logoutButton = rootClassTokens(loggedIn.container);
+
+		expect(placeholder).toEqual([...loginLink, "invisible"].sort());
+		expect(logoutButton).toEqual(loginLink);
+		for (const token of NAV_ITEM_BASE.split(" ")) {
+			expect(placeholder).toContain(token);
+			expect(loginLink).toContain(token);
+			expect(logoutButton).toContain(token);
+		}
 	});
 
 	it("啟用且未登入時顯示指向 /login 的登入連結", () => {
