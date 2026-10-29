@@ -103,4 +103,5 @@ Depends on: §3
   - 結果（持雙鎖）：`quiz.spec.ts:49` 30/30 passed、`scoreboard.spec.ts:22` 30/30 passed（webkit，各 1.1m，load 約 3.2）。
 - [x] 4.5 驗收（指令）C6：`DO_NOT_TRACK=1 openspec validate site-navbar-account-entry --strict` exit 0
   - 結果：`Change 'site-navbar-account-entry' is valid`，exit 0。
-- [ ] 4.6 Final Code Review（`opus`）：`git diff main --stat` ⊆ proposal Impact；結論與處置寫入 design.md Open Questions 並 commit（`docs:`）
+- [x] 4.6 Final Code Review（`opus`）：`git diff main --stat` ⊆ proposal Impact；結論與處置寫入 design.md Open Questions 並 commit（`docs:`）
+  - 結果：PASS（無 blocking），結論與處置見 design.md Open Questions 4。補記：`5cd934c` 亦繼承 `8e8cdef` 的 TS2554，`f8341e1` 起修正。
