@@ -376,6 +376,8 @@ test.describe("本機資料匯入雲端", () => {
 		await page.goto(DATA_PAGE);
 		await expect(page.getByText(EMPTY_TEXT)).toBeVisible();
 		await expect(importButton(page)).toHaveCount(0);
+		// 沒有可匯入的資料時，「匯入後本機資料會保留」的說明沒有意義，不得顯示
+		await expect(page.getByText(HINT_TEXT)).toHaveCount(0);
 
 		// 資料量超過單次匯入上限時同樣不提供按鈕：單一姓名 70 萬個中文字約 2.1MB（UTF-8）
 		await seedLocal(page, {
@@ -388,5 +390,6 @@ test.describe("本機資料匯入雲端", () => {
 		await expect(page.getByText(OVERSIZE_TEXT)).toBeVisible();
 		await expect(page.getByText(EMPTY_TEXT)).toHaveCount(0);
 		await expect(importButton(page)).toHaveCount(0);
+		await expect(page.getByText(HINT_TEXT)).toHaveCount(0);
 	});
 });

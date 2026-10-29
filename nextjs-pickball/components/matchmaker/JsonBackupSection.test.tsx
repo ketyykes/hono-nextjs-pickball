@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { useSession } from "@/hooks/useSession";
 import type { UseSessionResult } from "@/hooks/useSession";
+import { parseBackup } from "@/lib/matchmaker/backup";
 import { REMOTE_TRANSFER_MESSAGES } from "@/lib/matchmaker/remote-transfer";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "@/lib/matchmaker/storage-keys";
 import { MATCH_SLOTS_KEY, STORAGE_KEY as SCOREBOARD_CURRENT_KEY } from "@/lib/scoreboard/storage-keys";
@@ -66,6 +67,13 @@ function buildBackupFile(): File {
 	return new File([JSON.stringify(backup)], "backup.json", { type: "application/json" });
 }
 
+// 版本不符的備份：parseBackup 會拒絕，用來走「驗證失敗」分支
+function buildUnsupportedVersionFile(): File {
+	return new File([JSON.stringify({ version: 2, players: [], currentRound: null, history: [] })], "bad.json", {
+		type: "application/json",
+	});
+}
+
 function snapshotKeys(): Record<string, string | null> {
 	return Object.fromEntries(ALL_KEYS.map((key) => [key, localStorage.getItem(key)]));
 }
@@ -117,13 +125,69 @@ describe("JsonBackupSection 雲端分支", () => {
 		expect(refresh).toHaveBeenCalledTimes(1);
 		expect(snapshotKeys()).toEqual(before);
 
-		// 帳號資料殘缺（取不到 user id）時不送出請求，改顯示未授權訊息
+		// 帳號資料殘缺（取不到 user id）時不送出請求，改顯示未授權訊息。
+		// 先卸載再全新 render：第一階段的 401 已留下同文字的 alert，沿用舊元件會讓
+		// 「null 防線自己顯示訊息」的斷言被舊 alert 蓋過而失去鑑別力
+		cleanup();
 		mockSessionWithoutUserId();
-		rerender(<JsonBackupSection />);
+		render(<JsonBackupSection />);
+		expect(screen.queryByRole("alert")).toBeNull();
 		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
 
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(snapshotKeys()).toEqual(before);
+	});
+
+	// regression guard（加入即綠）：雲端分支的 parseBackup 失敗路徑，行為在 5.2 已存在
+	it("雲端 JSON 匯入遇到不合法的備份檔時顯示 parseBackup 的訊息且不送出請求", async () => {
+		const user = userEvent.setup();
+		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [] }));
+		const before = snapshotKeys();
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+
+		const badFile = buildUnsupportedVersionFile();
+		// 預期訊息由同一段文字呼叫 parseBackup 取得，避免把錯誤字串寫死而與本機分支漂移
+		const expected = parseBackup(await badFile.text());
+		expect(expected.ok).toBe(false);
+		if (expected.ok) return;
+
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), badFile);
+
+		expect((await screen.findByRole("alert")).textContent).toBe(expected.message);
+		expect(fetchMock).not.toHaveBeenCalled();
+		expect(refresh).not.toHaveBeenCalled();
+		expect(snapshotKeys()).toEqual(before);
+	});
+
+	// regression guard（加入即綠）：先失敗後成功時，成功要清掉舊的錯誤訊息
+	it("雲端 JSON 匯入先失敗後成功時成功結果會清除舊的錯誤訊息", async () => {
+		const user = userEvent.setup();
+		const fetchMock = vi.fn<typeof fetch>();
+		fetchMock.mockImplementation(
+			async () =>
+				new Response(
+					JSON.stringify({ imported: { players: 2, round: false, slots: 0, history: 0, scoreboardCurrent: "none" } }),
+					{ status: 200 },
+				),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildUnsupportedVersionFile());
+		expect(await screen.findByRole("alert")).not.toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
+
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+
+		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(
+			"已匯入 2 位參賽者、0 筆歷史、0 個回合、0 個場次計分板。",
+		);
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });

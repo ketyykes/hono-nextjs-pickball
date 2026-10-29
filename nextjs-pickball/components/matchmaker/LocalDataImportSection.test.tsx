@@ -158,10 +158,14 @@ describe("LocalDataImportSection", () => {
 		expect(refresh).toHaveBeenCalledTimes(1);
 		expect(snapshotKeys()).toEqual(before);
 
-		// 帳號資料殘缺（取不到 user id）時不送出請求，改顯示未授權訊息
+		// 帳號資料殘缺（取不到 user id）時不送出請求，改顯示未授權訊息。
+		// 先卸載再全新 render：第一階段的 401 已留下同文字的 alert，沿用舊元件會讓
+		// 「null 防線自己顯示訊息」的斷言被舊 alert 蓋過而失去鑑別力
+		cleanup();
 		mockSessionWithoutUserId();
-		rerender(<LocalDataImportSection />);
-		await user.click(screen.getByRole("button", { name: "匯入本機資料到雲端" }));
+		render(<LocalDataImportSection />);
+		expect(screen.queryByRole("alert")).toBeNull();
+		await user.click(await screen.findByRole("button", { name: "匯入本機資料到雲端" }));
 
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
