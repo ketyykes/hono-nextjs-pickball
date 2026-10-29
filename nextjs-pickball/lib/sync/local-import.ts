@@ -53,8 +53,9 @@ function utf8Bytes(value: unknown): number {
 }
 
 /**
- * 讀取本機五個 key 組成匯入請求。只經既有 reader、只讀不寫：reader 對損毀資料的降級規則只有一份，
+ * 讀取本機五個 key 組成匯入請求。只經既有 reader：reader 對損毀資料的降級規則只有一份，
  * 直接 JSON.parse 會讓損毀在後端才以 400 失敗，使用者無從得知是哪一筆。
+ * 本模組自身不寫入任何 key；reader 遇損毀資料時的既有清理（回寫或移除該 key）除外。
  */
 export function buildLocalImportPayload(): LocalImportPreview {
 	const { players } = readRoster();
