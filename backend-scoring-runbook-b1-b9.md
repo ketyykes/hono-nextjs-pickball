@@ -22,7 +22,7 @@
 | apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；**下一棒 B9** |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
-| 工作位置 | 主 repo 分支 `change/local-data-import`，工作樹乾淨。**B9 leader 於 2026-10-28 15:33 因使用者關機被停止（不可續派，重開新 leader）**：已完成 §1（validate 修正、B7.5／B8 交接落實）、§2 核心契約、§3 後端 `POST /api/import`（含 Stage 2 補強與審查紀錄 `0c19852`）、§4.1 RED `dc37269`／§4.2 GREEN `384d6df`／補強 `56df8f5`／勾選 `f75e681`；§4 其餘 task 與 §4 兩階段審查未做。新 leader 先核對 tasks 勾選與 `git log main..HEAD`、跑 `pnpm -r exec tsc --noEmit`，再從 §4 接續 |
+| 工作位置 | 主 repo 分支 `change/local-data-import`，工作樹乾淨。**B9 第二任 leader 於 2026-10-29 16:23 因使用者關機被停止（不可續派，重開新 leader）**：§1～§4.2 已完成（第一任至 `f75e681`）；第二任補做 §4 Stage 2 審查與複審補強（`5055ac9`、`ca5938a`、`cb38be2`、`1a616ed`、`c3fe35e`），停止時正要派「§4 Stage 2 複審（第二輪）」——新 leader 先重跑一次 §4 Stage 2 確認無存活變異、在 design 記錄 §4 審查結果，再從 §5.1 接續。續派前先核對 tasks 勾選與 `git log main..HEAD`、跑 `pnpm -r exec tsc --noEmit` |
 
 ## 使用者已定案（2026-10-21）
 
