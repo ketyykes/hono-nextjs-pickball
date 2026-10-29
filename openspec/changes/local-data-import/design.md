@@ -158,3 +158,10 @@ drizzle 寫法為 `db.insert(<table>).select(sql\`SELECT … FROM json_each(${js
    **leader 裁定**：「500 不被吞成 409」併入既有 it「300 位參賽者與 2000 筆歷史可一次匯入」，delta Scenario「匯入 API：大量資料以常數個陳述式匯入」補一行 AND（單段 JSON > 2MB 回 500 且整批回滾），與 design Risks 一致，不新增 it 名稱。
    → fd2ccda regression guard（歷史 `match_id` 依 rowid 順序、`played_at` 精確值、`GET /slots/m1`、`updated_at` 上界、單段 >2MB 回 500 且零列、data 特殊字元往返）＋ c9386e2（`results[5]` 註解）→ 複審 PASS（6 條全紅、抽查 14 條仍紅、等價對照綠）。
    編號對照（fd2ccda 訊息與 tasks 3.2 註記沿用 Implementer 自編號）：Implementer L26＝Reviewer L50（歷史 `match_id`）、Implementer L34＝Reviewer L26（`played_at` +1）、Implementer L50＝Reviewer L34（`updated_at`）；其餘同號。§3 完成。後端全套 24 檔／177。
+9. （apply §4，2026-10-28～29，跨三任 leader）Implementer（sonnet）：dc37269 RED（模組不存在，5 個 it 皆真紅、無先綠）→ 384d6df GREEN → 56df8f5 regression guard（S4）→ f75e681 tasks 註記；REFACTOR skipped。Stage 1 PASS。
+   Stage 2（opus）共五輪，**每輪皆為測試鑑別力缺口、`local-import.ts` 實作無缺陷**（僅 ca5938a 修正 JSDoc 用語）：
+   第一輪 FAIL 10 條（break 變異、summary 欄位來源、`hasImportableLocalData` 清 key、備份改讀本機）→ 5055ac9；第一次複審 FAIL 8 組（備份 players／currentRound 改讀本機、body 改送本機 payload、imported 由 payload 推算、isEmpty 時清 key、去重鍵）→ 1a616ed；
+   第二次複審 FAIL（名單只取啟用者／排序、歷史只取 singles、oversize 量去重前歷史）→ 8f273eb（Implementer 依 Escalation 升 opus）；第三次複審 FAIL 26 條（欄位改寫／篩選、finished 與 0:0 分槽及計分板、歷史順序、去重鍵、備份逐欄）→ 091b591；
+   第四次複審：96 條全集 85 紅／11 存活（皆為等價或規格未定義），唯一缺口 N16／N18（把請求寫回本機）→ a964a11（leader 補一行快照斷言，harness 補前存活、補後轉紅）。**§4 完成**。
+   **leader 裁定（規格未定義，維持現行行為、不補測試）**：H07 `hasImportableLocalData` 在 oversize 時仍為 true（提示帶使用者到資料頁看 oversize 說明；8f273eb 已以測試鎖定）；F08 名單不依 id 去重、B04 備份歷史不去重、G04 playedAt 原樣送出、Y03 `summary.round` 依 `currentRound !== null`——不合法者一律由後端 400 拒絕；N07 分槽 `matchId` 以場次 id 為準（現行），改採 state 自帶值只在損毀資料時可觀察，低、不阻擋。
+   **流程發現**：從非 repo cwd 執行 `pnpm --dir <repo> --filter ./nextjs-pickball test …` 會 `No projects matched` 並 exit 0（假綠燈）；第二輪起的 harness 改為 `pnpm --dir <repo>/nextjs-pickball test --run …` 並檢查輸出含 `Test Files`。早期各輪結論已由後續輪次以修正後的 harness 重跑 96 條全集覆核。

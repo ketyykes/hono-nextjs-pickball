@@ -165,6 +165,9 @@ Depends on: §3
     等價對照 7 條（EQ1 Set 改陣列 `includes`、EQ2 `summary.round` 改再讀 `readRound()`、EQ3 body 改 `{ ...payload }`、EQ4 backup version 改 `backup.version`、EQ5 略過分支加 `void 0`、C05 current `teamPlayers` 改 null、O03 oversize 加判 current）補前補後皆維持綠。
     **規格未定義 4 條（leader 裁定，不補測試、維持現行行為）**：F08（名單依 id 去重）、Y03（`summary.round` 改用 matches 數）、G04（playedAt 經 `toISOString` 正規化）、B04（備份歷史去重）——現行行為皆為「前端原樣送出、不合法者由後端 400 拒絕」，spec 未要求前端處理；補前補後皆存活。
     單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0（持共用鎖）、測試檔 ESLint 0 errors。
+  - Stage 2 第四輪複審（opus）與收尾（test commit `a964a11`，由 leader 直接補一行斷言；regression guard，加入即綠，非 TDD 紅燈，`local-import.ts` 未改）：複審以自寫 harness 重跑 96 條全集為 85 轉紅、11 存活（恰為 7 條等價對照＋4 條 leader 裁定的規格未定義），另 24 條新變異與 8 條必做變異重做；判 FAIL 的唯一缺口為 N16（成功後把請求名單寫回本機）、N18（送出前把請求回合寫入本機）——第三個 it 的本機快照只在送出與本機相同的請求後比對一次，寫回看不出差異。
+    補強：該 it 末段（與本機不同的 `requestWithInactive` 送出後）追加一次五個 key 快照比對。leader harness（三重落地檢查、輸出含 `Test Files`、每次還原）：N16、N18 補前存活 → 補後轉紅；N17、X05 補前補後皆轉紅；對照 N07、EQ6 補前補後皆綠。單檔 5/5 綠、測試檔 ESLint 0 errors。
+    **N07（分槽 `matchId` 優先採 state 內自帶值）leader 裁定為低、不阻擋**：真實資料的分槽鍵由 `state.matchId` 推出，兩者只在損毀資料時分歧。§4 Stage 2 至此結案。
 
 ## 5. E2E 與畫面接線
 
