@@ -37,17 +37,21 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（例外層，須實跑紅燈）：新增 `nextjs-pickball/tests/e2e/specs/navbar-account-entry.spec.ts`，test「帳號入口載入前後導航連結位置不變」
+- [x] 2.1 RED（例外層，須實跑紅燈）：新增 `nextjs-pickball/tests/e2e/specs/navbar-account-entry.spec.ts`，test「帳號入口載入前後導航連結位置不變」
   （design Decision 3：攔住 `/api/session` → 等 `document.fonts.ready` → 量五連結與入口根元素 box → 依序以 guest、user、disabled 放行並等到對應狀態與 `fonts.ready` → 再量，`x`、`width` 差 ≤ 0.5px；
   每個分支一個 `test.step`、位移斷言用 `expect.soft`，使一次執行就能看到每個分支的結果；入口根元素以 `header > div > nav ~ *` 取得，SHALL NOT 用 `:last-child`（現況入口為 null 時會取到 `<nav>`））。
   持雙鎖在 chromium 與 webkit 各跑一次，貼出紅燈輸出：guest／user 須顯示連結 `x` 的位移量（約 64px）；disabled 因缺 `data-account-entry` 逾時而紅（**不是**先綠）。
   mobile-chrome／mobile-safari 在此階段因入口 `hidden` 而在等待可見時紅，不能當作位移證據，紀錄中點明。commit（`test:`）
-- [ ] 2.2 RED（TDD）：`AccountEntry.test.tsx` 新增 it「載入中或未啟用時渲染隱形佔位元素且不含互動元素」「佔位元素、登入連結與登出按鈕共用同一組版面 class」；
+- [x] 2.2 RED（TDD）：`AccountEntry.test.tsx` 新增 it「載入中或未啟用時渲染隱形佔位元素且不含互動元素」「佔位元素、登入連結與登出按鈕共用同一組版面 class」；
   依檔頭例外 ① 刪除「載入中或未啟用時不渲染任何元素」。單檔跑，貼出兩個新 it 的紅燈輸出。commit（`test:`）
-- [ ] 2.3 GREEN（TDD）：`AccountEntry.tsx` 依 design Decision 1 實作佔位元素（`<span>`、`aria-hidden="true"`、`invisible`、`data-account-entry`、內含 `size-4` 空元素），
+- [x] 2.3 GREEN（TDD）：`AccountEntry.tsx` 依 design Decision 1 實作佔位元素（`<span>`、`aria-hidden="true"`、`invisible`、`data-account-entry`、內含 `size-4` 空元素），
   三種狀態共用同一個版面 class 常數；更新檔頭註解（只寫為什麼）。`components/layout` 兩個單元測試檔全綠；
   持雙鎖以 2.1 的 spec 在 chromium、firefox、webkit 各跑一次全綠（webkit 不需 shard，單檔即可）；mobile-chrome／mobile-safari 此時入口仍為 `hidden`，guest／user 分支預期仍紅，留待 3.3 驗收。commit（`feat:`）
-- [ ] 2.4 REFACTOR：檢視版面 class 常數與 `navItemStyles.ts` 的分工有無重複；無壞味道註記 skipped
+- [x] 2.4 REFACTOR：檢視版面 class 常數與 `navItemStyles.ts` 的分工有無重複；無壞味道註記 skipped
+  - 結果（2026-10-30）：2.1 RED `8e8cdef`（chromium／webkit guest、user 分支五連結 `x` 位移 64px；disabled 分支 `[data-account-entry="disabled"]` 逾時）。
+    `8e8cdef` 本身 `tsc` 不過（`page.unroute` 誤帶 `unrouteAll` 才有的第三參數，TS2554），由 `f8341e1` 單行修正；Playwright 執行時不做型別檢查，紅燈證據不受影響。
+    2.2 RED `5cd934c`（兩個新 it 真紅，leader 以 `28bd0fb^` 的元件重跑複驗）；2.3 GREEN `28bd0fb`（chromium／firefox／webkit 綠；行動 project 依預期在 §3 前仍紅）。
+    2.4 skipped：`entryLayoutClass` 只放 display／shrink／對齊與 tone，內距只來自 `NAV_ITEM_BASE`，無重複。Stage 1 PASS、Stage 2 PASS（6 項 non-blocking，測試強化項併入 §3 派工）。
 
 ## 3. 窄螢幕顯示帳號入口
 
