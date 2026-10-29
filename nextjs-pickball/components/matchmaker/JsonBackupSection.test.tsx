@@ -32,6 +32,11 @@ function mockRemoteSession(userId: string): void {
 	vi.mocked(useSession).mockReturnValue(session);
 }
 
+function mockGuestSession(): void {
+	const session: UseSessionResult = { status: "ready", authEnabled: true, user: null, refresh };
+	vi.mocked(useSession).mockReturnValue(session);
+}
+
 // 模擬「session 資料殘缺」：已登入但 user 沒有 id。元件的 null 防線只有在這種輸入下才走得到
 function mockSessionWithoutUserId(): void {
 	const session = {
@@ -86,9 +91,18 @@ describe("JsonBackupSection 雲端分支", () => {
 		const fetchMock = vi.fn<typeof fetch>();
 		fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: "UNAUTHORIZED" }), { status: 401 }));
 		vi.stubGlobal("fetch", fetchMock);
-		mockRemoteSession("user-a");
 
+		// 訪客維持本機的覆寫式還原選檔，沒有雲端匯入選檔
+		mockGuestSession();
 		const { rerender } = render(<JsonBackupSection />);
+		expect(screen.queryByTestId("json-backup-import-input")).not.toBeNull();
+		expect(screen.queryByTestId("json-backup-cloud-import-input")).toBeNull();
+
+		// 登入後相反：本機覆寫式還原不渲染，改渲染雲端匯入選檔
+		mockRemoteSession("user-a");
+		rerender(<JsonBackupSection />);
+		expect(screen.queryByTestId("json-backup-import-input")).toBeNull();
+		expect(screen.queryByTestId("json-backup-cloud-import-input")).not.toBeNull();
 		// 點擊（選檔）前才換帳號，證明送出的是當下的 session 而非 mount 時的
 		mockRemoteSession("user-b");
 		rerender(<JsonBackupSection />);

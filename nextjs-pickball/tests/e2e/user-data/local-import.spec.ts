@@ -33,6 +33,7 @@ const OVERSIZE_TEXT = "本機資料量超過單次匯入上限，請先匯出 JS
 const CONFLICT_TEXT = "雲端已有對戰分配機資料，無法匯入。若要以本機資料取代，請先在參賽者頁重置名單。";
 const FAILED_TEXT = "匯入失敗，請稍後再試";
 const SKIPPED_TEXT = "雲端已有進行中的獨立計分板，未匯入該場";
+const HINT_TEXT = "只有在雲端沒有任何對戰分配機資料時才能匯入；匯入後本機資料會保留";
 const IMPORT_BUTTON_NAME = "匯入本機資料到雲端";
 const NO_RELOAD_MARKER = "__localImportNoReloadMarker";
 
@@ -196,7 +197,16 @@ test.describe("本機資料匯入雲端", () => {
 		await markNoReload(page);
 		await page.getByTestId("json-backup-cloud-import-input").setInputFiles(buildBackupFile());
 
-		await expect(page.getByTestId("json-backup-import-message")).toContainText("已匯入 2 位參賽者、1 筆歷史");
+		await expect(page.getByTestId("json-backup-import-message")).toHaveText(
+			"已匯入 2 位參賽者、1 筆歷史、0 個回合、0 個場次計分板。",
+		);
+		await expectNotReloaded(page);
+		expect(await readLocalKeys(page)).toEqual(before);
+
+		// 雲端已有資料後再匯入同一份備份：與匯入本機資料相同，拒絕且不覆寫、不合併
+		await page.getByTestId("json-backup-cloud-import-input").setInputFiles(buildBackupFile());
+		await expect(page.getByText(CONFLICT_TEXT)).toBeVisible();
+		await expect(page.getByTestId("json-backup-import-message")).toHaveCount(0);
 		await expectNotReloaded(page);
 		expect(await readLocalKeys(page)).toEqual(before);
 
@@ -217,12 +227,18 @@ test.describe("本機資料匯入雲端", () => {
 
 		await page.goto(DATA_PAGE);
 		await expect(importButton(page)).toBeVisible();
+		await expect(page.getByTestId("local-import-summary")).toHaveText(
+			"本機資料：2 位參賽者、1 筆歷史、1 個回合、1 個場次計分板、1 場獨立計分板",
+		);
+		await expect(page.getByText(HINT_TEXT)).toBeVisible();
 		const before = await readLocalKeys(page);
 		await markNoReload(page);
 
 		await importButton(page).click();
 
-		await expect(page.getByTestId("local-import-message")).toContainText("已匯入 2 位參賽者、1 筆歷史");
+		await expect(page.getByTestId("local-import-message")).toHaveText(
+			"已匯入 2 位參賽者、1 筆歷史、1 個回合、1 個場次計分板、1 場獨立計分板。",
+		);
 		// 雲端沒有獨立計分板，所以沒有「略過」的提示
 		await expect(page.getByText(SKIPPED_TEXT)).toHaveCount(0);
 		await expectNotReloaded(page);
@@ -285,7 +301,9 @@ test.describe("本機資料匯入雲端", () => {
 		expect(importRequestCount).toBe(1);
 
 		await importButton(page).click();
-		await expect(page.getByTestId("local-import-message")).toContainText("已匯入 2 位參賽者、1 筆歷史");
+		await expect(page.getByTestId("local-import-message")).toHaveText(
+			"已匯入 2 位參賽者、1 筆歷史、1 個回合、1 個場次計分板。",
+		);
 		await expect(page.getByText(SKIPPED_TEXT)).toBeVisible();
 
 		await page.goto(HISTORY_PAGE);
@@ -303,7 +321,7 @@ test.describe("本機資料匯入雲端", () => {
 		await expect(page.locator(HISTORY_CARDS)).toHaveCount(1);
 	});
 
-	test("雲端名單為空且本機有資料時參賽者頁顯示匯入提示", async ({ page }) => {
+	test("雲端名單為空且本機有資料時參賽者頁顯示匯入提示", async ({ page, browser }) => {
 		// 本機沒有資料時：本機 hook 掛載會寫出只含空陣列的容器，那不算可匯入的資料，不得顯示提示
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();
@@ -318,6 +336,10 @@ test.describe("本機資料匯入雲端", () => {
 		const notice = page.getByTestId("local-import-notice");
 		await expect(notice).toBeVisible();
 		await expect(notice.getByRole("link")).toHaveAttribute("href", "/matchmaker/data#local-import");
+		// 連結指向資料頁上實際存在的匯入區塊
+		await notice.getByRole("link").click();
+		await expect(page).toHaveURL(/\/matchmaker\/data#local-import$/);
+		await expect(page.locator("#local-import")).toBeVisible();
 
 		await page.goto(DATA_PAGE);
 		await expect(importButton(page)).toBeVisible();
@@ -328,6 +350,26 @@ test.describe("本機資料匯入雲端", () => {
 		await expect(page.locator(SYNCED)).toBeVisible();
 		await expect(page.getByText(LOCAL_NAME_A, { exact: true })).toBeVisible();
 		await expect(page.getByTestId("local-import-notice")).toHaveCount(0);
+
+		// 訪客（本機模式）即使名單為空、本機有可匯入的資料也不顯示：匯入只服務已登入的帳號
+		const guestContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+		try {
+			const guestPage = await guestContext.newPage();
+			await guestPage.goto(NEUTRAL_PAGE);
+			await seedLocal(guestPage, {
+				[HISTORY_KEY]: JSON.stringify({
+					version: 1,
+					entries: [buildHistoryEntry("lh1", LOCAL_NAME_A, LOCAL_NAME_B)],
+				}),
+			});
+			const sessionResponse = guestPage.waitForResponse((response) => response.url().endsWith("/api/session"));
+			await guestPage.goto(PLAYERS_PAGE);
+			await sessionResponse;
+			await expect(guestPage.getByText("目前還沒有參賽者")).toBeVisible();
+			await expect(guestPage.getByTestId("local-import-notice")).toHaveCount(0);
+		} finally {
+			await guestContext.close();
+		}
 	});
 
 	test("本機沒有資料時匯入區塊不提供匯入按鈕", async ({ page }) => {

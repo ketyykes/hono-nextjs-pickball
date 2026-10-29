@@ -33,6 +33,11 @@ function mockRemoteSession(userId: string): void {
 	vi.mocked(useSession).mockReturnValue(session);
 }
 
+function mockGuestSession(): void {
+	const session: UseSessionResult = { status: "ready", authEnabled: true, user: null, refresh };
+	vi.mocked(useSession).mockReturnValue(session);
+}
+
 // 模擬「session 資料殘缺」：已登入但 user 沒有 id。元件的 null 防線只有在這種輸入下才走得到
 function mockSessionWithoutUserId(): void {
 	const session = {
@@ -130,9 +135,14 @@ describe("LocalDataImportSection", () => {
 		const fetchMock = vi.fn<typeof fetch>();
 		fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: "UNAUTHORIZED" }), { status: 401 }));
 		vi.stubGlobal("fetch", fetchMock);
-		mockRemoteSession("user-a");
 
-		const { rerender } = render(<LocalDataImportSection />);
+		// 訪客（本機模式）不渲染任何東西，即使本機有可匯入的資料
+		mockGuestSession();
+		const { container, rerender } = render(<LocalDataImportSection />);
+		expect(container.firstChild).toBeNull();
+
+		mockRemoteSession("user-a");
+		rerender(<LocalDataImportSection />);
 		const button = await screen.findByRole("button", { name: "匯入本機資料到雲端" });
 		// 點擊前才換帳號，證明送出的是點擊當下的 session 而非 mount 時的
 		mockRemoteSession("user-b");
