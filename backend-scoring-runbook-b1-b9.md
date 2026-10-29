@@ -11,7 +11,7 @@
 > **每完成一棒（合併、刪分支、或中斷）就把狀態寫回本檔並 commit**（使用者硬性要求；
 > 跨 session 唯一的狀態來源就是本檔）。
 
-## 狀態快照（最後更新 2026-10-29，**B9 已合併，下一步 S2 本機全功能驗收**）
+## 狀態快照（最後更新 2026-10-29，**B1～B9 與 S1、S2 全部完成；僅剩 G1（暫緩）**）
 
 | 項目 | 值 |
 |---|---|
@@ -19,7 +19,7 @@
 | 已定案決策 | 見下方「使用者已定案（2026-10-21）」三條 |
 | 待裁決 | 無：D1～D6 已於 2026-10-21 依 `/goal` 授權採建議值（見「開工前待裁決」） |
 | propose | Wave 1 `7c3ab72`；Wave 2 前半 B4～B6 `a595294`、後半 B7～B9 `c2b48fa`（全部已 propose） |
-| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；B9 已合併並 archive；**下一步 S2** |
+| apply | Wave 1 已合併並 archive；S1 通過；B4 已合併並 archive；B5 已合併並 archive；B6 已合併並 archive；B7 已合併並 archive；B7.5 已合併並 archive；B8 已合併並 archive；B9 已合併並 archive；**S2 通過（2026-10-29）**；本機範圍全部完成，剩 G1（等使用者完成 Google 端設定） |
 | CF 資源 | B1～B9 **不需要任何遠端 CF 資源**（全在本機 local D1）；遠端 D1、secrets、staging 皆移到 G1 |
 | `main` 品質基線 | 已實測（見「`main` 品質基線」） |
 | 工作位置 | 主 repo `main`，工作樹乾淨 |
@@ -256,6 +256,20 @@ main@1e5e517
 
 Wave 2 全部合併後在本機（`pnpm dev` 與 `preview` 各一次），以測試帳號走完：計分板一場完整比賽 → 名單 → 產生回合 → 送出比分（含計時平局）
 → 歷史頁各區間 → 統計頁 → 換裝置（另一個瀏覽器）登入看到同一份資料 → 匯入本機資料。結果寫回本檔。
+
+**S2 結果（2026-10-29，opus agent 以 Playwright 腳本執行、coordinator 核對證據，全部通過）**
+- 腳本 `/tmp/s2/run.mjs`（repo 外；帳密只從 `.dev.vars` 讀取，輸出遮蔽，掃描 `/tmp/s2` 密碼命中 0）；每輪前 `db:migrate:local`＋`db:seed:local` 並確認六張使用者資料表 0 列；證據 `/tmp/s2/A/`、`/tmp/s2/B/`（每步截圖＋`results.json`＋server log）。
+- 環境 A＝`pnpm dev`；環境 B＝`dev:api`＋OpenNext preview `--port 3005`（**用 3005 就不必改 `BETTER_AUTH_URL`**，`.dev.vars` 全程未動；取代 S1 的 8788 做法）。兩環境各 21 步全 PASS：
+  1. chromium `/login` 表單登入 → 計分板 11-0 勝負對話框、重整由雲端還原（version 11、本機 key null）。
+  2. 名單 UI 新增 8 人（雲端 8 筆）→ 回合一雙打 2 場地：手動 11:5、經場次計分板 11-0 返回（雲端分槽清空）→ 回合二 10 分鐘計時：9:9 平局＋11:8（雲端 `draw`／`teamA`）。
+  3. 歷史頁五區間（今日 4、其餘 0，區間互斥）、平局卡兩隊皆「平手」；統計頁平局 S=0.5 逐人驗算相符（E_A=0.5240，例 5.15→5.14；S=1 會是 5.29），平局語意未回退。
+  4. **換裝置（Playwright WebKit 26.4，全新 context）**：登入後計分板、名單、回合二（同 matchId）、歷史五區間、統計 8 列皆與 chromium 逐字相同。
+  5. **匯入**：訪客 context 造五個 key（含一筆上月歷史）→ (a) 第二帳號（雲端空）參賽者頁出現匯入提示 → 資料頁匯入「已匯入 4 位參賽者、2 筆歷史、1 個回合、1 個場次計分板、1 場獨立計分板。」，雲端讀回 4／2、歷史區間今日 1＋上月 1、回合與分槽與計分板正確，本機五個 key 保留；
+     (b) 同 context 改主帳號登入匯入 → 409「雲端已有對戰分配機資料，無法匯入…」，主帳號雲端不變（8／4／計分板 v11）、未混入訪客資料，本機保留。
+- console：A 只有預期的 409 一筆；B 另有 WebKit pageerror `Fetch API cannot load …?_rsc=… due to access control checks.`（只在 production build＋WebKit、頁面載入約 1 秒內以 `page.goto` 整頁換頁時，被取消的 RSC prefetch 被回報為 pageerror；訪客也會出現、等 3 秒或站內連結點擊為 0；
+  診斷 `/tmp/s2/diag-webkit-rsc2.mjs`）→ 判定無功能影響。**若日後要對 preview 跑 WebKit pageerror 零容忍的 E2E，需先處理或過濾此項。**
+- 其他觀察：OpenNext build 需對外網路（首次抓 `fonts.gstatic.com` 字型逾時，重試成功）；對戰頁「對戰方式／場地數／計時」預備設定換頁後重置、回合存在時改計時是改當前輪（既有設計，M14 待裁決項），非 B 系列回歸。
+- **未涵蓋**：Playwright 的 WebKit 不是 Safari 實機；B7.5 9.2「Safari 實機手動驗證」若要求真機，仍需使用者人工補做。本機 D1 留有 S2 資料與 session，下次使用前重新 seed。
 
 ## G1 暫緩：Google 登入與上線（使用者完成 Google 端設定後才開）
 
@@ -638,7 +652,7 @@ E2E        660 條：632 passed / 27 skipped / 1 failed（tour mobile-safari「�
 - 使用者定案落實：匯入後保留本機；四張 matchmaker 表任一有本人資料 409 整份不寫；計分板已存在略過 `skipped`；重複匯入不產生重複歷史；登入時 JSON 還原改為「從 JSON 備份匯入到雲端」（同端點同規則）。
 - coordinator 接受 leader 裁定：H07（oversize 時仍提示，帶到資料頁看說明）、F08／B04／G04／Y03（前端照送、後端 400）、N07（分槽 matchId 以場次 id 為準）、U07／J12（409／failed 也 refresh）；§5 多出 `LocalImportResultMessage.tsx`、`local-import-view.ts` 已補入 proposal Impact。
 - **G1 前必修**：oversize 門檻餘裕不足——前端量原始陣列 UTF-8（門檻 1,900,000 B），後端 `json_each` 參數另有包裝（歷史每筆約 +80 B），實測前端 1,880,596 B → 後端 2,100,131 B，超過正式 D1 單一參數 2MB（本機 miniflare 不擋）。失敗安全（整批回滾、籠統失敗訊息），只是邊緣資料看不到 oversize 說明；改以後端包裝形狀量測或降低門檻。
-- 低優先後續：JSON 雲端匯入無送出中防護（連選兩次送兩請求，第二個 409，不重複寫入）；後端補「只有獨立計分板」與「playedAt 帶時區位移回 400」專屬 it；`history-spec.ts:294` 過時註解。
+- 低優先後續：JSON 雲端匯入無送出中防護（連選兩次送兩請求，第二個 409，不重複寫入）；後端補「只有獨立計分板」與「playedAt 帶時區位移回 400」專屬 it；`history-sync.spec.ts:294` 過時註解。
 - **coordinator 教訓**：第三任 leader 交回時其 §5 Stage 2 reviewer 仍活著（只是兩次工具呼叫之間無 process），coordinator 誤判已停而清掉它的 dev server、釋放它的鎖，鎖隨即被 mini4wd 取走；reviewer 自行重取鎖重跑受影響變異，結論未受影響。
   **判斷子 agent 已停只能以它的 hand-back／完成通知為準**，不能只看 ps。另：zsh 不拆變數字串，`H="python3 heavy.py ..."; $H cmd` 會 exit 127，雙鎖指令要寫全或用 bash 腳本。
 - **共用鎖（2026-10-29 起）**：三個 session（nextjspickball、mini4wd、blender）統一「先 `/tmp/heavy-lock.sh acquire`、再 `python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label <名稱> -- <指令>`、最後 release」；禁止 heavy.py 內再包 heavy.py。
