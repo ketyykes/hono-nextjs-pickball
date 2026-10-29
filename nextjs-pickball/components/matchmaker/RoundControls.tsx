@@ -23,7 +23,7 @@ import type {
 } from "@pickball/core/matchmaker/round-types";
 import type { SetTargetScoreResult, SetTimerDurationResult, StartTimerResult } from "@pickball/core/matchmaker/round";
 import { isTargetScoreLocked } from "@/lib/matchmaker/scoreboard-binding";
-// nextRadioIndex 與 capability 無關，位置為歷史因素（design Decision 6）；
+// nextRadioIndex 與 capability 無關，位置為歷史因素；
 // matchmaker 與 scoreboard 的目標分數選擇器共用同一份 WAI-ARIA radio group 方向鍵索引計算。
 import { nextRadioIndex } from "@/lib/scoreboard/radio-navigation";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
@@ -70,8 +70,8 @@ export interface RoundControlsProps {
 }
 
 // 本輪設定控制項：對戰方式、場地數、目標分數，以及「產生本輪對戰」操作入口。
-// settings／onSettingsChange／round／onGenerate 由父層以 props 傳入並在此處呼叫回去
-// （design Decision 9）——本元件不持有任何 store，場地數的夾值與邊界判定一律委派
+// settings／onSettingsChange／round／onGenerate 由父層以 props 傳入並在此處呼叫回去，
+// 本元件不持有任何 store，場地數的夾值與邊界判定一律委派
 // lib/matchmaker/round-settings.ts。
 export function RoundControls({
 	settings,
@@ -112,7 +112,7 @@ export function RoundControls({
 	// 每場所需人數唯一取自 PLAYERS_PER_MATCH，不得另行寫死 2／4。
 	const requiredPlayers = PLAYERS_PER_MATCH[settings.format];
 	const insufficientPlayers = activePlayerCount < requiredPlayers;
-	// 「未完成」＝非 completed，涵蓋 pending 與 scoring 兩態（design Open Questions 2b）——
+	// 「未完成」＝非 completed，涵蓋 pending 與 scoring 兩態——
 	// 場邊計分中的場次仍須算進「有可重排的場次」，不能只看 pending。
 	const hasIncompleteMatch =
 		round !== null && round.matches.some((match) => match.status !== "completed");
@@ -298,7 +298,7 @@ export function RoundControls({
 				{/* 鎖定與否重用 isTargetScoreLocked 的 locked 布林值（上方 locked 變數，同一次
 				    呼叫的結果），但顯示的原因 MUST 是 ROUND_TIMER_LOCKED_REASON 而非
 				    lockResult.reason——後者固定提及「目標分數」，出現在計時區塊會誤導使用者
-				    以為看錯區塊（design Decision 2）。 */}
+				    以為看錯區塊。 */}
 				{locked && <p className="text-xs text-muted-foreground">{ROUND_TIMER_LOCKED_REASON}</p>}
 				{canStartTimer && (
 					<Button type="button" variant="outline" size="sm" onClick={() => startTimer()}>

@@ -10,7 +10,7 @@ export { STORAGE_KEY };
 
 // 空字串視為未綁定（等同 null）：`/scoreboard?match=` 這種空 query param 會產生 ""，
 // 而非 null，若不正規化，reducer 現行的 SET_TARGET_SCORE guard 會誤判為「已綁定」
-// （見 design 8-D 的裁決：正規化交給邊界，不回頭改 reducer）。
+// （正規化交給邊界，不回頭改 reducer）。
 function isStandaloneMatchId(matchId: string | null): boolean {
 	return matchId === null || matchId === "";
 }

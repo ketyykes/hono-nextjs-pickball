@@ -123,11 +123,11 @@ describe("PlayerStatsTable", () => {
 
 		expect(cellTexts[2]).toBe("3.50");
 		expect(cellTexts[3]).toBe("10");
-		// draws 未覆寫，沿用 buildStat 預設值 0：勝負和欄三個數字恆常顯示（design Decision 4）。
+		// draws 未覆寫，沿用 buildStat 預設值 0：勝負和欄三個數字恆常顯示。
 		expect(cellTexts[4]).toBe("6 - 4 - 0");
 		expect(cellTexts[5]).toBe("60%");
 		expect(cellTexts[6]).toBe("+0.42");
-		// 常搭檔／常對手兩欄都要有消費端呈現，不是算了卻不顯示的暗資料（design Decision 6）。
+		// 常搭檔／常對手兩欄都要有消費端呈現，不是算了卻不顯示的暗資料。
 		expect(cellTexts[7]).toBe("陳小華");
 		expect(cellTexts[8]).toBe("林大同");
 	});
@@ -205,7 +205,7 @@ describe("PlayerStatsTable", () => {
 		const winLossDrawText = within(row).getAllByRole("cell")[4].textContent ?? "";
 
 		// 用逐一往後搜尋數字出現位置確認「依序」，而非只斷言三個數字都存在——
-		// 否則「順序被打亂」的變異也會通過（design Decision 4：三個數字恆常顯示且順序固定）。
+		// 否則「順序被打亂」的變異也會通過（三個數字恆常顯示且順序固定）。
 		const indexOfWins = winLossDrawText.indexOf("2");
 		const indexOfLosses = winLossDrawText.indexOf("1", indexOfWins + 1);
 		const indexOfDraws = winLossDrawText.indexOf("1", indexOfLosses + 1);
@@ -213,8 +213,7 @@ describe("PlayerStatsTable", () => {
 		expect(indexOfLosses).toBeGreaterThan(indexOfWins);
 		expect(indexOfDraws).toBeGreaterThan(indexOfLosses);
 
-		// 標題必須同步改名為「勝負和」，子字串比對（既有 E2E）無法承擔這條證明責任
-		// （design Decision 6）。
+		// 標題必須同步改名為「勝負和」，子字串比對（既有 E2E）無法承擔這條證明責任。
 		const headerTexts = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
 		expect(headerTexts[4]).toBe("勝負和");
 	});

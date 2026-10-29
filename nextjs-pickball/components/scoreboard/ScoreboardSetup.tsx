@@ -25,7 +25,7 @@ interface ScoreboardSetupProps {
 	locked: boolean;
 	isFocusMode: boolean;
 	// 綁定對戰場次時（matchId !== null）設定列改為唯讀目標分數 + 場地標示 + 返回對戰，
-	// 不渲染比賽形式下拉與目標分數 radiogroup（design Decision 8、MODIFIED Requirement）。
+	// 不渲染比賽形式下拉與目標分數 radiogroup。
 	matchId: string | null;
 	// 綁定模式下顯示的場地標示來源；null 時不渲染場地標示（見 courtNumber 為 null 時
 	// 的呈現決策：與其顯示「場地 -」等佔位文字誤導使用者，不如乾脆不顯示這塊）。
@@ -125,7 +125,7 @@ export function ScoreboardSetup({
 			</Select>
 			{isBound ? (
 				// 唯讀文字取代 radiogroup：disabled 的互動控制項會暗示「這裡本來可以改」，
-				// 但綁定模式下永遠不會解鎖，唯讀文字才誠實（design Decision 8）
+				// 但綁定模式下永遠不會解鎖，唯讀文字才誠實
 				<span className="text-sm font-medium">本輪 {targetScore} 分制</span>
 			) : (
 				<div

@@ -70,7 +70,7 @@ const REQUIRED_HEADERS: readonly string[] = [
 /**
  * 單一欄位驗證的統一形狀：合法時帶正規化後的值，不合法時帶繁體中文原因。
  * 五個欄位各自的驗證函式皆回傳這個形狀，讓呼叫端（collectField）用同一套
- * 邏輯組裝 RosterCsvRowError，不必五段各寫各的錯誤組裝（task 5.13）。
+ * 邏輯組裝 RosterCsvRowError，不必五段各寫各的錯誤組裝。
  */
 type FieldValidation<T> =
 	| { readonly valid: true; readonly value: T }
@@ -275,7 +275,7 @@ export interface ApplyRosterImportContext {
  * 將 CSV 解析結果套用到既有名單，寫入採**附加**模式（prd.md 9.3.2）。
  *
  * 第二個參數直接複用 `parseRosterCsv` 的成功回傳形狀（`{ rows, errors }`），
- * SHALL NOT 為此函式另立第二種只服務本函式的型別（task 6.2／6.4）。
+ * SHALL NOT 為此函式另立第二種只服務本函式的型別。
  *
  * 任一列驗證失敗（`parsed.errors` 非空）時直接回傳原名單，不進入逐列迴圈——
  * 「整份不匯入」不是「跳過失敗列後匯入其餘合法列」。

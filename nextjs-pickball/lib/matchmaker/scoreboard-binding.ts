@@ -7,7 +7,7 @@ import type { SubmitScoreInput } from "@pickball/core/matchmaker/round";
 import { pickTextColor } from "./colors";
 import type { Player } from "@pickball/core/matchmaker/types";
 
-// 名單中找不到該球員時的替代文字（design Decision 3：呈現替代文字，不跳過、不拋錯）。
+// 名單中找不到該球員時的替代文字（呈現替代文字，不跳過、不拋錯）。
 // 與 export-scene.ts「名單中找不到球員時以替代文字呈現」的既有判斷同構，但兩個
 // capability 各自獨立實作、不跨檔 import——export-scene.ts 的常數為 module-private，
 // 這裡重新宣告同一組字面量（沿用其措辭與色碼慣例，見 spec「隊伍球員顯示資訊」）。
@@ -18,15 +18,14 @@ const PLACEHOLDER_COLOR_FROM = "#9CA3AF";
 const PLACEHOLDER_COLOR_TO = "#4B5563";
 
 /**
- * 把單一隊伍的 playerIds 解析為球員顯示資訊陣列（design Decision 1／3）：查得到時取該員
+ * 把單一隊伍的 playerIds 解析為球員顯示資訊陣列：查得到時取該員
  * name／colorFrom／colorTo，查不到時（該員已被移除）以固定替代文字與中性色呈現——
  * SHALL NOT 跳過該筆，跳過會讓雙打面板變成一人一格（見 spec）。foreground 一律由
  * pickTextColor 依 colorFrom／colorTo 算好存入，scoreboard 端只讀不算，藉此維持
- * lib/scoreboard/ 不 import lib/matchmaker/ 的單向相依（design Decision 1）。
+ * lib/scoreboard/ 不 import lib/matchmaker/ 的單向相依。
  *
  * ⚠️ 與 components/matchmaker/CourtCard.tsx、lib/matchmaker/round.ts 內同名的
- * `resolveTeamPlayers`（兩者皆「查無此人就跳過」）行為相反，這是 design Decision 3
- * 明文接受的不一致：對戰頁色塊的 row／column 是離散格位，缺一格比多一格佔位更貼近
+ * `resolveTeamPlayers`（兩者皆「查無此人就跳過」）行為相反，這是明文接受的不一致：對戰頁色塊的 row／column 是離散格位，缺一格比多一格佔位更貼近
  * 版面推導的資料形狀；計分板面板沒有這層版面約束，少一筆反而會讓雙打看起來像單打。
  * 複製那兩個函式的假設到這裡會直接違反 spec，反之亦然。
  */
@@ -71,7 +70,7 @@ function buildTeamPlayers(match: RoundMatch, players: readonly Player[]): TeamPl
  * courtNumber 取自 match.courtNumber（唯一決定處）：計分板 SHALL NOT 反查
  * matchmaker:round:v1 來取得場地標示，seed 建立當下就是它唯一的資料來源。
  *
- * players 為必填（design Decision 4）：唯一的生產呼叫點（CourtCard.tsx）本來就已經
+ * players 為必填：唯一的生產呼叫點（CourtCard.tsx）本來就已經
  * 持有 players prop，沒有合法情境需要省略——optional 只會讓「忘記傳」從編譯期錯誤
  * 退化成執行期的靜默降級。round 僅保存球員 id，姓名與雙色漸層須由此參數解析。
  */
@@ -173,10 +172,10 @@ function isEligibleForBackfill(
 	if (slot.status !== "finished") return false;
 
 	// 條件二：場次仍在回合中。槽對應的場次可能因重排等原因已從回合消失（prd.md §11），
-	// 此時該槽是孤兒資料，SHALL NOT 拋錯——略過即可，等 §6 的清槽流程收尾。
+	// 此時該槽是孤兒資料，SHALL NOT 拋錯——略過即可，等清槽流程收尾。
 	if (match === undefined) return false;
 
-	// 條件三（冪等的第二道防線，design Decision 5）：清槽是主要機制，此條件是清槽失敗
+	// 條件三（冪等的第二道防線）：清槽是主要機制，此條件是清槽失敗
 	// （例如 LocalStorage 寫入被配額擋下）時的最後防線，避免評分被重複雙倍更新。
 	if (match.status === "completed") return false;
 

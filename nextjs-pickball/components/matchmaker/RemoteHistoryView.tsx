@@ -10,7 +10,7 @@ import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { HistoryRecordCard } from "./HistoryRecordCard";
 
-// 雲端模式的歷史頁內容（design Decision 3）：與本機的 HistoryView 分開，
+// 雲端模式的歷史頁內容：與本機的 HistoryView 分開，
 // 使訪客路徑的元件一行不動。區間篩選由後端依前端算好的界線完成，
 // 所以這裡拿到的 items 已經是目前區間的紀錄，不再前端篩選。
 export function RemoteHistoryView() {

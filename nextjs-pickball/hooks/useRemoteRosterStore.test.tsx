@@ -1232,7 +1232,7 @@ describe("useRemoteRosterStore 名單 port（接收後端寫入的評分）", ()
 		expect(result.current.players).toEqual([]);
 	});
 
-	// regression guard：以下 it 在實作完成後補寫，寫入當下即綠（Stage 2 mutation 發現的缺口）
+	// regression guard：以下 it 在實作完成後補寫，寫入當下即綠（mutation 發現的缺口）
 	it("applyRemotePlayers 只在回應中的參賽者有待送變更時才重載", async () => {
 		enqueue(200, listBody([[makePlayer("p1"), 2], [makePlayer("p2"), 2]]));
 		const { result } = renderRemote({ enabled: true });

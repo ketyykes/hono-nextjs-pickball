@@ -1,5 +1,5 @@
 // 本輪設定的預設值與場地數夾值——純函式，元件內以 useState 管理狀態，
-// 刻意不做 useRoundSettings hook（design Decision 3）。
+// 刻意不做 useRoundSettings hook。
 
 import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
 import {
@@ -29,7 +29,7 @@ export interface CourtCountBounds {
  * 場地數加減後的結果：夾值後的設定，附帶是否已達上下限。
  * settings 獨立成一個鍵，而非把 RoundSettings 的欄位攤平進本介面——攤平會讓本型別
  * 結構上相容 RoundSettings，`setSettings(changeCourtCount(settings, 1))` 在
- * useState<RoundSettings>（design Decision 3 指定的狀態形式）下會被型別放行，
+ * useState<RoundSettings>（元件採用的狀態形式）下會被型別放行，
  * 兩個衍生旗標就這樣混進 state，並在後續 `{ ...settings, format: "doubles" }`
  * 之類的更新中繼續帶著過期旗標傳播。
  */

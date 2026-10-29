@@ -1,6 +1,6 @@
 // matchmaker 區段導覽（對戰／參賽者）的分頁清單與 active 判定——純函式，
-// 不 import React 或 next/navigation，純函式才能在 lib/ 這一層做單元測試
-// （design Decision 2）；「兩頁共用一份判定」本身是 app/matchmaker/layout.tsx
+// 不 import React 或 next/navigation，純函式才能在 lib/ 這一層做單元測試；
+// 「兩頁共用一份判定」本身是 app/matchmaker/layout.tsx
 // 只掛一份導覽所保證的，非本模組職責。
 
 /** matchmaker 區段導覽的單一分頁 */

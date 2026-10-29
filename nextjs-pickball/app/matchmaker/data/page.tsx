@@ -7,10 +7,10 @@ import { RosterCsvImportSection } from "@/components/matchmaker/RosterCsvImportS
 
 // 資料工具頁入口：集中放置 JSON 完整備份、歷史賽果 CSV 匯出、
 // 參賽者名單 CSV 匯入與清除本機資料四個功能區塊
-// （spec「資料工具頁與其導覽入口」，`openspec/changes/matchmaker-data-transfer/specs/data-transfer/spec.md`）。
+// （spec「資料工具頁與其導覽入口」，`openspec/specs/data-transfer/spec.md`）。
 // 導覽入口由 app/matchmaker/layout.tsx 掛的 MatchmakerTabs 提供，讀
 // lib/matchmaker/section-nav.ts 的同一份常數，本檔不另寫路徑字面值。
-// 本檔屬例外層（純入口，design Decision 1），不含邏輯——各區塊的實際接線
+// 本檔屬例外層（純入口），不含邏輯——各區塊的實際接線
 // 在各自的區塊元件內。
 //
 // 頂部的不對稱說明為 prd.md 9.3 前言明列的使用者誤解風險：CSV 匯出的是歷史賽果、

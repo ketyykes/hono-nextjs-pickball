@@ -78,7 +78,7 @@ interface RemoteState {
 	round: Round | null;
 	slots: SlotRecord;
 	status: SyncStatus;
-	/** 目前狀態屬於哪個帳號；render 時與 userId 不同代表 effect 還沒換世代（design Decision 7）。 */
+	/** 目前狀態屬於哪個帳號；render 時與 userId 不同代表 effect 還沒換世代。 */
 	owner: string | null;
 }
 
@@ -183,7 +183,7 @@ interface Controller {
 }
 
 /**
- * 登入時對戰回合的雲端實作（design Decision 6、7、8）：載入回合與分槽、以命令佇列送出、
+ * 登入時對戰回合的雲端實作：載入回合與分槽、以命令佇列送出、
  * 版本衝突時整份重新載入。畫面上的回合 = 已確認回合依序套用佇列中的命令，因此操作同步回傳。
  */
 export function useRemoteRoundStore({
@@ -449,7 +449,7 @@ export function useRemoteRoundStore({
 		if (mismatched || controller === null || !readyRef.current) {
 			return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: NOT_READY_MESSAGE };
 		}
-		// 名單未就緒時以空名單預測會回 scoring-failed 並擋下送出（design Open Questions 第 7 點）
+		// 名單未就緒時以空名單預測會回 scoring-failed 並擋下送出
 		if (!rosterReadyRef.current) {
 			return { ok: false, code: SUBMIT_SCORE_FAILURE_CODE.SCORING_FAILED, message: ROSTER_NOT_READY_MESSAGE };
 		}

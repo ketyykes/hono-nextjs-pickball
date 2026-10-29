@@ -7,7 +7,7 @@ import { matchmakerSectionTabs } from "@/lib/matchmaker/section-nav";
 import { cn } from "@/lib/utils";
 
 // matchmaker 區段導覽（對戰／參賽者）：純呈現，分頁清單與 active 判定完全委派
-// lib/matchmaker/section-nav.ts 的 matchmakerSectionTabs（design Decision 1）。
+// lib/matchmaker/section-nav.ts 的 matchmakerSectionTabs。
 // 為何掛在 layout 而非各頁自己渲染，見 app/matchmaker/layout.tsx 的檔頭註解。
 export function MatchmakerTabs() {
 	const pathname = usePathname();

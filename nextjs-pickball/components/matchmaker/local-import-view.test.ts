@@ -4,7 +4,7 @@ import type { LocalImportSummary } from "@/lib/sync/local-import";
 import { REMOTE_TRANSFER_MESSAGES } from "@/lib/matchmaker/remote-transfer";
 import { LOCAL_IMPORT_MESSAGES, describeImportOutcome, describeLocalSummary } from "./local-import-view";
 
-// regression guard：以下斷言寫入當下即綠（行為在 5.2 已存在），目的是補上 Stage 2 mutation 發現的鑑別力缺口。
+// regression guard：以下斷言寫入當下即綠（行為已存在），目的是補上 mutation 發現的鑑別力缺口。
 // 各欄位值刻意互不相同，欄位被換成別的欄位或常數時整句字串才會不同。
 
 function buildSummary(overrides: Partial<LocalImportSummary> = {}): LocalImportSummary {

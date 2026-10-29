@@ -160,7 +160,7 @@ describe("受限交換", () => {
 		expect(ratingSpread(after)).toBeLessThanOrEqual(spreadBefore);
 
 		// avoidRepeats 只能重排既有球員的位置，不得新增或移除任何人——
-		// 出場名單（本函式的輸入輸出皆不含休息名單）成員在調整前後必須完全相同（tasks 7.3、7.6）。
+		// 出場名單（本函式的輸入輸出皆不含休息名單）成員在調整前後必須完全相同。
 		const idsOf = (matches: readonly Match[]) => matches.flatMap((m) => m.teams.flatMap((t) => t.players.map((p) => p.id))).sort();
 		expect(idsOf(after)).toEqual(idsOf(before));
 	});
@@ -188,7 +188,7 @@ describe("受限交換", () => {
 	});
 
 	it("強度差距總和完全不變時仍接受交換", () => {
-		// design Decision 5：判準取 `調整後總和 <= 調整前總和`（含相等），而非 `<`——
+		// 判準取 `調整後總和 <= 調整前總和`（含相等），而非 `<`——
 		// 「相等代表強度品質未劣化，此時若能減少重複就該接受；用 `<` 會讓大量『零成本』的
 		// 迴避機會被白白放棄」。前一個 it（分差從 7.9 降到 4.1）只驗證了嚴格變小的情況，
 		// 沒有任何 fixture 逼出「相等也要接受」這條分支——`spread <= current.spread` 改成

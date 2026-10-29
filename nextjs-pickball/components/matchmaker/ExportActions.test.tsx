@@ -40,7 +40,7 @@ describe("ExportActions", () => {
 		const printButton = screen.getByRole("button", { name: "列印 PDF" }) as HTMLButtonElement;
 		expect(exportButton.disabled).toBe(true);
 		expect(printButton.disabled).toBe(true);
-		// 需要指出「需先產生本輪對戰」，不只是視覺變淡（design Decision 5）。
+		// 需要指出「需先產生本輪對戰」，不只是視覺變淡。
 		expect(screen.getByText(/需先產生本輪對戰/)).not.toBeNull();
 	});
 
@@ -54,7 +54,7 @@ describe("ExportActions", () => {
 		expect(exportButton.disabled).toBe(false);
 		expect(printButton.disabled).toBe(false);
 		// 反向對照：只驗「停用時有說明」的話，「說明文字恆顯示」的實作也會通過，
-		// 而那會在功能可用時誤導使用者（design Decision 5）。
+		// 而那會在功能可用時誤導使用者。
 		expect(screen.queryByText(/需先產生本輪對戰/)).toBeNull();
 	});
 

@@ -12,7 +12,7 @@ import type { RoundTimer } from "@pickball/core/matchmaker/round-types";
 export interface RoundTimerBannerProps {
 	timer: RoundTimer;
 	/**
-	 * 時間到提示音的注入點；省略時使用 playTimerExpiredChime（design Decision 6）。
+	 * 時間到提示音的注入點；省略時使用 playTimerExpiredChime。
 	 *
 	 * 「可選注入 prop」這個角色比照 ExportActions 的 `printer?` 先例，但型別刻意收窄為
 	 * `() => void` 而非該處的 `unknown`：`printer` 用 `unknown` 是為了讓「呼叫端傳入非函式值」
@@ -67,8 +67,8 @@ export function RoundTimerBanner({
 	}
 
 	if (expired) {
-		// 「時間到」大字 MUST 為靜態文字，零任何 CSS 動畫或 animate-* utility
-		// （design Decision 7）；role="alert" 隱含 aria-live="assertive"，
+		// 「時間到」大字 MUST 為靜態文字，零任何 CSS 動畫或 animate-* utility；
+		// role="alert" 隱含 aria-live="assertive"，
 		// 已足以讓讀屏即時播報，本區塊 SHALL NOT 另外加 aria-live 屬性。
 		return (
 			<div role="alert" className="flex flex-col gap-1">

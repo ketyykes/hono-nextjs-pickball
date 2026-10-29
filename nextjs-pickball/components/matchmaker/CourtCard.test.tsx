@@ -82,7 +82,7 @@ function buildRound(overrides: Partial<Round> = {}): Round {
 }
 
 // 測試專用預設 props：match／players 給合法單打初始值，其餘 callback 一律用 vi.fn()——
-// CourtCard 不持有任何 store（design Decision 9），測試不需要 mock 任何東西。
+// CourtCard 不持有任何 store，測試不需要 mock 任何東西。
 // round／matchSlot 為必填 props：round 給合法預設值，matchSlot 預設 null
 // （尚未開始場邊計分），既有測試皆不涉及計分板接線，不受影響。
 function buildProps(overrides: Partial<CourtCardProps> = {}): CourtCardProps {
@@ -320,8 +320,8 @@ describe("CourtCard", () => {
 		expect(teamBInput.disabled).toBe(true);
 		expect(submitButton.disabled).toBe(true);
 
-		// 完成場次的色塊 MUST 套用 playerTileStyle(..., { completed: true }) 的減弱樣式
-		// （design Decision 8）——這裡驗證的是 CourtCard 有沒有把 completed 正確 wiring
+		// 完成場次的色塊 MUST 套用 playerTileStyle(..., { completed: true }) 的減弱樣式，
+		// 這裡驗證的是 CourtCard 有沒有把 completed 正確 wiring
 		// 進 PlayerTile，不是 playerTileStyle 本身的計算（那已由 tile-style.test.ts 涵蓋）。
 		const completedTileStyle = (completedView.getByTestId("player-tile-p1") as HTMLElement).style;
 		expect(completedTileStyle.opacity).not.toBe("");
@@ -339,7 +339,7 @@ describe("CourtCard", () => {
 
 	it("已完成場次顯示最終比分勝方與完成時間", () => {
 		// 不硬寫時區換算後的字串——happy-dom 跑在本機時區，改用 Date 物件推導期望值，
-		// 避免測試在不同時區的機器上假紅（design Open Questions 3）。
+		// 避免測試在不同時區的機器上假紅。
 		function expectedTimeOf(iso: string): string {
 			const date = new Date(iso);
 			return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -491,7 +491,7 @@ describe("CourtCard", () => {
 		expect(tileP4.style.gridColumn).toBe("2");
 
 		// 比分與送出控制區必須落在上下兩排「之間」且橫跨兩欄，同時扮演雙打版面「網」的
-		// 分隔角色（design Decision 4）——不能只驗有沒有渲染 ScoreEntry，位置本身就是
+		// 分隔角色——不能只驗有沒有渲染 ScoreEntry，位置本身就是
 		// 這條 Requirement 的一部分（控制區移到最下、或只跨左半，都不該是綠燈）。
 		const scoreEntry = screen.getByTestId("court-match-1-score-entry");
 		expect(scoreEntry.style.gridRow).toBe("3");
@@ -715,7 +715,7 @@ describe("CourtCard", () => {
 		// match.scores.teamA === match.scores.teamB 的實作測不出任何差異（實測確認該變異在
 		// 補這組之前完全存活）。「比分相同是否算平局」是回合層的判定，RoundMatchSchema 只
 		// 保證 completed 場次帶有 winner，並未保證「比分相同 ⇔ 平局」，UI SHALL NOT 自行
-		// 複製一份這條規則（design Decision 6）。
+		// 複製一份這條規則。
 		const tieScoreWithWinnerMatch = buildMatch({
 			status: "completed",
 			scores: { teamA: 11, teamB: 11 },
@@ -733,7 +733,7 @@ describe("CourtCard", () => {
 	});
 
 	// UI 層 SHALL NOT 複製「兩隊比分相同是否可送出」這條
-	// 驗證規則（design Decision 6）——一律原樣往上傳，由 round-lifecycle 的
+	// 驗證規則——一律原樣往上傳，由 round-lifecycle 的
 	// validateScoreInput 決定是否接受平局。這條測試證明 CourtCard 本身沒有這種複製。
 	it("兩隊比分相同時 UI 仍照常委派送出而不自行攔截", async () => {
 		const user = userEvent.setup();

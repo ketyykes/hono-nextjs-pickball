@@ -2,7 +2,7 @@
 import { HistoryModeSwitch } from "@/components/matchmaker/HistoryModeSwitch";
 
 // 歷史頁入口。本檔刻意不標 "use client"：畫面狀態與資料讀取全部委派 HistoryModeSwitch（依登入態擇一渲染 HistoryView 或 RemoteHistoryView）
-// （design Decision 5 否決的替代方案——page.tsx 是 server component 慣例的入口層，
+// （page.tsx 是 server component 慣例的入口層，
 // 塞 "use client" 與狀態會讓路由入口同時承擔兩種角色）。
 //
 // MUST 可被直接開啟，不相依任何前一畫面留下的記憶體狀態（spec「歷史頁的導覽入口」）。

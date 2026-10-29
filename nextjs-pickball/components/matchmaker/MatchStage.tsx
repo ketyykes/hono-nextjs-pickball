@@ -34,15 +34,15 @@ export interface MatchStageProps {
 	remoteNavigate?: (href: string) => void;
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: MatchStageSubmitError | null;
-	// 換人操作的委派回呼（spec「場地區塊的換人操作」，design Decision 6：候選人清單由
+	// 換人操作的委派回呼（spec「場地區塊的換人操作」：候選人清單由
 	// CourtCard 內部依 round／players 推導，本層不重算）。
 	onSwapPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => void;
 	swapError: MatchStageSwapError | null;
 }
 
-// 舞台版面：場次網格＋休息名單，RWD 三斷點（design Decision 2）。桌面（lg 起）
+// 舞台版面：場次網格＋休息名單，RWD 三斷點。桌面（lg 起）
 // 左右並排、平板與手機皆單欄（休息名單移至場地內容下方）——用 flex-col + lg:flex-row
-// 一份規則同時滿足平板與手機兩列（design Open Questions 4：桌面欄數細節不寫進 spec，
+// 一份規則同時滿足平板與手機兩列（桌面欄數細節不寫進 spec，
 // 本檔決定手機 1 欄、md 起 2 欄）。
 //
 // 手機斷點觸控目標（≥44px）：CourtCard／ScoreEntry 屬 tasks 7～9 既有產出，**刻意不改動
@@ -70,8 +70,8 @@ export function MatchStage({
 		.filter((player): player is Player => player !== undefined);
 
 	// round.matches 為空但 round 本身非 null，是「回合已存在、但這一輪排不出任何
-	// 一場」的狀態（與 round 為 null 的「空白球場狀態」不同，見 EmptyMatches 檔頭
-	// 註解／design Decision 1）：改渲染 EmptyMatches 而非空的場地網格，
+	// 一場」的狀態（與 round 為 null 的「空白球場狀態」不同，見 EmptyMatches 檔頭註解）：
+	// 改渲染 EmptyMatches 而非空的場地網格，
 	// data-testid="match-stage-courts" 只在有場次時存在。RestingPanel 不受此
 	// 條件影響，一律渲染——即使本輪排不出任何場次，休息名單對主持人仍是有效資訊。
 	return (

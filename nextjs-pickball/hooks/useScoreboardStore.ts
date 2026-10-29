@@ -15,7 +15,7 @@ import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 // - standalone：未帶 matchId，沿用獨立計分板（scoreboard:current:v1）
 // - pending：帶 matchId 但尚未判定（read effect 尚未執行完成的暫定值）——
 //   若省略此態直接以 missing 起手，合法綁定場次會在 read effect 判定完成前
-//   先閃一幀「場次已失效」畫面（§7.0b）
+//   先閃一幀「場次已失效」畫面
 // - bound：帶 matchId 且分槽（scoreboard:matches:v1）內有對應條目
 // - missing：帶 matchId 但分槽內無對應條目，場次已失效（重排或刪除）
 export type ScoreboardBindingStatus = "standalone" | "pending" | "bound" | "missing";
@@ -41,7 +41,7 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 	ScoreboardBindingStatus,
 ] {
 	// 空字串（如 `/scoreboard?match=`）正規化為 null，視為未綁定——
-	// 正規化交給呼叫端邊界，reducer 不處理這件事（見 design 8-D）。
+	// 正規化交給呼叫端邊界，reducer 不處理這件事。
 	const matchId = matchIdParam === "" || matchIdParam === undefined ? null : matchIdParam;
 
 	const [state, dispatch] = useReducer(

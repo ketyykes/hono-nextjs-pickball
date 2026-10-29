@@ -39,17 +39,17 @@ export interface CourtCardProps {
 	onSubmitScore: (matchId: string, rawScoreA: string, rawScoreB: string) => void;
 	submitError: string | null;
 	// 換人操作的委派回呼：CourtCard 不判斷換人是否合法，一律交給 round-lifecycle 的
-	// swapMatchPlayer（spec「場地區塊的換人操作」，design Decision 6）。
+	// swapMatchPlayer（spec「場地區塊的換人操作」）。
 	onSwapPlayer: (matchId: string, outPlayerId: string, inPlayerId: string) => void;
-	// 換人被拒絕時的繁體中文錯誤訊息，null 代表目前沒有換人錯誤（design Decision 6，
-	// 比照既有 submitError 的字串｜null 形態）。
+	// 換人被拒絕時的繁體中文錯誤訊息，null 代表目前沒有換人錯誤
+	// （比照既有 submitError 的字串｜null 形態）。
 	swapError: string | null;
 	// 雲端模式才傳入：進入計分板前先以 PUT（version 0）建立雲端分槽，成功或已存在才用它導向。
 	// 未傳入（訪客）時完全沿用本機的 ensureMatchSlot 流程。
 	remoteNavigate?: (href: string) => void;
 }
 
-// RoundMatch 只存 playerIds（design Open Questions 2b）：回合與名單同時活著，內嵌整個
+// RoundMatch 只存 playerIds：回合與名單同時活著，內嵌整個
 // Player 會產生兩個互相矛盾的真相。顯示與版面推導都要靠 players 名單查表補全為完整 Player。
 // 查無此人（該員已被移除，roster.ts 的 removePlayer 不禁止移除仍在場次中的人）時直接
 // 從陣列中略過，不拋錯——結果是該格不渲染，而非讓整張場地卡片崩潰。
@@ -59,9 +59,9 @@ function resolveTeamPlayers(playerIds: readonly string[], players: readonly Play
 		.filter((player): player is Player => player !== undefined);
 }
 
-// 完成時間格式化為 HH:mm（design Open Questions 3）：直接讀本地時區的時／分，不切片
+// 完成時間格式化為 HH:mm：直接讀本地時區的時／分，不切片
 // ISO 字串——切片取到的是 UTC 而非本地時區，與歷史紀錄「對戰時間」的顯示基準不一致。
-// 沒有第二個消費者前不抽為共用格式化函式（design Open Questions 3 的刻意決定）。
+// 沒有第二個消費者前不抽為共用格式化函式（刻意決定）。
 function formatCompletedTime(completedAt: string): string {
 	const date = new Date(completedAt);
 	const hours = String(date.getHours()).padStart(2, "0");
@@ -69,7 +69,7 @@ function formatCompletedTime(completedAt: string): string {
 	return `${hours}:${minutes}`;
 }
 
-// 單一場地：色塊網格＋比分送出＋完成資訊（design Decision 2）。CourtCard 只做組裝——
+// 單一場地：色塊網格＋比分送出＋完成資訊。CourtCard 只做組裝——
 // 版面推導只用 buildCourtTiles、樣式推導只用 playerTileStyle（於 PlayerTile 內），
 // 本檔不得另寫一份 row／column 或漸層計算。tileGridRow／scoreEntryGridRow 只是把
 // buildCourtTiles 已推導好的邏輯座標（0 起算）翻譯成本檔選定版面下的 CSS grid 列號，
@@ -102,10 +102,10 @@ export function CourtCard({
 	const liveScore = matchSlot ? mapTeamScores(matchSlot.scores, "round") : null;
 	const entryLabel = inProgress ? "繼續計分" : "進入計分板";
 
-	// 換人操作的顯示條件與候選人（spec「場地區塊的換人操作」，design Decision 4／6）：
+	// 換人操作的顯示條件與候選人（spec「場地區塊的換人操作」）：
 	// 「尚未於計分板開始計分」重用既有的 inProgress 變數，不另立第二個判斷；候選人為
 	// round.restingPlayerIds 中目前仍 active 的球員，只計算一次供每個球員格重用
-	// （design Decision 6：不新增候選人 prop，由既有的 round／players 推導）。
+	// （不新增候選人 prop，由既有的 round／players 推導）。
 	const canSwap = !completed && !inProgress;
 	const swapCandidates = round.restingPlayerIds
 		.map((id) => players.find((player) => player.id === id))
@@ -156,7 +156,7 @@ export function CourtCard({
 	};
 	const tiles = buildCourtTiles(tileSource);
 
-	// 雙打上下分排（design Decision 4）：色塊列 0／1 分別落在 grid 第 2、4 列，
+	// 雙打上下分排：色塊列 0／1 分別落在 grid 第 2、4 列，
 	// 讓第 1、5 列可以貼隊伍標籤、第 3 列放比分區這個「網」；單打只有一排色塊，
 	// 直接排第 1 列，標籤改用格線外的左右並列（單打左右分置本就正確，不受雙打分排影響）。
 	function tileGridRow(tileRow: number): number {
@@ -209,7 +209,7 @@ export function CourtCard({
 
 	// 隊伍標籤＋勝方文字標籤：色彩不得作為唯一資訊來源，勝方 MUST 以文字而非僅顏色標示
 	// （prd.md 12.5）。標籤位置必須與色塊排列對應：單打左右分置，故作為 grid 外的並列標頭；
-	// 雙打上下分排（design Decision 4），故貼在各自那一排旁——若沿用單打的左右並列，
+	// 雙打上下分排，故貼在各自那一排旁——若沿用單打的左右並列，
 	// 「第二隊」會落在第一隊色塊的正上方，讀者仍得靠顏色把標籤連回色塊。
 	function renderTeamLabel(team: "a" | "b") {
 		const index = team === "a" ? 0 : 1;
@@ -300,8 +300,8 @@ export function CourtCard({
 							{canSwap && renderSwapTrigger(tile.player)}
 						</div>
 					))}
-					{/* 比分與送出控制區位於上排與下排之間，同時扮演雙打版面「網」的分隔角色
-					    （design Decision 4）；單打只有一排色塊，此區塊自然落在下方。 */}
+					{/* 比分與送出控制區位於上排與下排之間，同時扮演雙打版面「網」的分隔角色；
+					    單打只有一排色塊，此區塊自然落在下方。 */}
 					<div
 						data-testid={`court-${match.id}-score-entry`}
 						style={{ gridColumn: "1 / 3", gridRow: scoreEntryGridRow }}
@@ -318,7 +318,7 @@ export function CourtCard({
 				</div>
 
 				{/* 完成場次的關鍵資訊顯示在色塊外的場次資訊列，不受色塊減弱不透明度／飽和度
-				    影響（design Decision 8 的緩解）。比分與完成時間各自獨立判斷是否顯示——
+				    影響。比分與完成時間各自獨立判斷是否顯示——
 				    兩者理論上不會缺一（RoundMatchSchema 的 superRefine 保證 completed 場次
 				    scores／completedAt 同時存在），但不應讓其中一個欄位的損壞連坐拖累另一個
 				    仍然合法的欄位。 */}

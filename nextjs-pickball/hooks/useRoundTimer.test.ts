@@ -44,7 +44,7 @@ describe("useRoundTimer", () => {
 	});
 
 	// durationMinutes 特意用 20（而非只沿用主測試的 10），避免「忽略該欄位、
-	// 寫死 600 秒」這種恆真實作矇混過關（本 change 已知的恆真形態之一）。
+	// 寫死 600 秒」這種恆真實作矇混過關（已知的恆真形態之一）。
 	it("durationMinutes 20 分鐘時，初始剩餘秒數以 20 分鐘為基準", () => {
 		vi.setSystemTime(new Date("2026-09-07T00:00:00.000Z"));
 		const timer: RoundTimer = {

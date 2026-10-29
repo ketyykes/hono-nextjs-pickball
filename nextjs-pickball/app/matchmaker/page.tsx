@@ -50,8 +50,8 @@ function mergeSyncStatus(first: SyncStatus, second: SyncStatus): SyncStatus {
 	return found ?? "local";
 }
 
-// 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點
-// （design Decision 9）：頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
+// 對戰頁（場次舞台）。本檔為 matchmaker 對戰引擎（useRoundStore）唯一的 import 點：
+// 頁面層持有 useRosterStore 與 useRoundStore 兩個 store，
 // 把前者的 updatePlayer 當 port 傳給後者，理由見 hooks/useRoundStore.ts 頂端註解。
 export default function MatchmakerPage() {
 	const router = useRouter();
@@ -100,7 +100,7 @@ export default function MatchmakerPage() {
 	const activePlayerCount = players.filter((player) => player.isActive).length;
 	const hasActivePlayers = activePlayerCount > 0;
 
-	// 回填 reconcile（design Decision 5、Risks 第 1 條）：以「回合已 hydrate」為觸發條件
+	// 回填 reconcile：以「回合已 hydrate」為觸發條件
 	// （依賴陣列只放 round），而非獨立的 mount effect——mount 當下 round 可能仍是
 	// useRoundStore hydrate 前的 null，此時讀到的計分板槽無法比對出「該場是否仍在回合中」。
 	//
@@ -177,7 +177,7 @@ export default function MatchmakerPage() {
 		setSwapError(result.ok ? null : { matchId, message: result.message });
 	}
 
-	// buildExportScene 的唯一呼叫點（design Decision 2）：JPG 與列印稿共用
+	// buildExportScene 的唯一呼叫點：JPG 與列印稿共用
 	// 同一份內容真相來源，不各自組裝。round／players 變動時才重算。
 	const exportScene: ExportScene | null = useMemo(
 		() => (round === null ? null : buildExportScene(round, players)),
@@ -188,7 +188,7 @@ export default function MatchmakerPage() {
 	// 而非 new Date()，有兩個理由：
 	// ① 在 render 期間呼叫 new Date() 會讓 render 變成不純函式，同一份 props 在不同時刻
 	//    render 出不同結果，是 SSR／hydration 不一致的典型成因；
-	// ② 檔名日期的用途是「排序與辨識」（design Decision 6），而「這一輪是哪天排的」比
+	// ② 檔名日期的用途是「排序與辨識」，而「這一輪是哪天排的」比
 	//    「我哪一刻按下匯出」更貼近使用者辨識檔案的心智模型——跨午夜才匯出時，
 	//    round.createdAt 給的是這一輪實際發生的日期，反而比點擊時間正確。
 	// 由於 exportedAt 不再依賴當下時間，fileName 完全由 round 決定，useMemo 依 round
@@ -305,7 +305,7 @@ export default function MatchmakerPage() {
 				)}
 			</div>
 
-			{/* 列印版內容，與 JPG 匯出共用同一份 exportScene（design Decision 2）。
+			{/* 列印版內容，與 JPG 匯出共用同一份 exportScene。
 			    螢幕上預設隱藏、列印時顯示，由 app/globals.css 的 @media print 區塊負責。
 			    exportScene 為 null（尚無回合）時 PrintSheet 的 scene prop 為必填，故此處
 			    不掛入。 */}

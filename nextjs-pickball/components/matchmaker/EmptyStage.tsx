@@ -18,7 +18,7 @@ export interface EmptyStageProps {
 // SHALL NOT 顯示任何假名單、假比分或假場次——本元件不 import PlayerTile／
 // ScoreEntry／CourtCard，結構上就不可能帶出假資料。
 //
-// 入口依名單狀態分流（design Decision 9 的 EmptyStage 職責）：有可出場參賽者時
+// 入口依名單狀態分流：有可出場參賽者時
 // 給「建立第一輪」（onGenerate 由父層注入，等同呼叫「產生本輪對戰」）；名單為空
 // （或全員暫停出場）時改給導向 /matchmaker/players 的「加入參賽者」——
 // SHALL NOT 只給一顆按不動的「建立第一輪」，那會讓使用者停在死路上。

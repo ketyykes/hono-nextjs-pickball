@@ -1,4 +1,4 @@
-// 球員統計計算核心。純函式、決定性、不修改輸入（design Decision 2：只回傳資料，
+// 球員統計計算核心。純函式、決定性、不修改輸入（只回傳資料，
 // 不內嵌任何顯示文案；「已不在名單」等最終呈現文字交給 PlayerStatsTable.tsx）。
 
 import type { MatchHistoryEntry, HistoryPlayer } from "@pickball/core/matchmaker/history";
@@ -6,8 +6,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 
 /**
  * 球員統計結果。`mostFrequentPartner`／`mostFrequentOpponent` 為找到搭檔／對手時的
- * 姓名字串，找不到時為 `null`——不是「尚無紀錄」之類的顯示文字，那由呈現層決定
- * （design Decision 2）。
+ * 姓名字串，找不到時為 `null`——不是「尚無紀錄」之類的顯示文字，那由呈現層決定。
  */
 export interface PlayerStat {
 	id: string;
@@ -27,7 +26,7 @@ export interface PlayerStat {
 }
 
 // 已離開名單的球員沒有名單色塊可用——HistoryPlayerSchema 只留 id／name／
-// ratingBefore／ratingAfter，不含 colorFrom／colorTo（design Decision 3）。
+// ratingBefore／ratingAfter，不含 colorFrom／colorTo。
 // 這裡另訂一組中性灰，不共用 export-scene.ts 的 PLACEHOLDER_COLOR_FROM／TO：
 // 那組是私有常數（未 export），語意是「匯出圖片時尚未指派顏色」；本檔語意是
 // 「這位球員的顏色資訊已隨名單一起消失」，兩者恰好都是灰色只是巧合，不代表同一件事——
@@ -56,14 +55,14 @@ interface MutableStat {
 
 /**
  * 從一組帶有 `playedAt` 的候選中，取出 `playedAt` 最晚者所對應的值。比較採
- * ISO 8601 字串字典序（design Decision 4），SHALL NOT 用 `new Date()` 解析。
+ * ISO 8601 字串字典序，SHALL NOT 用 `new Date()` 解析。
  * 完整掃描全部候選而非只看陣列最後一個元素，結果因此不依賴呼叫端傳入的排列
- * 順序——供本檔目前強度計算與 §4 的最常搭檔／最常對手姓名解析共用同一份邏輯。
+ * 順序——供本檔目前強度計算與最常搭檔／最常對手姓名解析共用同一份邏輯。
  *
  * `playedAt` 完全相同的兩筆候選視為不可區分、取先遇者（陣列中在前者）——
  * 這是已知且可接受的行為，不另加同 `playedAt` 的 tie-break：實務上同一位球員
  * 不會在完全相同的時間戳同時出現在兩筆不同紀錄中，加一層 tie-break 換來的
- * 確定性在此不具實質意義（§3→§4 交棒事項 2，擇一採此文件化方案）。
+ * 確定性在此不具實質意義。
  */
 function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; value: T }[]): T | undefined {
 	let latest: { playedAt: string; value: T } | undefined;
@@ -79,7 +78,7 @@ function pickValueAtLatestPlayedAt<T>(candidates: readonly { playedAt: string; v
  * 依歷史紀錄逐筆收集每位球員的候選值，供 `pickValueAtLatestPlayedAt` 取最近一筆。
  * `latestRatingAfterByPlayer`（取 `ratingAfter`）與 `latestNameByPlayer`（取姓名
  * 快照）共用同一套「先建 `Map<id, candidates[]>` 再逐一取值」骨架，避免抄第三份
- * 幾乎相同的收集迴圈（§3→§4 交棒事項 1）。
+ * 幾乎相同的收集迴圈。
  */
 function collectCandidatesByPlayer<T>(
 	history: readonly MatchHistoryEntry[],
@@ -118,8 +117,8 @@ function latestRatingAfterByPlayer(history: readonly MatchHistoryEntry[]): Map<s
 
 /**
  * 依歷史紀錄逐筆解析每位球員最近一次出現的姓名快照，供最常搭檔／最常對手的顯示
- * 姓名解析共用（design Decision 4：以 `playedAt` 明確比較，不依賴輸入陣列排列順序，
- * 沿用 `pickValueAtLatestPlayedAt` 同一份比較邏輯，§3.5 交棒事項 1）。
+ * 姓名解析共用（以 `playedAt` 明確比較，不依賴輸入陣列排列順序，
+ * 沿用 `pickValueAtLatestPlayedAt` 同一份比較邏輯）。
  */
 function latestNameByPlayer(history: readonly MatchHistoryEntry[]): Map<string, string> {
 	const candidatesByPlayer = collectCandidatesByPlayer(history, (historyPlayer) => historyPlayer.name);
@@ -138,7 +137,7 @@ function latestNameByPlayer(history: readonly MatchHistoryEntry[]): Map<string, 
  * 依歷史紀錄逐筆計數「自己 id → 對象 id」的配對次數，建立
  * `Map<selfId, Map<counterpartId, count>>`。最常搭檔（同隊隊友）與最常對手
  * （對方隊伍球員）共用同一套計數骨架，差異只在 `extractPairs` 如何從一筆歷史紀錄
- * 產生配對——SHALL NOT 為兩者各寫一份幾乎相同的迴圈（tasks 4.4）。
+ * 產生配對——SHALL NOT 為兩者各寫一份幾乎相同的迴圈。
  */
 function tallyPairs(
 	history: readonly MatchHistoryEntry[],
@@ -201,9 +200,8 @@ function extractOpponentPairs(entry: MatchHistoryEntry): readonly (readonly [str
 
 /**
  * 從「對象 id → 出現次數」的計數中取出次數最多者的姓名；次數相同時依姓名 UTF-16
- * code unit 排序取序位在前者（design Decision 5，SHALL NOT 用 `localeCompare`），
- * SHALL NOT 依 `Map` 迭代順序決定。找不到任何對象時回傳 `null`——不是空字串
- * （design Decision 2）。`nameById` 找不到對應姓名的 id 視為資料不一致並略過：
+ * code unit 排序取序位在前者（SHALL NOT 用 `localeCompare`），
+ * SHALL NOT 依 `Map` 迭代順序決定。找不到任何對象時回傳 `null`——不是空字串。`nameById` 找不到對應姓名的 id 視為資料不一致並略過：
  * 在合法輸入下不會發生，因為 `counts` 的 key 必然來自同一份 `history`。
  */
 function pickMostFrequentName(counts: ReadonlyMap<string, number>, nameById: ReadonlyMap<string, string>): string | null {
@@ -231,8 +229,7 @@ function pickMostFrequentName(counts: ReadonlyMap<string, number>, nameById: Rea
  * （spec：SHALL NOT 以姓名為鍵）。名單內球員的姓名、色塊、目前強度取自 `players`；
  * 只出現在歷史的球員以其快照姓名暫代、色塊為上方的中性灰，目前強度取
  * `latestRatingAfterByPlayer` 算出的最近一筆 `ratingAfter`，並標示 `onRoster: false`。
- * 整段聯集只在這裡建構一次，供後續累加沿用，不在 §4 重新掃描 history／players
- * （tasks 2.7）。
+ * 整段聯集只在這裡建構一次，供後續累加沿用，不在後續累加時重新掃描 history／players。
  */
 function buildRosterUnion(
 	history: readonly MatchHistoryEntry[],
@@ -309,7 +306,7 @@ function tallyGamesAndResults(
 				if (entry.winner === winnerKey) {
 					stat.wins += 1;
 				} else if (entry.winner === "draw") {
-					// 和局是打過的一場，仍計入 gamesPlayed（design Decision 1），
+					// 和局是打過的一場，仍計入 gamesPlayed，
 					// 但 SHALL NOT 落入敗場，否則雙方會被誤記各一場敗場。
 					stat.draws += 1;
 				} else {
@@ -350,7 +347,7 @@ function tallyRatingDelta(stats: ReadonlyMap<string, MutableStat>, history: read
 /**
  * 排行榜排序比較器：目前強度 desc → 勝率 desc → 出場數 desc → 姓名（UTF-16
  * code unit）asc（spec「排行榜排序規則」）。集中成單一具名函式，避免排序邏輯
- * 散落在 `.sort()` 呼叫內、不易獨立對每一層的比較方向各自測試（tasks 4.7）。
+ * 散落在 `.sort()` 呼叫內、不易獨立對每一層的比較方向各自測試。
  */
 function comparePlayerStatsForRanking(a: PlayerStat, b: PlayerStat): number {
 	if (a.currentRating !== b.currentRating) {

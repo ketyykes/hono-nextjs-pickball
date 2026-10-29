@@ -12,7 +12,7 @@ import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { MatchSlots } from "@/lib/scoreboard/match-slots";
 
 // 測試專用預設 props：settings 給合法初始值，其餘 callback 一律用 vi.fn()——
-// 本元件不持有任何 store（design Decision 9），測試因此不需要 mock 任何東西。
+// 本元件不持有任何 store，測試因此不需要 mock 任何東西。
 // matchSlots／setTargetScore 為必填 props：matchSlots 預設空集合
 // （無任何場次開始場邊計分），setTargetScore 預設 vi.fn()——多數既有測試不涉及
 // 目標分數鎖定判定或變更委派，給這兩個預設值即可，需要的測試再各自 override。
@@ -226,7 +226,7 @@ describe("RoundControls", () => {
 	});
 
 	it("可出場人數不足一場時產生按鈕 disabled 並顯示繁體中文原因", () => {
-		// 雙打情境（test-plan 指定的驗收情境）：每場需 4 人，可出場僅 3 人。
+		// 雙打情境：每場需 4 人，可出場僅 3 人。
 		const doubles = render(
 			<RoundControls
 				{...buildProps({
@@ -478,7 +478,7 @@ describe("RoundControls", () => {
 		expect(screen.queryByText(ROUND_TIMER_LOCKED_REASON)).toBeNull();
 	});
 
-	// design Decision 2：鎖定與否重用 isTargetScoreLocked 的 locked 布林值（此處以
+	// 鎖定與否重用 isTargetScoreLocked 的 locked 布林值（此處以
 	// 「任一場次 completed」這條件觸發），但顯示的原因文案 MUST 是 labels.ts 的
 	// ROUND_TIMER_LOCKED_REASON，而非 isTargetScoreLocked 回傳的 reason。
 	it("本輪已開始計分時計時控制項 disabled 並顯示鎖定原因", () => {

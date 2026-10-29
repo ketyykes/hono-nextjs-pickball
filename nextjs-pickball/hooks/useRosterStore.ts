@@ -17,7 +17,7 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 import type { SyncStatus } from "@/lib/sync/sync-status";
 
 // 名單 store 的 state 形狀。
-// droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數（見 storage 的 Decision 3），
+// droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數，
 // 供 UI 提示「有 N 筆資料損毀已略過」，SHALL NOT 靜默處理。
 interface RosterState {
 	players: Player[];
@@ -35,8 +35,8 @@ interface RosterState {
 }
 
 // HYDRATE：mount 後把 localStorage 讀到的名單灌入 state，
-// 避免 SSR/CSR 首次輸出不一致（見 design Decision 8，沿用 useScoreboardStore 的模式）。
-// ADD_PLAYER：委派給 lib/matchmaker/roster.ts 的純函式，id／now 由本層注入（design Decision 4）。
+// 避免 SSR/CSR 首次輸出不一致（沿用 useScoreboardStore 的模式）。
+// ADD_PLAYER：委派給 lib/matchmaker/roster.ts 的純函式，id／now 由本層注入。
 type RosterAction =
 	| { type: "HYDRATE"; players: Player[]; droppedCount: number }
 	| { type: "ADD_PLAYER"; input: AddPlayerInput; id: string; now: string }
@@ -177,7 +177,7 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 	}
 
 	// 委派 resetMatchmakerData() 而非 clearRoster()：前者清除 RESET_KEYS 列舉的所有 key，
-	// rounds 與 history 加進該清單後，本函式不需改動（見 storage 的 Decision 6）。
+	// rounds 與 history 加進該清單後，本函式不需改動。
 	function resetRoster(): void {
 		resetMatchmakerData();
 		dispatch({ type: "RESET" });

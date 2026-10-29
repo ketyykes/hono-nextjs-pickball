@@ -20,7 +20,7 @@ export const ScoreEventSchema = z.object({
 
 // 球員姓名色塊：色碼欄位刻意維持 z.string()、不加 hex regex 驗證——
 // lib/scoreboard/ 不依賴 lib/matchmaker/ 的任何 schema（單向相依），
-// 格式正確性由寫入端（buildMatchSlotSeed，唯一生產者）負責（design Decision 6）。
+// 格式正確性由寫入端（buildMatchSlotSeed，唯一生產者）負責。
 export const PlayerBadgeSchema = z.object({
 	name: z.string(),
 	colorFrom: z.string(),
@@ -29,7 +29,7 @@ export const PlayerBadgeSchema = z.object({
 });
 
 // us／them 兩個 key 沿用 scoreboard-binding 既有的 ScoreboardTeamScores 命名慣例；
-// 單打每隊 1 筆、雙打每隊 2 筆，故長度界於 1～2（design Decision 6）。
+// 單打每隊 1 筆、雙打每隊 2 筆，故長度界於 1～2。
 export const TeamPlayersSchema = z.object({
 	us: z.array(PlayerBadgeSchema).min(1).max(2),
 	them: z.array(PlayerBadgeSchema).min(1).max(2),

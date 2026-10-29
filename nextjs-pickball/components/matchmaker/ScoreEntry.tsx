@@ -20,7 +20,7 @@ export interface ScoreEntryProps {
 //
 // 手動輸入比分是 prd.md 6.3 明訂不得移除的 fallback，MUST 能獨立完成一場。比分驗證規則
 // （空白、非數字、平局、已完成）歸屬回合 capability 的送出 pipeline，本元件 SHALL NOT
-// 複製一份——只負責把欄位原樣往上傳並把 submitError 原樣顯示出來（design Open Questions 2e）。
+// 複製一份——只負責把欄位原樣往上傳並把 submitError 原樣顯示出來。
 //
 // 送出時 SHALL NOT 先 Number() 轉換：lib/matchmaker/round.ts 的 validateScoreInput 靠
 // 「原始字串」才分得出空白（EMPTY_FIELD）與非數字（INVALID_NUMBER）兩種不同的拒絕原因——

@@ -23,7 +23,7 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 // （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
 // 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker，「Blob → 下載」的樣板抽到
 // 共用函式 downloadTextFile，與 HistoryCsvSection 共用）。
-// Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在元件層（design Decision 7），
+// Blob／<a download>／File.text() 等瀏覽器 I/O 只出現在元件層，
 // lib/matchmaker/backup.ts 與 transfer-storage.ts 只回傳純資料或可判讀的結果物件。
 //
 // exportedAt MUST 直接來自 new Date().toISOString()（spec「JSON 完整備份的匯出內容」），

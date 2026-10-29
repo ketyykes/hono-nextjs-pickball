@@ -180,7 +180,7 @@ describe("RemoteHistoryView", () => {
 		});
 	});
 
-	// 以下為 Stage 2 補的 regression guard：元件實作已存在，加入即綠（非 RED），用來殺 mutation 存活的分支。
+	// 以下為補上的 regression guard：元件實作已存在，加入即綠（非 RED），用來殺 mutation 存活的分支。
 	describe("regression guard：紀錄卡片、提示樣式與同步狀態", () => {
 		it("regression guard：每筆雲端紀錄各自渲染一張卡片且保留後端順序", () => {
 			mockReadySession();

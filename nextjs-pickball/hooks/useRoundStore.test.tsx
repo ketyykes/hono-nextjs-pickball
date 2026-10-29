@@ -111,8 +111,7 @@ describe("useRoundStore", () => {
 	// 與本 hook，但該 Requirement 五個 Scenario 的驗收全部指向 round.test.ts——那些只驗
 	// createRound 回傳值裡的 restSettlements 算得對不對，驗不到 hook 有沒有把它套用出去。
 	// 審查時實測把 hook 內整段 restSettlements → updatePlayer 的接線刪光，全套測試仍然全綠，
-	// 等於這條 MUST 的唯一實作處毫無保護。做法採 design Decision 7 的方式：
-	// 以受控的 players 陣列與 updatePlayer spy 直接斷言被套用的 patch。
+	// 等於這條 MUST 的唯一實作處毫無保護。做法是以受控的 players 陣列與 updatePlayer spy 直接斷言被套用的 patch。
 	it("產生新一輪時把上一輪的休息結算交給 roster port，並以上一輪為基準遞增輪次", () => {
 		// GIVEN：localStorage 已有第 1 輪（6 人單打 1 場，故有 4 人休息）與一筆歷史。
 		// 歷史刻意先寫入而非留空——留空的話「產生新一輪時順手清掉歷史」這個 bug
@@ -355,7 +354,7 @@ describe("useRoundStore", () => {
 		expect(result.current.round).toBe(roundAfterComplete);
 	});
 
-	// 不在 test-plan 內：本 repo TDD 規範要求 hooks/** 的行為邏輯模組另有 hook 層把關
+	// 補充測試：本 repo TDD 規範要求 hooks/** 的行為邏輯模組另有 hook 層把關
 	// （round-lifecycle 的清槽驗收錨點在 lib/matchmaker/scoreboard-binding.test.ts，
 	// 此處只驗證 useRoundStore 是否真的把重排前後的回合接線進 clearDiscardedMatchSlots，
 	// 殺「清槽呼叫被拿掉」或「忘記在 dispatch 前保留重排前的回合參考」兩類變異）。
@@ -537,7 +536,7 @@ describe("useRoundStore", () => {
 		expect(remounted.current.round?.timer).toEqual(timerBeforeRemount);
 	});
 
-	// regression guard（非 test-plan 內、非 9.1 驗收錨點）：上方「重新掛載後仍保留已開始
+	// regression guard（補充測試，非驗收錨點）：上方「重新掛載後仍保留已開始
 	// 計時的 timer」只走 startTimer 的成功路徑，測不到 setTimerDuration 本身的接線是否正確、
 	// 也測不到兩者在「尚無回合」時的 null 防線。比照既有 setTargetScore 的兩條接線測試
 	// （「setTargetScore 成功時套用新目標分數、已開始計分時拒絕且 round 參考不變」與
@@ -587,7 +586,7 @@ describe("useRoundStore", () => {
 		expect(result.current.round).toBe(roundAfterComplete);
 	});
 
-	// regression guard（非 test-plan 內、非 9.1 驗收錨點）：上方錨點 it 只走 startTimer 的成功
+	// regression guard（補充測試，非驗收錨點）：上方錨點 it 只走 startTimer 的成功
 	// 路徑，下方 null 防線 it 又在防線就 return，兩者都到不了「回合存在但純函式拒絕」這條路徑
 	// ——審查時實測把 startTimer 改成「失敗時也 dispatch」，全套測試仍然全綠。既有
 	// setTargetScore／setTimerDuration／swapMatchPlayer 三者都有對應的「非 null 回合失敗時

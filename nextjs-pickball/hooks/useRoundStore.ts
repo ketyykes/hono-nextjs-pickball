@@ -41,8 +41,7 @@ import type { SyncStatus } from "@/lib/sync/sync-status";
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
 // 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate
 // 路徑寫入，對外暴露讀取持久化資料時被丟棄的損壞筆數——比照 useRosterStore 已
-// 匯出 droppedCount 的既有做法。現況：本 change（對戰頁）尚未在畫面上消費這個值，
-// 是已知缺口，留給後續處理歷史頁面的 change。
+// 匯出 droppedCount 的既有做法。現況：對戰頁尚未在畫面上消費這個值，是已知缺口。
 interface RoundStoreState {
 	round: Round | null;
 	history: MatchHistoryEntry[];
@@ -52,7 +51,7 @@ interface RoundStoreState {
 // HYDRATE：mount 後把 localStorage 讀到的回合與歷史灌入 state（沿用 useRosterStore
 // 的 SSR/CSR 一致性理由）。GENERATE_ROUND／RESET_INCOMPLETE_MATCHES：只取代 round，
 // 對應的名單／休息次數 patch 不經過本 reducer——那些 patch 屬於名單（roster port），
-// 本 store 不擁有名單狀態（design Decision 7）。SUBMIT_SCORE：取代 round 並把新完成
+// 本 store 不擁有名單狀態。SUBMIT_SCORE：取代 round 並把新完成
 // 的一場附加進 history；playerPatches 同樣不經過本 reducer，套用方式見下方 submitScore。
 type RoundStoreAction =
 	| { type: "HYDRATE"; round: Round | null; history: MatchHistoryEntry[]; droppedCount: number }
@@ -91,7 +90,7 @@ function roundStoreReducer(state: RoundStoreState, action: RoundStoreAction): Ro
 	}
 }
 
-/** useRoundStore 的注入埠（design Decision 7）：本 store 不擁有名單，`updatePlayer`
+/** useRoundStore 的注入埠：本 store 不擁有名單，`updatePlayer`
  * 的簽章與 `useRosterStore` 匯出的同名函式逐字相同，頁面層直接把後者的回傳值傳入即可。
  * SHALL NOT 在本 hook 內部呼叫 `useRosterStore()`——那會產生第二個名單 reducer 實例，
  * 兩個實例各自寫回同一個 LocalStorage key，最後寫的會贏，是典型的靜默資料遺失。 */
@@ -240,7 +239,7 @@ export function useLocalRoundStore(options: UseRoundStoreOptions): LocalRoundSto
 	// swapMatchPlayer 同樣讀 render scope 的 state.round，適用同一條限制（換人尤其明顯：
 	// 同一次 render 內連換兩次，第二次會以換人前的回合為基底，第一次的換人結果被覆蓋掉）。
 	//
-	// 「本輪結束」＝產生新一輪的那一刻（design Decision 1）：createRound() 一次算出
+	// 「本輪結束」＝產生新一輪的那一刻：createRound() 一次算出
 	// 新回合與 restSettlements，本函式在同一次同步呼叫內依序 dispatch 新回合、
 	// 並把每筆 restSettlement 交給 roster port 的 updatePlayer——失敗（result.ok
 	// 為 false）時兩者皆不觸碰，不會出現「休息次數已加但回合沒換」的中途狀態。
@@ -263,7 +262,7 @@ export function useLocalRoundStore(options: UseRoundStoreOptions): LocalRoundSto
 		return result;
 	}
 
-	// 重排本輪尚未比賽的人（design Open Questions 2d）：resetIncompleteMatches 回傳值
+	// 重排本輪尚未比賽的人：resetIncompleteMatches 回傳值
 	// 刻意不含 restCount patch（重排不是本輪結束，見 round.ts 該函式的註解），本函式因此
 	// 只需 dispatch 新回合，不需要像 generateRound 那樣額外套用休息結算。
 	//

@@ -458,7 +458,7 @@ test.describe("/matchmaker/data 資料工具頁", () => {
 	// HistoryCsvSection（歷史賽果 CSV 匯出）：
 	// 此 describe 固定裝置時區為 Asia/Taipei（UTC+8），並選一個在 UTC 與
 	// Asia/Taipei 屬於不同曆日的 playedAt（世界協調時 18:30 → 台北時間已跨入隔日
-	// 02:30），用來驗證 Decision 12（時區必須注入本地時區，SHALL NOT 用 UTC）——
+	// 02:30），用來驗證時區必須注入本地時區、不可用 UTC——
 	// 斷言方式刻意不直接比對某個字面值時區換算結果（測試機時區會造成假紅燈），
 	// 改為比對 CSV 的「日期」欄與 /matchmaker/history 頁面同一筆記錄顯示的日期是否相等：
 	// 兩者都在同一個 page context（同一個被固定為 Asia/Taipei 的裝置時區）內產生，

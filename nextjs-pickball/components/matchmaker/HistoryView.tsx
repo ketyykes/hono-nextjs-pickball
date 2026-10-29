@@ -10,7 +10,7 @@ import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { HistoryRecordCard } from "./HistoryRecordCard";
 
-// hydration 後一次取樣的「現在」與讀回的歷史紀錄（design Decision 7）：render 期間
+// hydration 後一次取樣的「現在」與讀回的歷史紀錄：render 期間
 // SHALL NOT 取用時鐘或 localStorage，避免 SSR／CSR 輸出不一致產生 hydration mismatch。
 interface HydratedHistory {
 	now: Date;
@@ -31,7 +31,7 @@ function hydratedHistoryReducer(_current: HydratedHistory | null, next: Hydrated
 	return next;
 }
 
-// 歷史頁的畫面狀態與資料讀取（design Decision 5）：只讀 readHistory()，不 import
+// 歷史頁的畫面狀態與資料讀取：只讀 readHistory()，不 import
 // useRoundStore、不呼叫任何 writer、不碰 localStorage.setItem／removeItem——本頁是
 // 唯讀消費既有紀錄的頁面。
 export function HistoryView() {
@@ -39,7 +39,7 @@ export function HistoryView() {
 	// 初次開啟預設選中今日（spec「歷史紀錄依區間篩選與排序」、prd.md 13.4）。
 	const [selectedRange, setSelectedRange] = useState<HistoryRange>("today");
 
-	// hydration 的 useEffect 內取一次 new Date() 與 readHistory() 的結果（design Decision 7）：
+	// hydration 的 useEffect 內取一次 new Date() 與 readHistory() 的結果：
 	// 首次伺服器輸出固定為空狀態，避免 render 期間取用系統時鐘或 localStorage。
 	useEffect(() => {
 		const { entries, droppedCount } = readHistory();
@@ -54,8 +54,8 @@ export function HistoryView() {
 	return (
 		<div className="flex flex-col gap-4">
 			{/* droppedCount > 0：讀取歷史紀錄時有損壞筆數被逐筆丟棄，SHALL NOT 靜默處理。
-			    樣式 class 與文案比照 app/matchmaker/players/page.tsx 既有的損毀提示區塊
-			    （design Decision 2）：兩者分屬 player-roster／match-history 兩個不同
+			    樣式 class 與文案比照 app/matchmaker/players/page.tsx 既有的損毀提示區塊：
+			    兩者分屬 player-roster／match-history 兩個不同
 			    capability，各自持有一份、不抽共用元件——抽象需要跨 capability 改動或
 			    新建第三個檔案，在只有兩個消費端且文案主詞本就不同（「參賽者資料」vs
 			    「歷史紀錄」）的情況下是提前抽象，故維持各自一份（記為 tech debt）。 */}

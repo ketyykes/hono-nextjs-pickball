@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 // /matchmaker/players 參賽者名單頁的 E2E 驗收
-// 對應 add-player-roster change 的驗收錨點：空白初始狀態、reload 持久化、
+// 驗收範圍：空白初始狀態、reload 持久化、
 // 重置名單的二次確認（確認／取消兩條路徑）。
 //
 // 此頁刻意未加進全站 navbar（功能尚不完整，見 app/matchmaker/players/page.tsx
@@ -9,13 +9,13 @@ import { test, expect, type Page } from "@playwright/test";
 //
 // 名單資料存在 localStorage["matchmaker:roster:v1"]，格式為
 // { version: 1, players: [...] }（見 lib/matchmaker/storage.ts）。首次 render
-// 一律為空名單，useEffect 讀取 localStorage 後才 dispatch HYDRATE（design
-// Decision 8，沿用 useScoreboardStore 的模式），故斷言時一律等待畫面穩定
+// 一律為空名單，useEffect 讀取 localStorage 後才 dispatch HYDRATE
+// （沿用 useScoreboardStore 的模式），故斷言時一律等待畫面穩定
 // （expect(...).toBeVisible() 本身即帶重試，不需額外 waitForTimeout）。
 //
 // 為避免 localStorage 跨測試污染，beforeEach 只清除本 capability 的
 // matchmaker:roster:v1，刻意不用 localStorage.clear()——那會連
-// scoreboard:current:v1（既有 capability 的資料）一併清掉，違反本 change
+// scoreboard:current:v1（既有 capability 的資料）一併清掉，違反
 // 「不誤傷既有名單以外資料」的核心保證。
 
 const STORAGE_KEY = "matchmaker:roster:v1";

@@ -14,7 +14,7 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 // 歷史賽果 CSV 匯出區塊。只匯出，不提供匯入——CSV 匯出入不對稱
 // （頁面頂部的說明已標示），本區塊 SHALL NOT 另外提供「匯入歷史 CSV」入口。
 //
-// 時區改用瀏覽器本地時區，SHALL NOT 傳 UTC（design Decision 12）。刻意不在本層
+// 時區改用瀏覽器本地時區，SHALL NOT 傳 UTC。刻意不在本層
 // 重算 `Intl.DateTimeFormat().resolvedOptions().timeZone` 再顯式傳入——historyToCsv
 // 本身已內建同樣的預設值（見 history-csv.ts 的 HistoryToCsvOptions 文件註解），
 // 兩處各算一次是純粹的冗餘，故本層直接省略 options 交由該預設值決定。

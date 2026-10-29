@@ -948,7 +948,7 @@ describe("useRemoteRoundStore", () => {
 		}
 	});
 
-	// ---- Stage 2 mutation 發現缺口後補的 regression guard（寫入即綠） ----
+	// ---- mutation 發現缺口後補的 regression guard（寫入即綠） ----
 
 	function buildTimedRound(players: Player[]): Round {
 		return {

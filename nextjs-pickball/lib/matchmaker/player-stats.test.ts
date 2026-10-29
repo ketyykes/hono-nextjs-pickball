@@ -62,8 +62,8 @@ function makeEntry(overrides: SinglesOverrides = {}): MatchHistoryEntry {
 }
 
 // 比照上方 SinglesOverrides 的樣板另建一份雙打版本，同樣排除 format 避免呼叫端
-// 誤把雙打分支覆寫成單打（或反之）卻讓 discriminated union 判斷失準（§4 需要雙打
-// fixture 來驗證最常搭檔邏輯，§2／§3 皆未建過這份樣板）。
+// 誤把雙打分支覆寫成單打（或反之）卻讓 discriminated union 判斷失準（最常搭檔
+// 邏輯需要雙打 fixture，單打樣板無法沿用）。
 type DoublesOverrides = Partial<Omit<Extract<MatchHistoryEntry, { format: "doubles" }>, "format">>;
 
 /** 建立一筆合法的雙打測試用歷史紀錄，可透過 overrides 覆寫特定欄位。 */
@@ -96,14 +96,14 @@ describe("computePlayerStats", () => {
 		const alice = result.find((stat) => stat.id === "p1");
 		expect(alice).toBeDefined();
 		expect(alice?.gamesPlayed).toBe(0);
-		// 「列入統計結果」不只是出現在陣列裡：這一筆必須真的是她——姓名與色塊取自名單
-		// （tasks 2.2），且被標成名單成員，否則呈現層會把她誤標成「已不在名單」。
+		// 「列入統計結果」不只是出現在陣列裡：這一筆必須真的是她——姓名與色塊取自名單，
+		// 且被標成名單成員，否則呈現層會把她誤標成「已不在名單」。
 		expect(alice?.onRoster).toBe(true);
 		expect(alice?.name).toBe("Alice");
 		expect(alice?.colorFrom).toBe("#111111");
 		expect(alice?.colorTo).toBe("#222222");
-		// 完全沒有任何紀錄時，兩個「最常」欄位 MUST 為 null 而非空字串——design Decision 2
-		// 明載找不到時是 null、由呈現層決定要顯示什麼字。少了對手這一條，只有搭檔那邊被守住。
+		// 完全沒有任何紀錄時，兩個「最常」欄位 MUST 為 null 而非空字串——
+		// 找不到時是 null、由呈現層決定要顯示什麼字。少了對手這一條，只有搭檔那邊被守住。
 		expect(alice?.mostFrequentPartner).toBeNull();
 		expect(alice?.mostFrequentOpponent).toBeNull();
 	});
@@ -186,7 +186,7 @@ describe("computePlayerStats", () => {
 		expect(alice?.draws).toBe(1);
 		expect(alice?.winRate).toBeCloseTo(1 / 2);
 
-		// 只斷言勝方會漏掉「只修了其中一隊的判斷」這種半套實作（test-plan「Why first」），
+		// 只斷言勝方會漏掉「只修了其中一隊的判斷」這種半套實作，
 		// 敗方同樣要驗證出場數、敗場與和局。
 		const bob = result.find((stat) => stat.id === "p2");
 		expect(bob?.gamesPlayed).toBe(2);
@@ -306,7 +306,7 @@ describe("computePlayerStats", () => {
 	});
 
 	it("最常搭檔為雙打隊友中出現次數最多者", () => {
-		// p1 在 d1 於 teamA 與甲搭檔、在 d2 於 teamB 與甲搭檔（交棒事項 3：受測球員需同時
+		// p1 在 d1 於 teamA 與甲搭檔、在 d2 於 teamB 與甲搭檔（受測球員需同時
 		// 出現在 teamA／teamB，否則「只掃 teamA」這類漏半邊的變異測不出來）、在 d3 於
 		// teamA 與乙搭檔一次——甲共 2 次、乙共 1 次，甲應為最常搭檔。
 		const history = [
@@ -345,8 +345,8 @@ describe("computePlayerStats", () => {
 		expect(p1?.mostFrequentPartner).toBe("甲");
 	});
 
-	// 補強：自我變異測試發現，design Decision 4（姓名取該 id `playedAt` 最近一次的快照）
-	// 在 §4 沒有任何測試守住——把姓名解析改成取最早一筆仍全綠，因為既有的搭檔／對手
+	// 補強：自我變異測試發現，「姓名取該 id `playedAt` 最近一次的快照」
+	// 沒有任何測試守住——把姓名解析改成取最早一筆仍全綠，因為既有的搭檔／對手
 	// fixture 中同一個 id 的姓名快照都相同。本測試讓同一位搭檔改過名，且刻意把較晚那筆
 	// 放在陣列前面：取最早、或取「陣列最後一筆」都會得到舊名而失敗。
 	it("最常搭檔的顯示姓名取該對象 playedAt 最近一次的姓名快照", () => {
@@ -417,7 +417,7 @@ describe("computePlayerStats", () => {
 
 	// 補強：自我變異測試發現，既有的搭檔／對手測試皆無次數平手的情境，反轉同分
 	// tie-break 方向（取 UTF-16 較後者）不會被既有測試發現。本測試刻意讓兩位搭檔
-	// 次數相同，驗證取 UTF-16 較前者（design Decision 5）。
+	// 次數相同，驗證取 UTF-16 較前者。
 	it("最常搭檔次數平手時取姓名 UTF-16 code unit 較前者", () => {
 		const history = [
 			makeDoublesEntry({
@@ -458,7 +458,7 @@ describe("computePlayerStats", () => {
 
 	it("最常對手為對戰過的對手中出現次數最多者", () => {
 		// p1 於 s1 在 teamA 對上丙（teamB），於 d1 改在 teamB 對上丙與 X（teamA）——
-		// 交棒事項 3：受測球員同時出現在 teamA／teamB；於 s2 在 teamA 對上丁一次。
+		// 受測球員同時出現在 teamA／teamB；於 s2 在 teamA 對上丁一次。
 		// 丙共 2 次、丁共 1 次、X 共 1 次，丙應為最常對手。
 		const history = [
 			makeEntry({

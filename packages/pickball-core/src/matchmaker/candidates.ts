@@ -1,4 +1,4 @@
-// 候選排序與出場名單決策。純函式、決定性、不修改輸入（design Decision 8）。
+// 候選排序與出場名單決策。純函式、決定性、不修改輸入。
 // 對應 prd.md 5.3：依「休息次數多者優先 → 強度分數高者優先 → 穩定排序」決定出場與休息名單。
 
 import { PLAYERS_PER_MATCH } from "./allocation-types";
@@ -13,7 +13,7 @@ export interface SelectPlayingResult {
 
 // 候選排序的比較函式：restCount 遞減 → rating 遞減。
 // 兩者皆相等時回傳 0，交由 Array.prototype.sort 的穩定性（ES2019 起保證）維持輸入相對次序，
-// 不需額外攜帶原始 index（design Decision 8）。
+// 不需額外攜帶原始 index。
 function compareCandidates(a: Player, b: Player): number {
 	if (a.restCount !== b.restCount) {
 		return b.restCount - a.restCount;
@@ -44,8 +44,7 @@ export function countPlaying(availableCount: number, format: MatchFormat, courtC
 
 /**
  * 決定本輪出場與休息名單：先以 isActive 過濾候選池，排序後取前 N 名出場，其餘為休息名單。
- * 暫停出場（isActive === false）者完全排除於候選池之外，既不出場也不列入休息名單
- * （design Decision 3）。此函式不修改任何 Player 物件。
+ * 暫停出場（isActive === false）者完全排除於候選池之外，既不出場也不列入休息名單。此函式不修改任何 Player 物件。
  */
 export function selectPlaying(players: readonly Player[], format: MatchFormat, courtCount: number): SelectPlayingResult {
 	const activeCandidates = players.filter((p) => p.isActive);

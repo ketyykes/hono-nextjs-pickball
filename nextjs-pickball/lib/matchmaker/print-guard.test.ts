@@ -70,7 +70,7 @@ describe("requestPrint", () => {
 	it("兩條失敗路徑回傳的訊息逐字等於 PRINT_BLOCKED_MESSAGE 常數", () => {
 		// 只用 toContain("彈出視窗") 與 /Ctrl.*P/ 兩個 substring 斷言時，
 		// 「整句改簡體但保留『彈出視窗』四字」與「退化成『彈出視窗 Ctrl P』關鍵字堆砌」
-		// 都能通過（Stage 2 實測三個此類 mutant 全部存活）。改為逐字比對常數本身，
+		// 都能通過（實測三個此類 mutant 全部存活）。改為逐字比對常數本身，
 		// 訊息一旦退化即轉紅；文案要調整時只需改常數，測試不必跟著改字面量。
 		const throwingPrinter = () => {
 			throw new Error("blocked");

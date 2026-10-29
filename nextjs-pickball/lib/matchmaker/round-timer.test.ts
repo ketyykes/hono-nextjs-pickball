@@ -4,7 +4,7 @@ import { remainingSeconds, isExpired, formatRemaining } from "./round-timer";
 
 // 倒數與時間到的純函式判定（spec round-lifecycle「回合計時器」）。「現在時間」一律由
 // 呼叫端以 ISO 字串注入，本模組 SHALL NOT 呼叫 new Date()／Date.now()，見 round-timer.ts
-// 檔頭註解與 design Decision 5、6。
+// 檔頭註解。
 describe("remainingSeconds", () => {
 	it("剩餘秒數依經過時間遞減，超過設定長度後夾在 0 不為負數", () => {
 		const timer: RoundTimer = {
@@ -16,13 +16,13 @@ describe("remainingSeconds", () => {
 		// 非整秒的經過時間：整秒案例測不出取整方式被改動，故取兩個不同的小數位置。
 		// 30.4 秒（剩餘 569.6 秒）殺得掉 floor（570 vs 569）但殺不掉 round（同為 570）；
 		// 30.9 秒（剩餘 569.1 秒）小數低於 0.5，ceil 為 570 而 round／floor 皆為 569。
-		// 兩者並列才真的把取整方式釘在 ceil（Stage 2 獨立 mutation：只有 30.4 秒那筆時，
+		// 兩者並列才真的把取整方式釘在 ceil（獨立 mutation：只有 30.4 秒那筆時，
 		// ceil → round 的變異存活）。
 		expect(remainingSeconds(timer, "2026-09-03T01:00:30.400Z")).toBe(570);
 		expect(remainingSeconds(timer, "2026-09-03T01:00:30.900Z")).toBe(570);
 		// 另一種計時長度：本檔其餘案例的 durationMinutes 全為 10，只有單一值時，
 		// 「忽略 timer.durationMinutes、直接寫死 10」的實作也會全數綠燈
-		// （Stage 2 獨立 mutation 實測存活），故補一筆 20 分鐘的案例。
+		// （獨立 mutation 實測存活），故補一筆 20 分鐘的案例。
 		expect(
 			remainingSeconds(
 				{ durationMinutes: 20, startedAt: "2026-09-03T01:00:00.000Z" },
@@ -31,7 +31,7 @@ describe("remainingSeconds", () => {
 		).toBe(1170);
 	});
 
-	// regression guard（寫下當下即綠）：補 Stage 2 獨立 mutation 找到的零覆蓋——
+	// regression guard（寫下當下即綠）：補獨立 mutation 找到的零覆蓋——
 	// 拿掉 remainingSeconds 夾上限的 Math.min 後全數測試仍為綠燈。上限夾值不是可有可無的
 	// 防禦：formatRemaining 刻意不防禦三位數分鐘，正是建立在「本函式的回傳值必落在
 	// [0, durationMinutes * 60]」這個承諾上，兩個決策互相依賴，必須有測試釘住。

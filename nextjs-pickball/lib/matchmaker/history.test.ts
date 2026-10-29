@@ -142,7 +142,7 @@ describe("MatchHistoryEntrySchema", () => {
 
 	// AssertFormatCovered 的消費點。沒有這個賦值，那個型別別名即使退化成 never 也不會
 	// 讓 tsc 轉紅——TypeScript 對「型別別名等於 never」本身不報錯，必須有實際使用處。
-	// Final Review 實測把它整個改成 never，全套測試與 tsc 皆綠，等於 history.ts 註解
+	// 實測把它整個改成 never，全套測試與 tsc 皆綠，等於 history.ts 註解
 	// 承諾的「擋得住 MatchFormat 新增字面量」那一側防護當時並不存在。此處的 runtime
 	// 斷言不是重點，重點是讓 tsc 非檢查這個型別不可。
 	it("format 值域涵蓋檢查的型別守衛仍成立", () => {

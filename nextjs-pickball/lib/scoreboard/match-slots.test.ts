@@ -35,7 +35,7 @@ describe("match-slots", () => {
 		expect(m1AfterUpdate?.scores).toEqual({ us: 8, them: 5 });
 		expect(m1AfterUpdate?.history).toEqual(m1State.history);
 		expect(m1AfterUpdate?.targetScore).toBe(15);
-		// Stage 2 mutation 補強：只斷言 m1 時，「readMatchSlot 忽略參數、一律回傳 map
+		// mutation 補強：只斷言 m1 時，「readMatchSlot 忽略參數、一律回傳 map
 		// 第一筆」的 mutation 會存活（m1 恰為第一筆）。加驗 m2 才能證明讀取真的以
 		// matchId 為鍵，而非碰巧取到正確的那一筆。
 		expect(readMatchSlot("m2")?.scores).toEqual({ us: 3, them: 1 });
@@ -50,7 +50,7 @@ describe("match-slots", () => {
 	});
 
 	it("courtNumber 不合法的分槽條目被逐筆丟棄，合法者保留", () => {
-		// Stage 2 mutation 補強：schema 的 number()／int()／positive() 三個約束原本零覆蓋——
+		// mutation 補強：schema 的 number()／int()／positive() 三個約束原本零覆蓋——
 		// 放寬為 z.number() 或 z.any() 時全套測試皆不轉紅。本 it 逐一釘住這三個約束，
 		// 並一併涵蓋「同時缺 courtNumber 與其他欄位」仍走逐筆降級（而非整份清除）的情形。
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -86,9 +86,9 @@ describe("match-slots", () => {
 		expect(droppedCount).toBe(0);
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 TeamPlayersSchema 的
-	// .min(1).max(2) 零覆蓋——放寬為 .min(0).max(9) 時全套測試皆不轉紅。design Decision 6
-	// 明文要求把「單打 1 人、雙打 2 人」這條值域寫進 zod，本 it 釘住該邊界，
+	// 補充測試：mutation 測試發現 TeamPlayersSchema 的
+	// .min(1).max(2) 零覆蓋——放寬為 .min(0).max(9) 時全套測試皆不轉紅。需求明訂
+	// 「單打 1 人、雙打 2 人」這條值域要寫進 zod，本 it 釘住該邊界，
 	// 寫法比照上方「courtNumber 不合法的分槽條目被逐筆丟棄，合法者保留」。
 	it("teamPlayers 每隊人數超出 1～2 的分槽條目被逐筆丟棄，1 人與 2 人皆保留", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -164,7 +164,7 @@ describe("match-slots", () => {
 		expect(slots.m2).toEqual(m2State);
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉 hasLocalStorage()
+	// 補充測試：mutation 測試時發現拿掉 hasLocalStorage()
 	// 守門在既有 4 個 it 下不會轉紅（happy-dom 恆有 window.localStorage），
 	// 故另補此測試堵住這個偵測缺口，寫法比照 storage.test.ts 的 SSR 情境。
 	it("SSR（無 window）時 read／write／clear 皆不寫入也不 throw", () => {
@@ -187,7 +187,7 @@ describe("match-slots", () => {
 		expect(localStorage.getItem(MATCH_SLOTS_KEY)).toBe(sentinel);
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現拿掉 hasLocalStorage()
+	// 補充測試：mutation 測試發現拿掉 hasLocalStorage()
 	// 內的 try/catch 後仍全綠——上一個 test 走的是 typeof window 分支，這是另一條
 	// 「屬性 getter 直接 throw」的 guard 路徑，寫法比照 storage.test.ts 的同名情境。
 	it("存取 localStorage 本身即拋例外（如 Firefox 私密模式）時安全降級", () => {
@@ -217,7 +217,7 @@ describe("match-slots", () => {
 		}
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現「解析後不是物件」
+	// 補充測試：mutation 測試發現「解析後不是物件」
 	// 這條分支完全沒有測試覆蓋——既有的「整份非 JSON」案例用 "{{{"，會在 JSON.parse
 	// 就拋錯而走 catch，永遠碰不到這個分支。拿掉 Array.isArray guard、拿掉該分支的
 	// console.warn、乃至整段刪除，四種 mutation 都存活。spec 的 Scenario 明訂
@@ -242,7 +242,7 @@ describe("match-slots", () => {
 		warnSpy.mockRestore();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現拿掉
+	// 補充測試：mutation 測試發現拿掉
 	// `raw === null` 早退後仍全綠——那會讓「首次使用、分槽 key 尚不存在」被當成
 	// 損壞資料處理（JSON.parse("") 拋錯 → 走 catch → 誤 warn 並誤呼叫 removeItem）。
 	it("分槽 key 不存在時視為空集合，不 warn 也不觸發清除", () => {
@@ -257,8 +257,8 @@ describe("match-slots", () => {
 		removeItemSpy.mockRestore();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現這兩個 catch 分支的
-	// console.warn 拿掉後全綠。寫入超出配額是 design Risks 明列的失效模式，
+	// 補充測試：mutation 測試發現這兩個 catch 分支的
+	// console.warn 拿掉後全綠。寫入超出配額是已知的失效模式，
 	// 寫法比照 storage.test.ts 的「writeScoreboard localStorage 拋例外時不 throw，僅 warn」。
 	it("寫入與批次清除遇 localStorage 拋例外時不 throw，僅 warn", () => {
 		writeMatchSlot({ ...createInitialState(), matchId: "m1" });

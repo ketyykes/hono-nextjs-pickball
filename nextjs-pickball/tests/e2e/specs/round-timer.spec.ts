@@ -9,10 +9,10 @@ import type { Locator, Page } from "@playwright/test";
 // （單元測試只能驗「被注入的假函式被呼叫了」，驗不到那個函式裡面做了什麼）。
 //
 // 常數、trackConsoleIssues／buildTestPlayer／seedRoster 的形態沿用 match-stage.spec.ts
-// 的既有慣例，並依 tasks 12.1 於本檔內建立同構的區域函式，不跨檔 import helper。
+// 的既有慣例，於本檔內建立同構的區域函式，不跨檔 import helper。
 //
-// ── page.clock 的語意實測結論（本 repo 第一次使用這個 API，design Risks 要求 apply
-//    階段實測確認；以下數字是 chromium 上實跑觀察到的，不是照文件推測）──
+// ── page.clock 的語意實測結論（本 repo 第一次使用這個 API，
+//    以下數字是 chromium 上實跑觀察到的，不是照文件推測）──
 //   ① install() 後假時鐘會隨真實時間自走：Node 端真的等 2 秒後，頁面的 Date.now() 前進
 //      2001ms，畫面倒數同步由 10:00 走到 09:58——即 setInterval 在假時鐘下照常每秒觸發。
 //   ② runFor(1000) 逐一觸發中間回呼，畫面恰好走一秒（09:58 → 09:57）。

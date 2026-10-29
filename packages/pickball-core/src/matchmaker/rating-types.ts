@@ -1,7 +1,7 @@
 // 評分模組的型別與常數骨架。純型別與常數，無執行期邏輯、無函式。
 // openspec/config.yaml 的 TDD 例外清單只列 *.d.ts、next-env.d.ts、cloudflare-env.d.ts，不含本檔——
 // 本檔免測的依據不是援引該清單，而是 config.yaml 主句「對……下所有具備行為邏輯的模組採通用 TDD」：
-// 本檔無函式，本來就不在 TDD 適用範圍內（design Decision 1）。
+// 本檔無函式，本來就不在 TDD 適用範圍內。
 // 常數的對外可觀察值改在 rating.test.ts 斷言，因為該檔是這些常數的消費端。
 
 import type { MatchFormat } from "./allocation-types";
@@ -28,7 +28,7 @@ export const K_DECAY_GAMES = 20;
 /**
  * 單一選手的評分輸入：id、目前評分、出賽場數。
  * 選擇此最小集合而非整個 Player 物件，以避免測試案例雜訊、降低 schema 演進耦合、
- * 防止誤用 Team.rating（design Decision 2）。
+ * 防止誤用 Team.rating。
  */
 export interface RatingPlayerInput {
 	readonly id: string;
@@ -40,7 +40,7 @@ export interface RatingPlayerInput {
  * 一支隊伍：隊內選手清單（由 PLAYERS_PER_MATCH[format] / 2 推導出的 1 人或 2 人）。
  * Side 與 allocation-types.ts 的 Team 不可互換：
  * Side 無 rating 加總欄位，帶 gamesPlayed；Team.rating 是隊內各選手 rating 的加總，
- * 而評分計算要用隊伍的平均評分（design Decision 2）。
+ * 而評分計算要用隊伍的平均評分。
  */
 export type Side = readonly RatingPlayerInput[];
 
@@ -53,7 +53,7 @@ export type Side = readonly RatingPlayerInput[];
  * 本模組只負責在收到 "draw" 時正確計算）。
  * 平局以第三個字面量表達而非另加 isDraw 布林旗標，是為了讓 winnerIndex 維持唯一的
  * 「結果」真相來源：兩個欄位會生出 isDraw 為真但 winnerIndex 仍指向某隊的無效組合，
- * 而型別擋不住它（design Decision 1；前例為 MatchStatus 由兩值擴為三值時同樣走字面量聯集）。
+ * 而型別擋不住它（前例為 MatchStatus 由兩值擴為三值時同樣走字面量聯集）。
  */
 export interface RatingUpdateInput {
 	readonly format: MatchFormat;
@@ -65,9 +65,9 @@ export interface RatingUpdateInput {
  * 單名選手的賽後評分變動紀錄。
  * id 為選手識別碼。before 為賽前評分，after 為賽後評分（已四捨五入）。
  * delta 為評分變動（計算為 after 減 before，亦已四捨五入；負值表扣分）；
- * 是重算結果而非理論值（design Decision 6），過程亦涉及四捨五入。
+ * 是重算結果而非理論值，過程亦涉及四捨五入。
  *
- * 旗標語意分歧需特別注意（design Decision 7）：
+ * 旗標語意分歧需特別注意：
  * - atUpperBound：賽後分數等於 RATING_MAX（8.00），不論本場有無被夾，只要停在界上即為 true
  * - atLowerBound：賽後分數等於 RATING_MIN（1.00），不論本場有無被夾，只要停在界上即為 true
  * - clamped：本場的理論值超出 [RATING_MIN, RATING_MAX] 範圍而被截斷，代表本場少拿了分數

@@ -24,8 +24,8 @@ type PreviewState =
 // （可新增人數＋問題列的列號／欄位／原因）→ 有錯誤列時確認鈕 disabled →
 // 確認後 applyRosterImport → 寫入 → 檢查寫入結果後才 reload。
 // 「選檔 → 讀文字」的樣板抽到共用元件 FileTextPicker；File.text() 等瀏覽器 I/O
-// 只出現在元件層（design Decision 7）；parseRosterCsv／applyRosterImport 皆為
-// 純函式，不在此另外實作任何驗證或空列過濾邏輯（Decision 13：parseRosterCsv
+// 只出現在元件層；parseRosterCsv／applyRosterImport 皆為
+// 純函式，不在此另外實作任何驗證或空列過濾邏輯（parseRosterCsv
 // 已跳過空白列，本層不再過濾一次）。
 //
 // 寫入改用 transfer-storage.ts 的 writeRosterPlayers（而非 storage.ts 的

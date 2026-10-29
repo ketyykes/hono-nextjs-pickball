@@ -7,7 +7,7 @@ export function getServeSide(servingTeamScore: number): ServeSide {
 
 // 勝利判定：任一方達目標分數且差距 ≥ 2（延長賽持續到差距 ≥ 2，不設分數上限）。
 // targetScore 為必填參數且刻意不給預設值——給了預設值會讓漏傳的呼叫點靜默退回 11 分制，
-// 且既有測試會直接通過而失去 TDD 紅燈（見 design.md Decision 3）。
+// 且既有測試會直接通過而失去 TDD 紅燈。
 export function isGameWon(
 	scores: { us: number; them: number },
 	targetScore: TargetScore,

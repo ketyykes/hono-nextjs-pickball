@@ -7,7 +7,7 @@
 // 不會有任何編譯錯誤或既有測試轉紅——列印樣式會靜默失效。
 //
 // 這支測試是唯一能機械保證兩側同源的方式：直接讀 app/globals.css 的原始文字，
-// 從 PrintSheet.tsx import 常數組出期望字串後做逐字比對（leader 裁決 2）。
+// 從 PrintSheet.tsx import 常數組出期望字串後做逐字比對。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

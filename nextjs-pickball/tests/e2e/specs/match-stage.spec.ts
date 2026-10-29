@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import type { Page, Locator } from "@playwright/test";
 
 // /matchmaker 對戰頁（場次舞台）的 E2E 驗收。
-// 對應 matchmaker-match-stage-ui change tasks 11 的 test-plan：路由與區段動線、
+// 驗收範圍：路由與區段動線、
 // 空白球場、單打色塊排列、完成一輪、RWD 三斷點、鍵盤導覽與無障礙名稱、navbar 進入。
 //
 // 種資料格式沿用既有 player-roster.spec.ts 的做法：寫 matchmaker:roster:v1
@@ -430,11 +430,9 @@ test.describe("/matchmaker 對戰頁", () => {
 		// 鎖定情境：此處只驗 disabled 與 aria-checked——鎖定時三顆 radio 皆 disabled，
 		// 鍵盤無法把焦點放進容器，方向鍵在真實鍵盤路徑上不可達 handleTargetScoreKeyDown
 		// 內的 if (locked) return;，該防線改由 RoundControls.test.tsx 的 integration
-		// 測試以 fireEvent.keyDown 直接對容器派發事件覆蓋（tasks 11 裁決 2）。
+		// 測試以 fireEvent.keyDown 直接對容器派發事件覆蓋。
 		//
-		// matchmaker-scoreboard-binding change 的必要連帶調整（本測試名稱與方向鍵導覽
-		// 部分不動，僅調整鎖定情境的建立方式）：鎖定條件已由「有回合就鎖」放寬為
-		// 「本輪已開始計分才鎖」（match-stage delta 的 MODIFIED「目標分數選擇器」），
+		// 鎖定情境的建立方式：鎖定條件為「本輪已開始計分才鎖」（非「有回合就鎖」），
 		// 剛產生的本輪所有場次皆為 pending、尚無任何計分板槽，不再滿足鎖定條件——
 		// 若只點「產生本輪對戰」就斷言 disabled 會轉紅。改為完成該場（手動輸入比分）
 		// 讓本輪確實「已開始計分」，維持這條 it 原本要驗證的「鎖定時三顆 radio 皆

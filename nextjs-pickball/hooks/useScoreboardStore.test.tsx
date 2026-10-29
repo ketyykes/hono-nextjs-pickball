@@ -252,7 +252,7 @@ describe("useScoreboardStore", () => {
 	// 若無覆蓋——reducer 層只驗過 UNDO 保留 matchId。下列兩種變異會因此存活／僅由 reducer
 	// 單元測試擋下：
 	// ① writeMatchSlot 對 finished 狀態誤加早退 guard（待送出清單全部落空）；
-	// ② UNDO replay 掉 matchId（design Decision 6 的洞：同時失去綁定並把整場比賽
+	// ② UNDO replay 掉 matchId（同時失去綁定並把整場比賽
 	//    寫進獨立槽 scoreboard:current:v1）——hook 層原本沒有第二道防線。
 	it("綁定模式下打到結束並 UNDO 後仍只寫回該槽", () => {
 		writeMatchSlot({ ...createInitialState({ targetScore: 11 }), matchId: "m1" });

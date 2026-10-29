@@ -1,6 +1,6 @@
 // components/matchmaker/PlayerStatsTable.tsx
 // 排行榜表格：純呈現元件，資料由 computePlayerStats 算好並排序完成傳入
-// （lib/matchmaker/player-stats.ts design Decision 2），本檔不重新排序、不做任何
+// （lib/matchmaker/player-stats.ts），本檔不重新排序、不做任何
 // id 回查，也不 import 任何 store——呈現決策（已不在名單的文字標示、null 的佔位符號）
 // 集中在這裡，計算邏輯留在 lib/（spec「統計頁的路由與呈現」）。
 "use client";
@@ -22,7 +22,7 @@ export interface PlayerStatsTableProps {
 }
 
 // 最常搭檔／最常對手為 null（找不到）時的表格佔位符號。單一消費端、純顯示用途，
-// 不進 labels.ts（design Decision 2；§4→§5 交棒事項 1：null 的顯示決策留在本檔）。
+// 不進 labels.ts（null 的顯示決策留在本檔）。
 const NO_FREQUENT_NAME_PLACEHOLDER = "尚無紀錄";
 
 // 表格的可存取名稱：標題列不構成 <table> 的可存取名稱，缺少名稱時螢幕閱讀器的表格清單
@@ -61,7 +61,7 @@ export function PlayerStatsTable({ stats }: PlayerStatsTableProps) {
 			<TableBody>
 				{stats.map((stat, index) => {
 					// 色塊一律用 stat.colorFrom／colorTo 渲染，不論 onRoster 為何——已離開名單者
-					// 的中性灰已由 player-stats.ts 決定好（design Decision 3），本檔不需要另外
+					// 的中性灰已由 player-stats.ts 決定好，本檔不需要另外
 					// 判斷「要不要換色」。
 					const background = `linear-gradient(${GRADIENT_ANGLE_DEG}deg, ${stat.colorFrom}, ${stat.colorTo})`;
 					const color = pickTextColor(stat.colorFrom, stat.colorTo);

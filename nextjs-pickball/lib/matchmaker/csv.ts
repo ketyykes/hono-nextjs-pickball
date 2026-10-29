@@ -1,6 +1,6 @@
 // CSV 的底層序列化與解析（跳脫、BOM、換行）。
 // 本模組只認識字串與二維陣列，完全不 import 任何網域型別，
-// 因此不可能在解析層偷偷做網域驗證（design.md Decision 1）。
+// 因此不可能在解析層偷偷做網域驗證。
 
 /** UTF-8 BOM（U+FEFF），Excel 需要它才能正確辨識 UTF-8 中文，不會被系統預設編碼誤判為亂碼。 */
 export const UTF8_BOM = "﻿";
@@ -43,7 +43,7 @@ function escapeField(field: string): string {
  *
  * 刻意不在最後一列後面補一個 `LINE_BREAK`：Excel／Google Sheets 開啟「無尾端換行」與
  * 「有尾端換行」的 CSV 結果相同，但若本函式輸出尾端換行，`parseCsv` 讀回時就會多解析出
- * 一列空列（即下方 Stage 2 review 抓到的幻影空列問題）——保持「不輸出」可以讓
+ * 一列空列（即幻影空列問題）——保持「不輸出」可以讓
  * `parseCsv(toCsv(rows))` 這條 round-trip 不必額外處理自己製造出來的邊界。
  */
 export function toCsv(rows: readonly (readonly string[])[]): string {
@@ -58,7 +58,7 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
  * 設計取捨（刻意維持寬鬆、不拋錯）：若引號未閉合，狀態機會把後續所有內容
  * （含換行與分隔符）併入同一欄位，直到字串結束，並不會產生第二列。
  * 這是有意的取捨——要偵測「引號未閉合」就必須把回傳型別從 `string[][]`
- * 改成可攜帶錯誤的型別，牽動所有呼叫端；而下游（§5／§6）本來就會核對
+ * 改成可攜帶錯誤的型別，牽動所有呼叫端；而下游本來就會核對
  * 「欄位數是否等於標題數」，未閉合引號造成的列數／欄位數異常會被那一層攔下，
  * 不需要本模組額外報錯。
  */
@@ -97,7 +97,7 @@ export function parseCsv(text: string): string[][] {
 			currentRow.push(currentField);
 			currentField = "";
 		} else if (char === CARRIAGE_RETURN) {
-			// `\r\n` 由後續的 LINE_FEED 分支結束該列；單獨的 CR 不在支援範圍內（見 design.md Non-Goals），
+			// `\r\n` 由後續的 LINE_FEED 分支結束該列；單獨的 CR 不在支援範圍內，
 			// 引號外的單獨 CR 會被靜默丟棄（不進 currentField）——若欄位值本身含 CR，
 			// 呼叫端須透過 toCsv 跳脫（needsQuoting 已涵蓋 CR），CR 才會被引號保護、原樣讀回。
 			continue;

@@ -25,7 +25,7 @@ const _timerDurationMinutesIsRequired: RequiredTimerDuration = true;
 void _timerDurationMinutesIsRequired;
 
 // 本輪設定的預設值與場地數夾值——純函式，元件層（RoundControls 的加減按鈕）以 useState
-// 消費而非 hook，見 design Decision 3。
+// 消費而非 hook。
 describe("createRoundSettings", () => {
 	it("預設為單打與 1 個場地且取用分配引擎匯出的常數", () => {
 		// 直接比對 import 進來的常數而非字面量，避免本檔與 round-settings.ts
@@ -107,7 +107,7 @@ describe("changeCourtCount", () => {
 	});
 });
 
-// courtCountBounds 是 Stage 2 審查後才抽出的具名函式（讓 RoundControls 初次渲染時
+// courtCountBounds 是具名函式（讓 RoundControls 初次渲染時
 // 不必呼叫 changeCourtCount(settings, 0) 這種怪寫法就能算出 disabled 狀態）。
 // 行為在抽出當下已經確定，這裡的測試是 regression guard，寫入當下即為綠燈。
 describe("courtCountBounds", () => {

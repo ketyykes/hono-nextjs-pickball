@@ -1,5 +1,5 @@
 /**
- * matchmaker 三個 LocalStorage key 與 hasLocalStorage() 的單一來源（design Decision 8）。
+ * matchmaker 三個 LocalStorage key 與 hasLocalStorage() 的單一來源。
  *
  * 獨立成檔而非放在 storage.ts：round-storage.ts 需要這三個 key 與 hasLocalStorage()，
  * 而 storage.ts 的 RESET_KEYS 也需要全部三個 key。若 key 名稱寫在 round-storage.ts、

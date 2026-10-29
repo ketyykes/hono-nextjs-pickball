@@ -1,6 +1,6 @@
 // 色塊版面推導——由一場對戰算出每格屬於哪一隊、位於第幾列第幾欄的純函式，
-// 不挾帶 React 節點（design Decision 2）。雙打採「上排第一隊、下排第二隊」而非對角，
-// 理由見 design Decision 4：上下分排 + 中央比分區才有球場感，對角配置需要讀者先知道
+// 不挾帶 React 節點。雙打採「上排第一隊、下排第二隊」而非對角，
+// 理由是上下分排 + 中央比分區才有球場感，對角配置需要讀者先知道
 // 「對角同色是一隊」這條額外規則，違反色彩不可作為唯一資訊來源的精神。
 
 import type { MatchFormat } from "@pickball/core/matchmaker/allocation-types";
@@ -16,7 +16,7 @@ export interface CourtTileTeamSource {
  * CourtCard 拿到的是 RoundMatch（teams[].playerIds），把它回填成完整 Match 需要偽造
  * doublesComposition（RoundMatch 為 optional、Match 的 doubles 分支為必填），是靜默補值。
  * 放寬為只要求 format 與 teams[].players，allocation-types 的 Match 可直接指派，
- * 呼叫端則傳入由 playerIds 解析後的隊伍（design Open Questions 2c）。
+ * 呼叫端則傳入由 playerIds 解析後的隊伍。
  */
 export interface CourtTileSource {
 	readonly format: MatchFormat;

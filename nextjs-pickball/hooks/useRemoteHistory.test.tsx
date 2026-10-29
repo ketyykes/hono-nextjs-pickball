@@ -325,7 +325,7 @@ describe("useRemoteHistory", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
-	// 以下四個 it 為 regression guard：加入時即為綠燈（實作已具備），補 Stage 2 mutation 找到的存活變異缺口
+	// 以下四個 it 為 regression guard：加入時即為綠燈（實作已具備），補 mutation 找到的存活變異缺口
 	it("regression guard：五個區間的請求界線皆等於 rangeBounds 且無界的一端不送出", async () => {
 		// 逐一 rerender 五個區間，涵蓋單一區間測不到的「無界端不送」與各區間切點
 		for (let i = 0; i < HISTORY_RANGES.length; i++) enqueue(200, listBody([]));

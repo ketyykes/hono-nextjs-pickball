@@ -447,7 +447,7 @@ describe("/api/matchmaker 名單端點", () => {
 
 	it("匯入遇到非主鍵的約束違規時回 500 而非 409", async () => {
 		const cookie = await seedAndSignIn("mp-import-fk@example.com");
-		// 實測（design Open Questions）：D1 batch 的主鍵衝突在最外層訊息就含 SQLITE_CONSTRAINT_PRIMARYKEY，
+		// 實測：D1 batch 的主鍵衝突在最外層訊息就含 SQLITE_CONSTRAINT_PRIMARYKEY，
 		// 不需走 cause。此處刻意把非主鍵的 FOREIGN KEY 違規包在 cause 內，驗證兩件事：
 		// 一是 isConstraintError 沿 cause 鏈查找也只認主鍵／UNIQUE，二是 FK 違規不是 id 重複，必須回 500 而非 409
 		const constraintError = new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_FOREIGNKEY)");

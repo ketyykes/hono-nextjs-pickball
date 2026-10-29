@@ -36,7 +36,7 @@ describe("csv", () => {
 	it("parseCsv 對檔尾換行不產生幻影空列，且保留檔案中間的空列", () => {
 		// 使用者從 Google Sheets／Excel 另存的 CSV 檔案幾乎都以換行結尾，
 		// 若無條件把「迴圈結束後累積的欄位」推成最後一列，會多吐出一列 [""]，
-		// 讓下游（§5／§6）依列號回報的錯誤指向試算表上不存在的那一列。
+		// 讓下游依列號回報的錯誤指向試算表上不存在的那一列。
 		expect(parseCsv("a,b\nc,d\n")).toEqual([
 			["a", "b"],
 			["c", "d"],
@@ -48,9 +48,9 @@ describe("csv", () => {
 	});
 
 	// 以下為 regression guard：寫入當下即為綠燈（行為早已由既有實作涵蓋），
-	// 補上是為了填補 Stage 2 mutation testing 找到的覆蓋缺口（parseCsv 的主流路徑、
+	// 補上是為了填補 mutation testing 找到的覆蓋缺口（parseCsv 的主流路徑、
 	// 未閉合引號、單獨 CR、邊界輸入皆從未被真正餵過）。已用「改壞實作看紅、
-	// 還原看綠」的方式驗證偵測力，見本次回報的存活 mutation 複驗表。
+	// 還原看綠」的方式驗證偵測力。
 
 	it("無 BOM、LF 換行、未跳脫欄位的多列 CSV 可被完整解析（如 Google Sheets 匯出）", () => {
 		// 既有兩條測試餵給 parseCsv 的輸入永遠帶 BOM、永遠只有一列、

@@ -10,7 +10,7 @@ import type { Locator, Page } from "@playwright/test";
 //
 // 種資料與「已有回合」狀態的建立方式沿用 match-stage.spec.ts 的既有 helper
 // （seedRoster／buildTestPlayer／trackConsoleIssues），「已有回合」一律用 UI 操作
-// （點「產生本輪對戰」）達成，不種 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有裁決）。
+// （點「產生本輪對戰」）達成，不種 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有做法）。
 
 const ROSTER_STORAGE_KEY = "matchmaker:roster:v1";
 const ROUND_STORAGE_KEY = "matchmaker:round:v1";
@@ -191,7 +191,7 @@ function buildTestPlayer(index: number) {
 }
 
 // 用 addInitScript 而非 goto+evaluate：保證在頁面任何 script 執行前就已寫入
-// localStorage（沿用 match-stage.spec.ts 的既有裁決）。
+// localStorage（沿用 match-stage.spec.ts 的既有做法）。
 async function seedRoster(page: Page, count: number): Promise<void> {
 	const players = Array.from({ length: count }, (_, i) => buildTestPlayer(i + 1));
 	await page.addInitScript(
@@ -221,7 +221,7 @@ async function snapshotLocalStorage(page: Page): Promise<Record<string, string>>
 // 回合格式來源為 `matchmaker:round:v1`，改動請同步。
 // 能用 UI 操作到達的狀態優先用 UI 操作，只有無法用 UI 到達的狀態（球員名單本身沒有
 // 對應的 UI 建立流程）才種資料——「已有回合」一律靠點擊「產生本輪對戰」達成，
-// 不直接寫入 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有裁決）。
+// 不直接寫入 matchmaker:round:v1（沿用 match-stage.spec.ts 的既有做法）。
 async function gotoMatchmakerWithRound(page: Page, count: number): Promise<void> {
 	await seedRoster(page, count);
 	await page.goto("/matchmaker");
@@ -509,7 +509,7 @@ test.describe("/matchmaker 匯出功能", () => {
 	// 匯出 MUST 完全在瀏覽器本機完成，不得將參賽者資料送往後端或第三方服務
 	// （spec「匯出為純前端唯讀操作」；prd.md 12.4）。
 	test("匯出過程不發出任何網路請求", async ({ page }) => {
-		// 列印用 stub，避免真的呼叫瀏覽器原生列印對話框卡住測試（沿用既有列印測試的既有裁決）。
+		// 列印用 stub，避免真的呼叫瀏覽器原生列印對話框卡住測試（沿用既有列印測試的做法）。
 		await page.addInitScript(() => {
 			window.print = () => {};
 		});

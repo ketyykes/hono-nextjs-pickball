@@ -217,7 +217,7 @@
 }
 
 /*
-  matchmaker 列印樣式（matchmaker-visual-export change §8，design Decision 3）。
+  matchmaker 列印樣式。
   規則集中於此、一律以 data-print 屬性選取，SHALL NOT 散落於各元件的 utility class——
   列印要關掉的東西橫跨全站導覽（app/layout.tsx）與對戰頁控制項（app/matchmaker/page.tsx）
   兩個不同擁有者，集中一處才追得動。
@@ -260,7 +260,7 @@
   }
 
   /* 每個場地區塊不可跨頁切斷（spec：SHALL NOT 讓同一個場地的球員被拆到兩頁），
-     並給予基本間距與縮排，讓紙本可讀（leader 裁決 4：只做「讓紙本可讀」所需的
+     並給予基本間距與縮排，讓紙本可讀（只做「讓紙本可讀」所需的
      最小排版，SHALL NOT 做頁首頁尾、頁碼、指定紙張大小）。 */
   [data-print="court"] {
     break-inside: avoid;

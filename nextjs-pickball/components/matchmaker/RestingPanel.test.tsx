@@ -105,7 +105,7 @@ describe("RestingPanel", () => {
 		expect(swatchP2.style.background).not.toBe(swatchP3.style.background);
 		expect(swatchP1.style.background).not.toBe(swatchP3.style.background);
 
-		// 元件不得重排或篩選清單（tasks 9.3）：清單順序須與傳入的 resting 陣列一致，
+		// 元件不得重排或篩選清單：清單順序須與傳入的 resting 陣列一致，
 		// 用 DOM 順序驗證（若實作反轉清單或依 restCount／姓名排序，這裡的順序會不同）。
 		const rows = screen.getAllByTestId(/^resting-player-/);
 		expect(rows.map((row) => row.getAttribute("data-testid"))).toStrictEqual([

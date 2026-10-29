@@ -7,16 +7,16 @@ import type { TeamPlayers } from "@pickball/core/scoreboard/types";
 import { pickTextColor } from "@/lib/matchmaker/colors";
 
 // /scoreboard?match=<matchId> 對戰場次綁定的 E2E 驗收。
-// 對應 matchmaker-scoreboard-binding change §7 的 test-plan：失效說明與出口、
+// 驗收範圍：失效說明與出口、
 // 改用獨立計分板、綁定模式設定列（唯讀目標分數、場地標示、返回對戰）、
 // 綁定模式下多 viewport 零捲動。
 //
-// 綁定有效性只看 scoreboard:matches:v1 有無該 matchId 的條目（design Decision 2），
-// 不需要真實的回合資料，因此以 page.addInitScript 直接寫入分槽即可（design Risks）。
+// 綁定有效性只看 scoreboard:matches:v1 有無該 matchId 的條目，
+// 不需要真實的回合資料，因此以 page.addInitScript 直接寫入分槽即可。
 // 種入的欄位形狀複製自 lib/scoreboard/types.ts 的 ScoreboardStateSchema，
 // schema 若異動需同步更新本檔。
 //
-// 為避免 localStorage 跨測試污染，beforeEach 只清除本 change 相關的兩個 key，
+// 為避免 localStorage 跨測試污染，beforeEach 只清除本檔相關的兩個 key，
 // 刻意不用 localStorage.clear()（沿用 match-stage.spec.ts 的既有慣例）。
 
 const MATCH_SLOTS_KEY = "scoreboard:matches:v1";
@@ -44,7 +44,7 @@ function hexToRgb(hex: string): string {
 	return `rgb(${r}, ${g}, ${b})`;
 }
 
-// 雙打綁定場次的球員姓名色塊種子資料（每隊 2 筆，內容量最大的情境，design Decision 5）。
+// 雙打綁定場次的球員姓名色塊種子資料（每隊 2 筆，內容量最大的情境）。
 // foreground 為 seed 建立端已算好存入的欄位，測試不需要也不應該自行重算（見 spec
 // 「計分板 SHALL NOT 自行計算球員姓名色塊的前景文字色」）。
 const DOUBLES_TEAM_PLAYERS: TeamPlayers = {
@@ -70,7 +70,7 @@ function seedMatchSlot(
 	} = {},
 ) {
 	// courtNumber 用 in 判斷而非 ??：`?? 3` 會把明確傳入的 null 一併吃成 3，
-	// 使「綁定但無場地編號」這個分支在測試裡根本無法表達（Stage 2 mutation 補洞）。
+	// 使「綁定但無場地編號」這個分支在測試裡根本無法表達（mutation 補洞）。
 	const courtNumber = "courtNumber" in overrides ? overrides.courtNumber : 3;
 	// teamPlayers 同理用 in 判斷：未傳入時維持既有測試「無球員姓名色塊」的既有行為
 	// （schema .default(null) 涵蓋的向後相容路徑），而非誤把「明確傳 null」與「未傳」混為一談。
@@ -116,7 +116,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 	test("場次失效時顯示繁中說明與兩個出口且不顯示技術錯誤碼", async ({ page }) => {
 		await page.goto("/scoreboard?match=gone");
 
-		// Stage 2 mutation 補洞：原本只斷言兩個出口，把標題與說明段落整段刪掉仍全綠——
+		// mutation 補洞：原本只斷言兩個出口，把標題與說明段落整段刪掉仍全綠——
 		// 但 test 名稱要求的正是「顯示繁中說明」，需要對文案本身的正向斷言。
 		await expect(page.getByText("這場比賽目前無法計分")).toBeVisible();
 		await expect(
@@ -154,7 +154,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 	test("綁定模式設定列以唯讀文字顯示目標分數且無比賽形式下拉", async ({ page }) => {
 		// targetScore 刻意選 21（不同於 seed 預設的 15、也不同於 courtNumber 與
 		// createInitialState 的 11），否則把「本輪 {targetScore} 分制」寫死成常數
-		// 或改讀 courtNumber 都能蒙混過關（Stage 2 mutation 補洞）
+		// 或改讀 courtNumber 都能蒙混過關（mutation 補洞）
 		await seedMatchSlot(page, "m1", { targetScore: 21, courtNumber: 7 });
 		await page.goto("/scoreboard?match=m1");
 
@@ -166,7 +166,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 	test("綁定模式顯示場地標示且返回對戰可回到對戰頁", async ({ page }) => {
 		// courtNumber 刻意選 7（不同於 seed 預設的 3、也不同於 targetScore 的 15），
 		// 否則把「場地 {courtNumber}」寫死成常數 3 或改讀 targetScore 都能蒙混過關
-		// （Stage 2 mutation 補洞）
+		// （mutation 補洞）
 		await seedMatchSlot(page, "m1", { courtNumber: 7, targetScore: 15 });
 		await page.goto("/scoreboard?match=m1");
 
@@ -175,7 +175,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		await expect(page).toHaveURL(/\/matchmaker$/);
 	});
 
-	// design Decision 8：綁定模式設定列組成改變（少三顆按鈕、多場地標示與返回入口），
+	// 綁定模式設定列組成改變（少三顆按鈕、多場地標示與返回入口），
 	// 既有的零捲動測試只驗過獨立模式 URL，不會自動覆蓋綁定 URL，故需在此重跑一次。
 	test("綁定模式多 viewport 零捲動：整頁不可垂直捲動且核心按鈕完整可見", async ({
 		page,
@@ -227,9 +227,9 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		}
 	});
 
-	// matchmaker-scoreboard-team-labels change §4：加入球員姓名色塊後，以雙打（每隊 2 筆，
+	// 加入球員姓名色塊後，以雙打（每隊 2 筆，
 	// 內容量最大的情境）重新跑一次既有的零捲動驗收公式，而非信任「新增內容量不大所以應該
-	// 沒事」的直覺（design Decision 5、Risks）。
+	// 沒事」的直覺。
 	test("綁定模式含球員姓名色塊時多 viewport 仍零捲動", async ({ page }) => {
 		await seedMatchSlot(page, "m1", { teamPlayers: DOUBLES_TEAM_PLAYERS });
 
@@ -238,7 +238,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 			await page.goto("/scoreboard?match=m1");
 			await expect(page.getByText("我方", { exact: true })).toBeVisible();
 			// 確認姓名色塊確實有被渲染，而非因為 teamPlayers 被忽略、本測試在
-			// 「畫面其實沒多渲染任何內容」的情況下巧合通過零捲動斷言（design Decision 5）。
+			// 「畫面其實沒多渲染任何內容」的情況下巧合通過零捲動斷言。
 			await expect(
 				page.getByText(DOUBLES_TEAM_PLAYERS.us[0].name, { exact: true }),
 			).toBeVisible();
@@ -277,7 +277,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		}
 	});
 
-	// Stage 2 mutation 補洞：page.tsx 的 `Array.isArray(rawMatch) ? rawMatch[0] : rawMatch`
+	// mutation 補洞：page.tsx 的 `Array.isArray(rawMatch) ? rawMatch[0] : rawMatch`
 	// 收斂零覆蓋——改成直接 `rawMatch as string` 後全套仍綠。同名 query 重複出現時
 	// searchParams 的值為 string[]，未收斂會把整個陣列當成 matchId，分槽查不到而
 	// 把合法場次誤判為失效。
@@ -291,7 +291,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		await expect(page.getByRole("link", { name: "回到對戰頁" })).toHaveCount(0);
 	});
 
-	// Stage 2 mutation 補洞：courtNumber 為 null 的綁定場次（該場尚未指派場地）零覆蓋——
+	// mutation 補洞：courtNumber 為 null 的綁定場次（該場尚未指派場地）零覆蓋——
 	// 原本的 seedMatchSlot 連 null 都表達不出來（`?? 3` 會吃掉）。此分支比一般綁定模式
 	// 少渲染一個節點，需一併確認設定列其餘部分仍在、且高度預算不因此走樣。
 	test("綁定模式 courtNumber 為 null 時不渲染場地標示且維持零捲動", async ({
@@ -320,7 +320,7 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 		}
 	});
 
-	// Stage 2 checklist 補洞：失效說明畫面自成一個 h-dvh 容器，不共用計分板本體的
+	// 補洞：失效說明畫面自成一個 h-dvh 容器，不共用計分板本體的
 	// 高度預算，既有零捲動測試（只跑計分板本體）完全涵蓋不到它——往說明裡加內容
 	// 會靜默溢出。
 	test("場次失效畫面多 viewport 零捲動", async ({ page }) => {
@@ -345,8 +345,8 @@ test.describe("/scoreboard 對戰場次綁定", () => {
 	});
 });
 
-// /matchmaker 對戰頁的計分板接線 E2E 驗收（§8）。
-// 對應 test-plan：計分中標示與當前比分、離開後再進入接續、多場地互不覆蓋、
+// /matchmaker 對戰頁的計分板接線 E2E 驗收。
+// 驗收範圍：計分中標示與當前比分、離開後再進入接續、多場地互不覆蓋、
 // 回填後轉為已完成、已完成場次不顯示入口、鎖定說明、手動輸入路徑不受影響、
 // 重設本輪後舊連結顯示失效說明。
 //
@@ -367,7 +367,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 	// 自己的 colorFrom／colorTo 接到對應色塊」這件事測不出來。
 	// 第一組刻意採「深色漸層」（pickTextColor 回傳淺色前景），其餘三組為淺色漸層（回傳
 	// 深色前景）：四組若全部落在同一側，四位球員的預期 foreground 會是同一個值，
-	// 「color 寫死成該值」的變異就殺不掉（Stage 2 mutation 補洞）。
+	// 「color 寫死成該值」的變異就殺不掉（mutation 補洞）。
 	const PLAYER_COLOR_PALETTE = [
 		{ colorFrom: "#0E6B63", colorTo: "#134E4A" },
 		{ colorFrom: "#16a34a", colorTo: "#4ade80" },
@@ -508,7 +508,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await clickWin(page, "us", 8);
 		// side-out 記分：我方先發、連贏 8 球後我方持續發球（比分 8:0）；接下來對方
 		// 第 1 次贏球只換發球權不得分，第 2～6 次贏球才各 +1 分——6 次點擊使對方得 5 分
-		// （見 tasks.md §8 開工盤點的實測與 lib/scoreboard/rules.ts 的 applyRallyResult）。
+		// （見 lib/scoreboard/rules.ts 的 applyRallyResult）。
 		await clickWin(page, "them", 6);
 		await page.getByRole("link", { name: "返回對戰" }).click();
 		await expect(page).toHaveURL(/\/matchmaker$/);
@@ -558,7 +558,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await seedRoster(page, 4);
 		// 兩個場地：第二場用來驗證回填只清除該場次的槽，不動其他場次的槽
 		// （spec「回填後清除該場次的計分板槽」Scenario 的「其他場次的條目不受影響」半句，
-		// 只用一個場次時沒有「其他場次」可供斷言，Stage 1 review 判定為零覆蓋）。
+		// 只用一個場次時沒有「其他場次」可供斷言，會是零覆蓋）。
 		await generateRound(page, 2);
 		const matchId = await courtMatchId(page, 0);
 		const otherMatchId = await courtMatchId(page, 1);
@@ -594,7 +594,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(parsedSlots[otherMatchId].scores).toEqual(otherScores);
 	});
 
-	// Stage 2 mutation 補洞（多筆同時符合零覆蓋）：reconcile effect 刻意寫成「每次只處理
+	// mutation 補洞（多筆同時符合零覆蓋）：reconcile effect 刻意寫成「每次只處理
 	// 待送出清單的第一筆，靠 round 變動觸發重跑逐筆收斂」，但既有 e2e 從未同時存在兩個
 	// finished 槽——把 clearMatchSlots([first.matchId]) 改成一次清掉 finished 全部的
 	// matchId（只送出第一筆、其餘進度靜默遺失）後，全套仍綠。這條同時釘住「兩筆都會被
@@ -623,7 +623,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(Object.keys(parsedSlots)).toEqual([]);
 	});
 
-	// Stage 2 mutation 補洞（分支零覆蓋）：回填送出失敗這條路徑從未被執行到——把
+	// mutation 補洞（分支零覆蓋）：回填送出失敗這條路徑從未被執行到——把
 	// `if (result.ok) { clearMatchSlots(...) }` 的 ok 判定拿掉、或把送出分支尾端的
 	// setMatchSlots(slots) 刪掉，全套皆仍綠。槽內比分平手是唯一能從資料面觸發
 	// submitScore 失敗（TIE）而又通過回填三條件的情境，故以它當載體。
@@ -700,7 +700,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		await expect(court.getByTestId(`court-${matchId}-team-a`)).toHaveText("第一隊勝");
 
 		// 評分更新並寫入歷史：手動輸入不因計分板入口存在而改變既有行為，直接讀
-		// localStorage 驗證兩者皆確實發生（本 change 尚無歷史 UI 頁面可供操作驗收）。
+		// localStorage 驗證兩者皆確實發生。
 		// 容器形狀為 { version, entries }（見 lib/matchmaker/round-storage.ts 的
 		// writeHistory），不是裸陣列。
 		const history = await page.evaluate(
@@ -711,10 +711,8 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(parsedHistory.entries?.length ?? 0).toBeGreaterThan(0);
 	});
 
-	// round-lifecycle delta 的 Scenario「回到已失效場次的計分板時顯示說明」——重排本輪
-	// 會丟棄未完成場次並清除對應計分板槽（§6），使舊的 ?match= 連結指向的槽消失，
-	// 落地於 §7 已完成的 MatchBindingNotice。此測試補上「從對戰頁實際重排」這條真實
-	// 前置路徑的驗收（前五棒遺漏、由第六棒 leader 於 tasks.md 補上此錨點）。
+	// 重排本輪會丟棄未完成場次並清除對應計分板槽，使舊的 ?match= 連結指向的槽消失，
+	// 落地於 MatchBindingNotice。此測試驗收「從對戰頁實際重排」這條真實前置路徑。
 	test("重設本輪後回到舊計分板連結顯示失效說明", async ({ page }) => {
 		await seedRoster(page, 8);
 		await generateRound(page, 2);
@@ -742,7 +740,7 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(bodyText).not.toMatch(/Error/);
 	});
 
-	// matchmaker-scoreboard-team-labels change §4：golden path——本 change 唯一使用者可見的
+	// golden path——此功能唯一使用者可見的
 	// 最終行為，是整條資料鏈（seed → schema → reducer → 元件）真的接上的唯一證據。
 	test("由對戰頁進入時面板顯示球員姓名", async ({ page }) => {
 		await seedRoster(page, 4);
@@ -770,8 +768,8 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 			);
 			expect(backgroundImage).toContain(hexToRgb(player.colorFrom));
 			expect(backgroundImage).toContain(hexToRgb(player.colorTo));
-			// spec 明文要求「MUST 直接採用已算好的 foreground」，不得自行計算亮度或對比
-			// （design Decision 1）：獨立以 pickTextColor 算出預期值比對，而非只確認
+			// spec 明文要求「MUST 直接採用已算好的 foreground」，不得自行計算亮度或對比，
+			// 故獨立以 pickTextColor 算出預期值比對，而非只確認
 			// background 正確——否則「color 寫死固定色碼」這種變異測不出來。
 			const color = await badge.evaluate((el) => getComputedStyle(el).color);
 			expect(color).toBe(hexToRgb(pickTextColor(player.colorFrom, player.colorTo)));
@@ -792,11 +790,11 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(themNameCounts.filter((count) => count > 0)).toHaveLength(2);
 
 		// 顯示位置的結構斷言（spec「顯示位置 MUST 為 TeamPanel.tsx 既有的名稱行，
-		// SHALL NOT 新增獨立的列或區塊」、design Decision 5）：頁面為 h-dvh + overflow-hidden
+		// SHALL NOT 新增獨立的列或區塊」）：頁面為 h-dvh + overflow-hidden
 		// 鎖高，多一列會壓縮分數面板的高度預算，且溢出的失敗模式是靜默裁切而非出現捲軸——
 		// 零捲動測試因此不保證抓得到。改以「色塊最近的祖先 div 同時含有『我方』與『分制』
 		// 兩段既有文字」直接驗證色塊確實落在名稱行內；把色塊搬到名稱行之外自成一列時，
-		// 該祖先 div 只會有球員姓名，本斷言即轉紅（Stage 2 mutation 補洞）。
+		// 該祖先 div 只會有球員姓名，本斷言即轉紅（mutation 補洞）。
 		const badgeRowText = await page
 			.getByText(testPlayers[0].name, { exact: true })
 			.evaluate((el) => el.closest("div")?.textContent ?? "");

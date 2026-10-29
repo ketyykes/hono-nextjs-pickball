@@ -114,9 +114,8 @@ describe("storage", () => {
 		expect(loaded?.history).toHaveLength(1);
 	});
 
-	// Stage 2 補充測試：design Migration Plan 的 Rollback 一節要求「回退後多出的新欄位
-	// 會被舊版 schema 剝除而非拒絕」須以測試實測、不得只憑推論。此處以一個 schema 未定義的
-	// 欄位模擬「舊版程式讀到新版資料」的情形（回退後 teamPlayers 對舊 schema 而言即為未知欄位）。
+	// 補充測試：回退後多出的新欄位會被舊版 schema 剝除而非拒絕，須以測試實測、不得只憑推論。
+	// 此處以一個 schema 未定義的欄位模擬「舊版程式讀到新版資料」的情形（回退後 teamPlayers 對舊 schema 而言即為未知欄位）。
 	// 註：zod 物件預設即會剝除未知欄位，本 it 為 regression guard 而非 TDD 紅燈。
 	it("含未知欄位的資料被剝除該欄位而非判為損壞", () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -134,10 +133,10 @@ describe("storage", () => {
 	});
 
 	it("matchId 為空字串時視為獨立計分板", () => {
-		// 補充測試（非 test-plan 逐字條目）：mutation 測試時發現拿掉
+		// 補充測試：mutation 測試時發現拿掉
 		// isStandaloneMatchId() 的空字串分支在既有測試下不會轉紅——`/scoreboard?match=`
 		// 這種空 query param 會產生 ""，而非 null，若不正規化，reducer 現行的
-		// SET_TARGET_SCORE guard 會誤判為「已綁定」（見 design 8-D）。
+		// SET_TARGET_SCORE guard 會誤判為「已綁定」。
 		const state = { ...createInitialState(), matchId: "" };
 		writeScoreboard(state);
 
@@ -146,7 +145,7 @@ describe("storage", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現 clearScoreboard() 的
+	// 補充測試：mutation 測試發現 clearScoreboard() 的
 	// **綁定分支完全沒有測試覆蓋**——把該分支整段刪掉（使帶 matchId 的清除改去 removeItem
 	// 獨立槽）後全套仍綠。那正是 spec 最忌的「清除範圍過寬」：清一個場次卻清掉獨立計分板。
 	it("clearScoreboard 帶 matchId 時只清該場次分槽，不動獨立槽與其他場次", () => {
@@ -161,7 +160,7 @@ describe("storage", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
 	});
 
-	// 補充測試（非 test-plan 逐字條目）：Stage 2 mutation 測試發現改動 storage-keys.ts 內
+	// 補充測試：mutation 測試發現改動 storage-keys.ts 內
 	// 任一 key 的字面值（v1 → v2）後全套仍綠——所有測試都改用匯出常數，沒有任何一處釘住
 	// 字面字串。key 是持久化契約，改動會讓既有使用者進行中的比賽靜默消失。
 	// 比照 lib/matchmaker/round-storage.test.ts 的同性質既有測試。

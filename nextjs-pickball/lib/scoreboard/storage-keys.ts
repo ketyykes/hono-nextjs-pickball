@@ -1,7 +1,7 @@
 /**
  * scoreboard 兩個 LocalStorage key 與 hasLocalStorage() 的單一來源。
  *
- * 獨立成檔而非放在 storage.ts：§3 讓 storage.ts 需要 import match-slots.ts
+ * 獨立成檔而非放在 storage.ts：storage.ts 需要 import match-slots.ts
  * 的 writeMatchSlot（分派入口）。若 hasLocalStorage() 留在 storage.ts、
  * match-slots.ts 反過來 import 它，會形成 storage.ts → match-slots.ts →
  * storage.ts 的循環匯入。抽出這個無專案內部相依的葉節點模組後，storage.ts

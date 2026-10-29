@@ -1,7 +1,7 @@
 // 分配引擎的型別與常數骨架。純型別與 as const 常數，無執行期邏輯、無函式。
 // openspec/config.yaml 的 TDD 例外清單只列 *.d.ts、next-env.d.ts、cloudflare-env.d.ts，不含本檔——
 // 本檔免測的依據不是援引該清單，而是 config.yaml 主句「對……下所有具備行為邏輯的模組採通用 TDD」：
-// 本檔無函式，本來就不在 TDD 適用範圍內（design Decision 2）。
+// 本檔無函式，本來就不在 TDD 適用範圍內。
 // 常數的對外可觀察值改在 candidates.test.ts 斷言，因為該檔是這些常數的消費端。
 
 import type { Player } from "./types";
@@ -30,7 +30,7 @@ interface MatchBase {
 /**
  * 一場對戰：場地編號、兩支隊伍、對戰方式；doublesComposition 僅雙打場次帶有。
  * 以 discriminated union 表達，而非 optional 欄位——單打場次 MUST 不帶此標示、
- * 雙打場次 MUST 帶有，兩者皆為編譯期保證，不靠執行期檢查（design Decision 1 的同一哲學）。
+ * 雙打場次 MUST 帶有，兩者皆為編譯期保證，不靠執行期檢查。
  */
 export type Match =
 	| (MatchBase & { readonly format: "singles"; readonly doublesComposition?: never })
@@ -45,7 +45,7 @@ export interface RoundAllocation {
 /**
  * 重複配對簽章索引：隊友組合、交叉對手組合、完整比賽組合三類。
  * 每個元素為排序後 player id 以分隔符串接成的字串（見 duplication.ts 的
- * teammateKeys／opponentKeys／fullMatchKeys，design Decision 4）。
+ * teammateKeys／opponentKeys／fullMatchKeys）。
  * 三個欄位型別為 ReadonlySet<string> 而非陣列：Set 天然去重（陣列允許重複條目，
  * 第 3 段逐輪 append 時會無界成長並被寫進 LocalStorage），且做 O(1) 比對。
  * 持久化時另以字串陣列表示，由第 3 段在讀取 LocalStorage 時轉換為 Set、寫回前轉換回陣列；

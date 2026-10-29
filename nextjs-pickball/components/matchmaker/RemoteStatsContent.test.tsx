@@ -241,7 +241,7 @@ describe("RemoteStatsContent", () => {
 		});
 	});
 
-	// 以下為 Stage 2 補的 regression guard：元件實作已存在，加入即綠（非 RED），用來殺 mutation 存活的分支。
+	// 以下為補上的 regression guard：元件實作已存在，加入即綠（非 RED），用來殺 mutation 存活的分支。
 	describe("regression guard：同步狀態優先序、篩選與空區間", () => {
 		it("regression guard：名單 load-failed 而歷史 loading 時以名單狀態為準", () => {
 			mockReadySession();

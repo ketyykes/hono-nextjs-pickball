@@ -37,7 +37,7 @@ const CELL_INDEX_GAMES_PLAYED = 3;
 const KNOWN_DEV_ONLY_NOISE = /ChunkLoadError.*(hmr-client|global-error)/;
 
 // 監控瀏覽器 console：收集 error 與 warning，並收集未捕捉的 pageerror。
-// 本頁在 render 期間呼叫 new Date() 取「現在」（tasks 6.2 明文指定），因此特別留意
+// 本頁在 render 期間呼叫 new Date() 取「現在」，因此特別留意
 // hydration mismatch——首次伺服器輸出與 hydration 當下的 history 皆為空、走同一個
 // 空狀態分支，理論上不會不一致，這條測試就是那個「理論上」的實證。
 function trackConsoleIssues(page: Page): string[] {
@@ -252,7 +252,7 @@ test.describe("/matchmaker/stats 球員統計頁", () => {
 		await expect(page.getByTestId("empty-history-range")).toHaveCount(0);
 		// spec：SHALL NOT 顯示只有標題列的空表格。
 		await expect(page.getByRole("table", { name: STATS_TABLE_NAME })).toHaveCount(0);
-		// tasks 6.2：完全沒有紀錄時只渲染 EmptyHistory，區間篩選一併不出現。
+		// 完全沒有紀錄時只渲染 EmptyHistory，區間篩選一併不出現。
 		await expect(page.getByRole("radiogroup", { name: "歷史區間" })).toHaveCount(0);
 	});
 

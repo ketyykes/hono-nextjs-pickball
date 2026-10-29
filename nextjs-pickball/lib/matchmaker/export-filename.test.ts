@@ -8,13 +8,13 @@ describe("jpgExportFileName", () => {
 			jpgExportFileName({ roundNumber: 3, exportedAt: "2026-08-23T01:02:03.000Z" }),
 		).toBe("matchmaker-round-3-2026-08-23.jpg");
 		// 第二組刻意換一個回合編號：只驗第一組時，把 roundNumber 寫死成 3 的實作也會通過，
-		// 本錨點測試自己就殺不掉那個 mutant（Stage 2 實測 Minor-3）。
+		// 本錨點測試自己就殺不掉那個 mutant。
 		expect(
 			jpgExportFileName({ roundNumber: 12, exportedAt: "2026-08-23T01:02:03.000Z" }),
 		).toBe("matchmaker-round-12-2026-08-23.jpg");
 	});
 
-	// 以下為補充測試（非 spec 錨點），用來把 §8 列出的各種 mutant 逐一釘死。
+	// 以下為補充測試（非 spec 錨點），用來把各種 mutant 逐一釘死。
 
 	it("不同 roundNumber 得到不同檔名，且回合編號原樣出現而未被補零或改寫", () => {
 		expect(

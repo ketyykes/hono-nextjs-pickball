@@ -21,7 +21,7 @@ export interface ReadMatchSlotsResult {
  * 只清 MATCH_SLOTS_KEY 一個 key，SHALL NOT 波及獨立槽 scoreboard:current:v1）。
  * 整份能解析為物件時逐筆 safeParse——刻意不定義「整份 map」的 schema 一次驗完，
  * 因為一筆壞資料就會讓整份驗證失敗，與「單場損壞不得連坐清空
- * 其他場次」的需求牴觸（見 design Decision 4）。
+ * 其他場次」的需求牴觸。
  */
 export function readMatchSlots(): ReadMatchSlotsResult {
 	if (!hasLocalStorage()) return { slots: {}, droppedCount: 0 };
@@ -67,7 +67,7 @@ export function readMatchSlot(matchId: string): ScoreboardState | null {
 }
 
 /**
- * 寫入單一場次的分槽 state。map 形態下任一次寫入都要重寫整份 map（design Decision 4），
+ * 寫入單一場次的分槽 state。map 形態下任一次寫入都要重寫整份 map，
  * 代價可忽略：場地數上限為 8（prd.md 4.3）。
  *
  * 槽位由 state.matchId 推導，不接受呼叫端另傳 matchId 參數——舊簽章

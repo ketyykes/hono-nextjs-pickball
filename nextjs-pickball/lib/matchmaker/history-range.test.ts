@@ -220,7 +220,7 @@ describe("history-range", () => {
 		expect(result).not.toBe(input);
 	});
 
-	// regression guard（寫下當下即綠）：補 Stage 2 獨立 mutation 找到的三個零覆蓋。
+	// regression guard（寫下當下即綠）：補獨立 mutation 找到的三個零覆蓋。
 	// 既有兩個 it 只用過 "today" 一個區間、且輸入筆數不足以區分「篩選」與「截斷」，
 	// 導致三種壞法全部存活：① 忽略 range 參數寫死 "today" ② slice(0, 3) ③ slice(0, -1)。
 	// 本 it 以「同一組輸入分別查兩個區間」堵住 ①，以「五筆輸入中今日佔四筆」堵住 ②③。

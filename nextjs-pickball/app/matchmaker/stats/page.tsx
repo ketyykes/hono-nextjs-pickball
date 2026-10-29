@@ -6,7 +6,7 @@ import { RemoteStatsContent } from "@/components/matchmaker/RemoteStatsContent";
 import { useSession } from "@/hooks/useSession";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
-// 統計頁入口：依儲存模式擇一渲染本機或雲端內容（design Decision 3）。
+// 統計頁入口：依儲存模式擇一渲染本機或雲端內容。
 // hooks 不能條件式呼叫，所以兩條路徑各自是獨立元件；本機內容原樣搬到 LocalStatsContent，
 // 訪客路徑一行未改。session 載入中 resolveStorageMode 回 local，與訪客首屏時序一致。
 // 雲端內容只在 remote 時掛載：其 hook 在 userId 為 null 時不發請求，但元件本身不該在訪客路徑出現。

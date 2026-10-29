@@ -416,7 +416,7 @@ describe("round-command-queue", () => {
 		expect(h.queue.getPending()).toEqual([s]);
 	});
 
-	// regression guard：以下兩個 it 在寫入當下即綠，補的是 Stage 2 mutation 發現的缺口
+	// regression guard：以下兩個 it 在寫入當下即綠，補的是 mutation 發現的缺口
 	it("dispose 後不留計時器、佇列清空，之後排入的命令不進入 getPending", async () => {
 		const h = setup({ log: [] }, 1);
 		h.putRound.mockResolvedValue({ kind: "failed" });

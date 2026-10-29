@@ -56,14 +56,14 @@ export function TeamPanel({ team, label, state, disabled, onWinRally }: TeamPane
 			<div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-[clamp(0.25rem,3cqh,1.5rem)] p-[clamp(0.25rem,3cqh,1.5rem)] portrait:md:gap-[clamp(0.25rem,5.15cqh,2rem)] portrait:md:p-[clamp(0.25rem,5.15cqh,2rem)]">
 				<div className="font-outfit text-sm uppercase tracking-[3px] text-muted-foreground">
 					<span>{label}</span>
-					{/* 綁定場次的球員姓名色塊（design Decision 5）：teamPlayers 為 null 時
-					（獨立計分板，或本次變更前已建立的舊版計分板槽）不渲染，此時上下兩行
+					{/* 綁定場次的球員姓名色塊：teamPlayers 為 null 時
+					（獨立計分板，或舊版計分板槽）不渲染，此時上下兩行
 					與外層 div 的既有 JSX 逐字未變，維持既有的「我方」／「對方」純文字
 					呈現，不改變任何既有互動（spec「綁定場次的隊伍標示」Requirement）。
 					色塊群組本身另包一層 inline-flex span 承載 gap，不動外層 div 的
 					className，避免影響 teamPlayers 為 null 時的既有排版。foreground 為
 					seed 建立端已算好存入的欄位，本元件只讀取、直接當成 CSS color 值套用，
-					不自行計算亮度或對比（design Decision 1，維持 lib/scoreboard/ 不
+					不自行計算亮度或對比（維持 lib/scoreboard/ 不
 					import lib/matchmaker/ 的單向相依）。 */}
 					{state.teamPlayers !== null && (
 						<span className="mx-1 inline-flex items-center gap-1 align-middle">

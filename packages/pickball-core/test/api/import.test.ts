@@ -262,7 +262,7 @@ describe("本機資料匯入 API 契約", () => {
     expect(LocalImportResponseSchema.safeParse({ imported: withoutHistory }).success).toBe(false);
   });
 
-  // Stage 2 補強（regression guard）：以下斷言對既有實作加入即綠，用來釘住存活的變異。
+  // regression guard：以下斷言對既有實作加入即綠，用來釘住存活的變異。
   it("LocalImportRequestSchema 的邊界輸入：僅回合、id 去重鍵、空字串 matchId 與缺漏段落", () => {
     // 只有回合（場次皆完成），其餘四段皆空：非空匯入，合法
     expect(

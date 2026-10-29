@@ -23,7 +23,7 @@ function pickDisplayStatus(rosterStatus: SyncStatus, historyStatus: SyncStatus):
 	return historyStatus;
 }
 
-// 雲端模式的統計頁內容（design Decision 3）：只掛名單與雲端歷史兩個 hook，
+// 雲端模式的統計頁內容：只掛名單與雲端歷史兩個 hook，
 // 刻意不掛 useRoundStore——統計不需要回合，掛了會多出回合與分槽的讀取請求。
 export function RemoteStatsContent() {
 	const session = useSession();

@@ -13,7 +13,7 @@ import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
 
 // 統計頁（球員排行榜）。本檔標 "use client" 並直接持有 useRosterStore 與 useRoundStore
-// 兩個既有 store（design Decision 1，形態比照 app/matchmaker/page.tsx）：不另呼叫
+// 兩個既有 store（形態比照 app/matchmaker/page.tsx）：不另呼叫
 // readRoster()／readHistory()，否則會在兩個 hook 之外長出第三、第四份 hydration 邏輯，
 // 各自的 droppedCount 也得再接一次。本頁只做 store 接線與條件渲染，統計計算與區間
 // 篩選全數委派 computePlayerStats／filterHistoryByRange。
@@ -84,7 +84,7 @@ export function LocalStatsContent() {
 				<EmptyHistory range={null} />
 			) : (
 				// 外層不加自己的 padding／grid：橫向捲動由 components/ui/table.tsx 內建的
-				// overflow-x-auto 容器提供（design Decision 7），額外的水平內距會把捲動
+				// overflow-x-auto 容器提供，額外的水平內距會把捲動
 				// 容器撐破而讓窄螢幕溢出。
 				<>
 					<HistoryRangeFilter value={selectedRange} onChange={setSelectedRange} />

@@ -100,7 +100,7 @@ export function useRemoteMatchSlotStore({
 	);
 
 	// 目前狀態屬於哪個帳號：render 時與 userId 不同代表 effect 還沒換世代，
-	// 此時不能把前一帳號的資料交給畫面（design Decision 7）
+	// 此時不能把前一帳號的資料交給畫面
 	const [owner, setOwner] = useReducer(
 		(_current: string | null, next: string | null): string | null => next,
 		null,

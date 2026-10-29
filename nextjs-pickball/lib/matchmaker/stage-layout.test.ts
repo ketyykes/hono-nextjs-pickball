@@ -22,7 +22,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
 	};
 }
 
-// buildCourtTiles 的參數型別放寬為結構型別（design Open Questions 2c），這裡直接宣告
+// buildCourtTiles 的參數型別放寬為結構型別，這裡直接宣告
 // 真正的 Match 傳入，藉此在型別層驗證 Match 可免 cast 指派給該結構型別。
 describe("buildCourtTiles", () => {
 	it("單打回傳兩格且兩格同列左右相鄰分屬兩隊", () => {
@@ -93,7 +93,7 @@ describe("buildCourtTiles", () => {
 		]);
 	});
 
-	// design Decision 4 的落地判準：「對角同隊」的錯誤實作同樣會通過上一條 2x2 斷言，
+	// 雙打須上下分排：「對角同隊」的錯誤實作同樣會通過上一條 2x2 斷言，
 	// 需要獨立一條把它擋下。
 	it("雙打上排兩格為第一隊下排兩格為第二隊", () => {
 		const match: Match = {

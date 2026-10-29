@@ -11,7 +11,7 @@ const HistoryDoublesCompositionSchema: z.ZodType<DoublesComposition> = z.enum([
 	"general",
 ]);
 
-// 歷史必須比名單活得久（design Decision 3）：id 只留供日後比對，name 才是顯示用的
+// 歷史必須比名單活得久：id 只留供日後比對，name 才是顯示用的
 // 姓名快照。球員被刪除或改名後，這筆快照仍要能完整還原當時的姓名——
 // SHALL NOT 只存 id 再回查名單，那樣一次刪除就會讓過去所有賽果跟著消失或變成空白。
 export const HistoryPlayerSchema = z.object({

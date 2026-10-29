@@ -207,7 +207,7 @@ describe("history-csv", () => {
 	});
 
 	it("球員姓名含逗號、雙引號或換行時，parseCsv 讀回值逐字相同", () => {
-		// Stage 2 review J2：既有測試的 naive split(",") 對「跳脫是否生效」零保護；
+		// 既有測試的 naive split(",") 對「跳脫是否生效」零保護；
 		// 姓名含逗號時該切法會把資料列切成 12 個欄位、從第 6 欄起全部錯位。
 		// 這裡改用 parseCsv（csv.ts 的公開介面），姓名刻意放入逗號、雙引號與換行。
 		const entry = makeDoublesEntry();

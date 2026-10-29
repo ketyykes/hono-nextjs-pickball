@@ -84,7 +84,7 @@ export function useRemoteRosterStore({
 		"loading",
 	);
 	// 目前名單屬於哪個帳號：render 時與 userId 不同代表 effect 還沒換世代，
-	// 此時不能把前一帳號的名單交給畫面，操作也一律不送出（design Decision 7）
+	// 此時不能把前一帳號的名單交給畫面，操作也一律不送出
 	const [owner, setOwner] = useReducer(
 		(_current: string | null, next: string | null): string | null => next,
 		null,

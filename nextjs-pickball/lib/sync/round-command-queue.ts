@@ -1,4 +1,4 @@
-// 回合命令佇列（design Decision 6）：單一在途、先進先出，送出時才把命令套用在
+// 回合命令佇列：單一在途、先進先出，送出時才把命令套用在
 // 「最新已確認的雲端回合」上。無 React 相依，由 useRemoteRoundStore 持有。
 //
 // 為什麼存命令而不是算好的回合資料：送出比分的回應（伺服器算出的完成場次與時間）必須成為
@@ -34,7 +34,7 @@ export interface ConfirmedRound {
 export interface RoundCommandQueueOptions {
 	initial: ConfirmedRound;
 	getPlayers: () => readonly Player[];
-	/** 已綁定帳號的送出函式：佇列不知道帳號，由持有佇列的世代以閉包綁定（design Decision 6）。 */
+	/** 已綁定帳號的送出函式：佇列不知道帳號，由持有佇列的世代以閉包綁定。 */
 	putRound: (round: Round, version: number) => ReturnType<typeof putRemoteRound>;
 	submitScore: (
 		matchId: string,

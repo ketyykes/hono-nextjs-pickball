@@ -5,8 +5,8 @@ import { PrintSheet, PRINT_COURT_DATA_VALUE, PRINT_SHEET_DATA_VALUE, COLOR_DOT_S
 import type { ExportCourt, ExportScene, ExportTile } from "@/lib/matchmaker/export-scene";
 
 // happy-dom／testing-library 的預設文字比對會把 Unicode 全形空白（U+3000）正規化成一般
-// 半形空白再比對——查詢字串與節點文字兩邊「各自」正規化後理當一致，但實測（見本 change
-// 的紅燈驗證）在含全形空白的字串上仍會判定找不到節點。title／statusText 皆含全形空白
+// 半形空白再比對——查詢字串與節點文字兩邊「各自」正規化後理當一致，但實測在含全形空白的字串上
+// 仍會判定找不到節點。title／statusText 皆含全形空白
 // （TITLE_SEPARATOR／STATUS_SEPARATOR，見 export-scene.ts），故這裡以 identity normalizer
 // 停用正規化、要求逐字比對，避免這個環境特有的假陰性。
 const EXACT_TEXT_MATCH = { normalizer: (text: string) => text };
@@ -54,9 +54,9 @@ function buildScene(overrides: Partial<ExportScene> = {}): ExportScene {
 
 describe("PrintSheet", () => {
 	// spec 錨點：nextjs-pickball/components/matchmaker/PrintSheet.test.tsx，
-	// it 名稱 MUST 逐字一致（tasks.md §6、test-plan.md）。
+	// it 名稱 MUST 逐字一致。
 	it("列印版顯示回合標題與每個場地的球員與比分", () => {
-		// 場地編號刻意選非連續、不從 1 起算的 3 與 7（design Decision 2：courtNumber MUST
+		// 場地編號刻意選非連續、不從 1 起算的 3 與 7（courtNumber MUST
 		// 取自 ExportScene，不是位置推導）——原本兩個場地剛好是索引 0、1 對應編號 1、2，
 		// 「用索引冒充場地編號」（court.courtNumber 改成 index + 1）的實作會完全測不出來。
 		const scene = buildScene({
@@ -255,7 +255,7 @@ describe("PrintSheet", () => {
 		expect((nameNodeB as HTMLElement).style.backgroundColor).toBe("");
 
 		// 姓名所在的整列容器（<li>）本身也不得帶有任何樣式——色彩只能落在獨立的小色點
-		// 元素上，SHALL NOT 把整格套上大面積漸層背景（design Decision 3 明文否決的做法）。
+		// 元素上，SHALL NOT 把整格套上大面積漸層背景（刻意否決的做法）。
 		const rowContainer = nameNode.closest("li");
 		expect(rowContainer?.getAttribute("style")).toBeNull();
 	});
@@ -336,7 +336,7 @@ describe("PrintSheet", () => {
 	});
 
 	it("COLOR_DOT_SIZE 是固定的小尺寸而非百分比，且元件內零 linear-gradient", () => {
-		// 這條擋的是把小色點退化成大面積背景，design Decision 3 明文否決——
+		// 這條擋的是把小色點退化成大面積背景，這是刻意否決的做法——
 		// COLOR_DOT_SIZE 若被改成 "100%"，色點會撐滿整個容器，等同大面積色塊。
 		expect(COLOR_DOT_SIZE).not.toContain("%");
 		const remValue = Number.parseFloat(COLOR_DOT_SIZE.replace("rem", ""));

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { requestPrint } from "@/lib/matchmaker/print-guard";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
 
-// 目前回合不存在時的說明文字（design Decision 5：停用不隱藏，disabled 狀態必須解釋
+// 目前回合不存在時的說明文字（停用不隱藏，disabled 狀態必須解釋
 // 下一步該做什麼，比照 RoundControls.tsx／EmptyStage.tsx 既有的「停用並說明原因」寫法）。
 const NO_ROUND_DESCRIPTION = "需先產生本輪對戰才能匯出。";
 
@@ -18,14 +18,14 @@ export interface ExportActionsProps {
 	fileName: string;
 	/** JPG 匯出（繪製 → 編碼 → 下載）的注入點；實作於 scene-canvas.ts，本元件不 import 它。 */
 	exportJpg: (scene: ExportScene, fileName: string) => Promise<void>;
-	/** 列印函式的注入點；省略時元件層取 window.print（design Decision 4）。 */
+	/** 列印函式的注入點；省略時元件層取 window.print。 */
 	printer?: unknown;
 }
 
 // 對戰頁的匯出入口（spec「對戰頁的匯出入口與可用狀態」）：兩顆按鈕、觸發匯出、被擋提示。
 // 資料與注入點一律走 props，本元件不 import 任何 store（沿用對戰頁「store 只在 page 層」
 // 的分層），也不做任何比分／勝方／姓名的字串組裝——那些全在 ExportScene 內完成
-// （design Decision 2：ExportScene 是唯一的內容真相來源）。
+// （ExportScene 是唯一的內容真相來源）。
 export function ExportActions({ scene, fileName, exportJpg, printer }: ExportActionsProps) {
 	// 列印被阻擋時的提示訊息；null 代表目前沒有提示，MUST 在每次點擊列印時重新判定
 	// （成功時清除前一次的錯誤訊息，spec：列印成功時 MUST NOT 顯示任何錯誤訊息）。
@@ -36,7 +36,7 @@ export function ExportActions({ scene, fileName, exportJpg, printer }: ExportAct
 	const hasNoRound = scene === null;
 
 	// 用 finally 而非 catch 是刻意的：spec 未為「JPG 匯出失敗」定義任何提示行為，
-	// 元件自行 catch 後 setError 一則自寫文案，正是 design Decision 4 明文否決的替代方案
+	// 元件自行 catch 後 setError 一則自寫文案，正是刻意否決的替代方案
 	// （「訊息文案與判定條件散落在元件裡」）。因此本元件只保證「失敗後按鈕恢復可用」，
 	// 讓 rejection 往外傳；若日後要為匯出失敗提供提示，接線點是注入 exportJpg 的
 	// 呼叫端（page.tsx）而非本元件。

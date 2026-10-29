@@ -127,8 +127,7 @@ function matchHitsSeen(match: Match, seen: SignatureIndex): boolean {
  * 「不追求全域最優」的明文設計取捨）：單次交換通常只能拆掉一支隊伍，另一支隊伍的隊友簽章仍命中，
  * 「有命中的場次數」因而不變，`avoidRepeats` 的嚴格 `repeats < current.repeats` 判準會拒絕該
  * 交換——即使場上可能存在能讓 repeats／spread 同時歸零的其他重排方式，貪婪逐步改善法也不會
- * 找到（已用 3000 組隨機情境實測反例，記錄於
- * `.claude/agent-memory/code-reviewer-readonly/project_matchmaker_allocation_engine.md`）。
+ * 找到（已用 3000 組隨機情境實測反例）。
  */
 export function countRepeats(matches: readonly Match[], seen: SignatureIndex): number {
 	return matches.filter((match) => matchHitsSeen(match, seen)).length;

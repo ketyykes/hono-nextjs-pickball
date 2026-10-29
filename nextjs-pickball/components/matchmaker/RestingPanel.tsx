@@ -16,9 +16,9 @@ const ALL_PLAYING_TEXT = "本輪全員出場";
 const ALL_PAUSED_TEXT = "目前沒有任何可出場的參賽者（全員暫停出場）";
 
 // 休息名單輔助區：每筆顯示姓名、該員雙色漸層的顏色標記，以及累計休息次數（prd.md 7.4）。
-// resting 已是頁面層查表解析完的 Player（design Open Questions 2b：Round 只存
+// resting 已是頁面層查表解析完的 Player（Round 只存
 // restingPlayerIds），本元件不做任何 id 查表，也不對名單做排序或篩選——名單的內容與順序
-// 完全由分配引擎決定（design Decision 9）。
+// 完全由分配引擎決定。
 export function RestingPanel({ resting, hasActivePlayers }: RestingPanelProps) {
 	if (resting.length === 0) {
 		return (
@@ -31,8 +31,8 @@ export function RestingPanel({ resting, hasActivePlayers }: RestingPanelProps) {
 	return (
 		<ul className="flex flex-col gap-2">
 			{resting.map((player) => {
-				// 顏色標記重用 tile-style.ts 的 playerTileStyle，不另寫一份漸層字串（design
-				// Decision 8）；休息名單不對應任何場次，completed 恆傳 false。
+				// 顏色標記重用 tile-style.ts 的 playerTileStyle，不另寫一份漸層字串；
+				// 休息名單不對應任何場次，completed 恆傳 false。
 				const style = playerTileStyle(player, { completed: false });
 				return (
 					<li
