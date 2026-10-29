@@ -153,6 +153,18 @@ Depends on: §3
     **H07 裁定（leader）**：依 it 名稱「只在任一 key 有資料時為 true」與 spec「本機有可匯入的資料」，oversize 時仍為 true——參賽者頁照樣提示並帶使用者到資料頁，由資料頁匯入區塊顯示 oversize 說明；現行實作即此語意，未改實作。
     回歸：前兩輪 19 條（M08、M09、S05、S06、S11、S12、C12、B07、B08、B09、N03、N04、N08、N09、N10、N12、N13、N16、N16b）與 execution-plan b. §4 必做 13 條（分槽讀已完成場次、歷史不去重、保留最後一筆、門檻 2,000,000、成功後清除五個 key 各一次、409／401 分類為 failed、`expectedUserId` 固定字串／不傳）補強後仍全數轉紅；reviewer 第二輪 168 條變異集重跑，非等價者全數轉紅（其中 6 條為 reviewer 首版字串比對失敗的 HARNESS-ERROR，其修正版皆轉紅）。
     等價對照 4 條（E09 `history.length + skipped === 0`、S14 分槽依 matchId 排序、EQ1 Set 改陣列 `includes`、EQ11 `summary.players` 改再讀一次 `readRoster()`）補前補後皆維持綠。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0（持共用鎖）、測試檔 ESLint 0 errors。
+  - Stage 2 第三輪複審缺口與補強（test commit `091b591`；regression guard，加入即綠，非 TDD 紅燈，`local-import.ts` 未改動；只在既有四個 it 末段追加 seed 與斷言，並新增 fixture `distinctFieldPlayers` 與 helper `makeDoublesHistoryEntry`、`playUntilFinished`，既有 it 名稱與斷言未改，diff 為 198 行新增、2 行刪除（皆為 import 擴充匯入 `scoreboardReducer` 與 `Team`））：Stage 2 第三輪複審判 FAIL，26 條非等價變異存活（派工單寫 24 條，但逐條列出者為 26 條，以實測為準）。以 reviewer 的 96 條變異集對 `HEAD`（`3908e46`）版測試實測全數存活、補強後全數轉紅：
+    G10（歷史依 matchId 排序）、K01～K04（去重鍵加 format／winner／scoreB／teamA 首位球員）→ 第一個 it 末段 seed 歷史 h30、h10、h20（matchId 非字典序）加一筆與 h30 在單雙打、勝方、scoreB、teamA 球員皆不同的同 matchId 雙打紀錄，斷言 `payload.history` 為原順序三筆、略過 1 筆；
+    S03／S04（略過 finished／0:0 分槽）、S06／S07／S13（分槽 history 改 []、status 改 setup、winner 改 null）→ 同段回合的兩個未完成場次分別 seed 以 reducer 實際打完的 finished 分槽（winner 為 us、帶 rally history）與 0:0 分槽，斷言分槽原樣兩筆；
+    C01／C04（finished 的 current 改 null、current history 改 []）、C02（0:0 的 current 改 null）→ 同段 seed finished（winner 為 them、帶 rally history）的獨立計分板，下一段改 seed 0:0 的獨立計分板，各斷言 `scoreboard.current` 原樣；
+    F01／F02／F04／F05／F06（名單 restCount／gamesPlayed 歸零、rating 改 5、createdAt 固定、色碼改寫、gender 改 female）→ 同段名單改用各欄皆非 `makePlayer` 預設值、id 非字典序且夾停用者的 `distinctFieldPlayers`，斷言 `payload.players` 原樣；以上兩段皆以快照確認 reader 未降級或回寫、payload 通過 `LocalImportRequestSchema`；
+    O01（oversize 只量啟用者）→ 第二個 it 末段 seed 姓名超過上限的停用者加一位啟用者，斷言 `oversize` 為 true；
+    I06（body 名單只取啟用者）→ 第三個 it 末段以名單為 `distinctFieldPlayers` 的請求呼叫，斷言 body 原樣；
+    B01／B02／B03／B06／B07／B08（備份名單只取啟用者、依 id 排序、歷史只取 singles、名單 restCount／gamesPlayed 歸零、回合去掉已完成場次、timer 改 null）→ 第四個 it 末段以 `distinctFieldPlayers`、單打加雙打歷史、含已完成場次且 timer 非 null 的回合組成備份，斷言 players／currentRound／history 原樣並通過 `LocalImportRequestSchema`。
+    回歸：96 條中補前已轉紅的 59 條（含第二輪的 R07、Y13、R09、R08、O12、H07 與 execution-plan b. §4 必做 P01～P09：分槽讀已完成場次、歷史不去重、保留最後一筆、門檻 2,000,000、成功後清除五個 key 各一次、409／401 分類為 failed、`expectedUserId` 固定 user-a／user-b／不傳）補強後仍全數轉紅；補後統計 85 轉紅、11 存活。
+    等價對照 7 條（EQ1 Set 改陣列 `includes`、EQ2 `summary.round` 改再讀 `readRound()`、EQ3 body 改 `{ ...payload }`、EQ4 backup version 改 `backup.version`、EQ5 略過分支加 `void 0`、C05 current `teamPlayers` 改 null、O03 oversize 加判 current）補前補後皆維持綠。
+    **規格未定義 4 條（leader 裁定，不補測試、維持現行行為）**：F08（名單依 id 去重）、Y03（`summary.round` 改用 matches 數）、G04（playedAt 經 `toISOString` 正規化）、B04（備份歷史去重）——現行行為皆為「前端原樣送出、不合法者由後端 400 拒絕」，spec 未要求前端處理；補前補後皆存活。
+    單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0（持共用鎖）、測試檔 ESLint 0 errors。
 
 ## 5. E2E 與畫面接線
 
