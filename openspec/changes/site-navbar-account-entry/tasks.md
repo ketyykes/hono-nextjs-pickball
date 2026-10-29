@@ -57,21 +57,28 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（例外層，須實跑紅燈）：
+- [x] 3.1 RED（例外層，須實跑紅燈）：
   - `navbar-account-entry.spec.ts` 新增 test「各寬度下帳號入口與五個導航連結皆完整落在視口內且不溢出」（只在 chromium 執行，`test.skip` 寫法比照 `navbar-rwd.spec.ts`；
     guest／user 兩種 `route.fulfill` × 320／375／390／640／1280）；
   - `auth-session.spec.ts` 新增 test「窄螢幕下 navbar 登入入口可前往登入頁」（放在既有「窄螢幕訪客」describe，viewport 390）；依檔頭例外 ③ 修改「窄螢幕下可經由登入頁登入與登出」；
     依檔頭例外 ② 刪除舊的窄螢幕 test 與常數。
   - 持雙鎖在 chromium 跑兩個 spec，貼出三條新／改 test 的紅燈輸出（入口在 < 640 為 hidden）。commit（`test:`）
-- [ ] 3.2 RED（TDD）：`AccountEntry.test.tsx` 新增 it「登入連結與登出按鈕不在任何斷點隱藏」、依檔頭例外 ① 刪除「登入連結與登出按鈕在 sm 以下隱藏」；
+- [x] 3.2 RED（TDD）：`AccountEntry.test.tsx` 新增 it「登入連結與登出按鈕不在任何斷點隱藏」、依檔頭例外 ① 刪除「登入連結與登出按鈕在 sm 以下隱藏」；
   `SiteNavbar.test.tsx` 新增 it「窄螢幕下導航連結內距與容器間距依斷點遞減」（以 `className.split(/\s+/)` 精確比對 token，容器以 `header > div` 取得）。
   單檔各跑一次，貼出紅燈輸出。commit（`test:`）
-- [ ] 3.3 GREEN（TDD）：依 design Decision 2——`navItemStyles.ts` 的 `NAV_ITEM_BASE` 改為 `px-1.5 … max-[375px]:px-1 sm:px-3`；`SiteNavbar.tsx` 內層容器 `gap-3` → `gap-1`
+- [x] 3.3 GREEN（TDD）：依 design Decision 2——`navItemStyles.ts` 的 `NAV_ITEM_BASE` 改為 `px-1.5 … max-[375px]:px-1 sm:px-3`；`SiteNavbar.tsx` 內層容器 `gap-3` → `gap-1`
   並更新窄螢幕註解；`AccountEntry.tsx` 移除 `hidden sm:inline-flex` 改為 `inline-flex`；`components/auth/LoginForm.tsx` 第 34 行過時註解改為「navbar 與本頁皆可登出」意旨（不改行為）。
   兩個單元測試檔全綠；持雙鎖在 chromium 跑 `navbar-account-entry.spec.ts`、`auth-session.spec.ts`、`navbar-rwd.spec.ts` 全綠，並在 mobile-chrome、mobile-safari 跑 `navbar-account-entry.spec.ts` 全綠（位移測試在窄視口首次有意義）。
   同一 commit 同步 `nextjs-pickball/CLAUDE.md`「架構總覽」`/login` 條目（第 55 行）：刪除「帳號入口在 `< sm` 隱藏…窄螢幕改由直接造訪 `/login`…」的敘述，改為「帳號入口在所有寬度顯示，載入中與 auth 停用時以隱形佔位元素保留寬度」意旨。
   若任一寬度溢出，**停止並升級**（design Risk 2），SHALL NOT 自行縮文案、隱藏連結或改 logo 規則。commit（`feat:`）
-- [ ] 3.4 REFACTOR：檢視 `SiteNavbar.tsx`、`AccountEntry.tsx`、`nextjs-pickball/CLAUDE.md` 是否與新數值一致、有無殘留「sm 以下隱藏」敘述（`grep -rn "sm:inline-flex\|sm 以下" nextjs-pickball/components nextjs-pickball/CLAUDE.md`）；無壞味道註記 skipped
+- [x] 3.4 REFACTOR：檢視 `SiteNavbar.tsx`、`AccountEntry.tsx`、`nextjs-pickball/CLAUDE.md` 是否與新數值一致、有無殘留「sm 以下隱藏」敘述（`grep -rn "sm:inline-flex\|sm 以下" nextjs-pickball/components nextjs-pickball/CLAUDE.md`）；無壞味道註記 skipped
+  - 結果（2026-10-30）：`659a556`（§2 Stage 2 non-blocking 測試強化，regression guard：佔位 helper 改對 container 查 `[tabindex]`、補 `tagName === "SPAN"`、位移 E2E 等待失敗時略過比較、`Route` 型別併入 import）。
+    3.1 RED `a2bcb80`（chromium：「窄螢幕下 navbar 登入入口可前往登入頁」等不到 header「登入」逾時；「窄螢幕下可經由登入頁登入與登出」header「登出」not found；寬度 test guest／user × 320／375／390 共 6 筆 `toBeInViewport` 失敗，640／1280 綠）。
+    3.2 RED `69f3153`（兩個新 it 真紅，leader 以 `67892fc^` 的三個元件檔重跑 `components/layout` 複驗：2 failed／16 passed）。3.3 GREEN `67892fc`。
+    實測（chromium）入口右緣恰貼容器內容框右緣：320→308、375→359、390→374、640→616、1280→1216，無溢出、無換行。
+    3.4 skipped：grep 殘留 3 處皆為正確敘述（`SiteNavbar.tsx` 的「sm 以下的收合」指 logo 文字；`AccountEntry.test.tsx` 兩處為 `not.toContain("sm:inline-flex")`）。
+    Stage 1 PASS、Stage 2 PASS；Stage 2 指出寬度 E2E 抓不到「溢出進容器右內距」（`px-1.5`→`px-2`、`gap-1`→`gap-3` 時 E2E 全綠，只有單元 token 測試轉紅），
+    以 `7ab0d7a` 補「入口右緣不超出容器內容框」E2E soft 斷言與容器 `px-4`／`max-[375px]:px-3`／`sm:px-6` token 斷言（regression guard，已以 mutation 確認會轉紅），並修正兩處註解。
 
 ## 4. 驗收
 
