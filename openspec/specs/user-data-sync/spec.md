@@ -155,7 +155,7 @@ Hono 型別參數 SHALL 分為兩層：`AuthAppEnv`（`Variables` 只有 `auth`�
 `nextjs-pickball/lib/sync/storage-mode.ts` SHALL 匯出 `resolveStorageMode(snapshot: SessionSnapshot): "local" | "remote"`，
 是前端「存本機還是存雲端」的**唯一判斷**：只有 `status === "ready"`、`authEnabled === true` 且 `user !== null` 時回 `"remote"`，其餘一律 `"local"`。
 
-session 仍在載入時 MUST 為 `"local"`：訪客（含正式站，auth 停用）的首屏時序 SHALL NOT 因等待 `/api/session` 而改變（runbook R3）。
+session 仍在載入時 MUST 為 `"local"`：訪客（含正式站，auth 停用）的首屏時序 SHALL NOT 因等待 `/api/session` 而改變——訪客行為與既有 E2E 須零迴歸。
 代價是已登入使用者在 session 回應前會先看到本機資料一瞬間，之後切換為雲端載入中——此為刻意取捨，SHALL NOT 以「等 session 就緒才渲染」改變訪客時序。
 
 各資料的 store hook SHALL 以「選擇器」形態接上儲存模式：既有本機實作原封不動保留（改名為同檔的 `useLocal<X>Store`），
@@ -335,10 +335,10 @@ MUST NOT throw，回傳以下其一：
 ### Requirement: 後端多表寫入以單一 batch 與整批守衛完成
 
 同一個請求需要寫入多張使用者資料表（或同一張表的多列），且其中任一寫入以版本或存在性為前提時，後端 SHALL 以**單一** D1 `batch()` 完成全部寫入，
-SHALL NOT 拆成多次 `run()`／`batch()`、SHALL NOT 以「先寫、失敗再手動補償」的方式達成原子性——D1 沒有互動式 transaction（runbook R2），
+SHALL NOT 拆成多次 `run()`／`batch()`、SHALL NOT 以「先寫、失敗再手動補償」的方式達成原子性——D1 沒有互動式 transaction，
 多次呼叫之間的失敗會留下部分寫入。
 
-batch 中**影響 0 列的 UPDATE／DELETE 不是錯誤**，不會讓整批回滾（design Decision 2 的 Context7 查證與 characterization 測試）。因此版本條件 SHALL NOT 只寫在各 UPDATE 的 `WHERE` 中；
+batch 中**影響 0 列的 UPDATE／DELETE 不是錯誤**，不會讓整批回滾（D1 文件查證，並由下方 characterization 測試守住）。因此版本條件 SHALL NOT 只寫在各 UPDATE 的 `WHERE` 中；
 MUST 以**整批守衛**表達：batch 的第一條陳述式為
 
 ```sql
