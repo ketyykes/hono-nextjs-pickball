@@ -16,6 +16,7 @@ const ROUND_API = "/api/matchmaker/round";
 const HISTORY_API = "/api/matchmaker/history";
 const SYNCED = '[data-sync-status="synced"]';
 const LOAD_FAILED = '[data-sync-status="load-failed"]';
+const LOADING = '[data-sync-status="loading"]';
 const COURT_GRIDS = '[data-testid="match-stage-courts"] [data-testid$="-grid"]';
 const RANGE_LABELS = ["今日", "本週", "本月", "上月", "更早"] as const;
 const JSON_CLOUD_IMPORT_HINT_TEXT =
@@ -243,7 +244,68 @@ test.describe("matchmaker 歷史與統計雲端同步", () => {
 		await page.goto(HISTORY_PAGE);
 		await expect(page.getByText("無法載入雲端資料，請重新整理頁面")).toBeVisible();
 		await expect(page.locator(LOAD_FAILED)).toBeVisible();
-		await expect(page.getByRole("radio", { name: "今日" })).toHaveCount(0);
+		const todayRadio = page.getByRole("radio", { name: "今日" });
+		await expect(todayRadio).toBeVisible();
+		await expect(todayRadio).toBeChecked();
+	});
+
+	test("雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器", async ({ page }) => {
+		await seedCloudPlayers(page, 2);
+		await playOneMatch(page, { scoreA: "11", scoreB: "5" });
+
+		// 依區間而非請求次數判定：next dev 的 StrictMode 會在 mount 時送出兩個「今日」請求。
+		// 「今日」只帶 from；「本週」帶 from 與 to（週一時兩者相等，但 to 仍存在）。
+		let releaseWeekRequests: () => void = () => {};
+		const weekRequestsGate = new Promise<void>((resolve) => {
+			releaseWeekRequests = resolve;
+		});
+		let released = false;
+		await page.route(`**${HISTORY_API}*`, async (route) => {
+			if (released) {
+				await route.continue();
+				return;
+			}
+			const isWeekRequest = new URL(route.request().url()).searchParams.has("to");
+			if (isWeekRequest) {
+				await weekRequestsGate;
+				await route.continue();
+				return;
+			}
+			await route.fulfill({ status: 500, body: "" });
+		});
+
+		try {
+			await page.goto(HISTORY_PAGE);
+			// session 載入中會先渲染本機元件，所有 radio 與焦點操作都排在失敗提示可見之後
+			await expect(page.locator(LOAD_FAILED)).toBeVisible();
+			const todayRadio = page.getByRole("radio", { name: "今日" });
+			const weekRadio = page.getByRole("radio", { name: "本週" });
+			await expect(todayRadio).toBeChecked();
+
+			await weekRadio.focus();
+			await page.keyboard.press("Enter");
+			await expect(page.locator(LOADING)).toBeVisible();
+			await expect(weekRadio).toBeChecked();
+			await expect(weekRadio).toBeFocused();
+
+			released = true;
+			releaseWeekRequests();
+			await expect(page.locator(SYNCED)).toBeVisible();
+			await expect(weekRadio).toBeFocused();
+			// 那一場是今日完成的，不屬於本週，所以顯示區間空狀態
+			await expect(page.getByTestId("empty-history-range")).toBeVisible();
+
+			await todayRadio.focus();
+			await page.keyboard.press("Enter");
+			await expect(page.locator('[data-testid^="history-record-"][data-slot="card"]')).toHaveCount(1);
+			await expect(page.locator(SYNCED)).toBeVisible();
+			await expect(todayRadio).toBeChecked();
+			await expect(todayRadio).toBeFocused();
+		} finally {
+			released = true;
+			releaseWeekRequests();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
 	});
 
 	test("登入時計時回合的平局在統計頁計為和局", async ({ page }) => {
