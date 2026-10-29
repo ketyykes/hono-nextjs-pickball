@@ -4,7 +4,7 @@
 
 ## 定位
 
-- 放「前端與後端都會用到」的純函式、型別與常數：計分機（`scoreboard/{types,rules,reducer}`）與對戰分配機（`matchmaker/*` 的 15 個純邏輯模組）。B5～B9 需要的共用契約（API envelope、路徑常數等）**一律加在這裡**，不要各自複製到前後端。
+- 放「前端與後端都會用到」的純函式、型別與常數：計分機（`scoreboard/{types,rules,reducer}`）與對戰分配機（`matchmaker/*` 的 15 個純邏輯模組）。前後端共用的 API 契約（`api/*`：envelope、錯誤碼、路徑常數、header 名稱等）**一律加在這裡**，不要各自複製到前後端。
 - **無建置產物**：`exports` 為 `{"./*": "./src/*.ts"}`，消費端直接吃 `.ts` 原始碼，匯入寫法為 `@pickball/core/<area>/<module>`。前端靠 `next.config.ts` 的 `transpilePackages`，後端靠 vitest-pool-workers／esbuild 本身即可解析。
 - `dependencies` 只有 `zod`；沒有 `type` 欄位（刻意，見下方「注意事項」第 3 點）。
 
@@ -19,7 +19,7 @@
 
 ## 新增模組
 
-- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 23 項），否則邊界測試轉紅。
+- 新增核心模組 MUST 同步更新 `test/module-boundary.test.ts` 的 `CORE_MODULES`（目前 26 項），否則邊界測試轉紅。
 - 需要瀏覽器 I/O 的程式（localStorage、Blob 下載、canvas）留在前端，不進本套件。
 
 ## 測試
