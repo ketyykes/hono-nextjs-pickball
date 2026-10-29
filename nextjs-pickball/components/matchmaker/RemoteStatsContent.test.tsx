@@ -209,7 +209,92 @@ describe("RemoteStatsContent", () => {
 			expect(screen.getByRole("status").textContent).toBe(message);
 			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
 			expect(screen.queryByRole("table")).toBeNull();
-			expect(screen.queryByRole("radiogroup")).toBeNull();
+		});
+
+		it.each([
+			["loading", LOADING_MESSAGE],
+			["load-failed", LOAD_FAILED_MESSAGE],
+		] as const)("歷史載入中與載入失敗時保留標題與區間篩選並只以提示取代排行榜", (status, message) => {
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			// 與真實 hook 同形：載入中與失敗時 items 為空、total 恆為 0
+			mockHistory({ syncStatus: status, items: [], total: 0 });
+
+			const { container } = render(<RemoteStatsContent />);
+
+			expect(screen.getByRole("heading", { name: "球員統計" })).not.toBeNull();
+			expect(screen.getByRole("radiogroup", { name: "歷史區間" })).not.toBeNull();
+			expect(screen.getByRole("radio", { name: "今日" }).getAttribute("aria-checked")).toBe("true");
+			expect(screen.getByRole("status").textContent).toBe(message);
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
+			expect(screen.queryByRole("table")).toBeNull();
+			expect(screen.queryByTestId("empty-history")).toBeNull();
+		});
+
+		it("以鍵盤切換區間時焦點在歷史載入中、載入完成與載入失敗後都留在被選取的區間選項", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			mockRoster({ players: [buildPlayer()] });
+			mockHistory({ syncStatus: "synced", items: [], total: 5 });
+			const { rerender } = render(<RemoteStatsContent />);
+
+			// 先取得 DOM 參照，之後以節點同一性斷言：能區分「篩選器從未卸載」與「重建後碰巧聚焦同名選項」
+			const weekOption = screen.getByRole("radio", { name: "本週" });
+			weekOption.focus();
+			await user.keyboard("{Enter}");
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("thisWeek");
+
+			mockHistory({ syncStatus: "loading", items: [], total: 0 });
+			rerender(<RemoteStatsContent />);
+			expect(document.activeElement).toBe(weekOption);
+
+			mockHistory({ syncStatus: "synced", items: [], total: 5 });
+			rerender(<RemoteStatsContent />);
+			expect(document.activeElement).toBe(weekOption);
+
+			const monthOption = screen.getByRole("radio", { name: "本月" });
+			monthOption.focus();
+			await user.keyboard("{Enter}");
+			expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("thisMonth");
+
+			mockHistory({ syncStatus: "load-failed", items: [], total: 0 });
+			rerender(<RemoteStatsContent />);
+			expect(document.activeElement).toBe(monthOption);
+		});
+
+		it("歷史載入失敗後改選其他區間會以新區間重新載入並顯示排行榜", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			mockRoster({ players: [buildPlayer({ id: "p1", name: "王小明" })] });
+			// 依區間回傳：今日載入失敗，本週載入成功
+			vi.mocked(useRemoteHistory).mockReset();
+			vi.mocked(useRemoteHistory).mockImplementation(({ range }) => {
+				if (range === "thisWeek") {
+					return {
+						items: [{ data: buildDrawEntry(), version: 1 }],
+						total: 5,
+						droppedCount: 0,
+						syncStatus: "synced",
+					};
+				}
+				return { items: [], total: 0, droppedCount: 0, syncStatus: "load-failed" };
+			});
+
+			try {
+				render(<RemoteStatsContent />);
+				expect(screen.getByRole("status").textContent).toBe(LOAD_FAILED_MESSAGE);
+
+				await user.click(screen.getByRole("radio", { name: "本週" }));
+
+				expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("thisWeek");
+				expect(screen.getByRole("table", { name: "球員排行榜" })).not.toBeNull();
+				const cells = within(screen.getByTestId("player-stat-row-p1")).getAllByRole("cell");
+				expect(cells[3].textContent).toBe("1");
+				expect(screen.queryByRole("status")).toBeNull();
+				expect(screen.getByRole("radio", { name: "本週" }).getAttribute("aria-checked")).toBe("true");
+			} finally {
+				vi.mocked(useRemoteHistory).mockReset();
+			}
 		});
 
 		it.each([
