@@ -5,11 +5,18 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
+import { LocalImportResultMessage } from "@/components/matchmaker/LocalImportResultMessage";
+import {
+	LOCAL_IMPORT_MESSAGES,
+	describeImportOutcome,
+} from "@/components/matchmaker/local-import-view";
+import type { ImportResultView } from "@/components/matchmaker/local-import-view";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
 import { useSession } from "@/hooks/useSession";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
+import { backupToImportRequest, importLocalData } from "@/lib/sync/local-import";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // JSON 完整備份區塊（M8 §8.4／§8.9）：涵蓋匯出（Blob + <a download>）與匯入
@@ -27,6 +34,8 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 // 不用字串比對 message 內容判斷類別。
 export function JsonBackupSection() {
 	const [message, setMessage] = useState<string | null>(null);
+	// 雲端匯入成功的結果；失敗與驗證錯誤沿用 message
+	const [cloudImportResult, setCloudImportResult] = useState<ImportResultView | null>(null);
 	const session = useSession();
 	const isRemote = resolveStorageMode(session) === "remote";
 	// 以觸發當下畫面所見的帳號送出；帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
@@ -78,6 +87,33 @@ export function JsonBackupSection() {
 		location.reload();
 	}
 
+	// 雲端分支：備份檔只匯入雲端，不寫入任何本機 key、不 reload（與本機的覆寫式還原相反）。
+	// userId 取自選檔當下的 render，onFileText 在 File.text() 讀完後才被呼叫，仍是同一份 closure。
+	async function handleCloudImportText(text: string) {
+		const parsed = parseBackup(text);
+		if (!parsed.ok) {
+			setCloudImportResult(null);
+			setMessage(parsed.message);
+			return;
+		}
+		if (userId === null) {
+			setCloudImportResult(null);
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
+
+		const outcome = await importLocalData(userId, backupToImportRequest(parsed.backup));
+		if (outcome.kind === "unauthorized") void session.refresh();
+		const view = describeImportOutcome(outcome);
+		if (view.tone === "error") {
+			setCloudImportResult(null);
+			setMessage(view.text);
+			return;
+		}
+		setMessage(null);
+		setCloudImportResult(view);
+	}
+
 	return (
 		<Card>
 			<CardHeader>
@@ -89,10 +125,16 @@ export function JsonBackupSection() {
 			<CardContent className="flex flex-wrap items-start gap-2">
 				<Button onClick={handleExport}>匯出 JSON</Button>
 				{isRemote ? (
-					// 雲端名單不能被備份檔整份覆蓋，還原改由登出後的本機流程處理
-					<p className="w-full text-sm text-muted-foreground">
-						登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能
-					</p>
+					// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
+					<>
+						<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
+						<FileTextPicker
+							label="選擇備份檔匯入雲端…"
+							accept="application/json"
+							testId="json-backup-cloud-import-input"
+							onFileText={handleCloudImportText}
+						/>
+					</>
 				) : (
 					<FileTextPicker
 						label="選擇備份檔…"
@@ -100,6 +142,11 @@ export function JsonBackupSection() {
 						testId="json-backup-import-input"
 						onFileText={handleImportText}
 					/>
+				)}
+				{cloudImportResult !== null && (
+					<div className="flex w-full flex-col gap-1">
+						<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />
+					</div>
 				)}
 				{message !== null && (
 					<p role="alert" className="w-full text-sm text-destructive">
