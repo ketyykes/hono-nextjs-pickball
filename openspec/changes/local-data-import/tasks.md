@@ -145,6 +145,14 @@ Depends on: §3
     N03／N04（去重鍵改 `matchId + playedAt`／略過筆數改 0／1 旗標）→ seed h5、h6、h5'（playedAt 等欄不同）、h7、h5''、h7'、h8，斷言保留 `[h5, h6, h7, h8]`、略過 3 筆（唯一筆數與略過筆數刻意不同）。
     回歸：前輪 10 條（M08、M09、S05、S06、S11、S12、C12、B07、B08、B09）與 N11 仍轉紅。新嘗試 16 條（imported 單欄改由 payload 或本機推算 5 條、body 單段改讀本機 3 條、去重鍵改 `matchId + courtNumber`、略過筆數上限 2、略過筆數改 `history.length - 1`、`readRound() ?? backup`、名單併入本機、isEmpty 時移除分槽 key／空名單時移除名單 key、只略過相鄰重複）全數轉紅。
     等價對照 3 條（`dedupeHistory` 的 Set 改陣列 `includes`、`isEmpty` 加判分槽、body 改 `{ ...payload }`）補前補後皆維持綠。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0、ESLint 0 errors。
+  - Stage 2 第二輪複審缺口與補強（test commit `8f273eb`；regression guard，加入即綠，非 TDD 紅燈，`local-import.ts` 未改動；只在既有三個 it 末段追加 seed 與斷言，既有 it 名稱與斷言未改，diff 為 68 行純新增）：Stage 2 第二輪複審判 FAIL，6 條非等價變異存活。補強前以 harness 直接對 `HEAD`（`4045bda`）版測試實測全數存活、補強後全數轉紅：
+    R07／Y13／R09（名單只取啟用者、`summary.players` 改啟用者數、名單依 id 排序；既有名單 seed 全為啟用且 id 已排序所致）→ 第一個 it 末段 seed id 非字典序且夾兩位停用者的名單（p7、p2 停用、p5、p1 停用），斷言 `payload.players` 原樣含順序（後端 sort_order 取自陣列索引）、`summary.players` 為 4；
+    R08（歷史只取 singles；既有歷史 fixture 全為單打所致）→ 同段 seed 單打 h10、雙打 h11（`doublesComposition: "mixed"`、teamB 勝）、單打 h12，斷言 `payload.history` 原樣三筆、`summary.history` 為 3，並以快照確認 reader 未降級或回寫、payload 通過 `LocalImportRequestSchema`；
+    O12（oversize 改量去重前的歷史）→ 第二個 it 末段 seed 兩筆同 matchId、各約 1MB 的歷史（去重前超過 1,900,000 位元組、去重後未超過），斷言略過 1 筆、`oversize` 為 false；
+    H07（`hasImportableLocalData` 在 oversize 時回 false）→ 第五個 it 末段 seed 超過上限的歷史，斷言 `oversize` 為 true 且 `hasImportableLocalData()` 仍為 true。
+    **H07 裁定（leader）**：依 it 名稱「只在任一 key 有資料時為 true」與 spec「本機有可匯入的資料」，oversize 時仍為 true——參賽者頁照樣提示並帶使用者到資料頁，由資料頁匯入區塊顯示 oversize 說明；現行實作即此語意，未改實作。
+    回歸：前兩輪 19 條（M08、M09、S05、S06、S11、S12、C12、B07、B08、B09、N03、N04、N08、N09、N10、N12、N13、N16、N16b）與 execution-plan b. §4 必做 13 條（分槽讀已完成場次、歷史不去重、保留最後一筆、門檻 2,000,000、成功後清除五個 key 各一次、409／401 分類為 failed、`expectedUserId` 固定字串／不傳）補強後仍全數轉紅；reviewer 第二輪 168 條變異集重跑，非等價者全數轉紅（其中 6 條為 reviewer 首版字串比對失敗的 HARNESS-ERROR，其修正版皆轉紅）。
+    等價對照 4 條（E09 `history.length + skipped === 0`、S14 分槽依 matchId 排序、EQ1 Set 改陣列 `includes`、EQ11 `summary.players` 改再讀一次 `readRoster()`）補前補後皆維持綠。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0（持共用鎖）、測試檔 ESLint 0 errors。
 
 ## 5. E2E 與畫面接線
 
