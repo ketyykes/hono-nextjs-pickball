@@ -37,14 +37,19 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`RemoteHistoryView.test.tsx` 新增三個 it——「載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊」（`it.each` 兩個狀態）、
+- [x] 2.1 RED（TDD）：`RemoteHistoryView.test.tsx` 新增三個 it——「載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊」（`it.each` 兩個狀態）、
   「以鍵盤切換區間時焦點在載入中、載入完成與載入失敗後都留在被選取的區間選項」、「載入失敗後改選其他區間會以新區間重新載入並顯示紀錄」（斷言依 test-plan，焦點以 DOM 節點同一性斷言）；
   同一 commit 依檔頭例外 ① 刪除一行。單檔 vitest 確認新 it 全紅並貼出輸出（例外 ① 的 it 刪行後仍綠，屬預期）
-- [ ] 2.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（依區間以 `searchParams.has("to")` 攔截、暫停以 `Promise` resolver 放行並以 `try／finally` 或 `page.unrouteAll({ behavior: "ignoreErrors" })` 收尾，沿用 `seedCloudPlayers`／`playOneMatch`；**所有 radio、焦點操作與斷言排在 `[data-sync-status="load-failed"]` 可見之後**）；
+  - 紀錄：`6add4c7`。單檔 vitest 紅燈 `Test Files 1 failed`、`Tests 4 failed | 12 passed (16)`，4 個失敗全為新 it（保留篩選 ×2：找不到 radiogroup「歷史區間」；焦點：`expected <body> to be <button 本週>`；改選區間：找不到 radio「本週」）。無先綠的新 it。`git show 6add4c7^:` 機械複驗：測試檔不含新 it 名稱、產品檔 RED 前後相同；Stage 1 另以 RED 時產品檔實跑重現 4 failed。
+- [x] 2.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（依區間以 `searchParams.has("to")` 攔截、暫停以 `Promise` resolver 放行並以 `try／finally` 或 `page.unrouteAll({ behavior: "ignoreErrors" })` 收尾，沿用 `seedCloudPlayers`／`playOneMatch`；**所有 radio、焦點操作與斷言排在 `[data-sync-status="load-failed"]` 可見之後**）；
   同一 commit 依檔頭例外 ③ 改最後一行。雙鎖下以單檔 E2E（`-g` 篩兩條）確認兩條皆紅並貼出輸出
-- [ ] 2.3 GREEN（TDD）：改 `RemoteHistoryView.tsx` 為單一 return，篩選器固定位置、只替換內容槽、阻斷時不顯示損毀提示（design Decision 1、2）。
+  - 紀錄：`3a39cf9`。雙鎖下單檔 E2E（`-g "雲端歷史載入失敗"`）2 failed：改寫的既有 test 在「今日」`toBeVisible` 失敗、新 test 在「今日」`toBeChecked` element not found；`git show 3a39cf9^:` 不含新 test 名稱。
+- [x] 2.3 GREEN（TDD）：改 `RemoteHistoryView.tsx` 為單一 return，篩選器固定位置、只替換內容槽、阻斷時不顯示損毀提示（design Decision 1、2）。
   2.1 的 it、2.2 的兩條 E2E 全綠；`RemoteHistoryView.test.tsx` 其餘既有 it 原樣綠；`history-sync.spec.ts` 其餘既有 test 原樣綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 2.4 REFACTOR：阻斷判定與內容槽是否以具名變數表達、有無巢狀三元運算；無壞味道則註記 skipped
+  - 紀錄：`3ae1a6d`。單檔 vitest 16 passed；雙鎖下 `history-sync.spec.ts` 全檔 user-data 7 passed；`pnpm -r exec tsc --noEmit` exit 0；三個改動檔 ESLint exit 0；C6 輸出為空。
+    Stage 1（sonnet）PASS；Stage 2（opus）PASS——獨立 mutation 30 條，「阻斷時改用另一份篩選器實例」「阻斷時篩選器換 key」「篩選器子節點索引改變」皆由焦點 it 轉紅，等價對照組維持綠；存活兩條：`HistoryRecordCard` 的 `key` 改常數（main 既有程式碼，畫面無差異）、阻斷時把提示移到篩選器前面（版面順序，非阻擋建議）。
+- [x] 2.4 REFACTOR：阻斷判定與內容槽是否以具名變數表達、有無巢狀三元運算；無壞味道則註記 skipped
+  - skipped：GREEN 已以具名變數 `isBlocking`、`content` 加 if/else 取代巢狀三元，單一 return、無重複（Stage 2 確認成立）。
 
 ## 3. 雲端統計頁保留標題與篩選器
 
