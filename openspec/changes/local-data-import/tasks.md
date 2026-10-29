@@ -137,6 +137,14 @@ Depends on: §3
     等價對照 3 條（`dedupeHistory` 的 Set 改陣列 `includes`、`hasImportableLocalData` 加判分槽、`isEmpty` 的 `players.length === 0` 改 `!players.length`）補前補後皆維持綠。
     自審時發現首輪 M08／M09 的 harness 寫成無條件 `break`（補前就轉紅，屬 harness 錯誤而非測試鑑別力），改為 `if (…) break;` 後重跑才得到「補前存活、補後轉紅」。
     另修正 `buildLocalImportPayload` JSDoc：「只讀不寫」改為本模組不寫入、reader 遇損毀資料的既有清理除外（design Decision 3 已載明）。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0、ESLint 0 errors。
+  - Stage 2 複審缺口與補強（test commit `1a616ed`；regression guard，加入即綠，非 TDD 紅燈，`local-import.ts` 未改動；只在既有 it 末段追加斷言與 seed、新增 `emptyLikeSeeds` helper，既有 it 名稱與斷言未改，diff 為 99 行純新增）：Stage 2 複審判 FAIL，8 組非等價變異存活。補強前以 harness 對 `HEAD:local-import.test.ts`（探針檔，跑完已刪）實測全數存活、補強後全數轉紅：
+    N09／N10（`backupToImportRequest` 的 players／currentRound 改讀本機；`5055ac9` 的完整 seed 恰與備份逐欄相同所致）→ 備份 it 末段清空後 seed 逐欄不同的本機資料（名單 p9、回合含 pending m7、分槽 m7、current、歷史 h9），斷言 players、currentRound、history 取自備份、scoreboard 為空；
+    N08（`importLocalData` 改送本機組出的 payload）→ 以與本機不同的請求（p9、h9、無回合）呼叫，斷言 body 等於參數；
+    N16／N16b（`imported` 筆數改由 payload 推算）→ 追加兩個各欄與請求及本機都不一致的 200 回應（布林欄位兩個方向各一次），斷言結果原樣帶回；
+    N12／N13（isEmpty 時清除本機／移除孤兒分槽 key）→ 「只有空容器」「只有孤兒分槽 m6」兩組 seed，於 isEmpty 與 `hasImportableLocalData` 兩個 it 比對呼叫前後五個 key 逐字相同；
+    N03／N04（去重鍵改 `matchId + playedAt`／略過筆數改 0／1 旗標）→ seed h5、h6、h5'（playedAt 等欄不同）、h7、h5''、h7'、h8，斷言保留 `[h5, h6, h7, h8]`、略過 3 筆（唯一筆數與略過筆數刻意不同）。
+    回歸：前輪 10 條（M08、M09、S05、S06、S11、S12、C12、B07、B08、B09）與 N11 仍轉紅。新嘗試 16 條（imported 單欄改由 payload 或本機推算 5 條、body 單段改讀本機 3 條、去重鍵改 `matchId + courtNumber`、略過筆數上限 2、略過筆數改 `history.length - 1`、`readRound() ?? backup`、名單併入本機、isEmpty 時移除分槽 key／空名單時移除名單 key、只略過相鄰重複）全數轉紅。
+    等價對照 3 條（`dedupeHistory` 的 Set 改陣列 `includes`、`isEmpty` 加判分槽、body 改 `{ ...payload }`）補前補後皆維持綠。單檔 5/5 綠、`pnpm -r exec tsc --noEmit` exit 0、ESLint 0 errors。
 
 ## 5. E2E 與畫面接線
 
