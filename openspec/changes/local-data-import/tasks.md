@@ -173,11 +173,16 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 RED（E2E）：新增 `tests/e2e/user-data/local-import.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()` 並清空本機 storage），
+- [x] 5.1 RED（E2E）：新增 `tests/e2e/user-data/local-import.spec.ts`（`test.use({ storageState })`、skip 條件、`test.beforeEach` 呼叫 `clearTestAccountUserData()` 並清空本機 storage），
   spec 錨點的全部 5 個 test（本機資料以 `page.addInitScript` 或 `page.evaluate` 在開啟頁面前寫入；JSON 備份檔以 fixture 產生，不含任何帳密）；
   同時**刪除** `roster-sync.spec.ts` 的「登入時 JSON 還原停用並顯示說明」（commit 訊息載明原因與 spec 出處），並依檔頭例外 ④ 改寫兩檔的同步點常數；
   另新增兩個元件單元測試（RED，TDD）：`components/matchmaker/LocalDataImportSection.test.tsx`「匯入以點擊當下的帳號送出且未授權時刷新 session」、`components/matchmaker/JsonBackupSection.test.tsx`「雲端 JSON 匯入以點擊當下的帳號送出且未授權時刷新 session」，以單檔 vitest 確認紅燈。
   以單檔執行 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=user-data tests/e2e/user-data/local-import.spec.ts`（前後清殘留 dev server），貼出輸出
+  - 完成（RED commit `cfe7bf3`）：新增 `local-import.spec.ts` 5 個 test、`LocalDataImportSection.test.tsx`、`JsonBackupSection.test.tsx` 各 1 個 it（名稱與 delta spec 驗收錨點逐字一致）；刪除 `roster-sync.spec.ts`「登入時 JSON 還原停用並顯示說明」（原因與 spec 出處已寫入 commit 訊息）；兩檔常數依例外 ④ 改名為 `JSON_CLOUD_IMPORT_HINT_TEXT`。
+    紅燈輸出（單檔 vitest，從 `/tmp` 以 `pnpm --dir …/nextjs-pickball test --run <path>` 執行）：`LocalDataImportSection.test.tsx` → `Failed to resolve import "./LocalDataImportSection"`（`Test Files 1 failed`）；`JsonBackupSection.test.tsx` → `Unable to find an element by: [data-testid="json-backup-cloud-import-input"]`（畫面只有 B6 停用說明；`Tests 1 failed`）。
+    紅燈輸出（`playwright test --workers=1 --project=user-data local-import.spec.ts roster-sync.spec.ts history-sync.spec.ts`）：`9 failed, 13 passed`。local-import 5 條全紅（找不到雲端匯入說明文字／匯入按鈕／`local-import-notice`／「本機沒有可匯入的資料」）；改常數的 4 條同步點 test（roster-sync「登入時 CSV 匯入的參賽者寫入雲端」「登入時 CSV 匯入確認中不可重複送出」「登入時 JSON 匯出的參賽者來自雲端」、history-sync「登入時歷史 CSV 匯出的內容來自雲端」）全紅（`getByText(JSON_CLOUD_IMPORT_HINT_TEXT)` 找不到）；其餘 13 條既有 test 原樣通過。
+    機械複驗：`git show cfe7bf3^:` 查 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`tests/e2e/user-data/local-import.spec.ts`、`JsonBackupSection.test.tsx` 皆 `fatal: path … does not exist`；`JsonBackupSection.tsx` 在 `cfe7bf3^` 不含 `json-backup-cloud-import-input`（`grep -c` 為 0）。
+    先綠者：無（5 個 E2E、2 個 it、4 個同步點 test 寫入當下皆紅）。
 - [ ] 5.2 GREEN（例外層：I/O 樣板元件與頁面，以 5.1 驗收）：新增 `components/matchmaker/LocalDataImportSection.tsx`、`LocalImportNotice.tsx`（本機讀取在 effect 內）；
   `app/matchmaker/data/page.tsx` 掛載區塊（雲端模式）、`app/matchmaker/players/page.tsx` 掛載提示（雲端模式）；`JsonBackupSection.tsx` 雲端分支改為匯入（本機分支不動）。
   5.1 全綠（E2E 5 條、元件 2 個 it，以及授權改寫同步點的既有 4 條 E2E）；不得以 `waitForTimeout` 取代狀態等待
