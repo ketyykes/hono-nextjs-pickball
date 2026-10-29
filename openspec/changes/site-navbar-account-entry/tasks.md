@@ -84,12 +84,23 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 驗收（指令）C1、C2：`components/layout` 單檔測試；持雙鎖跑全套 `pnpm test`、`pnpm lint`（0 errors）、`pnpm -r exec tsc --noEmit`（exit 0）。結果寫在本 task 後方
-- [ ] 4.2 驗收（指令）C5：`grep -rn 'name: "登出"' nextjs-pickball/tests/e2e` 逐筆檢視，每筆都在 `/` 或已以 `header`／`main` 限定範圍；結果寫在本 task 後方
-- [ ] 4.3 驗收（指令）C3：`.dev.vars` 齊備下持雙鎖，依 project 分開跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p>`
+- [x] 4.1 驗收（指令）C1、C2：`components/layout` 單檔測試；持雙鎖跑全套 `pnpm test`、`pnpm lint`（0 errors）、`pnpm -r exec tsc --noEmit`（exit 0）。結果寫在本 task 後方
+  - 結果（2026-10-30，持雙鎖，load 約 2～4）：C1 `components/layout` 2 files／18 tests 綠。`pnpm test` exit 0：前端 109 files／1070 tests（基線 1068：`AccountEntry.test.tsx` 刪 2 增 3、`SiteNavbar.test.tsx` 增 1）、後端 24／177、核心 9／21。
+    `pnpm lint` exit 0（0 errors、3 warnings 皆既有）；`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./packages/pickball-core typecheck` exit 0；`pnpm --filter ./hono-pickball build`（`wrangler deploy --dry-run`）exit 0。
+- [x] 4.2 驗收（指令）C5：`grep -rn 'name: "登出"' nextjs-pickball/tests/e2e` 逐筆檢視，每筆都在 `/` 或已以 `header`／`main` 限定範圍；結果寫在本 task 後方
+  - 結果：8 筆。`auth-session.spec.ts:56`（已 `toHaveURL("/")`）、`:117`／`:119`（`goto("/")`）在 `/`；`:69`、`:94` 以 `header` 限定；`:104` 以 `main` 限定；
+    `navbar-account-entry.spec.ts:135`、`:208` 以 `header` 限定且在 `/`。全數符合。
+- [x] 4.3 驗收（指令）C3：`.dev.vars` 齊備下持雙鎖，依 project 分開跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p>`
   （chromium、firefox、mobile-chrome、user-data 各一次；webkit 與 mobile-safari 各 `--shard=1/3`～`3/3`）。
   既有 test 全數原樣通過（扣除例外 ② 刪除的 1 條）；新增 test 依 test-plan C3 的各 project 預期執行範圍 passed、auth spec 無 skip；`--list` 數與 1.1 基線差異逐一對帳。
   特別留意 Tab 走訪類 test（`match-stage.spec.ts` 的 `tabUntilFocused`、`visual-export.spec.ts` 的 Tab 迴圈）在行動 project 多一個 header tab stop 後仍通過。失敗不得自行判定為雜訊，證據上報
-- [ ] 4.4 驗收（指令）C4：持雙鎖跑 `--project=webkit --repeat-each=30 tests/e2e/specs/quiz.spec.ts:49` 與 `tests/e2e/specs/scoreboard.spec.ts:22`，預期各 30/30 passed；結果寫在本 task 後方
-- [ ] 4.5 驗收（指令）C6：`DO_NOT_TRACK=1 openspec validate site-navbar-account-entry --strict` exit 0
+  - 結果（`.dev.vars` 齊備，持雙鎖，`--workers=1`，全數 exit 0）：`--list` 各瀏覽器 project 145→147 tests、17→18 files（＋位移、寬度、窄螢幕登入入口 3 條；－例外 ② 刪除 1 條），user-data 44 不變。
+    chromium 147 passed；firefox 135 passed／12 skipped；mobile-chrome 145 passed／2 skipped；user-data 44 passed；webkit shard 1～3：45＋41＋49 passed／4＋8＋0 skipped；mobile-safari shard 1～3：45＋41＋49 passed／4＋8＋0 skipped。
+    skipped 全為既有的 browserName／project 條件 skip（`api-health`、`auth-proxy`、`navbar-rwd` 七條）與新寬度 test 的 `browserName !== "chromium"` skip；auth spec 無 skip。
+    新增 test：位移 5 個瀏覽器 project 皆 passed；寬度 chromium、mobile-chrome passed，其餘 skip；「窄螢幕下 navbar 登入入口可前往登入頁」與修改後的「窄螢幕下可經由登入頁登入與登出」5 個瀏覽器 project 皆 passed。
+    Tab 走訪類（`match-stage.spec.ts`、`visual-export.spec.ts`）在行動 project 皆通過。
+- [x] 4.4 驗收（指令）C4：持雙鎖跑 `--project=webkit --repeat-each=30 tests/e2e/specs/quiz.spec.ts:49` 與 `tests/e2e/specs/scoreboard.spec.ts:22`，預期各 30/30 passed；結果寫在本 task 後方
+  - 結果（持雙鎖）：`quiz.spec.ts:49` 30/30 passed、`scoreboard.spec.ts:22` 30/30 passed（webkit，各 1.1m，load 約 3.2）。
+- [x] 4.5 驗收（指令）C6：`DO_NOT_TRACK=1 openspec validate site-navbar-account-entry --strict` exit 0
+  - 結果：`Change 'site-navbar-account-entry' is valid`，exit 0。
 - [ ] 4.6 Final Code Review（`opus`）：`git diff main --stat` ⊆ proposal Impact；結論與處置寫入 design.md Open Questions 並 commit（`docs:`）
