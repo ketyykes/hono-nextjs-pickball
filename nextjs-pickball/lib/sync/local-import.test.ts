@@ -208,6 +208,22 @@ describe("local-import", () => {
 		expect(second.payload.scoreboard.matches.map((slot) => slot.matchId)).toEqual(["m1", "m3"]);
 		expect(second.payload.scoreboard.matches.map((slot) => slot.scores.us)).toEqual([3, 6]);
 		expect(second.summary.slots).toBe(2);
+
+		// 場地順序任意：已完成場次與無分槽場次排在有分槽場次之前，後面的分槽也不能遺失
+		seedRound(
+			makeRound([
+				makeCompletedMatch("m2", 2),
+				makeRoundMatch({ id: "m5", courtNumber: 3 }),
+				makeRoundMatch({ id: "m1" }),
+				makeRoundMatch({ id: "m3", status: "scoring" }),
+			]),
+		);
+		seedSlots({ m1: makeSlot("m1", 3), m3: makeSlot("m3", 6) });
+
+		const third = buildLocalImportPayload();
+
+		expect(third.payload.scoreboard.matches.map((slot) => slot.matchId)).toEqual(["m1", "m3"]);
+		expect(third.summary.slots).toBe(2);
 	});
 
 	it("本機沒有資料時回報 isEmpty，任一段超過上限時回報 oversize", () => {
@@ -233,6 +249,28 @@ describe("local-import", () => {
 		localStorage.clear();
 		seedSlots({ m9: makeSlot("m9", 9) });
 		expect(buildLocalImportPayload().isEmpty).toBe(true);
+
+		// summary 的 round 與 scoreboardCurrent 各自獨立：只有其中一項時不能被另一項帶動
+		localStorage.clear();
+		seedCurrent(makeSlot(null, 2));
+		expect(buildLocalImportPayload().summary).toEqual({
+			players: 0,
+			round: false,
+			slots: 0,
+			history: 0,
+			scoreboardCurrent: true,
+			duplicateHistorySkipped: 0,
+		});
+		localStorage.clear();
+		seedRound(makeRound([makeCompletedMatch("m2", 1)]));
+		expect(buildLocalImportPayload().summary).toEqual({
+			players: 0,
+			round: true,
+			slots: 0,
+			history: 0,
+			scoreboardCurrent: false,
+			duplicateHistorySkipped: 0,
+		});
 
 		// 五段中任一段有資料即非空
 		const nonEmptySeeds: Array<[string, () => void]> = [
@@ -367,6 +405,9 @@ describe("local-import", () => {
 			history: [makeHistoryEntry("h1"), makeHistoryEntry("h2")],
 		});
 
+		// 本機有完整資料時，備份的計分板仍須為空：不得改讀本機
+		seedFullLocalData();
+
 		const request = backupToImportRequest(backup);
 
 		expect(request.version).toBe(1);
@@ -400,5 +441,12 @@ describe("local-import", () => {
 		localStorage.clear();
 		seedRound(makeRound([makeRoundMatch()]));
 		expect(hasImportableLocalData()).toBe(true);
+
+		// 使用者定案：判斷過程不得清除或改寫任何本機 key
+		localStorage.clear();
+		seedFullLocalData();
+		const before = snapshotKeys();
+		expect(hasImportableLocalData()).toBe(true);
+		expect(snapshotKeys()).toEqual(before);
 	});
 });
