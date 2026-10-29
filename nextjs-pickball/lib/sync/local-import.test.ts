@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { LocalImportRequestSchema } from "@pickball/core/api/import";
 import type { LocalImportRequest } from "@pickball/core/api/import";
-import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import { createInitialState, scoreboardReducer } from "@pickball/core/scoreboard/reducer";
 import { BackupSchema } from "@pickball/core/matchmaker/transfer-types";
 import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round, RoundMatch } from "@pickball/core/matchmaker/round-types";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
-import type { ScoreboardState } from "@pickball/core/scoreboard/types";
+import type { ScoreboardState, Team } from "@pickball/core/scoreboard/types";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "../matchmaker/storage-keys";
 import { MATCH_SLOTS_KEY, STORAGE_KEY as SCOREBOARD_CURRENT_KEY } from "../scoreboard/storage-keys";
 import {
@@ -93,6 +93,47 @@ function makeRound(matches: RoundMatch[]): Round {
 	};
 }
 
+/**
+ * 每個欄位都不是 makePlayer 的預設值、id 不依字典序且夾一位停用者的名單：
+ * 只用預設值 fixture 時，「原樣送出」與「改寫成預設值、篩選或排序」看起來一模一樣。
+ */
+const distinctFieldPlayers: Player[] = [
+	makePlayer({
+		id: "p8",
+		name: "Hana",
+		gender: "male",
+		colorFrom: "#123456",
+		colorTo: "#abcdef",
+		rating: 6.5,
+		restCount: 3,
+		gamesPlayed: 7,
+		createdAt: "2026-09-01T08:30:00.000Z",
+	}),
+	makePlayer({
+		id: "p3",
+		name: "Chen",
+		gender: "other",
+		colorFrom: "#0a0b0c",
+		colorTo: "#fedcba",
+		rating: 2.5,
+		restCount: 1,
+		gamesPlayed: 4,
+		isActive: false,
+		createdAt: "2026-09-02T09:15:00.000Z",
+	}),
+	makePlayer({
+		id: "p6",
+		name: "Fay",
+		gender: "male",
+		colorFrom: "#13579b",
+		colorTo: "#2468ac",
+		rating: 7,
+		restCount: 2,
+		gamesPlayed: 9,
+		createdAt: "2026-09-03T10:45:00.000Z",
+	}),
+];
+
 function makeHistoryEntry(matchId: string, scoreA = 11, name = "Alice"): MatchHistoryEntry {
 	return {
 		format: "singles",
@@ -105,6 +146,49 @@ function makeHistoryEntry(matchId: string, scoreA = 11, name = "Alice"): MatchHi
 		scoreB: 7,
 		winner: "teamA",
 	};
+}
+
+/**
+ * 與 makeHistoryEntry 的單打紀錄在單雙打、勝方、scoreB、teamA 球員上全都不同的雙打紀錄。
+ * 帶 doublesComposition，reader 才不會把它當損毀資料丟掉。
+ */
+function makeDoublesHistoryEntry(matchId: string): MatchHistoryEntry {
+	return {
+		format: "doubles",
+		doublesComposition: "mixed",
+		matchId,
+		courtNumber: 2,
+		playedAt: "2026-08-20T05:00:00.000Z",
+		teamA: {
+			rating: 5,
+			players: [
+				{ id: "p7", name: "Gina", ratingBefore: 5, ratingAfter: 4.8 },
+				{ id: "p2", name: "Bob", ratingBefore: 5, ratingAfter: 4.8 },
+			],
+		},
+		teamB: {
+			rating: 6,
+			players: [
+				{ id: "p5", name: "Eve", ratingBefore: 6, ratingAfter: 6.2 },
+				{ id: "p1", name: "Alice", ratingBefore: 6, ratingAfter: 6.2 },
+			],
+		},
+		scoreA: 8,
+		scoreB: 11,
+		winner: "teamB",
+	};
+}
+
+/** 以 reducer 實際打到分出勝負：history、比分與勝方彼此一致，而不是手填出來的形狀。 */
+function playUntilFinished(initial: ScoreboardState, opening: Team[], closer: Team): ScoreboardState {
+	let state = initial;
+	for (const winner of opening) {
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner });
+	}
+	for (let guard = 0; state.status !== "finished" && guard < 200; guard++) {
+		state = scoreboardReducer(state, { type: "RALLY_WON", winner: closer });
+	}
+	return state;
 }
 
 /** 分槽的 state；scores 各場不同，讓「讀錯槽」在比對時看得出來。 */
@@ -306,6 +390,67 @@ describe("local-import", () => {
 		// seed 全數合法：reader 沒有降級或回寫，上面的斷言才是在驗證匯入內容而非 reader 的清理
 		expect(snapshotKeys()).toEqual(beforeFifth);
 		expect(LocalImportRequestSchema.safeParse(fifth.payload).success).toBe(true);
+
+		// 分槽與獨立計分板原樣送出：已打完但尚未送出比分（finished）與剛建立（0:0）的計分板都屬於未完成場次，
+		// 濾掉或改寫狀態、勝方、rally 紀錄，匯入後的計分板就與本機不同。前面的計分板 seed 全是
+		// setup 狀態、沒有 rally 紀錄的非零比分，看不出這類篩選或改寫
+		const finishedM1 = playUntilFinished(
+			createInitialState({ mode: "singles", matchId: "m1", courtNumber: 1 }),
+			["us", "them", "them", "us"],
+			"us",
+		);
+		const freshM3 = createInitialState({ mode: "singles", matchId: "m3", courtNumber: 2 });
+		const finishedCurrent = playUntilFinished(
+			createInitialState({ mode: "doubles", firstServer: "them", targetScore: 15 }),
+			["us", "them", "us", "us"],
+			"them",
+		);
+		expect(finishedM1).toMatchObject({ status: "finished", winner: "us" });
+		expect(finishedM1.history.length).toBeGreaterThan(0);
+		expect(finishedCurrent).toMatchObject({ status: "finished", winner: "them" });
+		expect(finishedCurrent.history.length).toBeGreaterThan(0);
+		seedRoster(distinctFieldPlayers);
+		seedRound(
+			makeRound([makeRoundMatch({ id: "m1" }), makeRoundMatch({ id: "m3", courtNumber: 2, status: "scoring" })]),
+		);
+		seedSlots({ m1: finishedM1, m3: freshM3 });
+		seedCurrent(finishedCurrent);
+		// 歷史依本機的追加順序送出（後端依陣列順序插入，同時間的紀錄才維持原順序），matchId 刻意不依字典序；
+		// 重複的那筆與第一筆只有 matchId 相同，去重鍵若混入其他欄位就會把它當成另一筆送出
+		const orderH30 = makeHistoryEntry("h30", 11);
+		const orderH10 = makeHistoryEntry("h10", 6);
+		const orderH20 = makeHistoryEntry("h20", 9);
+		seedHistory([orderH30, orderH10, orderH20, makeDoublesHistoryEntry("h30")]);
+		const beforeSixth = snapshotKeys();
+
+		const sixth = buildLocalImportPayload();
+
+		expect(sixth.payload.players).toEqual(distinctFieldPlayers);
+		expect(sixth.payload.scoreboard.matches).toEqual([finishedM1, freshM3]);
+		expect(sixth.payload.scoreboard.current).toEqual(finishedCurrent);
+		expect(sixth.payload.history).toEqual([orderH30, orderH10, orderH20]);
+		expect(sixth.summary).toEqual({
+			players: 3,
+			round: true,
+			slots: 2,
+			history: 3,
+			scoreboardCurrent: true,
+			duplicateHistorySkipped: 1,
+		});
+		expect(snapshotKeys()).toEqual(beforeSixth);
+		expect(LocalImportRequestSchema.safeParse(sixth.payload).success).toBe(true);
+
+		// 剛建立、尚未開打（0:0）的獨立計分板也是本機資料
+		const freshCurrent = createInitialState({ mode: "singles" });
+		seedCurrent(freshCurrent);
+		const beforeSeventh = snapshotKeys();
+
+		const seventh = buildLocalImportPayload();
+
+		expect(seventh.payload.scoreboard.current).toEqual(freshCurrent);
+		expect(seventh.summary.scoreboardCurrent).toBe(true);
+		expect(snapshotKeys()).toEqual(beforeSeventh);
+		expect(LocalImportRequestSchema.safeParse(seventh.payload).success).toBe(true);
 	});
 
 	it("本機沒有資料時回報 isEmpty，任一段超過上限時回報 oversize", () => {
@@ -438,6 +583,18 @@ describe("local-import", () => {
 		expect(deduped.summary.duplicateHistorySkipped).toBe(1);
 		expect(utf8Length(deduped.payload.history)).toBeLessThanOrEqual(LIMIT_BYTES);
 		expect(deduped.oversize).toBe(false);
+
+		// 名單的上限量的是整份名單：停用者同樣會送到後端，只量啟用者會漏判過大
+		localStorage.clear();
+		seedRoster([
+			makePlayer({ id: "p1", name: "x".repeat(LIMIT_BYTES), isActive: false }),
+			makePlayer({ id: "p2", name: "Bob" }),
+		]);
+		const beforeInactive = snapshotKeys();
+		const inactiveOversize = buildLocalImportPayload();
+		expect(inactiveOversize.payload.players).toHaveLength(2);
+		expect(inactiveOversize.oversize).toBe(true);
+		expect(snapshotKeys()).toEqual(beforeInactive);
 	});
 
 	it("importLocalData 依回應分類為已匯入、雲端已有資料、未授權或失敗且不改動本機", async () => {
@@ -530,6 +687,21 @@ describe("local-import", () => {
 			imported: unrelatedCountsB.imported,
 		});
 		expect(fetchMock).toHaveBeenCalledTimes(11);
+
+		// body 的名單原樣送出：停用者也是名單成員，前面各次請求的名單全是啟用者，看不出篩選
+		const requestWithInactive: LocalImportRequest = {
+			version: 1,
+			players: distinctFieldPlayers,
+			currentRound: null,
+			history: [],
+			scoreboard: { current: null, matches: [] },
+		};
+		expect(LocalImportRequestSchema.safeParse(requestWithInactive).success).toBe(true);
+		respond(json(200, importedBody));
+		await importLocalData("user-a", requestWithInactive);
+		expect(JSON.parse(fetchMock.mock.calls[11][1]?.body as string)).toEqual(
+			JSON.parse(JSON.stringify(requestWithInactive)),
+		);
 	});
 
 	it("JSON 備份轉為匯入請求時計分板為空", () => {
@@ -567,6 +739,30 @@ describe("local-import", () => {
 		expect(requestWithDistinctLocal.currentRound).toEqual(backup.currentRound);
 		expect(requestWithDistinctLocal.history).toEqual(backup.history);
 		expect(requestWithDistinctLocal.scoreboard).toEqual({ current: null, matches: [] });
+
+		// 備份原樣轉換：上方備份恰為 fixture 預設值（全啟用、id 已排序、累計欄位為 0、只有單打、
+		// 回合沒有已完成場次也不計時），看不出篩選、排序或改寫。換成停用者夾在中間、各欄非預設的名單，
+		// 雙打歷史，以及含已完成場次且正在計時的回合
+		const timer = { durationMinutes: 15, startedAt: "2026-08-16T00:05:00.000Z" } as const;
+		const distinctBackup = BackupSchema.parse({
+			version: 1,
+			players: distinctFieldPlayers,
+			currentRound: {
+				...makeRound([makeCompletedMatch("m2", 1), makeRoundMatch({ id: "m1", courtNumber: 2 })]),
+				timer,
+			},
+			history: [makeHistoryEntry("h4", 11), makeDoublesHistoryEntry("h3")],
+		});
+
+		const distinctRequest = backupToImportRequest(distinctBackup);
+
+		expect(distinctRequest.players).toEqual(distinctFieldPlayers);
+		expect(distinctRequest.currentRound).toEqual(distinctBackup.currentRound);
+		expect(distinctRequest.currentRound?.matches.map((match) => match.status)).toEqual(["completed", "pending"]);
+		expect(distinctRequest.currentRound?.timer).toEqual(timer);
+		expect(distinctRequest.history).toEqual(distinctBackup.history);
+		expect(distinctRequest.history.map((entry) => entry.format)).toEqual(["singles", "doubles"]);
+		expect(LocalImportRequestSchema.safeParse(distinctRequest).success).toBe(true);
 	});
 
 	it("hasImportableLocalData 只在任一 key 有資料時為 true", () => {
