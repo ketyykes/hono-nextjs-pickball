@@ -89,6 +89,7 @@ Depends on: §3, §4
 
 - [x] 5.1 例外層（E2E 驗收）：`tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時以超過 500 位參賽者的 JSON 備份匯入雲端時顯示資料量超過上限且雲端不寫入」（備份檔以 `MAX_PLAYERS_PER_IMPORT + 1` 位組成；斷言資料頁顯示 `tooLarge` 文案、參賽者頁雲端名單為空；等待以元素與 `data-sync-status` 為依據，不用 `waitForTimeout`）。
   持雙鎖以 `--project=user-data` 單跑該檔，預期加入即綠，如實記錄
+  - 紀錄：加入即綠（例外層，非 TDD 紅燈）；單跑該檔 6 passed／0 failed／0 skipped（load 3.40）。Stage 2 以兩條變異（前端 too-large 文案改回 failed、後端略過筆數判定照常寫入）各自轉紅，確認經前端 proxy 與 service binding 的真 413
 - [x] 5.2 文件：`hono-pickball/CLAUDE.md`「本機資料匯入 API」改寫上限敘述（body 10,000,000、單段 1,900,000 以核心 `checkImportLimits` 判定、超過回 413 `PAYLOAD_TOO_LARGE` 且不送出 batch；刪除「單段 JSON 參數超過 D1 的 2MB 上限，整批回滾、零列」的 500 例子）、
   「matchmaker 名單 API」的 `POST /players/import` 補 body 1,000,000／500 位上限與 id 非空；「路由約定」補「批次寫入端點一律掛 `src/http/body-limit.ts` 的 `jsonBodyLimit`」；
   `nextjs-pickball/CLAUDE.md` 對 `lib/sync/local-import.ts` 的敘述改為「以核心 `checkImportLimits` 判定 `oversize`（五段包裝後各 ≤ 1,900,000 位元組、參賽者 ≤ 500 位）」與「分類加 `too-large`（413）」，並補 `remote-transfer.ts` 的 413 → `importTooLarge`。只寫現行行為與理由，不寫 change 名稱（`docs:`）
@@ -97,7 +98,14 @@ Depends on: §3, §4
 
 Depends on: §5
 
-- [ ] 6.1 驗收（指令）C1～C5：三段 typecheck、`pnpm lint`、`pnpm test`、`pnpm build`、`db:generate` 無新檔（重負載一律持雙鎖）；數字寫在本 task 下
-- [ ] 6.2 驗收（指令）C6：E2E 依 project 分開跑（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），持雙鎖；既有 test 全數通過、user-data 新增 1 條 passed、無 skip
-- [ ] 6.3 驗收（指令）C7～C9：`openspec validate --strict`；`grep` 上限字面值與 repository 的 `JSON.stringify`；訪客路徑檔案 `git diff main --stat` 無輸出
+- [x] 6.1 驗收（指令）C1～C5：三段 typecheck、`pnpm lint`、`pnpm test`、`pnpm build`、`db:generate` 無新檔（重負載一律持雙鎖）；數字寫在本 task 下
+  - C1：`pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck` 皆 exit 0
+  - C2：`pnpm lint` exit 0，0 errors／3 warnings（與基線相同）
+  - C3：`pnpm test` exit 0：核心 10 檔／27（基線 9／21）、前端 109 檔／1085（基線 109／1078）、後端 25 檔／193（基線 24／177）
+  - C4：`pnpm build` exit 0
+  - C5：`db:generate` 回報 No schema changes，`git status --porcelain` 為空
+- [x] 6.2 驗收（指令）C6：E2E 依 project 分開跑（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），持雙鎖；既有 test 全數通過、user-data 新增 1 條 passed、無 skip
+  - 全部 exit 0，load 皆 < 11：chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145＋2 skipped；user-data 47 passed（基線 46＋新增 1，無 skip）；webkit 三 shard 45＋41＋49＝135 passed、4＋8＝12 skipped；mobile-safari 三 shard 45＋41＋49＝135 passed、12 skipped。五個 browser project 數量與基線相同（skip 為基線既有）
+- [x] 6.3 驗收（指令）C7～C9：`openspec validate --strict`；`grep` 上限字面值與 repository 的 `JSON.stringify`；訪客路徑檔案 `git diff main --stat` 無輸出
+  - C7：valid；C8：`JSON.stringify` 計數 0、上限字面值 grep 無輸出；C9：訪客路徑檔案（含 `LocalDataImportSection.tsx`、`JsonBackupSection.tsx`）`git diff main --stat` 無輸出
 - [ ] 6.4 Final Code Review（`opus`）：依 execution-plan「Final Code Reviewer」清單；結論與未採納項寫入 design Open Questions 並 commit
