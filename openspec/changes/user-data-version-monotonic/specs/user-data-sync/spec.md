@@ -85,6 +85,13 @@
 - **THEN** 重新匯入的 `m1` 分槽 version 為 6（大於送出比分前的 5，而非只取重置當下其餘列的最大值加一）
 - **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「送出比分刪除的分槽在重置後重新匯入時版本大於刪除前」
 
+#### Scenario: 版本下限：逐筆刪除路徑只依本人的資料提高下限
+
+- **GIVEN** 使用者 B 的參賽者 p1 為 version 5，回合（version 6）含 `pending` 的 `m1`、`m2`，兩者的分槽皆為 version 9
+- **WHEN** 使用者 A 依序：建立 p1（version 1）後 `DELETE` p1；以 `version: 0` PUT 含 `m1`、`m2` 的回合並建立 `m1` 的分槽，再 PUT 只含 `m2` 的回合（`m1` 的分槽被清除）；建立 `m2` 兩隊的選手與 `m2` 的分槽後對 `m2` 送出比分
+- **THEN** 三步之後 A 的下限依序為 1、2、3（只取自 A 被刪除的列）；B 的參賽者與分槽 version 不變，`sync_version_floors` 沒有 B 的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限」
+
 #### Scenario: 版本下限：沒有任何資料時重置不失敗
 
 - **GIVEN** 使用者從未寫入任何對戰分配機資料

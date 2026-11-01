@@ -385,4 +385,51 @@ describe("版本下限", () => {
 		const slots = await rowsOf("matchmaker_match_slots", userId);
 		expect(slots.map((row) => row.version)).toEqual([6]);
 	});
+
+	it("其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限", async () => {
+		const emailA = "vf-own-delete-a@example.com";
+		const emailB = "vf-own-delete-b@example.com";
+		const cookieA = await seedAndSignIn(emailA);
+		const cookieB = await seedAndSignIn(emailB);
+		const idA = await userIdOf(emailA);
+		const idB = await userIdOf(emailB);
+		const floorOfA = async () => (await rowsOf("sync_version_floors", idA)).map((row) => row.version);
+
+		// B 擁有與 A 同 id 且版本更高的參賽者與分槽，任一刪除路徑的選取漏掉 user_id 都會讓 A 的下限變成 B 的值
+		for (let version = 0; version < 5; version += 1) {
+			await request(cookieB, "PUT", "/players/p1", { data: makePlayer("p1"), version });
+		}
+		await seedRound(idB, makeRound([makeMatch("m1"), makeMatch("m2")]), 6);
+		await seedSlot(idB, makeSlot("m1"), 9);
+		await seedSlot(idB, makeSlot("m2"), 9);
+
+		// 刪除參賽者：A 的 p1 為 version 1
+		await request(cookieA, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
+		expect((await request(cookieA, "DELETE", "/players/p1")).status).toBe(204);
+		expect(await floorOfA()).toEqual([1]);
+
+		// 回合 PUT 的孤兒清除：A 的 m1 分槽為 version 2
+		await request(cookieA, "PUT", "/round", { data: makeRound([makeMatch("m1"), makeMatch("m2")]), version: 0 });
+		await request(cookieA, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 });
+		const removed = await request(cookieA, "PUT", "/round", { data: makeRound([makeMatch("m2")]), version: 2 });
+		expect(removed.status).toBe(200);
+		expect(await floorOfA()).toEqual([2]);
+
+		// 送出比分刪除該場分槽：A 的 m2 分槽為 version 3
+		await request(cookieA, "PUT", "/players/m2-a", { data: makePlayer("m2-a"), version: 0 });
+		await request(cookieA, "PUT", "/players/m2-b", { data: makePlayer("m2-b"), version: 0 });
+		await request(cookieA, "PUT", "/slots/m2", { data: makeSlot("m2"), version: 0 });
+		const submitted = await request(cookieA, "POST", "/round/matches/m2/score", {
+			scoreA: "11",
+			scoreB: "7",
+			roundVersion: 3,
+		});
+		expect(submitted.status).toBe(200);
+		expect(await floorOfA()).toEqual([3]);
+
+		// B 的資料與下限都不受 A 的刪除影響
+		expect((await rowsOf("matchmaker_players", idB)).map((row) => row.version)).toEqual([5]);
+		expect((await rowsOf("matchmaker_match_slots", idB)).map((row) => row.version)).toEqual([9, 9]);
+		expect(await rowsOf("sync_version_floors", idB)).toEqual([]);
+	});
 });
