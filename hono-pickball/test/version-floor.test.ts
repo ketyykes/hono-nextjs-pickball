@@ -1,7 +1,22 @@
-import "../src/index";
+import { exports } from "cloudflare:workers";
+import type { LocalImportRequest } from "@pickball/core/api/import";
+import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import type { Player } from "@pickball/core/matchmaker/types";
+import { createInitialState } from "@pickball/core/scoreboard/reducer";
+import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { describe, expect, it } from "vitest";
-import { makeMatch, makeRound, makeSlot, request, rowsOf, seedAndSignIn } from "./helpers/matchmaker-fixtures";
+import "../src/index";
+import {
+	appRequestInit,
+	makeHistoryEntry,
+	makeMatch,
+	makeRound,
+	makeSlot,
+	origin,
+	request,
+	rowsOf,
+	seedAndSignIn,
+} from "./helpers/matchmaker-fixtures";
 import { userIdOf } from "./helpers/session";
 
 interface Versioned<T> {
@@ -22,6 +37,30 @@ function makePlayer(id: string, name = `球友 ${id}`): Player {
 		isActive: true,
 		createdAt: "2026-01-01T00:00:00.000Z",
 	};
+}
+
+function historyAt(matchId: string, playedAt: string): MatchHistoryEntry {
+	return { ...makeHistoryEntry(matchId), playedAt };
+}
+
+function standaloneScoreboard(us: number, them: number): ScoreboardState {
+	return { ...createInitialState(), scores: { us, them } };
+}
+
+// 與 local-import.test.ts 的同名函式相同；那邊是檔內私有，這裡複製而不是為了共用去改既有測試檔。
+// 參賽者含 m1 兩隊的選手 m1-a、m1-b，送出比分才走得到版本檢查。
+function makePayload(): LocalImportRequest {
+	return {
+		version: 1,
+		players: [makePlayer("m1-a", "甲"), makePlayer("m1-b", "乙"), makePlayer("p-c", "丙")],
+		currentRound: makeRound([makeMatch("m1")]),
+		history: [historyAt("h1", "2026-01-01T00:10:00.000Z")],
+		scoreboard: { current: standaloneScoreboard(7, 3), matches: [makeSlot("m1", 5)] },
+	};
+}
+
+function postImport(cookie: string, body: unknown): Promise<Response> {
+	return exports.default.fetch(new Request(`${origin}/api/import`, appRequestInit(cookie, { method: "POST", body })));
 }
 
 async function bodyOf<T>(res: Response): Promise<T> {
@@ -154,5 +193,47 @@ describe("版本下限", () => {
 		}
 		const current = await bodyOf<Versioned<unknown>>(await request(cookie, "GET", "/slots/m1"));
 		expect(current).toEqual({ data: rebuiltSlot, version: 3 });
+	});
+
+	it("重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409", async () => {
+		const email = "vf-import@example.com";
+		const cookie = await seedAndSignIn(email);
+		const userId = await userIdOf(email);
+		const payload = makePayload();
+
+		const first = await postImport(cookie, payload);
+		expect(first.status).toBe(200);
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+		const second = await postImport(cookie, payload);
+		expect(second.status).toBe(200);
+		expect((await bodyOf<{ imported: { scoreboardCurrent: string } }>(second)).imported.scoreboardCurrent).toBe("skipped");
+
+		const versionsOf = async (table: string) => (await rowsOf(table, userId)).map((row) => row.version);
+		expect(await versionsOf("matchmaker_players")).toEqual([2, 2, 2]);
+		expect(await versionsOf("matchmaker_round")).toEqual([2]);
+		expect(await versionsOf("matchmaker_match_slots")).toEqual([2]);
+		expect(await versionsOf("matchmaker_history")).toEqual([1]);
+		expect(await versionsOf("scoreboard_current")).toEqual([1]);
+		const before = {
+			players: await rowsOf("matchmaker_players", userId),
+			round: await rowsOf("matchmaker_round", userId),
+			slots: await rowsOf("matchmaker_match_slots", userId),
+			history: await rowsOf("matchmaker_history", userId),
+		};
+
+		// 另一台裝置在第一次匯入後讀到的版本都是 1
+		const staleResponses = [
+			await request(cookie, "PUT", "/players/m1-a", { data: makePlayer("m1-a", "舊"), version: 1 }),
+			await request(cookie, "PUT", "/round", { data: makeRound([makeMatch("m9")]), version: 1 }),
+			await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 9), version: 1 }),
+			await request(cookie, "POST", "/round/matches/m1/score", { scoreA: "11", scoreB: "7", roundVersion: 1 }),
+		];
+		expect(staleResponses.map((res) => res.status)).toEqual([409, 409, 409, 409]);
+		expect({
+			players: await rowsOf("matchmaker_players", userId),
+			round: await rowsOf("matchmaker_round", userId),
+			slots: await rowsOf("matchmaker_match_slots", userId),
+			history: await rowsOf("matchmaker_history", userId),
+		}).toEqual(before);
 	});
 });
