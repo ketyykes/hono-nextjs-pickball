@@ -555,6 +555,18 @@ describe("POST /api/import 本機資料匯入", () => {
 		expect(res.status).toBe(200);
 	});
 
+	// regression guard：body 上限掛在 validator 之前，schema 不合法但 body 過大時回 413 而非 400
+	it("匯入的 body 超過上限且內容不合 schema 時回 413 而非 400", async () => {
+		const cookie = await seedAndSignIn("import-body-order-validator@example.com");
+		const userId = await userIdOf("import-body-order-validator@example.com");
+
+		const res = await postImport(cookie, { padding: "x".repeat(IMPORT_BODY_LIMIT_BYTES) });
+
+		expect(res.status).toBe(413);
+		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([userId]);
+	});
+
 	// regression guard：body 上限掛在 sub-app 守衛之後，未登入與帳號不符的回應仍優先於 413
 	it("匯入的 body 超過上限時，未登入仍回 401、帳號不符仍回 401 ACCOUNT_MISMATCH", async () => {
 		const cookie = await seedAndSignIn("import-body-order@example.com");
