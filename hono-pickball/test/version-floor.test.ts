@@ -16,6 +16,8 @@ import {
 	request,
 	rowsOf,
 	seedAndSignIn,
+	seedRound,
+	seedSlot,
 } from "./helpers/matchmaker-fixtures";
 import { userIdOf } from "./helpers/session";
 
@@ -135,6 +137,44 @@ describe("版本下限", () => {
 		const bPlayer = await request(cookieB, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
 		expect((await bodyOf<Versioned<unknown>>(bRound)).version).toBe(1);
 		expect((await bodyOf<Versioned<unknown>>(bPlayer)).version).toBe(1);
+		expect(await rowsOf("sync_version_floors", idB)).toEqual([]);
+	});
+
+	it("其他使用者有較高版本的資料時重置只依本人的資料提高下限", async () => {
+		const emailA = "vf-own-floor-a@example.com";
+		const emailB = "vf-own-floor-b@example.com";
+		const cookieA = await seedAndSignIn(emailA);
+		const cookieB = await seedAndSignIn(emailB);
+		const idA = await userIdOf(emailA);
+		const idB = await userIdOf(emailB);
+		const round = makeRound([makeMatch("m1")]);
+
+		// B 三張表的版本各不相同且都高於 A，任一表的選取漏掉 user_id 都會讓 A 的下限變成該表的值
+		for (let version = 0; version < 5; version += 1) {
+			await request(cookieB, "PUT", "/players/p1", { data: makePlayer("p1"), version });
+		}
+		await seedRound(idB, round, 6);
+		await seedSlot(idB, makeSlot("m1"), 7);
+
+		// A 的參賽者 version 2、回合與分槽 version 1，重置後下限應為 2
+		await request(cookieA, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
+		await request(cookieA, "PUT", "/players/p1", { data: makePlayer("p1"), version: 1 });
+		await request(cookieA, "PUT", "/round", { data: round, version: 0 });
+		await request(cookieA, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 });
+		expect((await request(cookieA, "POST", "/reset")).status).toBe(204);
+
+		expect((await rowsOf("sync_version_floors", idA)).map((row) => row.version)).toEqual([2]);
+		const rebuiltRound = await request(cookieA, "PUT", "/round", { data: round, version: 0 });
+		const rebuiltPlayer = await request(cookieA, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
+		const rebuiltSlot = await request(cookieA, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 });
+		expect((await bodyOf<Versioned<unknown>>(rebuiltRound)).version).toBe(3);
+		expect((await bodyOf<Versioned<unknown>>(rebuiltPlayer)).version).toBe(3);
+		expect((await bodyOf<Versioned<unknown>>(rebuiltSlot)).version).toBe(3);
+
+		// B 的資料與下限都不受 A 的重置影響
+		expect((await rowsOf("matchmaker_players", idB)).map((row) => row.version)).toEqual([5]);
+		expect((await rowsOf("matchmaker_round", idB)).map((row) => row.version)).toEqual([6]);
+		expect((await rowsOf("matchmaker_match_slots", idB)).map((row) => row.version)).toEqual([7]);
 		expect(await rowsOf("sync_version_floors", idB)).toEqual([]);
 	});
 

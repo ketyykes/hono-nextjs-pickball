@@ -99,6 +99,13 @@
 - **THEN** B 的回合與參賽者 version 皆為 1；`sync_version_floors` 沒有 B 的列
 - **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「一位使用者的重置不影響其他使用者的建立版本」
 
+#### Scenario: 版本下限：重置只依本人的資料提高下限
+
+- **GIVEN** 使用者 B 的參賽者 p1 為 version 5、回合為 version 6、`m1` 的分槽為 version 7；使用者 A 的參賽者 p1 為 version 2、回合與 `m1` 的分槽為 version 1
+- **WHEN** A 呼叫重置，再以 `version: 0` PUT 回合、參賽者 p1 與 `m1` 的分槽
+- **THEN** 重置回 204；A 的下限為 2；A 重建的回合、參賽者與分槽 version 皆為 3；B 的參賽者、回合、分槽 version 仍為 5、6、7，且 `sync_version_floors` 沒有 B 的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「其他使用者有較高版本的資料時重置只依本人的資料提高下限」
+
 #### Scenario: 版本下限：重置在同一個 batch 內提高下限並刪除四張表
 
 - **WHEN** 以記錄 `batch()` 呼叫的 D1 替身注入 env，呼叫 `POST /api/matchmaker/reset`

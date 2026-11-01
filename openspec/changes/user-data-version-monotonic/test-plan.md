@@ -26,6 +26,7 @@
 | 送出比分刪除的分槽在重置後重新匯入時版本大於刪除前 | 版本下限：送出比分刪除的分槽在重置後重新匯入 | 匯入（參賽者、pending `m1` 回合、`m1` 分槽）→ 分槽更新到 v5 → 送出 `m1` 比分 → reset → 再匯入同一份 → `m1` 分槽 version 6 | `submitScoreForUser` 刪除路徑；§3 完成（重置會提高下限）後仍只會得到 3（重置當下其餘列最大為 2）→ §4 時真紅 | integration |
 | 沒有任何資料時重置仍回 204 且之後建立的版本為 1 | 版本下限：沒有任何資料時重置不失敗 | 新使用者 reset 204 → 回合與參賽者 `PUT 0` 皆得 1；`sync_version_floors` 無該使用者的列 | 空集合的 `max()` 為 NULL 會讓重置 500，寫入 0 列又會在熱路徑多一次寫入；**現況已綠 → regression guard**（守住 GREEN 後的 `WHERE v IS NOT NULL`） | integration |
 | 一位使用者的重置不影響其他使用者的建立版本 | 版本下限：一位使用者的下限不影響他人 | A 回合 v3 → A reset → B 回合與參賽者 `PUT 0` 皆得 1；`sync_version_floors` 無 B 的列 | 下限查詢漏 `user_id` 時轉紅；空集合時誤寫 0 列（`putRound` 每次都提高下限）時於 §4 轉紅；**現況已綠 → regression guard**，MUST 在 §3、§4 每個 GREEN 後保持綠 | integration |
+| 其他使用者有較高版本的資料時重置只依本人的資料提高下限 | 版本下限：重置只依本人的資料提高下限 | B：p1 v5、回合 v6、`m1` 分槽 v7；A：p1 v2、回合與 `m1` 分槽 v1 → A reset 204 → A 下限 2；A 回合、p1、`m1` 分槽 `PUT 0` 皆得 3；B 三表仍為 5／6／7、無 B 的下限列 | 重置三表選取各自的 `user_id` 條件原本只被同檔前面 it 留下的資料間接擋住，與 it 順序綁在一起；本列讓三表的選取各自獨立被驗證（單獨拿掉任一表的 `user_id` 即轉紅）。§3 實作後補入，**寫入即綠 → regression guard** | integration |
 | （既有）刪除參賽者回 204 且重複刪除仍回 204 | 版本下限：刪除參賽者後以同 id 重建（空集合的邊界） | 重複刪除與刪除不存在的 id 仍 204 | `deletePlayer` 改為提高下限後，選不到列時 `max()` 為 NULL；漏掉空集合處理會 500。regression guard | integration |
 | （既有，斷言調整）重置以單一 D1 batch 送出四條刪除 | 版本下限：重置在同一個 batch 內提高下限並刪除四張表 | spy D1：reset 回 204；`batchSizes` 由 `[4]` 改為 `[5]` | 提高下限與四條刪除同批；斷言於 §3 GREEN 同步修改（proposal Impact 允許例外 ①），改後即綠 | integration |
 
