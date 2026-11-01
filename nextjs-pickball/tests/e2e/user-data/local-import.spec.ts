@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
+import { MAX_PLAYERS_PER_IMPORT } from "@pickball/core/api/players";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
@@ -31,6 +32,7 @@ const LEGACY_JSON_RESTORE_DISABLED_TEXT =
 const EMPTY_TEXT = "本機沒有可匯入的資料";
 const OVERSIZE_TEXT = "本機資料量超過單次匯入上限，請先匯出 JSON 備份後聯絡管理者";
 const CONFLICT_TEXT = "雲端已有對戰分配機資料，無法匯入。若要以本機資料取代，請先在參賽者頁重置名單。";
+const TOO_LARGE_TEXT = "資料量超過單次匯入上限，本次沒有匯入任何資料。請聯絡管理者協助匯入。";
 const FAILED_TEXT = "匯入失敗，請稍後再試";
 const SKIPPED_TEXT = "雲端已有進行中的獨立計分板，未匯入該場";
 const HINT_TEXT = "只有在雲端沒有任何對戰分配機資料時才能匯入；匯入後本機資料會保留";
@@ -220,6 +222,35 @@ test.describe("本機資料匯入雲端", () => {
 			(player) => player.name,
 		);
 		expect(localNames).toEqual(["不同的訪客"]);
+	});
+
+	test("登入時以超過 500 位參賽者的 JSON 備份匯入雲端時顯示資料量超過上限且雲端不寫入", async ({ page }) => {
+		// 檔案大小遠小於 body 上限，413 來自參賽者筆數
+		const players = Array.from({ length: MAX_PLAYERS_PER_IMPORT + 1 }, (_, index) =>
+			buildPlayer(`op${index}`, `過量${index}`),
+		);
+		const oversizedBackup = {
+			name: "matchmaker-backup-oversize.json",
+			mimeType: "application/json",
+			buffer: Buffer.from(JSON.stringify({ version: 1, players, currentRound: null, history: [] }), "utf-8"),
+		};
+
+		await page.goto(DATA_PAGE);
+		// 雲端分支才有的說明，作為「session 已就緒、已切到雲端分支」的同步點
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
+		const before = await readLocalKeys(page);
+		await markNoReload(page);
+
+		await page.getByTestId("json-backup-cloud-import-input").setInputFiles(oversizedBackup);
+
+		await expect(page.getByRole("alert").filter({ hasText: TOO_LARGE_TEXT })).toBeVisible();
+		await expectNotReloaded(page);
+		expect(await readLocalKeys(page)).toEqual(before);
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByText("目前還沒有參賽者")).toBeVisible();
+		await expect(page.getByText("過量0", { exact: true })).toHaveCount(0);
 	});
 
 	test("登入後匯入本機資料到空的雲端並保留本機資料", async ({ page }) => {
