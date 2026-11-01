@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MAX_PLAYERS_PER_IMPORT } from "@pickball/core/api/players";
 import type { Player } from "@pickball/core/matchmaker/types";
 import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
@@ -195,6 +196,37 @@ describe("remote-transfer", () => {
 			expect(result).toEqual({ ok: false, message });
 			expect(fetchMock).toHaveBeenCalledTimes(2);
 		}
+	});
+
+	it("雲端 CSV 匯入遇到 413 時回傳超過上限的訊息且不視為成功", async () => {
+		const preview = parseOk(CSV_THREE_ROWS);
+		const fetchMock = vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+			if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+			return new Response(JSON.stringify({ error: "PAYLOAD_TOO_LARGE" }), { status: 413 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const result = await importRemoteRoster("user-a", preview, CONTEXT);
+
+		expect(result).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.importTooLarge });
+		// 不是未授權：呼叫端不得因此刷新 session
+		expect((result as { unauthorized?: true }).unauthorized).toBeUndefined();
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		// 只有 413 是資料過大：高於 413 的其他 4xx 仍為 importFailed，且不帶未授權標示
+		for (const status of [422, 429]) {
+			const otherFetch = vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+				if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+				return new Response("x", { status });
+			});
+			vi.stubGlobal("fetch", otherFetch);
+			const other = await importRemoteRoster("user-a", preview, CONTEXT);
+			expect(other, `狀態碼 ${status}`).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.importFailed });
+			expect((other as { unauthorized?: true }).unauthorized, `狀態碼 ${status}`).toBeUndefined();
+		}
+		// 固定文案：人數取自核心常數，其餘文字與規格逐字相同
+		expect(REMOTE_TRANSFER_MESSAGES.importTooLarge).toBe(
+			`匯入的資料量超過單次上限（一次最多 ${MAX_PLAYERS_PER_IMPORT} 位參賽者），本次沒有匯入任何資料。請將 CSV 分成較小的檔案後再匯入。`,
+		);
 	});
 
 	it("雲端 CSV 匯入遇到登入失效時回傳登入失效訊息", async () => {

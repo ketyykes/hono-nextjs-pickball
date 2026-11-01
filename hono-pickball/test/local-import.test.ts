@@ -1,13 +1,22 @@
 import { env, exports } from "cloudflare:workers";
 import { API_ERROR_CODES } from "@pickball/core/api/errors";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
-import type { LocalImportRequest, LocalImportResponse } from "@pickball/core/api/import";
+import {
+	IMPORT_BODY_LIMIT_BYTES,
+	IMPORT_SEGMENT_LIMIT_BYTES,
+	type LocalImportRequest,
+	LocalImportRequestSchema,
+	type LocalImportResponse,
+	serializeImportSegments,
+	utf8ByteLength,
+} from "@pickball/core/api/import";
+import { MAX_PLAYERS_PER_IMPORT } from "@pickball/core/api/players";
 import { USER_DATA_TABLES } from "@pickball/core/api/user-data-tables";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getDb } from "../src/db/client";
 import { matchmakerPlayers, scoreboardCurrent } from "../src/db/schema";
 import app from "../src/index";
@@ -25,7 +34,7 @@ import {
 	seedRound,
 	seedSlot,
 } from "./helpers/matchmaker-fixtures";
-import { userIdOf } from "./helpers/session";
+import { expectedUserHeader, userIdOf } from "./helpers/session";
 
 const NOW = new Date(1_700_000_000_000);
 const IMPORT_URL = `${origin}/api/import`;
@@ -412,7 +421,7 @@ describe("POST /api/import 本機資料匯入", () => {
 		// 2000 筆 playedAt 相同，rowid 順序即插入順序；bulk-h-10 的字串序在 bulk-h-2 之前，能分辨排序依據
 		expect(historyRows.map((row) => row.match_id)).toEqual(history.map((entry) => entry.matchId));
 
-		// 單一段落的 JSON 參數超過 D1 的 2MB 上限時整批回滾回 500，不可被誤分類成 409，也不可留下部分寫入
+		// 單一段落的 JSON 參數超過 D1 單一字串上限 2,000,000 位元組時，在送出 batch 之前就回 413，且不留下任何寫入
 		const oversizedCookie = await seedAndSignIn("import-oversize@example.com");
 		const oversizedId = await userIdOf("import-oversize@example.com");
 		const oversizedHistory = ["a", "b", "c"].map((suffix) => {
@@ -429,8 +438,252 @@ describe("POST /api/import 本機資料匯入", () => {
 				scoreboard: { current: null, matches: [] },
 			}),
 		);
-		expect(oversized.status).toBe(500);
+		expect(oversized.status).toBe(413);
+		expect(await oversized.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
 		await expectNoRows([oversizedId]);
+	});
+
+	/** 歷史段（單筆歷史）經 serializeImportSegments 後恰為 targetBytes 位元組的合法請求。 */
+	function payloadWithHistorySegmentBytes(matchId: string, targetBytes: number): LocalImportRequest {
+		const entry = makeHistoryEntry(matchId);
+		const build = (padding: number): LocalImportRequest => {
+			const copy = structuredClone(entry);
+			copy.teamA.players[0].name = "x".repeat(padding);
+			return makePayload({
+				players: [],
+				currentRound: null,
+				history: [copy],
+				scoreboard: { current: null, matches: [] },
+			});
+		};
+		const baseBytes = utf8ByteLength(serializeImportSegments(build(0)).history);
+		return build(targetBytes - baseBytes);
+	}
+
+	/** 參賽者段（單一位參賽者）經 serializeImportSegments 後恰為 targetBytes 位元組的合法請求。 */
+	function payloadWithPlayersSegmentBytes(playerId: string, targetBytes: number): LocalImportRequest {
+		const build = (padding: number): LocalImportRequest =>
+			makePayload({
+				players: [makePlayer(playerId, { name: "x".repeat(padding) })],
+				currentRound: null,
+				history: [],
+				scoreboard: { current: null, matches: [] },
+			});
+		const baseBytes = utf8ByteLength(serializeImportSegments(build(0)).players);
+		return build(targetBytes - baseBytes);
+	}
+
+	it("單段 JSON 參數恰為上限時匯入成功，超過一位元組時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入", async () => {
+		const okCookie = await seedAndSignIn("import-seg-ok@example.com");
+		const okId = await userIdOf("import-seg-ok@example.com");
+		const okPayload = payloadWithHistorySegmentBytes("seg-ok", IMPORT_SEGMENT_LIMIT_BYTES);
+		expect(utf8ByteLength(serializeImportSegments(okPayload).history)).toBe(IMPORT_SEGMENT_LIMIT_BYTES);
+		const ok = await importOk(okCookie, okPayload);
+		expect(ok.imported.history).toBe(1);
+		expect(await rowsOf("matchmaker_history", okId)).toHaveLength(1);
+
+		const historyCookie = await seedAndSignIn("import-seg-history@example.com");
+		const historyId = await userIdOf("import-seg-history@example.com");
+		const historyOver = payloadWithHistorySegmentBytes("seg-over", IMPORT_SEGMENT_LIMIT_BYTES + 1);
+		expect(utf8ByteLength(serializeImportSegments(historyOver).history)).toBe(IMPORT_SEGMENT_LIMIT_BYTES + 1);
+		const historyRes = await postImport(historyCookie, historyOver);
+		expect(historyRes.status).toBe(413);
+		expect(await historyRes.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([historyId]);
+
+		const playersCookie = await seedAndSignIn("import-seg-players@example.com");
+		const playersId = await userIdOf("import-seg-players@example.com");
+		const playersOver = payloadWithPlayersSegmentBytes("seg-p", IMPORT_SEGMENT_LIMIT_BYTES + 1);
+		expect(utf8ByteLength(serializeImportSegments(playersOver).players)).toBe(IMPORT_SEGMENT_LIMIT_BYTES + 1);
+		const playersRes = await postImport(playersCookie, playersOver);
+		expect(playersRes.status).toBe(413);
+		expect(await playersRes.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([playersId]);
+	});
+
+	function playersOnlyPayload(count: number): LocalImportRequest {
+		return makePayload({
+			players: Array.from({ length: count }, (_, index) => makePlayer(`cap-p-${index}`)),
+			currentRound: null,
+			history: [],
+			scoreboard: { current: null, matches: [] },
+		});
+	}
+
+	it("參賽者恰為 500 位時匯入成功，501 位時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入", async () => {
+		const okCookie = await seedAndSignIn("import-cap-ok@example.com");
+		const okId = await userIdOf("import-cap-ok@example.com");
+		const ok = await importOk(okCookie, playersOnlyPayload(MAX_PLAYERS_PER_IMPORT));
+		expect(ok.imported.players).toBe(MAX_PLAYERS_PER_IMPORT);
+		expect(await rowsOf("matchmaker_players", okId)).toHaveLength(MAX_PLAYERS_PER_IMPORT);
+
+		const overCookie = await seedAndSignIn("import-cap-over@example.com");
+		const overId = await userIdOf("import-cap-over@example.com");
+		const over = await postImport(overCookie, playersOnlyPayload(MAX_PLAYERS_PER_IMPORT + 1));
+		expect(over.status).toBe(413);
+		expect(await over.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([overId]);
+	});
+
+	it("請求 body 超過匯入上限時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入", async () => {
+		const cookie = await seedAndSignIn("import-body-over@example.com");
+		const userId = await userIdOf("import-body-over@example.com");
+		// 未知欄位會在 schema 驗證時被剝除，所以只有 validator 之前的 body 上限能擋下
+		const build = (padding: number): string => JSON.stringify({ ...makePayload(), padding: "x".repeat(padding) });
+		// 只多一位元組：上限的另一側由「恰為匯入上限時照常處理」固定
+		const body = build(IMPORT_BODY_LIMIT_BYTES + 1 - utf8ByteLength(build(0)));
+		expect(utf8ByteLength(body)).toBe(IMPORT_BODY_LIMIT_BYTES + 1);
+
+		const res = await postImport(cookie, JSON.parse(body));
+
+		expect(res.status).toBe(413);
+		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([userId]);
+	});
+
+	// regression guard：恰等於 body 上限時照常處理（邊界的另一側）
+	it("請求 body 恰為匯入上限時照常處理", async () => {
+		const cookie = await seedAndSignIn("import-body-exact@example.com");
+		const build = (padding: number): string => JSON.stringify({ ...makePayload(), padding: "x".repeat(padding) });
+		const baseBytes = utf8ByteLength(build(0));
+		const body = build(IMPORT_BODY_LIMIT_BYTES - baseBytes);
+		// 先確認組出的 body 恰為上限，再送出；避免測試本身算錯而失去邊界意義
+		expect(utf8ByteLength(body)).toBe(IMPORT_BODY_LIMIT_BYTES);
+
+		const res = await postImport(cookie, JSON.parse(body));
+
+		expect(res.status).toBe(200);
+	});
+
+	// regression guard：body 上限掛在 validator 之前，schema 不合法但 body 過大時回 413 而非 400
+	it("匯入的 body 超過上限且內容不合 schema 時回 413 而非 400", async () => {
+		const cookie = await seedAndSignIn("import-body-order-validator@example.com");
+		const userId = await userIdOf("import-body-order-validator@example.com");
+
+		const res = await postImport(cookie, { padding: "x".repeat(IMPORT_BODY_LIMIT_BYTES) });
+
+		expect(res.status).toBe(413);
+		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		await expectNoRows([userId]);
+	});
+
+	// regression guard：body 上限掛在 sub-app 守衛之後，未登入與帳號不符的回應仍優先於 413
+	it("匯入的 body 超過上限時，未登入仍回 401、帳號不符仍回 401 ACCOUNT_MISMATCH", async () => {
+		const cookie = await seedAndSignIn("import-body-order@example.com");
+		const oversized = JSON.stringify({ ...makePayload(), padding: "x".repeat(IMPORT_BODY_LIMIT_BYTES) });
+
+		const anonymous = await postImportWithHeaders({}, oversized);
+		const mismatch = await postImportWithHeaders({ Cookie: cookie, [EXPECTED_USER_ID_HEADER]: "someone-else" }, oversized);
+
+		expect(anonymous.status).toBe(401);
+		expect(await anonymous.json()).toEqual({ error: API_ERROR_CODES.UNAUTHORIZED });
+		expect(mismatch.status).toBe(401);
+		expect(await mismatch.json()).toEqual({ error: API_ERROR_CODES.ACCOUNT_MISMATCH });
+	});
+
+	/** batch 被呼叫即計數並拋錯的替身；prepare 照常委派給真實 D1，所以 session 驗證可通過。 */
+	function batchCountingDb(error: Error): { db: D1Database; batchCalls: { count: number } } {
+		const batchCalls = { count: 0 };
+		const db = {
+			prepare: (query: string) => env.DB?.prepare(query),
+			batch: () => {
+				batchCalls.count += 1;
+				throw error;
+			},
+		} as unknown as D1Database;
+		return { db, batchCalls };
+	}
+
+	async function postImportWithDb(cookie: string, body: unknown, db: D1Database): Promise<Response> {
+		return app.request(
+			"/api/import",
+			{
+				method: "POST",
+				headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json", ...expectedUserHeader(cookie) },
+				body: JSON.stringify(body),
+			},
+			{ ...env, DB: db },
+		);
+	}
+
+	// regression guard：前端與後端必須量測並送出同一份形狀，repository 不得自行另組 JSON
+	it("送進 json_each 的五個參數就是 serializeImportSegments 的輸出", async () => {
+		const cookie = await seedAndSignIn("import-segments@example.com");
+		const payload = makePayload();
+		const boundStrings: string[] = [];
+		// 記錄每條陳述式 bind 的字串參數，其餘行為委派給真實 D1
+		const recordingDb = {
+			prepare: (query: string) => {
+				const statement = env.DB?.prepare(query);
+				if (!statement) {
+					throw new Error("缺少 DB binding");
+				}
+				return new Proxy(statement, {
+					get(target, property) {
+						if (property === "bind") {
+							return (...args: unknown[]) => {
+								for (const arg of args) {
+									if (typeof arg === "string") {
+										boundStrings.push(arg);
+									}
+								}
+								return target.bind(...args);
+							};
+						}
+						const value = Reflect.get(target, property, target);
+						return typeof value === "function" ? value.bind(target) : value;
+					},
+				});
+			},
+			batch: (statements: D1PreparedStatement[]) => env.DB?.batch(statements),
+		} as unknown as D1Database;
+
+		const res = await postImportWithDb(cookie, payload, recordingDb);
+
+		expect(res.status).toBe(200);
+		// 後端序列化的是 schema 解析後的物件（key 順序以 schema 為準），所以以同一份解析結果計算期望值
+		const segments = serializeImportSegments(LocalImportRequestSchema.parse(payload));
+		for (const segment of [segments.players, segments.round, segments.slots, segments.history, segments.current]) {
+			expect(boundStrings).toContain(segment);
+		}
+	});
+
+	it("超過上限的匯入不呼叫 D1 batch", async () => {
+		const cookie = await seedAndSignIn("import-nobatch@example.com");
+		const { db, batchCalls } = batchCountingDb(new Error("D1 暫時不可用（測試替身）"));
+
+		const res = await postImportWithDb(cookie, playersOnlyPayload(MAX_PLAYERS_PER_IMPORT + 1), db);
+
+		expect(res.status).toBe(413);
+		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		expect(batchCalls.count).toBe(0);
+	});
+
+	// regression guard：現行 catch 已照常拋出非守衛錯誤
+	it("batch 拋出非守衛錯誤時匯入回 500 而非 409", async () => {
+		const cookie = await seedAndSignIn("import-batcherr@example.com");
+		const { db, batchCalls } = batchCountingDb(new Error("D1 暫時不可用（測試替身）"));
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const res = await postImportWithDb(cookie, makePayload(), db);
+
+			expect(res.status).toBe(500);
+			expect(batchCalls.count).toBe(1);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	// regression guard：核心 schema 已收緊 id，寫入時預期先綠
+	it("參賽者 id 為空字串的匯入請求回 400 且不寫入", async () => {
+		const cookie = await seedAndSignIn("import-emptyid@example.com");
+		const userId = await userIdOf("import-emptyid@example.com");
+
+		const res = await postImport(cookie, makePayload({ players: [makePlayer("p-ok"), makePlayer("")] }));
+
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: API_ERROR_CODES.INVALID_BODY });
+		await expectNoRows([userId]);
 	});
 
 	it("預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入", async () => {

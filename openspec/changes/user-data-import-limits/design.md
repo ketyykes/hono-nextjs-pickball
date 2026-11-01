@@ -200,3 +200,23 @@ schema 驗證仍由 route 的 `zValidator` 先做（位元組上限只對合法�
    archive 順序由 coordinator 決定；後 archive 者 MUST 在 tasks 1.2 以主 spec 為底重套 delta，本 change 若在後，特別重套「大小與筆數上限」「陳述式上限」兩段與 Scenario「大量資料以常數個陳述式匯入」；程式碼層兩邊對 `importLocalData` 的修改需手動合併（本 change 只動參數來源與 batch 前的判定，不動 SELECT 欄位）。
 7. **量測成本的優化**（目前不做）：`checkImportLimits` 可對每段先以字串長度短路——UTF-16 長度 > 上限必然超過；長度 × 3 ≤ 上限必然未超過（每個 UTF-16 單位至多 3 位元組）——只有介於兩者之間才逐字元計算；前端亦可把 `oversize` 改為只在資料頁計算。
    不做的理由：多出的分支增加邊界測試與變異面，而目前沒有實測顯示成本有問題。
+8. **apply §1 對齊與查證結果（2026-11-01，已結案，不需裁定）**：
+   - 對齊：本 change 五個 MODIFIED Requirement 與主 spec 逐行比對，差異全為本 change 的增修；`openspec/specs/{user-data-sync,data-transfer,player-roster}` 自 propose（`630bbd2`）後無任何 commit，`user-data-version-monotonic` 尚未 archive，故不需重套 delta。
+     `local-import-repository.ts`、`players-repository.ts`、`routes/{import,matchmaker}.ts`、核心 `api/{errors,players,import}.ts`、前端 `lib/sync/local-import.ts` 自 propose 後亦無 commit，現況與 Context 相符（`site-navbar-account-entry`、`history-filter-retention` 未觸及上述檔案）。
+   - 查證（Context7 `/websites/hono_dev`、`/llmstxt/developers_cloudflare_d1_llms-full_txt`，Cloudflare 文件搜尋，已安裝 `hono@4.12.25` 原始碼）：與「查證紀錄」一致——D1 單一字串 2,000,000 B、每條陳述式 100 個參數、batch 內每條陳述式各自受單一 query 限制、`db.batch()` 對「每次 Worker 呼叫的 query 數」只計一次；
+     `bodyLimit` 預設 `onError` 拋 `HTTPException(413)`、有 `Content-Length` 且無 `Transfer-Encoding` 時只比對標頭，否則讀串流計數並在未超過時以讀到的 chunk 重建 request。
+     唯一補充：Workers 文件現寫明「進入 Worker 的 request body 上限取決於網域的 Cloudflare 方案（Free／Pro 100 MB），而非 Workers 方案」，對本 change 的 10,000,000 B 上限無影響。
+   - 1.3 一次性實測（workerd 單檔測試，未 commit）：
+     ① 10,000,001 B 的 body 在 workerd 測試環境可正常處理（`app.request` 經 `bodyLimit` 回 413 約 15～20 ms；`exports.default.fetch` 送到現行 `/api/import` 約 13 ms）。
+        **以字串 body 建立的 `new Request` 在 workerd 內不帶 `Content-Length` 標頭**，`bodyLimit` 因此走串流計數分支；手動指定 `Content-Length` 標頭時會保留並走標頭分支。
+        → 3.1「有 `Content-Length`」的案例 MUST 在測試內明確設定該標頭，否則兩個案例實際上都在測串流分支。
+     ② 未超過上限且不帶 `Content-Length` 的串流 body（分兩個 chunk）：`bodyLimit` 重建 request 後下游 `zValidator` 照常讀到 body（200）。
+     ③ 耗時：body 約 1.9MB 的匯入請求單一 it 約 200～300 ms；10MB 請求約 15～140 ms（含登入）。預設 5 秒 timeout 足夠，3.3／3.5 不需加 timeout 參數。
+     另觀察：歷史段包裝後約 2.35MB 的請求在本機 miniflare 回 500，與 Context「約 2.1～2.2MB 以上本機才失敗」一致。
+9. **apply Final Code Review 結論（2026-11-01，APPROVED，無必修）**：以下為審查中留下、未在本 change 處理的事項。
+   ① **test-plan 措辭更正**：test-plan 對 it「請求 body 超過匯入上限時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」寫的「證明 body 上限在 validator 之前」不成立——經 `exports.default.fetch` 的請求帶 `Content-Length`，`bodyLimit` 走標頭分支，掛到 validator 之後仍回 413。順序實際由 regression guard it「匯入的 body 超過上限且內容不合 schema 時回 413 而非 400」鎖定（Stage 2 以變異證實）。test-plan 是 RED 承諾書，不回改，更正記於此。
+   ② **Open Questions 8 第 ① 點的適用範圍**：「字串 body 的 `new Request` 在 workerd 內不帶 `Content-Length`」只適用於 `app.request` 注入；經 `exports.default.fetch` 的請求帶 `Content-Length`（Stage 2 以探針實測）。兩端點的路由層 413 測試因此都走標頭分支，串流分支由 `test/body-limit.test.ts` 的單元測試覆蓋。
+   ③ **「2MB」用語殘留**：`hono-pickball/CLAUDE.md` 已改為「D1 單一字串上限為 2,000,000 位元組」，但 delta spec `user-data-sync`（「超過 D1 單一字串上限 2MB」，archive 時會進入主 spec）、`hono-pickball/test/local-import.test.ts` 的一處註解與本 design 多處仍寫「2MB」。數值結論無誤，僅用語不一致；建議 archive 時一併統一，不需另開 change。
+   ④ **E2E skip 基線未記錄**：environment.md 只記錄 `--list` 總數（各 browser project 147），未記錄 skip 數，tasks 6.2 的「skip 為基線既有」無法由 artifact 機械複驗（passed＋skipped 皆為 147，結果自洽；數字與 coordinator 提供的 main 基線一致）。建議日後的 change 於 §1 基線一併記錄 skip 數。
+   ⑤ **與 `user-data-version-monotonic` 的重疊仍有效**：該 change 尚未 archive，Open Questions 6 的重套 delta 與手動合併 `local-import-repository.ts` 的義務不變；依 coordinator 裁定由該 change 在本 change archive 後重新對齊。
+   未採納（判定為可忽略）：前端未建構 round／current 段超過上限的本機資料（核心 `import-limits.test.ts` 已逐段覆蓋，前端只委派 `checkImportLimits`）；E2E 補「成功訊息不存在」的斷言（元件程式碼上成功與錯誤訊息互斥，且參賽者頁空名單已驗證未寫入）；`ImportLimitCheck` 失敗時不回報超過的段（前後端都只需布林結果）。

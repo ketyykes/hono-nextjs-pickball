@@ -80,4 +80,19 @@ describe("describeImportOutcome", () => {
 			text: LOCAL_IMPORT_MESSAGES.failed,
 		});
 	});
+
+	it("資料過大的匯入結果對應到超過上限的錯誤文案", () => {
+		expect(describeImportOutcome({ kind: "too-large" })).toEqual({
+			tone: "error",
+			text: LOCAL_IMPORT_MESSAGES.tooLarge,
+		});
+		// 固定文案：使用者看到的是這一句，不只是與常數相等
+		expect(LOCAL_IMPORT_MESSAGES.tooLarge).toBe(
+			"資料量超過單次匯入上限，本次沒有匯入任何資料。請聯絡管理者協助匯入。",
+		);
+		// 與其他錯誤文案不同，使用者才看得出是資料量問題
+		expect(LOCAL_IMPORT_MESSAGES.tooLarge).not.toBe(LOCAL_IMPORT_MESSAGES.failed);
+		expect(LOCAL_IMPORT_MESSAGES.tooLarge).not.toBe(LOCAL_IMPORT_MESSAGES.cloudNotEmpty);
+		expect(LOCAL_IMPORT_MESSAGES.tooLarge).not.toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
+	});
 });

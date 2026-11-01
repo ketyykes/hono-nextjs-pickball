@@ -55,6 +55,21 @@ describe("storage", () => {
 		expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 
+	// regression guard（加入即綠）：PlayerSchema 不變，訪客本機名單的空字串 id 不得被降級捨棄
+	it("id 為空字串的參賽者照常讀回且不被捨棄", () => {
+		const raw = JSON.stringify({
+			version: 1,
+			players: [makePlayer({ id: "" }), makePlayer({ id: "p2" })],
+		});
+		localStorage.setItem(STORAGE_KEY, raw);
+
+		const result = readRoster();
+
+		expect(result.players.map((player) => player.id)).toEqual(["", "p2"]);
+		expect(result.droppedCount).toBe(0);
+		expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
+	});
+
 	it("單筆不合法時保留其餘 2 筆並回報 droppedCount 為 1", () => {
 		const roster = {
 			version: 1,

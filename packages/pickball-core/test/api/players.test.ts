@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { LocalImportRequestSchema } from "../../src/api/import";
 import {
   PlayerImportRequestSchema,
   PlayerListResponseSchema,
+  PlayerWriteSchema,
 } from "../../src/api/players";
+import { PlayerSchema } from "../../src/matchmaker/types";
 
 /** 產生符合 PlayerSchema 的測試資料。 */
 function makePlayer(id: string, overrides: Record<string, unknown> = {}) {
@@ -67,5 +70,40 @@ describe("名單 API 契約", () => {
     expect(
       PlayerListResponseSchema.safeParse({ items: [{ data: makePlayer("a"), version: 0 }] }).success,
     ).toBe(false);
+  });
+
+  it("PlayerWriteSchema 拒絕空字串 id 而 PlayerSchema 照舊接受", () => {
+    const emptyId = makePlayer("");
+    // 訪客本機名單仍可能含空字串 id，PlayerSchema 不可收緊
+    expect(PlayerSchema.safeParse(emptyId).success).toBe(true);
+    expect(PlayerWriteSchema.safeParse(emptyId).success).toBe(false);
+    expect(PlayerImportRequestSchema.safeParse({ players: [emptyId] }).success).toBe(false);
+    expect(
+      LocalImportRequestSchema.safeParse({
+        version: 1,
+        players: [emptyId],
+        currentRound: null,
+        history: [],
+        scoreboard: { current: null, matches: [] },
+      }).success,
+    ).toBe(false);
+
+    // 同一筆資料 id 合法時，兩個 schema 的輸出相同
+    const valid = makePlayer("p1");
+    const writeResult = PlayerWriteSchema.safeParse(valid);
+    const baseResult = PlayerSchema.safeParse(valid);
+    expect(writeResult.success).toBe(true);
+    expect(baseResult.success).toBe(true);
+    expect(writeResult.data).toEqual(baseResult.data);
+    // 合法 id 的請求仍須通過，避免 schema 被改成一律拒絕
+    expect(
+      LocalImportRequestSchema.safeParse({
+        version: 1,
+        players: [valid],
+        currentRound: null,
+        history: [],
+        scoreboard: { current: null, matches: [] },
+      }).success,
+    ).toBe(true);
   });
 });

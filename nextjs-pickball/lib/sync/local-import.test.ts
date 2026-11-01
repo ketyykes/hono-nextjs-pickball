@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
-import { LocalImportRequestSchema } from "@pickball/core/api/import";
+import {
+	IMPORT_SEGMENT_LIMIT_BYTES,
+	LocalImportRequestSchema,
+	checkImportLimits,
+	serializeImportSegments,
+	utf8ByteLength,
+} from "@pickball/core/api/import";
+import { MAX_PLAYERS_PER_IMPORT } from "@pickball/core/api/players";
 import type { LocalImportRequest } from "@pickball/core/api/import";
 import { createInitialState, scoreboardReducer } from "@pickball/core/scoreboard/reducer";
 import { BackupSchema } from "@pickball/core/matchmaker/transfer-types";
@@ -25,7 +32,7 @@ const ALL_KEYS = [
 	SCOREBOARD_CURRENT_KEY,
 ] as const;
 
-const LIMIT_BYTES = 1_900_000;
+const LIMIT_BYTES = IMPORT_SEGMENT_LIMIT_BYTES;
 
 function makePlayer(overrides: Partial<Player> = {}): Player {
 	return {
@@ -531,9 +538,7 @@ describe("local-import", () => {
 		};
 		const measureSegment = (segment: Segment): number => {
 			const { payload } = buildLocalImportPayload();
-			if (segment === "players") return utf8Length(payload.players);
-			if (segment === "history") return utf8Length(payload.history);
-			return utf8Length(payload.scoreboard.matches);
+			return utf8ByteLength(serializeImportSegments(payload)[segment]);
 		};
 		for (const segment of Object.keys(segmentSeeds) as Segment[]) {
 			localStorage.clear();
@@ -595,6 +600,79 @@ describe("local-import", () => {
 		expect(inactiveOversize.payload.players).toHaveLength(2);
 		expect(inactiveOversize.oversize).toBe(true);
 		expect(snapshotKeys()).toEqual(beforeInactive);
+	});
+
+	it("oversize 以後端 json_each 參數的形狀判定，與後端對同一份請求的判定一致", () => {
+		// 原始歷史陣列不超過上限，但後端參數每筆另含 matchId 與 playedAt，包裝後超過
+		const idOf = (index: number) => `h${String(index).padStart(6, "0")}`;
+		const entryBytes = utf8Length(makeHistoryEntry(idOf(0)));
+		const count = Math.floor((LIMIT_BYTES - 1) / (entryBytes + 1));
+		seedHistory(Array.from({ length: count }, (_, index) => makeHistoryEntry(idOf(index))));
+		const wrapped = buildLocalImportPayload();
+		const rawBytes = utf8Length(wrapped.payload.history);
+		const wrappedBytes = utf8ByteLength(serializeImportSegments(wrapped.payload).history);
+		expect(rawBytes).toBeLessThanOrEqual(LIMIT_BYTES);
+		expect(wrappedBytes).toBeGreaterThan(LIMIT_BYTES);
+		expect(wrapped.oversize).toBe(true);
+
+		// 歷史段恰為上限與多一位元組：前端判定等於後端在 validator 之後的判定
+		const historySegmentBytes = (pad: string): number => {
+			localStorage.clear();
+			seedHistory([makeHistoryEntry("h1", 11, pad)]);
+			return utf8ByteLength(serializeImportSegments(buildLocalImportPayload().payload).history);
+		};
+		const baseBytes = historySegmentBytes("x");
+		for (const [extra, expected] of [
+			[1, false],
+			[2, true],
+		] as const) {
+			const segmentBytes = historySegmentBytes("x".repeat(extra + LIMIT_BYTES - baseBytes));
+			expect(segmentBytes, `歷史段長度應為上限加 ${extra - 1}`).toBe(LIMIT_BYTES + extra - 1);
+			const result = buildLocalImportPayload();
+			const backendVerdict = !checkImportLimits(LocalImportRequestSchema.parse(result.payload)).ok;
+			expect(result.oversize, `歷史段為上限加 ${extra - 1} 位元組`).toBe(expected);
+			expect(result.oversize, `歷史段為上限加 ${extra - 1} 位元組時與後端判定一致`).toBe(backendVerdict);
+		}
+	});
+
+	it("本機參賽者超過 500 位時回報 oversize", () => {
+		const makePlayers = (count: number) =>
+			Array.from({ length: count }, (_, index) => makePlayer({ id: `p${index}`, name: `P${index}` }));
+
+		seedRoster(makePlayers(MAX_PLAYERS_PER_IMPORT));
+		const atLimit = buildLocalImportPayload();
+		expect(atLimit.payload.players).toHaveLength(MAX_PLAYERS_PER_IMPORT);
+		expect(atLimit.oversize).toBe(false);
+		expect(hasImportableLocalData()).toBe(true);
+
+		localStorage.clear();
+		seedRoster(makePlayers(MAX_PLAYERS_PER_IMPORT + 1));
+		const overLimit = buildLocalImportPayload();
+		expect(overLimit.payload.players).toHaveLength(MAX_PLAYERS_PER_IMPORT + 1);
+		expect(overLimit.oversize).toBe(true);
+		expect(hasImportableLocalData()).toBe(true);
+	});
+
+	it("importLocalData 在 413 時回報資料過大且不改動本機", async () => {
+		seedFullLocalData();
+		const { payload } = buildLocalImportPayload();
+		const before = snapshotKeys();
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+		const json = (status: number, body: unknown) =>
+			new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+		fetchMock.mockResolvedValueOnce(json(413, { error: "PAYLOAD_TOO_LARGE" }));
+		expect(await importLocalData("user-a", payload)).toEqual({ kind: "too-large" });
+
+		// 只有 413 是資料過大：低於與高於 413 的其他 4xx 都維持 failed
+		for (const status of [400, 422, 429]) {
+			fetchMock.mockResolvedValueOnce(json(status, { error: "REJECTED" }));
+			expect(await importLocalData("user-a", payload), `狀態碼 ${status}`).toEqual({ kind: "failed" });
+		}
+
+		expect(fetchMock).toHaveBeenCalledTimes(4);
+		expect(snapshotKeys()).toEqual(before);
 	});
 
 	it("importLocalData 依回應分類為已匯入、雲端已有資料、未授權或失敗且不改動本機", async () => {
