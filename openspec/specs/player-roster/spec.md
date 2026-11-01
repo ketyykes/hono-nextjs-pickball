@@ -684,17 +684,26 @@ MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名�
 ### Requirement: 參賽者雲端 API
 
 `hono-pickball/src/routes/matchmaker.ts` SHALL 以 `/api/matchmaker` sub-app 提供下列端點（`user-data-sync`「多筆使用者資料的逐筆版本化契約」的第一個實作），
-`data` 一律以核心套件的 `PlayerSchema` 驗證：
+`data` 一律以核心套件的 `PlayerSchema` 驗證，唯批次匯入的每一筆改以 `PlayerWriteSchema` 驗證（見下方「寫入雲端的參賽者 id」）：
 
 | 方法與路徑 | 行為 |
 |---|---|
 | `GET /api/matchmaker/players` | `200 { items }`，依 `sort_order` |
 | `PUT /api/matchmaker/players/:id` | 建立（`version: 0`）或依版本更新；path id ≠ `data.id` → 400 |
 | `DELETE /api/matchmaker/players/:id` | `204`，冪等 |
-| `POST /api/matchmaker/players/import` | `{ players }` 整份附加（D1 `batch()`）；任一 id 已存在 → 409 且不寫入 |
+| `POST /api/matchmaker/players/import` | `{ players }` 整份附加（D1 `batch()`）；任一 id 已存在 → 409 且不寫入；body 超過 `PLAYER_IMPORT_BODY_LIMIT_BYTES`（1,000,000 位元組）或超過 `MAX_PLAYERS_PER_IMPORT`（500）位 → `413 PAYLOAD_TOO_LARGE` 且不寫入 |
 | `POST /api/matchmaker/reset` | `204`，以 `batch()` 刪除本人的對戰分配機資料（本 change：`matchmaker_players`） |
 
 資料存取 SHALL 位於 `hono-pickball/src/matchmaker/players-repository.ts`。所有查詢 MUST 以 `user_id = c.var.user.id` 為條件。
+
+**批次匯入的上限**（`user-data-sync`「批次寫入端點的筆數與 body 上限」）：body 上限 middleware 掛在 validator 之前；筆數檢查在 schema 通過之後、讀取 `sort_order` 與 `db.batch()` 之前。
+恰 500 位 MUST 照常匯入。body 上限 1,000,000 位元組小於 D1 單一列上限 2,000,000 位元組，因此通過上限的請求中任一位參賽者的 `data` 都不會超過 D1 的列大小。
+D1 的「每次 Worker 呼叫的 query 數」把一次 `db.batch()` 計為一個 query（Context7 查證，見 design），逐筆一條陳述式的匯入不受 Free 方案 50 個 query 的限制；500 位的上限用於約束單次 batch 的執行時間與 Worker CPU，並涵蓋球聚名單的實際規模。
+
+**寫入雲端的參賽者 id**：`@pickball/core/api/players` SHALL 匯出 `PlayerWriteSchema = PlayerSchema.extend({ id: z.string().min(1) })`；`PlayerImportRequestSchema` 的每一筆與 `user-data-sync` 的 `LocalImportRequestSchema.players` MUST 以它驗證，
+`id` 為空字串時 MUST 回 `400 INVALID_BODY` 且不寫入。`PUT /api/matchmaker/players/:id` 不需另行收緊：path 的 `:id` 不可能為空字串（`/api/matchmaker/players/` 不符合該路由），而 `data.id` MUST 等於 path id。
+**`PlayerSchema` 本身 SHALL NOT 改變**：它同時用於訪客本機名單的逐筆降級（「LocalStorage 持久化與逐筆降級」）、本機 JSON 還原（`BackupSchema`）與雲端回應的解析；
+收緊它會讓訪客既有的 id 為空字串的參賽者在下次讀取時被捨棄並回寫清除，因此只在寫入雲端的邊界收緊。
 
 #### Scenario: auth 停用時所有端點回 404
 
@@ -795,3 +804,34 @@ MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名�
 - **WHEN** POST reset
 - **THEN** 回 204；GET 為空清單
 - **驗收**：`hono-pickball/test/matchmaker-players.test.ts`，it 名稱「重置刪除本人全部參賽者並回 204」
+
+#### Scenario: 名單匯入超過 500 位時回 413 且不寫入
+
+- **WHEN** 分別以不同使用者匯入恰 500 位與 501 位參賽者
+- **THEN** 前者回 200 且 GET 有 500 位；後者回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，GET 為空清單
+- **驗收**：`hono-pickball/test/matchmaker-players.test.ts`，it 名稱「匯入恰 500 位參賽者成功，501 位時回 413 PAYLOAD_TOO_LARGE 且不寫入」
+
+#### Scenario: 名單匯入的 body 超過上限時回 413 且不寫入
+
+- **WHEN** 匯入一位 `name` 長度使 body 超過 1,000,000 位元組的參賽者
+- **THEN** 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`；GET 為空清單
+- **驗收**：`hono-pickball/test/matchmaker-players.test.ts`，it 名稱「匯入請求 body 超過上限時回 413 PAYLOAD_TOO_LARGE 且不寫入」
+
+#### Scenario: 名單匯入的參賽者 id 為空字串時回 400
+
+- **WHEN** 匯入 `[p1, { ...p2, id: "" }]`
+- **THEN** 回 `400 { "error": "INVALID_BODY" }`；GET 為空清單
+- **驗收**：`hono-pickball/test/matchmaker-players.test.ts`，it 名稱「匯入含 id 為空字串的參賽者時回 400 且不寫入」
+
+#### Scenario: 寫入雲端的參賽者 schema 只在邊界收緊 id
+
+- **WHEN** 以 `PlayerSchema`、`PlayerWriteSchema`、`PlayerImportRequestSchema`、`LocalImportRequestSchema` 分別解析含 `id: ""` 的參賽者（其餘欄位合法），並以 `PlayerWriteSchema` 解析 `id: "p1"` 的同一筆
+- **THEN** `PlayerSchema` 通過；`PlayerWriteSchema`、`PlayerImportRequestSchema`、`LocalImportRequestSchema` 皆失敗；`id: "p1"` 時 `PlayerWriteSchema` 通過且輸出與 `PlayerSchema` 相同
+- **驗收**：`packages/pickball-core/test/api/players.test.ts`，it 名稱「PlayerWriteSchema 拒絕空字串 id 而 PlayerSchema 照舊接受」
+
+#### Scenario: 訪客本機名單照舊保留 id 為空字串的參賽者
+
+- **GIVEN** 本機 `matchmaker:roster:v1` 含一位 `id` 為 `""` 與一位 `id` 為 `"p2"` 的合法參賽者
+- **WHEN** 呼叫 `readRoster()`
+- **THEN** 回傳兩位、`droppedCount` 為 0，且 key 的內容未被回寫改變
+- **驗收**：`nextjs-pickball/lib/matchmaker/storage.test.ts`，it 名稱「id 為空字串的參賽者照常讀回且不被捨棄」

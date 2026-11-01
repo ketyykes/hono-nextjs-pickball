@@ -388,7 +388,7 @@ VALUES (?, CASE WHEN <全部前提成立> THEN 1 END, ?)
 守衛 MUST 位於 `localAuth` 與 `requireSession` 之後：auth 停用時仍回 404、未登入時仍回 `401 UNAUTHORIZED`、`getSession` 例外時仍回 500。
 缺標頭與不符共用同一個錯誤碼，SHALL NOT 另設 400 類錯誤碼。
 
-`@pickball/core/api/errors` 的 `API_ERROR_CODES` SHALL 恰含 `UNAUTHORIZED`、`VERSION_CONFLICT`、`INVALID_BODY`、`ACCOUNT_MISMATCH` 四個鍵（本 Requirement 補充「版本化讀寫契約」所列的錯誤碼清單）；
+`@pickball/core/api/errors` 的 `API_ERROR_CODES` SHALL 恰含 `UNAUTHORIZED`、`VERSION_CONFLICT`、`INVALID_BODY`、`ACCOUNT_MISMATCH`、`PAYLOAD_TOO_LARGE` 五個鍵（本 Requirement 補充「版本化讀寫契約」所列的錯誤碼清單；`PAYLOAD_TOO_LARGE` 的語意見「批次寫入端點的筆數與 body 上限」）；
 `@pickball/core/api/headers` SHALL 匯出 `EXPECTED_USER_ID_HEADER = "X-Expected-User-Id"`，前後端 MUST 使用同一個常數。
 
 守衛範圍 MUST 為「所有使用者資料路由」：`hono-pickball/src/index.ts` 的 app 中，除 `/api/health`、`/api/cookie-check`、`/api/auth/*`、`/api/me`、`/api/session` 之外的每一條路由。
@@ -440,8 +440,8 @@ VALUES (?, CASE WHEN <全部前提成立> THEN 1 END, ?)
 #### Scenario: 預期帳號守衛：錯誤碼常數含 ACCOUNT_MISMATCH
 
 - **WHEN** 匯入 `@pickball/core/api/errors` 的 `API_ERROR_CODES`
-- **THEN** 恰含 `UNAUTHORIZED`、`VERSION_CONFLICT`、`INVALID_BODY`、`ACCOUNT_MISMATCH` 四個鍵，且各鍵的值等於鍵名
-- **驗收**：`packages/pickball-core/test/api/errors.test.ts`，it 名稱「API_ERROR_CODES 恰為四個錯誤碼且值等於鍵名」
+- **THEN** 恰含 `UNAUTHORIZED`、`VERSION_CONFLICT`、`INVALID_BODY`、`ACCOUNT_MISMATCH`、`PAYLOAD_TOO_LARGE` 五個鍵，且各鍵的值等於鍵名
+- **驗收**：`packages/pickball-core/test/api/errors.test.ts`，it 名稱「API_ERROR_CODES 恰為五個錯誤碼且值等於鍵名」
 
 #### Scenario: 預期帳號守衛：標頭名稱常數
 
@@ -649,14 +649,24 @@ VALUES (?, CASE WHEN <全部前提成立> THEN 1 END, ?)
 
 ```
 LocalImportRequestSchema = BackupSchema.extend({
+  players: PlayerWriteSchema[],
   scoreboard: { current: ScoreboardState（matchId 為 null）| null, matches: ScoreboardState[]（matchId 皆非 null） }
 })
 ```
 
 `matches` 每一筆即一個場次分槽，分槽鍵為該筆的 `matchId`（與 B7 `matchmaker_match_slots` 的 `match_id` 等於 `data.matchId` 的不變式一致）。
+`players` 以 `@pickball/core/api/players` 的 `PlayerWriteSchema`（`PlayerSchema` 再要求 `id` 為非空字串）驗證；`BackupSchema` 與 `PlayerSchema` 本身不變（見 `player-roster`「參賽者雲端 API」）。
 
-並 MUST 額外拒絕（`400 INVALID_BODY`）：參賽者 id 重複、歷史 `matchId` 重複、分槽 `matchId` 重複、分槽的 `matchId` 不屬於 `currentRound` 中未完成的場次（`currentRound` 為 `null` 時不得有分槽）、
+並 MUST 額外拒絕（`400 INVALID_BODY`）：參賽者 id 為空字串、參賽者 id 重複、歷史 `matchId` 重複、分槽 `matchId` 重複、分槽的 `matchId` 不屬於 `currentRound` 中未完成的場次（`currentRound` 為 `null` 時不得有分槽）、
 五段皆為空（無參賽者、無回合、無歷史、無分槽、無獨立計分板）。
+
+**大小與筆數上限**（依「批次寫入端點的筆數與 body 上限」）：
+
+- 請求 body 超過核心 `IMPORT_BODY_LIMIT_BYTES`（10,000,000 位元組）時 MUST 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且 SHALL NOT 執行 validator 與 handler。
+- 通過 schema 後，以核心 `checkImportLimits(request)` 判定：參賽者超過 `MAX_PLAYERS_PER_IMPORT`（500）位，或 `serializeImportSegments(request)` 產生的五段 JSON 參數（參賽者、回合、分槽、歷史、獨立計分板）任一段的 UTF-8 位元組數超過 `IMPORT_SEGMENT_LIMIT_BYTES`（1,900,000）時，
+  MUST 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且 MUST 在呼叫 `db.batch()` **之前**拒絕——不寫入任何列、不建立守衛列。恰等於上限時 MUST 照常匯入。各段分別計算，SHALL NOT 以各段加總判定。
+- 送進 `json_each` 的五個參數 MUST 就是 `checkImportLimits` 通過時回傳的 `segments`（即 `serializeImportSegments` 的輸出），repository SHALL NOT 自行另組 JSON：前端判定 oversize 用的是同一個函式，形狀只有一份，判定才會與後端一致。
+- 判定上限與 D1 平台上限的關係：D1 單一字串／BLOB／列最大 2,000,000 位元組；1,900,000 為 5% 的餘裕（正式 D1 無法在本機驗證；本機 miniflare 約到 2.1～2.2MB 仍會成功，不能代表正式環境）。
 
 **拒絕規則（使用者定案）**：該使用者在 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 任一表已有資料時，
 MUST 回 `409 VERSION_CONFLICT` 且**整份不寫入**——SHALL NOT 覆寫、SHALL NOT 合併。獨立計分板（`scoreboard_current`）不在拒絕條件內：
@@ -667,7 +677,7 @@ MUST 回 `409 VERSION_CONFLICT` 且**整份不寫入**——SHALL NOT 覆寫、S
 同一份資料重複匯入時，第二次必因第一次已寫入名單、回合或歷史而被守衛拒絕；歷史的 `(user_id, match_id)` 主鍵是第二道防線。因此重複匯入 SHALL NOT 產生重複歷史。
 
 **陳述式數量為常數**：參賽者、分槽、歷史各以**一條** `INSERT … SELECT … FROM json_each(?)` 寫入（整段陣列為單一參數），SHALL NOT 逐筆展開成多條陳述式或多個參數——
-D1 每條陳述式最多 100 個參數、每個參數最多 2MB（design Decision 2 的 Context7 查證）。插入順序 MUST 依陣列順序（`ORDER BY key`）：
+D1 每條陳述式最多 100 個參數、單一字串最多 2,000,000 位元組（見 design「查證紀錄」）。插入順序 MUST 依陣列順序（`ORDER BY key`）：
 參賽者的 `sort_order` 為陣列索引；歷史的 `played_at` 為 `Date.parse(playedAt)`、插入順序即本機的追加順序（B8 的同時間排序依 `rowid`）。所有匯入列的 `version` 為 1。
 
 成功回 `200 { imported: { players, round: boolean, slots, history, scoreboardCurrent: "imported" | "skipped" | "none" } }`。
@@ -677,7 +687,8 @@ D1 每條陳述式最多 100 個參數、每個參數最多 2MB（design Decisio
 
 **歷史可被讀回**：匯入的歷史列 MUST 能被 `GET /api/matchmaker/history`（`hono-pickball/src/matchmaker/history-repository.ts`）依區間與兩種排序讀回：`played_at` 為 `Date.parse(playedAt)` 的毫秒值，同 `played_at` 時依插入順序（`rowid`）。
 
-**陳述式上限**：整個 batch 為固定的 7 條陳述式（守衛、參賽者、回合、分槽、歷史、獨立計分板、釋放守衛），不隨資料筆數增加；任一段的 JSON 參數超過 D1 單一參數上限（2MB）時 D1 拋錯、整批回滾、回 500（前端以 1,900,000 位元組先行阻擋，見 `data-transfer`「登入後匯入本機資料到雲端」）。
+**陳述式上限**：整個 batch 為固定的 7 條陳述式（守衛、參賽者、回合、分槽、歷史、獨立計分板、釋放守衛），不隨資料筆數增加。任一段參數超過上限時依上方「大小與筆數上限」回 413、不送出 batch（前端以同一個 `checkImportLimits` 先行阻擋，見 `data-transfer`「登入後匯入本機資料到雲端」）。
+batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500，SHALL NOT 被分類為 409；batch 失敗時整批回滾是 D1 的平台行為，由 `hono-pickball/test/d1-batch-guard.test.ts` 固定。
 
 #### Scenario: 匯入 API：auth 停用時匯入端點回 404
 
@@ -736,7 +747,7 @@ D1 每條陳述式最多 100 個參數、每個參數最多 2MB（design Decisio
 
 - **WHEN** 匯入 300 位參賽者與 2,000 筆歷史
 - **THEN** 回 200；兩表筆數分別為 300 與 2,000，且列的順序與 `match_id` 依陣列順序
-- **AND** 另一次匯入的單段 JSON 參數超過 D1 單一參數上限（2MB）時回 500，且該使用者在各使用者資料表與 `sync_batch_guards` 皆無任何列（整批回滾；非守衛錯誤不被分類為 409）
+- **AND** 另一次匯入的歷史段 JSON 參數約 2.4MB（超過 D1 單一字串上限 2,000,000 位元組）時回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且該使用者在各使用者資料表與 `sync_batch_guards` 皆無任何列
 - **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「300 位參賽者與 2000 筆歷史可一次匯入」
 
 #### Scenario: 匯入 API：共用的匯入請求 schema
@@ -764,3 +775,82 @@ D1 每條陳述式最多 100 個參數、每個參數最多 2MB（design Decisio
 - **WHEN** 匯入依序 `h1`（`playedAt` 為 T1）、`h2`、`h3`（兩者 `playedAt` 皆為 T2，T2 > T1）的歷史，之後以 `GET /api/matchmaker/history` 讀取：不帶參數、`order=asc`、`from=<T2 毫秒>`、`to=<T2 毫秒>`
 - **THEN** 不帶參數（desc）為 `h2`、`h3`、`h1`；`asc` 為 `h1`、`h2`、`h3`；`from=T2` 只含 `h2`、`h3`；`to=T2` 只含 `h1`；每筆 `data` 與匯入值深度相等、`version` 為 1
 - **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「匯入的歷史可被歷史端點依區間與兩種排序讀回」
+
+#### Scenario: 匯入 API：單段參數恰為上限時匯入、超過時回 413 且不寫入
+
+- **GIVEN** 雲端為空
+- **WHEN** 分別送出：歷史段經 `serializeImportSegments` 後恰為 1,900,000 位元組的請求；歷史段多 1 位元組的請求；參賽者段多 1 位元組的請求（三者各用不同使用者）
+- **THEN** 第一個回 200 且歷史已寫入；後兩個皆回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，該使用者在 `USER_DATA_TABLES` 每張表與 `sync_batch_guards` 皆無任何列
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「單段 JSON 參數恰為上限時匯入成功，超過一位元組時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」
+
+#### Scenario: 匯入 API：參賽者超過 500 位時回 413 且不寫入
+
+- **WHEN** 分別匯入恰 500 位與 501 位參賽者（各用不同使用者，其餘段為空）
+- **THEN** 前者回 200 且 `matchmaker_players` 有 500 列；後者回 `413 { "error": "PAYLOAD_TOO_LARGE" }` 且該使用者在 `USER_DATA_TABLES` 每張表中皆無任何列
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「參賽者恰為 500 位時匯入成功，501 位時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」
+
+#### Scenario: 匯入 API：請求 body 超過上限時回 413 且不寫入
+
+- **WHEN** 送出一份 schema 合法、但另含一個約 10MB 未知欄位而使 body 超過 10,000,000 位元組的匯入請求
+- **THEN** 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`（未知欄位在 schema 驗證時會被剝除，所以只有 body 上限能擋下）；該使用者在 `USER_DATA_TABLES` 每張表中皆無任何列
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「請求 body 超過匯入上限時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」
+
+#### Scenario: 匯入 API：超過上限時不送出 D1 batch
+
+- **GIVEN** 一個 `batch` 被呼叫即計數並拋錯的 D1 替身（`prepare` 照常委派給真實 D1，session 驗證可通過）
+- **WHEN** 以該替身送出參賽者 501 位的匯入請求
+- **THEN** 回 413 `PAYLOAD_TOO_LARGE`，替身的 `batch` 被呼叫 0 次
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「超過上限的匯入不呼叫 D1 batch」
+
+#### Scenario: 匯入 API：batch 的非守衛錯誤回 500 而非 409
+
+- **GIVEN** 一個 `batch` 一律拋出一般錯誤的 D1 替身
+- **WHEN** 以該替身送出一份合法且未超過上限的匯入請求
+- **THEN** 回 500（不是 409）
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「batch 拋出非守衛錯誤時匯入回 500 而非 409」
+
+#### Scenario: 匯入 API：參賽者 id 為空字串時回 400 且不寫入
+
+- **WHEN** 送出含一位 `id` 為 `""` 的參賽者（其餘欄位合法）的匯入請求
+- **THEN** 回 `400 { "error": "INVALID_BODY" }`；該使用者在 `USER_DATA_TABLES` 每張表中皆無任何列
+- **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「參賽者 id 為空字串的匯入請求回 400 且不寫入」
+
+#### Scenario: 匯入 API：共用的匯入參數形狀與位元組數
+
+- **WHEN** 以一份五段皆有資料的請求呼叫 `serializeImportSegments`；另以 ASCII、2 位元組、3 位元組（中文）、4 位元組（emoji）字元與單獨的代理字元呼叫 `utf8ByteLength`
+- **THEN** 五段依序為 `[{ id, data, sortOrder }]`（`sortOrder` 為陣列索引）、`[{ data }]`（回合；`currentRound` 為 null 時為 `[]`）、`[{ matchId, data }]`、`[{ matchId, playedAt: Date.parse(playedAt), data }]`、`[{ data }]`（獨立計分板；null 時為 `[]`）的 `JSON.stringify` 結果；
+  `utf8ByteLength` 與 `new TextEncoder().encode(text).length` 逐一相等
+- **驗收**：`packages/pickball-core/test/api/import-limits.test.ts`，it 名稱「serializeImportSegments 產生後端 json_each 參數的五段 JSON」「utf8ByteLength 與 TextEncoder 的位元組數一致」
+
+#### Scenario: 匯入 API：共用的上限判定
+
+- **WHEN** 以 `checkImportLimits` 判定：五段各自恰為 1,900,000 位元組、各自多 1 位元組；參賽者恰 500 位與 501 位；兩段各約 1,200,000 位元組（加總超過上限）
+- **THEN** 恰為上限、500 位、兩段各自未超過者 `ok` 為 true 且回傳的 `segments` 等於 `serializeImportSegments` 的輸出；任一段多 1 位元組或 501 位者 `ok` 為 false
+- **驗收**：`packages/pickball-core/test/api/import-limits.test.ts`，it 名稱「checkImportLimits 依後端參數形狀判定，五段各自恰為上限時通過、多一位元組即超過」「checkImportLimits 拒絕超過 500 位參賽者且不以各段加總判定」
+
+### Requirement: 批次寫入端點的筆數與 body 上限
+
+「批次寫入端點」指以客戶端送來的陣列一次寫入多列的使用者資料端點，目前恰為 `POST /api/matchmaker/players/import` 與 `POST /api/import`；
+其餘寫入端點（各 `PUT`、`DELETE`、`POST /api/matchmaker/reset`、送出比分）每次只寫入單筆或由伺服器產生固定筆數，不屬此類。之後新增批次寫入端點時 MUST 同樣遵守本 Requirement。
+
+每個批次寫入端點 SHALL 同時具備：
+
+- **body 上限**：以 `hono-pickball/src/http/body-limit.ts` 的共用 middleware（包裝 `hono/body-limit` 的 `bodyLimit`）掛在該路由的 validator **之前**；超過時 MUST 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，SHALL NOT 執行 validator 與 handler。
+  middleware 位於 sub-app 的 `localAuth`、`requireSession`、`requireExpectedUser` 之後：未登入、停用與帳號不符的回應仍優先。
+- **筆數上限**：參賽者一次最多 `MAX_PLAYERS_PER_IMPORT`（500）位；超過時 MUST 回 `413 { "error": "PAYLOAD_TOO_LARGE" }`。歷史與分槽不另設筆數上限，由單段位元組上限約束（見「本機資料匯入雲端的 API」）。
+- **在寫入前拒絕**：超過任一上限時 MUST 在呼叫 `db.batch()` 之前回應，SHALL NOT 寫入任何列；恰等於上限時 MUST 照常處理。
+
+所有上限數值 MUST 定義在 `@pickball/core`（`api/players` 的 `MAX_PLAYERS_PER_IMPORT`、`PLAYER_IMPORT_BODY_LIMIT_BYTES`；`api/import` 的 `IMPORT_SEGMENT_LIMIT_BYTES`、`IMPORT_BODY_LIMIT_BYTES`），前後端引用同一個常數，SHALL NOT 在任一端另寫數字。
+錯誤碼 `PAYLOAD_TOO_LARGE` 只用於本 Requirement 所列的超過上限；schema 不合法仍為 `400 INVALID_BODY`。前端 `requestJson` 對 413 照既有規則分類為 `{ kind: "rejected", status: 413 }`，由各呼叫端依狀態碼轉為「超過上限」的結果。
+
+#### Scenario: 批次寫入上限：共用 body 上限 middleware 回 413 JSON
+
+- **WHEN** 以只掛共用 body 上限 middleware（上限 16 位元組）的測試用 Hono app 分別送出 16 位元組與 17 位元組的 body，以及不帶 `Content-Length` 的 17 位元組串流 body
+- **THEN** 16 位元組時交給下一層（回 200）；17 位元組與串流 17 位元組皆回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且下一層未被執行
+- **驗收**：`hono-pickball/test/body-limit.test.ts`，it 名稱「共用 body 上限 middleware 超過上限時回 413 PAYLOAD_TOO_LARGE 且不執行下一層」
+
+#### Scenario: 批次寫入上限：錯誤碼與上限常數由核心匯出
+
+- **WHEN** 匯入 `@pickball/core/api/players` 與 `@pickball/core/api/import` 的上限常數
+- **THEN** `MAX_PLAYERS_PER_IMPORT` 為 500、`PLAYER_IMPORT_BODY_LIMIT_BYTES` 為 1,000,000、`IMPORT_SEGMENT_LIMIT_BYTES` 為 1,900,000、`IMPORT_BODY_LIMIT_BYTES` 為 10,000,000；`IMPORT_SEGMENT_LIMIT_BYTES` 小於 D1 單一字串上限 2,000,000，`PLAYER_IMPORT_BODY_LIMIT_BYTES` 亦小於 2,000,000
+- **驗收**：`packages/pickball-core/test/api/import-limits.test.ts`，it 名稱「批次寫入的上限常數皆小於 D1 單一字串上限」
