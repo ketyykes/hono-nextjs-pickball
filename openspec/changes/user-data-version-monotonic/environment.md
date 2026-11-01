@@ -30,8 +30,15 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：待 apply §1.1 實跑後回填（前端／後端／核心各幾檔幾 it、三段 typecheck、`pnpm lint` 的 errors／warnings、`playwright test --list` 各 project 數量）。
-- **Initial commit hash**：待 apply §1.1 回填（`change/user-data-version-monotonic` 分出時的 `main` HEAD；propose 當下 `main` 為 `630bbd2`，僅供參考）。
+- **Baseline tests**（2026-11-01，HEAD `4088acf`，持雙鎖實跑；load 4.2）：
+  - `pnpm install`：lockfile 已是最新、`git status --porcelain` 為空；`db:migrate:local`：No migrations to apply（0000～0003 已套用）。
+  - `pnpm test` exit 0：核心 10 檔／27 it、前端 109 檔／1085 it、後端 25 檔／193 it，全綠。
+  - 三段 typecheck：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0。
+  - `pnpm lint` exit 0：0 errors／3 warnings。
+  - `playwright test --list`：chromium 147、firefox 147、mobile-chrome 147、user-data 47、webkit 147、mobile-safari 147（皆 18 檔；user-data 6 檔）。
+  - E2E 實跑基線（coordinator 於 main 實測，skip 為瀏覽器條件式 `test.skip`）：chromium 147 passed／0 skip、firefox 135 passed＋12 skip、mobile-chrome 145 passed＋2 skip、
+    user-data 47 passed／0 skip、webkit 135 passed＋12 skip、mobile-safari 135 passed＋12 skip。§5.4 以此比對。
+- **Initial commit hash**：`4088acf`（`change/user-data-version-monotonic` 由 `main` 此 commit 切出；propose 當下 `main` 為 `630bbd2`）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
