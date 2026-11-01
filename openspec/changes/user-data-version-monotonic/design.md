@@ -209,3 +209,12 @@
 5. **（審查建議，未採納）`onConflictDoUpdate` 加 `setWhere: excluded.version > 既有`**：見 Decision 3 末條。
 6. **與並行 change `user-data-import-limits` 的衝突**：該 change 也 MODIFIED `user-data-sync`「本機資料匯入雲端的 API」，並改 `src/import/local-import-repository.ts`（送進 `json_each` 的參數形狀）與 `test/local-import.test.ts`，與本 change 3.10 的 `selectFromJsonEach` 簽章重疊。
    **後歸檔者 MUST 以先歸檔者合併後的主 spec 為底重做 MODIFIED**，程式碼由後合併者手動 rebase（tasks 1.2 已要求）；兩者語意不衝突（筆數上限 vs. 初始 version）。
+   - **（apply §1.2 落實，2026-11-01）** `user-data-import-limits` 已先歸檔（`openspec/changes/archive/2026-11-01-user-data-import-limits/`）並合併進 main（`4088acf`）。對齊結果：
+     - `user-data-sync` delta 的 MODIFIED「本機資料匯入雲端的 API」原本以舊主 spec 為底，漏了主 spec 現有的 8 個 scenario（單段參數上限、500 位上限、body 上限、不送出 batch、非守衛錯誤 500、空字串 id 400、共用參數形狀、共用上限判定），
+       且仍寫著「單段超過 2MB 回 500」，使 `openspec validate --strict` 失敗。已改為**以目前主 spec 該 Requirement 全文為底**，只加兩處本 change 的增修：「原子性與冪等」段加入「守衛條件 SHALL NOT 包含 `sync_version_floors`」一句；
+       「陳述式數量為常數」段的「所有匯入列的 `version` 為 1」改為「參賽者、回合、分槽為下限加一，歷史與獨立計分板為 1」。上限用語沿用主 spec 的「D1 單一字串上限 2,000,000 位元組」與 413 行為，舊的「回 500」敘述已刪除。
+     - `user-data-sync` 另兩個 MODIFIED（「版本化讀寫契約」「多筆使用者資料的逐筆版本化契約」）、`round-lifecycle` 的 MODIFIED「回合與送出比分的雲端 API」逐行比對主 spec：只有本 change 預期的增修，無遺漏；`backend-database` 為純 ADDED。
+     - test-plan「本機資料匯入雲端的 API」既有列改為「全部 21 個 it」（import-limits 後 `local-import.test.ts` 由 11 個增為 21 個）、「超過上限回 413 後各表仍零列」（原寫「2MB 失敗」）。
+     - 程式碼：`local-import-repository.ts` 現由核心 `checkImportLimits` 先判定上限（413 在 `db.batch` 之前），送進 `json_each` 的五段 JSON 取自 `limits.segments`。3.10 的 `selectFromJsonEach` 只在既有四個參數 `(userId, fields, json, updatedAt)` 之外**增加一個 `version: SQL` 參數**，
+       不動 `checkImportLimits` 的呼叫位置與 `segments` 的來源，因此 413 行為與既有 21 個 it 不受影響（3.10 驗收含 `test/local-import.test.ts` 全綠）。
+     - 刪除路徑（`grep -rn "delete(matchmaker" hono-pickball/src` 7 行、4 條路徑）與建立路徑（7 條）與 Context 盤點表一致，無新增。

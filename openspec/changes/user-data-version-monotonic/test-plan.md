@@ -50,7 +50,7 @@
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| （既有）`local-import.test.ts` 全部 11 個 it（含「匯入五段資料後各自為 version 1 且保留原順序」「四張對戰分配機表任一有資料時回 409 且整份不寫入」「300 位參賽者與 2000 筆歷史可一次匯入」「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」等） | 本 Requirement 全部既有 Scenario | 原樣通過（新使用者下限為 0，version 仍為 1；匯入不提高下限，ACCOUNT_MISMATCH 與 2MB 失敗後各表仍零列——含新表） | regression guard；`USER_DATA_TABLES` 加入新表後「每張表零列」的斷言自動涵蓋新表 | integration |
+| （既有）`local-import.test.ts` 全部 21 個 it（含「匯入五段資料後各自為 version 1 且保留原順序」「四張對戰分配機表任一有資料時回 409 且整份不寫入」「300 位參賽者與 2000 筆歷史可一次匯入」「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」等） | 本 Requirement 全部既有 Scenario | 原樣通過（新使用者下限為 0，version 仍為 1；匯入不提高下限，ACCOUNT_MISMATCH 與超過上限回 413 後各表仍零列——含新表） | regression guard；`USER_DATA_TABLES` 加入新表後「每張表零列」的斷言自動涵蓋新表 | integration |
 | （既有）LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入 | 匯入 API：共用的匯入請求 schema | 原樣通過 | regression guard | unit |
 | （既有）每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變；缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變；列舉出的使用者資料路由恰與守衛樣本表一致 | 匯入 API：守衛樣本表含匯入端點 | 原樣通過（不新增路由，仍 15 條） | regression guard | integration |
 | 重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409；送出比分刪除的分槽在重置後重新匯入時版本大於刪除前 | （本 Requirement 修改的 version 條款與守衛不含下限表） | 同上表；第二次匯入回 200 即證明守衛不含下限表 | 修改條款的直接證據 | integration |
