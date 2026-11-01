@@ -30,8 +30,13 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（apply §1.1 回填。內容：`pnpm test:api` 的檔數與 it 數、兩段 typecheck、`pnpm --filter ./hono-pickball build`、E2E `--project=user-data` 的 passed／skipped 數、執行時的 load）
-- **Initial commit hash**：（apply §1.1 回填；propose 提交時 `main` 的 HEAD 見本 change 的 propose commit）
+- **Baseline tests**（2026-11-01 apply §1.1，皆持雙鎖執行）：
+  - `pnpm install`：lockfile 零變動，工作樹仍乾淨；`db:migrate:local`：No migrations to apply。
+  - 完整 `pnpm test`（exit 0，load 2.8）：核心 10 檔／27、前端 109 檔／1085、後端（`test:api` 部分）26 檔／210，全數 passed。
+  - `pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck`：皆 exit 0。
+  - `pnpm --filter ./hono-pickball build`：exit 0（load 4.7）。
+  - E2E `--project=user-data --workers=1`：47 passed、0 skipped、0 failed（load 4.6～5.4）。
+- **Initial commit hash**：`c5eafcc26d0bfaeedc0601392b8300bad6b5986e`（本分支起點，即 propose commit）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

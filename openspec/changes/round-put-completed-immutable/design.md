@@ -213,3 +213,10 @@
      - 前端盤點完整，所有行號核對正確；重試、衝突重載、樂觀回合、匯入、備份還原、計分板回填都不經 PUT /round 產生「同 id 改回未完成」。
      - Decision 3 的多裝置推理與各種 version 邊界正確，且與 B7 OQ16／18① 相容。
      - 2.1 的 regression guard 宣稱與 2.2 的真紅宣稱正確，C1、C2 確實等價。
+6. **（apply 階段發現，需 coordinator 知悉，建議不在本 change 補）反向規則外層「每一場」的量詞沒有被測試釘住**：Stage 2 追加的變異 M16（把「目前回合每一場 completed 都要通過」寫成 `length === 0 || some(...)`）存活。
+   - 原因：四個新 it 與既有 it 都沒有「目前回合有 ≥2 場 completed，只改回其中一場、另一場以相同內容保留」的情境。
+   - 實務風險低：不加空清單守門的 `some` 會被大量既有 it 擋下；M16 這種寫法要刻意構造。test-plan 的 M1～M14 全數轉紅、C1／C2 存活，符合 test-plan 承諾。
+   - 若要補強：另開 change 或由 coordinator 裁定在本 change 加一個 regression guard it（種子多放一場 completed 的 `m0`，新資料保留 `m0` 不變、只改回 `m2`，預期 400）。本 change 未自行加入，因為 test-plan 未列此 it、既有斷言與 it 名稱依 test-plan 逐字對齊。
+
+   **Coordinator 裁定（合併前）**：OQ6 不另開 change，於本 change 直接補上 Scenario「回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400」、test-plan 列與對應 it（regression guard，寫入即綠）。
+   以單一 it 實跑：M16（外層 `every` 改 `some`）與「只檢查第一場已完成場次」（`.slice(0, 1)`）皆轉紅；對照組（多一層恆真 `filter`）維持綠。

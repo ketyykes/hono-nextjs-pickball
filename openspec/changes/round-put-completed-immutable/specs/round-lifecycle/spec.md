@@ -95,6 +95,13 @@
 - **AND** 雲端回合仍為原內容與 version 1；`m1` 與 `m3` 的分槽皆保留；該使用者沒有版本下限列（未送出 batch）
 - **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 把已完成場次改回未完成時回 400 且不寫入」
 
+#### Scenario: 回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400
+
+- **GIVEN** 雲端回合（version 1）中 `m0` 為 `completed`、`m1` 為 `pending`、`m2` 為 `completed`
+- **WHEN** 以 version 1 PUT「內容相同的已完成 `m0`、`m1`、改為 `pending` 的 `m2`」的回合
+- **THEN** 回 400 `INVALID_BODY`，雲端回合仍為原內容與 version 1
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400」
+
 #### Scenario: 回合 PUT 整輪替換（前一輪完成場次不出現在新資料）時接受
 
 - **GIVEN** 雲端回合（version 1）中 `m1` 為 `pending`（有分槽）、`m2` 為 `completed`
