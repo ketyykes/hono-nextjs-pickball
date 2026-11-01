@@ -23,14 +23,15 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 驗收（指令）：
+- [x] 1.1 驗收（指令）：
   - 確認分支為 `change/round-put-completed-immutable`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功。
   - 持鎖跑以下基線：`pnpm test:api`（記錄檔數與 it 數）、兩段 typecheck、`pnpm --filter ./hono-pickball build`、E2E `--project=user-data`（記錄 passed／skipped 數）。
   - 結果回填 environment.md「Verification」並 commit（`docs:`）。
-- [ ] 1.2 對齊：
+- [x] 1.2 對齊：
   - 重讀 `round-repository.ts`，確認 design Context 引用的行號與行為仍成立；`grep -rln "putRemoteRound\|putRound" nextjs-pickball/{lib,hooks,components,app}` 的非測試命中仍只有 design 所列的檔案。
   - 比對 delta 的 MODIFIED「回合與送出比分的雲端 API」與目前主 spec：**若主 spec 已被其他 change 改過，就以主 spec 為底重新套用本 change 的增修**。
   - `DO_NOT_TRACK=1 openspec validate round-put-completed-immutable --strict` 通過後 commit（`docs:`；沒有差異就在本行註記「無差異」）。
+  - **結果（2026-11-01）：無差異**。`round-repository.ts` 行號（`:58-64`、`:80-118`、`:86`、`:87-89`、`:112`）與路由 `:77-87` 皆成立；前端非測試命中仍只有 `lib/sync/round-api.ts`、`lib/sync/round-command-queue.ts`、`hooks/useRemoteRoundStore.ts`。delta 的 MODIFIED 以目前主 spec（`1d31563` 後）為底，差異只有本 change 的增修。Context7 查證 D1：`batch()` 為循序執行的 SQL transaction、失敗整批回滾；未使用 Sessions API（repo 無 `withSession`）時所有查詢都在主庫執行，與 design Decision 3「D1 單一主庫讀寫強一致」的假設一致。`openspec validate --strict` 通過。
 
 ## 2. 反向完成狀態規則
 
