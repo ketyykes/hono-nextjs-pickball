@@ -331,4 +331,30 @@ describe("版本下限", () => {
 		expect(res.status).toBe(204);
 		expect(batchSizes).toEqual([2]);
 	});
+
+	it("回合 PUT 清除的分槽以同場次重建時版本大於清除前", async () => {
+		const cookie = await seedAndSignIn("vf-orphan-slot@example.com");
+		await request(cookie, "PUT", "/round", { data: makeRound([makeMatch("m1"), makeMatch("m2")]), version: 0 });
+		await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 });
+		await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 1), version: 1 });
+		await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 2), version: 2 });
+
+		// m1 被移出回合：其分槽（version 3）在孤兒清除時被刪
+		const removed = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m2"), makeMatch("m3")]),
+			version: 1,
+		});
+		expect(removed.status).toBe(200);
+		const restored = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m1"), makeMatch("m2"), makeMatch("m3")]),
+			version: 2,
+		});
+		expect(restored.status).toBe(200);
+
+		const recreated = await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 4), version: 0 });
+		const stale = await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 9), version: 3 });
+		expect((await bodyOf<Versioned<unknown>>(recreated)).version).toBe(4);
+		expect(stale.status).toBe(409);
+		expect(await bodyOf<{ error: string }>(stale)).toEqual({ error: "VERSION_CONFLICT" });
+	});
 });
