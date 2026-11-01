@@ -1,7 +1,7 @@
 import "../src/index";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { describe, expect, it } from "vitest";
-import { makeMatch, makeRound, request, rowsOf, seedAndSignIn } from "./helpers/matchmaker-fixtures";
+import { makeMatch, makeRound, makeSlot, request, rowsOf, seedAndSignIn } from "./helpers/matchmaker-fixtures";
 import { userIdOf } from "./helpers/session";
 
 interface Versioned<T> {
@@ -128,5 +128,31 @@ describe("版本下限", () => {
 			expect(stale.status).toBe(409);
 			expect(await stale.json()).toEqual({ error: "VERSION_CONFLICT" });
 		}
+	});
+
+	it("重置後重建同場次的分槽版本大於重置前且持舊版本的 PUT 回 409", async () => {
+		const cookie = await seedAndSignIn("vf-slot@example.com");
+		const round = makeRound([makeMatch("m1")]);
+
+		// 回合 version 1，m1 分槽建立後更新成 version 2
+		await request(cookie, "PUT", "/round", { data: round, version: 0 });
+		await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1"), version: 0 });
+		await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 1), version: 1 });
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+
+		const rebuiltRound = await request(cookie, "PUT", "/round", { data: round, version: 0 });
+		expect((await bodyOf<Versioned<unknown>>(rebuiltRound)).version).toBe(3);
+		const rebuiltSlot = makeSlot("m1", 4);
+		const created = await request(cookie, "PUT", "/slots/m1", { data: rebuiltSlot, version: 0 });
+		expect(created.status).toBe(200);
+		expect((await bodyOf<Versioned<unknown>>(created)).version).toBe(3);
+
+		for (const staleVersion of [1, 2]) {
+			const stale = await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", 9), version: staleVersion });
+			expect(stale.status).toBe(409);
+			expect(await stale.json()).toEqual({ error: "VERSION_CONFLICT" });
+		}
+		const current = await bodyOf<Versioned<unknown>>(await request(cookie, "GET", "/slots/m1"));
+		expect(current).toEqual({ data: rebuiltSlot, version: 3 });
 	});
 });
