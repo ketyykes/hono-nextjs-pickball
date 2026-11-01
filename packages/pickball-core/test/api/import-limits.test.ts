@@ -192,6 +192,17 @@ describe("本機資料匯入的共用參數形狀與上限判定", () => {
     expect(withoutOptional.current).toBe("[]");
     expect(withoutOptional.slots).toBe("[]");
 
+    // 回合與獨立計分板各自獨立判斷 null：只有一段為 null 時，另一段仍要序列化
+    const onlyRoundNull = serializeImportSegments({ ...request, currentRound: null });
+    expect(onlyRoundNull.round).toBe("[]");
+    expect(onlyRoundNull.current).toBe(JSON.stringify([{ data: request.scoreboard.current }]));
+    const onlyCurrentNull = serializeImportSegments({
+      ...request,
+      scoreboard: { ...request.scoreboard, current: null },
+    });
+    expect(onlyCurrentNull.current).toBe("[]");
+    expect(onlyCurrentNull.round).toBe(JSON.stringify([{ data: request.currentRound }]));
+
     // 其餘段落為空陣列時同樣是 "[]"
     const empty = serializeImportSegments({
       version: 1,
