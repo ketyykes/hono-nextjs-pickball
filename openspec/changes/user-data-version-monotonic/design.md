@@ -227,3 +227,10 @@
      - 程式碼：`local-import-repository.ts` 現由核心 `checkImportLimits` 先判定上限（413 在 `db.batch` 之前），送進 `json_each` 的五段 JSON 取自 `limits.segments`。3.10 的 `selectFromJsonEach` 只在既有四個參數 `(userId, fields, json, updatedAt)` 之外**增加一個 `version: SQL` 參數**，
        不動 `checkImportLimits` 的呼叫位置與 `segments` 的來源，因此 413 行為與既有 21 個 it 不受影響（3.10 驗收含 `test/local-import.test.ts` 全綠）。
      - 刪除路徑（`grep -rn "delete(matchmaker" hono-pickball/src` 7 行、4 條路徑）與建立路徑（7 條）與 Context 盤點表一致，無新增。
+7. **（apply 進度紀錄，2026-11-01，leader 在派下一組之前停止）**：
+   - 已完成並勾選：§1（1.1～1.3）、§2（2.1、2.2，Stage 1／2 皆 PASS）。
+   - §3（3.1～3.11）實作已 commit（`3da926e`～`51b9e85`，3.11 REFACTOR 註記 skipped；後端全套 26 檔／204 it 綠），Stage 1 PASS；
+     **Stage 2（opus）審查在本次停止時仍在執行中，結果未收到**，因此 §3 的 checkbox 尚未勾選。續作者 MUST 重派 §3 Stage 2（範圍 `ca97892..51b9e85`），通過後才勾選 3.1～3.11。
+   - §3 Implementer 回報：upsert「`max(既有, excluded)` 改為直接覆寫 `excluded.version`」的變異在 §3 無法觀察（只有 reset 會提高下限，且 reset 刪除三表全部列）；§4 的 `deletePlayer`（先刪 v3 的 p1、再刪 v1 的 p2）MUST 覆蓋此變異，§4 Stage 2 須確認。
+   - `51b9e85` 在「重置後重建的回合…」it 尾端追加「再重置後匯入，驗歷史與獨立計分板 version 為 1」步驟（殺死「獨立計分板段改用下限」變異）；Stage 1 判可接受。
+   - 尚未開始：§4、§5、Final Code Review、完整驗收（含 E2E）。
