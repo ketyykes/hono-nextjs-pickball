@@ -31,9 +31,9 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it——「sync_version_floors 可由 migration 建立並寫入讀回」「sync_version_floors 每位使用者只能有一列」「sync_version_floors 的 version 不可為 NULL」「刪除使用者時其 sync_version_floors 一併刪除」。
+- [x] 2.1 RED（TDD）：`test/d1-schema.test.ts` 新增四個 it——「sync_version_floors 可由 migration 建立並寫入讀回」「sync_version_floors 每位使用者只能有一列」「sync_version_floors 的 version 不可為 NULL」「刪除使用者時其 sync_version_floors 一併刪除」。
   「version 不可為 NULL」MUST 比對錯誤訊息含 `NOT NULL constraint failed: sync_version_floors.version`（只比對「拋錯」會因表不存在而先綠）。確認四個皆紅並貼出輸出（`test:`）
-- [ ] 2.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 新增 `syncVersionFloors`（`user_id` PK FK cascade、`version` NOT NULL 無 DEFAULT、`updated_at` `timestamp_ms` NOT NULL，註解寫明為何不設 DEFAULT；
+- [x] 2.2 GREEN（設定層＋TDD）：`src/db/schema.ts` 新增 `syncVersionFloors`（`user_id` PK FK cascade、`version` NOT NULL 無 DEFAULT、`updated_at` `timestamp_ms` NOT NULL，註解寫明為何不設 DEFAULT；
   欄位宣告順序 MUST 為 `user_id, version, updated_at`——`raiseVersionFloor` 沿用 `selectFromJsonEach` 的位置式 `INSERT … SELECT`，順序不同會使 version 與 updated_at 對調）；
   `pnpm --filter ./hono-pickball db:generate --name sync_version_floors` 產生 `drizzle/0004_sync_version_floors.sql` 與 meta（不手改）；`packages/pickball-core/src/api/user-data-tables.ts` 的 `USER_DATA_TABLES` 加 `"sync_version_floors"`；
   `pnpm --filter ./hono-pickball db:migrate:local`。2.1 全綠；既有 `test/user-data-tables.test.ts` 兩個 it 綠（regression guard）；再跑一次 `db:generate` 無新檔（`feat:`）
