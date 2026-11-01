@@ -66,15 +66,19 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 設定層（文件）：更新 `hono-pickball/CLAUDE.md`「matchmaker 回合、場次分槽與送出比分 API」第一個子項目的**判定順序**，改為三段：
+- [x] 3.1 設定層（文件）：更新 `hono-pickball/CLAUDE.md`「matchmaker 回合、場次分槽與送出比分 API」第一個子項目的**判定順序**，改為三段：
   1. 正向規則（新資料的已完成場次 MUST 已存在於目前回合且內容相同）不論版本，違反回 400。
   2. 反向規則（目前回合的已完成場次若 id 出現在新資料，MUST 不變；不出現則允許）只在讀到的 version 等於請求的 version 時檢查，違反回 400、不送 batch。
   3. 其餘送出帶版本條件的 batch，版本不符回 409。
 
   保留「正向規則先於版本比對，舊回合裝置重排時會先得到 400 而非 409，不要自行對調」的警語；再補一句「反向規則不得移到版本比對之前，否則另一裝置送出比分後，舊裝置的任何操作都會變成 400 且不重新載入」（`docs:`）。
-- [ ] 3.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck` 皆 exit 0。
-- [ ] 3.3 驗收（指令）C2～C4：持鎖依序跑以下三項，數字記錄於此：
+  - **紀錄**：`6c32497`，只改 `hono-pickball/CLAUDE.md` 該子項目（+8／−1），三段式判定順序與兩句警語皆到位；原句「此順序符合 spec 字面」指舊的兩段順序，一併移除。Stage 1（sonnet）PASS、Stage 2（opus）PASS，無必修。
+- [x] 3.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck` 皆 exit 0。
+  - **紀錄**：兩者 exit 0（Implementer 與 Stage 1 各自實跑）。
+- [x] 3.3 驗收（指令）C2～C4：持鎖依序跑以下三項，數字記錄於此：
   - `pnpm test:api`：全綠，檔數與基線相同、it 數 = 基線 + 4。
   - `pnpm --filter ./hono-pickball build`：exit 0。
   - E2E `--project=user-data`：數量與 1.1 基線一致且全數 passed，不得因缺帳密而 skip。
-- [ ] 3.4 驗收（指令）C5：`DO_NOT_TRACK=1 openspec validate round-put-completed-immutable --strict` 通過。
+  - **紀錄**（2026-11-01，持雙鎖，load 4.3～4.8）：`pnpm test:api` 26 檔／214 it 全 passed（基線 26／210，+4）；`pnpm --filter ./hono-pickball build` exit 0；E2E user-data 47 passed、0 skipped、0 failed（與基線 47 一致）。E2E 前後 `lsof`／`ps` 無本 repo 殘留。
+- [x] 3.4 驗收（指令）C5：`DO_NOT_TRACK=1 openspec validate round-put-completed-immutable --strict` 通過。
+  - **紀錄**：`Change 'round-put-completed-immutable' is valid`，exit 0。
