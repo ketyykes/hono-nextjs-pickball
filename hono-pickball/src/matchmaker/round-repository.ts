@@ -52,7 +52,7 @@ function isDeepEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * 新資料中每一場 completed 場次，都必須在目前回合中存在同 id 且內容相同的 completed 場次。
+ * 正向規則（新資料 → 目前回合）：新資料中每一場 completed 場次，都必須在目前回合中存在同 id 且內容相同的 completed 場次。
  * 場次只能經送出比分端點完成，否則評分與歷史不會被寫入（後端權威）。
  */
 function keepsCompletedMatches(current: Round | null, next: Round): boolean {
@@ -60,6 +60,19 @@ function keepsCompletedMatches(current: Round | null, next: Round): boolean {
 		.filter((match) => match.status === "completed")
 		.every((match) =>
 			current?.matches.some((existing) => existing.status === "completed" && isDeepEqual(existing, match)),
+		);
+}
+
+/**
+ * 反向規則（目前回合 → 新資料）：目前回合中 completed 的場次，新資料中每一場同 id 的場次都必須內容完全相同。
+ * 否則已完成的場次會被改回未完成而重新計分。同 id 完全不出現（整輪替換或只移除部分場次）不受限；
+ * 以逐場比較而非 find，才擋得住重複 id 夾帶未完成版本的請求。
+ */
+function keepsCompletedMatchesUnchanged(current: Round, next: Round): boolean {
+	return current.matches
+		.filter((match) => match.status === "completed")
+		.every((completed) =>
+			next.matches.filter((match) => match.id === completed.id).every((match) => isDeepEqual(completed, match)),
 		);
 }
 
@@ -74,7 +87,12 @@ function orphanSlotCondition(userId: string): SQL {
 
 /**
  * 以樂觀鎖建立或更新回合，並在同一個 batch 內清除不屬於目前回合未完成場次的分槽。
- * 完成狀態的比對在 batch 外，但寫入帶版本條件：比對後回合若被改動，寫入影響 0 列而回 conflict。
+ * 完成狀態的比對在 batch 外，依序為：
+ * 1. 正向規則（見 keepsCompletedMatches），不論版本都檢查。
+ * 2. 反向規則（見 keepsCompletedMatchesUnchanged），只在目前回合的 version 等於請求的 version 時檢查。
+ *    版本不符代表呼叫端停在舊回合（例如另一台裝置已送出比分）；此時若回 400，前端不會重新載入而卡在舊狀態，
+ *    所以交給帶版本條件的寫入判為 409。版本相符時比對的正是這次寫入要取代的那一版。
+ * 寫入帶版本條件：比對後回合若被改動，寫入影響 0 列而回 conflict。
  * 孤兒分槽的刪除條件以資料庫中的回合內容推導，所以不論寫入成功與否，分槽都與目前回合一致。
  */
 export async function putRound(
@@ -85,6 +103,9 @@ export async function putRound(
 ): Promise<PutRoundResult> {
 	const current = await getRound(db, userId);
 	if (!keepsCompletedMatches(current?.data ?? null, data)) {
+		return { kind: "invalid" };
+	}
+	if (current !== null && current.version === expectedVersion && !keepsCompletedMatchesUnchanged(current.data, data)) {
 		return { kind: "invalid" };
 	}
 
