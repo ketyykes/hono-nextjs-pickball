@@ -1035,9 +1035,17 @@
 
 分槽不提供批次附加與 DELETE（多筆契約的子集）：分槽的刪除一律由伺服器在回合 PUT、送出比分與重置的 batch 內完成。
 
-**完成狀態不可經 PUT 改變**：`PUT /api/matchmaker/round` 的 `data` 中每一場 `status` 為 `completed` 的場次，MUST 在雲端目前回合中存在同 id、且內容完全相同的已完成場次；
-否則回 `400 INVALID_BODY`——場次只能經送出比分端點完成（後端權威），否則評分與歷史不會被寫入。比對以讀出的目前回合為準，
-寫入本身是帶版本條件的單一 UPDATE：比對後回合若已被改動，UPDATE 影響 0 列而回 409，因此比對與寫入之間沒有可被利用的競態。
+**完成狀態不可經 PUT 改變**：`PUT /api/matchmaker/round` MUST 同時滿足兩個方向的規則：
+
+1. **正向（新資料 → 目前回合）**：`data` 中每一場 `status` 為 `completed` 的場次，MUST 在雲端目前回合中存在同 id、且內容完全相同的已完成場次——場次只能經送出比分端點完成（後端權威），否則評分與歷史不會被寫入。
+2. **反向（目前回合 → 新資料）**：雲端目前回合中每一場 `status` 為 `completed` 的場次，`data` 中**每一場**與其同 id 的場次 MUST 仍為 `completed` 且內容完全相同（`data` 含重複 id 時逐場檢查，不只看第一場）——已完成的場次不得經 PUT 回到未完成（`pending` 或 `scoring`）而被重新計分。
+   同 id 的場次完全不出現在 `data` 中時不受此限：產生新一輪時以場次 id 全新的回合整輪替換、前一輪的已完成場次整個消失，是合法操作；只移除部分已完成場次同樣不受此限。
+
+依下述判定順序，違反任一方向時回 `400 INVALID_BODY`，且 SHALL NOT 送出 batch（回合、分槽與版本下限皆不變）。「內容完全相同」的比較不受 JSON 鍵順序影響。
+
+**判定順序**：先檢查正向規則（不論版本）；反向規則只在讀出的目前回合存在、且其 version 等於請求的 `version` 時檢查；兩者皆通過（或反向規則因版本不符而不檢查）時，才送出帶版本條件的 batch。
+通過正向規則的版本不符請求，因此一律由帶版本條件的寫入判為 409，不會因反向規則先得到 400——停在舊回合的裝置（另一裝置已對其仍顯示為未完成的場次送出比分）得到 409 並整份重新載入，而不是被拒絕後停在舊狀態。
+比對以讀出的目前回合為準，寫入本身是帶版本條件的單一陳述式（更新為 `UPDATE … WHERE version = <請求的 version>`，建立為 `INSERT … ON CONFLICT DO NOTHING`）：比對後回合若已被改動，寫入影響 0 列而回 409；反向規則只在版本相符時檢查，所以它比對的正是該寫入要取代的那一版。
 
 **分槽清理**：`PUT /api/matchmaker/round` 的寫入與「刪除該使用者所有 `match_id` 不屬於（寫入後的）目前回合中**未完成**場次的分槽」MUST 在同一個 batch 內；
 刪除條件 MUST 以資料庫中的回合內容推導（`json_each(matchmaker_round.data, '$.matches')`），使「分槽只存在於目前回合的未完成場次」這個不變式由伺服器維護，
@@ -1098,6 +1106,43 @@
 - **THEN** 兩者皆回 400 `INVALID_BODY`；雲端回合不變
 - **AND** 以 version 0 建立一個含 `completed` 場次的回合同樣回 400
 - **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 改變場次完成狀態或已完成場次內容時回 400」
+
+#### Scenario: 回合 PUT 把已完成場次改回未完成時回 400 且不寫入
+
+- **GIVEN** 雲端回合（version 1）中 `m1` 為 `pending`、`m2` 為 `completed`、`m3` 為 `pending`，`m1` 與 `m3` 各有分槽
+- **WHEN** 以 version 1 分別 PUT「`m1`、改為 `pending` 的 `m2`（移除 `m3`）」「`m1`、改為 `scoring` 的 `m2`、`m3`」與「`m1`、內容相同的已完成 `m2`、再一場同 id 但為 `pending` 的 `m2`、`m3`」的回合
+- **THEN** 三者皆回 400 `INVALID_BODY`
+- **AND** 雲端回合仍為原內容與 version 1；`m1` 與 `m3` 的分槽皆保留；該使用者沒有版本下限列（未送出 batch）
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 把已完成場次改回未完成時回 400 且不寫入」
+
+#### Scenario: 回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400
+
+- **GIVEN** 雲端回合（version 1）中 `m0` 為 `completed`、`m1` 為 `pending`、`m2` 為 `completed`
+- **WHEN** 以 version 1 PUT「內容相同的已完成 `m0`、`m1`、改為 `pending` 的 `m2`」的回合
+- **THEN** 回 400 `INVALID_BODY`，雲端回合仍為原內容與 version 1
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400」
+
+#### Scenario: 回合 PUT 整輪替換（前一輪完成場次不出現在新資料）時接受
+
+- **GIVEN** 雲端回合（version 1）中 `m1` 為 `pending`（有分槽）、`m2` 為 `completed`
+- **WHEN** 以 version 1 PUT 只含全新場次 `n1`、`n2` 的下一輪回合
+- **THEN** 回 200 且 version 為 2，`GET /round` 取回新回合；`m1` 的分槽已被清除
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 整輪替換時前一輪的已完成場次可不出現在新資料」
+
+#### Scenario: 回合 PUT 只移除部分已完成場次時接受
+
+- **GIVEN** 雲端回合（version 1）中 `m1`、`m2` 為 `completed`，`m3` 為 `pending`
+- **WHEN** 以 version 1 PUT 只含「內容相同的已完成 `m2`」與「同 id 但改到 2 號場地的 `pending` `m3`」的回合（`m1` 不出現）
+- **THEN** 回 200 且 version 為 2，`GET /round` 取回該回合
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 只移除部分已完成場次時接受」
+
+#### Scenario: 版本過期的回合 PUT 以 409 優先於反向完成狀態檢查
+
+- **GIVEN** 雲端回合為 version 2，其中 `m1` 為 `pending`、`m2` 為 `completed`（另一裝置已送出 `m2` 的比分）
+- **WHEN** 停在 version 1 的裝置以 version 1 PUT 一個 `m2` 仍為 `pending` 的回合；另以 version 0 與 version 3 各 PUT 同一個回合
+- **THEN** 三者皆回 409 `VERSION_CONFLICT`（不是 400）
+- **AND** 雲端回合仍為原內容與 version 2
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「版本過期的回合 PUT 把已完成場次改回未完成時回 409 而非 400」
 
 #### Scenario: 回合 PUT 在同一 batch 內清除不屬於新回合的分槽
 
