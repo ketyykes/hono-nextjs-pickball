@@ -100,24 +100,29 @@ export async function importPlayers(
 	const now = new Date();
 
 	const statements = players.map((player, index) =>
-		db.insert(matchmakerPlayers).values({
-			userId,
-			id: player.id,
-			data: player,
-			sortOrder: start + index,
-			version: 1,
-			updatedAt: now,
-		}),
+		db
+			.insert(matchmakerPlayers)
+			.values({
+				userId,
+				id: player.id,
+				data: player,
+				sortOrder: start + index,
+				version: initialVersion(userId),
+				updatedAt: now,
+			})
+			.returning(),
 	);
+	let results;
 	try {
-		await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+		results = await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
 	} catch (error) {
 		if (isConstraintError(error)) {
 			return null;
 		}
 		throw error;
 	}
-	return players.map((player) => ({ data: player, version: 1 }));
+	// 回應的 version 取自實際寫入的列：初始版本由 SQL 子查詢決定，JS 端無從得知
+	return results.map((rows) => toVersioned(rows[0]));
 }
 
 /** 刪除本人全部對戰分配機資料；之後新增的資料表要加進同一個 batch。 */
