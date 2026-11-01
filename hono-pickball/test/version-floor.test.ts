@@ -84,4 +84,26 @@ describe("版本下限", () => {
 		expect((await bodyOf<Versioned<unknown>>(bPlayer)).version).toBe(1);
 		expect(await rowsOf("sync_version_floors", idB)).toEqual([]);
 	});
+
+	it("重置後以 version 0 重建同 id 的參賽者版本大於重置前且持舊版本的 PUT 回 409", async () => {
+		const cookie = await seedAndSignIn("vf-player@example.com");
+		const original = makePlayer("p1", "舊");
+		const rebuilt = makePlayer("p1", "重建");
+
+		// p1 建立後更新兩次成為 version 3，p2 維持 version 1
+		await request(cookie, "PUT", "/players/p1", { data: original, version: 0 });
+		await request(cookie, "PUT", "/players/p1", { data: original, version: 1 });
+		await request(cookie, "PUT", "/players/p1", { data: original, version: 2 });
+		await request(cookie, "PUT", "/players/p2", { data: makePlayer("p2"), version: 0 });
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+
+		const created = await request(cookie, "PUT", "/players/p1", { data: rebuilt, version: 0 });
+		expect(created.status).toBe(200);
+		expect((await bodyOf<Versioned<Player>>(created)).version).toBe(4);
+		const stale = await request(cookie, "PUT", "/players/p1", { data: original, version: 3 });
+		expect(stale.status).toBe(409);
+		expect(await stale.json()).toEqual({ error: "VERSION_CONFLICT" });
+		const listed = await bodyOf<{ items: Versioned<Player>[] }>(await request(cookie, "GET", "/players"));
+		expect(listed.items).toEqual([{ data: rebuilt, version: 4 }]);
+	});
 });
