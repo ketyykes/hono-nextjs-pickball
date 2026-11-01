@@ -1,6 +1,6 @@
 import { API_ERROR_CODES } from "@pickball/core/api/errors";
 import { HistoryQuerySchema } from "@pickball/core/api/history";
-import { PlayerImportRequestSchema } from "@pickball/core/api/players";
+import { MAX_PLAYERS_PER_IMPORT, PLAYER_IMPORT_BODY_LIMIT_BYTES, PlayerImportRequestSchema } from "@pickball/core/api/players";
 import { MatchSlotPutRequestSchema, RoundPutRequestSchema, SubmitScoreRequestSchema } from "@pickball/core/api/round";
 import { versionedWriteSchema } from "@pickball/core/api/versioned";
 import { PlayerSchema } from "@pickball/core/matchmaker/types";
@@ -10,6 +10,7 @@ import { localAuth } from "../auth/local-auth-middleware";
 import { requireExpectedUser } from "../auth/require-expected-user";
 import { requireSession, type SessionAppEnv } from "../auth/require-session";
 import { getDb } from "../db/client";
+import { jsonBodyLimit } from "../http/body-limit";
 import { invalidBodyHook, userDataOnError } from "../http/invalid-body";
 import {
 	deletePlayer,
@@ -54,9 +55,14 @@ export const matchmakerRoutes = new Hono<SessionAppEnv>()
 	})
 	.post(
 		"/players/import",
+		jsonBodyLimit(PLAYER_IMPORT_BODY_LIMIT_BYTES),
 		zValidator("json", PlayerImportRequestSchema, invalidBodyHook),
 		async (c) => {
 			const { players } = c.req.valid("json");
+			// 筆數用 413 而非 schema 的 400：前端要分辨「資料太大」與「資料不合法」
+			if (players.length > MAX_PLAYERS_PER_IMPORT) {
+				return c.json({ error: API_ERROR_CODES.PAYLOAD_TOO_LARGE }, 413);
+			}
 			const items = await importPlayers(getDb(c.env), c.var.user.id, players);
 			if (!items) {
 				return c.json({ error: API_ERROR_CODES.VERSION_CONFLICT }, 409);
