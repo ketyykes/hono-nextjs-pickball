@@ -664,10 +664,13 @@ describe("local-import", () => {
 		fetchMock.mockResolvedValueOnce(json(413, { error: "PAYLOAD_TOO_LARGE" }));
 		expect(await importLocalData("user-a", payload)).toEqual({ kind: "too-large" });
 
-		fetchMock.mockResolvedValueOnce(json(400, { error: "INVALID_BODY" }));
-		expect(await importLocalData("user-a", payload)).toEqual({ kind: "failed" });
+		// 只有 413 是資料過大：低於與高於 413 的其他 4xx 都維持 failed
+		for (const status of [400, 422, 429]) {
+			fetchMock.mockResolvedValueOnce(json(status, { error: "REJECTED" }));
+			expect(await importLocalData("user-a", payload), `狀態碼 ${status}`).toEqual({ kind: "failed" });
+		}
 
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(4);
 		expect(snapshotKeys()).toEqual(before);
 	});
 
