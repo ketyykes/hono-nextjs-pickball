@@ -527,8 +527,11 @@ hook MUST 記錄目前結果所屬的 `userId`（擁有者標記），render 時
 換帳號的那一次 render 起就不顯示前一帳號的歷史；舊帳號在途請求的結果 MUST 被忽略。
 `RemoteHistoryView` 與 `RemoteStatsContent` MUST 以 `useSession()` 快照中的 user id（`status` 非 `ready` 或無 user 時為 `null`）作為 `userId`、`refresh` 作為 `onUnauthorized`，比照選擇器 hook 的接線。
 
-`RemoteHistoryView` 與 `RemoteStatsContent` 在 `syncStatus` 為 `loading`／`load-failed` 時以 `SyncStatusNotice` 取代內容；`total === 0` 時顯示引導型空狀態（`EmptyHistory range={null}`），
-`total > 0` 但 `items` 為空時顯示該區間的空狀態（`EmptyHistory range={range}`）。根元素帶 `data-sync-status`。
+`RemoteHistoryView` 在 `syncStatus` 為 `loading`／`load-failed` 時 MUST 保留 `HistoryRangeFilter`，只把紀錄區塊（紀錄卡片與兩種空狀態）換成 `SyncStatusNotice`，且 SHALL NOT 顯示損毀提示（此時沒有可信資料）。
+篩選器在 `loading`、`load-failed`、`synced` 之間轉換時 MUST 是同一個持續掛載的元素，SHALL NOT 卸載重建——焦點已在某個區間選項上時（例如以鍵盤選取區間），焦點 MUST 留在該選項上，載入中、載入完成與載入失敗皆然（每次換區間 hook 都會回到 `loading`，卸載篩選器會讓焦點掉回 `body`）。以指標點擊時是否讓按鈕取得焦點由瀏覽器決定，本規則不額外要求。
+載入失敗時篩選器 MUST 可操作：改選其他區間即依上述「`range` 改變時重新 GET」的規則以新區間重新載入，成功後顯示該區間的紀錄；失敗文案沿用 `SyncStatusNotice` 的固定文案，不另設重試按鈕。
+`RemoteStatsContent` 在載入中與載入失敗時的呈現見 `player-stats`「統計依區間篩選」。
+`total === 0` 時顯示引導型空狀態（`EmptyHistory range={null}`），`total > 0` 但 `items` 為空時顯示該區間的空狀態（`EmptyHistory range={range}`）。根元素帶 `data-sync-status`。
 
 #### Scenario: 雲端歷史：auth 停用時歷史端點回 404
 
@@ -676,5 +679,34 @@ hook MUST 記錄目前結果所屬的 `userId`（擁有者標記），render 時
 
 - **GIVEN** 以 `page.route` 讓 `GET /api/matchmaker/history*` 回 500
 - **WHEN** 開啟 `/matchmaker/history`
-- **THEN** 顯示「無法載入雲端資料，請重新整理頁面」，區間篩選不存在
+- **THEN** 顯示「無法載入雲端資料，請重新整理頁面」，區間篩選仍存在且「今日」為選中狀態
 - **驗收**：`nextjs-pickball/tests/e2e/user-data/history-sync.spec.ts`，test 名稱「雲端歷史載入失敗時歷史頁顯示錯誤提示」
+
+#### Scenario: 雲端歷史：載入中與載入失敗時保留區間篩選
+
+- **GIVEN** `useRemoteHistory` 回報 `syncStatus` 為 `loading`（另一次為 `load-failed`），且回傳值帶一筆紀錄、`total: 3`、`droppedCount: 2`
+- **WHEN** 渲染 `RemoteHistoryView`
+- **THEN** 「歷史區間」radiogroup 存在、五個區間選項皆在且「今日」為選中；`role="status"` 的文字為該狀態的固定文案；根元素的 `data-sync-status` 為該狀態
+- **AND** 不顯示紀錄卡片、引導型空狀態、區間空狀態與損毀提示
+- **驗收**：`nextjs-pickball/components/matchmaker/RemoteHistoryView.test.tsx`，it 名稱「載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊」
+
+#### Scenario: 雲端歷史：切換區間時焦點留在篩選器
+
+- **GIVEN** 已登入，「今日」已載入一筆紀錄（`synced`）
+- **WHEN** 焦點移到「本週」選項並按 Enter，hook 先回報 `loading`（`items: []`、`total: 0`）、之後回報 `synced`；接著焦點移到「本月」並按 Enter，hook 回報 `load-failed`（`items: []`、`total: 0`）
+- **THEN** 「本週」在 `loading` 與 `synced` 兩個階段都是 `document.activeElement`，且與按鍵前取得的是同一個 DOM 節點；「本月」在 `load-failed` 時同樣是 `document.activeElement` 且為同一個節點；被選取的選項 `aria-checked` 為 `true`
+- **驗收**：`nextjs-pickball/components/matchmaker/RemoteHistoryView.test.tsx`，it 名稱「以鍵盤切換區間時焦點在載入中、載入完成與載入失敗後都留在被選取的區間選項」
+
+#### Scenario: 雲端歷史：載入失敗後改選其他區間可重新載入
+
+- **GIVEN** 「今日」的載入失敗（`load-failed`）
+- **WHEN** 選取「本週」，hook 對 `thisWeek` 回報 `synced` 並帶一筆紀錄
+- **THEN** `useRemoteHistory` 最後一次收到的 `range` 為 `thisWeek`；畫面顯示該筆紀錄卡片、不再有失敗提示，篩選器仍在且「本週」為選中
+- **驗收**：`nextjs-pickball/components/matchmaker/RemoteHistoryView.test.tsx`，it 名稱「載入失敗後改選其他區間會以新區間重新載入並顯示紀錄」
+
+#### Scenario: 雲端歷史：載入失敗後切換區間重新載入成功且焦點不遺失
+
+- **GIVEN** 以測試帳號登入、雲端已有一筆今日完成的對戰；以 `page.route` 攔截 `GET /api/matchmaker/history*`：測試放行前，「今日」區間的請求（只帶 `from`）回 500、「本週」區間的請求暫不回應；放行後所有請求照常轉給後端（依區間而非請求次數判定，因 dev 模式的 StrictMode 會在 mount 時送出兩次請求）
+- **WHEN** 開啟 `/matchmaker/history`，出現失敗提示後以鍵盤選取「本週」，確認載入中後放行，再以鍵盤選取「今日」
+- **THEN** 失敗時區間篩選可見且「今日」為選中；「本週」在 `data-sync-status="loading"` 與 `synced` 時皆為焦點所在；最後「今日」顯示那一筆紀錄卡片，焦點在「今日」選項
+- **驗收**：`nextjs-pickball/tests/e2e/user-data/history-sync.spec.ts`，test 名稱「雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」
