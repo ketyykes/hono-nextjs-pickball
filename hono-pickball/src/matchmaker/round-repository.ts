@@ -2,6 +2,7 @@ import type { Round } from "@pickball/core/matchmaker/round-types";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerMatchSlots, matchmakerRound } from "../db/schema";
+import { initialVersion } from "./version-floor";
 
 export interface VersionedRound {
 	data: Round;
@@ -81,7 +82,7 @@ export async function putRound(
 	const now = new Date();
 	const write =
 		expectedVersion === 0
-			? db.insert(matchmakerRound).values({ userId, data, version: 1, updatedAt: now }).onConflictDoNothing().returning()
+			? db.insert(matchmakerRound).values({ userId, data, version: initialVersion(userId), updatedAt: now }).onConflictDoNothing().returning()
 			: db
 					.update(matchmakerRound)
 					.set({ data, version: expectedVersion + 1, updatedAt: now })

@@ -2,6 +2,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound } from "../db/schema";
+import { raiseVersionFloor } from "./version-floor";
 
 export interface VersionedPlayer {
 	data: Player;
@@ -121,7 +122,13 @@ export async function importPlayers(
 
 /** 刪除本人全部對戰分配機資料；之後新增的資料表要加進同一個 batch。 */
 export async function resetMatchmaker(db: Db, userId: string): Promise<void> {
+	const now = new Date();
+	// 下限必須在刪除之前提高：刪除後就讀不到將被刪列的 version
+	const deletedVersions = sql`SELECT version AS v FROM matchmaker_players WHERE user_id = ${userId}
+		UNION ALL SELECT version AS v FROM matchmaker_round WHERE user_id = ${userId}
+		UNION ALL SELECT version AS v FROM matchmaker_match_slots WHERE user_id = ${userId}`;
 	await db.batch([
+		raiseVersionFloor(db, userId, deletedVersions, now),
 		db.delete(matchmakerPlayers).where(eq(matchmakerPlayers.userId, userId)),
 		db.delete(matchmakerRound).where(eq(matchmakerRound.userId, userId)),
 		db.delete(matchmakerMatchSlots).where(eq(matchmakerMatchSlots.userId, userId)),

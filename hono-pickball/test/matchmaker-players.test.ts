@@ -650,6 +650,6 @@ describe("/api/matchmaker 名單端點", () => {
 		});
 
 		expect(res.status).toBe(204);
-		expect(batchSizes).toEqual([4]);
+		expect(batchSizes).toEqual([5]);
 	});
 });
