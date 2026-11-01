@@ -107,7 +107,7 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 
 - **WHEN** 匯入 300 位參賽者與 2,000 筆歷史
 - **THEN** 回 200；兩表筆數分別為 300 與 2,000，且列的順序與 `match_id` 依陣列順序
-- **AND** 另一次匯入的歷史段 JSON 參數約 2.4MB（超過 D1 單一字串上限 2MB）時回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且該使用者在各使用者資料表與 `sync_batch_guards` 皆無任何列
+- **AND** 另一次匯入的歷史段 JSON 參數約 2.4MB（超過 D1 單一字串上限 2,000,000 位元組）時回 `413 { "error": "PAYLOAD_TOO_LARGE" }`，且該使用者在各使用者資料表與 `sync_batch_guards` 皆無任何列
 - **驗收**：`hono-pickball/test/local-import.test.ts`，it 名稱「300 位參賽者與 2000 筆歷史可一次匯入」
 
 #### Scenario: 匯入 API：共用的匯入請求 schema

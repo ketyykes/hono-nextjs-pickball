@@ -421,7 +421,7 @@ describe("POST /api/import 本機資料匯入", () => {
 		// 2000 筆 playedAt 相同，rowid 順序即插入順序；bulk-h-10 的字串序在 bulk-h-2 之前，能分辨排序依據
 		expect(historyRows.map((row) => row.match_id)).toEqual(history.map((entry) => entry.matchId));
 
-		// 單一段落的 JSON 參數超過 D1 的 2MB 上限時，在送出 batch 之前就回 413，且不留下任何寫入
+		// 單一段落的 JSON 參數超過 D1 單一字串上限 2,000,000 位元組時，在送出 batch 之前就回 413，且不留下任何寫入
 		const oversizedCookie = await seedAndSignIn("import-oversize@example.com");
 		const oversizedId = await userIdOf("import-oversize@example.com");
 		const oversizedHistory = ["a", "b", "c"].map((suffix) => {
