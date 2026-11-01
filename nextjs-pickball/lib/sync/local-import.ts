@@ -1,4 +1,4 @@
-import { LocalImportResponseSchema } from "@pickball/core/api/import";
+import { LocalImportResponseSchema, checkImportLimits } from "@pickball/core/api/import";
 import type { LocalImportRequest, LocalImportResponse } from "@pickball/core/api/import";
 import type { Backup } from "@pickball/core/matchmaker/transfer-types";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
@@ -9,9 +9,6 @@ import { requestJson } from "./api-client";
 
 // 路徑集中在這一處，元件不直接拼字串，避免各處路徑漂移。
 const IMPORT_PATH = "/api/import";
-
-// D1 單一參數上限為 2MB，留出餘量給 JSON 以外的包裝；超過時後端會整批回滾並回 500。
-const SEGMENT_LIMIT_BYTES = 1_900_000;
 
 export interface LocalImportSummary {
 	players: number;
@@ -34,6 +31,7 @@ export type LocalImportOutcome =
 	| { kind: "imported"; imported: LocalImportResponse["imported"] }
 	| { kind: "cloud-not-empty" }
 	| { kind: "unauthorized" }
+	| { kind: "too-large" }
 	| { kind: "failed" };
 
 function dedupeHistory(entries: readonly MatchHistoryEntry[]): { history: MatchHistoryEntry[]; skipped: number } {
@@ -45,11 +43,6 @@ function dedupeHistory(entries: readonly MatchHistoryEntry[]): { history: MatchH
 		history.push(entry);
 	}
 	return { history, skipped: entries.length - history.length };
-}
-
-// 以位元組而非字元數判定：D1 的上限是位元組，中文姓名一個字元佔 3 位元組。
-function utf8Bytes(value: unknown): number {
-	return new TextEncoder().encode(JSON.stringify(value)).length;
 }
 
 /**
@@ -93,10 +86,8 @@ export function buildLocalImportPayload(): LocalImportPreview {
 		},
 		// 有分槽必有回合，所以分槽不需要單獨列入判斷
 		isEmpty: players.length === 0 && currentRound === null && history.length === 0 && current === null,
-		oversize:
-			utf8Bytes(players) > SEGMENT_LIMIT_BYTES ||
-			utf8Bytes(history) > SEGMENT_LIMIT_BYTES ||
-			utf8Bytes(matches) > SEGMENT_LIMIT_BYTES,
+		// 與後端送出 D1 batch 前同一個判定：量的是 json_each 參數（含包裝），不是原始陣列
+		oversize: !checkImportLimits(payload).ok,
 	};
 }
 
@@ -116,7 +107,8 @@ export async function importLocalData(expectedUserId: string, payload: LocalImpo
 	}
 	if (result.kind === "conflict") return { kind: "cloud-not-empty" };
 	if (result.kind === "unauthorized") return { kind: "unauthorized" };
-	// rejected（其他 4xx）與 failed 對使用者沒有差別：都是「匯入失敗，請稍後再試」
+	// 413 要讓使用者知道是資料量問題（重試無用）；其他 4xx 與 failed 對使用者沒有差別
+	if (result.kind === "rejected" && result.status === 413) return { kind: "too-large" };
 	return { kind: "failed" };
 }
 
