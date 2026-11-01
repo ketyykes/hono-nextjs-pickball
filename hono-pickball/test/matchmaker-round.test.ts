@@ -307,8 +307,8 @@ describe("/api/matchmaker/round", () => {
 
 		expect(created.status).toBe(200);
 		expect(stale.status).toBe(409);
-		// 成功與衝突兩條路徑都是「一次 batch、兩條陳述式」
-		expect(batchSizes).toEqual([2, 2]);
+		// 成功與衝突兩條路徑都是「一次 batch、三條陳述式（回合寫入、提高版本下限、清除分槽）」
+		expect(batchSizes).toEqual([3, 3]);
 	});
 
 	it("回合 PUT 刪除不屬於新回合的分槽且衝突時分槽仍與雲端回合一致", async () => {
