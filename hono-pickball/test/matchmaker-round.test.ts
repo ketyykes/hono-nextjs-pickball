@@ -376,4 +376,51 @@ describe("/api/matchmaker/round", () => {
 		expect(before).toHaveLength(2);
 		expect(await rowsOf("matchmaker_history", userId)).toEqual(before);
 	});
+
+	it("回合 PUT 整輪替換時前一輪的已完成場次可不出現在新資料", async () => {
+		const cookie = await seedAndSignIn("mr-replace-round@example.com");
+		const userId = await userIdOf("mr-replace-round@example.com");
+		await seedRound(userId, makeRound([makeMatch("m1"), makeMatch("m2", "completed")]));
+		await seedSlot(userId, makeSlot("m1"));
+
+		const next = makeRound([makeMatch("n1"), makeMatch("n2")], 2);
+		const res = await request(cookie, "PUT", "/round", { data: next, version: 1 });
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ data: next, version: 2 });
+		expect(await getRound(cookie)).toEqual({ data: next, version: 2 });
+		expect(await slotMatchIds(cookie)).toEqual([]);
+	});
+
+	it("回合 PUT 只移除部分已完成場次時接受", async () => {
+		const cookie = await seedAndSignIn("mr-partial-remove@example.com");
+		const userId = await userIdOf("mr-partial-remove@example.com");
+		await seedRound(
+			userId,
+			makeRound([makeMatch("m1", "completed"), makeMatch("m2", "completed"), makeMatch("m3")]),
+		);
+
+		// m3 是同 id、內容改變的未完成場次（臨時換場地），不屬於反向規則的管轄
+		const next = makeRound([makeMatch("m2", "completed"), { ...makeMatch("m3"), courtNumber: 2 }]);
+		const res = await request(cookie, "PUT", "/round", { data: next, version: 1 });
+
+		expect(res.status).toBe(200);
+		expect(((await res.json()) as Versioned<unknown>).version).toBe(2);
+		expect(await getRound(cookie)).toEqual({ data: next, version: 2 });
+	});
+
+	it("版本過期的回合 PUT 把已完成場次改回未完成時回 409 而非 400", async () => {
+		const cookie = await seedAndSignIn("mr-stale-uncomplete@example.com");
+		const userId = await userIdOf("mr-stale-uncomplete@example.com");
+		const original = makeRound([makeMatch("m1"), makeMatch("m2", "completed")]);
+		await seedRound(userId, original, 2);
+
+		const uncompleted = makeRound([makeMatch("m1"), makeMatch("m2")]);
+		for (const version of [1, 0, 3]) {
+			const res = await request(cookie, "PUT", "/round", { data: uncompleted, version });
+			expect(res.status).toBe(409);
+			expect(await res.json()).toEqual({ error: "VERSION_CONFLICT" });
+		}
+		expect(await getRound(cookie)).toEqual({ data: original, version: 2 });
+	});
 });
