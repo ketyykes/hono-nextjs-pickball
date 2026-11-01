@@ -21,48 +21,74 @@
 
 ## 1. 對齊 main 與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/history-filter-retention`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/history-filter-retention`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`、兩個測試檔與 `history-sync.spec.ts` 與 propose 時（`main` `630bbd2`）的內容一致；
+  - 結果：分支正確、工作樹乾淨、lockfile 零變動、migration 無待套用；基線數字見 environment.md Verification（前端 109／1070、後端 24／177、核心 9／21；lint 0 errors／3 warnings；`--list` 各 browser project 147、user-data 44）
+- [x] 1.2 對齊 main：確認 `RemoteHistoryView.tsx`、`RemoteStatsContent.tsx`、兩個測試檔與 `history-sync.spec.ts` 與 propose 時（`main` `630bbd2`）的內容一致；
   以 python difflib 比對本 change 兩個 MODIFIED Requirement（`match-history`「登入時歷史以雲端為準」、`player-stats`「統計依區間篩選」）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
+  - 結果：`git diff --stat 630bbd2 main` 對兩個元件、兩個測試檔、`history-sync.spec.ts`、`openspec/specs/match-history`、`openspec/specs/player-stats` 皆無輸出（`630bbd2..eaf1f50` 只有 `site-navbar-account-entry` 的提交）；
+    difflib 比對兩個 MODIFIED Requirement 與主 spec，差異只有本 change 刻意增修（`RemoteHistoryView` 載入中／失敗段落、改寫的「載入失敗時歷史頁顯示錯誤」THEN、新增 4＋5 個 Scenario 與統計頁「雲端模式的載入中與載入失敗」段落）；`openspec validate --strict` valid。主 spec 未被其他 change 改動，不需重新套用。
+  - Context7 查證（與 design 假設一致，無需記入 Open Questions）：`/reactjs/react.dev` preserving-and-resetting-state——同一位置同一型別跨 `if` return 保留、同一位置換型別即移除並銷毀狀態；
+    `/microsoft/playwright`——`route.fulfill({ status })`、`route.continue()`、`page.unrouteAll({ behavior: "ignoreErrors" })`（v1.41 起，本機 1.60.0）、`toBeFocused` 為 web-first 斷言；
+    `/testing-library/user-event`（本機 14.6.1）——焦點在 `<button>` 時 `keyboard("{Enter}")` 的 keypress behavior 會對該按鈕 dispatch `click`。
 
 ## 2. 雲端歷史頁保留篩選器
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`RemoteHistoryView.test.tsx` 新增三個 it——「載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊」（`it.each` 兩個狀態）、
+- [x] 2.1 RED（TDD）：`RemoteHistoryView.test.tsx` 新增三個 it——「載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊」（`it.each` 兩個狀態）、
   「以鍵盤切換區間時焦點在載入中、載入完成與載入失敗後都留在被選取的區間選項」、「載入失敗後改選其他區間會以新區間重新載入並顯示紀錄」（斷言依 test-plan，焦點以 DOM 節點同一性斷言）；
   同一 commit 依檔頭例外 ① 刪除一行。單檔 vitest 確認新 it 全紅並貼出輸出（例外 ① 的 it 刪行後仍綠，屬預期）
-- [ ] 2.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（依區間以 `searchParams.has("to")` 攔截、暫停以 `Promise` resolver 放行並以 `try／finally` 或 `page.unrouteAll({ behavior: "ignoreErrors" })` 收尾，沿用 `seedCloudPlayers`／`playOneMatch`；**所有 radio、焦點操作與斷言排在 `[data-sync-status="load-failed"]` 可見之後**）；
+  - 紀錄：`6add4c7`。單檔 vitest 紅燈 `Test Files 1 failed`、`Tests 4 failed | 12 passed (16)`，4 個失敗全為新 it（保留篩選 ×2：找不到 radiogroup「歷史區間」；焦點：`expected <body> to be <button 本週>`；改選區間：找不到 radio「本週」）。無先綠的新 it。`git show 6add4c7^:` 機械複驗：測試檔不含新 it 名稱、產品檔 RED 前後相同；Stage 1 另以 RED 時產品檔實跑重現 4 failed。
+- [x] 2.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「雲端歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（依區間以 `searchParams.has("to")` 攔截、暫停以 `Promise` resolver 放行並以 `try／finally` 或 `page.unrouteAll({ behavior: "ignoreErrors" })` 收尾，沿用 `seedCloudPlayers`／`playOneMatch`；**所有 radio、焦點操作與斷言排在 `[data-sync-status="load-failed"]` 可見之後**）；
   同一 commit 依檔頭例外 ③ 改最後一行。雙鎖下以單檔 E2E（`-g` 篩兩條）確認兩條皆紅並貼出輸出
-- [ ] 2.3 GREEN（TDD）：改 `RemoteHistoryView.tsx` 為單一 return，篩選器固定位置、只替換內容槽、阻斷時不顯示損毀提示（design Decision 1、2）。
+  - 紀錄：`3a39cf9`。雙鎖下單檔 E2E（`-g "雲端歷史載入失敗"`）2 failed：改寫的既有 test 在「今日」`toBeVisible` 失敗、新 test 在「今日」`toBeChecked` element not found；`git show 3a39cf9^:` 不含新 test 名稱。
+- [x] 2.3 GREEN（TDD）：改 `RemoteHistoryView.tsx` 為單一 return，篩選器固定位置、只替換內容槽、阻斷時不顯示損毀提示（design Decision 1、2）。
   2.1 的 it、2.2 的兩條 E2E 全綠；`RemoteHistoryView.test.tsx` 其餘既有 it 原樣綠；`history-sync.spec.ts` 其餘既有 test 原樣綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 2.4 REFACTOR：阻斷判定與內容槽是否以具名變數表達、有無巢狀三元運算；無壞味道則註記 skipped
+  - 紀錄：`3ae1a6d`。單檔 vitest 16 passed；雙鎖下 `history-sync.spec.ts` 全檔 user-data 7 passed；`pnpm -r exec tsc --noEmit` exit 0；三個改動檔 ESLint exit 0；C6 輸出為空。
+    Stage 1（sonnet）PASS；Stage 2（opus）PASS——獨立 mutation 30 條，「阻斷時改用另一份篩選器實例」「阻斷時篩選器換 key」「篩選器子節點索引改變」皆由焦點 it 轉紅，等價對照組維持綠；存活兩條：`HistoryRecordCard` 的 `key` 改常數（main 既有程式碼，畫面無差異）、阻斷時把提示移到篩選器前面（版面順序，非阻擋建議）。
+- [x] 2.4 REFACTOR：阻斷判定與內容槽是否以具名變數表達、有無巢狀三元運算；無壞味道則註記 skipped
+  - skipped：GREEN 已以具名變數 `isBlocking`、`content` 加 if/else 取代巢狀三元，單一 return、無重複（Stage 2 確認成立）。
 
 ## 3. 雲端統計頁保留標題與篩選器
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`RemoteStatsContent.test.tsx` 新增三個 it——「歷史載入中與載入失敗時保留標題與區間篩選並只以提示取代排行榜」（`it.each` 兩個狀態）、
+- [x] 3.1 RED（TDD）：`RemoteStatsContent.test.tsx` 新增三個 it——「歷史載入中與載入失敗時保留標題與區間篩選並只以提示取代排行榜」（`it.each` 兩個狀態）、
   「以鍵盤切換區間時焦點在歷史載入中、載入完成與載入失敗後都留在被選取的區間選項」、「歷史載入失敗後改選其他區間會以新區間重新載入並顯示排行榜」；
   阻斷狀態 mock 用真實 hook 同形（`items: []`、`total: 0`，test-plan「mock 的共同要求」）；同一 commit 依檔頭例外 ② 刪除一行。單檔 vitest 確認新 it 全紅並貼出輸出；既有「名單 syncStatus 為 %s…」與「regression guard：total 為 0 時不顯示區間篩選」維持綠（regression guard，點名）
-- [ ] 3.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「登入時統計頁歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（攔截、收尾與斷言順序同 2.2；標題斷言同樣排在 `load-failed` 可見之後，因本機 `LocalStatsContent` 也有「球員統計」標題）。雙鎖下以單檔 E2E 確認紅燈並貼出輸出
-- [ ] 3.3 GREEN（TDD）：改 `RemoteStatsContent.tsx`——名單阻斷維持 early return；名單可用時單一 return，標題與篩選器固定位置，歷史阻斷時內容槽為 `SyncStatusNotice`，`total === 0` 時篩選器槽位為空（design Decision 3、4）；更新「標題只在有可信資料時顯示」的註解。
+  - 紀錄：`d82f93f`。單檔 vitest 紅燈 `Test Files 1 failed`、`Tests 4 failed | 17 passed (21)`，4 個失敗全為新 it（保留標題 ×2：找不到 heading「球員統計」；焦點：`expected <body> to be <button>`；改選區間：找不到 radio「本週」）。先綠（regression guard，點名）：「名單 syncStatus 為 %s…」×2（radiogroup 為 null 那行保留）、「regression guard：total 為 0 時不顯示區間篩選」與其餘既有 it。`git show d82f93f^:` 不含新 it 名稱、產品檔 RED 前後相同；Stage 1 以 RED 時產品檔實跑重現 4 failed。
+- [x] 3.2 RED（TDD，E2E）：`history-sync.spec.ts` 新增 test「登入時統計頁歷史載入失敗後切換區間重新載入成功且焦點留在篩選器」（攔截、收尾與斷言順序同 2.2；標題斷言同樣排在 `load-failed` 可見之後，因本機 `LocalStatsContent` 也有「球員統計」標題）。雙鎖下以單檔 E2E 確認紅燈並貼出輸出
+  - 紀錄：`c6bb1ca`。雙鎖下單檔 E2E（`-g "登入時統計頁歷史載入失敗後"`）1 failed：`load-failed` 可見後 heading「球員統計」element(s) not found；`git show c6bb1ca^:` 不含新 test 名稱。
+- [x] 3.3 GREEN（TDD）：改 `RemoteStatsContent.tsx`——名單阻斷維持 early return；名單可用時單一 return，標題與篩選器固定位置，歷史阻斷時內容槽為 `SyncStatusNotice`，`total === 0` 時篩選器槽位為空（design Decision 3、4）；更新「標題只在有可信資料時顯示」的註解。
   3.1、3.2 全綠；`RemoteStatsContent.test.tsx` 其餘既有 it 原樣綠；雙鎖下 `roster-sync.spec.ts` 的「雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容」與 `history-sync.spec.ts` 全檔綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 3.4 REFACTOR：兩個元件的阻斷判定與內容槽寫法是否一致；是否值得共用（只有兩個使用端且統計頁多一層名單判定，預期不抽）；無壞味道則註記 skipped
+  - 紀錄：`2d929a5`。單檔 vitest 21 passed；雙鎖下 `history-sync.spec.ts` 全檔 8 passed、`roster-sync.spec.ts`「雲端名單載入失敗時對戰頁與統計頁以錯誤提示取代內容」1 passed；`pnpm -r exec tsc --noEmit` exit 0；三個改動檔 ESLint exit 0；C6 輸出為空。移除已無使用端的 `pickDisplayStatus`。
+    Stage 1（sonnet）PASS；Stage 2（opus）PASS——必做變異 10 條全紅（含「名單阻斷併入保留分支」由既有名單阻斷 it 轉紅、「阻斷時另一份篩選器實例／換 key／移進內容槽」由焦點 it 轉紅、「篩選器槽位只看 total」轉紅），等價對照組維持綠；覆蓋率盤點 24 條全紅，無未守住的分支。
+- [x] 3.4 REFACTOR：兩個元件的阻斷判定與內容槽寫法是否一致；是否值得共用（只有兩個使用端且統計頁多一層名單判定，預期不抽）；無壞味道則註記 skipped
+  - skipped：兩元件寫法已一致（阻斷布林、`let content: ReactNode` 的 if/else 鏈、篩選器固定槽位、單一 return）；差異僅統計頁的名單 early return 與 `showRangeFilter`，皆為規格要求；只有兩個使用端，不抽共用（Stage 2 確認成立）。
 
 ## 4. 文件同步與總驗收
 
 Depends on: §3
 
-- [ ] 4.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——名單雲端同步段的「對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容」指的是**名單**狀態，維持不改；
+- [x] 4.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——名單雲端同步段的「對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容」指的是**名單**狀態，維持不改；
   `/matchmaker/history` 與 `/matchmaker/stats` 條目各補一句「雲端歷史 loading／load-failed 時保留區間篩選（統計頁連同標題），只替換紀錄／排行榜區塊，焦點不遺失；失敗後改選區間即重新載入」。commit（`docs:`）
-- [ ] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
-- [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋8，後端與核心與基線相同
-- [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
-- [ ] 4.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
+  - 紀錄：`0037392`，只改 `nextjs-pickball/CLAUDE.md` 第 36、45 行條目末尾各補一句；第 114 行名單段未改。
+- [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 結果：`pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck`（後兩者含 test tsconfig 第二段）皆 exit 0。
+- [x] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
+  - 結果：雙鎖下 exit 0，`✖ 3 problems (0 errors, 3 warnings)`，與基線相同（三個皆為既有 hooks 的 unused-vars）。
+- [x] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋8，後端與核心與基線相同
+  - 結果：雙鎖下 exit 0；前端 109 檔／1078（基線 1070＋8）、後端 24／177、核心 9／21，與期望一致。
+- [x] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+  - 結果：雙鎖下 exit 0（前端 12 個 route 產出、後端 `wrangler deploy --dry-run` 通過）；建置後 `git status --porcelain` 為空。
+- [x] 4.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋2 全 passed、0 skipped；五個 browser project 數量與基線相同、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空（訪客路徑、hook、共用元件、app、後端、核心零變更）
-- [ ] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過
+  - 進度（2026-10-30 06:31 前）：user-data 46 passed／0 skipped（基線＋2）；chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145 passed＋2 skipped；webkit 三 shard 合計 135 passed＋12 skipped；皆 0 failed、0 flaky，與基線相同。
+    mobile-safari：06:02 起主機系統 daemon 造成 load 暴衝（約 170～296，非本 repo process），當時 1/3 在高負載下 `match-stage.spec.ts` 5 條逾時後被中止，屬無效執行、不計入。
+    07:56 load 降到 7 後由 leader 雙鎖重跑：1/3 45 passed＋4 skipped、2/3 41 passed＋8 skipped、3/3 49 passed，合計 135 passed＋12 skipped、0 failed，與基線相同（取鎖時 load 7.36／6.08／4.34，前後無殘留 server）。
+- [x] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空（訪客路徑、hook、共用元件、app、後端、核心零變更）
+  - 結果：輸出為空。
+- [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate history-filter-retention --strict` 通過
+  - 結果：`Change 'history-filter-retention' is valid`。

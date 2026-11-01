@@ -163,7 +163,6 @@ describe("RemoteHistoryView", () => {
 
 			expect(screen.getByRole("status").textContent).toBe(message);
 			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
-			expect(screen.queryByRole("radiogroup")).toBeNull();
 			expect(screen.queryByRole("alert")).toBeNull();
 			expect(screen.queryByTestId("history-record-m1")).toBeNull();
 		});
@@ -177,6 +176,113 @@ describe("RemoteHistoryView", () => {
 			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe("synced");
 			expect(screen.getByRole("radiogroup", { name: "歷史區間" })).not.toBeNull();
 			expect(screen.getByTestId("history-record-m1")).not.toBeNull();
+		});
+	});
+
+	describe("歷史頁保留篩選器", () => {
+		const FILTER_RANGE_LABELS = ["今日", "本週", "本月", "上月", "更早"] as const;
+
+		it.each([
+			["loading", "正在載入雲端資料…"],
+			["load-failed", "無法載入雲端資料，請重新整理頁面"],
+		] as const)("載入中與載入失敗時保留區間篩選並只以提示取代紀錄區塊", (status, message) => {
+			mockReadySession();
+			mockHistory({ syncStatus: status, items: [{ data: buildEntry("m1"), version: 1 }], total: 3, droppedCount: 2 });
+
+			const { container } = render(<RemoteHistoryView />);
+
+			const group = screen.getByRole("radiogroup", { name: "歷史區間" });
+			const radios = within(group).getAllByRole("radio");
+			expect(radios.map((radio) => radio.textContent)).toEqual([...FILTER_RANGE_LABELS]);
+			expect(screen.getByRole("radio", { name: "今日" }).getAttribute("aria-checked")).toBe("true");
+			expect(screen.getByRole("status").textContent).toBe(message);
+			expect(container.firstElementChild?.getAttribute("data-sync-status")).toBe(status);
+			expect(screen.queryByTestId("history-record-m1")).toBeNull();
+			expect(screen.queryByTestId("empty-history")).toBeNull();
+			expect(screen.queryByTestId("empty-history-range")).toBeNull();
+			expect(screen.queryByRole("alert")).toBeNull();
+		});
+
+		it("以鍵盤切換區間時焦點在載入中、載入完成與載入失敗後都留在被選取的區間選項", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			const blockedResult: UseRemoteHistoryResult = {
+				items: [],
+				total: 0,
+				droppedCount: 0,
+				syncStatus: "loading",
+			};
+			const syncedResult: UseRemoteHistoryResult = {
+				items: [{ data: buildEntry("m1"), version: 1 }],
+				total: 1,
+				droppedCount: 0,
+				syncStatus: "synced",
+			};
+			let weekResult: UseRemoteHistoryResult = blockedResult;
+			let monthResult: UseRemoteHistoryResult = blockedResult;
+			vi.mocked(useRemoteHistory).mockReset();
+			vi.mocked(useRemoteHistory).mockImplementation(({ range }) => {
+				if (range === "thisWeek") return weekResult;
+				if (range === "thisMonth") return monthResult;
+				return syncedResult;
+			});
+
+			try {
+				const { rerender } = render(<RemoteHistoryView />);
+
+				// 取得選項的 DOM 參照後，每個階段都斷言焦點仍在同一個節點上（篩選器從未卸載）
+				const week = screen.getByRole("radio", { name: "本週" });
+				week.focus();
+				await user.keyboard("{Enter}");
+				expect(document.activeElement).toBe(week);
+				expect(week.getAttribute("aria-checked")).toBe("true");
+
+				weekResult = syncedResult;
+				rerender(<RemoteHistoryView />);
+				expect(document.activeElement).toBe(week);
+				expect(week.getAttribute("aria-checked")).toBe("true");
+
+				const month = screen.getByRole("radio", { name: "本月" });
+				monthResult = { ...blockedResult, syncStatus: "load-failed" };
+				month.focus();
+				await user.keyboard("{Enter}");
+				expect(document.activeElement).toBe(month);
+				expect(month.getAttribute("aria-checked")).toBe("true");
+			} finally {
+				vi.mocked(useRemoteHistory).mockReset();
+			}
+		});
+
+		it("載入失敗後改選其他區間會以新區間重新載入並顯示紀錄", async () => {
+			const user = userEvent.setup();
+			mockReadySession();
+			vi.mocked(useRemoteHistory).mockReset();
+			vi.mocked(useRemoteHistory).mockImplementation(({ range }) => {
+				if (range === "thisWeek") {
+					return {
+						items: [{ data: buildEntry("m1"), version: 1 }],
+						total: 1,
+						droppedCount: 0,
+						syncStatus: "synced",
+					};
+				}
+				return { items: [], total: 0, droppedCount: 0, syncStatus: "load-failed" };
+			});
+
+			try {
+				render(<RemoteHistoryView />);
+				expect(screen.getByRole("status").textContent).toBe("無法載入雲端資料，請重新整理頁面");
+
+				await user.click(screen.getByRole("radio", { name: "本週" }));
+
+				expect(vi.mocked(useRemoteHistory).mock.lastCall?.[0].range).toBe("thisWeek");
+				expect(screen.getByTestId("history-record-m1")).not.toBeNull();
+				expect(screen.queryByRole("status")).toBeNull();
+				expect(screen.getByRole("radiogroup", { name: "歷史區間" })).not.toBeNull();
+				expect(screen.getByRole("radio", { name: "本週" }).getAttribute("aria-checked")).toBe("true");
+			} finally {
+				vi.mocked(useRemoteHistory).mockReset();
+			}
 		});
 	});
 
