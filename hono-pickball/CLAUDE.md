@@ -88,10 +88,10 @@
   - 掛 `localAuth, requireSession, requireExpectedUser`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
   - 多筆契約要點：複合主鍵 `(user_id, id)`；`sort_order = coalesce(max,-1)+1`；`GET` 依 `sort_order, rowid` 排序；只有主鍵衝突判 409，其他約束違規為 500（`isConstraintError` 只認 `SQLITE_CONSTRAINT_PRIMARYKEY` 與 `UNIQUE constraint failed`，並沿 cause 鏈查找）
 - **matchmaker 回合、場次分槽與送出比分 API**（同在 `src/routes/matchmaker.ts`；`src/matchmaker/{round,slots,score}-repository.ts`）：
-  - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。寫入為 3 條的 batch：回合寫入 → 提高版本下限 → 刪除孤兒分槽。此順序符合 spec 字面，舊回合裝置重排時會先得到 400 而非 409，不要自行對調
+  - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序符合 spec 字面，舊回合裝置重排時會先得到 400 而非 409，不要自行對調。寫入為 3 條的 batch：回合寫入 → 提高版本下限 → 刪除孤兒分槽
   - `GET /slots`（清單）、`GET /slots/:matchId`（單筆，不存在回 `{ data: null, version: 0 }`）、`PUT /slots/:matchId`（path 的 `matchId` 必須等於 `data.matchId`，否則 400；版本不符 409）。**`GET /slots` 的 `orderBy`（依 `match_id`）必須保留**：不排序時 `ANALYZE` 後查詢計畫可能改變回傳順序
   - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽（刪除之前先提高版本下限）；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
-  - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
+  - `POST /reset` 的 batch 刪除四張表，共 5 條（含第一條提高版本下限，見上方名單 API）
   - **新增或修改使用者資料端點時須遵守**：
     1. **歷史只增不改**：歷史沒有 PUT 更新，只能以 import 式附加寫入；讀取走 `GET /api/matchmaker/history`（見下方「matchmaker 歷史讀取 API」）。前端 `buildRemoteBackupSnapshot()` 的 `history` 取自雲端
     2. **「雲端為空才寫入」用整批守衛**（`POST /api/import` 即如此）；「雲端已有資料」沿用 409 `VERSION_CONFLICT`，不另增錯誤碼，由前端依端點語意顯示文案。寫入的分槽 MUST 屬於同批回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗
