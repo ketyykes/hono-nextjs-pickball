@@ -56,19 +56,19 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `hono-pickball/test/body-limit.test.ts`，it「共用 body 上限 middleware 超過上限時回 413 PAYLOAD_TOO_LARGE 且不執行下一層」（測試用 Hono app、上限 16；含有 `Content-Length` 與無 `Content-Length` 的串流兩種 17 位元組請求）。確認紅燈（模組不存在）
-- [ ] 3.2 GREEN（TDD）：新增 `src/http/body-limit.ts` 的 `jsonBodyLimit(maxSize)`：包裝 `hono/body-limit` 的 `bodyLimit`，`onError` 回 `c.json({ error: API_ERROR_CODES.PAYLOAD_TOO_LARGE }, 413)`（design Decision 5）
-- [ ] 3.3 RED（TDD）：`test/local-import.test.ts` 依檔頭例外 ② 修改一條斷言，並新增 it「單段 JSON 參數恰為上限時匯入成功，超過一位元組時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」「參賽者恰為 500 位時匯入成功，501 位時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」
+- [x] 3.1 RED（TDD）：新增 `hono-pickball/test/body-limit.test.ts`，it「共用 body 上限 middleware 超過上限時回 413 PAYLOAD_TOO_LARGE 且不執行下一層」（測試用 Hono app、上限 16；含有 `Content-Length` 與無 `Content-Length` 的串流兩種 17 位元組請求）。確認紅燈（模組不存在）
+- [x] 3.2 GREEN（TDD）：新增 `src/http/body-limit.ts` 的 `jsonBodyLimit(maxSize)`：包裝 `hono/body-limit` 的 `bodyLimit`，`onError` 回 `c.json({ error: API_ERROR_CODES.PAYLOAD_TOO_LARGE }, 413)`（design Decision 5）
+- [x] 3.3 RED（TDD）：`test/local-import.test.ts` 依檔頭例外 ② 修改一條斷言，並新增 it「單段 JSON 參數恰為上限時匯入成功，超過一位元組時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」「參賽者恰為 500 位時匯入成功，501 位時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」
   「請求 body 超過匯入上限時回 413 PAYLOAD_TOO_LARGE 且雲端不寫入」「超過上限的匯入不呼叫 D1 batch」「batch 拋出非守衛錯誤時匯入回 500 而非 409」「參賽者 id 為空字串的匯入請求回 400 且不寫入」。
   邊界資料以核心 `serializeImportSegments`／`utf8ByteLength`／常數計算填充長度，不寫字面值；替身沿用 `test/matchmaker-players.test.ts` 的 `batchFailingDb` 寫法（`app.request` 注入 env）。
   確認紅燈；**「batch 拋出非守衛錯誤時匯入回 500 而非 409」與「參賽者 id 為空字串的匯入請求回 400 且不寫入」預期先綠**（後者因 2.4 已收緊核心 schema；真紅證據為 2.3）——點名並標 regression guard
-- [ ] 3.4 GREEN（TDD）：`src/import/local-import-repository.ts`：`ImportOutcome` 加 `{ kind: "too-large" }`；第一步 `checkImportLimits(input)`，不通過即回 `too-large`（不建立陳述式、不呼叫 `db.batch()`）；通過時以 `segments` 作為五個 `json_each` 參數，移除自行 `JSON.stringify`。
+- [x] 3.4 GREEN（TDD）：`src/import/local-import-repository.ts`：`ImportOutcome` 加 `{ kind: "too-large" }`；第一步 `checkImportLimits(input)`，不通過即回 `too-large`（不建立陳述式、不呼叫 `db.batch()`）；通過時以 `segments` 作為五個 `json_each` 參數，移除自行 `JSON.stringify`。
   `src/routes/import.ts`：`post("/", jsonBodyLimit(IMPORT_BODY_LIMIT_BYTES), zValidator(…), handler)`，`too-large` 回 `413 { error: PAYLOAD_TOO_LARGE }`（design Decision 4、5）。3.3 全綠、`local-import.test.ts` 與 `expected-user-guard.test.ts` 既有 it 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
-- [ ] 3.5 RED（TDD）：`test/matchmaker-players.test.ts` 新增 it「匯入恰 500 位參賽者成功，501 位時回 413 PAYLOAD_TOO_LARGE 且不寫入」「匯入請求 body 超過上限時回 413 PAYLOAD_TOO_LARGE 且不寫入」「匯入含 id 為空字串的參賽者時回 400 且不寫入」。
+- [x] 3.5 RED（TDD）：`test/matchmaker-players.test.ts` 新增 it「匯入恰 500 位參賽者成功，501 位時回 413 PAYLOAD_TOO_LARGE 且不寫入」「匯入請求 body 超過上限時回 413 PAYLOAD_TOO_LARGE 且不寫入」「匯入含 id 為空字串的參賽者時回 400 且不寫入」。
   確認紅燈；**「匯入含 id 為空字串的參賽者時回 400 且不寫入」預期先綠**（2.4 已收緊；真紅證據為 2.3）——點名並標 regression guard
-- [ ] 3.6 GREEN（TDD）：`src/routes/matchmaker.ts` 的 `POST /players/import`：`jsonBodyLimit(PLAYER_IMPORT_BODY_LIMIT_BYTES)` 掛在 `zValidator` 之前；驗證後 `players.length > MAX_PLAYERS_PER_IMPORT` 回 `413 { error: PAYLOAD_TOO_LARGE }`，不呼叫 repository。
+- [x] 3.6 GREEN（TDD）：`src/routes/matchmaker.ts` 的 `POST /players/import`：`jsonBodyLimit(PLAYER_IMPORT_BODY_LIMIT_BYTES)` 掛在 `zValidator` 之前；驗證後 `players.length > MAX_PLAYERS_PER_IMPORT` 回 `413 { error: PAYLOAD_TOO_LARGE }`，不呼叫 repository。
   `test/matchmaker-players.test.ts` 與 `test/expected-user-guard.test.ts` 全綠；`pnpm --filter ./hono-pickball typecheck` exit 0
-- [ ] 3.7 REFACTOR：視需要整理（例：兩個 route 的 413 回應是否值得共用一個小函式）；無壞味道註記 skipped
+- [x] 3.7 REFACTOR：視需要整理（例：兩個 route 的 413 回應是否值得共用一個小函式）；無壞味道註記 skipped
 
 ## 4. 前端：oversize 判定、413 分類與文案
 
