@@ -423,4 +423,35 @@ describe("/api/matchmaker/round", () => {
 		}
 		expect(await getRound(cookie)).toEqual({ data: original, version: 2 });
 	});
+
+	it("回合 PUT 把已完成場次改回未完成時回 400 且不寫入", async () => {
+		const cookie = await seedAndSignIn("mr-uncomplete@example.com");
+		const userId = await userIdOf("mr-uncomplete@example.com");
+		const original = makeRound([makeMatch("m1"), makeMatch("m2", "completed"), makeMatch("m3")]);
+		await seedRound(userId, original);
+		await seedSlot(userId, makeSlot("m1"));
+		await seedSlot(userId, makeSlot("m3"));
+
+		const toPending = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m1"), makeMatch("m2")]),
+			version: 1,
+		});
+		const toScoring = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m1"), { ...makeMatch("m2"), status: "scoring" }, makeMatch("m3")]),
+			version: 1,
+		});
+		// 重複 id：第一場內容相同，第二場同 id 卻為 pending，不能只看第一筆
+		const duplicateId = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m1"), makeMatch("m2", "completed"), makeMatch("m2"), makeMatch("m3")]),
+			version: 1,
+		});
+
+		for (const res of [toPending, toScoring, duplicateId]) {
+			expect(res.status).toBe(400);
+			expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+		}
+		expect(await getRound(cookie)).toEqual({ data: original, version: 1 });
+		expect(await slotMatchIds(cookie)).toEqual(["m1", "m3"]);
+		expect(await rowsOf("sync_version_floors", userId)).toEqual([]);
+	});
 });
