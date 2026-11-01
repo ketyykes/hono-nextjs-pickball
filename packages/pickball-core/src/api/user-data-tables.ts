@@ -9,6 +9,7 @@ export const USER_DATA_TABLES = [
   "matchmaker_match_slots",
   "matchmaker_history",
   "sync_batch_guards",
+  "sync_version_floors",
 ] as const;
 
 export type UserDataTable = (typeof USER_DATA_TABLES)[number];

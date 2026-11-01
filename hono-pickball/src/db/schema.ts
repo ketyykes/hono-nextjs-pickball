@@ -186,3 +186,15 @@ export const syncBatchGuards = sqliteTable("sync_batch_guards", {
   version: integer("version").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+// 版本下限：記錄使用者曾經用過的最大 version，刪除後重建的列才不會重複使用舊版本號。
+// version 刻意不設 DEFAULT 且為 NOT NULL，提高下限的陳述式若誤算出 NULL，
+// 要以 NOT NULL 失敗暴露，而不是被預設值靜默取代。
+// 欄位順序為 user_id、version、updated_at：寫入端使用位置式 INSERT … SELECT，順序不同會使 version 與 updated_at 對調。
+export const syncVersionFloors = sqliteTable("sync_version_floors", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
