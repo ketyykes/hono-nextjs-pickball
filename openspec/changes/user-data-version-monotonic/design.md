@@ -193,7 +193,12 @@
   提高下限的 `INSERT … SELECT … ON CONFLICT DO UPDATE` MUST 帶 `WHERE`（本設計為 `WHERE v IS NOT NULL`）；`insert().select(sql\`…\`)` 可傳 SQL 樣板。`guides/upsert`：`onConflictDoUpdate({ target, set })` 的 `set` 可用 `sql\`excluded.<col>\`` 參照提議值。
 - `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`worker-api/d1-database#batch`）：「each statement in the list will execute and commit sequentially, non-concurrently. Batched statements are SQL transactions; if a statement fails … the entire sequence is aborted or rolled back」——
   提高下限與刪除同批即原子；讀下限與建立在同一條陳述式內，無先讀後寫的時間窗。`best-practices/retry-queries`：寫入期間資料庫被鎖，寫入彼此序列化。
-- **尚待 apply §1 實測**（Open Questions 3）：drizzle 0.45.2 在 `db.batch` 內執行 `insert().select(sql…).onConflictDoUpdate(…)` 的實際 SQL；`set` 中引用既有列欄位的寫法（`sync_version_floors.version` 或未限定欄名）在 SQLite upsert 中的解析。
+- **apply §1.3 再查證（2026-11-01）**：`/drizzle-team/drizzle-orm-docs` 的 `sqlite/insert`「Insert into … select」警語與 `guides/upsert`（`set` 以 `sql\`excluded.<col>\`` 參照提議值）內容與 propose 時相同；
+  `/llmstxt/developers_cloudflare_d1_llms-full_txt` 的 `batch()`：「execute and commit, sequentially, non-concurrently」「Batched statements are SQL transactions … aborts or rolls back the entire sequence」，與 propose 時相同。設計假設不變。
+- **apply §1.3 實測**（一次性 workerd 探針 `test/zz-probe-floor.test.ts`，因 0004 尚未產生而在探針內臨時建表；跑完即刪、未 commit）——結果見 Open Questions 3，全部與 Decision 3 相符。
+  drizzle 0.45.2 產生的提高下限 SQL 為：
+  `insert into "sync_version_floors" ("user_id", "version", "updated_at") SELECT ?, v, ? FROM (SELECT max(v) AS v FROM (<被刪列子查詢>)) WHERE v IS NOT NULL on conflict ("sync_version_floors"."user_id") do update set "version" = max("sync_version_floors"."version", excluded.version), "updated_at" = excluded.updated_at`。
+  `insert().select()` 會依 schema 宣告順序**明確列出欄名**，所以 SELECT 的位置必須與 `user_id, version, updated_at` 的宣告順序一致（tasks 2.2 已要求）；`set` 中以 `${syncVersionFloors.version}` 產生的限定欄名 `"sync_version_floors"."version"` 在 SQLite upsert 中正確解析為既有列。
 
 ## Open Questions
 
@@ -204,8 +209,48 @@
    建議 coordinator 另開 change（TDD：新增「把已完成場次改回未完成回 400」的 scenario）。本 change 的測試刻意不依賴此行為（送出比分的分槽改以「重置＋重新匯入」重建）。
 3. **apply §1 實測項**：(a) `raiseVersionFloor` 在 `db.batch` 內可執行，`ON CONFLICT DO UPDATE SET version = max(<既有>, excluded.version)` 只升不降，空集合時零列寫入；(b) `initialVersion` 子查詢在 `INSERT … SELECT FROM json_each` 中只計算一次且值正確；
    (c) `importPlayers` 的多條 `insert().values().returning()` 在 batch 結果中可依序取回 version。任一與本 design 不符，改寫 Decision 3 並記錄於此。
+   **（apply §1.3 實測結果，2026-11-01，皆符合，Decision 3 不需改寫）**：
+   (a) 符合：空集合時 batch 成功且下限表 0 列；先刪 v3 的 `p1`、再刪 v1 的 `p2` 後下限為 3（不被降低）；三表 `UNION ALL`（players 空、round v7、slots 空）提高後為 7。
+   (b) 符合：下限 5 時以 `json_each` 一次插入 3 位參賽者，三列 version 皆為 6（子查詢與列無關，值一致）；`putSlot` 形式的 `INSERT … SELECT … WHERE …` 與 `putRound` 形式的 `values({ version: <SQL> })` 也都寫入 6。
+   (c) 符合：下限 2 時 batch 內 3 條 `insert().values({ version: initialVersion }).returning()`，`batch` 結果依陳述式順序為 `[[x,3]],[[y,3]],[[z,3]]`，可直接組回應。
 4. **（已定案）為何連 API 層才會用到的重建路徑也處理**：前端新增參賽者與 CSV 匯入用隨機 UUID，`PUT /players/:id` version 0 與 `POST /players/import` 在正常使用下不會以舊 id 重建；
    但下限是「表」的不變式，只放過某些建立路徑會讓不變式依賴前端行為，且每條路徑的改動只是把常數 `1` 換成子查詢。故全部建立路徑一致處理。
 5. **（審查建議，未採納）`onConflictDoUpdate` 加 `setWhere: excluded.version > 既有`**：見 Decision 3 末條。
 6. **與並行 change `user-data-import-limits` 的衝突**：該 change 也 MODIFIED `user-data-sync`「本機資料匯入雲端的 API」，並改 `src/import/local-import-repository.ts`（送進 `json_each` 的參數形狀）與 `test/local-import.test.ts`，與本 change 3.10 的 `selectFromJsonEach` 簽章重疊。
    **後歸檔者 MUST 以先歸檔者合併後的主 spec 為底重做 MODIFIED**，程式碼由後合併者手動 rebase（tasks 1.2 已要求）；兩者語意不衝突（筆數上限 vs. 初始 version）。
+   - **（apply §1.2 落實，2026-11-01）** `user-data-import-limits` 已先歸檔（`openspec/changes/archive/2026-11-01-user-data-import-limits/`）並合併進 main（`4088acf`）。對齊結果：
+     - `user-data-sync` delta 的 MODIFIED「本機資料匯入雲端的 API」原本以舊主 spec 為底，漏了主 spec 現有的 8 個 scenario（單段參數上限、500 位上限、body 上限、不送出 batch、非守衛錯誤 500、空字串 id 400、共用參數形狀、共用上限判定），
+       且仍寫著「單段超過 2MB 回 500」，使 `openspec validate --strict` 失敗。已改為**以目前主 spec 該 Requirement 全文為底**，只加兩處本 change 的增修：「原子性與冪等」段加入「守衛條件 SHALL NOT 包含 `sync_version_floors`」一句；
+       「陳述式數量為常數」段的「所有匯入列的 `version` 為 1」改為「參賽者、回合、分槽為下限加一，歷史與獨立計分板為 1」。上限用語沿用主 spec 的「D1 單一字串上限 2,000,000 位元組」與 413 行為，舊的「回 500」敘述已刪除。
+     - `user-data-sync` 另兩個 MODIFIED（「版本化讀寫契約」「多筆使用者資料的逐筆版本化契約」）、`round-lifecycle` 的 MODIFIED「回合與送出比分的雲端 API」逐行比對主 spec：只有本 change 預期的增修，無遺漏；`backend-database` 為純 ADDED。
+     - test-plan「本機資料匯入雲端的 API」既有列改為「全部 21 個 it」（import-limits 後 `local-import.test.ts` 由 11 個增為 21 個）、「超過上限回 413 後各表仍零列」（原寫「2MB 失敗」）。
+     - 程式碼：`local-import-repository.ts` 現由核心 `checkImportLimits` 先判定上限（413 在 `db.batch` 之前），送進 `json_each` 的五段 JSON 取自 `limits.segments`。3.10 的 `selectFromJsonEach` 只在既有四個參數 `(userId, fields, json, updatedAt)` 之外**增加一個 `version: SQL` 參數**，
+       不動 `checkImportLimits` 的呼叫位置與 `segments` 的來源，因此 413 行為與既有 21 個 it 不受影響（3.10 驗收含 `test/local-import.test.ts` 全綠）。
+     - 刪除路徑（`grep -rn "delete(matchmaker" hono-pickball/src` 7 行、4 條路徑）與建立路徑（7 條）與 Context 盤點表一致，無新增。
+7. **（apply 進度紀錄，2026-11-01，leader 在派下一組之前停止）**：
+   - 已完成並勾選：§1（1.1～1.3）、§2（2.1、2.2，Stage 1／2 皆 PASS）。
+   - §3（3.1～3.11）實作已 commit（`3da926e`～`51b9e85`，3.11 REFACTOR 註記 skipped；後端全套 26 檔／204 it 綠），Stage 1 PASS；
+     **Stage 2（opus）審查在本次停止時仍在執行中，結果未收到**，因此 §3 的 checkbox 尚未勾選。續作者 MUST 重派 §3 Stage 2（範圍 `ca97892..51b9e85`），通過後才勾選 3.1～3.11。
+   - §3 Implementer 回報：upsert「`max(既有, excluded)` 改為直接覆寫 `excluded.version`」的變異在 §3 無法觀察（只有 reset 會提高下限，且 reset 刪除三表全部列）；§4 的 `deletePlayer`（先刪 v3 的 p1、再刪 v1 的 p2）MUST 覆蓋此變異，§4 Stage 2 須確認。
+   - `51b9e85` 在「重置後重建的回合…」it 尾端追加「再重置後匯入，驗歷史與獨立計分板 version 為 1」步驟（殺死「獨立計分板段改用下限」變異）；Stage 1 判可接受。
+   - 尚未開始：§4、§5、Final Code Review、完整驗收（含 E2E）。
+8. **（第二任 leader，2026-11-01，coordinator 對 §3 的追加裁定落實）**：
+   - §3 Stage 2（opus）已 PASS、無必修項（獨立 27 條變異＋2 條對照組），3.1～3.11 已勾選（`ae8c976`）。
+   - **it 名稱涵蓋追加步驟**（`16dd4b7`，`test:`，refactor 性質、非紅燈）：it 改名為「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1」；
+     delta `user-data-sync` 的 Scenario「版本下限：重置後重建的回合不被持舊版本的裝置覆寫」WHEN／THEN 補上第二次重置與匯入（參賽者 version 4、歷史與獨立計分板 version 1），驗收錨點與 test-plan 三處名稱逐字一致。
+     tasks 3.1 的文字保留當時的 it 名稱（歷史紀錄，未改）。`openspec validate user-data-version-monotonic --strict` 通過。
+   - **跨使用者隔離補強**（`7578120`，`test:`，**regression guard**，寫入即綠）：新增 it「其他使用者有較高版本的資料時重置只依本人的資料提高下限」與對應 Scenario「版本下限：重置只依本人的資料提高下限」、test-plan 列。
+     B 的參賽者／回合／分槽分別為 v5／v6／v7，A 為 v2／v1／v1；A 重置後下限 2、重建皆得 3，B 不受影響。變異（`players-repository.ts` 重置選取，三重落地檢查皆過、每次還原後 `git status` 乾淨）：
+     M7b-p（players 選取拿掉 `user_id`）、M7b-r（round）、M7b-s（slots）在**只執行此 it**（`-t`）時各自轉紅；對照組「round 段 `UNION ALL` 改 `UNION`」綠。
+     因此新增 1 個 it，5.3 的後端預期數字由「基線 + 1 檔、+15 it」變為「+1 檔、+16 it」。
+   - 非必修 2（`updated_at` 未測）、非必修 3（`let results` 型別）依裁定不處理。M6（upsert 直接覆寫 `excluded.version`）移交 §4 的 deletePlayer it 覆蓋。
+9. **（第二任 leader，2026-11-01，§4 結果）**：
+   - §4（`ab06d04`～`a9c33d9`）Stage 1 PASS、Stage 2（opus）PASS 無必修項，4.1～4.7 已勾選（`7d867a4`）。M6（upsert 直接覆寫 `excluded.version`）由 §4 的「刪除參賽者後以同 id 重建時版本大於刪除前」覆蓋，單獨執行即轉紅（Implementer 與 Stage 2 皆實跑）。
+   - **Stage 2 非必修觀察 1 的處理（leader 決定，比照 coordinator 對 §3 的裁定 2）**：三條逐筆刪除路徑（deletePlayer、putRound 孤兒清除、送出比分）的下限選取若漏掉 `user_id`，整檔執行時會轉紅，但只因同檔前面的 it 留下他人資料，單獨 `-t` 執行時三條全部存活。
+     已新增 regression guard it「其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限」與對應 Scenario「版本下限：逐筆刪除路徑只依本人的資料提高下限」、test-plan 列（`a53cd15`，寫入即綠）。
+     以 `-t` 只跑此 it：A4（deletePlayer 漏 `user_id`，得 5≠1）、B6（putRound，9≠2）、C4（送出比分，9≠3）各自轉紅；對照組 `WHERE v NOT NULL` 綠。**請 coordinator 確認此追加可接受**。
+   - Stage 2 非必修觀察 2（deletePlayer 與送出比分在「沒有列被刪除」時不寫下限列，未有斷言；只有逐路徑自行改寫選取為 `coalesce(max, 0)` 的變異會存活，共用的外層 WHERE 已被兩條 it 守住）：風險低，未處理，留待 coordinator 裁定。
+   - 後端 it 數：§3 後 26 檔／205（含 §3 追加的隔離 it）→ §4 後 209 → 本次追加後 210。5.3 的預期因此為「基線 25 檔／193 + 1 檔、+17 it」＝ 26 檔／210（原計畫 +15，另加兩條隔離 regression guard）。
+10. **（第二任 leader，2026-11-01，apply 完成）**：§5 完成（5.1 文件經 Stage 1 退回一次後 PASS、Stage 2 PASS；5.2～5.5 指令驗收皆通過，數字見 tasks §5）。Final Code Review（opus）PASS、無必修項；
+    其非必修觀察 1（test-plan C3 期望與 regression guard 計數過時）已同步（`13e85ae`）；觀察 2、3（`51b9e85`、`3da926e` 的 commit body 未標註 regression guard／先綠 it，僅記於 tasks 與本節第 7 點）屬已提交的歷史，不改寫 commit。
+    待 coordinator 裁定：第 9 點的 §4 追加隔離 it 是否接受、Stage 2 非必修觀察 2（deletePlayer／送出比分「無列被刪除時不寫下限列」未斷言）是否需要補。

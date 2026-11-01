@@ -79,24 +79,26 @@
   - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
   - **預期帳號守衛**（`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 15 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
   - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
+  - `sync_version_floors` 為版本下限表，不屬任何 feature（`user_id` 為主鍵，每位使用者最多一列），用途見下方「新增或修改使用者資料端點時須遵守」第 6 點
   - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
   - sub-app 的 `onError` 要把 JSON 語法錯誤的 `HTTPException(400)` 轉為 `INVALID_BODY`，共用實作為 `src/http/invalid-body.ts` 的 `userDataOnError`（搭配 zValidator 的 `invalidBodyHook`），新 sub-app 直接沿用、不要另寫
   - **授權覆蓋表**：每個端點須有四類測試——未登入 401、他人資料不可見／不可改、帳號停用 404、預期帳號缺少／不符 401（第四類由 `test/expected-user-guard.test.ts` 的列舉 it 統一覆蓋）
 - **matchmaker 名單 API**（`src/routes/matchmaker.ts`、`src/matchmaker/players-repository.ts`）：
-  - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409；body ≤ 1,000,000 位元組、參賽者 ≤ 500 位，超過回 413 `PAYLOAD_TOO_LARGE`；每位參賽者的 id 不可為空字串，空字串回 400）；`POST /reset`（`db.batch()` 一次刪除 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表）
+  - 端點 `/api/matchmaker/*`：`GET /players`；`PUT /players/:id`（per-record version，version 0 為建立，path id 必須等於 `data.id`）；`DELETE /players/:id`（冪等 204；以 2 條的 batch 先提高版本下限再刪除）；`POST /players/import`（`db.batch()` 原子，主鍵衝突 409；body ≤ 1,000,000 位元組、參賽者 ≤ 500 位，超過回 413 `PAYLOAD_TOO_LARGE`；每位參賽者的 id 不可為空字串，空字串回 400）；`POST /reset`（`db.batch()` 共 5 條：第一條提高版本下限，再依序刪除 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表）
   - 掛 `localAuth, requireSession, requireExpectedUser`，錯誤處理用 `userDataOnError`；共用的 `src/http/invalid-body.ts`（`userDataOnError`、`invalidBodyHook`，scoreboard 與 matchmaker 共用）——**凡是使用者資料路由都沿用它，不要各寫一份**
   - 多筆契約要點：複合主鍵 `(user_id, id)`；`sort_order = coalesce(max,-1)+1`；`GET` 依 `sort_order, rowid` 排序；只有主鍵衝突判 409，其他約束違規為 500（`isConstraintError` 只認 `SQLITE_CONSTRAINT_PRIMARYKEY` 與 `UNIQUE constraint failed`，並沿 cause 鏈查找）
 - **matchmaker 回合、場次分槽與送出比分 API**（同在 `src/routes/matchmaker.ts`；`src/matchmaker/{round,slots,score}-repository.ts`）：
-  - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序符合 spec 字面，舊回合裝置重排時會先得到 400 而非 409，不要自行對調
+  - `GET /round` 回 `{ data | null, version }`（尚無回合時 `version` 為 0）；`PUT /round` 帶 `{ data, version }`，回應為寫入後的資料與新版本。**判定順序**：先比對完成狀態（PUT 不得改變場次完成狀態，違反回 400 `INVALID_BODY`），再比版本（不符回 409 `VERSION_CONFLICT`）。此順序符合 spec 字面，舊回合裝置重排時會先得到 400 而非 409，不要自行對調。寫入為 3 條的 batch：回合寫入 → 提高版本下限 → 刪除孤兒分槽
   - `GET /slots`（清單）、`GET /slots/:matchId`（單筆，不存在回 `{ data: null, version: 0 }`）、`PUT /slots/:matchId`（path 的 `matchId` 必須等於 `data.matchId`，否則 400；版本不符 409）。**`GET /slots` 的 `orderBy`（依 `match_id`）必須保留**：不排序時 `ANALYZE` 後查詢計畫可能改變回傳順序
-  - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
-  - `POST /reset` 的 batch 已擴充為四張表（見上方名單 API）
+  - `POST /round/matches/:matchId/score`（body `{ scoreA, scoreB, roundVersion }`）：後端權威，以核心套件純函式計算評分，在**同一個 batch** 內更新四位球員評分、回合完成狀態、寫歷史、刪除該場分槽（刪除之前先提高版本下限）；不合法（`empty-field`、`invalid-number`、`negative-score`、`tie`）回 400；`match-not-found`、`already-completed`、`scoring-failed`、版本條件不成立或同一場次已有歷史回 409。由「多表寫入用整批守衛」保護
+  - `POST /reset` 的 batch 刪除四張表，共 5 條（含第一條提高版本下限，見上方名單 API）
   - **新增或修改使用者資料端點時須遵守**：
     1. **歷史只增不改**：歷史沒有 PUT 更新，只能以 import 式附加寫入；讀取走 `GET /api/matchmaker/history`（見下方「matchmaker 歷史讀取 API」）。前端 `buildRemoteBackupSnapshot()` 的 `history` 取自雲端
     2. **「雲端為空才寫入」用整批守衛**（`POST /api/import` 即如此）；「雲端已有資料」沿用 409 `VERSION_CONFLICT`，不另增錯誤碼，由前端依端點語意顯示文案。寫入的分槽 MUST 屬於同批回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗
     3. **守衛 batch 不抽共用包裝**：`guardedBatch` **不是程式碼中的具名函式**；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在呼叫端（`src/matchmaker/score-repository.ts` 的送出比分函式、`src/import/local-import-repository.ts`）。不抽的理由：匯入為固定 7 條且需取回計分板 `RETURNING` 結果，共用包裝需泛型與額外分類參數，複雜度高於兩處各數行的重複。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈
     4. **預期帳號守衛**：新 sub-app 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)`；掛在既有 sub-app 內的新端點雖自動受守衛保護，守衛樣本表仍 MUST 補一條（`GET /api/matchmaker/history`、`POST /api/import` 皆已在表內）
     5. **寫入歷史的規則**：① MUST 寫入 `played_at`（`Date.parse(playedAt)`），否則 `GET /history` 的區間查詢會漏掉；② 以 `asc` 讀回時順序為 `played_at` 加 `rowid`，批次寫入時 MUST 依本機的追加順序插入，同時間的紀錄才會維持原順序；③ 登入時重置不碰本機，本機五個 key 皆可作為匯入來源
+    6. **版本下限（防 ABA）**：刪除列後重建同 id 的列若 version 從頭起算，舊裝置手上的舊 version 會誤判為相符。因此：① 新增任何會刪除 `matchmaker_players`／`matchmaker_round`／`matchmaker_match_slots` 之列的寫入，MUST 在同一 batch、刪除之前呼叫 `raiseVersionFloor`；新增建立路徑 MUST 以 `initialVersion` 取初始 version。兩者位於 `src/matchmaker/version-floor.ts`；② 提高下限的選取條件 MUST 與刪除條件相同（`putRound` 以 `orphanSlotCondition` 共用）；③ 沒有列被刪除時不寫入下限列（外層 `WHERE v IS NOT NULL`）；④ `scoreboard_current`、`matchmaker_history`、`sync_batch_guards` 不適用，建立時 version 維持 1；⑤ `POST /api/import` 的守衛條件與重置的 DELETE 都不含 `sync_version_floors`
 - **本機資料匯入 API**（`src/routes/import.ts`、`src/import/local-import-repository.ts`，請求／回應契約在 `@pickball/core/api/import`）：
   - `POST /api/import`：獨立 sub-app，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`、`onError(userDataOnError)`、`zValidator` 以 `invalidBodyHook` 回 400；守衛樣本表已含此端點。請求為 `BackupSchema` 擴充 `scoreboard: { current, matches }`，`LocalImportRequestSchema` 拒絕重複參賽者 id／歷史 matchId／分槽 matchId、孤兒分槽、已完成場次的分槽與空匯入
   - **上限（超過回 413 `PAYLOAD_TOO_LARGE`，不送出 batch）**：路由掛 `jsonBodyLimit(IMPORT_BODY_LIMIT_BYTES)`（body 10,000,000 位元組，在 `zValidator` 之前）；repository 第一步以核心 `checkImportLimits` 判定，五段 JSON 參數各 ≤ `IMPORT_SEGMENT_LIMIT_BYTES`（1,900,000）、參賽者 ≤ 500 位，不通過即回 `too-large` 且不呼叫 `db.batch()`。理由：每段 JSON 參數在 D1 是一個字串，D1 單一字串上限為 2,000,000 位元組（1,900,000 保留 5% 餘裕），先在 batch 之前擋下，才不會讓整批在資料庫端失敗
@@ -122,7 +124,7 @@ D1 沒有互動式 transaction，只有 `db.batch()`：batch 中任一陳述式*
 - **禁止事項**：
   - 不得改用多次 `run()` 加 try/catch 補償：前面的寫入已提交，補償不可靠
   - 守衛 INSERT 不得加 `OR IGNORE`／`OR REPLACE`／`onConflictDoNothing`，否則違反約束的守衛會被靜默略過
-  - `sync_batch_guards.version` 不得有 `DEFAULT`，否則 NULL 會被預設值取代而不失敗
+  - `sync_batch_guards.version` 不得有 `DEFAULT`，否則 NULL 會被預設值取代而不失敗；`sync_version_floors.version` 同理（NULL 須以 NOT NULL 失敗暴露）
   - **drizzle 0.45.2 的 batch 內不可使用帶參數的 `db.run(sql)`**（`SQLiteRaw` 無 stmt，執行失敗）；一律改用 query builder 搭配 `sql` 片段（`insertBatchGuard` 即如此）
   - 不得在 JS 端先判定再傳常數條件（如 `sql`1``）：先讀後寫之間的競態就沒被消除。batch 前讀到的 version 只能當比較基準，比較本身必須在 SQL 內執行
 - 測試：`test/d1-batch-guard.test.ts` 固定兩個平台行為（0 列 UPDATE 不回滾、守衛失敗整批回滾）；repository 層以測試專用的 `afterRead` 鉤子模擬競態

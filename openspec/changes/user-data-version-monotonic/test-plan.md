@@ -15,7 +15,7 @@
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| 重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409 | 版本下限：重置後重建的回合不被持舊版本的裝置覆寫 | 回合 v2 → reset → `PUT {R2, 0}` 得 version 3；`PUT {R1′, 1}`、`PUT {R1′, 2}` 皆 409 `VERSION_CONFLICT`；GET 為 R2／3 | **ABA 的最小重現（design R1）**；現況重建得 1、`version: 1` 的 PUT 回 200 → 真紅 | integration |
+| 重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1 | 版本下限：重置後重建的回合不被持舊版本的裝置覆寫 | 回合 v2 → reset → `PUT {R2, 0}` 得 version 3；`PUT {R1′, 1}`、`PUT {R1′, 2}` 皆 409 `VERSION_CONFLICT`；GET 為 R2／3；再 reset → `POST /api/import`（一位參賽者、歷史、獨立計分板，無回合與分槽）200：參賽者 version 4、歷史與獨立計分板 version 1 | **ABA 的最小重現（design R1）**；現況重建得 1、`version: 1` 的 PUT 回 200 → 真紅 | integration |
 | 重置後以 version 0 重建同 id 的參賽者版本大於重置前且持舊版本的 PUT 回 409 | 版本下限：重置後以 version 0 重建同 id 的參賽者 | p1 v3、p2 v1 → reset → `PUT p1 {…, 0}` 得 4；`PUT p1 {…, 3}` 409；GET 的 p1 為重建值／4 | `putPlayer` 建立路徑；現況得 1 → 真紅 | integration |
 | 重置後批次附加同 id 的參賽者回應實際版本且持舊版本的 PUT 回 409 | 版本下限：重置後批次附加同 id 的參賽者 | p1 v2 → reset → `POST /players/import [p1, p2]` 回應 version `[3, 3]` 且等於 GET；`PUT p1` 以 1、2 皆 409 | `importPlayers` 建立路徑＋回應須為實際寫入值（現況 JS 寫死 1）→ 真紅 | integration |
 | 重置後重建同場次的分槽版本大於重置前且持舊版本的 PUT 回 409 | 版本下限：重置後重建同場次的分槽 | 回合 v1（pending `m1`）、`m1` 分槽 v2 → reset → 回合 `PUT 0` 得 3、分槽 `PUT 0` 得 3；分槽以 1、2 PUT 皆 409；GET `/slots/m1` 為重建值 | `putSlot` 建立路徑；現況得 1 → 真紅 | integration |
@@ -24,8 +24,10 @@
 | 刪除參賽者以單一 D1 batch 提高版本下限並刪除 | 版本下限：刪除參賽者以單一 batch 提高下限並刪除 | spy D1：`DELETE` 回 204；`batchSizes` 為 `[2]` | 原子性（提高下限與刪除不可分開提交）；現況不走 batch（`[]`）→ 真紅 | integration |
 | 回合 PUT 清除的分槽以同場次重建時版本大於清除前 | 版本下限：回合 PUT 清除的分槽以同場次重建 | 回合 `[m1, m2]`、`m1` 分槽 v3 → PUT `[m2, m3]` → PUT `[m1, m2, m3]`（m1 pending）→ 分槽 `PUT 0` 得 4；`PUT 3` 409 | `putRound` 孤兒清除路徑；現況得 1 → 真紅；§4 時「重置路徑已處理」也不會讓它變綠（不經重置） | integration |
 | 送出比分刪除的分槽在重置後重新匯入時版本大於刪除前 | 版本下限：送出比分刪除的分槽在重置後重新匯入 | 匯入（參賽者、pending `m1` 回合、`m1` 分槽）→ 分槽更新到 v5 → 送出 `m1` 比分 → reset → 再匯入同一份 → `m1` 分槽 version 6 | `submitScoreForUser` 刪除路徑；§3 完成（重置會提高下限）後仍只會得到 3（重置當下其餘列最大為 2）→ §4 時真紅 | integration |
+| 其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限 | 版本下限：逐筆刪除路徑只依本人的資料提高下限 | B：p1 v5、回合 v6（pending `m1`、`m2`）、`m1`／`m2` 分槽 v9；A：DELETE p1（v1）→ 下限 1；孤兒清除 `m1` 分槽（v2）→ 下限 2；送出 `m2` 比分刪除分槽（v3）→ 下限 3；B 的參賽者與分槽不變、無 B 的下限列 | 三條逐筆刪除路徑的 `user_id` 條件原本只被同檔前面 it 留下的他人資料間接擋住（單獨執行時漏 `user_id` 的變異會存活）；本列讓三者各自獨立被驗證。§4 實作後補入，**寫入即綠 → regression guard** | integration |
 | 沒有任何資料時重置仍回 204 且之後建立的版本為 1 | 版本下限：沒有任何資料時重置不失敗 | 新使用者 reset 204 → 回合與參賽者 `PUT 0` 皆得 1；`sync_version_floors` 無該使用者的列 | 空集合的 `max()` 為 NULL 會讓重置 500，寫入 0 列又會在熱路徑多一次寫入；**現況已綠 → regression guard**（守住 GREEN 後的 `WHERE v IS NOT NULL`） | integration |
 | 一位使用者的重置不影響其他使用者的建立版本 | 版本下限：一位使用者的下限不影響他人 | A 回合 v3 → A reset → B 回合與參賽者 `PUT 0` 皆得 1；`sync_version_floors` 無 B 的列 | 下限查詢漏 `user_id` 時轉紅；空集合時誤寫 0 列（`putRound` 每次都提高下限）時於 §4 轉紅；**現況已綠 → regression guard**，MUST 在 §3、§4 每個 GREEN 後保持綠 | integration |
+| 其他使用者有較高版本的資料時重置只依本人的資料提高下限 | 版本下限：重置只依本人的資料提高下限 | B：p1 v5、回合 v6、`m1` 分槽 v7；A：p1 v2、回合與 `m1` 分槽 v1 → A reset 204 → A 下限 2；A 回合、p1、`m1` 分槽 `PUT 0` 皆得 3；B 三表仍為 5／6／7、無 B 的下限列 | 重置三表選取各自的 `user_id` 條件原本只被同檔前面 it 留下的資料間接擋住，與 it 順序綁在一起；本列讓三表的選取各自獨立被驗證（單獨拿掉任一表的 `user_id` 即轉紅）。§3 實作後補入，**寫入即綠 → regression guard** | integration |
 | （既有）刪除參賽者回 204 且重複刪除仍回 204 | 版本下限：刪除參賽者後以同 id 重建（空集合的邊界） | 重複刪除與刪除不存在的 id 仍 204 | `deletePlayer` 改為提高下限後，選不到列時 `max()` 為 NULL；漏掉空集合處理會 500。regression guard | integration |
 | （既有，斷言調整）重置以單一 D1 batch 送出四條刪除 | 版本下限：重置在同一個 batch 內提高下限並刪除四張表 | spy D1：reset 回 204；`batchSizes` 由 `[4]` 改為 `[5]` | 提高下限與四條刪除同批；斷言於 §3 GREEN 同步修改（proposal Impact 允許例外 ①），改後即綠 | integration |
 
@@ -35,7 +37,7 @@
 |-----------|----------|-----------|-----------|------|
 | （既有）尚無資料時 GET 回 data null 與 version 0；以 version 0 首次寫入成功並回 version 1；以目前 version 寫入成功並遞增 version，GET 取回相同資料；version 不符時回 409 VERSION_CONFLICT 且資料不變；已有資料時以 version 0 寫入回 409；body 不符 schema 或 content-type 非 JSON 時回 400 INVALID_BODY | 對應既有 Scenario（計分板目前比賽） | 原樣通過 | `scoreboard_current` 不適用下限（Decision 5）；regression guard | integration |
 | （既有）versionedEnvelopeSchema 接受 data null 與非負整數 version；versionedWriteSchema 拒絕 null data 與負數或非整數 version | 共用契約 schema 的邊界 | 原樣通過 | regression guard | unit |
-| 重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409 | （本 Requirement 修改的「初始版本為下限加一」條款） | 同上表 | 修改條款的直接證據 | integration |
+| 重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1 | （本 Requirement 修改的「初始版本為下限加一」條款） | 同上表 | 修改條款的直接證據 | integration |
 
 ### Requirement: 多筆使用者資料的逐筆版本化契約（MODIFIED）
 
@@ -50,7 +52,7 @@
 
 | Test name | Scenario | Assertion | Why first | Tier |
 |-----------|----------|-----------|-----------|------|
-| （既有）`local-import.test.ts` 全部 11 個 it（含「匯入五段資料後各自為 version 1 且保留原順序」「四張對戰分配機表任一有資料時回 409 且整份不寫入」「300 位參賽者與 2000 筆歷史可一次匯入」「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」等） | 本 Requirement 全部既有 Scenario | 原樣通過（新使用者下限為 0，version 仍為 1；匯入不提高下限，ACCOUNT_MISMATCH 與 2MB 失敗後各表仍零列——含新表） | regression guard；`USER_DATA_TABLES` 加入新表後「每張表零列」的斷言自動涵蓋新表 | integration |
+| （既有）`local-import.test.ts` 全部 21 個 it（含「匯入五段資料後各自為 version 1 且保留原順序」「四張對戰分配機表任一有資料時回 409 且整份不寫入」「300 位參賽者與 2000 筆歷史可一次匯入」「預期帳號缺少或與 session 不符時匯入回 401 ACCOUNT_MISMATCH 且雲端不寫入」等） | 本 Requirement 全部既有 Scenario | 原樣通過（新使用者下限為 0，version 仍為 1；匯入不提高下限，ACCOUNT_MISMATCH 與超過上限回 413 後各表仍零列——含新表） | regression guard；`USER_DATA_TABLES` 加入新表後「每張表零列」的斷言自動涵蓋新表 | integration |
 | （既有）LocalImportRequestSchema 拒絕重複 id、孤兒分槽與空匯入 | 匯入 API：共用的匯入請求 schema | 原樣通過 | regression guard | unit |
 | （既有）每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變；缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變；列舉出的使用者資料路由恰與守衛樣本表一致 | 匯入 API：守衛樣本表含匯入端點 | 原樣通過（不新增路由，仍 15 條） | regression guard | integration |
 | 重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409；送出比分刪除的分槽在重置後重新匯入時版本大於刪除前 | （本 Requirement 修改的 version 條款與守衛不含下限表） | 同上表；第二次匯入回 200 即證明守衛不含下限表 | 修改條款的直接證據 | integration |
@@ -75,7 +77,7 @@
 |-----------|----------|-----------|-----------|------|
 | （既有）`matchmaker-round.test.ts`、`matchmaker-slots.test.ts`、`matchmaker-score.test.ts`、`matchmaker-players.test.ts` 中本 Requirement 的 14 個驗收 it | 本 Requirement 全部既有 Scenario | 原樣通過（「回合的單筆版本化讀寫」「分槽只能為目前回合的未完成場次建立」等皆為新使用者，version 仍為 1；送出比分的評分、歷史、回合 version + 1 不變） | regression guard | integration（核心 schema 一列為 unit） |
 | （既有，斷言調整）回合 PUT 的寫入與孤兒分槽清除在同一個 D1 batch 內送出 | 回合雲端 API：回合 PUT 以單一 batch 寫入、提高下限並清除分槽 | spy D1：200、409；`batchSizes` 由 `[2, 2]` 改為 `[3, 3]` | 下限與孤兒清除同批；斷言於 §4 GREEN 同步修改（proposal Impact 允許例外 ②），改後即綠 | integration |
-| 回合 PUT 清除的分槽以同場次重建時版本大於清除前；送出比分刪除的分槽在重置後重新匯入時版本大於刪除前；重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409 | （本 Requirement 修改的分槽清理、送出比分步驟 3、重置條款） | 同 `user-data-sync` 表 | 修改條款的直接證據 | integration |
+| 回合 PUT 清除的分槽以同場次重建時版本大於清除前；送出比分刪除的分槽在重置後重新匯入時版本大於刪除前；重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1 | （本 Requirement 修改的分槽清理、送出比分步驟 3、重置條款） | 同 `user-data-sync` 表 | 修改條款的直接證據 | integration |
 
 ## 指令驗收（非 Vitest，tasks 中標為「驗收（指令）」）
 
@@ -83,7 +85,7 @@
 |---|---|---|---|
 | C1 | （型別） | `pnpm -r exec tsc --noEmit`；`pnpm --filter ./hono-pickball typecheck`；`pnpm --filter ./packages/pickball-core typecheck` | 皆 exit 0 |
 | C2 | （lint） | `pnpm lint` | 0 errors、warning 不多於基線 |
-| C3 | （單元＋整合） | `pnpm test` | 三組皆綠；後端檔數 +1、it 數 = 基線 + 新增（11＋4），數字寫在 tasks |
+| C3 | （單元＋整合） | `pnpm test` | 三組皆綠；後端檔數 +1、it 數 = 基線 + 新增（`version-floor.test.ts` 13 ＋ `d1-schema.test.ts` 4 = 17；原計畫 11＋4，apply 時另加兩條跨使用者隔離 regression guard），數字寫在 tasks |
 | C4 | （建置） | `pnpm build` | exit 0 |
 | C5 | 版本下限表由 migration 建立 | `pnpm --filter ./hono-pickball db:generate` 後 `git -C <repo> status --porcelain hono-pickball/drizzle` 為空 | 無新檔（schema 與 0004 不漂移） |
 | C6 | （E2E，regression） | 先 `pnpm --filter ./hono-pickball db:migrate:local`；再依 project 分開跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p>`（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`） | 數量與基線一致、全數 passed（不新增、不刪除 E2E）；無因缺帳密 skip |
@@ -95,5 +97,5 @@
 - [x] 每個 Scenario 至少一列（既有 Scenario 以「（既有）」列合併）
 - [x] 每列皆有 Tier
 - [x] 每條刪除路徑（重置、逐筆刪除、孤兒清除、送出比分）與每條建立路徑（三個 PUT version 0、批次附加、本機匯入三段）各有至少一個會在漏改時轉紅的 it
-- [x] 會先綠的 it 已點名標 regression guard（2 個新 it ＋ 既有 it）
+- [x] 會先綠的 it 已點名標 regression guard（4 個新 it：propose 時 2 個、apply 時追加的跨使用者隔離 2 個；＋ 既有 it）
 - [x] 允許修改的既有斷言只有兩條（batch 大小 `[4]`、`[2, 2]`），名稱不改

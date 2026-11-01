@@ -2,6 +2,7 @@ import type { MatchSlot } from "@pickball/core/api/round";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerMatchSlots } from "../db/schema";
+import { initialVersion } from "./version-floor";
 
 export interface VersionedSlot {
 	data: MatchSlot;
@@ -51,7 +52,7 @@ export async function putSlot(
 		const inserted = await db
 			.insert(matchmakerMatchSlots)
 			.select(
-				sql`select ${userId}, ${matchId}, ${JSON.stringify(data)}, 1, ${now.getTime()}
+				sql`select ${userId}, ${matchId}, ${JSON.stringify(data)}, ${initialVersion(userId)}, ${now.getTime()}
 					where exists (
 						select 1 from matchmaker_round r, json_each(r.data, '$.matches') m
 						where r.user_id = ${userId}

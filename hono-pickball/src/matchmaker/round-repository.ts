@@ -1,7 +1,8 @@
 import type { Round } from "@pickball/core/matchmaker/round-types";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, type SQL, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerMatchSlots, matchmakerRound } from "../db/schema";
+import { initialVersion, raiseVersionFloor } from "./version-floor";
 
 export interface VersionedRound {
 	data: Round;
@@ -62,6 +63,15 @@ function keepsCompletedMatches(current: Round | null, next: Round): boolean {
 		);
 }
 
+/** 孤兒分槽：match_id 不屬於（寫入後的）目前回合中未完成的場次。 */
+function orphanSlotCondition(userId: string): SQL {
+	return sql`${matchmakerMatchSlots.matchId} NOT IN (
+		SELECT json_extract(m.value, '$.id')
+		FROM matchmaker_round r, json_each(r.data, '$.matches') m
+		WHERE r.user_id = ${userId} AND json_extract(m.value, '$.status') != 'completed'
+	)`;
+}
+
 /**
  * 以樂觀鎖建立或更新回合，並在同一個 batch 內清除不屬於目前回合未完成場次的分槽。
  * 完成狀態的比對在 batch 外，但寫入帶版本條件：比對後回合若被改動，寫入影響 0 列而回 conflict。
@@ -81,24 +91,25 @@ export async function putRound(
 	const now = new Date();
 	const write =
 		expectedVersion === 0
-			? db.insert(matchmakerRound).values({ userId, data, version: 1, updatedAt: now }).onConflictDoNothing().returning()
+			? db.insert(matchmakerRound).values({ userId, data, version: initialVersion(userId), updatedAt: now }).onConflictDoNothing().returning()
 			: db
 					.update(matchmakerRound)
 					.set({ data, version: expectedVersion + 1, updatedAt: now })
 					.where(and(eq(matchmakerRound.userId, userId), eq(matchmakerRound.version, expectedVersion)))
 					.returning();
-	const deleteOrphanSlots = db.delete(matchmakerMatchSlots).where(
-		and(
-			eq(matchmakerMatchSlots.userId, userId),
-			sql`${matchmakerMatchSlots.matchId} NOT IN (
-				SELECT json_extract(m.value, '$.id')
-				FROM matchmaker_round r, json_each(r.data, '$.matches') m
-				WHERE r.user_id = ${userId} AND json_extract(m.value, '$.status') != 'completed'
-			)`,
-		),
+	const orphanCondition = orphanSlotCondition(userId);
+	// 下限陳述式與孤兒 DELETE 共用同一個條件，兩者選到的才會是同一批分槽
+	const raiseFloor = raiseVersionFloor(
+		db,
+		userId,
+		sql`SELECT version AS v FROM matchmaker_match_slots WHERE user_id = ${userId} AND ${orphanCondition}`,
+		now,
 	);
+	const deleteOrphanSlots = db
+		.delete(matchmakerMatchSlots)
+		.where(and(eq(matchmakerMatchSlots.userId, userId), orphanCondition));
 
-	const [written] = await db.batch([write, deleteOrphanSlots]);
+	const [written] = await db.batch([write, raiseFloor, deleteOrphanSlots]);
 	const row = written[0];
 	if (!row) {
 		return { kind: "conflict" };

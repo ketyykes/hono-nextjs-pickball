@@ -533,4 +533,73 @@ describe("D1 migration 夾具與 auth 核心資料表", () => {
 			await expect(db.prepare(statement).bind(...params).run(), label).rejects.toThrow(/NOT NULL/);
 		}
 	});
+
+	it("sync_version_floors 可由 migration 建立並寫入讀回", async () => {
+		const db = getTestDb();
+		await insertUser(db, "floor-rw-user", "floor-rw@example.com");
+		await db
+			.prepare("INSERT INTO sync_version_floors (user_id, version, updated_at) VALUES (?, ?, ?)")
+			.bind("floor-rw-user", 7, NOW)
+			.run();
+		const row = await db
+			.prepare("SELECT user_id, version, updated_at FROM sync_version_floors WHERE user_id = ?")
+			.bind("floor-rw-user")
+			.first<{ user_id: string; version: number; updated_at: number }>();
+		expect(row).toEqual({ user_id: "floor-rw-user", version: 7, updated_at: NOW });
+	});
+
+	it("sync_version_floors 每位使用者只能有一列", async () => {
+		const db = getTestDb();
+		await insertUser(db, "floor-pk-a", "floor-pk-a@example.com");
+		await insertUser(db, "floor-pk-b", "floor-pk-b@example.com");
+		const insertSql = "INSERT INTO sync_version_floors (user_id, version, updated_at) VALUES (?, ?, ?)";
+		await db.prepare(insertSql).bind("floor-pk-a", 1, NOW).run();
+
+		await expect(db.prepare(insertSql).bind("floor-pk-a", 2, NOW).run()).rejects.toThrow(
+			/UNIQUE constraint failed: sync_version_floors\.user_id|PRIMARY KEY/,
+		);
+		await db.prepare(insertSql).bind("floor-pk-b", 1, NOW).run();
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM sync_version_floors WHERE user_id = ?", "floor-pk-a"),
+		).toBe(1);
+	});
+
+	it("sync_version_floors 的 version 不可為 NULL", async () => {
+		const db = getTestDb();
+		await insertUser(db, "floor-null-user", "floor-null@example.com");
+		// 比對完整訊息：表不存在時同樣會拋錯，只比對「拋錯」會在 migration 之前就先綠
+		await expect(
+			db
+				.prepare("INSERT INTO sync_version_floors (user_id, version, updated_at) VALUES (?, NULL, ?)")
+				.bind("floor-null-user", NOW)
+				.run(),
+		).rejects.toThrow(/NOT NULL constraint failed: sync_version_floors\.version/);
+
+		// 不得有 DEFAULT：預設值會把誤算出的 NULL 靜默取代而掩蓋錯誤
+		const versionColumn = await db
+			.prepare("SELECT dflt_value FROM pragma_table_info('sync_version_floors') WHERE name = 'version'")
+			.first<{ dflt_value: string | null }>();
+		expect(versionColumn).not.toBeNull();
+		expect(versionColumn?.dflt_value).toBeNull();
+	});
+
+	it("刪除使用者時其 sync_version_floors 一併刪除", async () => {
+		const db = getTestDb();
+		const userId = "floor-cascade-user";
+		await insertUser(db, userId, "floor-cascade@example.com");
+		await db
+			.prepare("INSERT INTO sync_version_floors (user_id, version, updated_at) VALUES (?, ?, ?)")
+			.bind(userId, 3, NOW)
+			.run();
+		// 先確認資料確實建立，避免刪除後的 0 是恆真
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM sync_version_floors WHERE user_id = ?", userId),
+			"刪除前應有 1 列",
+		).toBe(1);
+		await db.prepare("DELETE FROM user WHERE id = ?").bind(userId).run();
+		expect(
+			await countRows(db, "SELECT COUNT(*) AS n FROM sync_version_floors WHERE user_id = ?", userId),
+			"刪除後應為 0 列",
+		).toBe(0);
+	});
 });

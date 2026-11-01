@@ -2,6 +2,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound } from "../db/schema";
+import { initialVersion, raiseVersionFloor } from "./version-floor";
 
 export interface VersionedPlayer {
 	data: Player;
@@ -39,7 +40,7 @@ export async function putPlayer(
 		const inserted = await db
 			.insert(matchmakerPlayers)
 			.select(
-				sql`select ${userId}, ${data.id}, ${JSON.stringify(data)}, coalesce(max(${matchmakerPlayers.sortOrder}), -1) + 1, 1, ${now.getTime()} from ${matchmakerPlayers} where ${matchmakerPlayers.userId} = ${userId}`,
+				sql`select ${userId}, ${data.id}, ${JSON.stringify(data)}, coalesce(max(${matchmakerPlayers.sortOrder}), -1) + 1, ${initialVersion(userId)}, ${now.getTime()} from ${matchmakerPlayers} where ${matchmakerPlayers.userId} = ${userId}`,
 			)
 			.onConflictDoNothing()
 			.returning();
@@ -62,11 +63,19 @@ export async function putPlayer(
 	return row ? toVersioned(row) : null;
 }
 
-/** 刪除單一參賽者；刻意不檢查影響列數與版本，讓刪除冪等。 */
+/**
+ * 刪除單一參賽者；刻意不檢查影響列數與版本，讓刪除冪等。
+ * 下限與刪除同批，之後以同 id 重建時 version 才不會落回舊裝置持有的值。
+ */
 export async function deletePlayer(db: Db, userId: string, id: string): Promise<void> {
-	await db
-		.delete(matchmakerPlayers)
-		.where(and(eq(matchmakerPlayers.userId, userId), eq(matchmakerPlayers.id, id)));
+	const now = new Date();
+	const deletedVersions = sql`SELECT version AS v FROM matchmaker_players WHERE user_id = ${userId} AND id = ${id}`;
+	await db.batch([
+		raiseVersionFloor(db, userId, deletedVersions, now),
+		db
+			.delete(matchmakerPlayers)
+			.where(and(eq(matchmakerPlayers.userId, userId), eq(matchmakerPlayers.id, id))),
+	]);
 }
 
 /** 只認主鍵／UNIQUE 衝突（FK、NOT NULL、CHECK 違規不是 id 重複）；錯誤可能被包在 cause 內，逐層檢查。 */
@@ -99,29 +108,40 @@ export async function importPlayers(
 	const now = new Date();
 
 	const statements = players.map((player, index) =>
-		db.insert(matchmakerPlayers).values({
-			userId,
-			id: player.id,
-			data: player,
-			sortOrder: start + index,
-			version: 1,
-			updatedAt: now,
-		}),
+		db
+			.insert(matchmakerPlayers)
+			.values({
+				userId,
+				id: player.id,
+				data: player,
+				sortOrder: start + index,
+				version: initialVersion(userId),
+				updatedAt: now,
+			})
+			.returning(),
 	);
+	let results;
 	try {
-		await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+		results = await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
 	} catch (error) {
 		if (isConstraintError(error)) {
 			return null;
 		}
 		throw error;
 	}
-	return players.map((player) => ({ data: player, version: 1 }));
+	// 回應的 version 取自實際寫入的列：初始版本由 SQL 子查詢決定，JS 端無從得知
+	return results.map((rows) => toVersioned(rows[0]));
 }
 
 /** 刪除本人全部對戰分配機資料；之後新增的資料表要加進同一個 batch。 */
 export async function resetMatchmaker(db: Db, userId: string): Promise<void> {
+	const now = new Date();
+	// 下限必須在刪除之前提高：刪除後就讀不到將被刪列的 version
+	const deletedVersions = sql`SELECT version AS v FROM matchmaker_players WHERE user_id = ${userId}
+		UNION ALL SELECT version AS v FROM matchmaker_round WHERE user_id = ${userId}
+		UNION ALL SELECT version AS v FROM matchmaker_match_slots WHERE user_id = ${userId}`;
 	await db.batch([
+		raiseVersionFloor(db, userId, deletedVersions, now),
 		db.delete(matchmakerPlayers).where(eq(matchmakerPlayers.userId, userId)),
 		db.delete(matchmakerRound).where(eq(matchmakerRound.userId, userId)),
 		db.delete(matchmakerMatchSlots).where(eq(matchmakerMatchSlots.userId, userId)),

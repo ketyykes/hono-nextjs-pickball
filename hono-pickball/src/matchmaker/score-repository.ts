@@ -11,6 +11,7 @@ import {
 	releaseBatchGuard,
 } from "./batch-guard";
 import { getRound } from "./round-repository";
+import { raiseVersionFloor } from "./version-floor";
 
 export interface SubmitScoreForUserInput {
 	matchId: string;
@@ -118,6 +119,13 @@ export async function submitScoreForUser(
 						eq(matchmakerPlayers.version, player.readVersion),
 					),
 				),
+		),
+		// 下限必須在刪除之前，且選取條件與下一條刪除相同；否則日後以同場次 id 重建的分槽會落回舊版本
+		raiseVersionFloor(
+			db,
+			userId,
+			sql`SELECT version AS v FROM matchmaker_match_slots WHERE user_id = ${userId} AND match_id = ${input.matchId}`,
+			now,
 		),
 		// 場次完成後計分板分槽不再有意義，與其他寫入同批刪除以維持「分槽只存在於未完成場次」
 		db

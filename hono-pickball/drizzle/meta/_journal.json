@@ -29,6 +29,13 @@
       "when": 1792697119019,
       "tag": "0003_matchmaker_round_slots_history",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793524758412,
+      "tag": "0004_sync_version_floors",
+      "breakpoints": true
     }
   ]
 }
