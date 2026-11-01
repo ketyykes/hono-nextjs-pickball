@@ -42,22 +42,23 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：新增 `test/version-floor.test.ts`（檔頭 `import "../src/index"`、顯式匯入 vitest；登入 seed 用 `test/helpers/matchmaker-fixtures.ts`），寫入三個 it：
+- [x] 3.1 RED（TDD）：新增 `test/version-floor.test.ts`（檔頭 `import "../src/index"`、顯式匯入 vitest；登入 seed 用 `test/helpers/matchmaker-fixtures.ts`），寫入三個 it：
   「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409」（真紅：現況重建得 1、舊版本 PUT 200）、
   「沒有任何資料時重置仍回 204 且之後建立的版本為 1」與「一位使用者的重置不影響其他使用者的建立版本」（**預期先綠，點名標 regression guard**；後者斷言 `sync_version_floors` 無 B 的列，在 §2 後可查詢）。貼出輸出（`test:`）
-- [ ] 3.2 GREEN（TDD）：新增 `src/matchmaker/version-floor.ts`（`initialVersion(userId)`、`raiseVersionFloor(db, userId, deletedVersions, now)`，design Decision 3；`INSERT … SELECT ?, v, ? FROM (SELECT max(v) AS v FROM (…)) WHERE v IS NOT NULL ON CONFLICT DO UPDATE SET version = max(既有, excluded)`：空集合時零列）；
+- [x] 3.2 GREEN（TDD）：新增 `src/matchmaker/version-floor.ts`（`initialVersion(userId)`、`raiseVersionFloor(db, userId, deletedVersions, now)`，design Decision 3；`INSERT … SELECT ?, v, ? FROM (SELECT max(v) AS v FROM (…)) WHERE v IS NOT NULL ON CONFLICT DO UPDATE SET version = max(既有, excluded)`：空集合時零列）；
   `resetMatchmaker` 的 batch 第一條改為提高下限（`matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots` 三表 `UNION ALL`），四條 DELETE 不變、不刪下限列；
   `putRound` 的 version 0 建立改用 `initialVersion`。依檔頭例外 ① 把「重置以單一 D1 batch 送出四條刪除」的 `[4]` 改為 `[5]`。3.1 全綠、`test/matchmaker-*.test.ts` 全綠（`feat:`）
-- [ ] 3.3 RED（TDD）：it「重置後以 version 0 重建同 id 的參賽者版本大於重置前且持舊版本的 PUT 回 409」。確認紅燈（`putPlayer` 仍寫 1）（`test:`）
-- [ ] 3.4 GREEN（TDD）：`putPlayer` version 0 的 `INSERT … SELECT` 的 version 欄改為 `initialVersion(userId)`。3.3 綠（`feat:`）
-- [ ] 3.5 RED（TDD）：it「重置後批次附加同 id 的參賽者回應實際版本且持舊版本的 PUT 回 409」。確認紅燈（`importPlayers` 寫入與回應皆為 1）（`test:`）
-- [ ] 3.6 GREEN（TDD）：`importPlayers` 每筆 `values` 的 version 改為 `initialVersion(userId)`，並以 `.returning()` 從 batch 結果組回應（不再在 JS 端寫死 1；`isConstraintError` 的 409 行為不變）。3.5 綠、`test/matchmaker-players.test.ts` 全綠（`feat:`）
-- [ ] 3.7 RED（TDD）：it「重置後重建同場次的分槽版本大於重置前且持舊版本的 PUT 回 409」。確認紅燈（回合已取下限，但 `putSlot` 仍寫 1）（`test:`）
-- [ ] 3.8 GREEN（TDD）：`putSlot` version 0 的 `INSERT … SELECT` 的 version 欄改為 `initialVersion(userId)`（前置條件 `WHERE EXISTS` 不變）。3.7 綠、`test/matchmaker-slots.test.ts` 全綠（`feat:`）
-- [ ] 3.9 RED（TDD）：it「重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409」（`makePayload`／`makePlayer`／`postImport` 是 `test/local-import.test.ts` 的私有函式，在新檔內**複製**一份，SHALL NOT 為共用而改動既有測試檔；參賽者含 `m1` 兩隊的選手 `m1-a`、`m1-b`）。確認紅燈（四個舊版本寫入皆 200）（`test:`）
-- [ ] 3.10 GREEN（TDD）：`selectFromJsonEach` 增加 version 參數；`importLocalData` 的參賽者、回合、分槽段傳 `initialVersion(userId)`，歷史與獨立計分板段傳 `sql\`1\``；守衛條件不變（不含下限表）；batch 仍為固定 7 條。
+- [x] 3.3 RED（TDD）：it「重置後以 version 0 重建同 id 的參賽者版本大於重置前且持舊版本的 PUT 回 409」。確認紅燈（`putPlayer` 仍寫 1）（`test:`）
+- [x] 3.4 GREEN（TDD）：`putPlayer` version 0 的 `INSERT … SELECT` 的 version 欄改為 `initialVersion(userId)`。3.3 綠（`feat:`）
+- [x] 3.5 RED（TDD）：it「重置後批次附加同 id 的參賽者回應實際版本且持舊版本的 PUT 回 409」。確認紅燈（`importPlayers` 寫入與回應皆為 1）（`test:`）
+- [x] 3.6 GREEN（TDD）：`importPlayers` 每筆 `values` 的 version 改為 `initialVersion(userId)`，並以 `.returning()` 從 batch 結果組回應（不再在 JS 端寫死 1；`isConstraintError` 的 409 行為不變）。3.5 綠、`test/matchmaker-players.test.ts` 全綠（`feat:`）
+- [x] 3.7 RED（TDD）：it「重置後重建同場次的分槽版本大於重置前且持舊版本的 PUT 回 409」。確認紅燈（回合已取下限，但 `putSlot` 仍寫 1）（`test:`）
+- [x] 3.8 GREEN（TDD）：`putSlot` version 0 的 `INSERT … SELECT` 的 version 欄改為 `initialVersion(userId)`（前置條件 `WHERE EXISTS` 不變）。3.7 綠、`test/matchmaker-slots.test.ts` 全綠（`feat:`）
+- [x] 3.9 RED（TDD）：it「重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409」（`makePayload`／`makePlayer`／`postImport` 是 `test/local-import.test.ts` 的私有函式，在新檔內**複製**一份，SHALL NOT 為共用而改動既有測試檔；參賽者含 `m1` 兩隊的選手 `m1-a`、`m1-b`）。確認紅燈（四個舊版本寫入皆 200）（`test:`）
+- [x] 3.10 GREEN（TDD）：`selectFromJsonEach` 增加 version 參數；`importLocalData` 的參賽者、回合、分槽段傳 `initialVersion(userId)`，歷史與獨立計分板段傳 `sql\`1\``；守衛條件不變（不含下限表）；batch 仍為固定 7 條。
   3.9 綠、`test/local-import.test.ts` 全綠（`feat:`）
-- [ ] 3.11 REFACTOR：檢視 §3 的重複（例：測試中的「建立 → 重置 → 重建 → 舊版本 PUT」步驟可抽成檔內 helper）；無壞味道註記 skipped。後端全套持鎖跑一次並記錄數字（`refactor:` 或 skipped）
+- [x] 3.11 REFACTOR：檢視 §3 的重複（例：測試中的「建立 → 重置 → 重建 → 舊版本 PUT」步驟可抽成檔內 helper）；無壞味道註記 skipped。後端全套持鎖跑一次並記錄數字（`refactor:` 或 skipped）
+  - 紀錄：3.11 REFACTOR skipped（無壞味道）；後端全套 26 檔／204 it 綠。§3（`3da926e`～`51b9e85`）Stage 1 PASS；Stage 2（opus）PASS、無必修項——獨立 27 條變異＋2 條對照組，唯一存活的實質變異為「upsert 直接覆寫 `excluded.version`」（§3 無法以 API 觀察，移交 §4 的 deletePlayer it 覆蓋）
 
 ## 4. 其餘刪除路徑提高下限
 
