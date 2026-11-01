@@ -1,3 +1,4 @@
+import { MAX_PLAYERS_PER_IMPORT } from "@pickball/core/api/players";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { fetchRemoteHistory } from "../sync/history-api";
 import { fetchRemoteRound } from "../sync/round-api";
@@ -13,6 +14,7 @@ export const REMOTE_TRANSFER_MESSAGES = {
 	// 不斷言「沒有變動」：failed 也涵蓋後端已寫入、但回應在網路上遺失的情況。
 	importFailed: "雲端匯入失敗，請重新整理頁面確認名單後再試一次。",
 	importConflict: "雲端名單已在其他裝置變更，本次沒有匯入任何資料。請重新整理頁面確認最新名單後再匯入。",
+	importTooLarge: `匯入的資料量超過單次上限（一次最多 ${MAX_PLAYERS_PER_IMPORT} 位參賽者），本次沒有匯入任何資料。請將 CSV 分成較小的檔案後再匯入。`,
 	unauthorized: "登入狀態已失效，本次沒有匯入或匯出任何資料。請重新登入後再試一次。",
 	previewHasErrors: "預覽仍有錯誤的資料列，本次沒有匯入任何資料。請先修正 CSV 後重新選檔。",
 	backupFetchFailed: "無法取得雲端的參賽者名單，未產生備份檔。請確認網路連線後再試一次。",
@@ -79,6 +81,10 @@ export async function importRemoteRoster(
 	if (imported.kind === "ok") return { ok: true };
 	if (imported.kind === "unauthorized") return unauthorizedFailure();
 	if (imported.kind === "conflict") return { ok: false, message: REMOTE_TRANSFER_MESSAGES.importConflict };
+	// 413 是資料量問題，重試同一份檔案不會成功，要讓使用者知道該拆檔
+	if (imported.kind === "rejected" && imported.status === 413) {
+		return { ok: false, message: REMOTE_TRANSFER_MESSAGES.importTooLarge };
+	}
 	return { ok: false, message: REMOTE_TRANSFER_MESSAGES.importFailed };
 }
 

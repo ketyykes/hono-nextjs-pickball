@@ -78,8 +78,8 @@ Depends on: §2
 - [x] 4.2 GREEN（TDD）：`lib/sync/local-import.ts`：移除 `SEGMENT_LIMIT_BYTES` 與 `utf8Bytes`，`oversize = !checkImportLimits(payload).ok`；`LocalImportOutcome` 加 `{ kind: "too-large" }`，`importLocalData` 在 `rejected` 且 `status === 413` 時回傳之（design Decision 1、8）。`local-import.test.ts` 全綠
 - [x] 4.3 RED（TDD）：`components/matchmaker/local-import-view.test.ts` 新增 it「資料過大的匯入結果對應到超過上限的錯誤文案」；`components/matchmaker/JsonBackupSection.test.tsx` 新增 it「雲端 JSON 匯入遇到 413 時顯示資料量超過上限且不寫入本機」。確認紅燈
 - [x] 4.4 GREEN（TDD）：`components/matchmaker/local-import-view.ts` 新增 `LOCAL_IMPORT_MESSAGES.tooLarge`，`describeImportOutcome` 對 `too-large` 回 `{ tone: "error", text: tooLarge }`（design Decision 8）；`JsonBackupSection.tsx` 不改。兩檔測試全綠
-- [ ] 4.5 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 新增 it「雲端 CSV 匯入遇到 413 時回傳超過上限的訊息且不視為成功」。確認紅燈
-- [ ] 4.6 GREEN（TDD）：`lib/matchmaker/remote-transfer.ts` 新增 `REMOTE_TRANSFER_MESSAGES.importTooLarge`（訊息中的人數以 `MAX_PLAYERS_PER_IMPORT` 組字串）；`importRemoteRoster` 在 POST 回 `rejected` 且 413 時回傳之，其餘 4xx 仍為 `importFailed`。`remote-transfer.test.ts` 全綠
+- [x] 4.5 RED（TDD）：`lib/matchmaker/remote-transfer.test.ts` 新增 it「雲端 CSV 匯入遇到 413 時回傳超過上限的訊息且不視為成功」。確認紅燈
+- [x] 4.6 GREEN（TDD）：`lib/matchmaker/remote-transfer.ts` 新增 `REMOTE_TRANSFER_MESSAGES.importTooLarge`（訊息中的人數以 `MAX_PLAYERS_PER_IMPORT` 組字串）；`importRemoteRoster` 在 POST 回 `rejected` 且 413 時回傳之，其餘 4xx 仍為 `importFailed`。`remote-transfer.test.ts` 全綠
 - [ ] 4.7 regression guard：`lib/matchmaker/storage.test.ts` 新增 it「id 為空字串的參賽者照常讀回且不被捨棄」。預期加入即綠（`PlayerSchema` 不變），點名標 regression guard、`storage.ts` 不改
 - [ ] 4.8 驗收（指令）：前端單檔全綠後，持雙鎖跑 `pnpm lint` 0 errors；`pnpm -r exec tsc --noEmit` exit 0
 
