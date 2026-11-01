@@ -1042,17 +1042,20 @@
 **分槽清理**：`PUT /api/matchmaker/round` 的寫入與「刪除該使用者所有 `match_id` 不屬於（寫入後的）目前回合中**未完成**場次的分槽」MUST 在同一個 batch 內；
 刪除條件 MUST 以資料庫中的回合內容推導（`json_each(matchmaker_round.data, '$.matches')`），使「分槽只存在於目前回合的未完成場次」這個不變式由伺服器維護，
 不論該次 PUT 成功或因版本不符而未寫入都成立（`round-lifecycle`「重排本輪或重置名單時清除對應計分板進度」在雲端模式的實現）。
+同一個 batch MUST 在回合寫入之後、分槽刪除之前，以與刪除**相同的條件**提高版本下限（`user-data-sync`「刪除後重建的使用者資料版本不得重複」），因此該 batch 為三條陳述式；
+下限陳述式放在回合寫入之後，才能以寫入後的回合判定哪些分槽將被刪除。
 
 **送出比分**：
 
 1. 讀出目前回合與該使用者全部參賽者；回合不存在或 `version !== roundVersion` 時回 409。
 2. 以核心 `submitScore({ round, players, matchId, rawScoreA: scoreA, rawScoreB: scoreB, now: 伺服器時間 })` 計算。
    失敗碼為 `empty-field`、`invalid-number`、`negative-score`、`tie` 時回 `400 INVALID_BODY`；`match-not-found`、`already-completed`、`scoring-failed` 時回 409。
-3. 以**單一 batch** 依序：整批守衛（回合 version 等於 `roundVersion`，且每位被更新球員的 version 等於步驟 1 讀到的值）→ 插入歷史 → 更新回合（version + 1）→ 逐一更新被更新球員（`rating`、`gamesPlayed`，version + 1）→ 刪除該場分槽 → 刪除守衛列。
+3. 以**單一 batch** 依序：整批守衛（回合 version 等於 `roundVersion`，且每位被更新球員的 version 等於步驟 1 讀到的值）→ 插入歷史 → 更新回合（version + 1）→ 逐一更新被更新球員（`rating`、`gamesPlayed`，version + 1）→ 提高版本下限（該場分槽的 version；`user-data-sync`「刪除後重建的使用者資料版本不得重複」）→ 刪除該場分槽 → 刪除守衛列。
    守衛失敗或 `matchmaker_history` 主鍵衝突時回 409，資料不變。
 4. 成功回 `200 { round: { data, version }, players: [{ data, version }]（僅被更新者）, historyEntry, boundaryHits }`。
 
-`POST /api/matchmaker/reset` 的 batch MUST 刪除該使用者在 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表的列。
+`POST /api/matchmaker/reset` 的 batch MUST 刪除該使用者在 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history` 四張表的列；
+該 batch 的第一條 MUST 先以 `matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots` 中該使用者列的最大 version 提高版本下限（`user-data-sync`「刪除後重建的使用者資料版本不得重複」）。
 
 請求與回應的 schema 由核心套件 `@pickball/core/api/round` 匯出，前後端共用。
 
@@ -1149,6 +1152,12 @@
 - **WHEN** 以 `SubmitScoreRequestSchema` 解析「`roundVersion` 為 0」「缺 `scoreB`」「合法輸入」
 - **THEN** 只有合法輸入通過
 - **驗收**：`packages/pickball-core/test/api/round.test.ts`，it 名稱「SubmitScoreRequestSchema 要求兩個比分字串與正整數 roundVersion」
+
+#### Scenario: 回合雲端 API：回合 PUT 以單一 batch 寫入、提高下限並清除分槽
+
+- **WHEN** 以記錄 `batch()` 呼叫的 D1 替身注入 env，以 `version: 0` 建立回合後，再以同一個（已過期的）body PUT 一次
+- **THEN** 前者回 200、後者回 409；兩次各只送出一次 `batch()`，各含三條陳述式（回合寫入、提高版本下限、清除分槽）
+- **驗收**：`hono-pickball/test/matchmaker-round.test.ts`，it 名稱「回合 PUT 的寫入與孤兒分槽清除在同一個 D1 batch 內送出」（既有 it，斷言由 `[2, 2]` 改為 `[3, 3]`）
 
 ### Requirement: 登入時回合與場次分槽以雲端為準
 

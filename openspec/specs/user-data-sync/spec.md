@@ -65,7 +65,8 @@ Hono 型別參數 SHALL 分為兩層：`AuthAppEnv`（`Variables` 只有 `auth`�
 - `GET` MUST 回 `200 { "data": <T> | null, "version": <非負整數> }`；尚無資料時 MUST 回 `{ "data": null, "version": 0 }`，SHALL NOT 回 404
   （瀏覽器會把 4xx 記為 console 錯誤，與 `/api/session` 永遠 200 同理）。
 - `PUT` 的 body MUST 為 `{ "data": <T>, "version": <非負整數> }`，`version` 為呼叫端最後一次讀到或寫成的版本：
-  - `version` 為 0 且尚無資料 → 建立，回 `200 { data, version: 1 }`；
+  - `version` 為 0 且尚無資料 → 建立，回 `200 { data, version: <初始版本> }`。初始版本為 1；資料表屬於「刪除後重建的使用者資料版本不得重複」所列的可重建版本化表（例：`matchmaker_round`）時，
+    初始版本為該使用者的版本下限加一（從未刪除過該類資料的使用者下限為 0，初始版本仍為 1），且下限 MUST 在建立的同一條陳述式內以子查詢讀取；
   - `version` 等於目前版本 → 更新，回 `200 { data, version: 目前版本 + 1 }`；
   - 其他情況（含「已有資料卻送 0」「尚無資料卻送 n > 0」）→ `409 { "error": "VERSION_CONFLICT" }`，資料 MUST 不變。
 - 版本比對與寫入 MUST 是單一條件式 SQL（`INSERT ... ON CONFLICT DO NOTHING RETURNING` 或 `UPDATE ... WHERE user_id = ? AND version = ? RETURNING`），
@@ -309,10 +310,11 @@ MUST NOT throw，回傳以下其一：
   資料的 Requirement 可以為「建立」再加前置條件（例：分槽的場次必須屬於目前回合），條件不成立時 MUST 回 409 且不寫入。
 - **刪除單筆**：`DELETE /api/<feature>/<items>/:id` MUST 回 `204`，不比對版本、**冪等**（不存在也回 204）。刪除表達的是使用者明確意圖；
   與另一裝置的編輯同時發生時以刪除為準，對方下一次 PUT 會因資料不存在（`version > 0`）而得到 409 並重新載入。
+  刪除 MUST 依「刪除後重建的使用者資料版本不得重複」在同一個 `batch()` 內先提高版本下限：之後即使以同一 id 重建，對方持有的舊 version 也不會與新列相等。
 - **批次附加**：`POST /api/<feature>/<items>/import`，body `{ "<items>": [<T>, ...] }`（至少一筆、id 互不重複，否則 400），
-  MUST 以單一 D1 `batch()` 依序插入（`sort_order` 接續現有最大值），任一筆 id 已存在時**整份不寫入**並回 409；成功回 `200 { "items": [{ data, version: 1 }, ...] }`。
+  MUST 以單一 D1 `batch()` 依序插入（`sort_order` 接續現有最大值），任一筆 id 已存在時**整份不寫入**並回 409；成功回 `200 { "items": [{ data, version }, ...] }`，`version` 為實際寫入的初始版本（同單筆契約：從未刪除過該類資料時為 1，否則為版本下限加一）。
   原子性來自 D1 batch：任一陳述式失敗時整批回滾（design 的 Context7 查證）。
-- **重置**：`POST /api/<feature>/reset` MUST 以單一 `batch()` 刪除該使用者在此 feature 的所有使用者資料表的列並回 `204`；之後的 change 為同一 feature 新增資料表時 MUST 把該表加進這個 batch。
+- **重置**：`POST /api/<feature>/reset` MUST 以單一 `batch()` 刪除該使用者在此 feature 的所有使用者資料表的列並回 `204`；該 batch 的第一條 MUST 依「刪除後重建的使用者資料版本不得重複」提高版本下限；之後的 change 為同一 feature 新增資料表時 MUST 把該表加進這個 batch。
 
 各資料 MAY 只提供上列端點的**子集**（例：分槽不提供批次附加；歷史只增不改，不提供 PUT），但提供的端點 MUST 依上列語意；子集與排序 MUST 在該資料的 Requirement 中明列。
 
@@ -674,11 +676,13 @@ MUST 回 `409 VERSION_CONFLICT` 且**整份不寫入**——SHALL NOT 覆寫、S
 獨立計分板只是「一場進行中的比賽」，若也納入拒絕條件，使用過登入態計分板的使用者將永遠無法匯入名單。
 
 **原子性與冪等**：全部寫入 MUST 在**單一** D1 `batch()` 內完成，第一條為整批守衛（條件：上述四張表皆無該使用者的列），依「後端多表寫入以單一 batch 與整批守衛完成」。
+守衛條件 SHALL NOT 包含 `sync_version_floors`：重置後該使用者的下限列仍存在，納入會使重置後永遠無法匯入。
 同一份資料重複匯入時，第二次必因第一次已寫入名單、回合或歷史而被守衛拒絕；歷史的 `(user_id, match_id)` 主鍵是第二道防線。因此重複匯入 SHALL NOT 產生重複歷史。
 
 **陳述式數量為常數**：參賽者、分槽、歷史各以**一條** `INSERT … SELECT … FROM json_each(?)` 寫入（整段陣列為單一參數），SHALL NOT 逐筆展開成多條陳述式或多個參數——
 D1 每條陳述式最多 100 個參數、單一字串最多 2,000,000 位元組（見 design「查證紀錄」）。插入順序 MUST 依陣列順序（`ORDER BY key`）：
-參賽者的 `sort_order` 為陣列索引；歷史的 `played_at` 為 `Date.parse(playedAt)`、插入順序即本機的追加順序（B8 的同時間排序依 `rowid`）。所有匯入列的 `version` 為 1。
+參賽者的 `sort_order` 為陣列索引；歷史的 `played_at` 為 `Date.parse(playedAt)`、插入順序即本機的追加順序（B8 的同時間排序依 `rowid`）。參賽者、回合、分槽列的 `version` 為該使用者的版本下限加一（以子查詢在同一條 `INSERT … SELECT` 內讀取，不增加陳述式數量；從未刪除過對戰分配機資料時為 1），
+歷史與獨立計分板列的 `version` 為 1——見「刪除後重建的使用者資料版本不得重複」。
 
 成功回 `200 { imported: { players, round: boolean, slots, history, scoreboardCurrent: "imported" | "skipped" | "none" } }`。
 
@@ -854,3 +858,122 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 - **WHEN** 匯入 `@pickball/core/api/players` 與 `@pickball/core/api/import` 的上限常數
 - **THEN** `MAX_PLAYERS_PER_IMPORT` 為 500、`PLAYER_IMPORT_BODY_LIMIT_BYTES` 為 1,000,000、`IMPORT_SEGMENT_LIMIT_BYTES` 為 1,900,000、`IMPORT_BODY_LIMIT_BYTES` 為 10,000,000；`IMPORT_SEGMENT_LIMIT_BYTES` 小於 D1 單一字串上限 2,000,000，`PLAYER_IMPORT_BODY_LIMIT_BYTES` 亦小於 2,000,000
 - **驗收**：`packages/pickball-core/test/api/import-limits.test.ts`，it 名稱「批次寫入的上限常數皆小於 D1 單一字串上限」
+
+### Requirement: 刪除後重建的使用者資料版本不得重複
+
+樂觀鎖只比對「呼叫端持有的 `version` 是否等於目前 `version`」。`matchmaker_players`、`matchmaker_round`、`matchmaker_match_slots`（以下稱**可重建的版本化表**）的列被刪除後，
+可能以**同一個主鍵**重新建立（重置後再建立回合；重置或刪除後以原 id 匯入參賽者與分槽）；若重建的列 `version` 從 1 起算，仍持有舊列版本的裝置會比對成功而靜默覆蓋新資料（ABA）。
+因此後端 SHALL 維持下列不變式：**同一主鍵的列在任何時點的 `version`，都大於該主鍵先前任何一代列曾出現過的 `version`**。
+
+- **版本下限**：後端 SHALL 為每位使用者保存一個版本下限（表 `sync_version_floors`，每位使用者至多一列，`version` 欄即下限；沒有列視為 0）。下限只升不降。
+- **刪除時提高下限**：任何刪除可重建的版本化表之列的寫入，MUST 在**同一個** D1 `batch()` 內、於刪除陳述式**之前**，把下限設為 `max(目前下限, 將被刪除之列的最大 version)`；
+  將被刪除的列 MUST 以與刪除陳述式相同的條件在 SQL 內選出，SHALL NOT 依賴 batch 外先讀到的值。沒有任何列將被刪除時，SHALL NOT 寫入或改動下限列，且該陳述式 SHALL NOT 失敗（不得因 `max()` 得到 NULL 而違反 NOT NULL 使整批回滾）。
+  適用的刪除路徑為：`DELETE /api/matchmaker/players/:id`、`POST /api/matchmaker/reset`、`PUT /api/matchmaker/round` 的孤兒分槽清除、`POST /api/matchmaker/round/matches/:matchId/score` 的該場分槽刪除；
+  之後新增任何會刪除這三張表之列的寫入 MUST 同樣處理。
+- **建立時取下限加一**：在可重建的版本化表建立列時（`PUT` 以 `version: 0` 建立參賽者、回合或分槽；`POST /api/matchmaker/players/import`；`POST /api/import` 的參賽者、回合、分槽三段），
+  初始 `version` MUST 為「下限 + 1」，且下限 MUST 在建立的**同一條**陳述式內以 SQL 子查詢讀取，SHALL NOT 先在 JS 端讀取再寫入。從未刪除過這三張表之列的使用者下限為 0，初始 `version` 仍為 1。
+  回應中的 `version` MUST 為實際寫入的值。
+- **更新不變**：既有列的更新仍為 `version + 1`（「版本化讀寫契約」）；更新不讀也不改下限。
+- **不適用的表**：`scoreboard_current` 沒有任何刪除路徑（重置不含此表、匯入為 `ON CONFLICT DO NOTHING`），`version` 只增不減；`matchmaker_history` 沒有任何接受呼叫端 `version` 的寫入端點（只增不改，`version` 恆為 1）；
+  `sync_batch_guards` 在每個 batch 結束時即被刪除且 `version` 不對外。三者的寫入 SHALL NOT 讀取或提高下限，建立時 `version` 維持 1。
+- **重置與匯入**：`POST /api/matchmaker/reset` SHALL NOT 刪除下限列；`POST /api/import` 的整批守衛條件 SHALL NOT 包含 `sync_version_floors`。
+- 下限只屬於本人：所有讀寫 MUST 帶 `user_id = c.var.user.id`，一位使用者的刪除 SHALL NOT 影響其他使用者的建立版本。
+
+#### Scenario: 版本下限：重置後重建的回合不被持舊版本的裝置覆寫
+
+- **GIVEN** 回合以 `version: 0` 建立後再更新一次（目前 version 2），另一台裝置持有 version 1 與 version 2 的回合
+- **WHEN** 呼叫 `POST /api/matchmaker/reset`，再以 `version: 0` PUT 新回合 R2，接著分別以 `version: 1`、`version: 2` PUT 舊回合 R1′；
+  之後再呼叫重置，並以 `POST /api/import` 匯入一位參賽者、一筆歷史與獨立計分板（不含回合與分槽）
+- **THEN** 重建的回合 version 為 3；兩次舊版本 PUT 皆回 `409 { "error": "VERSION_CONFLICT" }`；`GET /api/matchmaker/round` 為 R2 且 version 3；
+  匯入回 200，匯入的參賽者 version 為 4（下限取自第二次重置前的回合 version 3），歷史與獨立計分板的 version 皆為 1（不適用下限）
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1」
+
+#### Scenario: 版本下限：重置後以 version 0 重建同 id 的參賽者
+
+- **GIVEN** 參賽者 p1 為 version 3、p2 為 version 1
+- **WHEN** 呼叫重置，以 `version: 0` PUT p1，再以 `version: 3` PUT p1
+- **THEN** 重建的 p1 version 為 4；`version: 3` 的 PUT 回 409；`GET /api/matchmaker/players` 的 p1 為重建值與 version 4
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後以 version 0 重建同 id 的參賽者版本大於重置前且持舊版本的 PUT 回 409」
+
+#### Scenario: 版本下限：重置後批次附加同 id 的參賽者
+
+- **GIVEN** 參賽者 p1 為 version 2
+- **WHEN** 呼叫重置，以 `POST /api/matchmaker/players/import` 附加 p1、p2，再分別以 `version: 1`、`version: 2` PUT p1
+- **THEN** 匯入回應的兩筆 `version` 皆為 3，且等於 `GET /api/matchmaker/players` 讀回的 version；兩次舊版本 PUT 皆回 409
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後批次附加同 id 的參賽者回應實際版本且持舊版本的 PUT 回 409」
+
+#### Scenario: 版本下限：重置後重建同場次的分槽
+
+- **GIVEN** 回合（version 1）含 `pending` 的 `m1`，`m1` 的分槽為 version 2
+- **WHEN** 呼叫重置，以 `version: 0` PUT 含 `pending` 的 `m1` 的回合，再以 `version: 0` PUT `m1` 的分槽，接著分別以 `version: 1`、`version: 2` PUT `m1` 的分槽
+- **THEN** 重建的回合與分槽 version 皆為 3；兩次舊版本 PUT 皆回 409；`GET /api/matchmaker/slots/m1` 為重建值
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後重建同場次的分槽版本大於重置前且持舊版本的 PUT 回 409」
+
+#### Scenario: 版本下限：重置後重新匯入同一份本機資料時持舊版本的寫入皆被拒
+
+- **GIVEN** 雲端為空時以 `POST /api/import` 匯入資料 P（參賽者——含 `m1` 兩隊的選手、含 `pending` 場次 `m1` 的回合、`m1` 的分槽、歷史 `h1`、獨立計分板），另一台裝置讀到的參賽者、回合、分槽皆為 version 1
+- **WHEN** 呼叫重置後再匯入同一份 P，接著依該裝置持有的舊版本：以 `version: 1` PUT 其中一位參賽者、以 `version: 1` PUT 回合、以 `version: 1` PUT `m1` 的分槽、以 `roundVersion: 1` 對 `m1` 送出比分
+- **THEN** 第二次匯入回 200 且 `scoreboardCurrent` 為 `"skipped"`；重新匯入的參賽者、回合、分槽 version 皆為 2，歷史 `h1` 的 version 為 1，獨立計分板仍為原值與 version 1；
+  四個舊版本寫入皆回 409，名單、回合、分槽與歷史皆與第二次匯入後相同
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後重新匯入同一份本機資料時持舊版本的寫入皆回 409」
+
+#### Scenario: 版本下限：刪除參賽者後以同 id 重建
+
+- **GIVEN** 參賽者 p1 為 version 3、p2 為 version 1
+- **WHEN** 依序 `DELETE` p1、`DELETE` p2，再以 `version: 0` PUT p1，接著以 `version: 3` PUT p1
+- **THEN** 兩次 DELETE 皆回 204；重建的 p1 version 為 4（下限取較大者，不被後一次較小的值降低）；`version: 3` 的 PUT 回 409
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「刪除參賽者後以同 id 重建時版本大於刪除前」
+
+#### Scenario: 版本下限：刪除參賽者以單一 batch 提高下限並刪除
+
+- **WHEN** 以記錄 `batch()` 呼叫的 D1 替身注入 env，`DELETE` 一位既有參賽者
+- **THEN** 回 204；只送出一次 `batch()`，含兩條陳述式（提高下限、刪除）
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「刪除參賽者以單一 D1 batch 提高版本下限並刪除」
+
+#### Scenario: 版本下限：回合 PUT 清除的分槽以同場次重建
+
+- **GIVEN** 回合含 `pending` 的 `m1`、`m2`，`m1` 的分槽為 version 3
+- **WHEN** PUT 只含 `m2`、`m3` 的回合（`m1` 的分槽被清除），再 PUT 把 `pending` 的 `m1` 加回的回合，接著以 `version: 0` PUT `m1` 的分槽，最後以 `version: 3` PUT `m1` 的分槽
+- **THEN** 重建的分槽 version 為 4；`version: 3` 的 PUT 回 409
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「回合 PUT 清除的分槽以同場次重建時版本大於清除前」
+
+#### Scenario: 版本下限：送出比分刪除的分槽在重置後重新匯入
+
+- **GIVEN** 以 `POST /api/import` 匯入參賽者（含 `m1` 兩隊的選手）、含 `pending` 的 `m1` 的回合與 `m1` 的分槽後，把 `m1` 的分槽更新到 version 5，再對 `m1` 送出比分（分槽被刪除；回合與參與該場的參賽者變為 version 2）
+- **WHEN** 呼叫重置後再匯入同一份資料
+- **THEN** 重新匯入的 `m1` 分槽 version 為 6（大於送出比分前的 5，而非只取重置當下其餘列的最大值加一）
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「送出比分刪除的分槽在重置後重新匯入時版本大於刪除前」
+
+#### Scenario: 版本下限：逐筆刪除路徑只依本人的資料提高下限
+
+- **GIVEN** 使用者 B 的參賽者 p1 為 version 5，回合（version 6）含 `pending` 的 `m1`、`m2`，兩者的分槽皆為 version 9
+- **WHEN** 使用者 A 依序：建立 p1（version 1）後 `DELETE` p1；以 `version: 0` PUT 含 `m1`、`m2` 的回合並建立 `m1` 的分槽，再 PUT 只含 `m2` 的回合（`m1` 的分槽被清除）；建立 `m2` 兩隊的選手與 `m2` 的分槽後對 `m2` 送出比分
+- **THEN** 三步之後 A 的下限依序為 1、2、3（只取自 A 被刪除的列）；B 的參賽者與分槽 version 不變，`sync_version_floors` 沒有 B 的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限」
+
+#### Scenario: 版本下限：沒有任何資料時重置不失敗
+
+- **GIVEN** 使用者從未寫入任何對戰分配機資料
+- **WHEN** 呼叫重置，再以 `version: 0` PUT 回合與一位參賽者
+- **THEN** 重置回 204；回合與參賽者的 version 皆為 1；`sync_version_floors` 沒有該使用者的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「沒有任何資料時重置仍回 204 且之後建立的版本為 1」
+
+#### Scenario: 版本下限：一位使用者的下限不影響他人
+
+- **GIVEN** 使用者 A 的回合為 version 3 並已重置
+- **WHEN** 從未刪除過資料的使用者 B 以 `version: 0` PUT 回合與一位參賽者
+- **THEN** B 的回合與參賽者 version 皆為 1；`sync_version_floors` 沒有 B 的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「一位使用者的重置不影響其他使用者的建立版本」
+
+#### Scenario: 版本下限：重置只依本人的資料提高下限
+
+- **GIVEN** 使用者 B 的參賽者 p1 為 version 5、回合為 version 6、`m1` 的分槽為 version 7；使用者 A 的參賽者 p1 為 version 2、回合與 `m1` 的分槽為 version 1
+- **WHEN** A 呼叫重置，再以 `version: 0` PUT 回合、參賽者 p1 與 `m1` 的分槽
+- **THEN** 重置回 204；A 的下限為 2；A 重建的回合、參賽者與分槽 version 皆為 3；B 的參賽者、回合、分槽 version 仍為 5、6、7，且 `sync_version_floors` 沒有 B 的列
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「其他使用者有較高版本的資料時重置只依本人的資料提高下限」
+
+#### Scenario: 版本下限：重置在同一個 batch 內提高下限並刪除四張表
+
+- **WHEN** 以記錄 `batch()` 呼叫的 D1 替身注入 env，呼叫 `POST /api/matchmaker/reset`
+- **THEN** 回 204；只送出一次 `batch()`，含五條陳述式（提高下限與四條刪除）
+- **驗收**：`hono-pickball/test/matchmaker-players.test.ts`，it 名稱「重置以單一 D1 batch 送出四條刪除」（既有 it，斷言由 `[4]` 改為 `[5]`）
