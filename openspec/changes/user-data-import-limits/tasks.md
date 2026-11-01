@@ -50,7 +50,7 @@ Depends on: §1
 - [x] 2.6 GREEN（TDD）：`src/api/players.ts` 新增 `MAX_PLAYERS_PER_IMPORT = 500`、`PLAYER_IMPORT_BODY_LIMIT_BYTES = 1_000_000`；`src/api/import.ts` 新增 `IMPORT_SEGMENT_LIMIT_BYTES = 1_900_000`、`IMPORT_BODY_LIMIT_BYTES = 10_000_000`、
   `ImportSegments` 型別、`serializeImportSegments`（五段形狀逐字沿用目前 `hono-pickball/src/import/local-import-repository.ts` 的五個 `JSON.stringify`）、`utf8ByteLength`（不用 `TextEncoder`）、`checkImportLimits`（design Decision 1、2、6）。
   核心全套綠；`pnpm --filter ./packages/pickball-core typecheck` 與 `pnpm -r exec tsc --noEmit` exit 0；`CORE_MODULES` 不變
-- [ ] 2.7 REFACTOR：視需要整理；無壞味道註記 skipped
+- [x] 2.7 REFACTOR：視需要整理；無壞味道註記 skipped
 
 ## 3. 後端：body 上限 middleware 與兩個批次寫入端點
 
