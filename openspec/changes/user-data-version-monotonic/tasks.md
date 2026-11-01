@@ -64,15 +64,16 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：it「刪除參賽者後以同 id 重建時版本大於刪除前」（先刪 v3 的 p1、再刪 v1 的 p2）與「刪除參賽者以單一 D1 batch 提高版本下限並刪除」（spy D1，範本為「重置以單一 D1 batch 送出四條刪除」）。確認兩者皆紅（`deletePlayer` 未提高下限、未走 batch）（`test:`）
-- [ ] 4.2 GREEN（TDD）：`deletePlayer` 改為 `db.batch([raiseVersionFloor(該參賽者), delete])`；刪除仍冪等（不存在也 204）。4.1 綠、`test/matchmaker-players.test.ts` 與 `test/version-floor.test.ts` 全綠（`feat:`）
-- [ ] 4.3 RED（TDD）：it「回合 PUT 清除的分槽以同場次重建時版本大於清除前」。確認紅燈（孤兒清除未提高下限，重建得 1）（`test:`）
-- [ ] 4.4 GREEN（TDD）：`putRound` 的 batch 改為「回合寫入 → 提高下限 → 孤兒 DELETE」，孤兒條件抽成同檔一個 SQL 片段供兩條共用（design Decision 3）。依檔頭例外 ② 把「回合 PUT 的寫入與孤兒分槽清除在同一個 D1 batch 內送出」的 `[2, 2]` 改為 `[3, 3]` 並更新註解。
+- [x] 4.1 RED（TDD）：it「刪除參賽者後以同 id 重建時版本大於刪除前」（先刪 v3 的 p1、再刪 v1 的 p2）與「刪除參賽者以單一 D1 batch 提高版本下限並刪除」（spy D1，範本為「重置以單一 D1 batch 送出四條刪除」）。確認兩者皆紅（`deletePlayer` 未提高下限、未走 batch）（`test:`）
+- [x] 4.2 GREEN（TDD）：`deletePlayer` 改為 `db.batch([raiseVersionFloor(該參賽者), delete])`；刪除仍冪等（不存在也 204）。4.1 綠、`test/matchmaker-players.test.ts` 與 `test/version-floor.test.ts` 全綠（`feat:`）
+- [x] 4.3 RED（TDD）：it「回合 PUT 清除的分槽以同場次重建時版本大於清除前」。確認紅燈（孤兒清除未提高下限，重建得 1）（`test:`）
+- [x] 4.4 GREEN（TDD）：`putRound` 的 batch 改為「回合寫入 → 提高下限 → 孤兒 DELETE」，孤兒條件抽成同檔一個 SQL 片段供兩條共用（design Decision 3）。依檔頭例外 ② 把「回合 PUT 的寫入與孤兒分槽清除在同一個 D1 batch 內送出」的 `[2, 2]` 改為 `[3, 3]` 並更新註解。
   4.3 綠、`test/matchmaker-round.test.ts` 與 `test/version-floor.test.ts` 全綠（特別是「一位使用者的重置不影響其他使用者的建立版本」：B 的 `PUT /round` 不得產生下限列）（`feat:`）
-- [ ] 4.5 RED（TDD）：it「送出比分刪除的分槽在重置後重新匯入時版本大於刪除前」。確認紅燈（§3 完成後重置只取得當下其餘列的最大值，分槽得 3 而非 6）（`test:`）
-- [ ] 4.6 GREEN（TDD）：`submitScoreForUser` 的 batch 在「刪除該場分槽」之前加入提高下限（選取條件與刪除相同：`user_id` 與 `match_id`）；守衛仍為第一條、釋放守衛仍為最後一條。
+- [x] 4.5 RED（TDD）：it「送出比分刪除的分槽在重置後重新匯入時版本大於刪除前」。確認紅燈（§3 完成後重置只取得當下其餘列的最大值，分槽得 3 而非 6）（`test:`）
+- [x] 4.6 GREEN（TDD）：`submitScoreForUser` 的 batch 在「刪除該場分槽」之前加入提高下限（選取條件與刪除相同：`user_id` 與 `match_id`）；守衛仍為第一條、釋放守衛仍為最後一條。
   4.5 綠、`test/matchmaker-score.test.ts` 與 `test/version-floor.test.ts` 全綠（守衛相關 it 若任一轉紅，依 execution-plan 升級）（`feat:`）
-- [ ] 4.7 REFACTOR：檢視四條刪除路徑的呼叫寫法是否一致、`version-floor.ts` 的註解是否只寫「為什麼」；無壞味道註記 skipped（`refactor:` 或 skipped）
+- [x] 4.7 REFACTOR：檢視四條刪除路徑的呼叫寫法是否一致、`version-floor.ts` 的註解是否只寫「為什麼」；無壞味道註記 skipped（`refactor:` 或 skipped）
+  - 紀錄：RED `ab06d04`（4.1，兩個 it 皆真紅：1≠4、`[]`≠`[2]`）、`59bb550`（4.3，1≠4）、`e9cd609`（4.5，3≠6），GREEN `74610cd`、`95b9081`（含例外 ② `[2, 2]`→`[3, 3]`）、`a9c33d9`；4.7 skipped（四條刪除路徑寫法一致：以與刪除相同條件的 `SELECT version AS v` 交給 `raiseVersionFloor`，`putRound` 以 `orphanSlotCondition` 共用條件）。後端全套 26 檔／209 it 綠。Stage 1 PASS；Stage 2（opus）PASS、無必修項——獨立 21 條變異＋1 條對照組，M6（upsert 直接覆寫 `excluded.version`）在「刪除參賽者後以同 id 重建時版本大於刪除前」單獨執行（`-t`）即轉紅；三個 RED 以 `git show <GREEN>^:<src>` 實跑複驗皆真紅
 
 ## 5. 文件與指令驗收
 
