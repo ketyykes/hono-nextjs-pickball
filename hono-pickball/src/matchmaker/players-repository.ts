@@ -2,7 +2,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound } from "../db/schema";
-import { raiseVersionFloor } from "./version-floor";
+import { initialVersion, raiseVersionFloor } from "./version-floor";
 
 export interface VersionedPlayer {
 	data: Player;
@@ -40,7 +40,7 @@ export async function putPlayer(
 		const inserted = await db
 			.insert(matchmakerPlayers)
 			.select(
-				sql`select ${userId}, ${data.id}, ${JSON.stringify(data)}, coalesce(max(${matchmakerPlayers.sortOrder}), -1) + 1, 1, ${now.getTime()} from ${matchmakerPlayers} where ${matchmakerPlayers.userId} = ${userId}`,
+				sql`select ${userId}, ${data.id}, ${JSON.stringify(data)}, coalesce(max(${matchmakerPlayers.sortOrder}), -1) + 1, ${initialVersion(userId)}, ${now.getTime()} from ${matchmakerPlayers} where ${matchmakerPlayers.userId} = ${userId}`,
 			)
 			.onConflictDoNothing()
 			.returning();
