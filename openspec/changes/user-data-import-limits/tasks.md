@@ -27,7 +27,7 @@
 
 ## 1. 對齊 main＋基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/user-data-import-limits`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/user-data-import-limits`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   持雙鎖跑 `pnpm test` baseline、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md Verification 並 commit（`chore:`）
 - [ ] 1.2 對齊：比對本 change 五個 MODIFIED Requirement 與目前主 spec 的原文（`openspec/specs/{user-data-sync,data-transfer,player-roster}/spec.md`）；**若原文不同（例：`user-data-version-monotonic` 已 archive），以主 spec 為底重新套用本 change 的增修**；
   對照 `hono-pickball/src/import/local-import-repository.ts`、`src/matchmaker/players-repository.ts`、`src/routes/{import,matchmaker}.ts`、核心 `api/{errors,players,import}.ts`、前端 `lib/sync/local-import.ts` 的現況與 design Context 是否相符；

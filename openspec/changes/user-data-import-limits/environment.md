@@ -29,8 +29,13 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（apply §1 實跑後回填：前端／後端／核心的檔數與 test 數；三段 typecheck；`pnpm lint`；`playwright test --list` 各 project 數量）
-- **Initial commit hash**：（apply §1 回填 `change/user-data-import-limits` 分出時的 `main` HEAD；propose 當下 `main` HEAD 為 `630bbd2`）
+- **Baseline tests**（2026-11-01 apply §1 實跑，持雙鎖，load 約 5）：
+  - `pnpm test`：前端 109 檔／1078 passed；後端 24 檔／177 passed；核心 9 檔／21 passed（exit 0）
+  - `pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck`：皆 exit 0
+  - `pnpm lint`：exit 0，0 errors／3 warnings
+  - `playwright test --list`：chromium、firefox、webkit、mobile-chrome、mobile-safari 各 147 tests（18 files）；user-data 46 tests（6 files）
+  - `pnpm install`：lockfile 零變動；`db:migrate:local`：No migrations to apply
+- **Initial commit hash**：`7d5d142`（`change/user-data-import-limits` 分出時的 `main` HEAD；propose 當下 `main` HEAD 為 `630bbd2`）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
