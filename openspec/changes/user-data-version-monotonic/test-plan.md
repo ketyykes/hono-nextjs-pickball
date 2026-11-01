@@ -85,7 +85,7 @@
 |---|---|---|---|
 | C1 | （型別） | `pnpm -r exec tsc --noEmit`；`pnpm --filter ./hono-pickball typecheck`；`pnpm --filter ./packages/pickball-core typecheck` | 皆 exit 0 |
 | C2 | （lint） | `pnpm lint` | 0 errors、warning 不多於基線 |
-| C3 | （單元＋整合） | `pnpm test` | 三組皆綠；後端檔數 +1、it 數 = 基線 + 新增（11＋4），數字寫在 tasks |
+| C3 | （單元＋整合） | `pnpm test` | 三組皆綠；後端檔數 +1、it 數 = 基線 + 新增（`version-floor.test.ts` 13 ＋ `d1-schema.test.ts` 4 = 17；原計畫 11＋4，apply 時另加兩條跨使用者隔離 regression guard），數字寫在 tasks |
 | C4 | （建置） | `pnpm build` | exit 0 |
 | C5 | 版本下限表由 migration 建立 | `pnpm --filter ./hono-pickball db:generate` 後 `git -C <repo> status --porcelain hono-pickball/drizzle` 為空 | 無新檔（schema 與 0004 不漂移） |
 | C6 | （E2E，regression） | 先 `pnpm --filter ./hono-pickball db:migrate:local`；再依 project 分開跑 `pnpm --filter ./nextjs-pickball exec playwright test --workers=1 --project=<p>`（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`） | 數量與基線一致、全數 passed（不新增、不刪除 E2E）；無因缺帳密 skip |
@@ -97,5 +97,5 @@
 - [x] 每個 Scenario 至少一列（既有 Scenario 以「（既有）」列合併）
 - [x] 每列皆有 Tier
 - [x] 每條刪除路徑（重置、逐筆刪除、孤兒清除、送出比分）與每條建立路徑（三個 PUT version 0、批次附加、本機匯入三段）各有至少一個會在漏改時轉紅的 it
-- [x] 會先綠的 it 已點名標 regression guard（2 個新 it ＋ 既有 it）
+- [x] 會先綠的 it 已點名標 regression guard（4 個新 it：propose 時 2 個、apply 時追加的跨使用者隔離 2 個；＋ 既有 it）
 - [x] 允許修改的既有斷言只有兩條（batch 大小 `[4]`、`[2, 2]`），名稱不改
