@@ -79,10 +79,14 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 設定層（文件）：`hono-pickball/CLAUDE.md`——「使用者資料 API」的新表慣例處加入「`sync_version_floors` 為版本下限、不屬任何 feature」；「matchmaker 名單 API」的 `POST /reset` 敘述加入「batch 第一條提高版本下限（共 5 條）」、`DELETE` 加入「以 2 條的 batch 先提高下限」；
+- [x] 5.1 設定層（文件）：`hono-pickball/CLAUDE.md`——「使用者資料 API」的新表慣例處加入「`sync_version_floors` 為版本下限、不屬任何 feature」；「matchmaker 名單 API」的 `POST /reset` 敘述加入「batch 第一條提高版本下限（共 5 條）」、`DELETE` 加入「以 2 條的 batch 先提高下限」；
   「新增或修改使用者資料端點時須遵守」加入第 6 點：**新增任何會刪除 `matchmaker_players`／`matchmaker_round`／`matchmaker_match_slots` 之列的寫入 MUST 在同一 batch、刪除之前呼叫 `raiseVersionFloor`；新增建立路徑 MUST 以 `initialVersion` 取初始 version**（理由一句：ABA）。
   `pnpm --filter ./hono-pickball db:generate` 不產生新檔（`docs:`）
-- [ ] 5.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0
-- [ ] 5.3 驗收（指令）C2～C5：持鎖跑 `pnpm lint`（0 errors、warning 不多於基線）、`pnpm test`（三組全綠；後端檔數與 it 數 = 基線 + 1 檔、+15 it）、`pnpm build`；C5 `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空。數字記錄於此
+  - 紀錄：`7617c58`、`92f59d6`（Stage 1 退回一次：`PUT /round` 的 batch 句位置使「此順序」指涉不清，已修正）；Stage 1 PASS、Stage 2（opus）PASS。`db:generate` 輸出 No schema changes、`hono-pickball/drizzle` 無變動
+- [x] 5.2 驗收（指令）C1：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0
+  - 紀錄（2026-11-01，HEAD `92f59d6`）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./packages/pickball-core typecheck` exit 0
+- [x] 5.3 驗收（指令）C2～C5：持鎖跑 `pnpm lint`（0 errors、warning 不多於基線）、`pnpm test`（三組全綠；後端檔數與 it 數 = 基線 + 1 檔、+15 it）、`pnpm build`；C5 `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空。數字記錄於此
+  - 紀錄（持雙鎖，load 2.4～3.4）：`pnpm lint` exit 0，0 errors／3 warnings（與基線相同）；`pnpm test` exit 0：核心 10 檔／27、前端 109 檔／1085、後端 26 檔／210（基線 25／193 + 1 檔、+17 it：原計畫 +15，另加 §3、§4 各一條跨使用者隔離 regression guard）；`pnpm build` exit 0；C5 `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空
 - [ ] 5.4 驗收（指令）C6：確認本機 D1 已套用 0004 後，持鎖依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`），數量與 1.1 基線一致且全數 passed；無因缺帳密 skip。數字記錄於此
-- [ ] 5.5 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` 通過
+- [x] 5.5 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` 通過
+  - 紀錄：`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` → valid
