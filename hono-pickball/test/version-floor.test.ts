@@ -357,4 +357,32 @@ describe("版本下限", () => {
 		expect(stale.status).toBe(409);
 		expect(await bodyOf<{ error: string }>(stale)).toEqual({ error: "VERSION_CONFLICT" });
 	});
+
+	it("送出比分刪除的分槽在重置後重新匯入時版本大於刪除前", async () => {
+		const email = "vf-score-delete@example.com";
+		const cookie = await seedAndSignIn(email);
+		const userId = await userIdOf(email);
+		const payload = makePayload();
+
+		expect((await postImport(cookie, payload)).status).toBe(200);
+		// 分槽匯入時為 version 1，更新四次到 version 5
+		for (const version of [1, 2, 3, 4]) {
+			const updated = await request(cookie, "PUT", "/slots/m1", { data: makeSlot("m1", version), version });
+			expect(updated.status).toBe(200);
+		}
+		const submitted = await request(cookie, "POST", "/round/matches/m1/score", {
+			scoreA: "11",
+			scoreB: "7",
+			roundVersion: 1,
+		});
+		expect(submitted.status).toBe(200);
+		expect(await rowsOf("matchmaker_match_slots", userId)).toEqual([]);
+
+		// 重置當下分槽已不存在，其餘列最大只有 2；下限必須在送出比分時就已記住 5
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+		expect((await postImport(cookie, payload)).status).toBe(200);
+
+		const slots = await rowsOf("matchmaker_match_slots", userId);
+		expect(slots.map((row) => row.version)).toEqual([6]);
+	});
 });
