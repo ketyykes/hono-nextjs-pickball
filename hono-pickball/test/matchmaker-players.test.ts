@@ -1,4 +1,5 @@
 import { env, exports } from "cloudflare:workers";
+import { MAX_PLAYERS_PER_IMPORT, PLAYER_IMPORT_BODY_LIMIT_BYTES } from "@pickball/core/api/players";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
@@ -411,6 +412,50 @@ describe("/api/matchmaker 名單端點", () => {
 		const cookie = await seedAndSignIn("mp-import-schema@example.com");
 
 		const res = await importPlayers(cookie, [makePlayer("p1", "越界", { rating: 99 }), makePlayer("p2")]);
+
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+		expect(await listItems(cookie)).toEqual([]);
+	});
+
+	it("匯入恰 500 位參賽者成功，501 位時回 413 PAYLOAD_TOO_LARGE 且不寫入", async () => {
+		const okCookie = await seedAndSignIn("mp-import-cap-ok@example.com");
+		const overCookie = await seedAndSignIn("mp-import-cap-over@example.com");
+		const build = (count: number): Player[] => Array.from({ length: count }, (_, index) => makePlayer(`cap-${index}`));
+
+		const ok = await importPlayers(okCookie, build(MAX_PLAYERS_PER_IMPORT));
+		const over = await importPlayers(overCookie, build(MAX_PLAYERS_PER_IMPORT + 1));
+
+		expect(ok.status).toBe(200);
+		expect(await listItems(okCookie)).toHaveLength(MAX_PLAYERS_PER_IMPORT);
+		expect(over.status).toBe(413);
+		expect(await over.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		expect(await listItems(overCookie)).toEqual([]);
+	});
+
+	it("匯入請求 body 超過上限時回 413 PAYLOAD_TOO_LARGE 且不寫入", async () => {
+		const okCookie = await seedAndSignIn("mp-import-body-ok@example.com");
+		const overCookie = await seedAndSignIn("mp-import-body-over@example.com");
+		// name 沒有長度上限，以填充長度精準控制 body 的位元組數（name 只含 ASCII，且不會被 trim 縮短）
+		const bodyWithName = (padding: number): string =>
+			JSON.stringify({ players: [makePlayer("big", "x".repeat(padding))] });
+		const baseBytes = new TextEncoder().encode(bodyWithName(0)).length;
+
+		const ok = await request(okCookie, "POST", "/players/import", bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes));
+		const over = await request(overCookie, "POST", "/players/import", bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes + 1));
+
+		expect(ok.status).toBe(200);
+		expect(await listItems(okCookie)).toHaveLength(1);
+		expect(over.status).toBe(413);
+		expect(await over.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+		expect(await listItems(overCookie)).toEqual([]);
+	});
+
+	// regression guard：核心 schema 已收緊 id，寫入時預期先綠
+	it("匯入含 id 為空字串的參賽者時回 400 且不寫入", async () => {
+		const cookie = await seedAndSignIn("mp-import-emptyid@example.com");
+
+		const res = await importPlayers(cookie, [makePlayer("p1"), makePlayer("", "空 id")]);
 
 		expect(res.status).toBe(400);
 		expect(await res.json()).toEqual({ error: "INVALID_BODY" });
