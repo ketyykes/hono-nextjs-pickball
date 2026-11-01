@@ -90,6 +90,20 @@ describe("版本下限", () => {
 		}
 		const current = await bodyOf<Versioned<unknown>>(await request(cookie, "GET", "/round"));
 		expect(current).toEqual({ data: r2, version: 3 });
+
+		// 下限只套用在可重建的版本化表：再重置後匯入，歷史與獨立計分板仍從 1 起算
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+		const userId = await userIdOf(email);
+		const imported = await postImport(cookie, {
+			...makePayload(),
+			players: [makePlayer("p-x")],
+			currentRound: null,
+			scoreboard: { current: standaloneScoreboard(7, 3), matches: [] },
+		});
+		expect(imported.status).toBe(200);
+		expect((await rowsOf("matchmaker_players", userId)).map((row) => row.version)).toEqual([4]);
+		expect((await rowsOf("matchmaker_history", userId)).map((row) => row.version)).toEqual([1]);
+		expect((await rowsOf("scoreboard_current", userId)).map((row) => row.version)).toEqual([1]);
 	});
 
 	it("沒有任何資料時重置仍回 204 且之後建立的版本為 1", async () => {
