@@ -106,4 +106,27 @@ describe("版本下限", () => {
 		const listed = await bodyOf<{ items: Versioned<Player>[] }>(await request(cookie, "GET", "/players"));
 		expect(listed.items).toEqual([{ data: rebuilt, version: 4 }]);
 	});
+
+	it("重置後批次附加同 id 的參賽者回應實際版本且持舊版本的 PUT 回 409", async () => {
+		const cookie = await seedAndSignIn("vf-player-import@example.com");
+		const original = makePlayer("p1", "舊");
+
+		await request(cookie, "PUT", "/players/p1", { data: original, version: 0 });
+		await request(cookie, "PUT", "/players/p1", { data: original, version: 1 });
+		expect((await request(cookie, "POST", "/reset")).status).toBe(204);
+
+		const appended = [makePlayer("p1", "重建"), makePlayer("p2")];
+		const imported = await request(cookie, "POST", "/players/import", { players: appended });
+		expect(imported.status).toBe(200);
+		const importedItems = (await bodyOf<{ items: Versioned<Player>[] }>(imported)).items;
+		expect(importedItems.map((item) => item.version)).toEqual([3, 3]);
+
+		const listed = await bodyOf<{ items: Versioned<Player>[] }>(await request(cookie, "GET", "/players"));
+		expect(listed.items).toEqual(importedItems);
+		for (const staleVersion of [1, 2]) {
+			const stale = await request(cookie, "PUT", "/players/p1", { data: original, version: staleVersion });
+			expect(stale.status).toBe(409);
+			expect(await stale.json()).toEqual({ error: "VERSION_CONFLICT" });
+		}
+	});
 });
