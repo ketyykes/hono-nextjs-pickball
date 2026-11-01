@@ -200,3 +200,16 @@ schema 驗證仍由 route 的 `zValidator` 先做（位元組上限只對合法�
    archive 順序由 coordinator 決定；後 archive 者 MUST 在 tasks 1.2 以主 spec 為底重套 delta，本 change 若在後，特別重套「大小與筆數上限」「陳述式上限」兩段與 Scenario「大量資料以常數個陳述式匯入」；程式碼層兩邊對 `importLocalData` 的修改需手動合併（本 change 只動參數來源與 batch 前的判定，不動 SELECT 欄位）。
 7. **量測成本的優化**（目前不做）：`checkImportLimits` 可對每段先以字串長度短路——UTF-16 長度 > 上限必然超過；長度 × 3 ≤ 上限必然未超過（每個 UTF-16 單位至多 3 位元組）——只有介於兩者之間才逐字元計算；前端亦可把 `oversize` 改為只在資料頁計算。
    不做的理由：多出的分支增加邊界測試與變異面，而目前沒有實測顯示成本有問題。
+8. **apply §1 對齊與查證結果（2026-11-01，已結案，不需裁定）**：
+   - 對齊：本 change 五個 MODIFIED Requirement 與主 spec 逐行比對，差異全為本 change 的增修；`openspec/specs/{user-data-sync,data-transfer,player-roster}` 自 propose（`630bbd2`）後無任何 commit，`user-data-version-monotonic` 尚未 archive，故不需重套 delta。
+     `local-import-repository.ts`、`players-repository.ts`、`routes/{import,matchmaker}.ts`、核心 `api/{errors,players,import}.ts`、前端 `lib/sync/local-import.ts` 自 propose 後亦無 commit，現況與 Context 相符（`site-navbar-account-entry`、`history-filter-retention` 未觸及上述檔案）。
+   - 查證（Context7 `/websites/hono_dev`、`/llmstxt/developers_cloudflare_d1_llms-full_txt`，Cloudflare 文件搜尋，已安裝 `hono@4.12.25` 原始碼）：與「查證紀錄」一致——D1 單一字串 2,000,000 B、每條陳述式 100 個參數、batch 內每條陳述式各自受單一 query 限制、`db.batch()` 對「每次 Worker 呼叫的 query 數」只計一次；
+     `bodyLimit` 預設 `onError` 拋 `HTTPException(413)`、有 `Content-Length` 且無 `Transfer-Encoding` 時只比對標頭，否則讀串流計數並在未超過時以讀到的 chunk 重建 request。
+     唯一補充：Workers 文件現寫明「進入 Worker 的 request body 上限取決於網域的 Cloudflare 方案（Free／Pro 100 MB），而非 Workers 方案」，對本 change 的 10,000,000 B 上限無影響。
+   - 1.3 一次性實測（workerd 單檔測試，未 commit）：
+     ① 10,000,001 B 的 body 在 workerd 測試環境可正常處理（`app.request` 經 `bodyLimit` 回 413 約 15～20 ms；`exports.default.fetch` 送到現行 `/api/import` 約 13 ms）。
+        **以字串 body 建立的 `new Request` 在 workerd 內不帶 `Content-Length` 標頭**，`bodyLimit` 因此走串流計數分支；手動指定 `Content-Length` 標頭時會保留並走標頭分支。
+        → 3.1「有 `Content-Length`」的案例 MUST 在測試內明確設定該標頭，否則兩個案例實際上都在測串流分支。
+     ② 未超過上限且不帶 `Content-Length` 的串流 body（分兩個 chunk）：`bodyLimit` 重建 request 後下游 `zValidator` 照常讀到 body（200）。
+     ③ 耗時：body 約 1.9MB 的匯入請求單一 it 約 200～300 ms；10MB 請求約 15～140 ms（含登入）。預設 5 秒 timeout 足夠，3.3／3.5 不需加 timeout 參數。
+     另觀察：歷史段包裝後約 2.35MB 的請求在本機 miniflare 回 500，與 Context「約 2.1～2.2MB 以上本機才失敗」一致。

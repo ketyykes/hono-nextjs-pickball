@@ -29,10 +29,10 @@
 
 - [x] 1.1 確認分支 `change/user-data-import-limits`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   持雙鎖跑 `pnpm test` baseline、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊：比對本 change 五個 MODIFIED Requirement 與目前主 spec 的原文（`openspec/specs/{user-data-sync,data-transfer,player-roster}/spec.md`）；**若原文不同（例：`user-data-version-monotonic` 已 archive），以主 spec 為底重新套用本 change 的增修**；
+- [x] 1.2 對齊：比對本 change 五個 MODIFIED Requirement 與目前主 spec 的原文（`openspec/specs/{user-data-sync,data-transfer,player-roster}/spec.md`）；**若原文不同（例：`user-data-version-monotonic` 已 archive），以主 spec 為底重新套用本 change 的增修**；
   對照 `hono-pickball/src/import/local-import-repository.ts`、`src/matchmaker/players-repository.ts`、`src/routes/{import,matchmaker}.ts`、核心 `api/{errors,players,import}.ts`、前端 `lib/sync/local-import.ts` 的現況與 design Context 是否相符；
   `DO_NOT_TRACK=1 openspec validate user-data-import-limits --strict` 通過後 commit（`docs:`）；差異記入 design Open Questions
-- [ ] 1.3 一次性實測（不 commit）：在 workerd 單檔測試中以 `exports.default.fetch` 對一個臨時掛 `bodyLimit` → `zValidator` 的路由送出 ① 10,000,001 位元組 body（確認 workerd 測試環境可承受此大小、記錄是否帶 `Content-Length`）；
+- [x] 1.3 一次性實測（不 commit）：在 workerd 單檔測試中以 `exports.default.fetch` 對一個臨時掛 `bodyLimit` → `zValidator` 的路由送出 ① 10,000,001 位元組 body（確認 workerd 測試環境可承受此大小、記錄是否帶 `Content-Length`）；
   ② 未超過上限且**不帶** `Content-Length` 的串流 body（確認 `bodyLimit` 重建 request 後下游 `zValidator` 仍讀得到 body）；並記錄 1.9MB 與 10MB 請求的單一 it 耗時。
   結果記入 design Open Questions；若預設 5 秒 timeout 不足，3.3／3.5 對個別 it 加 timeout 參數並註明理由（不改 `vitest.config.ts`）；若 ① 不可行，3.3 的 body 上限 it 改以 `app.request` 注入並回報
 
