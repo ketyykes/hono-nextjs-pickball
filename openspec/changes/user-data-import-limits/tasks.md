@@ -89,7 +89,7 @@ Depends on: §3, §4
 
 - [x] 5.1 例外層（E2E 驗收）：`tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時以超過 500 位參賽者的 JSON 備份匯入雲端時顯示資料量超過上限且雲端不寫入」（備份檔以 `MAX_PLAYERS_PER_IMPORT + 1` 位組成；斷言資料頁顯示 `tooLarge` 文案、參賽者頁雲端名單為空；等待以元素與 `data-sync-status` 為依據，不用 `waitForTimeout`）。
   持雙鎖以 `--project=user-data` 單跑該檔，預期加入即綠，如實記錄
-- [ ] 5.2 文件：`hono-pickball/CLAUDE.md`「本機資料匯入 API」改寫上限敘述（body 10,000,000、單段 1,900,000 以核心 `checkImportLimits` 判定、超過回 413 `PAYLOAD_TOO_LARGE` 且不送出 batch；刪除「單段 JSON 參數超過 D1 的 2MB 上限，整批回滾、零列」的 500 例子）、
+- [x] 5.2 文件：`hono-pickball/CLAUDE.md`「本機資料匯入 API」改寫上限敘述（body 10,000,000、單段 1,900,000 以核心 `checkImportLimits` 判定、超過回 413 `PAYLOAD_TOO_LARGE` 且不送出 batch；刪除「單段 JSON 參數超過 D1 的 2MB 上限，整批回滾、零列」的 500 例子）、
   「matchmaker 名單 API」的 `POST /players/import` 補 body 1,000,000／500 位上限與 id 非空；「路由約定」補「批次寫入端點一律掛 `src/http/body-limit.ts` 的 `jsonBodyLimit`」；
   `nextjs-pickball/CLAUDE.md` 對 `lib/sync/local-import.ts` 的敘述改為「以核心 `checkImportLimits` 判定 `oversize`（五段包裝後各 ≤ 1,900,000 位元組、參賽者 ≤ 500 位）」與「分類加 `too-large`（413）」，並補 `remote-transfer.ts` 的 413 → `importTooLarge`。只寫現行行為與理由，不寫 change 名稱（`docs:`）
 
