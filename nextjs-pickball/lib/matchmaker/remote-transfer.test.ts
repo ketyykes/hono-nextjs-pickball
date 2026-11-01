@@ -212,6 +212,17 @@ describe("remote-transfer", () => {
 		// 不是未授權：呼叫端不得因此刷新 session
 		expect((result as { unauthorized?: true }).unauthorized).toBeUndefined();
 		expect(fetchMock).toHaveBeenCalledTimes(2);
+		// 只有 413 是資料過大：高於 413 的其他 4xx 仍為 importFailed，且不帶未授權標示
+		for (const status of [422, 429]) {
+			const otherFetch = vi.fn().mockImplementation(async (_p: string, init: RequestInit) => {
+				if (init.method === "GET") return listResponse(CLOUD_PLAYERS);
+				return new Response("x", { status });
+			});
+			vi.stubGlobal("fetch", otherFetch);
+			const other = await importRemoteRoster("user-a", preview, CONTEXT);
+			expect(other, `狀態碼 ${status}`).toEqual({ ok: false, message: REMOTE_TRANSFER_MESSAGES.importFailed });
+			expect((other as { unauthorized?: true }).unauthorized, `狀態碼 ${status}`).toBeUndefined();
+		}
 		// 固定文案：人數取自核心常數，其餘文字與規格逐字相同
 		expect(REMOTE_TRANSFER_MESSAGES.importTooLarge).toBe(
 			`匯入的資料量超過單次上限（一次最多 ${MAX_PLAYERS_PER_IMPORT} 位參賽者），本次沒有匯入任何資料。請將 CSV 分成較小的檔案後再匯入。`,
