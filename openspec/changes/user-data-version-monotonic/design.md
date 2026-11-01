@@ -244,3 +244,10 @@
      M7b-p（players 選取拿掉 `user_id`）、M7b-r（round）、M7b-s（slots）在**只執行此 it**（`-t`）時各自轉紅；對照組「round 段 `UNION ALL` 改 `UNION`」綠。
      因此新增 1 個 it，5.3 的後端預期數字由「基線 + 1 檔、+15 it」變為「+1 檔、+16 it」。
    - 非必修 2（`updated_at` 未測）、非必修 3（`let results` 型別）依裁定不處理。M6（upsert 直接覆寫 `excluded.version`）移交 §4 的 deletePlayer it 覆蓋。
+9. **（第二任 leader，2026-11-01，§4 結果）**：
+   - §4（`ab06d04`～`a9c33d9`）Stage 1 PASS、Stage 2（opus）PASS 無必修項，4.1～4.7 已勾選（`7d867a4`）。M6（upsert 直接覆寫 `excluded.version`）由 §4 的「刪除參賽者後以同 id 重建時版本大於刪除前」覆蓋，單獨執行即轉紅（Implementer 與 Stage 2 皆實跑）。
+   - **Stage 2 非必修觀察 1 的處理（leader 決定，比照 coordinator 對 §3 的裁定 2）**：三條逐筆刪除路徑（deletePlayer、putRound 孤兒清除、送出比分）的下限選取若漏掉 `user_id`，整檔執行時會轉紅，但只因同檔前面的 it 留下他人資料，單獨 `-t` 執行時三條全部存活。
+     已新增 regression guard it「其他使用者有較高版本的同 id 資料時逐筆刪除路徑只依本人的資料提高下限」與對應 Scenario「版本下限：逐筆刪除路徑只依本人的資料提高下限」、test-plan 列（`a53cd15`，寫入即綠）。
+     以 `-t` 只跑此 it：A4（deletePlayer 漏 `user_id`，得 5≠1）、B6（putRound，9≠2）、C4（送出比分，9≠3）各自轉紅；對照組 `WHERE v NOT NULL` 綠。**請 coordinator 確認此追加可接受**。
+   - Stage 2 非必修觀察 2（deletePlayer 與送出比分在「沒有列被刪除」時不寫下限列，未有斷言；只有逐路徑自行改寫選取為 `coalesce(max, 0)` 的變異會存活，共用的外層 WHERE 已被兩條 it 守住）：風險低，未處理，留待 coordinator 裁定。
+   - 後端 it 數：§3 後 26 檔／205（含 §3 追加的隔離 it）→ §4 後 209 → 本次追加後 210。5.3 的預期因此為「基線 25 檔／193 + 1 檔、+17 it」＝ 26 檔／210（原計畫 +15，另加兩條隔離 regression guard）。
