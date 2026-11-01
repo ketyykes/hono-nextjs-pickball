@@ -546,10 +546,12 @@ describe("POST /api/import 本機資料匯入", () => {
 		const cookie = await seedAndSignIn("import-body-exact@example.com");
 		const build = (padding: number): string => JSON.stringify({ ...makePayload(), padding: "x".repeat(padding) });
 		const baseBytes = utf8ByteLength(build(0));
+		const body = build(IMPORT_BODY_LIMIT_BYTES - baseBytes);
+		// 先確認組出的 body 恰為上限，再送出；避免測試本身算錯而失去邊界意義
+		expect(utf8ByteLength(body)).toBe(IMPORT_BODY_LIMIT_BYTES);
 
-		const res = await postImport(cookie, JSON.parse(build(IMPORT_BODY_LIMIT_BYTES - baseBytes)));
+		const res = await postImport(cookie, JSON.parse(body));
 
-		expect(utf8ByteLength(build(IMPORT_BODY_LIMIT_BYTES - baseBytes))).toBe(IMPORT_BODY_LIMIT_BYTES);
 		expect(res.status).toBe(200);
 	});
 
