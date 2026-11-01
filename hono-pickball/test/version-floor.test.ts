@@ -68,7 +68,7 @@ async function bodyOf<T>(res: Response): Promise<T> {
 }
 
 describe("版本下限", () => {
-	it("重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409", async () => {
+	it("重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1", async () => {
 		const email = "vf-round@example.com";
 		const cookie = await seedAndSignIn(email);
 		const r1 = makeRound([makeMatch("m1")], 1);

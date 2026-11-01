@@ -23,9 +23,11 @@
 #### Scenario: 版本下限：重置後重建的回合不被持舊版本的裝置覆寫
 
 - **GIVEN** 回合以 `version: 0` 建立後再更新一次（目前 version 2），另一台裝置持有 version 1 與 version 2 的回合
-- **WHEN** 呼叫 `POST /api/matchmaker/reset`，再以 `version: 0` PUT 新回合 R2，接著分別以 `version: 1`、`version: 2` PUT 舊回合 R1′
-- **THEN** 重建的回合 version 為 3；兩次舊版本 PUT 皆回 `409 { "error": "VERSION_CONFLICT" }`；`GET /api/matchmaker/round` 為 R2 且 version 3
-- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409」
+- **WHEN** 呼叫 `POST /api/matchmaker/reset`，再以 `version: 0` PUT 新回合 R2，接著分別以 `version: 1`、`version: 2` PUT 舊回合 R1′；
+  之後再呼叫重置，並以 `POST /api/import` 匯入一位參賽者、一筆歷史與獨立計分板（不含回合與分槽）
+- **THEN** 重建的回合 version 為 3；兩次舊版本 PUT 皆回 `409 { "error": "VERSION_CONFLICT" }`；`GET /api/matchmaker/round` 為 R2 且 version 3；
+  匯入回 200，匯入的參賽者 version 為 4（下限取自第二次重置前的回合 version 3），歷史與獨立計分板的 version 皆為 1（不適用下限）
+- **驗收**：`hono-pickball/test/version-floor.test.ts`，it 名稱「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1」
 
 #### Scenario: 版本下限：重置後以 version 0 重建同 id 的參賽者
 
