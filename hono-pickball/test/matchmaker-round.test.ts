@@ -454,4 +454,21 @@ describe("/api/matchmaker/round", () => {
 		expect(await slotMatchIds(cookie)).toEqual(["m1", "m3"]);
 		expect(await rowsOf("sync_version_floors", userId)).toEqual([]);
 	});
+
+	it("回合 PUT 在多場已完成場次中只把其中一場改回未完成時仍回 400", async () => {
+		const cookie = await seedAndSignIn("mr-uncomplete-many@example.com");
+		const userId = await userIdOf("mr-uncomplete-many@example.com");
+		const original = makeRound([makeMatch("m0", "completed"), makeMatch("m1"), makeMatch("m2", "completed")]);
+		await seedRound(userId, original);
+
+		// 第一場已完成場次保持不變、只改第二場：每一場都要檢查，不能只看第一場或「任一場相同」
+		const res = await request(cookie, "PUT", "/round", {
+			data: makeRound([makeMatch("m0", "completed"), makeMatch("m1"), makeMatch("m2")]),
+			version: 1,
+		});
+
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+		expect(await getRound(cookie)).toEqual({ data: original, version: 1 });
+	});
 });
