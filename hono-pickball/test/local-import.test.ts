@@ -5,6 +5,7 @@ import {
 	IMPORT_BODY_LIMIT_BYTES,
 	IMPORT_SEGMENT_LIMIT_BYTES,
 	type LocalImportRequest,
+	LocalImportRequestSchema,
 	type LocalImportResponse,
 	serializeImportSegments,
 	utf8ByteLength,
@@ -590,6 +591,48 @@ describe("POST /api/import 本機資料匯入", () => {
 			{ ...env, DB: db },
 		);
 	}
+
+	// regression guard：前端與後端必須量測並送出同一份形狀，repository 不得自行另組 JSON
+	it("送進 json_each 的五個參數就是 serializeImportSegments 的輸出", async () => {
+		const cookie = await seedAndSignIn("import-segments@example.com");
+		const payload = makePayload();
+		const boundStrings: string[] = [];
+		// 記錄每條陳述式 bind 的字串參數，其餘行為委派給真實 D1
+		const recordingDb = {
+			prepare: (query: string) => {
+				const statement = env.DB?.prepare(query);
+				if (!statement) {
+					throw new Error("缺少 DB binding");
+				}
+				return new Proxy(statement, {
+					get(target, property) {
+						if (property === "bind") {
+							return (...args: unknown[]) => {
+								for (const arg of args) {
+									if (typeof arg === "string") {
+										boundStrings.push(arg);
+									}
+								}
+								return target.bind(...args);
+							};
+						}
+						const value = Reflect.get(target, property, target);
+						return typeof value === "function" ? value.bind(target) : value;
+					},
+				});
+			},
+			batch: (statements: D1PreparedStatement[]) => env.DB?.batch(statements),
+		} as unknown as D1Database;
+
+		const res = await postImportWithDb(cookie, payload, recordingDb);
+
+		expect(res.status).toBe(200);
+		// 後端序列化的是 schema 解析後的物件（key 順序以 schema 為準），所以以同一份解析結果計算期望值
+		const segments = serializeImportSegments(LocalImportRequestSchema.parse(payload));
+		for (const segment of [segments.players, segments.round, segments.slots, segments.history, segments.current]) {
+			expect(boundStrings).toContain(segment);
+		}
+	});
 
 	it("超過上限的匯入不呼叫 D1 batch", async () => {
 		const cookie = await seedAndSignIn("import-nobatch@example.com");

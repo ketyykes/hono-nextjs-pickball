@@ -463,6 +463,17 @@ describe("/api/matchmaker 名單端點", () => {
 		expect(await listItems(cookie)).toEqual([]);
 	});
 
+	// regression guard：body 上限掛在 validator 之前，schema 不合法但 body 過大時回 413 而非 400
+	it("匯入的 body 超過上限且內容不合 schema 時回 413 而非 400", async () => {
+		const cookie = await seedAndSignIn("mp-import-order-validator@example.com");
+		const body = JSON.stringify({ players: [], padding: "x".repeat(PLAYER_IMPORT_BODY_LIMIT_BYTES) });
+
+		const res = await request(cookie, "POST", "/players/import", body);
+
+		expect(res.status).toBe(413);
+		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+	});
+
 	// regression guard：body 上限掛在 sub-app 守衛之後，未登入與帳號不符的回應仍優先於 413
 	it("匯入的 body 超過上限時，未登入仍回 401、帳號不符仍回 401 ACCOUNT_MISMATCH", async () => {
 		const cookie = await seedAndSignIn("mp-import-order@example.com");
