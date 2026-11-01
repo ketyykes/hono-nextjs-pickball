@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BackupSchema } from "../matchmaker/transfer-types";
+import { PlayerWriteSchema } from "./players";
 import { MatchSlotSchema } from "./round";
 import { ScoreboardStateSchema } from "../scoreboard/types";
 
@@ -14,6 +15,7 @@ const StandaloneScoreboardSchema = ScoreboardStateSchema.refine(
  * 欄位一律沿用既有 schema，不重新宣告；跨段的一致性由 superRefine 檢查。
  */
 export const LocalImportRequestSchema = BackupSchema.extend({
+  players: z.array(PlayerWriteSchema),
   scoreboard: z.object({
     current: StandaloneScoreboardSchema.nullable(),
     matches: z.array(MatchSlotSchema),

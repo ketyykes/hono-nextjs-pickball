@@ -42,8 +42,8 @@ Depends on: §1
 
 - [x] 2.1 RED（TDD）：依檔頭例外 ① 修改 `packages/pickball-core/test/api/errors.test.ts`，it「API_ERROR_CODES 恰為五個錯誤碼且值等於鍵名」。確認紅燈（缺 `PAYLOAD_TOO_LARGE`）
 - [x] 2.2 GREEN（TDD）：`src/api/errors.ts` 的 `API_ERROR_CODES` 加 `PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE"`（design Decision 3）
-- [ ] 2.3 RED（TDD）：`test/api/players.test.ts` 新增 it「PlayerWriteSchema 拒絕空字串 id 而 PlayerSchema 照舊接受」（含 `PlayerImportRequestSchema` 與 `LocalImportRequestSchema` 拒絕 id 為 `""` 的參賽者）。確認紅燈；同 it 內「`PlayerSchema` 接受 `""`」的斷言在 RED 時即成立，於紀錄中點名
-- [ ] 2.4 GREEN（TDD）：`src/api/players.ts` 新增 `PlayerWriteSchema = PlayerSchema.extend({ id: z.string().min(1) })`，`PlayerImportRequestSchema` 改用之；`src/api/import.ts` 的 `LocalImportRequestSchema` 以 `BackupSchema.extend({ players: z.array(PlayerWriteSchema), scoreboard: … })` 覆寫 `players`（design Decision 7）。
+- [x] 2.3 RED（TDD）：`test/api/players.test.ts` 新增 it「PlayerWriteSchema 拒絕空字串 id 而 PlayerSchema 照舊接受」（含 `PlayerImportRequestSchema` 與 `LocalImportRequestSchema` 拒絕 id 為 `""` 的參賽者）。確認紅燈；同 it 內「`PlayerSchema` 接受 `""`」的斷言在 RED 時即成立，於紀錄中點名
+- [x] 2.4 GREEN（TDD）：`src/api/players.ts` 新增 `PlayerWriteSchema = PlayerSchema.extend({ id: z.string().min(1) })`，`PlayerImportRequestSchema` 改用之；`src/api/import.ts` 的 `LocalImportRequestSchema` 以 `BackupSchema.extend({ players: z.array(PlayerWriteSchema), scoreboard: … })` 覆寫 `players`（design Decision 7）。
   `PlayerSchema`、`BackupSchema` 不改；既有 `test/api/{players,import}.test.ts` 全綠
 - [ ] 2.5 RED（TDD）：新增 `test/api/import-limits.test.ts`，it「serializeImportSegments 產生後端 json_each 參數的五段 JSON」「utf8ByteLength 與 TextEncoder 的位元組數一致」「checkImportLimits 依後端參數形狀判定，五段各自恰為上限時通過、多一位元組即超過」
   「checkImportLimits 拒絕超過 500 位參賽者且不以各段加總判定」「批次寫入的上限常數皆小於 D1 單一字串上限」。確認五個 it 皆紅（函式與常數不存在）
