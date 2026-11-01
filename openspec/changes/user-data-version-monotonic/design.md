@@ -234,3 +234,13 @@
    - §3 Implementer 回報：upsert「`max(既有, excluded)` 改為直接覆寫 `excluded.version`」的變異在 §3 無法觀察（只有 reset 會提高下限，且 reset 刪除三表全部列）；§4 的 `deletePlayer`（先刪 v3 的 p1、再刪 v1 的 p2）MUST 覆蓋此變異，§4 Stage 2 須確認。
    - `51b9e85` 在「重置後重建的回合…」it 尾端追加「再重置後匯入，驗歷史與獨立計分板 version 為 1」步驟（殺死「獨立計分板段改用下限」變異）；Stage 1 判可接受。
    - 尚未開始：§4、§5、Final Code Review、完整驗收（含 E2E）。
+8. **（第二任 leader，2026-11-01，coordinator 對 §3 的追加裁定落實）**：
+   - §3 Stage 2（opus）已 PASS、無必修項（獨立 27 條變異＋2 條對照組），3.1～3.11 已勾選（`ae8c976`）。
+   - **it 名稱涵蓋追加步驟**（`16dd4b7`，`test:`，refactor 性質、非紅燈）：it 改名為「重置後重建的回合版本大於重置前且持舊版本的 PUT 回 409，再重置後匯入的歷史與獨立計分板版本仍為 1」；
+     delta `user-data-sync` 的 Scenario「版本下限：重置後重建的回合不被持舊版本的裝置覆寫」WHEN／THEN 補上第二次重置與匯入（參賽者 version 4、歷史與獨立計分板 version 1），驗收錨點與 test-plan 三處名稱逐字一致。
+     tasks 3.1 的文字保留當時的 it 名稱（歷史紀錄，未改）。`openspec validate user-data-version-monotonic --strict` 通過。
+   - **跨使用者隔離補強**（`7578120`，`test:`，**regression guard**，寫入即綠）：新增 it「其他使用者有較高版本的資料時重置只依本人的資料提高下限」與對應 Scenario「版本下限：重置只依本人的資料提高下限」、test-plan 列。
+     B 的參賽者／回合／分槽分別為 v5／v6／v7，A 為 v2／v1／v1；A 重置後下限 2、重建皆得 3，B 不受影響。變異（`players-repository.ts` 重置選取，三重落地檢查皆過、每次還原後 `git status` 乾淨）：
+     M7b-p（players 選取拿掉 `user_id`）、M7b-r（round）、M7b-s（slots）在**只執行此 it**（`-t`）時各自轉紅；對照組「round 段 `UNION ALL` 改 `UNION`」綠。
+     因此新增 1 個 it，5.3 的後端預期數字由「基線 + 1 檔、+15 it」變為「+1 檔、+16 it」。
+   - 非必修 2（`updated_at` 未測）、非必修 3（`let results` 型別）依裁定不處理。M6（upsert 直接覆寫 `excluded.version`）移交 §4 的 deletePlayer it 覆蓋。
