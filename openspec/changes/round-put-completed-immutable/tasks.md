@@ -37,15 +37,17 @@
 
 Depends on: §1
 
-- [ ] 2.1 regression guard（寫入即綠）：新增三個 it，各自對應 test-plan 的同名列：
+- [x] 2.1 regression guard（寫入即綠）：新增三個 it，各自對應 test-plan 的同名列：
   - 「回合 PUT 整輪替換時前一輪的已完成場次可不出現在新資料」
   - 「回合 PUT 只移除部分已完成場次時接受」
   - 「版本過期的回合 PUT 把已完成場次改回未完成時回 409 而非 400」
 
   在 GREEN 之前寫入，守住 GREEN 不擋下整輪替換、部分移除，也不讓版本過期的請求退化成 400。貼出三者在 main 程式碼上皆綠的輸出，並在紀錄中逐一點名標 regression guard（`test:`）。
-- [ ] 2.2 RED（TDD）：新增 it「回合 PUT 把已完成場次改回未完成時回 400 且不寫入」，斷言依 test-plan：三個 PUT（改回 pending、改為 scoring、重複 id）皆 400；回合不變；`m1`、`m3` 分槽保留；無下限列。
+  - **紀錄**：`2fdacf9`（只動測試檔）。三個 it 在未改實作的程式碼上寫入即綠（單檔 18 passed），逐一標 **regression guard**：整輪替換、只移除部分已完成場次、版本過期回 409。Stage 2 以 `git show 28a3770^:…/round-repository.ts` 複驗三者在舊實作下皆綠。
+- [x] 2.2 RED（TDD）：新增 it「回合 PUT 把已完成場次改回未完成時回 400 且不寫入」，斷言依 test-plan：三個 PUT（改回 pending、改為 scoring、重複 id）皆 400；回合不變；`m1`、`m3` 分槽保留；無下限列。
   確認紅燈並貼出輸出（現況第一個 PUT 回 200，之後兩個因版本已遞增回 409）（`test:`）。
-- [ ] 2.3 GREEN（TDD）：在 `round-repository.ts` 加入反向規則（design Decision 1、3、4）：
+  - **紀錄**：`59e8116`（不含 src 變更；`git diff 59e8116^ 59e8116 -- hono-pickball/src` 為空，src 與 main `c5eafcc` 相同）。leader 以 main 的 `round-repository.ts` 機械複驗：`1 failed | 18 passed (19)`，`AssertionError: expected 200 to be 400`（第一個 PUT），**真紅**。
+- [x] 2.3 GREEN（TDD）：在 `round-repository.ts` 加入反向規則（design Decision 1、3、4）：
   - 只看目前回合中 completed 的場次；以 id 對應，新資料中每一場同 id 的場次都以 `isDeepEqual` 比較。
   - 只在 `current !== null && current.version === expectedVersion` 時檢查；違反時在 batch 之前回 `{ kind: "invalid" }`。
   - 正向規則的程式碼與位置不變。
@@ -53,8 +55,12 @@ Depends on: §1
 
   驗收：2.2 轉綠；2.1 與 `test/matchmaker-round.test.ts` 全綠；`test/matchmaker-slots.test.ts`、`test/matchmaker-score.test.ts`、`test/version-floor.test.ts` 單檔各跑一次全綠。
   依 test-plan 跑 M1～M14 與 C1、C2，在紀錄中列出結果（`feat:`）。
-- [ ] 2.4 REFACTOR：檢視正向與反向規則的命名與拆分，是否讓「哪個方向、為何看版本」一眼可辨；新 it 之間若有重複的種子步驟，可抽成檔內 helper（不動既有 it）。
+  - **紀錄**：`28a3770`，新增私有函式 `keepsCompletedMatchesUnchanged`，`putRound` 在正向規則之後以 `current !== null && current.version === expectedVersion` 閘門呼叫；JSDoc 寫明兩方向與判定順序。單檔：matchmaker-round 19、matchmaker-slots 7、matchmaker-score 18、version-floor 13，全綠；兩段 typecheck exit 0。
+  - Mutation：Implementer 與 Stage 2（opus，自寫 harness）各自獨立跑 M1～M14 全數轉紅、C1／C2 存活；Stage 2 另追加 M7c～e（分槽、下限列、回合三項斷言各自有效）、M15（`current === null` 側有覆蓋）、M17、M18 皆轉紅。追加的 M16（外層 `every` 改為 `length === 0 || some`）存活，見 design Open Questions 6。
+  - Stage 1（sonnet）PASS；Stage 2（opus）PASS，無必修。
+- [x] 2.4 REFACTOR：檢視正向與反向規則的命名與拆分，是否讓「哪個方向、為何看版本」一眼可辨；新 it 之間若有重複的種子步驟，可抽成檔內 helper（不動既有 it）。
   沒有壞味道就註記 skipped（`refactor:` 或 skipped）。
+  - **skipped**：兩方向已拆成 `keepsCompletedMatches`（正向）與 `keepsCompletedMatchesUnchanged`（反向），共用同一份 `isDeepEqual`；版本閘門的理由在 `putRound` JSDoc；新 it 的種子步驟與既有 it 同一寫法，抽 helper 反而偏離風格。Stage 2 評估 skipped 合理。
 
 ## 3. 文件與指令驗收
 
