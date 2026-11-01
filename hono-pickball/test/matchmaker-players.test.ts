@@ -1,4 +1,5 @@
 import { env, exports } from "cloudflare:workers";
+import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { MAX_PLAYERS_PER_IMPORT, PLAYER_IMPORT_BODY_LIMIT_BYTES } from "@pickball/core/api/players";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { describe, expect, it, vi } from "vitest";
@@ -460,6 +461,31 @@ describe("/api/matchmaker 名單端點", () => {
 		expect(res.status).toBe(400);
 		expect(await res.json()).toEqual({ error: "INVALID_BODY" });
 		expect(await listItems(cookie)).toEqual([]);
+	});
+
+	// regression guard：body 上限掛在 sub-app 守衛之後，未登入與帳號不符的回應仍優先於 413
+	it("匯入的 body 超過上限時，未登入仍回 401、帳號不符仍回 401 ACCOUNT_MISMATCH", async () => {
+		const cookie = await seedAndSignIn("mp-import-order@example.com");
+		const oversized = JSON.stringify({ players: [makePlayer("big", "x".repeat(PLAYER_IMPORT_BODY_LIMIT_BYTES + 1))] });
+
+		const anonymous = await request(undefined, "POST", "/players/import", oversized);
+		const mismatch = await exports.default.fetch(
+			new Request(`${base}/players/import`, {
+				method: "POST",
+				headers: {
+					Origin: origin,
+					Cookie: cookie,
+					"Content-Type": "application/json",
+					[EXPECTED_USER_ID_HEADER]: "someone-else",
+				},
+				body: oversized,
+			}),
+		);
+
+		expect(anonymous.status).toBe(401);
+		expect(await anonymous.json()).toEqual({ error: "UNAUTHORIZED" });
+		expect(mismatch.status).toBe(401);
+		expect(await mismatch.json()).toEqual({ error: "ACCOUNT_MISMATCH" });
 	});
 
 	it("匯入遇到非主鍵衝突的資料庫錯誤時回 500", async () => {

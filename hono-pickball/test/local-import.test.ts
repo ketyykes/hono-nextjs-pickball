@@ -528,14 +528,42 @@ describe("POST /api/import 本機資料匯入", () => {
 		const cookie = await seedAndSignIn("import-body-over@example.com");
 		const userId = await userIdOf("import-body-over@example.com");
 		// 未知欄位會在 schema 驗證時被剝除，所以只有 validator 之前的 body 上限能擋下
-		const body = JSON.stringify({ ...makePayload(), padding: "x".repeat(IMPORT_BODY_LIMIT_BYTES) });
-		expect(utf8ByteLength(body)).toBeGreaterThan(IMPORT_BODY_LIMIT_BYTES);
+		const build = (padding: number): string => JSON.stringify({ ...makePayload(), padding: "x".repeat(padding) });
+		// 只多一位元組：上限的另一側由「恰為匯入上限時照常處理」固定
+		const body = build(IMPORT_BODY_LIMIT_BYTES + 1 - utf8ByteLength(build(0)));
+		expect(utf8ByteLength(body)).toBe(IMPORT_BODY_LIMIT_BYTES + 1);
 
 		const res = await postImport(cookie, JSON.parse(body));
 
 		expect(res.status).toBe(413);
 		expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
 		await expectNoRows([userId]);
+	});
+
+	// regression guard：恰等於 body 上限時照常處理（邊界的另一側）
+	it("請求 body 恰為匯入上限時照常處理", async () => {
+		const cookie = await seedAndSignIn("import-body-exact@example.com");
+		const build = (padding: number): string => JSON.stringify({ ...makePayload(), padding: "x".repeat(padding) });
+		const baseBytes = utf8ByteLength(build(0));
+
+		const res = await postImport(cookie, JSON.parse(build(IMPORT_BODY_LIMIT_BYTES - baseBytes)));
+
+		expect(utf8ByteLength(build(IMPORT_BODY_LIMIT_BYTES - baseBytes))).toBe(IMPORT_BODY_LIMIT_BYTES);
+		expect(res.status).toBe(200);
+	});
+
+	// regression guard：body 上限掛在 sub-app 守衛之後，未登入與帳號不符的回應仍優先於 413
+	it("匯入的 body 超過上限時，未登入仍回 401、帳號不符仍回 401 ACCOUNT_MISMATCH", async () => {
+		const cookie = await seedAndSignIn("import-body-order@example.com");
+		const oversized = JSON.stringify({ ...makePayload(), padding: "x".repeat(IMPORT_BODY_LIMIT_BYTES) });
+
+		const anonymous = await postImportWithHeaders({}, oversized);
+		const mismatch = await postImportWithHeaders({ Cookie: cookie, [EXPECTED_USER_ID_HEADER]: "someone-else" }, oversized);
+
+		expect(anonymous.status).toBe(401);
+		expect(await anonymous.json()).toEqual({ error: API_ERROR_CODES.UNAUTHORIZED });
+		expect(mismatch.status).toBe(401);
+		expect(await mismatch.json()).toEqual({ error: API_ERROR_CODES.ACCOUNT_MISMATCH });
 	});
 
 	/** batch 被呼叫即計數並拋錯的替身；prepare 照常委派給真實 D1，所以 session 驗證可通過。 */
