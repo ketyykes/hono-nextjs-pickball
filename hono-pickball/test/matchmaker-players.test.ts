@@ -441,9 +441,14 @@ describe("/api/matchmaker 名單端點", () => {
 		const bodyWithName = (padding: number): string =>
 			JSON.stringify({ players: [makePlayer("big", "x".repeat(padding))] });
 		const baseBytes = new TextEncoder().encode(bodyWithName(0)).length;
+		const okBody = bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes);
+		const overBody = bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes + 1);
+		// 確認組出的 body 恰為上限與上限多一位元組，邊界才有意義
+		expect(new TextEncoder().encode(okBody).length).toBe(PLAYER_IMPORT_BODY_LIMIT_BYTES);
+		expect(new TextEncoder().encode(overBody).length).toBe(PLAYER_IMPORT_BODY_LIMIT_BYTES + 1);
 
-		const ok = await request(okCookie, "POST", "/players/import", bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes));
-		const over = await request(overCookie, "POST", "/players/import", bodyWithName(PLAYER_IMPORT_BODY_LIMIT_BYTES - baseBytes + 1));
+		const ok = await request(okCookie, "POST", "/players/import", okBody);
+		const over = await request(overCookie, "POST", "/players/import", overBody);
 
 		expect(ok.status).toBe(200);
 		expect(await listItems(okCookie)).toHaveLength(1);
