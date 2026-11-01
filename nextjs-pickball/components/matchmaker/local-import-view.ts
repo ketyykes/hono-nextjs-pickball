@@ -12,6 +12,7 @@ export const LOCAL_IMPORT_MESSAGES = {
 	hint: "只有在雲端沒有任何對戰分配機資料時才能匯入；匯入後本機資料會保留",
 	cloudNotEmpty: "雲端已有對戰分配機資料，無法匯入。若要以本機資料取代，請先在參賽者頁重置名單。",
 	failed: "匯入失敗，請稍後再試",
+	tooLarge: "資料量超過單次匯入上限，本次沒有匯入任何資料。請聯絡管理者協助匯入。",
 	scoreboardSkipped: "雲端已有進行中的獨立計分板，未匯入該場",
 	// 雲端 JSON 匯入的說明：與本機覆寫式還原的差異（拒絕規則、不寫入本機）要在選檔前讓使用者看到
 	jsonCloudImportHint:
@@ -56,6 +57,9 @@ export function describeImportOutcome(outcome: LocalImportOutcome): ImportResult
 	}
 	if (outcome.kind === "unauthorized") {
 		return { tone: "error", text: REMOTE_TRANSFER_MESSAGES.unauthorized };
+	}
+	if (outcome.kind === "too-large") {
+		return { tone: "error", text: LOCAL_IMPORT_MESSAGES.tooLarge };
 	}
 	return { tone: "error", text: LOCAL_IMPORT_MESSAGES.failed };
 }
