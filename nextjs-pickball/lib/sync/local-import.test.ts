@@ -626,11 +626,12 @@ describe("local-import", () => {
 			[1, false],
 			[2, true],
 		] as const) {
-			historySegmentBytes("x".repeat(extra + LIMIT_BYTES - baseBytes));
+			const segmentBytes = historySegmentBytes("x".repeat(extra + LIMIT_BYTES - baseBytes));
+			expect(segmentBytes, `歷史段長度應為上限加 ${extra - 1}`).toBe(LIMIT_BYTES + extra - 1);
 			const result = buildLocalImportPayload();
 			const backendVerdict = !checkImportLimits(LocalImportRequestSchema.parse(result.payload)).ok;
-			expect(result.oversize, `歷史段 +${extra - 1}`).toBe(expected);
-			expect(result.oversize, `歷史段 +${extra - 1} 與後端判定一致`).toBe(backendVerdict);
+			expect(result.oversize, `歷史段為上限加 ${extra - 1} 位元組`).toBe(expected);
+			expect(result.oversize, `歷史段為上限加 ${extra - 1} 位元組時與後端判定一致`).toBe(backendVerdict);
 		}
 	});
 
