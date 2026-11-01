@@ -63,11 +63,19 @@ export async function putPlayer(
 	return row ? toVersioned(row) : null;
 }
 
-/** 刪除單一參賽者；刻意不檢查影響列數與版本，讓刪除冪等。 */
+/**
+ * 刪除單一參賽者；刻意不檢查影響列數與版本，讓刪除冪等。
+ * 下限與刪除同批，之後以同 id 重建時 version 才不會落回舊裝置持有的值。
+ */
 export async function deletePlayer(db: Db, userId: string, id: string): Promise<void> {
-	await db
-		.delete(matchmakerPlayers)
-		.where(and(eq(matchmakerPlayers.userId, userId), eq(matchmakerPlayers.id, id)));
+	const now = new Date();
+	const deletedVersions = sql`SELECT version AS v FROM matchmaker_players WHERE user_id = ${userId} AND id = ${id}`;
+	await db.batch([
+		raiseVersionFloor(db, userId, deletedVersions, now),
+		db
+			.delete(matchmakerPlayers)
+			.where(and(eq(matchmakerPlayers.userId, userId), eq(matchmakerPlayers.id, id))),
+	]);
 }
 
 /** 只認主鍵／UNIQUE 衝突（FK、NOT NULL、CHECK 違規不是 id 重複）；錯誤可能被包在 cause 內，逐層檢查。 */
