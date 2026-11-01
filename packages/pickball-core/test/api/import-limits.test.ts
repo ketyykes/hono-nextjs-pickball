@@ -111,6 +111,12 @@ function encodedLength(text: string): number {
 
 type SegmentName = "players" | "round" | "slots" | "history" | "current";
 
+/** 只有 us 的姓名會補長，them 維持短字串，補長的位元組才只出現一次。 */
+function makeTeamPlayers(usName: string) {
+  const badge = (name: string) => ({ name, colorFrom: "#000000", colorTo: "#ffffff", foreground: "#ffffff" });
+  return { us: [badge(usName)], them: [badge("t")] };
+}
+
 /** 每一段各自可注入任意長度字串的欄位；其餘段落維持基準大小。 */
 const PADDERS: Record<SegmentName, (request: LocalImportRequest, pad: string) => void> = {
   players: (request, pad) => {
@@ -120,14 +126,14 @@ const PADDERS: Record<SegmentName, (request: LocalImportRequest, pad: string) =>
     request.currentRound!.restingPlayerIds = [pad];
   },
   slots: (request, pad) => {
-    request.scoreboard.matches[0].matchId += pad;
+    // matchId 會在 json 內出現兩次（外層與 data），補長會加倍而無法精準對到上限，改補只出現一次的姓名欄位
+    request.scoreboard.matches[0].teamPlayers = makeTeamPlayers(pad);
   },
   history: (request, pad) => {
     request.history[0].teamA.players[0].name += pad;
   },
   current: (request, pad) => {
-    const badge = { name: pad, colorFrom: "#000000", colorTo: "#ffffff", foreground: "#ffffff" };
-    request.scoreboard.current!.teamPlayers = { us: [badge], them: [badge] };
+    request.scoreboard.current!.teamPlayers = makeTeamPlayers(pad);
   },
 };
 
@@ -143,7 +149,7 @@ function withPad(segment: SegmentName, pad: string): LocalImportRequest {
 function makeRequestWithSegmentBytes(segment: SegmentName, targetBytes: number): LocalImportRequest {
   const baseBytes = encodedLength(serializeImportSegments(withPad(segment, ""))[segment]);
   const request = withPad(segment, "x".repeat(targetBytes - baseBytes));
-  expect(encodedLength(serializeImportSegments(request)[segment])).toBe(targetBytes);
+  expect(encodedLength(serializeImportSegments(request)[segment]), segment).toBe(targetBytes);
   return request;
 }
 

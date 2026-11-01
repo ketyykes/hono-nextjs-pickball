@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { BackupSchema } from "../matchmaker/transfer-types";
-import { PlayerWriteSchema } from "./players";
+import { MAX_PLAYERS_PER_IMPORT, PlayerWriteSchema } from "./players";
 import { MatchSlotSchema } from "./round";
 import { ScoreboardStateSchema } from "../scoreboard/types";
 
@@ -82,3 +82,89 @@ export const LocalImportResponseSchema = z.object({
 
 export type LocalImportRequest = z.infer<typeof LocalImportRequestSchema>;
 export type LocalImportResponse = z.infer<typeof LocalImportResponseSchema>;
+
+/** 單一段 json_each 參數的位元組上限；D1 單一字串上限為 2,000,000，保留 5% 餘裕。 */
+export const IMPORT_SEGMENT_LIMIT_BYTES = 1_900_000;
+
+/** 本機資料匯入的 body 上限，只用來在解析 JSON 前擋下明顯過大的請求。 */
+export const IMPORT_BODY_LIMIT_BYTES = 10_000_000;
+
+/** 後端 json_each 的五個參數，皆為 JSON 字串。 */
+export interface ImportSegments {
+  players: string;
+  round: string;
+  slots: string;
+  history: string;
+  current: string;
+}
+
+/**
+ * 產生送進 D1 json_each 的五段 JSON。
+ * 前後端都用這個函式量測與送出，量測的字串與寫入的字串才不會漂移。
+ */
+export function serializeImportSegments(request: LocalImportRequest): ImportSegments {
+  return {
+    players: JSON.stringify(
+      request.players.map((data, index) => ({ id: data.id, data, sortOrder: index })),
+    ),
+    round: JSON.stringify(request.currentRound === null ? [] : [{ data: request.currentRound }]),
+    slots: JSON.stringify(request.scoreboard.matches.map((data) => ({ matchId: data.matchId, data }))),
+    history: JSON.stringify(
+      request.history.map((data) => ({
+        matchId: data.matchId,
+        playedAt: Date.parse(data.playedAt),
+        data,
+      })),
+    ),
+    current: JSON.stringify(
+      request.scoreboard.current === null ? [] : [{ data: request.scoreboard.current }],
+    ),
+  };
+}
+
+/**
+ * 計算字串的 UTF-8 位元組數。
+ * 核心套件的型別環境沒有 TextEncoder，所以自行計算；單獨的代理字元與 TextEncoder 一樣視為 3 位元組（U+FFFD）。
+ */
+export function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code < 0x80) {
+      bytes += 1;
+    } else if (code < 0x800) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        index += 1;
+      } else {
+        bytes += 3;
+      }
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
+}
+
+export type ImportLimitCheck = { ok: true; segments: ImportSegments } | { ok: false };
+
+/**
+ * 判定匯入請求是否超過筆數或單段位元組上限。
+ * D1 的限制是每個字串而非每個請求，所以五段各自比較、不加總；恰等於上限時通過。
+ */
+export function checkImportLimits(request: LocalImportRequest): ImportLimitCheck {
+  if (request.players.length > MAX_PLAYERS_PER_IMPORT) {
+    return { ok: false };
+  }
+  const segments = serializeImportSegments(request);
+  const texts = [segments.players, segments.round, segments.slots, segments.history, segments.current];
+  for (const text of texts) {
+    if (utf8ByteLength(text) > IMPORT_SEGMENT_LIMIT_BYTES) {
+      return { ok: false };
+    }
+  }
+  return { ok: true, segments };
+}

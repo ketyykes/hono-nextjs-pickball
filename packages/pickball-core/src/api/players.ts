@@ -12,6 +12,12 @@ export const PlayerListResponseSchema = z.object({
   items: z.array(PlayerItemSchema),
 });
 
+/** 單次批次匯入的參賽者人數上限；兩個批次寫入端點共用，使同一份名單在兩邊的接受度一致。 */
+export const MAX_PLAYERS_PER_IMPORT = 500;
+
+/** 名單批次匯入的 body 上限；小於 D1 單一列 2,000,000 位元組，單一參賽者的 data 因此不會超過列大小。 */
+export const PLAYER_IMPORT_BODY_LIMIT_BYTES = 1_000_000;
+
 /**
  * 寫入雲端時的參賽者：id 必須非空。
  * 只在寫入邊界收緊；PlayerSchema 同時服務訪客本機名單與備份還原，收緊它會讓既有的空 id 資料被捨棄。

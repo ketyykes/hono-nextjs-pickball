@@ -45,9 +45,9 @@ Depends on: §1
 - [x] 2.3 RED（TDD）：`test/api/players.test.ts` 新增 it「PlayerWriteSchema 拒絕空字串 id 而 PlayerSchema 照舊接受」（含 `PlayerImportRequestSchema` 與 `LocalImportRequestSchema` 拒絕 id 為 `""` 的參賽者）。確認紅燈；同 it 內「`PlayerSchema` 接受 `""`」的斷言在 RED 時即成立，於紀錄中點名
 - [x] 2.4 GREEN（TDD）：`src/api/players.ts` 新增 `PlayerWriteSchema = PlayerSchema.extend({ id: z.string().min(1) })`，`PlayerImportRequestSchema` 改用之；`src/api/import.ts` 的 `LocalImportRequestSchema` 以 `BackupSchema.extend({ players: z.array(PlayerWriteSchema), scoreboard: … })` 覆寫 `players`（design Decision 7）。
   `PlayerSchema`、`BackupSchema` 不改；既有 `test/api/{players,import}.test.ts` 全綠
-- [ ] 2.5 RED（TDD）：新增 `test/api/import-limits.test.ts`，it「serializeImportSegments 產生後端 json_each 參數的五段 JSON」「utf8ByteLength 與 TextEncoder 的位元組數一致」「checkImportLimits 依後端參數形狀判定，五段各自恰為上限時通過、多一位元組即超過」
+- [x] 2.5 RED（TDD）：新增 `test/api/import-limits.test.ts`，it「serializeImportSegments 產生後端 json_each 參數的五段 JSON」「utf8ByteLength 與 TextEncoder 的位元組數一致」「checkImportLimits 依後端參數形狀判定，五段各自恰為上限時通過、多一位元組即超過」
   「checkImportLimits 拒絕超過 500 位參賽者且不以各段加總判定」「批次寫入的上限常數皆小於 D1 單一字串上限」。確認五個 it 皆紅（函式與常數不存在）
-- [ ] 2.6 GREEN（TDD）：`src/api/players.ts` 新增 `MAX_PLAYERS_PER_IMPORT = 500`、`PLAYER_IMPORT_BODY_LIMIT_BYTES = 1_000_000`；`src/api/import.ts` 新增 `IMPORT_SEGMENT_LIMIT_BYTES = 1_900_000`、`IMPORT_BODY_LIMIT_BYTES = 10_000_000`、
+- [x] 2.6 GREEN（TDD）：`src/api/players.ts` 新增 `MAX_PLAYERS_PER_IMPORT = 500`、`PLAYER_IMPORT_BODY_LIMIT_BYTES = 1_000_000`；`src/api/import.ts` 新增 `IMPORT_SEGMENT_LIMIT_BYTES = 1_900_000`、`IMPORT_BODY_LIMIT_BYTES = 10_000_000`、
   `ImportSegments` 型別、`serializeImportSegments`（五段形狀逐字沿用目前 `hono-pickball/src/import/local-import-repository.ts` 的五個 `JSON.stringify`）、`utf8ByteLength`（不用 `TextEncoder`）、`checkImportLimits`（design Decision 1、2、6）。
   核心全套綠；`pnpm --filter ./packages/pickball-core typecheck` 與 `pnpm -r exec tsc --noEmit` exit 0；`CORE_MODULES` 不變
 - [ ] 2.7 REFACTOR：視需要整理；無壞味道註記 skipped
