@@ -1,11 +1,11 @@
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import type { LocalImportRequest } from "@pickball/core/api/import";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import type { Player } from "@pickball/core/matchmaker/types";
 import { createInitialState } from "@pickball/core/scoreboard/reducer";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { describe, expect, it } from "vitest";
-import "../src/index";
+import app from "../src/index";
 import {
 	appRequestInit,
 	makeHistoryEntry,
@@ -289,5 +289,46 @@ describe("版本下限", () => {
 			slots: await rowsOf("matchmaker_match_slots", userId),
 			history: await rowsOf("matchmaker_history", userId),
 		}).toEqual(before);
+	});
+
+	it("刪除參賽者後以同 id 重建時版本大於刪除前", async () => {
+		const cookie = await seedAndSignIn("vf-delete-player@example.com");
+		await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
+		await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1"), version: 1 });
+		await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1"), version: 2 });
+		await request(cookie, "PUT", "/players/p2", { data: makePlayer("p2"), version: 0 });
+
+		// 先刪版本大的、再刪版本小的：下限只升不降
+		expect((await request(cookie, "DELETE", "/players/p1")).status).toBe(204);
+		expect((await request(cookie, "DELETE", "/players/p2")).status).toBe(204);
+
+		const recreated = await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1", "重建"), version: 0 });
+		const stale = await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1", "舊"), version: 3 });
+		expect((await bodyOf<Versioned<unknown>>(recreated)).version).toBe(4);
+		expect(stale.status).toBe(409);
+		expect(await bodyOf<{ error: string }>(stale)).toEqual({ error: "VERSION_CONFLICT" });
+	});
+
+	it("刪除參賽者以單一 D1 batch 提高版本下限並刪除", async () => {
+		const cookie = await seedAndSignIn("vf-delete-one-batch@example.com");
+		await request(cookie, "PUT", "/players/p1", { data: makePlayer("p1"), version: 0 });
+		const batchSizes: number[] = [];
+		const spyDb = {
+			prepare: (query: string) => env.DB!.prepare(query),
+			batch: (statements: D1PreparedStatement[]) => {
+				batchSizes.push(statements.length);
+				return env.DB!.batch(statements);
+			},
+			exec: (query: string) => env.DB!.exec(query),
+		} as unknown as D1Database;
+
+		const res = await app.request(
+			"/api/matchmaker/players/p1",
+			appRequestInit(cookie, { method: "DELETE" }),
+			{ ...env, DB: spyDb },
+		);
+
+		expect(res.status).toBe(204);
+		expect(batchSizes).toEqual([2]);
 	});
 });
