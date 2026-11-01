@@ -1,11 +1,17 @@
-import type { LocalImportRequest, LocalImportResponse } from "@pickball/core/api/import";
+import { checkImportLimits, type LocalImportRequest, type LocalImportResponse } from "@pickball/core/api/import";
 import { type SQL, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound, scoreboardCurrent } from "../db/schema";
 import { insertBatchGuard, isBatchGuardViolation, releaseBatchGuard } from "../matchmaker/batch-guard";
 
-/** conflict 對應 409：雲端的四張對戰分配機表任一已有本人的資料。 */
-export type ImportOutcome = { kind: "ok"; value: LocalImportResponse["imported"] } | { kind: "conflict" };
+/**
+ * conflict 對應 409：雲端的四張對戰分配機表任一已有本人的資料。
+ * too-large 對應 413：參賽者筆數或任一段 JSON 參數超過上限，尚未碰 D1。
+ */
+export type ImportOutcome =
+	| { kind: "ok"; value: LocalImportResponse["imported"] }
+	| { kind: "conflict" }
+	| { kind: "too-large" };
 
 /**
  * 把 JSON 陣列在資料庫內展開成待插入的列：user_id、依序抽出的欄位、version 1、updated_at。
@@ -26,18 +32,16 @@ function selectFromJsonEach(userId: string, fields: readonly string[], json: str
  * 刻意不用 db.run／db.all：drizzle 0.45.2 的 batch 內帶參數的 raw 陳述式會失敗。
  */
 export async function importLocalData(db: Db, userId: string, input: LocalImportRequest): Promise<ImportOutcome> {
+	// 先判定上限再碰 D1：超過 D1 單一字串上限的參數會讓 batch 失敗，且送出的 JSON 形狀必須與判定時量測的同一份
+	const limits = checkImportLimits(input);
+	if (!limits.ok) {
+		return { kind: "too-large" };
+	}
+	const { players: playersJson, round: roundJson, slots: slotsJson, history: historyJson, current: currentJson } =
+		limits.segments;
+
 	const now = new Date();
 	const updatedAt = now.getTime();
-
-	const playersJson = JSON.stringify(
-		input.players.map((data, index) => ({ id: data.id, data, sortOrder: index })),
-	);
-	const roundJson = JSON.stringify(input.currentRound === null ? [] : [{ data: input.currentRound }]);
-	const slotsJson = JSON.stringify(input.scoreboard.matches.map((data) => ({ matchId: data.matchId, data })));
-	const historyJson = JSON.stringify(
-		input.history.map((data) => ({ matchId: data.matchId, playedAt: Date.parse(data.playedAt), data })),
-	);
-	const currentJson = JSON.stringify(input.scoreboard.current === null ? [] : [{ data: input.scoreboard.current }]);
 
 	// 條件在 SQL 內對資料庫目前內容判定：先讀後寫之間的競態（兩台裝置同時匯入）正是守衛要消除的。
 	// 獨立計分板不在條件內：登入後用過一次計分板的使用者雲端就有一列，納入會讓名單永遠無法匯入。
