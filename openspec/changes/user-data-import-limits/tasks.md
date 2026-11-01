@@ -108,4 +108,4 @@ Depends on: §5
   - 全部 exit 0，load 皆 < 11：chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145＋2 skipped；user-data 47 passed（基線 46＋新增 1，無 skip）；webkit 三 shard 45＋41＋49＝135 passed、4＋8＝12 skipped；mobile-safari 三 shard 45＋41＋49＝135 passed、12 skipped。五個 browser project 數量與基線相同（skip 為基線既有）
 - [x] 6.3 驗收（指令）C7～C9：`openspec validate --strict`；`grep` 上限字面值與 repository 的 `JSON.stringify`；訪客路徑檔案 `git diff main --stat` 無輸出
   - C7：valid；C8：`JSON.stringify` 計數 0、上限字面值 grep 無輸出；C9：訪客路徑檔案（含 `LocalDataImportSection.tsx`、`JsonBackupSection.tsx`）`git diff main --stat` 無輸出
-- [ ] 6.4 Final Code Review（`opus`）：依 execution-plan「Final Code Reviewer」清單；結論與未採納項寫入 design Open Questions 並 commit
+- [x] 6.4 Final Code Review（`opus`）：依 execution-plan「Final Code Reviewer」清單；結論與未採納項寫入 design Open Questions 並 commit
