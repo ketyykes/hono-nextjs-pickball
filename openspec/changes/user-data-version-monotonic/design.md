@@ -251,3 +251,6 @@
      以 `-t` 只跑此 it：A4（deletePlayer 漏 `user_id`，得 5≠1）、B6（putRound，9≠2）、C4（送出比分，9≠3）各自轉紅；對照組 `WHERE v NOT NULL` 綠。**請 coordinator 確認此追加可接受**。
    - Stage 2 非必修觀察 2（deletePlayer 與送出比分在「沒有列被刪除」時不寫下限列，未有斷言；只有逐路徑自行改寫選取為 `coalesce(max, 0)` 的變異會存活，共用的外層 WHERE 已被兩條 it 守住）：風險低，未處理，留待 coordinator 裁定。
    - 後端 it 數：§3 後 26 檔／205（含 §3 追加的隔離 it）→ §4 後 209 → 本次追加後 210。5.3 的預期因此為「基線 25 檔／193 + 1 檔、+17 it」＝ 26 檔／210（原計畫 +15，另加兩條隔離 regression guard）。
+10. **（第二任 leader，2026-11-01，apply 完成）**：§5 完成（5.1 文件經 Stage 1 退回一次後 PASS、Stage 2 PASS；5.2～5.5 指令驗收皆通過，數字見 tasks §5）。Final Code Review（opus）PASS、無必修項；
+    其非必修觀察 1（test-plan C3 期望與 regression guard 計數過時）已同步（`13e85ae`）；觀察 2、3（`51b9e85`、`3da926e` 的 commit body 未標註 regression guard／先綠 it，僅記於 tasks 與本節第 7 點）屬已提交的歷史，不改寫 commit。
+    待 coordinator 裁定：第 9 點的 §4 追加隔離 it 是否接受、Stage 2 非必修觀察 2（deletePlayer／送出比分「無列被刪除時不寫下限列」未斷言）是否需要補。

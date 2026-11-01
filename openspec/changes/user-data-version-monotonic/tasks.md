@@ -87,6 +87,7 @@ Depends on: §4
   - 紀錄（2026-11-01，HEAD `92f59d6`）：`pnpm -r exec tsc --noEmit` exit 0；`pnpm --filter ./hono-pickball typecheck` exit 0；`pnpm --filter ./packages/pickball-core typecheck` exit 0
 - [x] 5.3 驗收（指令）C2～C5：持鎖跑 `pnpm lint`（0 errors、warning 不多於基線）、`pnpm test`（三組全綠；後端檔數與 it 數 = 基線 + 1 檔、+15 it）、`pnpm build`；C5 `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空。數字記錄於此
   - 紀錄（持雙鎖，load 2.4～3.4）：`pnpm lint` exit 0，0 errors／3 warnings（與基線相同）；`pnpm test` exit 0：核心 10 檔／27、前端 109 檔／1085、後端 26 檔／210（基線 25／193 + 1 檔、+17 it：原計畫 +15，另加 §3、§4 各一條跨使用者隔離 regression guard）；`pnpm build` exit 0；C5 `db:generate` 後 `git status --porcelain hono-pickball/drizzle` 為空
-- [ ] 5.4 驗收（指令）C6：確認本機 D1 已套用 0004 後，持鎖依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`），數量與 1.1 基線一致且全數 passed；無因缺帳密 skip。數字記錄於此
+- [x] 5.4 驗收（指令）C6：確認本機 D1 已套用 0004 後，持鎖依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3..3/3`），數量與 1.1 基線一致且全數 passed；無因缺帳密 skip。數字記錄於此
+  - 紀錄（2026-11-01 18:44～19:00，HEAD `3a524e4`，本機 D1 已套用 0004；每段各自持雙鎖，起訖 load 3.1～5.2）：chromium 147 passed；firefox 135 passed＋12 skipped；mobile-chrome 145 passed＋2 skipped；user-data 47 passed；webkit 45＋4 skip／41＋8 skip／49 → 135 passed＋12 skipped；mobile-safari 45＋4 skip／41＋8 skip／49 → 135 passed＋12 skipped。全部 exit 0、無 failed／flaky，數量與基線完全一致（skip 皆為既有的瀏覽器條件式 `test.skip`，無因缺帳密 skip）
 - [x] 5.5 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` 通過
   - 紀錄：`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` → valid
