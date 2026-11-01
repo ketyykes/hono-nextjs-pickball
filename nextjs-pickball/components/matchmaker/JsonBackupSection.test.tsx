@@ -6,6 +6,7 @@ import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { useSession } from "@/hooks/useSession";
 import type { UseSessionResult } from "@/hooks/useSession";
 import { parseBackup } from "@/lib/matchmaker/backup";
+import { LOCAL_IMPORT_MESSAGES } from "./local-import-view";
 import { REMOTE_TRANSFER_MESSAGES } from "@/lib/matchmaker/remote-transfer";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "@/lib/matchmaker/storage-keys";
 import { MATCH_SLOTS_KEY, STORAGE_KEY as SCOREBOARD_CURRENT_KEY } from "@/lib/scoreboard/storage-keys";
@@ -136,6 +137,28 @@ describe("JsonBackupSection 雲端分支", () => {
 
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(snapshotKeys()).toEqual(before);
+	});
+
+	it("雲端 JSON 匯入遇到 413 時顯示資料量超過上限且不寫入本機", async () => {
+		const user = userEvent.setup();
+		localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify({ version: 1, players: [] }));
+		localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ version: 1, entries: [] }));
+		const before = snapshotKeys();
+		const fetchMock = vi.fn<typeof fetch>();
+		fetchMock.mockImplementation(
+			async () => new Response(JSON.stringify({ error: "PAYLOAD_TOO_LARGE" }), { status: 413 }),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+
+		expect((await screen.findByRole("alert")).textContent).toBe(LOCAL_IMPORT_MESSAGES.tooLarge);
+		expect(screen.queryByRole("status")).toBeNull();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(refresh).not.toHaveBeenCalled();
 		expect(snapshotKeys()).toEqual(before);
 	});
 
