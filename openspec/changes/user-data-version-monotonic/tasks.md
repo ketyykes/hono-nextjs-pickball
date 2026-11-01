@@ -24,7 +24,7 @@
   持鎖跑 `pnpm test` baseline、三段 typecheck、`pnpm lint`；`playwright test --list` 各 project 數量；回填 environment.md「Verification」並 commit（`docs:`）
 - [x] 1.2 對齊：重讀 design「Context」盤點表涉及的 `hono-pickball/src/**` 檔案，確認刪除路徑仍只有四條（`grep -rn "delete(matchmaker" hono-pickball/src` 預期 7 行命中：`players-repository.ts` 5 行、`round-repository.ts` 1 行、`score-repository.ts` 1 行，分屬 4 條路徑）、建立路徑仍只有七條（三個 PUT version 0、`importPlayers`、`importLocalData` 三段）；
   比對本 change 的三個 MODIFIED Requirement 與目前主 spec，**若主 spec 已被其他 change 改過（已知並行 change `user-data-import-limits` 也 MODIFIED「本機資料匯入雲端的 API」並改 `local-import-repository.ts`，見 design Open Questions 6），以主 spec 為底重新套用本 change 的增修**，`DO_NOT_TRACK=1 openspec validate user-data-version-monotonic --strict` 通過後 commit（`docs:`）
-- [ ] 1.3 Context7 查證並一次性實測（不 commit 探針）：`/drizzle-team/drizzle-orm-docs`（`insert().select()` 搭配 `onConflictDoUpdate`、`excluded` 的寫法）、`/llmstxt/developers_cloudflare_d1_llms-full_txt`（batch 語意）；
+- [x] 1.3 Context7 查證並一次性實測（不 commit 探針）：`/drizzle-team/drizzle-orm-docs`（`insert().select()` 搭配 `onConflictDoUpdate`、`excluded` 的寫法）、`/llmstxt/developers_cloudflare_d1_llms-full_txt`（batch 語意）；
   在 workerd 測試中實測 design Open Questions 3 的 (a)(b)(c)；結果寫入 design「Context7 查證紀錄」與 Open Questions 3 並 commit（`docs:`）
 
 ## 2. 版本下限資料表

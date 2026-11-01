@@ -193,7 +193,12 @@
   提高下限的 `INSERT … SELECT … ON CONFLICT DO UPDATE` MUST 帶 `WHERE`（本設計為 `WHERE v IS NOT NULL`）；`insert().select(sql\`…\`)` 可傳 SQL 樣板。`guides/upsert`：`onConflictDoUpdate({ target, set })` 的 `set` 可用 `sql\`excluded.<col>\`` 參照提議值。
 - `/llmstxt/developers_cloudflare_d1_llms-full_txt`（`worker-api/d1-database#batch`）：「each statement in the list will execute and commit sequentially, non-concurrently. Batched statements are SQL transactions; if a statement fails … the entire sequence is aborted or rolled back」——
   提高下限與刪除同批即原子；讀下限與建立在同一條陳述式內，無先讀後寫的時間窗。`best-practices/retry-queries`：寫入期間資料庫被鎖，寫入彼此序列化。
-- **尚待 apply §1 實測**（Open Questions 3）：drizzle 0.45.2 在 `db.batch` 內執行 `insert().select(sql…).onConflictDoUpdate(…)` 的實際 SQL；`set` 中引用既有列欄位的寫法（`sync_version_floors.version` 或未限定欄名）在 SQLite upsert 中的解析。
+- **apply §1.3 再查證（2026-11-01）**：`/drizzle-team/drizzle-orm-docs` 的 `sqlite/insert`「Insert into … select」警語與 `guides/upsert`（`set` 以 `sql\`excluded.<col>\`` 參照提議值）內容與 propose 時相同；
+  `/llmstxt/developers_cloudflare_d1_llms-full_txt` 的 `batch()`：「execute and commit, sequentially, non-concurrently」「Batched statements are SQL transactions … aborts or rolls back the entire sequence」，與 propose 時相同。設計假設不變。
+- **apply §1.3 實測**（一次性 workerd 探針 `test/zz-probe-floor.test.ts`，因 0004 尚未產生而在探針內臨時建表；跑完即刪、未 commit）——結果見 Open Questions 3，全部與 Decision 3 相符。
+  drizzle 0.45.2 產生的提高下限 SQL 為：
+  `insert into "sync_version_floors" ("user_id", "version", "updated_at") SELECT ?, v, ? FROM (SELECT max(v) AS v FROM (<被刪列子查詢>)) WHERE v IS NOT NULL on conflict ("sync_version_floors"."user_id") do update set "version" = max("sync_version_floors"."version", excluded.version), "updated_at" = excluded.updated_at`。
+  `insert().select()` 會依 schema 宣告順序**明確列出欄名**，所以 SELECT 的位置必須與 `user_id, version, updated_at` 的宣告順序一致（tasks 2.2 已要求）；`set` 中以 `${syncVersionFloors.version}` 產生的限定欄名 `"sync_version_floors"."version"` 在 SQLite upsert 中正確解析為既有列。
 
 ## Open Questions
 
@@ -204,6 +209,10 @@
    建議 coordinator 另開 change（TDD：新增「把已完成場次改回未完成回 400」的 scenario）。本 change 的測試刻意不依賴此行為（送出比分的分槽改以「重置＋重新匯入」重建）。
 3. **apply §1 實測項**：(a) `raiseVersionFloor` 在 `db.batch` 內可執行，`ON CONFLICT DO UPDATE SET version = max(<既有>, excluded.version)` 只升不降，空集合時零列寫入；(b) `initialVersion` 子查詢在 `INSERT … SELECT FROM json_each` 中只計算一次且值正確；
    (c) `importPlayers` 的多條 `insert().values().returning()` 在 batch 結果中可依序取回 version。任一與本 design 不符，改寫 Decision 3 並記錄於此。
+   **（apply §1.3 實測結果，2026-11-01，皆符合，Decision 3 不需改寫）**：
+   (a) 符合：空集合時 batch 成功且下限表 0 列；先刪 v3 的 `p1`、再刪 v1 的 `p2` 後下限為 3（不被降低）；三表 `UNION ALL`（players 空、round v7、slots 空）提高後為 7。
+   (b) 符合：下限 5 時以 `json_each` 一次插入 3 位參賽者，三列 version 皆為 6（子查詢與列無關，值一致）；`putSlot` 形式的 `INSERT … SELECT … WHERE …` 與 `putRound` 形式的 `values({ version: <SQL> })` 也都寫入 6。
+   (c) 符合：下限 2 時 batch 內 3 條 `insert().values({ version: initialVersion }).returning()`，`batch` 結果依陳述式順序為 `[[x,3]],[[y,3]],[[z,3]]`，可直接組回應。
 4. **（已定案）為何連 API 層才會用到的重建路徑也處理**：前端新增參賽者與 CSV 匯入用隨機 UUID，`PUT /players/:id` version 0 與 `POST /players/import` 在正常使用下不會以舊 id 重建；
    但下限是「表」的不變式，只放過某些建立路徑會讓不變式依賴前端行為，且每條路徑的改動只是把常數 `1` 換成子查詢。故全部建立路徑一致處理。
 5. **（審查建議，未採納）`onConflictDoUpdate` 加 `setWhere: excluded.version > 既有`**：見 Decision 3 末條。
