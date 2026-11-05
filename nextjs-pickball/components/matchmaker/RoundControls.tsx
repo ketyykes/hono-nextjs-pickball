@@ -138,6 +138,9 @@ export function RoundControls({
 
 	// WAI-ARIA APG radio group：方向鍵移動即選取，尾端／開頭循環；locked 時方向鍵
 	// 不得改變選取（按鈕本身雖已 disabled，但 onKeyDown 掛在容器上仍會收到事件）。
+	//
+	// 目前索引取自 displayedTargetScore 而非 settings：回合已產生時畫面上選中的是回合的
+	// 目標分數，若以設定值起算，方向鍵會從一個畫面上看不到的位置開始移動。
 	function handleTargetScoreKeyDown(event: KeyboardEvent<HTMLDivElement>) {
 		if (locked) return;
 		const currentIndex = TARGET_SCORE_OPTIONS.indexOf(displayedTargetScore);
