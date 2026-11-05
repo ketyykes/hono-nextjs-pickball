@@ -133,8 +133,9 @@ export interface UseRoundStoreResult {
 	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
 	/** 更改本輪計時長度：委派 round.ts 的 setTimerDuration（鎖定條件與 setTargetScore 相同，
 	 * 該輪所有場次仍為 pending 時才允許），失敗（`ok: false`）時不套用任何變動；成功時一律
-	 * 得到全新的 timer 物件（`startedAt` 重置為 `null`，見 round.ts 該函式的註解）。 */
-	setTimerDuration: (durationMinutes: RoundTimerDurationMinutes) => SetTimerDurationResult;
+	 * 得到全新的 timer 物件（`startedAt` 重置為 `null`，見 round.ts 該函式的註解）；傳入 `null`
+	 * 則取消計時（`timer` 變為 `null`）。 */
+	setTimerDuration: (durationMinutes: RoundTimerDurationMinutes | null) => SetTimerDurationResult;
 	/** 開始本輪計時：委派 round.ts 的 startTimer（本輪已設定計時長度且尚未開始時才允許，
 	 * 與是否已開始計分無關），`now` 由本 hook 以 `new Date().toISOString()` 注入；失敗
 	 * （`ok: false`）時不套用任何變動。 */
@@ -347,7 +348,7 @@ export function useLocalRoundStore(options: UseRoundStoreOptions): LocalRoundSto
 	// 更改本輪計時長度：委派 round.ts 的純函式，成功時 dispatch 新回合；失敗（該輪已有
 	// 場次非 pending）時不套用任何變動，形態比照 setTargetScore 的
 	// 「呼叫純函式 → 判 ok → dispatch」。
-	function setTimerDuration(durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+	function setTimerDuration(durationMinutes: RoundTimerDurationMinutes | null): SetTimerDurationResult {
 		if (state.round === null) {
 			return {
 				ok: false,

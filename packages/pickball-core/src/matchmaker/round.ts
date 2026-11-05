@@ -414,10 +414,17 @@ export type SetTimerDurationResult = SetTimerDurationSuccess | SetTimerDurationF
  * 成功時一律回傳全新的 timer 物件、startedAt 重置為 null：變更計時
  * 長度代表使用者想要一段新的倒數，沿用舊的 startedAt 會讓剩餘時間依新長度立即重新計算，
  * 等同在使用者不知情的情況下悄悄跳秒。
+ *
+ * durationMinutes 為 null 代表取消計時：整個 timer 清除為 null，不保留長度或 startedAt。
+ * 鎖定條件與變更長度相同，但倒數已開始時仍允許取消——開始計時與比分無關，主持人可能按錯。
  */
-export function setTimerDuration(round: Round, durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+export function setTimerDuration(round: Round, durationMinutes: RoundTimerDurationMinutes | null): SetTimerDurationResult {
 	if (round.matches.some((match) => match.status !== "pending")) {
 		return { ok: false, code: SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED, message: TIMER_SCORING_STARTED_MESSAGE };
+	}
+
+	if (durationMinutes === null) {
+		return { ok: true, round: { ...round, timer: null } };
 	}
 
 	return { ok: true, round: { ...round, timer: { durationMinutes, startedAt: null } } };
