@@ -35,12 +35,19 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`nextjs-pickball/lib/matchmaker/round.test.ts` 的 `describe("setTimerDuration")` 新增 it「setTimerDuration 傳入 null 時把本輪改回不計時，計時已開始亦同」與「已有場次離開 pending 時 setTimerDuration 傳入 null 亦拒絕且不改動回合」（依 test-plan）；
+- [x] 2.1 RED（TDD）：`nextjs-pickball/lib/matchmaker/round.test.ts` 的 `describe("setTimerDuration")` 新增 it「setTimerDuration 傳入 null 時把本輪改回不計時，計時已開始亦同」與「已有場次離開 pending 時 setTimerDuration 傳入 null 亦拒絕且不改動回合」（依 test-plan）；
   單檔 vitest 確認前者紅、後者綠（**regression guard，點名**）並貼出輸出
-- [ ] 2.2 RED（TDD）：`hooks/useRoundStore.test.tsx` 新增 it「訪客模式 setTimerDuration(null) 取消本輪計時並寫回儲存」、`hooks/useRemoteRoundStore.test.tsx` 新增 it「雲端回合 setTimerDuration(null) 以 timer 為 null 寫入回合」（沿用各檔既有 fixture 與 fetch mock）；單檔 vitest 各自確認紅燈並貼出輸出
-- [ ] 2.3 GREEN（TDD）：`setTimerDuration` 參數型別放寬為 `RoundTimerDurationMinutes | null`，鎖定檢查之後 `null` 回傳 `{ ...round, timer: null }`、其餘維持現行；JSDoc 補 `null` 語意與「倒數已開始仍允許取消」理由（design Decision 1、2）。
+- [x] 2.2 RED（TDD）：`hooks/useRoundStore.test.tsx` 新增 it「訪客模式 setTimerDuration(null) 取消本輪計時並寫回儲存」、`hooks/useRemoteRoundStore.test.tsx` 新增 it「雲端回合 setTimerDuration(null) 以 timer 為 null 寫入回合」（沿用各檔既有 fixture 與 fetch mock）；單檔 vitest 各自確認紅燈並貼出輸出
+- [x] 2.3 GREEN（TDD）：`setTimerDuration` 參數型別放寬為 `RoundTimerDurationMinutes | null`，鎖定檢查之後 `null` 回傳 `{ ...round, timer: null }`、其餘維持現行；JSDoc 補 `null` 語意與「倒數已開始仍允許取消」理由（design Decision 1、2）。
   兩個 store 的 `setTimerDuration` 參數型別（含介面宣告）同步放寬，邏輯不變。2.1、2.2 的 it 全綠；四個測試檔其餘既有 it 原樣綠；兩段 typecheck exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b §2）
-- [ ] 2.4 REFACTOR：`null` 分支是否以 if／else 清楚表達（避免巢狀三元）、JSDoc 是否仍說「只接受 10／15／20」；無壞味道則註記 skipped
+- [x] 2.4 REFACTOR：`null` 分支是否以 if／else 清楚表達（避免巢狀三元）、JSDoc 是否仍說「只接受 10／15／20」；無壞味道則註記 skipped
+  - 紀錄（§2）：RED `d0f8d42`（2.1＋2.2 合一）、GREEN `3b247bb`、測試修正 `cb57b05`。
+    - 紅燈：`round.test.ts` 1 failed／62 passed、`useRoundStore.test.tsx` 1 failed／25 passed、`useRemoteRoundStore.test.tsx` 1 failed／44 passed，三者皆失敗於 `expected { durationMinutes: null, … } to be null`（現行回傳非 null timer）。**regression guard**：「已有場次離開 pending 時 setTimerDuration 傳入 null 亦拒絕且不改動回合」寫入即綠（鎖定檢查本就先於 timer 賦值）。leader 以 `git show d0f8d42^:<path>` 複驗：三個產品檔在 RED 前後相同、三個測試檔在 RED 前不含新 it 名稱。
+    - 瑕疵（誠實記錄）：GREEN `3b247bb` commit 時，訪客 it 的「讀回儲存」斷言誤以 `JSON.parse(localStorage)` 直接讀 `.timer`（儲存格式有外層容器而讀到 undefined），該 it 在 GREEN commit 上仍紅；`cb57b05` 改用既有 helper `readRound()`＋`not.toBeNull()` 後全綠。只動 Implementer 自己新增的 it；RED 時該 it 先在 `round?.timer` 斷言失敗，紅燈真實性不受影響。
+    - GREEN 後：三檔 63／26／45 tests 全綠；`pnpm -r exec tsc --noEmit` 與核心 `typecheck` exit 0；改動前端檔 ESLint 0 errors（核心檔不在前端 ESLint 範圍）。`RoundControls.tsx` 未動（參數逆變，tsc 綠）。
+    - mutation（Implementer 與 Stage 2 獨立各做一次，結果一致）：M1 null 分支改回 `{ durationMinutes, startedAt: null }` → 三個新 it（核心、訪客、雲端）轉紅；M2 已開始時保留原 timer → 「…計時已開始亦同」轉紅；M3 鎖定檢查移到 null 分支後 → 「已有場次離開 pending…亦拒絕…」轉紅；M4 `timer: undefined` → 三個新 it 轉紅；EQ 改寫為單一 return 三元 → 維持綠。無存活變異。
+    - 2.4 REFACTOR：skipped（null 分支為 if 早退、無巢狀三元；JSDoc 無「只接受 10／15／20」字樣）。
+    - Stage 1（sonnet）：PASS。Stage 2（opus）：PASS；非阻擋建議：`useRoundStore.ts` 實作內註解可補 null 語意、失敗訊息「如需改用其他計時長度…」用於取消情境語意略偏（spec 要求沿用，不改）、雲端衝突重套無專屬 null 測試（由核心純函式保證）。leader 裁定三項皆不處理（範圍外或屬沿用）。
 
 ## 3. 對戰頁「不計時」委派取消計時
 
