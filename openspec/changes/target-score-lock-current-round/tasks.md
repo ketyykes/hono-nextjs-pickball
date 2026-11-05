@@ -51,6 +51,7 @@ Depends on: §1
     **chromium 的 `scoreboard-binding.spec.ts`、`match-stage.spec.ts` 全檔綠燈：待 coordinator 於合併前執行**（鎖時段限制，coordinator 裁定由其合併前驗收一併跑）。
 - [x] 2.4 REFACTOR：過濾是否以具名變數表達、JSDoc 是否仍殘留「任一計分板槽」字樣、與 `collectFinishedSubmissions` 的比對寫法是否值得共用（兩個使用端、一個找場次一個只判存在，預期不抽）；無壞味道則註記 skipped
   - Stage 1（sonnet）：PASS——五個 Scenario 名稱逐字相符、RED 機械複驗通過、GREEN 只動第二條與 JSDoc、以鍵比對、只刪授權的 it；鍵比對 it 未斷言 reason 與 test-plan 該列 Assertion 一致，不構成退件。
+  - Stage 2（opus）：PASS——獨立 mutation 8 條（b 清單 5 條＋自加「只比對最後一場」「`.some` 改 `.every`」皆轉紅；等價對照組 `round.matches.some` 34/34 綠），存活變異：無；每條還原後工作樹乾淨。JSDoc、命名、E2E 同步點與 locator（`-grid` testid 僅 `CourtCard` 一處）皆通過。non-blocking 兩點未採納：① `RoundControls.tsx:55` prop 註解「該輪各場次的計分板槽」為既有檔且在範圍外（tasks 檔頭禁改）；② 鍵比對 it 未斷言 `reason`——test-plan 該列 Assertion 只列 `locked`，偵測力不受影響，維持原樣。
   - 紀錄：skipped——過濾已以具名變數 `currentMatchIds`／`anySlotStarted` 表達；JSDoc 已無「任一計分板槽」字樣；與 `collectFinishedSubmissions` 不抽共用（一個找場次、一個只判存在）。
 
 ## 3. 文件與指令驗收
