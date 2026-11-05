@@ -603,8 +603,9 @@ describe("useRoundStore", () => {
 
 		expect(clearResult?.ok).toBe(true);
 		expect(result.current.round?.timer).toBeNull();
-		const stored = JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY) ?? "null");
-		expect(stored?.timer).toBeNull();
+		const storedRound = readRound();
+		expect(storedRound).not.toBeNull();
+		expect(storedRound?.timer).toBeNull();
 	});
 
 	// regression guard（補充測試，非驗收錨點）：上方錨點 it 只走 startTimer 的成功
