@@ -6,11 +6,13 @@ import {
 	MAX_COURT_COUNT,
 } from "@pickball/core/matchmaker/allocation-types";
 import { DEFAULT_TARGET_SCORE } from "@pickball/core/matchmaker/round-types";
+import type { Round } from "@pickball/core/matchmaker/round-types";
 import type { RoundSettings } from "./round-settings";
 import {
 	createRoundSettings,
 	changeCourtCount,
 	courtCountBounds,
+	resolveRoundSettings,
 } from "./round-settings";
 
 // 型別層防線：timerDurationMinutes 為必要欄位（非 optional）。物件字面量在「必要且值為
@@ -124,5 +126,93 @@ describe("courtCountBounds", () => {
 			canIncrement: true,
 			canDecrement: false,
 		});
+	});
+});
+
+// 只有 format／courtCount／targetScore／timer 四欄影響解析結果，其餘欄位給最小合法值。
+function buildRound(
+	fields: Pick<Round, "format" | "courtCount" | "targetScore" | "timer">,
+): Round {
+	return {
+		roundNumber: 1,
+		createdAt: "2026-01-01T00:00:00.000Z",
+		matches: [],
+		restingPlayerIds: [],
+		seenSignatures: { teammateKeys: [], opponentKeys: [], fullMatchKeys: [] },
+		...fields,
+	};
+}
+
+describe("resolveRoundSettings", () => {
+	it("回合存在且未變更過設定時取回合的對戰方式、場地數、目標分數與計時", () => {
+		const round = buildRound({
+			format: "doubles",
+			courtCount: 3,
+			targetScore: 21,
+			timer: { durationMinutes: 15, startedAt: null },
+		});
+
+		expect(resolveRoundSettings(null, round)).toEqual({
+			format: "doubles",
+			courtCount: 3,
+			targetScore: 21,
+			timerDurationMinutes: 15,
+		});
+	});
+
+	it("回合不計時時解析出的計時為不計時，不論變更過的設定為何", () => {
+		const draft: RoundSettings = {
+			format: "singles",
+			courtCount: 1,
+			targetScore: 11,
+			timerDurationMinutes: 10,
+		};
+		const round = buildRound({
+			format: "singles",
+			courtCount: 1,
+			targetScore: 11,
+			timer: null,
+		});
+
+		expect(resolveRoundSettings(draft, round)).toEqual({
+			format: "singles",
+			courtCount: 1,
+			targetScore: 11,
+			timerDurationMinutes: null,
+		});
+	});
+
+	it("變更過設定時對戰方式與場地數取變更值，目標分數與計時仍取回合", () => {
+		const draft: RoundSettings = {
+			format: "doubles",
+			courtCount: 2,
+			targetScore: 15,
+			timerDurationMinutes: null,
+		};
+		const round = buildRound({
+			format: "singles",
+			courtCount: 1,
+			targetScore: 21,
+			timer: { durationMinutes: 20, startedAt: "2026-01-01T00:00:00.000Z" },
+		});
+
+		expect(resolveRoundSettings(draft, round)).toEqual({
+			format: "doubles",
+			courtCount: 2,
+			targetScore: 21,
+			timerDurationMinutes: 20,
+		});
+	});
+
+	it("沒有回合時取變更過的設定，未變更過則為預設值", () => {
+		expect(resolveRoundSettings(null, null)).toEqual(createRoundSettings());
+
+		const draft: RoundSettings = {
+			format: "doubles",
+			courtCount: 2,
+			targetScore: 15,
+			timerDurationMinutes: 10,
+		};
+		expect(resolveRoundSettings(draft, null)).toEqual(draft);
 	});
 });
