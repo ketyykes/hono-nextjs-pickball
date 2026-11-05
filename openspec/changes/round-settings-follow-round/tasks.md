@@ -84,14 +84,18 @@ Depends on: §3
     **後續事項**：回合存在時無法改回「不計時」（`RoundControls.tsx` 的 ⚠️ 暫行處置），且本 change 後計時會逐輪沿用——一旦某輪設了計時，之後每一輪都沿用，只有重置名單才能回到不計時；建議下一個 change 優先處理（design Risk 1；已有 proposal `round-timer-clear` 排在本 change 之後）。
 - [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：leader 於 `a020a3b` 實跑 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck` 皆 exit 0。
-- [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
+- [x] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
-- [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋5，後端與核心與基線相同
+  - 紀錄（coordinator，2026-11-06 05:23，HEAD `501b445`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋5，後端與核心與基線相同
   - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
-- [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
+  - 紀錄（coordinator，05:23～05:24，雙鎖）：前端 111 檔／1112 tests（基線 1107＋5）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
+- [x] 4.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
-- [ ] 4.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - 紀錄（coordinator，05:31，雙鎖）：`pnpm build` exit 0；建置後 `git status --porcelain` 為空。
+- [x] 4.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
+  - 紀錄（coordinator，05:24～05:31，雙鎖、`--workers=1`、每段前後清殘留）：② chromium 全套 156 passed（基線 154＋2）；① `match-stage`＋`scoreboard-binding`＋`round-timer` 三檔在 firefox／webkit／mobile-chrome／mobile-safari 各 50 passed（chromium 的三檔含於 ②；Implementer 於 GREEN 後另跑 chromium 三檔 50 passed）；③ user-data `round-sync.spec.ts` 9 passed、0 skipped。全部 0 failed、0 flaky。
 - [x] 4.7 驗收（指令）C6：test-plan C6 兩條 `git diff` 輸出符合期望
   - 紀錄：前者輸出為空；後者恰為 `app/matchmaker/page.tsx`、`components/matchmaker/RoundControls.test.tsx`、`components/matchmaker/RoundControls.tsx`、`lib/matchmaker/round-settings.test.ts`、`lib/matchmaker/round-settings.ts`。
 - [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-settings-follow-round --strict` 通過
