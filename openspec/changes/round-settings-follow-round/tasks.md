@@ -36,15 +36,26 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`round-settings.test.ts` 新增四個 it——「回合存在且未變更過設定時取回合的對戰方式、場地數、目標分數與計時」、「回合不計時時解析出的計時為不計時，不論變更過的設定為何」、
+- [x] 2.1 RED（TDD）：`round-settings.test.ts` 新增四個 it——「回合存在且未變更過設定時取回合的對戰方式、場地數、目標分數與計時」、「回合不計時時解析出的計時為不計時，不論變更過的設定為何」、
   「變更過設定時對戰方式與場地數取變更值，目標分數與計時仍取回合」、「沒有回合時取變更過的設定，未變更過則為預設值」（輸入與斷言依 test-plan；`resolveRoundSettings` 自 `./round-settings` 匯入）。
   單檔 vitest 確認四個 it 皆紅（預期為 `resolveRoundSettings is not a function` 或匯入失敗）並貼出輸出
-- [ ] 2.2 RED（TDD，E2E）：`match-stage.spec.ts` 的 describe「/matchmaker 對戰頁」末尾新增兩條 test——「離開對戰頁再回來時本輪設定與目前回合一致」、「回合存在時變更的目標分數與計時沿用到下一輪」（步驟依 test-plan 與 design Decision 6）。
+- [x] 2.2 RED（TDD，E2E）：`match-stage.spec.ts` 的 describe「/matchmaker 對戰頁」末尾新增兩條 test——「離開對戰頁再回來時本輪設定與目前回合一致」、「回合存在時變更的目標分數與計時沿用到下一輪」（步驟依 test-plan 與 design Decision 6）。
   雙鎖下以單檔 E2E（chromium、`-g` 分別篩兩條）確認紅燈：第一條預期失敗於回來後「雙打」`aria-checked` 斷言、第二條預期失敗於新一輪「21」`aria-checked` 斷言（而非前置步驟或同步點）並貼出輸出。兩條可在同一個鎖時段內連續跑
-- [ ] 2.3 GREEN（TDD）：`round-settings.ts` 新增 `resolveRoundSettings(draft: RoundSettings | null, round: Round | null): RoundSettings`（規則依 delta spec，含 JSDoc 說明為何目標分數與計時一律取回合、`draft` 為 `null` 的意義）；2.1 的四個 it 與檔內既有 it 全綠
-- [ ] 2.4 GREEN（接線）：`page.tsx` 把 `useState<RoundSettings>(() => createRoundSettings())` 改為 `useState<RoundSettings | null>(null)` 的 `draft`，以 `const settings = resolveRoundSettings(draft, round)` 取得設定，`RoundControls` 的 `onSettingsChange` 改接 `draft` 的 setter；`EmptyStage` 與 `RoundControls` 皆收 `settings`。
+- [x] 2.3 GREEN（TDD）：`round-settings.ts` 新增 `resolveRoundSettings(draft: RoundSettings | null, round: Round | null): RoundSettings`（規則依 delta spec，含 JSDoc 說明為何目標分數與計時一律取回合、`draft` 為 `null` 的意義）；2.1 的四個 it 與檔內既有 it 全綠
+- [x] 2.4 GREEN（接線）：`page.tsx` 把 `useState<RoundSettings>(() => createRoundSettings())` 改為 `useState<RoundSettings | null>(null)` 的 `draft`，以 `const settings = resolveRoundSettings(draft, round)` 取得設定，`RoundControls` 的 `onSettingsChange` 改接 `draft` 的 setter；`EmptyStage` 與 `RoundControls` 皆收 `settings`。
   不加 effect、不讀寫 LocalStorage。2.2 的兩條 E2E 在 chromium 轉綠；雙鎖下 chromium 的 `match-stage.spec.ts`、`scoreboard-binding.spec.ts`、`round-timer.spec.ts` 全檔綠；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b 的 §2 兩段）
-- [ ] 2.5 REFACTOR：`resolveRoundSettings` 是否有巢狀三元（改 if/else）、`page.tsx` 的 `draft`／`settings` 命名與註解是否清楚、`createRoundSettings` 是否被重複呼叫可接受（純函式，每次 render 一次）；無壞味道則註記 skipped
+- [x] 2.5 REFACTOR：`resolveRoundSettings` 是否有巢狀三元（改 if/else）、`page.tsx` 的 `draft`／`settings` 命名與註解是否清楚、`createRoundSettings` 是否被重複呼叫可接受（純函式，每次 render 一次）；無壞味道則註記 skipped
+
+  - 紀錄（§2，Implementer sonnet）：
+    - 2.1 RED `71348fe`：單檔 vitest `Tests 4 failed | 5 passed (9)`，四個新 it 皆 `TypeError: resolveRoundSettings is not a function`。真紅（leader 機械複驗：`git show 71348fe^:…/round-settings.test.ts` 與 `…/round-settings.ts` 皆不含 `resolveRoundSettings`；RED 前後產品檔無差異）。
+    - 2.2 RED `9a45484`：chromium `-g` 分別跑；第一條失敗於 :852「雙打」`aria-checked` Expected "true" Received "false"（導覽、`match-stage-region`、網格 2 皆已通過）；第二條失敗於 :884 新一輪「21」`aria-checked`（舊 testid 消失同步點已通過）。真紅（`git show 9a45484^` 不含兩條 test 名稱；RED 前後 app／lib 無差異）。
+    - 2.3 GREEN `d2a5c90`：`Tests 9 passed (9)`。
+    - 2.4 GREEN `32167b7`：`draft`＋`resolveRoundSettings(draft, round)`，無 effect、無 LocalStorage。雙鎖下 chromium 三檔 50 passed（match-stage 25＝基線 23＋2、scoreboard-binding 23、round-timer 2）；`tsc` exit 0；改動檔 ESLint 0 errors。
+    - mutation（Implementer）：M1～M5 皆轉紅、等價對照組維持綠；E2E 接線變異（`settings = draft ?? createRoundSettings()`）兩條新 test 皆紅。
+    - 2.5 REFACTOR：skipped（無巢狀三元、命名與註解清楚、`createRoundSettings` 只在無 draft 且無回合時呼叫）。
+    - Stage 1（sonnet）：PASS（名稱逐字、真紅、無 scope creep、`RoundControls`／`EmptyStage` 皆收解析值、範圍 C6 符合）。
+    - Stage 2（opus）：PASS。獨立 mutation 以 verbose reporter 逐條比對 it 名稱：M1（3 紅含預期）、M2／M2a／M2b、M3、M4、M5 皆轉紅於預期 it；等價對照 C1（timer 映射）、C2（`draft !== null ? … : …`）9/9 綠。推演：送出比分、`setTargetScore`／`setTimerDuration`、計時開始、雲端 LOADED／衝突重載、訪客 HYDRATE 皆只改 `round` 不寫 `draft`，使用者改過的對戰方式／場地數不會被蓋回；產生新一輪不清 `draft`，新回合由解析值產生故一致；雲端載入中 `SyncStatusNotice` 取代整頁，不會以預設值送出；回合不計時時送出 `timerDurationMinutes: null`（M4／M2b 證明 it 鎖住）。
+      Minor（不修）：① 第一條 E2E 以「減少場地數」enabled 代理場地數 2——此為 design Decision 6 的明確選擇，且後續「再產生仍為 2 個網格」已驗送出值；② 換帳號時頁面不 remount，前一帳號的 draft 對戰方式／場地數會沿用——符合「本次進入對戰頁後變更過的設定」字面意義，記入 design Open Questions 供後續參考。
 
 ## 3. 目標分數方向鍵以畫面選中值起算
 
