@@ -578,6 +578,26 @@ describe("useRemoteRoundStore", () => {
 		expect(result.current.round?.timer?.durationMinutes).toBe(10);
 	});
 
+	it("雲端回合 setTimerDuration(null) 以 timer 為 null 寫入回合", async () => {
+		const players = makePlayers(4);
+		const round: Round = {
+			...buildRound(players, "doubles", 1),
+			timer: { durationMinutes: 10, startedAt: null },
+		};
+		const { result } = await mountSynced(round, 2, [], { players });
+
+		onPutEcho(3);
+		let outcome: { ok: boolean } | undefined;
+		act(() => {
+			outcome = result.current.setTimerDuration(null);
+		});
+
+		expect(outcome?.ok).toBe(true);
+		await waitFor(() => expect(callsOf("PUT", ROUND_PATH)).toHaveLength(1));
+		expect(bodiesOf("PUT", ROUND_PATH)[0].data.timer).toBeNull();
+		expect(result.current.round?.timer).toBeNull();
+	});
+
 	it("swapMatchPlayer 成功時樂觀換人並送出回合 PUT", async () => {
 		const players = makePlayers(6);
 		const round = buildRound(players, "singles", 1);
