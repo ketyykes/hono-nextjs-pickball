@@ -6,6 +6,7 @@ import { LogoMark } from "@/components/icons";
 import { AccountEntry } from "@/components/layout/AccountEntry";
 import { NAV_ITEM_BASE, navItemTone } from "@/components/layout/navItemStyles";
 import { useScrolledPast } from "@/hooks/useScrolledPast";
+import { isNavLinkActive } from "@/lib/navActive";
 import { getNavHeightPx } from "@/lib/navHeight";
 import { cn } from "@/lib/utils";
 
@@ -63,11 +64,12 @@ export function SiteNavbar() {
 				</Link>
 				<nav className="ml-auto flex items-center gap-0.5 sm:gap-1">
 					{NAV_LINKS.map((link) => {
-						const active = pathname === link.href;
+						const active = isNavLinkActive(link.href, pathname);
 						return (
 							<Link
 								key={link.href}
 								href={link.href}
+								aria-current={active ? "page" : undefined}
 								transitionTypes={[link.href === "/" ? "nav-back" : "nav-forward"]}
 								className={cn(
 									NAV_ITEM_BASE,

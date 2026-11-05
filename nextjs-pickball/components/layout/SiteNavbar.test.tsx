@@ -107,18 +107,67 @@ describe("SiteNavbar", () => {
 		const { usePathname } = await import("next/navigation");
 		(
 			usePathname as unknown as { mockReturnValue: (v: string) => void }
-		).mockReturnValue("/matchmaker/players");
+		).mockReturnValue("/matchmakerx");
 
 		render(<SiteNavbar />);
 
-		// /matchmaker/players 是子路徑而非 /matchmaker 本身：若 active 判定誤用
-		// 前綴比對（pathname.startsWith(link.href)）或對新連結整段失效，
-		// 「對戰分配」會在名單頁誤判為 active，使使用者誤以為自己在對戰頁。
-		const classes = screen
-			.getByRole("link", { name: "對戰分配" })
-			.className.split(/\s+/);
+		// 前綴相似但非子路由的路徑不得被誤判為 active：若 active 判定誤用
+		// pathname.startsWith(link.href)，/matchmakerx 會讓「對戰分配」亮起。
+		const link = screen.getByRole("link", { name: "對戰分配" });
+		const classes = link.className.split(/\s+/);
 		expect(classes).toContain("text-muted-foreground");
 		expect(classes).not.toContain("text-slate-900");
+		expect(link.getAttribute("aria-current")).toBeNull();
+	});
+
+	it.each([
+		"/matchmaker/players",
+		"/matchmaker/history",
+		"/matchmaker/stats",
+		"/matchmaker/data",
+	])("路由為 %s 時對戰分配連結帶 aria-current 並套用 active 樣式", async (pathname) => {
+		const { usePathname } = await import("next/navigation");
+		(
+			usePathname as unknown as { mockReturnValue: (v: string) => void }
+		).mockReturnValue(pathname);
+
+		render(<SiteNavbar />);
+
+		// 精確 token 比對：text-slate-900 是 hover:text-slate-900 的子字串。
+		const active = screen.getByRole("link", { name: "對戰分配" });
+		const activeClasses = active.className.split(/\s+/);
+		expect(active.getAttribute("aria-current")).toBe("page");
+		expect(activeClasses).toContain("text-slate-900");
+		expect(activeClasses).not.toContain("text-muted-foreground");
+
+		for (const label of ["首頁", "完整體驗", "計分板", "測驗"]) {
+			const muted = screen.getByRole("link", { name: label });
+			const mutedClasses = muted.className.split(/\s+/);
+			expect(muted.getAttribute("aria-current")).toBeNull();
+			expect(mutedClasses).toContain("text-muted-foreground");
+		}
+	});
+
+	it("完全相等時只有 active 連結帶 aria-current=page", async () => {
+		const { usePathname } = await import("next/navigation");
+		(
+			usePathname as unknown as { mockReturnValue: (v: string) => void }
+		).mockReturnValue("/quiz");
+
+		const { container } = render(<SiteNavbar />);
+
+		const marked = container.querySelectorAll("header [aria-current]");
+		expect(marked).toHaveLength(1);
+		const quiz = screen.getByRole("link", { name: "測驗" });
+		expect(marked[0]).toBe(quiz);
+		expect(quiz.getAttribute("aria-current")).toBe("page");
+
+		const nav = screen.getByRole("navigation");
+		const logo = screen
+			.getAllByRole("link")
+			.find((link) => link.getAttribute("href") === "/" && !nav.contains(link));
+		expect(logo).toBeTruthy();
+		expect(logo!.getAttribute("aria-current")).toBeNull();
 	});
 
 	it("logo 與所有導航連結皆套用 whitespace-nowrap", () => {

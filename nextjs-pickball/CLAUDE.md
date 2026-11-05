@@ -31,7 +31,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   的 canvas 手繪（**零外部套件**），PDF 走瀏覽器列印流程（`window.print()` + `app/globals.css`
   的 `@media print` 區塊 + `components/matchmaker/PrintSheet.tsx` 列印版）
   各場地色塊的「進入計分板」入口導向 `/scoreboard?match=<matchId>` 時，兩隊名稱行會顯示該隊球員姓名與雙色漸層色塊；獨立開啟 `/scoreboard`（無 `match` 參數）維持「我方」／「對方」純文字
-- `/matchmaker/players` — 參賽者名單。**不在全站 navbar**，由 matchmaker 區段導覽抵達
+- `/matchmaker/players` — 參賽者名單。**不在全站 navbar**，由 matchmaker 區段導覽抵達。navbar 的「對戰分配」在 `/matchmaker/*` 子頁亦標示 active（`aria-current="page"`），判定在 `lib/navActive.ts`
 - `/matchmaker/history`、`/matchmaker/data` — 歷史賽果與資料匯入匯出，同樣不在全站 navbar
   - `/matchmaker/history` 登入態：`app/matchmaker/history/page.tsx` 為 server component，由 client 小元件 `HistoryModeSwitch` 依 `resolveStorageMode` 擇一渲染；remote 掛 `RemoteHistoryView`（經 `useRemoteHistory` 讀雲端），其餘為 `HistoryView`（本機）。區間界線由前端以核心 `rangeBounds` 計算後傳給後端，後端不推算區間。雲端歷史 loading／load-failed 時保留區間篩選，只把紀錄區塊換成 `SyncStatusNotice`（且不顯示損毀提示），篩選器不卸載、焦點不遺失；失敗後改選區間即重新載入
   - `/matchmaker/data` 登入態差異：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），history 取自雲端（`GET /api/matchmaker/history?order=asc`）；JSON 還原改為「從 JSON 備份匯入到雲端」（見下方「本機資料匯入雲端」），本機覆寫式還原只在訪客時渲染；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 登入時改讀雲端（`buildRemoteHistoryCsv`）；清除本機資料兩種模式相同（只清本機）
@@ -53,6 +53,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
 - 上述**五頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料／統計」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
   **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
 - `/login` — 本機測試帳號登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在所有寬度顯示（窄螢幕的空間由 `NAV_ITEM_BASE` 的連結內距與 navbar 容器間距讓出），載入中與 auth 停用時以隱形佔位元素保留寬度，回應前後導航連結位置不變
+- 未匹配路由 — 由 `app/not-found.tsx`（Server Component）顯示中文 404 頁，HTTP 404、含「回首頁」「前往對戰分配」；`/api/*` 不經此頁（仍由 proxy 轉發後端）
 - `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
 
 matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍在前端或核心套件，是刻意決策，不是待搬的後端邏輯）：
@@ -112,7 +113,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
   - matchmaker 名單雲端同步：`useRemoteRosterStore`（歸 player-roster 清單；由 `useRosterStore` 選擇器切換，本機實作 `useLocalRosterStore`）
     - 雲端 hook 實作要點：每位參賽者一個最新優先佇列、任一 409 整份重載、401 交給 session refresh；loading、load-failed、重載中、重置中都不送出也不改名單
     - 對戰、參賽者、統計三頁在 loading／load-failed 時以 `SyncStatusNotice` 取代內容，`data-sync-status` 只在非 local 時輸出
-- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）、`sync/`（雲端同步共用基礎：`storage-mode` 的 `resolveStorageMode`、`api-client` 的 `requestJson`、`latest-wins-saver` 的 `createLatestWinsSaver`、`sync-status` 的 `SyncStatus`）
+- `lib/` — `utils.ts`（cn）、`health.ts`、`navHeight.ts`、`navActive.ts`（navbar 連結 active 判定）；`auth/`（session-client、session-store）、`matchmaker/`（名單、儲存、匯出入、計時等留在前端的模組，如 roster、storage、round-storage、round-timer、csv、scene-canvas）、`scoreboard/`（storage、storage-keys、match-slots、radio-navigation）、`sync/`（雲端同步共用基礎：`storage-mode` 的 `resolveStorageMode`、`api-client` 的 `requestJson`、`latest-wins-saver` 的 `createLatestWinsSaver`、`sync-status` 的 `SyncStatus`）
   - `lib/sync/api-client.ts` 的 `requestJson`：**必填 `expectedUserId`**，每個請求帶 `X-Expected-User-Id`；只用呼叫端給的值、不讀 session store，401（含 `ACCOUNT_MISMATCH`）分類為 `unauthorized`。API 包裝（`roster-api`、`round-api`、`remote-transfer`）一律以 `expectedUserId` 為第一參數
   - `lib/sync/roster-api.ts`：名單 API 薄包裝，一律經 `requestJson`
   - `lib/sync/round-api.ts`：回合、場次分槽、送出比分的路徑字串與回應 schema 的唯一來源，一律經 `requestJson`，hook 不自行拼路徑
@@ -129,7 +130,7 @@ matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍
 `openspec/` 在 repo root，openspec CLI 一律從 repo root 執行；規格內引用本 workspace 的檔案路徑須帶 `nextjs-pickball/` 前綴。本 workspace 的 TDD 適用範圍與例外層（原 `openspec/config.yaml` 所載；該檔現在只放 `schema` 與 `context` 兩項設定，不含規則內文）：
 
 - `app/**`、`components/**`、`hooks/**`、`lib/**`、`data/**` 下的行為邏輯模組採 TDD：先寫失敗測試 → 實作至綠 → refactor（三步規則與紅燈要求見 root CLAUDE.md）
-- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）、`lib/matchmaker/scene-canvas.ts`（canvas 繪製與下載：所有決策都已在 `ExportScene` 內定死，本檔零分支、happy-dom 無 2D context，改以 `tests/e2e/specs/visual-export.spec.ts` 驗收，理由見該檔檔頭）
+- 例外（不強制 TDD，鼓勵補 smoke / E2E）：純樣式檔（`*.css`）、型別檔（`*.d.ts`）、入口與配置（`app/**/page.tsx`、`app/**/layout.tsx`、`app/not-found.tsx`、各種 `*.config.*`、`wrangler.jsonc`、`components.json`、`tsconfig.json`）、API proxy route、Playwright E2E 與測試基礎建設（`tests/**`）、`lib/matchmaker/scene-canvas.ts`（canvas 繪製與下載：所有決策都已在 `ExportScene` 內定死，本檔零分支、happy-dom 無 2D context，改以 `tests/e2e/specs/visual-export.spec.ts` 驗收，理由見該檔檔頭）
 - **純呈現型元件不強制單元 TDD**（以 Playwright E2E 驗收）；行為邏輯下放 `hooks/`、`lib/` 再對其做 TDD
 - 規格情境用 Given/When/Then 撰寫，行為邏輯情境須可直接對應到 Vitest test case
 
