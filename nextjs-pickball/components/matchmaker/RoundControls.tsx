@@ -140,7 +140,7 @@ export function RoundControls({
 	// 不得改變選取（按鈕本身雖已 disabled，但 onKeyDown 掛在容器上仍會收到事件）。
 	function handleTargetScoreKeyDown(event: KeyboardEvent<HTMLDivElement>) {
 		if (locked) return;
-		const currentIndex = TARGET_SCORE_OPTIONS.indexOf(settings.targetScore);
+		const currentIndex = TARGET_SCORE_OPTIONS.indexOf(displayedTargetScore);
 		const nextIndex = nextRadioIndex(currentIndex, TARGET_SCORE_OPTIONS.length, event.key);
 		if (nextIndex === null) return;
 		event.preventDefault();
