@@ -29,8 +29,12 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（待 apply §1.1 回填：`pnpm test` 三個 workspace 的檔數／測試數、三段 typecheck、`pnpm lint` 的 errors／warnings、`playwright test --list` 六個 project 各自數量，以及 C5 指定檔案在各 project 的數量）
-- **Initial commit hash**：（待 apply §1.1 回填：`change/scoreboard-bound-game-over` 分出時的 `main` HEAD）
+- **Baseline tests**（2026-11-06 01:55～01:58 實跑，`pnpm install` 後 lockfile 零變動、`db:migrate:local` exit 0）：
+  - `pnpm test`（雙鎖）：前端 109 檔／1085 tests、後端 26 檔／215 tests、核心 10 檔／27 tests，全綠
+  - 三段 typecheck：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0
+  - `pnpm lint`（雙鎖）：0 errors、3 warnings
+  - `playwright test --list`：chromium／firefox／webkit／mobile-chrome／mobile-safari 各 147 tests（18 檔）、user-data 47 tests（6 檔）；C5 ② 三檔在四個 browser project 各 38；`scoreboard-binding.spec.ts` 在 chromium 為 20；C5 ③ 兩檔在 user-data 為 15
+- **Initial commit hash**：`c4b18a7`（`change/scoreboard-bound-game-over` 分出時的 `main` HEAD）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
