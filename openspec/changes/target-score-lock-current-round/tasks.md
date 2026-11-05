@@ -63,14 +63,18 @@ Depends on: §2
   - 紀錄：`grep -n '鎖定' nextjs-pickball/CLAUDE.md` 只有 :111 雲端段「回填與鎖定判定以 `remoteMatchSlots` 為來源」，仍正確；無描述「任一計分板槽」的段落，不改。
 - [x] 3.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：GREEN 後 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck` 皆 exit 0。
-- [ ] 3.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
+- [x] 3.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行。
-- [ ] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
+  - 紀錄（coordinator，2026-11-06 03:39，HEAD `98fac73`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
   - 由 coordinator 於合併前執行。
-- [ ] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+  - 紀錄（coordinator，03:39～03:40，雙鎖）：前端 109 檔／1091 tests（基線 1088＋3；基線 commit `46b68c1` 與其前一個 commit 只差 openspec 文件，測試數相同）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
+- [x] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行。
-- [ ] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - 紀錄（coordinator，03:48，雙鎖）：`pnpm build` exit 0；建置後 `git status --porcelain` 為空。
+- [x] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，03:40～03:47，雙鎖、`--workers=1`、每段前後清殘留）：② chromium 全套 150 passed（基線 149＋1，含 `scoreboard-binding.spec.ts` 23 條與新 test 的綠燈）；① `scoreboard-binding.spec.ts`＋`match-stage.spec.ts` 在 firefox／webkit／mobile-chrome／mobile-safari 各 45 passed；③ user-data `round-sync.spec.ts` 9 passed。全部 0 failed、0 skipped、0 flaky。2.3 註記的 chromium 兩檔綠燈由 ② 涵蓋。
 - [x] 3.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空
   - 紀錄：GREEN 後實跑，輸出為空。
 - [x] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過
