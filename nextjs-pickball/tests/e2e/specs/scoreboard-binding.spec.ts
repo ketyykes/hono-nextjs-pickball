@@ -594,6 +594,50 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(parsedSlots[otherMatchId].scores).toEqual(otherScores);
 	});
 
+	test("綁定場次比賽結束時對話框以返回對戰取代再來一局且返回後比分已回填", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await clickWin(page, "us", 11);
+
+		const dialog = page.getByRole("dialog");
+		await expect(dialog).toBeVisible();
+		await expect(dialog.getByRole("button", { name: "再來一局" })).toHaveCount(0);
+		await dialog.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:0");
+		await expect(court.getByTestId(`court-${matchId}-team-a`)).toHaveText("第一隊勝");
+		await expect(court.getByRole("link", { name: "進入計分板" })).toHaveCount(0);
+		await expect(court.getByRole("link", { name: "繼續計分" })).toHaveCount(0);
+	});
+
+	test("專注模式下綁定場次比賽結束後可由對話框返回對戰", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page);
+		const matchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${matchId}`);
+
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await expect(page).toHaveURL(new RegExp(`/scoreboard\\?match=${matchId}$`));
+		await page.getByRole("button", { name: "進入專注模式" }).click();
+		// 專注模式隱藏設定列，頁面上不應再有「返回對戰」入口。
+		await expect(page.getByRole("link", { name: "返回對戰" })).toHaveCount(0);
+		await clickWin(page, "us", 11);
+
+		const dialog = page.getByRole("dialog");
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		await expect(court.getByTestId(`court-${matchId}-score`)).toHaveText("11:0");
+		await expect(court.getByTestId(`court-${matchId}-team-a`)).toHaveText("第一隊勝");
+	});
+
 	// mutation 補洞（多筆同時符合零覆蓋）：reconcile effect 刻意寫成「每次只處理
 	// 待送出清單的第一筆，靠 round 變動觸發重跑逐筆收斂」，但既有 e2e 從未同時存在兩個
 	// finished 槽——把 clearMatchSlots([first.matchId]) 改成一次清掉 finished 全部的
