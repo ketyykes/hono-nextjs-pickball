@@ -17,7 +17,7 @@ import type { SyncStatus } from "@/lib/sync/sync-status";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
 import { jpgExportFileName } from "@/lib/matchmaker/export-filename";
-import { createRoundSettings } from "@/lib/matchmaker/round-settings";
+import { resolveRoundSettings } from "@/lib/matchmaker/round-settings";
 import type { RoundSettings } from "@/lib/matchmaker/round-settings";
 import { collectFinishedSubmissions, toSubmitScoreInput } from "@/lib/matchmaker/scoreboard-binding";
 import { downloadSceneAsJpeg } from "@/lib/matchmaker/scene-canvas";
@@ -85,7 +85,10 @@ export default function MatchmakerPage() {
 	// 名單載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
 	const isRosterReady = rosterSyncStatus !== "loading" && rosterSyncStatus !== "load-failed";
 
-	const [settings, setSettings] = useState<RoundSettings>(() => createRoundSettings());
+	// draft 只記錄使用者於本次進入對戰頁後變更過的設定（null 為尚未變更）；
+	// 實際使用的設定由 draft 與目前回合在 render 中解析，離開再回來時才會跟隨回合而非回到預設值。
+	const [draft, setDraft] = useState<RoundSettings | null>(null);
+	const settings = resolveRoundSettings(draft, round);
 	const [roundError, setRoundError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<MatchStageSubmitError | null>(null);
 	const [swapError, setSwapError] = useState<MatchStageSwapError | null>(null);
@@ -260,7 +263,7 @@ export default function MatchmakerPage() {
 			>
 				<RoundControls
 					settings={settings}
-					onSettingsChange={setSettings}
+					onSettingsChange={setDraft}
 					round={round}
 					matchSlots={stageSlots}
 					activePlayerCount={activePlayerCount}

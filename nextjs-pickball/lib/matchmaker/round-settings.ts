@@ -8,7 +8,7 @@ import {
 	MIN_COURT_COUNT,
 	MAX_COURT_COUNT,
 } from "@pickball/core/matchmaker/allocation-types";
-import type { RoundTargetScore, RoundTimerDurationMinutes } from "@pickball/core/matchmaker/round-types";
+import type { Round, RoundTargetScore, RoundTimerDurationMinutes } from "@pickball/core/matchmaker/round-types";
 import { DEFAULT_TARGET_SCORE } from "@pickball/core/matchmaker/round-types";
 
 /** 本輪設定：對戰方式、場地數、目標分數、計時長度。 */
@@ -80,5 +80,31 @@ export function changeCourtCount(
 	return {
 		settings: { ...settings, courtCount },
 		...courtCountBounds(courtCount),
+	};
+}
+
+/**
+ * 由使用者變更過的設定與目前回合解析出本輪設定，設定列的顯示值與「產生本輪對戰」的輸入共用這一份。
+ *
+ * draft 為使用者於本次進入對戰頁後變更過的設定，尚未變更過為 null；null 代表「沒動過」，
+ * 因此回合之後的任何更新都不會把使用者剛改的值蓋回去。
+ *
+ * 回合存在時目標分數與計時一律取回合：這兩個控制項在回合存在時顯示並寫入的本來就是回合的值
+ * （變更委派回合入口），取回合才能保證下一輪沿用畫面上看到的值，而不是 draft 內過期的副本。
+ * 對戰方式與場地數沒有回合端的變更入口，使用者改過就以 draft 為準，否則跟隨回合。
+ */
+export function resolveRoundSettings(
+	draft: RoundSettings | null,
+	round: Round | null,
+): RoundSettings {
+	if (round === null) {
+		return draft ?? createRoundSettings();
+	}
+
+	return {
+		format: draft?.format ?? round.format,
+		courtCount: draft?.courtCount ?? round.courtCount,
+		targetScore: round.targetScore,
+		timerDurationMinutes: round.timer?.durationMinutes ?? null,
 	};
 }

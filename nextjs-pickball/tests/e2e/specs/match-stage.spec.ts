@@ -822,4 +822,67 @@ test.describe("/matchmaker 對戰頁", () => {
 		// 換人／送出邏輯無關；不限定範圍會讓本斷言恆為「至少 1」而失去鑑別力。
 		await expect(page.getByTestId("match-stage-courts").getByRole("alert")).toHaveCount(0);
 	});
+
+	// 區段導覽是 client-side 軟導覽，會卸載再重掛對戰頁；設定列必須回到目前回合的值，
+	// 否則直接再按「產生本輪對戰」會靜默改掉賽制與場地數。
+	test("離開對戰頁再回來時本輪設定與目前回合一致", async ({ page }) => {
+		await seedRoster(page, 8);
+		await page.goto("/matchmaker");
+		await page.getByRole("radio", { name: "雙打", exact: true }).click();
+		await page.getByRole("button", { name: "增加場地數" }).click();
+		await page.getByRole("radio", { name: "15", exact: true }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(2);
+
+		await page
+			.getByRole("navigation", { name: "對戰分配區段導覽" })
+			.getByRole("link", { name: "參賽者", exact: true })
+			.click();
+		await expect(page).toHaveURL(/\/matchmaker\/players$/);
+		await page
+			.getByRole("navigation", { name: "對戰分配區段導覽" })
+			.getByRole("link", { name: "對戰", exact: true })
+			.click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+		await expect(page.getByTestId("match-stage-region")).toBeVisible();
+		await expect(courtGrids).toHaveCount(2);
+
+		await expect(page.getByRole("radio", { name: "雙打", exact: true })).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByRole("button", { name: "減少場地數" })).toBeEnabled();
+		await expect(page.getByRole("radio", { name: "15", exact: true })).toHaveAttribute("aria-checked", "true");
+
+		const oldGridTestId = await courtGrids.first().getAttribute("data-testid");
+		expect(oldGridTestId).not.toBeNull();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId(oldGridTestId ?? "")).toHaveCount(0);
+		await expect(courtGrids).toHaveCount(2);
+	});
+
+	test("回合存在時變更的目標分數與計時沿用到下一輪", async ({ page }) => {
+		await seedRoster(page, 4);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(1);
+
+		const radio21 = page.getByRole("radio", { name: "21", exact: true });
+		const radioTimer10 = page.getByRole("radio", { name: "10 分鐘", exact: true });
+		await radio21.click();
+		await expect(radio21).toHaveAttribute("aria-checked", "true");
+		await radioTimer10.click();
+		await expect(radioTimer10).toHaveAttribute("aria-checked", "true");
+
+		const oldGridTestId = await courtGrids.first().getAttribute("data-testid");
+		expect(oldGridTestId).not.toBeNull();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId(oldGridTestId ?? "")).toHaveCount(0);
+		await expect(courtGrids).toHaveCount(1);
+
+		await expect(radio21).toHaveAttribute("aria-checked", "true");
+		await expect(radioTimer10).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByRole("button", { name: "開始計時" })).toBeVisible();
+	});
 });
