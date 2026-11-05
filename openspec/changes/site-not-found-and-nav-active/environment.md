@@ -29,8 +29,10 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（待 apply §1.1 回填：`pnpm test` 三個 workspace 的檔數／測試數、三段 typecheck、`pnpm lint` errors／warnings 數、`playwright test --list` 六個 project 各自數量）
-- **Initial commit hash**：（待 apply §1.1 回填：`change/site-not-found-and-nav-active` 分出時的 `main` HEAD；propose 時為 `38b6ae8`）
+- **Baseline tests**（來源：coordinator 於前一個 change 合併前在 `main` 的前一個 commit 實跑；leader 依今晚安排未重跑全套）：
+  前端 109 檔／1091 tests、後端 26 檔／215、核心 10 檔／27，全綠；`pnpm lint` 0 errors／3 warnings；三段 typecheck exit 0；E2E chromium 全套 150 passed（18 檔）。
+  leader 於 2026-11-06 03:50 在本分支實跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` → exit 0；工作樹乾淨；未跑 `pnpm install`（lockfile 未變）。
+- **Initial commit hash**：`cb9b585`（`main` HEAD，分支自此分出；propose 時為 `38b6ae8`）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

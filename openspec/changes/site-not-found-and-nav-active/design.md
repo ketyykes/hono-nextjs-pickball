@@ -138,3 +138,5 @@
 ## Open Questions
 
 （無。設計裁量皆已於上方 Decisions 定案；apply 階段的阻塞事項由 leader 追加於此。）
+
+- **apply 流程裁量（leader，2026-11-06）**：依 coordinator 裁定，因重負載鎖只在 04:19 前可用，執行順序調整為「§1 精簡 → 先寫 2.4、3.2 兩個 E2E RED 並一次取鎖跑紅 → §2、§3 單元層 RED→GREEN（同一個 Implementer 依序完成、逐 task commit）→ Stage 1／Stage 2 各一次合審兩組」；task 內容與驗收條件不變。E2E 綠燈（2.5、3.3 的雙鎖 E2E 項）與 C2～C5 由 coordinator 於合併前驗收執行。§1.1 的全套基線改採 coordinator 提供的數字。

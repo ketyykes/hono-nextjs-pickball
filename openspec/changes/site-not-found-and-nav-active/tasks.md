@@ -24,12 +24,14 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/site-not-found-and-nav-active`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/site-not-found-and-nav-active`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat 38b6ae8 main -- nextjs-pickball/components/layout nextjs-pickball/app nextjs-pickball/lib/navActive.ts nextjs-pickball/tests/e2e/specs/navbar-active.spec.ts nextjs-pickball/tests/e2e/specs/site-not-found.spec.ts nextjs-pickball/CLAUDE.md openspec/specs/site-navbar` 確認與 propose 時一致；
+  - 紀錄：依 coordinator 今晚安排精簡執行——分支 `change/site-not-found-and-nav-active`、工作樹乾淨、`pnpm -r exec tsc --noEmit` exit 0（leader 實跑）；`pnpm install`／`db:migrate:local`／全套 test／lint／`--list` 未重跑，基線數字採 coordinator 於前一個 change 合併前實跑者（前端 109／1091、後端 26／215、核心 10／27、lint 0／3、chromium E2E 150），已回填 environment.md。
+- [x] 1.2 對齊 main：`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat 38b6ae8 main -- nextjs-pickball/components/layout nextjs-pickball/app nextjs-pickball/lib/navActive.ts nextjs-pickball/tests/e2e/specs/navbar-active.spec.ts nextjs-pickball/tests/e2e/specs/site-not-found.spec.ts nextjs-pickball/CLAUDE.md openspec/specs/site-navbar` 確認與 propose 時一致；
   確認 `openspec/specs/site-not-found/` 仍不存在、`nextjs-pickball/app/not-found.tsx`／`loading.tsx` 仍不存在；
   **若主 spec `site-navbar` 已被其他 change 改動**，確認本 change 的 ADDED Requirement 與新主 spec 不衝突，`DO_NOT_TRACK=1 openspec validate site-not-found-and-nav-active --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   另讀 `nextjs-pickball/node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md`，確認 design「Next.js 16 慣例查證」與本機版本一致
+  - 紀錄：`git diff --stat 38b6ae8 main -- <列出路徑>` 輸出為空（main 自 propose 後合併的兩個 change 未觸及這些路徑，主 spec `site-navbar` 未變，無需調整 ADDED Requirement）；`openspec/specs/site-not-found/`、`app/not-found.tsx`、`app/loading.tsx` 皆不存在；本機 `not-found.md` 與 design 慣例查證一致（root `not-found` 處理未匹配 URL、預設 Server Component、non-streamed 回 404、`global-not-found` 仍 experimental）。
 
 ## 2. navbar active 判定與 aria-current
 
