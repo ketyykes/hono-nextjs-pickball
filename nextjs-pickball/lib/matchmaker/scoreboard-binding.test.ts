@@ -649,20 +649,60 @@ describe("scoreboard-binding", () => {
 		expect(isTargetScoreLocked(allPending, finishedSlot).locked).toBe(true);
 	});
 
-	// collectFinishedSubmissions 會略過「已不在回合中」的孤兒槽，
-	// isTargetScoreLocked 則刻意不做這道檢查——鎖定判定的錯誤方向是不對稱的：誤鎖只是使用者
-	// 改不了分制，誤放行則讓同輪各場地打不同分制。此 it 釘住這個 fail-closed 的取捨，
-	// 日後若有人「順手補上一致性」會被抓到，需先回到 spec 討論。
-	it("槽已不在回合中但非 setup 時仍判定為鎖定", () => {
+	it("前一輪殘留的計分板槽不鎖定新一輪的目標分數", () => {
 		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
 		const slots: MatchSlots = {
-			gone: makeSlot({ matchId: "gone", status: "playing", scores: { us: 4, them: 2 } }),
+			old: makeSlot({ matchId: "old", status: "playing", scores: { us: 4, them: 2 } }),
+		};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(false);
+		expect(result.reason).toBeNull();
+	});
+
+	it("本輪場次的槽仍為 setup 時非本輪的 finished 槽不使其鎖定", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
+		const slots: MatchSlots = {
+			m1: makeSlot({ matchId: "m1", status: "setup", scores: { us: 0, them: 0 } }),
+			old: makeSlot({ matchId: "old", status: "finished", scores: { us: 11, them: 5 } }),
+		};
+
+		const result = isTargetScoreLocked(round, slots);
+
+		expect(result.locked).toBe(false);
+		expect(result.reason).toBeNull();
+	});
+
+	it("本輪場次的槽已開始時仍鎖定且不受殘留槽影響", () => {
+		const round = makeRound({
+			matches: [makeMatch({ id: "m1", status: "pending" }), makeMatch({ id: "m2", status: "pending" })],
+		});
+		const slots: MatchSlots = {
+			m2: makeSlot({ matchId: "m2", status: "playing", scores: { us: 1, them: 0 } }),
+			old: makeSlot({ matchId: "old", status: "playing", scores: { us: 4, them: 2 } }),
 		};
 
 		const result = isTargetScoreLocked(round, slots);
 
 		expect(result.locked).toBe(true);
 		expect(result.reason).toBe("本輪已開始計分，目標分數不可更改。");
+	});
+
+	it("鎖定判定以槽集合的鍵比對本輪場次而非槽內容的 matchId", () => {
+		const round = makeRound({ matches: [makeMatch({ id: "m1", status: "pending" })] });
+
+		// 鍵不在本輪、內容 matchId 卻指向本輪場次：以鍵為準，不鎖定。
+		const keyedElsewhere: MatchSlots = {
+			old: makeSlot({ matchId: "m1", status: "playing" }),
+		};
+		expect(isTargetScoreLocked(round, keyedElsewhere).locked).toBe(false);
+
+		// 鍵屬於本輪、內容 matchId 指向別處：以鍵為準，鎖定。
+		const contentElsewhere: MatchSlots = {
+			m1: makeSlot({ matchId: "other", status: "playing" }),
+		};
+		expect(isTargetScoreLocked(round, contentElsewhere).locked).toBe(true);
 	});
 
 	// isTargetScoreLocked 的第一條與 setTargetScore
