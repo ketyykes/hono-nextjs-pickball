@@ -31,7 +31,7 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 - **Baseline tests**（2026-11-06 01:55～01:58 實跑，`pnpm install` 後 lockfile 零變動、`db:migrate:local` exit 0）：
   - `pnpm test`（雙鎖）：前端 109 檔／1085 tests、後端 26 檔／215 tests、核心 10 檔／27 tests，全綠
-  - 三段 typecheck：`pnpm -r exec tsc --noEmit`、`pnpm --filter ./hono-pickball typecheck`、`pnpm --filter ./packages/pickball-core typecheck` 皆 exit 0
+  - 三段 typecheck：`pnpm -r exec tsc --noEmit` exit 0；後兩段以 `pnpm --dir <root> --filter ./<ws> typecheck` 執行時回 "No projects matched the filters"（exit 0 但未實際檢查，見 design.md Open Questions），C1 改以 `pnpm --dir <root>/<ws> typecheck` 實跑
   - `pnpm lint`（雙鎖）：0 errors、3 warnings
   - `playwright test --list`：chromium／firefox／webkit／mobile-chrome／mobile-safari 各 147 tests（18 檔）、user-data 47 tests（6 檔）；C5 ② 三檔在四個 browser project 各 38；`scoreboard-binding.spec.ts` 在 chromium 為 20；C5 ③ 兩檔在 user-data 為 15
 - **Initial commit hash**：`c4b18a7`（`change/scoreboard-bound-game-over` 分出時的 `main` HEAD）
