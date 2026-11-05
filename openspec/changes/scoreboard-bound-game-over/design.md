@@ -113,5 +113,6 @@
 - **[TIME_UP，2026-11-06 02:47] C4 重跑與 C5 未完成**：§1、§2（含 Stage 1／Stage 2）與 3.1～3.4、3.7、3.8 已完成；3.5（C4）與 3.6（C5）未勾。
   C4 首次失敗原因為 `fonts.gstatic.com` 連線逾時（`next/font/google`），判定為建置機網路問題、非程式碼；C5 與 C4 重跑排隊取重負載鎖 32 分鐘未取得（mini4wd 的 blender 工作接力持鎖），為守 03:00 期限中止。
   交由 coordinator：依 tasks 3.5、3.6 的指令與期望數字重跑；特別留意 design Risks 第 1 條（`round-sync.spec.ts` 中「關閉」後立刻點設定列「返回對戰」的 test 尚無本 change 之後的實跑紀錄）。工作樹乾淨、`pnpm -r exec tsc --noEmit` exit 0。
+  **已結案（coordinator，2026-11-06 02:59）**：C4 重跑 exit 0；C5 ①②③ 全數通過且數量與期望一致（紀錄見 tasks 3.5、3.6）；design Risks 第 1 條未發生。
 - **[指令注意] `--filter ./<ws>` 以 shell cwd 為基準**：`pnpm --dir <root> --filter ./hono-pickball …` 的相對路徑是對 shell 當下 cwd 解析，不是對 `--dir`；cwd 不在 repo root 時會回 "No projects matched the filters" 且 exit 0（未實際執行）。C1 首跑時 cwd 恰在 `openspec/changes/`，因此改以 `pnpm --dir <root>/hono-pickball typecheck`、`pnpm --dir <root>/packages/pickball-core typecheck` 實跑，皆 exit 0。§1.1 基線兩段的 log 有實際 `tsc` 執行標頭，基線有效。
 - **[程序紀錄] Stage 2 mutation 與 C4 時間重疊**：Stage 2 Reviewer 自述在 02:11:45～46 做過一次「寫入變異後立即 `git checkout` 還原」的 harness 試跑，與首次 `pnpm build` 收尾重疊；build 失敗訊息為字型下載逾時，與該變異無關，且 `pnpm test`／`pnpm lint` 在此之前已完成。C4 仍須重跑（見上）。

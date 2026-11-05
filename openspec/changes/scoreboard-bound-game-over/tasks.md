@@ -65,12 +65,14 @@ Depends on: §2
   - 紀錄：雙鎖下 `pnpm lint` exit 0，`0 errors, 3 warnings`（＝基線）。
 - [x] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
   - 紀錄：雙鎖下 `pnpm test` exit 0：前端 109 檔／1088 tests（基線 1085＋3）、後端 26／215、核心 10／27（皆＝基線）。
-- [ ] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+- [x] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
   - 紀錄（未完成）：02:11 雙鎖下 `pnpm build` exit 1，後端 `wrangler deploy --dry-run` 成功，前端 `next build` 失敗於 `next/font/google` 抓 Noto Sans TC 時 `Connection timed out when requesting https://fonts.gstatic.com/...`（Turbopack 報 5 個 `Can't resolve '@vercel/turbopack-next/internal/font/google/font'`）。屬建置機對外網路逾時、非本 change 程式碼；建置後 `git status --porcelain` 為空。重跑排在 C5 之後，因重負載鎖被占用而未執行（見 design.md Open Questions），**待 coordinator 重跑**。
-- [ ] 3.6 驗收（指令）C5：`.dev.vars` 齊備下依 test-plan C5 的 ①②③ 分次跑 E2E，每次雙鎖、前後清殘留；數量與結果寫在本 task 後方，失敗不得自行判定為雜訊
+  - 紀錄（coordinator 重跑，2026-11-06 02:58～02:59，HEAD `f331e7d`，雙鎖）：`pnpm build` exit 0（前端 `next build` Done、字型下載正常，首次失敗確認為暫時性網路逾時）；建置後 `git status --porcelain` 為空。
+- [x] 3.6 驗收（指令）C5：`.dev.vars` 齊備下依 test-plan C5 的 ①②③ 分次跑 E2E，每次雙鎖、前後清殘留；數量與結果寫在本 task 後方，失敗不得自行判定為雜訊
   - 紀錄（未執行）：`.dev.vars` 齊備（`TEST_ACCOUNT_*`、`ENVIRONMENT` 共 4 行）。02:15 起排隊取得重負載鎖，至 02:47 鎖持續由 mini4wd 連續占用（多個 blender 工作接力 acquire），leader 為守 03:00 期限中止排隊，①②③ 皆**未跑**，**待 coordinator 執行**。
     期望：① chromium 149（基線 147＋2）全 passed；② firefox／webkit／mobile-chrome／mobile-safari 三檔各 40（基線 38＋2）、0 failed；③ user-data 兩檔 15、全 passed、0 skipped。
     已有的 E2E 證據（皆 chromium、雙鎖）：Implementer GREEN 後 `scoreboard-binding.spec.ts` 全檔 22 passed；Stage 2 未變異下 `-g` 三條（兩條新 test＋既有「由計分板判定勝負後返回，比分自動回填且該場轉為已完成」）3 passed，無 strict mode violation。`round-sync.spec.ts` 尚無本 change 之後的執行紀錄。
+  - 紀錄（coordinator 執行，2026-11-06 02:51～02:58，HEAD `f331e7d`，雙鎖、`--workers=1`、每段前後清殘留）：① chromium 全套 149 passed（2.3m）；② firefox 40 passed、webkit 40 passed、mobile-chrome 40 passed、mobile-safari 40 passed；③ user-data 兩檔 15 passed、0 skipped（含 `round-sync.spec.ts`「關閉」後點設定列「返回對戰」的 test，無 strict mode violation）。數量與期望完全一致、0 failed、0 flaky。
 - [x] 3.7 驗收（指令）C6：`git diff main --stat` 只含 test-plan C6 所列檔案
   - 紀錄：`git diff main --stat` 只含 `GameOverDialog.tsx`、`GameOverDialog.test.tsx`、`Scoreboard.tsx`、`scoreboard-binding.spec.ts` 與 `openspec/changes/scoreboard-bound-game-over/{environment,tasks,design}.md`；`Scoreboard.tsx` diff 只有 `<GameOverDialog>` 那一處（改為多行並加 `matchId={matchId}`）；`openspec/specs/` 零變動。
 - [x] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate scoreboard-bound-game-over --strict` 通過
