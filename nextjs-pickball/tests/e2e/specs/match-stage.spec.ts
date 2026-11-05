@@ -334,6 +334,31 @@ test.describe("/matchmaker 對戰頁", () => {
 		await expect(secondCourt.getByRole("alert")).toHaveCount(0);
 	});
 
+	test("多場地時可依場地群組定位比分欄位並以 Enter 送出", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await seedRoster(page, 4);
+		await page.goto("/matchmaker");
+		await page.getByRole("button", { name: "增加場地數" }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+
+		const courtGrids = page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]');
+		await expect(courtGrids).toHaveCount(2);
+
+		const secondGroup = page.getByRole("group", { name: "第 2 場地比分" });
+		const firstGroup = page.getByRole("group", { name: "第 1 場地比分" });
+		await secondGroup.getByLabel("第一隊比分").fill("11");
+		const secondTeamB = secondGroup.getByLabel("第二隊比分");
+		await secondTeamB.fill("7");
+		await secondTeamB.press("Enter");
+
+		await expect(secondGroup.getByLabel("第一隊比分")).toBeDisabled();
+		await expect(secondGroup.getByLabel("第二隊比分")).toBeDisabled();
+		await expect(secondGroup.getByRole("button", { name: "送出比分" })).toBeDisabled();
+		await expect(firstGroup.getByLabel("第一隊比分")).toBeEnabled();
+		// 未發生原生表單送出導覽
+		await expect(page).toHaveURL(/\/matchmaker$/);
+	});
+
 	test("桌面斷點場地內容與休息名單左右並排", async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 800 });
 		await seedRoster(page, 4);
