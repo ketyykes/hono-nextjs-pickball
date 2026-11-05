@@ -99,4 +99,7 @@ Depends on: §3
 
 ## Final Code Review
 
-- [ ] Final Code Review（opus）：依 execution-plan Final Code Reviewer checklist；結果記於此
+- [x] Final Code Review（opus）：依 execution-plan Final Code Reviewer checklist；結果記於此
+  - 結論：**PASS**，無必修項。① `git diff main --stat` ⊆ proposal Impact（產品 3 檔＋測試 3 檔＋本 change artifact），主 spec 與 `nextjs-pickball/CLAUDE.md` 無改動，C6 重跑符合；② C1／C6／C7 有紀錄，C2～C5 待 coordinator；靜態核對新增單元 it +5、E2E +2，名稱與七個 Scenario 逐字一致；③ 設定列顯示值與兩個產生入口皆取 `resolveRoundSettings` 的回傳值，無 effect、無 LocalStorage；④ §4.1 已記錄「不計時」缺口為後續 change。
+    整體確認：回合更新不寫 `draft`、產生新一輪不清 `draft` 且一致、訪客／登入同一路徑（載入中 `SyncStatusNotice` 取代整頁）、「回合不計時時解析結果為不計時」有 it 鎖住、commit 無 footer、註解無 change 名稱或 task 編號。實跑：round-settings 9 passed、RoundControls 24 passed、`tsc` exit 0、`openspec validate --strict` valid。
+  - Minor（不修）：① 回合存在時改對戰方式／場地數會讓 `draft` 帶一份當下目標分數／計時快照，若同一次掛載內回合消失（實際上只有雲端衝突重載時伺服器無回合或換帳號；重置名單在參賽者頁、會卸載對戰頁），設定列會回到該快照——符合 delta spec「無回合時取 draft」字面；② 既有 it「計時方向鍵以畫面選中值起算…」上方註解已過時（無授權修改既有測試，留待後續 change）。
