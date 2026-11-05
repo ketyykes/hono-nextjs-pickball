@@ -53,6 +53,7 @@ Depends on: §1
   - 紀錄：commit `281da7a`；`SiteNavbar.test.tsx` 14 passed、與 `navActive.test.ts` 合跑 19 passed（leader 另以四檔合跑複驗 `Tests 27 passed (27)`）；tsc exit 0；ESLint 0 errors。mutation ③④⑤⑥ 皆轉紅。**雙鎖 E2E（`navbar-active.spec.ts`、`match-stage.spec.ts` chromium）由 coordinator 於合併前執行**。
 - [x] 2.6 REFACTOR：檢查判定式是否清楚（具名變數、無巢狀三元）、檔頭註解是否只寫理由；無壞味道則註記 skipped
   - 紀錄：skipped——判定式為一個提早 return 加一個布林式，無巢狀三元，檔頭註解只寫理由。
+  - §2 審查：Stage 1（sonnet）PASS——名稱逐字一致、RED 機械複驗皆真紅、無 scope creep、授權 it 只改三處；Stage 2（opus）PASS——獨立 mutation ①～⑥ 皆轉紅、對照組（移除首頁特判）維持綠；`aria-current` 寫法與 `MatchmakerTabs` 一致；E2E locator 在五個 project 下（窄螢幕不隱藏導航連結、`main`／`banner` 皆唯一）判讀可用。
 
 ## 3. 中文 404 頁
 
@@ -69,6 +70,7 @@ Depends on: §2
   - 紀錄：commit `e51163d`；`not-found.test.tsx`＋`emojiFree.test.ts` 合跑 8 passed（emojiFree 為 regression guard）；tsc exit 0；ESLint 0 errors。mutation ①～⑤ 皆轉紅（對照組未跑）。**雙鎖 E2E（`site-not-found.spec.ts` chromium）由 coordinator 於合併前執行**。
 - [x] 3.4 REFACTOR：檢查文案是否集中、版面 token 是否與 `app/quiz/page.tsx` 一致、註解是否只寫理由；無壞味道則註記 skipped
   - 紀錄：skipped——文案集中於單一元件，版面 token 與 `app/quiz/page.tsx` 一致。
+  - §3 審查：Stage 1（sonnet）PASS；Stage 2（opus）PASS——獨立 mutation ①～⑤ 皆轉紅、對照組（調換按鈕順序）維持綠。**存活變異 1 項**：刪除說明段落 `p` 仍綠（「至少一個 p 非空」會被 `404` 小標 p 滿足）；test-plan 字面允許此斷言，leader 裁量不在本 change 內加嚴，列入 design.md Open Questions 供 coordinator 決定。
 
 ## 4. 文件與指令驗收
 
