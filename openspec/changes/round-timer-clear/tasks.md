@@ -53,24 +53,41 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`components/matchmaker/RoundControls.test.tsx` 新增 it「回合存在且未鎖定時點選不計時委派 setTimerDuration(null)」與「回合存在且未鎖定時方向鍵移到不計時亦委派 setTimerDuration(null)」（沿用 `buildProps`／`buildRound`）；單檔 vitest 確認兩者紅並貼出輸出
-- [ ] 3.2 RED（TDD，E2E）：`tests/e2e/specs/round-timer.spec.ts` 新增 test「回合存在時選不計時可取消已開始的本輪計時」與「取消本輪計時後產生下一輪仍為不計時」（步驟依 test-plan）；
+- [x] 3.1 RED（TDD）：`components/matchmaker/RoundControls.test.tsx` 新增 it「回合存在且未鎖定時點選不計時委派 setTimerDuration(null)」與「回合存在且未鎖定時方向鍵移到不計時亦委派 setTimerDuration(null)」（沿用 `buildProps`／`buildRound`）；單檔 vitest 確認兩者紅並貼出輸出
+- [x] 3.2 RED（TDD，E2E）：`tests/e2e/specs/round-timer.spec.ts` 新增 test「回合存在時選不計時可取消已開始的本輪計時」與「取消本輪計時後產生下一輪仍為不計時」（步驟依 test-plan）；
   雙鎖下以單檔 E2E（chromium、`-g` 各篩一次）確認紅燈（預期失敗於「不計時」的 `aria-checked`，而非前置步驟）並貼出輸出
-- [ ] 3.3 GREEN（TDD）：`RoundControls.tsx` 的 `setTimerDuration` prop 型別放寬；`handleTimerDurationChange` 回合存在時一律委派 `commitTimerDuration(durationMinutes)`；刪除 ⚠️ 暫行處置註解並改寫為一句「`null` 代表取消本輪計時」的說明（design Decision 3）。
+- [x] 3.3 GREEN（TDD）：`RoundControls.tsx` 的 `setTimerDuration` prop 型別放寬；`handleTimerDurationChange` 回合存在時一律委派 `commitTimerDuration(durationMinutes)`；刪除 ⚠️ 暫行處置註解並改寫為一句「`null` 代表取消本輪計時」的說明（design Decision 3）。
   3.1、3.2 全綠；`RoundControls.test.tsx` 其餘既有 it 原樣綠；雙鎖下 chromium 的 `round-timer.spec.ts`、`match-stage.spec.ts` 全檔綠；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b §3）
-- [ ] 3.4 REFACTOR：handler 是否還有多餘分支、上方註解是否殘留「尚未定案」「SHALL NOT 在此自行決定」字樣；無壞味道則註記 skipped
+- [x] 3.4 REFACTOR：handler 是否還有多餘分支、上方註解是否殘留「尚未定案」「SHALL NOT 在此自行決定」字樣；無壞味道則註記 skipped
+  - 紀錄（§3）：RED 單元 `6afe891`、RED E2E `08763c7`、GREEN `8eb69a6`；無 refactor commit。
+    - 單元紅燈：`RoundControls.test.tsx` 2 failed／24 passed，兩個新 it 皆 `expected "vi.fn()" to be called 1 times, but got 0 times`；無先綠者。
+    - E2E 紅燈（chromium、`-g` 各一次，雙鎖）：「回合存在時選不計時可取消已開始的本輪計時」失敗於 :345、「取消本輪計時後產生下一輪仍為不計時」失敗於 :372，皆為點「不計時」後 `aria-checked` 期望 "true" 收到 "false"，前置步驟（產生本輪、開始計時、倒數可見）皆通過。
+    - leader 機械複驗：`RoundControls.tsx` 自 `6afe891^` 至 `08763c7` 無變動；兩測試檔在各自 RED 前不含新名稱。
+    - GREEN：`RoundControls.tsx` prop 型別放寬、刪除 `if (durationMinutes === null) return;` 與 ⚠️ 暫行處置註解，改寫為「`null` 代表取消本輪計時…鎖定由純函式與 locked 共同守住」。`RoundControls.test.tsx` 26 passed；雙鎖下 chromium `round-timer.spec.ts`＋`match-stage.spec.ts` 29 passed／0 failed（4＋25，基線 2＋25）；三段 typecheck exit 0；三個改動檔 ESLint 0 errors；E2E 無 `waitForTimeout`。
+    - E2E 同步點：倒數文字以 `getByText(/^\d{2}:\d{2}$/)`；第二個 test 頁面無輪次標題，改以「產生前記下 `[data-testid$="-grid"]` 的 testid（`court-${match.id}-grid`），產生後等其 `toHaveCount(0)`」為舊場地網格消失的同步點。
+    - mutation（Implementer 與 Stage 2 獨立各做）：M1 加回 null 早退 → 兩新 it 紅；M2 `commitTimerDuration(10)` → 兩新 it 紅於 `toHaveBeenCalledWith(null)`；M3 null 改走 onSettingsChange → 兩新 it 紅（先紅於次數）；M3b（Stage 2 補）同時呼叫 commit 與 onSettingsChange → 兩新 it 紅於 `onSettingsChange).not.toHaveBeenCalled()`；M4 方向鍵索引 0 不呼叫 → 只有方向鍵 it 紅；M5 等價對照（回合分支合一行）→ 維持綠。無存活變異。
+    - 3.4 REFACTOR：skipped（handler 無多餘分支；整檔無「尚未定案」「SHALL NOT 在此自行決定」「只接受 10／15／20」殘留）。
+    - Stage 1（sonnet）：PASS。Stage 2（opus）：PASS；非阻擋建議：props JSDoc 可補 null 語意、grid locator 可限縮於 `match-stage-courts` 底下、倒數 regex 為整頁比對（目前 fixture 下唯一）。leader 裁定不處理（非必要，且不擴大改動）。
 
 ## 4. 文件與指令驗收
 
 Depends on: §3
 
-- [ ] 4.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否描述「回合存在時不計時無作用」或計時設定的變更方式；有則同步並 commit（`docs:`），否則在本 task 下記錄查核結果、不 commit
-- [ ] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+- [x] 4.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否描述「回合存在時不計時無作用」或計時設定的變更方式；有則同步並 commit（`docs:`），否則在本 task 下記錄查核結果、不 commit
+  - 紀錄：`nextjs-pickball/CLAUDE.md` 唯一提及計時處為 `lib/matchmaker/` 模組清單中的 `round-timer`，無「回合存在時不計時無作用」或計時設定變更方式的描述，不需同步，不 commit。
+- [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄：leader 於 §3 GREEN 後（HEAD `8eb69a6`）實跑 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck`，皆 exit 0。
 - [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
+  - 由 coordinator 於合併前執行（基線 0 errors／3 warnings）。
 - [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋6，後端與核心與基線相同
+  - 由 coordinator 於合併前執行（基線前端 111 檔／1112 tests → 預期 111 檔／1118 tests；後端 26／215、核心 10／27 不變）。
 - [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行。
 - [ ] 4.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 4.7 驗收（指令）C6：test-plan C6 的 ① 輸出為空、② 恰為四個產品檔
-- [ ] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-timer-clear --strict` 通過
+  - 由 coordinator 於合併前執行（預期：① 每個 browser project 兩檔 27→29；② chromium 全套 156→158；③ user-data `round-sync.spec.ts` 9 passed）。leader 已見 chromium 兩檔 29 passed（§3 Implementer 實跑）。
+- [x] 4.7 驗收（指令）C6：test-plan C6 的 ① 輸出為空、② 恰為四個產品檔
+  - 紀錄：① 輸出為空；② 恰為 `nextjs-pickball/components/matchmaker/RoundControls.tsx`、`nextjs-pickball/hooks/useRemoteRoundStore.ts`、`nextjs-pickball/hooks/useRoundStore.ts`、`packages/pickball-core/src/matchmaker/round.ts`（CLAUDE.md 未更新）。`openspec/specs/` 無改動。
+- [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-timer-clear --strict` 通過
+  - 紀錄：`Change 'round-timer-clear' is valid`。
 
 > `<repo>` 一律為 `/Users/m2_24gb/Desktop/project/nextjs-pickball`。
