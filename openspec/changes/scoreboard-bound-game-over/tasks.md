@@ -19,12 +19,14 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/scoreboard-bound-game-over`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/scoreboard-bound-game-over`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量，另記 C5 ② 三檔在四個 browser project、C5 ③ 兩檔在 user-data 的數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `GameOverDialog.tsx`、`GameOverDialog.test.tsx`、`Scoreboard.tsx`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）內容一致；
+- [x] 1.2 對齊 main：確認 `GameOverDialog.tsx`、`GameOverDialog.test.tsx`、`Scoreboard.tsx`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）內容一致；
   以 python difflib 比對本 change MODIFIED「賽前設定與階段鎖定」與目前主 spec，除 RESET 那一句外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate scoreboard-bound-game-over --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   另確認 `scoreboard-binding.spec.ts` 若已被並行 change（如 `target-score-lock-current-round`）新增 test，新 test 仍加在 `/matchmaker 對戰頁的計分板接線` describe 內、不與其衝突
+  - 紀錄（1.1）：基線數字見 environment.md Verification（前端 109／1085、後端 26／215、核心 10／27；lint 0 errors／3 warnings；chromium 147、user-data 47；C5 ② 各 38、C5 ③ 15）。
+  - 紀錄（1.2）：四個檔案與主 spec `scoreboard` 在 `38b6ae8..c4b18a7` 間零變動；difflib 比對 MODIFIED「賽前設定與階段鎖定」與主 spec 皆 121 行、只有 RESET 那一句不同；主 spec 未被他人改動，無需重新套用、無 commit。`scoreboard-binding.spec.ts` 未被並行 change 新增 test。
 
 ## 2. 比賽結束對話框依綁定模式切換動作
 
