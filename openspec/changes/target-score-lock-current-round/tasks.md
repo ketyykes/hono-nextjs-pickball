@@ -75,3 +75,8 @@ Depends on: §2
   - 紀錄：GREEN 後實跑，輸出為空。
 - [x] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過
   - 紀錄：`Change 'target-score-lock-current-round' is valid`。
+
+## Final Code Review
+
+- 紀錄（opus）：PASS——`git diff main...HEAD` 僅 `scoreboard-binding.ts`／`.test.ts`／`.spec.ts` 與本 change 的 tasks.md、environment.md；主 spec 無改動；`scoreboard-binding.test.ts` it 數 31 → 34（+4−1）；`isTargetScoreLocked` 與 `collectFinishedSubmissions` 皆以槽集合的鍵判定是否屬於本輪；commit 無 attribution 行；`tsc` exit 0、工作樹乾淨。
+  C2～C5 與 2.3 的 chromium 兩檔 E2E 綠燈標「待 coordinator」，不判 FAIL。提醒：C3 的基線 1088 來自 `46b68c1` 的前一個 commit，比對 +3 前宜確認 `46b68c1` 本身的前端測試數。
