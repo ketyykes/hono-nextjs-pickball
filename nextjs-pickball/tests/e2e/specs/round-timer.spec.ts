@@ -325,4 +325,62 @@ test.describe("/matchmaker 回合計時器", () => {
 			`不應有 console error/warning：\n${consoleIssues.join("\n")}`,
 		).toEqual([]);
 	});
+
+	test("回合存在時選不計時可取消已開始的本輪計時", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+
+		await startRoundTimer(page);
+
+		// 倒數文字（未到期時為 mm:ss）可見，作為取消前的前提。
+		const countdown = page.getByText(/^\d{2}:\d{2}$/);
+		await expect(countdown).toBeVisible();
+
+		const noTimerRadio = page.getByRole("radiogroup", { name: "計時" }).getByRole("radio", {
+			name: "不計時",
+			exact: true,
+		});
+		await noTimerRadio.click();
+
+		await expect(noTimerRadio).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByRole("button", { name: "開始計時" })).toHaveCount(0);
+		await expect(countdown).toHaveCount(0);
+
+		// 重新載入後取消仍然有效，證明清除已寫入儲存而不只是畫面狀態。
+		await page.reload();
+		await expect(
+			page.getByRole("radiogroup", { name: "計時" }).getByRole("radio", {
+				name: "不計時",
+				exact: true,
+			}),
+		).toHaveAttribute("aria-checked", "true");
+	});
+
+	test("取消本輪計時後產生下一輪仍為不計時", async ({ page }) => {
+		await seedRoster(page, 2);
+		await page.goto("/matchmaker");
+
+		await page.getByRole("radio", { name: TIMER_OPTION_LABEL, exact: true }).click();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByRole("button", { name: "開始計時" })).toBeVisible();
+
+		const noTimerRadio = page.getByRole("radiogroup", { name: "計時" }).getByRole("radio", {
+			name: "不計時",
+			exact: true,
+		});
+		await noTimerRadio.click();
+		await expect(noTimerRadio).toHaveAttribute("aria-checked", "true");
+
+		// 同步點：場次 id 每輪重新產生，舊場地網格的 testid 消失即代表下一輪已取代本輪。
+		const oldGridTestId = await page
+			.locator('[data-testid$="-grid"]')
+			.first()
+			.getAttribute("data-testid");
+		expect(oldGridTestId).not.toBeNull();
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId(oldGridTestId ?? "")).toHaveCount(0);
+
+		await expect(noTimerRadio).toHaveAttribute("aria-checked", "true");
+		await expect(page.getByRole("button", { name: "開始計時" })).toHaveCount(0);
+	});
 });
