@@ -70,7 +70,7 @@ Depends on: §2
   - 紀錄：commit `e51163d`；`not-found.test.tsx`＋`emojiFree.test.ts` 合跑 8 passed（emojiFree 為 regression guard）；tsc exit 0；ESLint 0 errors。mutation ①～⑤ 皆轉紅（對照組未跑）。**雙鎖 E2E（`site-not-found.spec.ts` chromium）由 coordinator 於合併前執行**。
 - [x] 3.4 REFACTOR：檢查文案是否集中、版面 token 是否與 `app/quiz/page.tsx` 一致、註解是否只寫理由；無壞味道則註記 skipped
   - 紀錄：skipped——文案集中於單一元件，版面 token 與 `app/quiz/page.tsx` 一致。
-  - §3 審查：Stage 1（sonnet）PASS；Stage 2（opus）PASS——獨立 mutation ①～⑤ 皆轉紅、對照組（調換按鈕順序）維持綠。**存活變異 1 項**：刪除說明段落 `p` 仍綠（「至少一個 p 非空」會被 `404` 小標 p 滿足）；test-plan 字面允許此斷言，leader 裁量不在本 change 內加嚴，列入 design.md Open Questions 供 coordinator 決定。
+  - §3 審查：Stage 1（sonnet）PASS；Stage 2（opus）PASS——獨立 mutation ①～⑤ 皆轉紅、對照組（調換按鈕順序）維持綠。**存活變異 1 項**：刪除說明段落 `p` 仍綠（「至少一個 p 非空」會被 `404` 小標 p 滿足）；leader 裁量派新 Implementer 加嚴（commit `98b6772`，只改該 it 的說明段落判斷式為「含中文字」，it 名稱與其餘斷言不變；寫入即綠＝regression guard）；複測：刪除說明段落轉紅、改寫為另一句中文維持綠。
 
 ## 4. 文件與指令驗收
 

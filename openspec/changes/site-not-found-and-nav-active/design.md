@@ -140,5 +140,5 @@
 （無。設計裁量皆已於上方 Decisions 定案；apply 階段的阻塞事項由 leader 追加於此。）
 
 - **apply 流程裁量（leader，2026-11-06）**：依 coordinator 裁定，因重負載鎖只在 04:19 前可用，執行順序調整為「§1 精簡 → 先寫 2.4、3.2 兩個 E2E RED 並一次取鎖跑紅 → §2、§3 單元層 RED→GREEN（同一個 Implementer 依序完成、逐 task commit）→ Stage 1／Stage 2 各一次合審兩組」；task 內容與驗收條件不變。E2E 綠燈（2.5、3.3 的雙鎖 E2E 項）與 C2～C5 由 coordinator 於合併前驗收執行。§1.1 的全套基線改採 coordinator 提供的數字。
-- **存活變異（Stage 2 回報，未修）**：`app/not-found.test.tsx` 的 render it 以「`main` 內至少一個 `p` 非空」驗說明文字，`404` 小標本身就是 `p`，刪除說明段落時仍綠。斷言與 test-plan 字面一致，故不在本 change 內改寫；若要加嚴，可改為「存在含中文的 `p`」或把 `404` 小標改用非 `p` 元素（需另開 change 或由 coordinator 授權）。
+- **存活變異（Stage 2 回報，已修）**：`app/not-found.test.tsx` 的 render it 原以「`main` 內至少一個 `p` 非空」驗說明文字，`404` 小標本身就是 `p`，刪除說明段落時仍綠。spec Scenario 要求的是「非空的**中文**說明文字」，故 leader 裁量把判斷式加嚴為「含中文字」（`98b6772`；偏離 test-plan 字面但更貼近 spec，屬加嚴、無行為變更）。
 - **4.1 文件先行**：`nextjs-pickball/CLAUDE.md` 的文件 commit（`3ef33b0`）為趕時程提前到 §2／§3 實作之前提交；內容只描述 tasks 指定的行為，其後 GREEN 與之一致（Stage 1 確認）。
