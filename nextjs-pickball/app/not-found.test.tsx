@@ -21,7 +21,7 @@ describe("全站 404 頁", () => {
 		const main = screen.getByRole("main");
 		const paragraphs = Array.from(main.querySelectorAll("p"));
 		const hasDescription = paragraphs.some(
-			(p) => (p.textContent ?? "").replace(/\s+/g, "") !== "",
+			(p) => /[一-鿿]/.test(p.textContent ?? ""),
 		);
 		expect(hasDescription).toBe(true);
 
