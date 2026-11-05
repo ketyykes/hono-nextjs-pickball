@@ -60,7 +60,7 @@ Depends on: §2
   - 紀錄：`grep -E "GameOverDialog|再來一局|比賽結束|返回對戰" nextjs-pickball/CLAUDE.md` 無命中；與本 change 無關，**不修改**、無 commit。
 - [x] 3.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄（HEAD `9ea099d`）：`pnpm -r exec tsc --noEmit`、`pnpm --dir hono-pickball typecheck`、`pnpm --dir packages/pickball-core typecheck` 皆 exit 0。
-    註：本環境 `pnpm --dir <root> --filter ./hono-pickball typecheck` 回 "No projects matched the filters" 且 exit 0（未實際檢查），§1.1 基線那兩段因此無效；本次改以 workspace 目錄為 `--dir` 實跑兩段 `tsc --noEmit && tsc --noEmit -p test/tsconfig.json`，皆 exit 0。
+    註：首跑時 shell cwd 在 `openspec/changes/`，`--filter ./<ws>` 對 cwd 解析而回 "No projects matched"（exit 0、未執行），故改以 workspace 目錄為 `--dir` 實跑兩段 `tsc --noEmit && tsc --noEmit -p test/tsconfig.json`，皆 exit 0；§1.1 基線不受影響。
 - [x] 3.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
   - 紀錄：雙鎖下 `pnpm lint` exit 0，`0 errors, 3 warnings`（＝基線）。
 - [x] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
