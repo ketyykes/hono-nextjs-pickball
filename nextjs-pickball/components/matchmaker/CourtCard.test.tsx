@@ -299,6 +299,63 @@ describe("CourtCard", () => {
 		withoutError.unmount();
 	});
 
+	it("在比分欄位按 Enter 會以場次識別與兩隊分數送出一次", async () => {
+		const user = userEvent.setup();
+		const onSubmitScore = vi.fn();
+		const view = render(
+			<CourtCard {...buildProps({ match: buildMatch({ id: "match-42" }), onSubmitScore })} />,
+		);
+
+		await user.type(view.getByLabelText("第一隊比分"), "11");
+		await user.type(view.getByLabelText("第二隊比分"), "7{Enter}");
+
+		expect(onSubmitScore).toHaveBeenCalledTimes(1);
+		expect(onSubmitScore).toHaveBeenCalledWith("match-42", "11", "7");
+	});
+
+	it("只填一欄比分按 Enter 時與按送出按鈕同樣傳遞原始空字串", async () => {
+		const user = userEvent.setup();
+		const onSubmitScore = vi.fn();
+		const view = render(
+			<CourtCard {...buildProps({ match: buildMatch({ id: "match-42" }), onSubmitScore })} />,
+		);
+
+		await user.type(view.getByLabelText("第一隊比分"), "11{Enter}");
+
+		expect(onSubmitScore).toHaveBeenCalledTimes(1);
+		expect(onSubmitScore).toHaveBeenCalledWith("match-42", "11", "");
+	});
+
+	it("已完成場次的比分欄位按 Enter 不會送出", async () => {
+		const user = userEvent.setup();
+		const onSubmitScore = vi.fn();
+		const match = buildMatch({
+			status: "completed",
+			scores: { teamA: 11, teamB: 5 },
+			winner: "teamA",
+			completedAt: "2026-08-23T01:00:00.000Z",
+			playerRatings: [
+				{ playerId: "p1", before: 3, after: 3.1 },
+				{ playerId: "p2", before: 3, after: 2.9 },
+			],
+		});
+		const view = render(<CourtCard {...buildProps({ match, onSubmitScore })} />);
+
+		await user.click(view.getByLabelText("第一隊比分"));
+		await user.keyboard("{Enter}");
+
+		expect(onSubmitScore).not.toHaveBeenCalled();
+	});
+
+	it("比分欄位與送出按鈕包在以場地編號命名的群組內", () => {
+		const view = render(<CourtCard {...buildProps({ match: buildMatch({ courtNumber: 2 }) })} />);
+
+		const group = view.getByRole("group", { name: "第 2 場地比分" });
+		expect(within(group).getByLabelText("第一隊比分")).not.toBeNull();
+		expect(within(group).getByLabelText("第二隊比分")).not.toBeNull();
+		expect(within(group).getByRole("button", { name: "送出比分" })).not.toBeNull();
+	});
+
 	it("已完成場次的比分欄位與送出按鈕皆為 disabled", () => {
 		const match = buildMatch({
 			status: "completed",

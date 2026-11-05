@@ -71,4 +71,6 @@
 
 ## Open Questions
 
-（無）
+- **apply 進度（04:58 硬停）**：§1、§2（RED→GREEN→REFACTOR skipped）、Stage 1／Stage 2（皆 PASS）、3.1、3.2、3.7、3.8 已完成；**Final Code Review 未做**（留給下一個 session 或 coordinator）；3.3～3.6（C2～C5）由 coordinator 於合併前執行。
+- **E2E 對 `preventDefault` 的鑑別力不足（Stage 2 建議，不擋合併）**：移除 `event.preventDefault()` 時「多場地時可依場地群組定位比分欄位並以 Enter 送出」仍綠——`toHaveURL(/\/matchmaker$/)` 可能在導覽發生前就判定通過。可在後續以 `window` 旗標存活或監聽 `framenavigated` 補強；本次未改，避免在時限內擴大範圍。
+- Implementer 未做對照組等價變異（時間不足）。
