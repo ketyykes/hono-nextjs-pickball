@@ -77,14 +77,20 @@ Depends on: §3
   - 紀錄：`nextjs-pickball/CLAUDE.md` 唯一提及計時處為 `lib/matchmaker/` 模組清單中的 `round-timer`，無「回合存在時不計時無作用」或計時設定變更方式的描述，不需同步，不 commit。
 - [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：leader 於 §3 GREEN 後（HEAD `8eb69a6`）實跑 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck`，皆 exit 0。
-- [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
+- [x] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行（基線 0 errors／3 warnings）。
-- [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋6，後端與核心與基線相同
+  - 紀錄（coordinator，2026-11-06 05:59，HEAD `558c79e`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋6，後端與核心與基線相同
   - 由 coordinator 於合併前執行（基線前端 111 檔／1112 tests → 預期 111 檔／1118 tests；後端 26／215、核心 10／27 不變）。
+  - 紀錄（coordinator，05:59～06:00，雙鎖）：前端 111 檔／1118 tests（基線 1112＋6）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
 - [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行。
+  - 紀錄（**未執行**，coordinator，2026-11-06）：排在 E2E 之後，E2E 進行中整個驗收指令被系統因記憶體不足中止（見 4.6），build 尚未跑。待重跑。
 - [ ] 4.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 由 coordinator 於合併前執行（預期：① 每個 browser project 兩檔 27→29；② chromium 全套 156→158；③ user-data `round-sync.spec.ts` 9 passed）。leader 已見 chromium 兩檔 29 passed（§3 Implementer 實跑）。
+  - 紀錄（**未完成**，coordinator，2026-11-06 06:00～06:13，HEAD `558c79e`，雙鎖、`--workers=1`）：這次改跑六個 project 全套（為 test-plan C5 的超集）。已完成且全過：chromium 全套 158 passed（基線 156＋2）；firefox 146 passed＋12 skipped；mobile-chrome 156 passed＋2 skipped；webkit 三個 shard 49＋45＋52＝146 passed、12 skipped（skip 皆為既有瀏覽器條件）。
+    mobile-safari `--shard=1/3`：48 passed、4 skipped、**1 failed**——`tests/e2e/specs/matchmaker-data-transfer.spec.ts:150`「資料頁標示 CSV 匯出入不對稱且完整還原請用 JSON」，錯誤為 `browserContext.newPage: Test timeout of 30000ms exceeded`（Test timeout … while setting up "page"，尚未進入測試本體；log 在 `/tmp/cg-round-timer-clear/e2e-7-mobile-safari.log`）。該 spec 與本 change 改動的檔案無交集，且發生時機緊接在系統記憶體告急之前，但**未重跑驗證，不自行判定為雜訊**。
+    隨後整個驗收指令被 Claude Code 以「系統記憶體嚴重不足」為由中止：mobile-safari `--shard=2/3`、`3/3`（含 `round-timer.spec.ts`）、user-data、build **都沒有跑**。依該機制的規定 coordinator 不得自行重啟，**待使用者指示後重跑**（`/tmp/cgate.sh round-timer-clear`，矩陣在 `/tmp/cgate-round-timer-clear.e2e`；/tmp 重開機會消失）。本 change 因此**尚未合併**。
 - [x] 4.7 驗收（指令）C6：test-plan C6 的 ① 輸出為空、② 恰為四個產品檔
   - 紀錄：① 輸出為空；② 恰為 `nextjs-pickball/components/matchmaker/RoundControls.tsx`、`nextjs-pickball/hooks/useRemoteRoundStore.ts`、`nextjs-pickball/hooks/useRoundStore.ts`、`packages/pickball-core/src/matchmaker/round.ts`（CLAUDE.md 未更新）。`openspec/specs/` 無改動。
 - [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-timer-clear --strict` 通過
