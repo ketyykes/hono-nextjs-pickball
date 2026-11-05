@@ -63,7 +63,7 @@ export interface RoundControlsProps {
 	setTargetScore: (targetScore: RoundTargetScore) => SetTargetScoreResult;
 	/** 回合存在但尚未開始計分時，變更計時長度委派此入口（round.ts 的 setTimerDuration，
 	 * 經 useRoundStore 接線）。SHALL NOT 於本元件內直接改寫回合物件。 */
-	setTimerDuration: (durationMinutes: RoundTimerDurationMinutes) => SetTimerDurationResult;
+	setTimerDuration: (durationMinutes: RoundTimerDurationMinutes | null) => SetTimerDurationResult;
 	/** 開始本輪計時（round.ts 的 startTimer，經 useRoundStore 接線）。零參數：now 已於
 	 * hook 層注入，本元件 SHALL NOT 自行取當下時間。 */
 	startTimer: () => StartTimerResult;
@@ -151,19 +151,11 @@ export function RoundControls({
 		targetScoreButtonRefs.current[nextIndex]?.focus();
 	}
 
-	// 計時長度的變更委派方式與目標分數完全相同（回合存在走 capability 入口、尚無回合只改
-	// 預備設定），唯一的差別是「不計時」這個選項：round-lifecycle 沒有把已產生的本輪改回
-	// 不計時的入口（round.ts 的 setTimerDuration 只接受 10／15／20），而本元件 SHALL NOT
-	// 自行改寫回合物件，因此回合已存在時選到「不計時」只能不作為。
-	//
-	// ⚠️ 下面那行 `if (durationMinutes === null) return;` 是**暫行處置，不是漏實作**：
-	// 「本輪已產生後能否改回不計時」是已知缺口，尚未定案。
-	// 目前的使用者可見後果是「不計時」這顆 radio 看起來可按、按下去卻毫無反應也不解釋
-	// （aria-checked 不變），這正是待定案的部分——補 round-lifecycle 的 clearTimer 入口、
-	// 或改為在回合存在時 disable 這顆選項並說明原因，定案前 SHALL NOT 在此自行決定。
+	// 計時長度的變更委派方式與目標分數完全相同：回合存在走 capability 入口、尚無回合只改
+	// 預備設定。`null`（不計時）代表取消本輪計時，同樣委派 setTimerDuration，鎖定由純函式
+	// 與 locked 共同守住。
 	function handleTimerDurationChange(durationMinutes: RoundTimerDurationMinutes | null) {
 		if (round !== null) {
-			if (durationMinutes === null) return;
 			commitTimerDuration(durationMinutes);
 			return;
 		}
