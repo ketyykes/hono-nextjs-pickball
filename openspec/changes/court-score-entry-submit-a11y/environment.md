@@ -32,8 +32,8 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：留待 apply §1.1 回填（`pnpm test` 三組檔數／測試數、三段 typecheck、`pnpm lint` errors／warnings、`playwright --list` 各 project 數量與 `match-stage.spec.ts` 在五個 browser project 的數量）。
-- **Initial commit hash**：留待 apply §1.1 回填（`change/court-score-entry-submit-a11y` 自 `main` 分出的 commit）。
+- **Baseline tests**（來源：coordinator 於前一個 change 合併前實跑，leader 未重跑全套）：前端 111 檔／1103 tests、後端 26 檔／215、核心 10 檔／27，全綠；`pnpm lint` 0 errors／3 warnings；三段 typecheck exit 0；E2E 五個 browser project 各 153（chromium 153 passed；firefox、webkit、mobile-safari 各 141 passed＋12 skipped；mobile-chrome 151＋2）、user-data 47 passed。leader 於 §1.1 僅實跑 `pnpm --dir <repo> -r exec tsc --noEmit`：exit 0。
+- **Initial commit hash**：`96d384a`（`change/court-score-entry-submit-a11y` 自 `main` 分出）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
