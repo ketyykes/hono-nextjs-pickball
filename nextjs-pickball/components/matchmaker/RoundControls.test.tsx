@@ -451,6 +451,40 @@ describe("RoundControls", () => {
 		expect(onSettingsChange).toHaveBeenCalledWith({ ...settings, targetScore: 15 });
 	});
 
+	// handleTargetScoreKeyDown 的起算索引 MUST 取自「畫面上選中的值」（displayedTargetScore），
+	// SHALL NOT 取自 settings——任何呼叫端傳入的 settings 都可能與目前回合分歧，以 settings
+	// 起算會讓方向鍵從畫面上看不到的位置開始移動，與計時方向鍵的規則一致。
+	// 起算刻意用 ArrowRight：從畫面選中的 15（index 1）往右為 21，而以 settings 的 11
+	// （index 0）起算往右會是 15，兩者結果不同才測得出來。
+	it("目標分數方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算", () => {
+		const round = buildRound({ targetScore: 15, matches: [buildMatch({ status: "pending" })] });
+		const setTargetScore = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({
+					round,
+					matchSlots: {},
+					settings: buildSettings({ targetScore: 11 }),
+					setTargetScore,
+				})}
+			/>,
+		);
+
+		const targetGroup = screen.getByRole("radiogroup", { name: "目標分數" });
+		// 前提：畫面上選中的是回合的 15，而非 settings 的 11。
+		const checkedBefore = within(targetGroup)
+			.getAllByRole("radio")
+			.filter((radio) => radio.getAttribute("aria-checked") === "true");
+		expect(checkedBefore[0].textContent).toBe("15");
+
+		fireEvent.keyDown(targetGroup, { key: "ArrowRight" });
+
+		expect(setTargetScore).toHaveBeenCalledTimes(1);
+		expect(setTargetScore).toHaveBeenCalledWith(21);
+		// focus 也 MUST 落在新選中的那一顆。
+		expect(document.activeElement?.textContent).toBe("21");
+	});
+
 	// 計時設定控制項。選項清單為「不計時」＋ round-lifecycle 匯出的
 	// ROUND_TIMER_DURATION_OPTIONS（10／15／20），元件內 SHALL NOT 另寫一份
 	// [10, 15, 20]；此處只釘住畫面上的四個選項、其可用性與預設選中項。
