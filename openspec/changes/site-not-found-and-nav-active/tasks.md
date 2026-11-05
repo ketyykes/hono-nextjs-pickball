@@ -98,3 +98,7 @@ Depends on: §3
   - 紀錄：輸出為空（leader 實跑）。
 - [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate site-not-found-and-nav-active --strict` 通過
   - 紀錄：`Change 'site-not-found-and-nav-active' is valid`（leader 實跑）。
+
+## Final Code Review
+
+- 紀錄：Final Code Reviewer（opus）PASS，無必修項——`git diff main --stat` 12 檔皆在 proposal Impact＋本 change 目錄內、主 spec 零改動；靜態計數新增 it 12、E2E test 3、前端測試檔 2；`CLAUDE.md` 敘述與行為一致；commit 訊息無 attribution；tsc exit 0。待 coordinator：C2～C5（含 2.5、3.3 的 E2E 綠燈）；部署後人工確認正式站 404 狀態碼與中文標題。
