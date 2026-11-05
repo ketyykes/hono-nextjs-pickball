@@ -54,14 +54,18 @@ Depends on: §2
   - 紀錄：grep 命中 :28、:62、:110、:112、:119，皆為路由摘要或雲端送出資料流，無描述手動比分輸入 DOM 結構的段落 → 不補文字、不 commit。
 - [x] 3.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：GREEN 後 `pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck` 皆 exit 0。
-- [ ] 3.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
+- [x] 3.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行。
-- [ ] 3.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋4，後端與核心與基線相同
+  - 紀錄（coordinator，2026-11-06 04:52，HEAD `5e45540`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 3.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋4，後端與核心與基線相同
   - 由 coordinator 於合併前執行。
-- [ ] 3.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
+  - 紀錄（coordinator，04:52～04:53，雙鎖）：前端 111 檔／1107 tests（基線 1103＋4）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
+- [x] 3.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行。
-- [ ] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - 紀錄（coordinator，04:58，雙鎖）：`pnpm build` exit 0；建置後 `git status --porcelain` 為空。
+- [x] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，04:53～04:58，雙鎖、`--workers=1`、每段前後清殘留）：② chromium 全套 154 passed（基線 153＋1）；① `match-stage.spec.ts` 在 firefox／webkit／mobile-chrome／mobile-safari 各 23 passed（基線 22＋1；chromium 的該檔含於 ②）；③ user-data `round-sync.spec.ts` 9 passed、0 skipped。全部 0 failed、0 flaky。
 - [x] 3.7 驗收（指令）C6：test-plan C6 兩條 `git diff main --stat` 符合期望
   - 紀錄：前者（hooks／app／lib／hono-pickball／packages）輸出為空；components 只含 `CourtCard.test.tsx`、`CourtCard.tsx`、`ScoreEntry.tsx`。
 - [x] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate court-score-entry-submit-a11y --strict` 通過
@@ -69,5 +73,6 @@ Depends on: §2
 
 ## Final Code Review
 
-- [ ] Final Code Reviewer（opus）一次審完全部 commit，結果記於此
+- [x] Final Code Reviewer（opus）一次審完全部 commit，結果記於此
   - 未執行（04:58 硬停，依 coordinator 安排留給下一個 session 或 coordinator）。
+  - 紀錄（coordinator 於 04:53 派出，opus，唯讀）：PASS，無必修項。範圍只含 `ScoreEntry.tsx`、`CourtCard.tsx`（僅多傳 `groupLabel`）、`CourtCard.test.tsx`（＋4 it）、`match-stage.spec.ts`（＋1 test）與本 change 文件；既有 it／test 名稱與斷言未改；五個 Scenario 的驗收錨點逐字一致。非必修建議（未做，留待後續）：補一個以 `createEvent.submit` 斷言 `defaultPrevented` 的 it、或讓 E2E 以 `window` 旗標證明送出後頁面未重新載入——目前沒有測試能抓到漏掉 `preventDefault`（見 design Open Questions）。對照組 mutation 未做（時間限制）。
