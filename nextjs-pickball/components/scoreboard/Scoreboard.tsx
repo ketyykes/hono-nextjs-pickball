@@ -204,7 +204,11 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 				onReset={() => dispatch({ type: "RESET" })}
 				focusMode={focusMode}
 			/>
-			<GameOverDialog state={state} onPlayAgain={() => dispatch({ type: "RESET" })} />
+			<GameOverDialog
+				state={state}
+				onPlayAgain={() => dispatch({ type: "RESET" })}
+				matchId={matchId}
+			/>
 			{feedback && (
 				<div
 					key={feedback.key}
