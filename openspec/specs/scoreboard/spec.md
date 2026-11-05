@@ -296,7 +296,7 @@ UI MUST 以原生 `disabled` 屬性表達鎖定狀態（`nextjs-pickball/compone
 
 此約束 MUST 於使用端（`ScoreboardSetup.tsx`）傳入，SHALL NOT 修改 `nextjs-pickball/components/ui/select.tsx` —— 該檔為 shadcn 原生元件，專案慣例為不自行修改其結構、更新走 shadcn CLI，且改動預設值會波及全站所有 Select。
 
-重置（RESET）MUST 保留 `mode`、`firstServer`、`targetScore` 與 `matchId`、清空分數與 history、將 `status` 回到 `setup`，且 MUST 經二次確認才執行 —— 誤觸重置會讓整場比賽的分數消失且無法 Undo。
+重置（RESET）MUST 保留 `mode`、`firstServer`、`targetScore` 與 `matchId`、清空分數與 history、將 `status` 回到 `setup`，且 MUST 經二次確認才執行 —— 誤觸重置會讓整場比賽的分數消失且無法 Undo。**唯一例外**為獨立計分板（`matchId === null`）比賽結束對話框的「再來一局」：此時比賽已結束（`status === "finished"`）、終局比分已在對話框呈現，且該按鈕只在對話框內出現、按下本身即為明確意圖，SHALL 直接執行 RESET 而不再經二次確認；綁定對戰場次時比賽結束對話框 SHALL NOT 提供任何會觸發 RESET 的動作（見「比賽結束對話框的動作」Requirement）。ActionBar 的「重置」在任何階段、任何模式下仍 MUST 經二次確認。
 
 UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 state 後 replay」實作（見「Undo 機制」Requirement），重建時若未帶入 `targetScore`，目標分數會靜默退回 11，使 15／21 分制的比賽在 Undo 後可能立即誤判為結束。此失效路徑僅在使用者按下 Undo 時顯現，正常計分完全正常，MUST 有獨立測試覆蓋。
 
@@ -820,3 +820,57 @@ UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 
 - **WHEN** `useScoreboardStore("m1")` mount 並 dispatch `RALLY_WON`
 - **THEN** `localStorage["scoreboard:matches:v1"]` 不存在（未被寫入）；送出 `PUT /api/matchmaker/slots/m1`
 - **驗收**：`nextjs-pickball/hooks/useScoreboardStore.test.tsx`，it 名稱「已登入且帶 matchId 時改用雲端分槽且不寫入 scoreboard:matches:v1」
+
+### Requirement: 比賽結束對話框的動作
+
+比賽結束（`status === "finished"`）時自動開啟的比賽結束對話框（`nextjs-pickball/components/scoreboard/GameOverDialog.tsx`）SHALL 顯示勝方與終局比分，並依計分板是否綁定對戰場次提供不同的動作。
+
+**綁定模式的判斷來源**：是否為綁定模式 MUST 以頁面傳入計分板元件的 `matchId` prop 判斷（非 `null` 即綁定），與設定列（`ScoreboardSetup`）同一個判斷來源；SHALL NOT 改以 reducer 的 `state.matchId` 判斷——prop 在 mount 當下即已知，`state.matchId` 要等讀取完成才有值，兩處若用不同來源，會出現設定列與對話框對「是否綁定」看法不一致的過渡期。
+
+**獨立模式**（`matchId === null`）：對話框 MUST 提供「關閉」與「再來一局」兩個按鈕。「再來一局」SHALL 直接執行 RESET、不再經二次確認（「賽前設定與階段鎖定」RESET 二次確認規則的唯一例外：比賽已結束、終局比分已在對話框呈現，按下該按鈕即為明確意圖）。
+
+**綁定模式**（`matchId !== null`）：對話框 SHALL NOT 渲染「再來一局」或任何會觸發 RESET 的動作，MUST 改以「返回對戰」為主要動作，並保留「關閉」。理由：對戰頁依該場分槽的 `finished` 狀態自動回填比分（見 `match-stage` capability），RESET 會把分槽改回 `setup` 並清空分數，使這場比分無法回填，登入時還會把清空後的分槽寫回雲端；綁定場次打完後的下一步一律是回對戰頁。
+
+- 「返回對戰」MUST 為連到對戰頁（`/matchmaker`）的連結，寫法與設定列既有的「返回對戰」入口一致；按下後 SHALL 只導航，SHALL NOT 觸發 RESET、SHALL NOT 寫入任何分槽或 `scoreboard:current:v1`。
+- 「關閉」MUST 只關閉對話框、保留 `finished` 狀態，讓使用者檢視終局分數；關閉後不提供重新開啟對話框的入口（既有行為）。
+
+**專注模式**：對話框為 portal 至 `body` 的元素，不受專注模式隱藏設定列影響，上述兩種模式的動作在專注模式下 MUST 相同。綁定模式在專注模式下，比賽結束對話框的「返回對戰」即為不退出專注模式而回到對戰頁的入口；「對戰場次綁定與失效處理」所述設定列返回入口在專注模式下隱藏的規則不變。
+
+**場次失效**：綁定狀態為 `missing` 時計分板以失效說明取代整個畫面（「對戰場次綁定與失效處理」），不渲染比賽結束對話框；本 Requirement 不為失效狀態另設對話框分支。
+
+實作位於 `nextjs-pickball/components/scoreboard/GameOverDialog.tsx` 與 `nextjs-pickball/components/scoreboard/Scoreboard.tsx`（把 `matchId` prop 傳給對話框）。
+
+#### Scenario: 綁定模式的比賽結束對話框提供返回對戰且不提供再來一局
+
+- **GIVEN** `status === "finished"` 的計分狀態，且對話框收到 `matchId = "m1"`
+- **WHEN** 渲染比賽結束對話框
+- **THEN** 對話框內有名稱為「返回對戰」的連結且其 `href` 為 `/matchmaker`，有「關閉」按鈕，SHALL NOT 有「再來一局」按鈕
+- **驗收**：`nextjs-pickball/components/scoreboard/GameOverDialog.test.tsx`，it 名稱「綁定模式顯示返回對戰連結且不顯示再來一局」
+
+#### Scenario: 綁定模式按關閉後對話框關閉且不重置
+
+- **GIVEN** `status === "finished"` 的計分狀態，且對話框收到 `matchId = "m1"`
+- **WHEN** 使用者按下「關閉」
+- **THEN** 對話框關閉，`onPlayAgain` 未被呼叫
+- **驗收**：`nextjs-pickball/components/scoreboard/GameOverDialog.test.tsx`，it 名稱「綁定模式按關閉後對話框關閉且不呼叫 onPlayAgain」
+
+#### Scenario: 獨立模式維持關閉與再來一局且再來一局不經二次確認
+
+- **GIVEN** `status === "finished"` 的計分狀態，且對話框收到 `matchId = null`（或未傳入）
+- **WHEN** 渲染比賽結束對話框並按下「再來一局」
+- **THEN** 對話框有「關閉」與「再來一局」兩個按鈕、SHALL NOT 有「返回對戰」連結；按下「再來一局」後 `onPlayAgain` 恰被呼叫一次，且畫面上不出現二次確認的 `alertdialog`
+- **驗收**：`nextjs-pickball/components/scoreboard/GameOverDialog.test.tsx`，it 名稱「獨立模式顯示再來一局且點擊即呼叫 onPlayAgain 而不經二次確認」
+
+#### Scenario: 綁定場次打到結束後由對話框返回對戰且比分已回填
+
+- **GIVEN** 訪客模式下名單有四位、已產生一輪 11 分制對戰，由某場地的「進入計分板」進入 `/scoreboard?match=<該場 matchId>`
+- **WHEN** 我方連贏 11 球使比賽結束，使用者在比賽結束對話框按下「返回對戰」
+- **THEN** 對話框內 SHALL NOT 有「再來一局」按鈕；按下後回到 `/matchmaker`，該場比分顯示 `11:0`、第一隊為勝方，且不再提供進入計分板的入口
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts`，test 名稱「綁定場次比賽結束時對話框以返回對戰取代再來一局且返回後比分已回填」
+
+#### Scenario: 專注模式下綁定場次結束後可由對話框返回對戰
+
+- **GIVEN** 同上的綁定場次，使用者已進入專注模式（設定列與其「返回對戰」不渲染）
+- **WHEN** 我方連贏 11 球使比賽結束，使用者在比賽結束對話框按下「返回對戰」
+- **THEN** 回到 `/matchmaker`，該場比分顯示 `11:0` 且第一隊為勝方
+- **驗收**：`nextjs-pickball/tests/e2e/specs/scoreboard-binding.spec.ts`，test 名稱「專注模式下綁定場次比賽結束後可由對話框返回對戰」
