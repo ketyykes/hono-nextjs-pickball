@@ -20,13 +20,16 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/round-timer-clear`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；
+- [x] 1.1 確認分支 `change/round-timer-clear`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；
   雙鎖下跑 `pnpm --dir <repo> test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm --dir <repo> lint`（errors／warnings 數）、`pnpm --dir <repo>/nextjs-pickball exec playwright test --list`（六個 project 各自數量，另記 `round-timer.spec.ts`＋`match-stage.spec.ts` 在五個 browser project 的數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 **相依對齊**：確認 `main` 已含 `round-settings-follow-round` 的合併 commit（`git -C <repo> log --oneline main | grep round-settings-follow-round`，且 `nextjs-pickball/lib/matchmaker/round-settings.ts` 已有 `resolveRoundSettings`）。
+- [x] 1.2 **相依對齊**：確認 `main` 已含 `round-settings-follow-round` 的合併 commit（`git -C <repo> log --oneline main | grep round-settings-follow-round`，且 `nextjs-pickball/lib/matchmaker/round-settings.ts` 已有 `resolveRoundSettings`）。
   **未合併 → 停止並上報 coordinator，不得開工、不得自行實作設定列跟隨、不得刪改 E2E「取消本輪計時後產生下一輪仍為不計時」迴避相依**。
   已合併 → 確認 `RoundControls.tsx` 的 `handleTimerDurationChange` 暫行處置（`if (durationMinutes === null) return;`）仍在、`setTimerDuration` 簽章仍只接受 `RoundTimerDurationMinutes`；
   以 python difflib 比對本 change MODIFIED 的「回合計時器」與目前主 spec，除本 change 刻意增修（取消計時規範段、七個新 Scenario）外應無差異；**若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**，`DO_NOT_TRACK=1 openspec validate round-timer-clear --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
-- [ ] 1.3 讀碼確認 design Decision 2 的收尾：`hooks/useRoundTimer.ts`、`lib/matchmaker/round-timer-sound.ts` 及其在對戰頁的使用端，對 `round.timer` 由非 `null` 變 `null` 不殘留倒數或提示音狀態；結果記在本 task 下方。若有殘留 → 停止上報（範圍變更）
+  - 紀錄（1.1）：分支 `change/round-timer-clear`、工作樹乾淨、起點 `239b19f`；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0。依 coordinator 裁定未跑 `pnpm install`（lockfile 未變）、全套 test／lint／`playwright --list`，基線數字由 coordinator 提供並回填 environment.md。
+  - 紀錄（1.2）：`main` 含 `4799404 merge: round-settings-follow-round` 與封存 `239b19f`；`round-settings.ts:96` 有 `resolveRoundSettings`；`RoundControls.tsx:166` 暫行處置 `if (durationMinutes === null) return;` 仍在、`round.ts:418` `setTimerDuration` 仍只接受 `RoundTimerDurationMinutes`。difflib 比對「回合計時器」：主 spec 對 change 的差異僅為本 change 的取消計時規範段（＋10 行）與七個新 Scenario（＋47 行），無其他差異，不需重套。後端確認：`hono-pickball/src/routes/matchmaker.ts:77` 以核心 `RoundPutRequestSchema`（`versionedWriteSchema(RoundSchema)`）驗證，`RoundSchema.timer` 為 `RoundTimerObjectSchema.nullable().default(null)`，接受 `timer: null`。`openspec validate --strict` 通過。無差異，design.md Open Questions 不需增補。
+- [x] 1.3 讀碼確認 design Decision 2 的收尾：`hooks/useRoundTimer.ts`、`lib/matchmaker/round-timer-sound.ts` 及其在對戰頁的使用端，對 `round.timer` 由非 `null` 變 `null` 不殘留倒數或提示音狀態；結果記在本 task 下方。若有殘留 → 停止上報（範圍變更）
+  - 紀錄（1.3）：無殘留。`useRoundTimer` 的 effect 依賴 `startedAt = timer?.startedAt ?? null`，`timer` 變 `null` 時 cleanup 清掉 interval 且新 effect 早退；`remainingSeconds`／`isExpired` 對 `null` timer 回傳 `null`／`false`。`RoundTimerBanner`（`page.tsx:288` 以 `round?.timer ?? null` 常駐掛載）在 `timer === null` 時回傳 `null`，提示音 effect 只在 `expired` 為真時呼叫 `playChime`，`timer` 為 `null` 時不會觸發；`round-timer-sound.ts` 本身無狀態（去重旗標在 Banner 的 `useRef`，只影響「是否再播」，不會讓聲音在無倒數時響起）。「開始計時」按鈕由 `canStartTimer` 依 `round.timer` 推導。
 
 ## 2. 核心 `setTimerDuration` 接受 null（含兩個 store）
 
