@@ -20,11 +20,17 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/round-settings-follow-round`、工作樹乾淨；確認 `/tmp/lock-fast.sh`、`/tmp/heavy-lock.sh` 存在（不存在則請 coordinator 重建）；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/round-settings-follow-round`、工作樹乾淨；確認 `/tmp/lock-fast.sh`、`/tmp/heavy-lock.sh` 存在（不存在則請 coordinator 重建）；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm --dir <repo> test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm --dir <repo> lint`（errors／warnings 數）、`pnpm --dir <repo>/nextjs-pickball exec playwright test --list`（六個 project 各自數量，另記 `match-stage.spec.ts`＋`scoreboard-binding.spec.ts`＋`round-timer.spec.ts` 在五個 browser project 的數量）；回填 environment.md Verification（含分出點 commit）並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `round-settings.ts`、`round-settings.test.ts`、`page.tsx`、`RoundControls.tsx`、`RoundControls.test.tsx`、`match-stage.spec.ts` 與 propose 時（`main` `cb9b585`）一致（`git -C <repo> diff --stat cb9b585 main -- <六檔>`）；
+- [x] 1.2 對齊 main：確認 `round-settings.ts`、`round-settings.test.ts`、`page.tsx`、`RoundControls.tsx`、`RoundControls.test.tsx`、`match-stage.spec.ts` 與 propose 時（`main` `cb9b585`）一致（`git -C <repo> diff --stat cb9b585 main -- <六檔>`）；
   若有差異，確認：① `page.tsx` 的設定仍為單一 `useState(createRoundSettings())`；② `RoundControls.tsx` :143 仍以 `settings.targetScore` 起算；③ 區段導覽連結名稱仍為「參賽者」「對戰」、`match-stage.spec.ts` 的 `seedRoster`／`beforeEach` 未變；
   ④ 重跑 design Risk 4 的查核（列出同一條 test 內產生兩次以上或導覽兩次以上的 E2E，確認無依賴預設值重置的斷言）。主 spec `match-stage` 若已新增同名或涵蓋本 Requirement 的規則，停止並上報。差異與查核結果記入本 task；需調整 delta 時 `DO_NOT_TRACK=1 openspec validate round-settings-follow-round --strict` 通過後 commit（`docs(openspec):`）
+
+  - 紀錄（1.1）：分支 `change/round-settings-follow-round`、工作樹乾淨、分出點 `bc96661`；`/tmp/lock-fast.sh`、`/tmp/heavy-lock.sh` 皆存在；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0。
+    依今晚特別安排第 2 點，`pnpm install`、`db:migrate:local`、全套 test／lint／`playwright --list` 不重跑，基線數字採 coordinator 於前一個 change 合併前實跑結果，已回填 environment.md。
+  - 紀錄（1.2）：`git diff --stat cb9b585 main` 六檔中只有 `match-stage.spec.ts` 有差異（+25，`court-score-entry-submit-a11y` 新增 test「多場地時可依場地群組定位比分欄位並以 Enter 送出」，同一次掛載內只產生一次，不依賴預設值重置）。
+    ① `page.tsx` :88 仍為 `useState<RoundSettings>(() => createRoundSettings())`；② `RoundControls.tsx` :143 仍以 `settings.targetScore` 起算；③ `MatchmakerTabs` 的 `nav[aria-label="對戰分配區段導覽"]` 與連結名稱「參賽者」「對戰」未變，`seedRoster`／`beforeEach` 未變；
+    ④ Risk 4 重查：導覽離開對戰頁的 E2E（`match-stage` 區段導覽 test、`matchmaker-history`、`matchmaker-data-transfer`、`navbar-*`）皆未在返回後產生回合並斷言預設值。主 spec `match-stage` 無同名或涵蓋本 Requirement 的規則。delta 不需調整。
 
 ## 2. 本輪設定由目前回合與使用者變更解析
 

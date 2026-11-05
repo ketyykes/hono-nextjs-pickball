@@ -31,8 +31,12 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：留待 apply §1.1 回填（`pnpm test` 三個 workspace 的檔數／測試數、`pnpm lint` 的 errors／warnings、三段 typecheck、`playwright test --list` 六個 project 的數量，另記 `match-stage.spec.ts`＋`scoreboard-binding.spec.ts`＋`round-timer.spec.ts` 在五個 browser project 的數量）。
-- **Initial commit hash**：留待 apply §1.1 回填（`change/round-settings-follow-round` 分出點）。
+- **Baseline tests**（來源：coordinator 於前一個 change `court-score-entry-submit-a11y` 合併前在 `main` 實跑；依今晚特別安排第 2 點，leader 不重跑全套）：
+  - `pnpm test`：前端 111 檔／1107 tests、後端 26 檔／215、核心 10 檔／27，全綠
+  - `pnpm lint`：0 errors／3 warnings
+  - 三段 typecheck：皆 exit 0（leader 於分支上另實跑 `pnpm --dir <repo> -r exec tsc --noEmit` exit 0）
+  - E2E：chromium 全套 154 passed；`match-stage.spec.ts` 五個 browser project 各 23 passed；`user-data/round-sync.spec.ts` 9 passed
+- **Initial commit hash**：`bc96661`（`main` HEAD，`change/round-settings-follow-round` 分出點）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown
