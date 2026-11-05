@@ -29,8 +29,13 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（待 apply §1.1 實跑後回填：三個 workspace 的檔數／測試數、三段 typecheck、`pnpm lint` errors／warnings、`playwright test --list` 各 project 數量與 `scoreboard-binding.spec.ts`＋`match-stage.spec.ts` 在各 project 的數量）
-- **Initial commit hash**：（待 apply §1.1 回填：`change/target-score-lock-current-round` 分出時的 `main` HEAD）
+- **Baseline tests**（來源：coordinator 於前一個 change `scoreboard-bound-game-over` 合併前在 `main` 的前一個 commit 實跑；leader 依 coordinator 裁定不重跑全套）：
+  - `pnpm test`：前端 109 檔／1088 tests、後端 26 檔／215、核心 10 檔／27，全綠
+  - `pnpm lint`：0 errors／3 warnings
+  - 三段 typecheck：皆 exit 0（leader 於本分支另實跑 `pnpm --dir <repo> -r exec tsc --noEmit` exit 0）
+  - E2E：chromium 全套 149 passed；`scoreboard-binding.spec.ts` 在 chromium 為 22 條；firefox／webkit／mobile-chrome／mobile-safari 的 scoreboard 三檔各 40 passed；
+    user-data `round-sync.spec.ts`＋`scoreboard-sync.spec.ts` 共 15 passed
+- **Initial commit hash**：`46b68c1`（`main` HEAD，`change/target-score-lock-current-round` 自此分出）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

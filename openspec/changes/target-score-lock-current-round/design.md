@@ -109,3 +109,7 @@
 ## Open Questions
 
 （無；設計裁量皆已於 Decisions 定案。apply 階段遇到阻礙時附加於此。）
+
+- apply 期間（2026-11-06）的流程裁量（coordinator 裁定，非設計變更）：重負載鎖時段受限，§1.1 基線採 coordinator 於前一個 change 合併前實跑的數字、不重跑；
+  2.2 的 E2E 紅燈於 03:19 的鎖空檔在 GREEN 前實跑；2.3 的 chromium `scoreboard-binding.spec.ts`／`match-stage.spec.ts` 全檔綠燈與 C2～C5 改由 coordinator 於合併前驗收一併執行。
+  Stage 2 的兩點 non-blocking 建議未採納（`RoundControls.tsx` prop 註解在範圍外；鍵比對 it 未斷言 `reason`，與 test-plan 該列 Assertion 一致），記於 tasks 2.4。

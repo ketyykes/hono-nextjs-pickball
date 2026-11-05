@@ -234,8 +234,13 @@ const TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可�
 
 /**
  * 判定本輪目標分數是否已鎖定（spec「開始計分後鎖定本輪目標分數」）：
- * 任一場次已開始（非 `pending`）、或任一計分板槽存在且非 `"setup"`，兩者為 OR、
+ * 任一場次已開始（非 `pending`）、或本輪場次的計分板槽存在且非 `"setup"`，兩者為 OR、
  * 任一成立即鎖定。
+ *
+ * 第二條只計入「槽集合的鍵等於本輪某場 `id`」的槽：前一輪殘留或重排時清除失敗而留下的
+ * 非本輪槽，不是本輪任何場地的計分場所，計入只會讓新一輪一產生就被鎖死。比對以鍵為準而非
+ * 槽內容的 `matchId` 欄位，與 `collectFinishedSubmissions` 的回填條件同一來源，
+ * 避免兩處對同一個槽給出相反的「是否屬於本輪」答案。
  *
  * 第一條與 `setTargetScore`（round.ts）的拒絕條件方向 MUST 一致：該入口以
  * `status !== "pending"` 判定是否拒絕變更，因此本判定同樣採 `!== "pending"`，
@@ -244,7 +249,10 @@ const TARGET_SCORE_LOCKED_REASON = "本輪已開始計分，目標分數不可�
  */
 export function isTargetScoreLocked(round: Round, slots: MatchSlots): TargetScoreLockResult {
 	const anyMatchStarted = round.matches.some((match) => match.status !== "pending");
-	const anySlotStarted = Object.values(slots).some((slot) => slot.status !== "setup");
+	const currentMatchIds = new Set(round.matches.map((match) => match.id));
+	const anySlotStarted = Object.entries(slots).some(
+		([matchId, slot]) => currentMatchIds.has(matchId) && slot.status !== "setup",
+	);
 
 	const locked = anyMatchStarted || anySlotStarted;
 	return { locked, reason: locked ? TARGET_SCORE_LOCKED_REASON : null };

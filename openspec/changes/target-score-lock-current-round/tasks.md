@@ -17,38 +17,70 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/target-score-lock-current-round`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/target-score-lock-current-round`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量，另記 `scoreboard-binding.spec.ts`＋`match-stage.spec.ts` 在五個 browser project 的數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `scoreboard-binding.ts`、`scoreboard-binding.test.ts`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）一致（`git diff --stat 38b6ae8 main -- <三檔>`）；
+  - 紀錄：分支正確、工作樹乾淨（分出點 `main` `46b68c1`）；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0。依 coordinator 裁定未重跑 `pnpm install`（lockfile 未變）、`db:migrate:local`、全套 `pnpm test`／`pnpm lint`／`playwright --list`，
+    基線數字採 coordinator 於前一個 change 合併前實跑的結果，已回填 environment.md。
+- [x] 1.2 對齊 main：確認 `scoreboard-binding.ts`、`scoreboard-binding.test.ts`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）一致（`git diff --stat 38b6ae8 main -- <三檔>`）；
   若 `scoreboard-binding.spec.ts` 已被並行 change 改動，確認 describe「/matchmaker 對戰頁的計分板接線」的 helper 與 `beforeEach` 未變；
   以 python difflib 比對本 change MODIFIED 的「開始計分後鎖定本輪目標分數」與目前主 spec，除本 change 刻意增修（第二條補述、「不屬於本輪場次的計分板槽」段落、五個新 Scenario）外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
+  - 紀錄：`git diff --stat 38b6ae8 main` 對 `scoreboard-binding.ts`、`scoreboard-binding.test.ts` 無差異；`scoreboard-binding.spec.ts` 由並行 change `scoreboard-bound-game-over` 在 describe「/matchmaker 對戰頁的計分板接線」中段新增兩條 test（+44 行），
+    helper 與 `beforeEach` 未變。`openspec/specs/round-lifecycle` 自 `38b6ae8` 起無改動；difflib 比對「開始計分後鎖定本輪目標分數」只見本 change 刻意增修（第二條補述、「不屬於本輪場次的計分板槽」段落、五個新 Scenario），delta 不需重套。
 
 ## 2. 鎖定判定只計入本輪場次的計分板槽
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`scoreboard-binding.test.ts` 新增四個 it——「前一輪殘留的計分板槽不鎖定新一輪的目標分數」、「本輪場次的槽仍為 setup 時非本輪的 finished 槽不使其鎖定」、
+- [x] 2.1 RED（TDD）：`scoreboard-binding.test.ts` 新增四個 it——「前一輪殘留的計分板槽不鎖定新一輪的目標分數」、「本輪場次的槽仍為 setup 時非本輪的 finished 槽不使其鎖定」、
   「本輪場次的槽已開始時仍鎖定且不受殘留槽影響」、「鎖定判定以槽集合的鍵比對本輪場次而非槽內容的 matchId」（輸入與斷言依 test-plan，沿用 `makeRound`／`makeMatch`／`makeSlot`）；
   同一 commit 依檔頭例外 ① 刪除既有 it。單檔 vitest 確認三個新 it 紅、「本輪場次的槽已開始時仍鎖定且不受殘留槽影響」綠（**regression guard，點名**）並貼出輸出
-- [ ] 2.2 RED（TDD，E2E）：`scoreboard-binding.spec.ts` 的 describe「/matchmaker 對戰頁的計分板接線」末尾新增 test「前一輪殘留的計分板進度不鎖定新一輪的目標分數與計時設定」
+  - 紀錄：RED commit `9bc491d`（`test:`）。單檔 vitest 3 failed | 31 passed (34)：紅＝「前一輪殘留的計分板槽不鎖定新一輪的目標分數」「本輪場次的槽仍為 setup 時非本輪的 finished 槽不使其鎖定」「鎖定判定以槽集合的鍵比對本輪場次而非槽內容的 matchId」；
+    **regression guard**＝「本輪場次的槽已開始時仍鎖定且不受殘留槽影響」（寫入即綠）。同一 commit 刪除授權的既有 it 與其上方四行註解。leader 機械複驗：`git diff 9bc491d^ 9bc491d -- scoreboard-binding.ts` 為空、`git show 9bc491d^:…test.ts` 不含四個新 it 名稱（計數 0）→ 真紅。
+- [x] 2.2 RED（TDD，E2E）：`scoreboard-binding.spec.ts` 的 describe「/matchmaker 對戰頁的計分板接線」末尾新增 test「前一輪殘留的計分板進度不鎖定新一輪的目標分數與計時設定」
   （步驟依 test-plan 與 design Decision 5：前置斷言第一輪已鎖定 → 直接點「產生本輪對戰」→ 以舊 grid 消失、網格數量 1 為同步點 → 兩個 radiogroup 全 enabled、兩段鎖定說明 `toHaveCount(0)`）。
   雙鎖下以單檔 E2E（chromium、`-g` 篩此 test）確認紅燈（預期在 `toBeEnabled` 失敗，而非前置斷言或同步點）並貼出輸出
-- [ ] 2.3 GREEN（TDD）：改 `isTargetScoreLocked` 第二條為「只計入鍵屬於 `round.matches` 某場 `id` 的槽且 `status !== "setup"`」，第一條與回傳形狀不變；JSDoc 改寫為本輪場次的槽並說明以鍵比對的理由（design Decision 1、2）。
+  - 紀錄：RED commit `c61e909`（`test:`）。取鎖 03:19:09、release 約 03:19:20（鎖時段內只跑此一條）；chromium `-g` 單檔 1 failed（6.5s），失敗於 `scoreboard-binding.spec.ts:875` 目標分數第一顆 radio 的 `toBeEnabled`（`unexpected value "disabled"`），
+    前置斷言與同步點皆通過 → 真紅（產品檔在 `c61e909` 前後相同）。紅燈於 GREEN 前實跑，未用 stash 或還原產品檔。
+- [x] 2.3 GREEN（TDD）：改 `isTargetScoreLocked` 第二條為「只計入鍵屬於 `round.matches` 某場 `id` 的槽且 `status !== "setup"`」，第一條與回傳形狀不變；JSDoc 改寫為本輪場次的槽並說明以鍵比對的理由（design Decision 1、2）。
   2.1 的 it、2.2 的 E2E 全綠；`scoreboard-binding.test.ts` 與 `components/matchmaker/RoundControls.test.tsx` 其餘既有 it 原樣綠；雙鎖下 chromium 的 `scoreboard-binding.spec.ts`、`match-stage.spec.ts` 全檔綠；
   `pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b）
-- [ ] 2.4 REFACTOR：過濾是否以具名變數表達、JSDoc 是否仍殘留「任一計分板槽」字樣、與 `collectFinishedSubmissions` 的比對寫法是否值得共用（兩個使用端、一個找場次一個只判存在，預期不抽）；無壞味道則註記 skipped
+  - 紀錄：GREEN commit `b689ec1`（`fix:`）：以 `currentMatchIds`（`Set`）過濾 `Object.entries(slots)`，第一條與回傳形狀不變，JSDoc 改寫。單檔 vitest：`scoreboard-binding.test.ts` 34 passed、`RoundControls.test.tsx` 23 passed；`pnpm -r exec tsc --noEmit` exit 0；改動三檔 ESLint exit 0。
+    Implementer mutation（單檔 vitest）：①移除過濾→三個真紅 it 轉紅；②改讀 `slot.matchId`→「鎖定判定以槽集合的鍵比對…」轉紅；③只比對第一場→「本輪場次的槽已開始時仍鎖定…」與「鎖定判定掃描全部場次與全部槽而非只看第一筆」轉紅；
+    ④過濾反向→「任一場次的計分板槽非 setup 時目標分數鎖定」等 5 個轉紅；⑤只認 `playing`→「鎖定判定掃描全部場次…」轉紅；⑥等價對照組 `round.matches.some` 取代 `Set.has`→全綠。存活變異：無。
+    **chromium 的 `scoreboard-binding.spec.ts`、`match-stage.spec.ts` 全檔綠燈：待 coordinator 於合併前執行**（鎖時段限制，coordinator 裁定由其合併前驗收一併跑）。
+- [x] 2.4 REFACTOR：過濾是否以具名變數表達、JSDoc 是否仍殘留「任一計分板槽」字樣、與 `collectFinishedSubmissions` 的比對寫法是否值得共用（兩個使用端、一個找場次一個只判存在，預期不抽）；無壞味道則註記 skipped
+  - Stage 1（sonnet）：PASS——五個 Scenario 名稱逐字相符、RED 機械複驗通過、GREEN 只動第二條與 JSDoc、以鍵比對、只刪授權的 it；鍵比對 it 未斷言 reason 與 test-plan 該列 Assertion 一致，不構成退件。
+  - Stage 2（opus）：PASS——獨立 mutation 8 條（b 清單 5 條＋自加「只比對最後一場」「`.some` 改 `.every`」皆轉紅；等價對照組 `round.matches.some` 34/34 綠），存活變異：無；每條還原後工作樹乾淨。JSDoc、命名、E2E 同步點與 locator（`-grid` testid 僅 `CourtCard` 一處）皆通過。non-blocking 兩點未採納：① `RoundControls.tsx:55` prop 註解「該輪各場次的計分板槽」為既有檔且在範圍外（tasks 檔頭禁改）；② 鍵比對 it 未斷言 `reason`——test-plan 該列 Assertion 只列 `locked`，偵測力不受影響，維持原樣。
+  - 紀錄：skipped——過濾已以具名變數 `currentMatchIds`／`anySlotStarted` 表達；JSDoc 已無「任一計分板槽」字樣；與 `collectFinishedSubmissions` 不抽共用（一個找場次、一個只判存在）。
 
 ## 3. 文件與指令驗收
 
 Depends on: §2
 
-- [ ] 3.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否有描述鎖定判定條件的段落；propose 時唯一提及處為雲端段「回填與鎖定判定以 `remoteMatchSlots` 為來源」，仍正確、**不改**。
+- [x] 3.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否有描述鎖定判定條件的段落；propose 時唯一提及處為雲端段「回填與鎖定判定以 `remoteMatchSlots` 為來源」，仍正確、**不改**。
   若 apply 時已有其他段落描述「任一計分板槽」之類的鎖定條件，則同步為「本輪場次的槽」並 commit（`docs:`）；否則在本 task 下記錄查核結果、不 commit
-- [ ] 3.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 3.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
-- [ ] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
-- [ ] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
-- [ ] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 3.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空
-- [ ] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過
+  - 紀錄：`grep -n '鎖定' nextjs-pickball/CLAUDE.md` 只有 :111 雲端段「回填與鎖定判定以 `remoteMatchSlots` 為來源」，仍正確；無描述「任一計分板槽」的段落，不改。
+- [x] 3.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄：GREEN 後 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck` 皆 exit 0。
+- [x] 3.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
+  - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，2026-11-06 03:39，HEAD `98fac73`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 3.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數不變、測試數＝基線＋3，後端與核心與基線相同
+  - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，03:39～03:40，雙鎖）：前端 109 檔／1091 tests（基線 1088＋3；基線 commit `46b68c1` 與其前一個 commit 只差 openspec 文件，測試數相同）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
+- [x] 3.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，03:48，雙鎖）：`pnpm build` exit 0；建置後 `git status --porcelain` 為空。
+- [x] 3.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
+  - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，03:40～03:47，雙鎖、`--workers=1`、每段前後清殘留）：② chromium 全套 150 passed（基線 149＋1，含 `scoreboard-binding.spec.ts` 23 條與新 test 的綠燈）；① `scoreboard-binding.spec.ts`＋`match-stage.spec.ts` 在 firefox／webkit／mobile-chrome／mobile-safari 各 45 passed；③ user-data `round-sync.spec.ts` 9 passed。全部 0 failed、0 skipped、0 flaky。2.3 註記的 chromium 兩檔綠燈由 ② 涵蓋。
+- [x] 3.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空
+  - 紀錄：GREEN 後實跑，輸出為空。
+- [x] 3.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過
+  - 紀錄：`Change 'target-score-lock-current-round' is valid`。
+
+## Final Code Review
+
+- 紀錄（opus）：PASS——`git diff main...HEAD` 僅 `scoreboard-binding.ts`／`.test.ts`／`.spec.ts` 與本 change 的 tasks.md、environment.md；主 spec 無改動；`scoreboard-binding.test.ts` it 數 31 → 34（+4−1）；`isTargetScoreLocked` 與 `collectFinishedSubmissions` 皆以槽集合的鍵判定是否屬於本輪；commit 無 attribution 行；`tsc` exit 0、工作樹乾淨。
+  C2～C5 與 2.3 的 chromium 兩檔 E2E 綠燈標「待 coordinator」，不判 FAIL。提醒：C3 的基線 1088 來自 `46b68c1` 的前一個 commit，比對 +3 前宜確認 `46b68c1` 本身的前端測試數。
