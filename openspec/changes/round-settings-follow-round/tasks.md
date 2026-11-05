@@ -61,23 +61,41 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`RoundControls.test.tsx` 新增 it「目標分數方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算」（輸入與斷言依 test-plan，比照既有 it「計時方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算」的寫法與註解精神）。單檔 vitest 確認紅燈（預期 `setTargetScore` 以 `15` 被呼叫）並貼出輸出
-- [ ] 3.2 GREEN（TDD）：`RoundControls.tsx` 的 `handleTargetScoreKeyDown` 起算值改為 `displayedTargetScore`；新 it 與 `RoundControls.test.tsx` 既有 it 全綠；`tsc` exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b 的 §3）
-- [ ] 3.3 REFACTOR：兩個方向鍵 handler 的起算註解是否一致（既有註解刻意不抽共用 helper，維持）；無壞味道則註記 skipped
+- [x] 3.1 RED（TDD）：`RoundControls.test.tsx` 新增 it「目標分數方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算」（輸入與斷言依 test-plan，比照既有 it「計時方向鍵以畫面選中值起算，而非以尚未同步的 settings 起算」的寫法與註解精神）。單檔 vitest 確認紅燈（預期 `setTargetScore` 以 `15` 被呼叫）並貼出輸出
+- [x] 3.2 GREEN（TDD）：`RoundControls.tsx` 的 `handleTargetScoreKeyDown` 起算值改為 `displayedTargetScore`；新 it 與 `RoundControls.test.tsx` 既有 it 全綠；`tsc` exit 0；改動檔 ESLint 0 errors；交件附 mutation 紀錄（execution-plan b 的 §3）
+- [x] 3.3 REFACTOR：兩個方向鍵 handler 的起算註解是否一致（既有註解刻意不抽共用 helper，維持）；無壞味道則註記 skipped
+
+  - 紀錄（§3，Implementer sonnet）：
+    - 3.1 RED `3bbf0b2`：`Tests 1 failed | 23 passed (24)`，失敗為 `setTargetScore` 預期以 `21` 呼叫、實際以 `15` 呼叫一次；前提斷言（15 為 `aria-checked="true"`）通過。真紅（leader 機械複驗：`git show 3bbf0b2^:…/RoundControls.test.tsx` 不含新 it 名稱；RED commit 只改測試檔）。
+    - 3.2 GREEN `ac6db09`：`handleTargetScoreKeyDown` 起算值改為 `displayedTargetScore`（一行）；`Tests 24 passed (24)`；`tsc` exit 0；兩檔 ESLint 0 errors。
+    - mutation（Implementer）：起算值改回 `settings.targetScore` → 新 it 轉紅；`round?.targetScore ?? settings.targetScore`（等價對照）→ 24 綠。
+    - Stage 1（sonnet）：PASS。
+    - Stage 2（opus）：PASS。獨立 mutation（verbose 逐條比對）：M1 改回 `settings.targetScore` → 只紅新 it（Received 15）；M2 等價對照 24 綠；額外 M3 focus 索引改 `currentIndex` → 只紅新 it（新 it 是目標分數 focus 的唯一防線）；M4 呼叫參數改 `currentIndex` → 紅新 it 與「目標分數未鎖定時方向鍵呼叫 onSettingsChange…」；M5 刪回合存在時委派分支 → 紅新 it 與「回合存在但尚未開始計分時…委派 setTargetScore」。
+      Minor ①：兩個方向鍵 handler 註解不對稱（目標分數 handler 缺起算來源說明）→ 屬 3.3 範圍，已處理（見下）。Minor ②：既有 it「計時方向鍵以畫面選中值起算…」上方註解「page.tsx 只在無回合時才寫回 settings」在 Decision 2 後已過時；本 change 無授權修改既有測試，保留不改，留待後續 change。
+    - 3.3 REFACTOR `a020a3b`：依 Stage 2 Minor ①，派全新 Implementer（sonnet）在 `handleTargetScoreKeyDown` 上方補三行起算來源註解（比照計時 handler，只增註解、不動程式碼；24 綠、tsc exit 0）。註解-only 變更未另跑 Stage 1／2，由 Final Code Review 一併涵蓋（leader 裁量）。
 
 ## 4. 文件與指令驗收
 
 Depends on: §3
 
-- [ ] 4.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否有描述本輪設定保存方式的段落（propose 時 :28 只列「本輪設定」為對戰頁內容，無保存方式描述）；有則同步為「由目前回合與本次變更解析、不持久化」並 commit（`docs:`），否則記錄查核結果、不 commit。
+- [x] 4.1 設定層（文件）：查核 `nextjs-pickball/CLAUDE.md` 是否有描述本輪設定保存方式的段落（propose 時 :28 只列「本輪設定」為對戰頁內容，無保存方式描述）；有則同步為「由目前回合與本次變更解析、不持久化」並 commit（`docs:`），否則記錄查核結果、不 commit。
   另在本 task 紀錄後續事項：「回合存在時無法改回不計時，且本 change 後計時會逐輪沿用」建議下一個 change 優先處理（design Risk 1）
-- [ ] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄（4.1）：查核 `nextjs-pickball/CLAUDE.md`，:28 只列「本輪設定」為對戰頁內容，無保存方式描述，不需同步，不 commit。
+    **後續事項**：回合存在時無法改回「不計時」（`RoundControls.tsx` 的 ⚠️ 暫行處置），且本 change 後計時會逐輪沿用——一旦某輪設了計時，之後每一輪都沿用，只有重置名單才能回到不計時；建議下一個 change 優先處理（design Risk 1；已有 proposal `round-timer-clear` 排在本 change 之後）。
+- [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄：leader 於 `a020a3b` 實跑 `pnpm --dir <repo> -r exec tsc --noEmit`、`pnpm --dir <repo>/hono-pickball typecheck`、`pnpm --dir <repo>/packages/pickball-core typecheck` 皆 exit 0。
 - [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm --dir <repo> lint` 0 errors、warning 不多於基線
+  - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
 - [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm --dir <repo> test` 全綠；前端檔數不變、測試數＝基線＋5，後端與核心與基線相同
+  - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
 - [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm --dir <repo> build` exit 0；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
 - [ ] 4.6 驗收（指令）C5：依 test-plan C5 的 ①②③ 分次執行（每次雙鎖、前後清殘留）；結果寫在本 task 後方；失敗不得自行判定為雜訊
-- [ ] 4.7 驗收（指令）C6：test-plan C6 兩條 `git diff` 輸出符合期望
-- [ ] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-settings-follow-round --strict` 通過
+  - 由 coordinator 於合併前執行（今晚特別安排第 4 點）。
+- [x] 4.7 驗收（指令）C6：test-plan C6 兩條 `git diff` 輸出符合期望
+  - 紀錄：前者輸出為空；後者恰為 `app/matchmaker/page.tsx`、`components/matchmaker/RoundControls.test.tsx`、`components/matchmaker/RoundControls.tsx`、`lib/matchmaker/round-settings.test.ts`、`lib/matchmaker/round-settings.ts`。
+- [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate round-settings-follow-round --strict` 通過
+  - 紀錄：`Change 'round-settings-follow-round' is valid`。
 
 ## Final Code Review
 
