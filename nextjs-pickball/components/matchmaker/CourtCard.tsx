@@ -312,6 +312,7 @@ export function CourtCard({
 							disabled={completed}
 							onSubmitScore={handleScoreSubmit}
 							submitError={submitError}
+							groupLabel={`第 ${match.courtNumber} 場地比分`}
 						/>
 					</div>
 					{isDoubles && <div style={{ gridColumn: "1 / 3", gridRow: 5 }}>{renderTeamLabel("b")}</div>}

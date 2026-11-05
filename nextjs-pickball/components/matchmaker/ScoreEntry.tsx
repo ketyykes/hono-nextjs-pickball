@@ -2,6 +2,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,10 @@ export interface ScoreEntryProps {
 	disabled: boolean;
 	onSubmitScore: (rawScoreA: string, rawScoreB: string) => void;
 	submitError: string | null;
+	// 兩個比分欄位與送出按鈕所屬群組的可存取名稱（例如「第 2 場地比分」）。同頁有多個場地時，
+	// 欄位名稱都是「第一隊比分」，靠群組名稱才分得出是哪一個場地；場地字樣由呼叫端組字，
+	// 本元件不需要知道「場地」概念。
+	groupLabel: string;
 }
 
 // 手機觸控目標（≥44px）由 components/matchmaker/MatchStage.tsx 以 max-md 的 Tailwind
@@ -21,6 +26,11 @@ export interface ScoreEntryProps {
 // 手動輸入比分是 prd.md 6.3 明訂不得移除的 fallback，MUST 能獨立完成一場。比分驗證規則
 // （空白、非數字、平局、已完成）歸屬回合 capability 的送出 pipeline，本元件 SHALL NOT
 // 複製一份——只負責把欄位原樣往上傳並把 submitError 原樣顯示出來。
+//
+// 以 <form onSubmit> 包住欄位，讓任一比分欄位按 Enter 與點擊送出按鈕走同一條路徑。
+// 群組（role="group"）刻意另包一層 div 而不放在 <form> 上：HTML-ARIA 不允許 form 元素
+// 改 role 為 group，而具名 form 會成為 form landmark，每個場地一個會讓 landmark 清單過於雜亂。
+// disabled 的欄位與按鈕不會觸發隱式送出，故 handler 不需再判斷 disabled。
 //
 // 送出時 SHALL NOT 先 Number() 轉換：lib/matchmaker/round.ts 的 validateScoreInput 靠
 // 「原始字串」才分得出空白（EMPTY_FIELD）與非數字（INVALID_NUMBER）兩種不同的拒絕原因——
@@ -32,19 +42,21 @@ export function ScoreEntry({
 	disabled,
 	onSubmitScore,
 	submitError,
+	groupLabel,
 }: ScoreEntryProps) {
 	const teamAId = useId();
 	const teamBId = useId();
 	const [teamAValue, setTeamAValue] = useState("");
 	const [teamBValue, setTeamBValue] = useState("");
 
-	function handleSubmit() {
+	function handleSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
 		onSubmitScore(teamAValue, teamBValue);
 	}
 
 	return (
-		<div className="flex flex-col gap-2">
-			<div className="flex items-end gap-2">
+		<form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+			<div role="group" aria-label={groupLabel} className="flex items-end gap-2">
 				<div className="flex flex-col gap-1">
 					<Label htmlFor={teamAId}>{teamALabel}比分</Label>
 					<Input
@@ -69,7 +81,7 @@ export function ScoreEntry({
 						className="w-16 text-center"
 					/>
 				</div>
-				<Button type="button" size="sm" disabled={disabled} onClick={handleSubmit}>
+				<Button type="submit" size="sm" disabled={disabled}>
 					送出比分
 				</Button>
 			</div>
@@ -78,6 +90,6 @@ export function ScoreEntry({
 					{submitError}
 				</p>
 			)}
-		</div>
+		</form>
 	);
 }
