@@ -17,12 +17,16 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/target-score-lock-current-round`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/target-score-lock-current-round`、工作樹乾淨；`pnpm install` 後 lockfile 零變動；`db:migrate:local` 成功；
   雙鎖下跑 `pnpm test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm lint`（errors／warnings 數）、`pnpm --filter ./nextjs-pickball exec playwright test --list`（六個 project 各自數量，另記 `scoreboard-binding.spec.ts`＋`match-stage.spec.ts` 在五個 browser project 的數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 `scoreboard-binding.ts`、`scoreboard-binding.test.ts`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）一致（`git diff --stat 38b6ae8 main -- <三檔>`）；
+  - 紀錄：分支正確、工作樹乾淨（分出點 `main` `46b68c1`）；`pnpm --dir <repo> -r exec tsc --noEmit` exit 0。依 coordinator 裁定未重跑 `pnpm install`（lockfile 未變）、`db:migrate:local`、全套 `pnpm test`／`pnpm lint`／`playwright --list`，
+    基線數字採 coordinator 於前一個 change 合併前實跑的結果，已回填 environment.md。
+- [x] 1.2 對齊 main：確認 `scoreboard-binding.ts`、`scoreboard-binding.test.ts`、`scoreboard-binding.spec.ts` 與 propose 時（`main` `38b6ae8`）一致（`git diff --stat 38b6ae8 main -- <三檔>`）；
   若 `scoreboard-binding.spec.ts` 已被並行 change 改動，確認 describe「/matchmaker 對戰頁的計分板接線」的 helper 與 `beforeEach` 未變；
   以 python difflib 比對本 change MODIFIED 的「開始計分後鎖定本輪目標分數」與目前主 spec，除本 change 刻意增修（第二條補述、「不屬於本輪場次的計分板槽」段落、五個新 Scenario）外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate target-score-lock-current-round --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
+  - 紀錄：`git diff --stat 38b6ae8 main` 對 `scoreboard-binding.ts`、`scoreboard-binding.test.ts` 無差異；`scoreboard-binding.spec.ts` 由並行 change `scoreboard-bound-game-over` 在 describe「/matchmaker 對戰頁的計分板接線」中段新增兩條 test（+44 行），
+    helper 與 `beforeEach` 未變。`openspec/specs/round-lifecycle` 自 `38b6ae8` 起無改動；difflib 比對「開始計分後鎖定本輪目標分數」只見本 change 刻意增修（第二條補述、「不屬於本輪場次的計分板槽」段落、五個新 Scenario），delta 不需重套。
 
 ## 2. 鎖定判定只計入本輪場次的計分板槽
 
