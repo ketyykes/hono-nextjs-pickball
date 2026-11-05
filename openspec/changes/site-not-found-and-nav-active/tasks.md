@@ -84,16 +84,20 @@ Depends on: §3
   - 紀錄：commit `3ef33b0`（leader 執行；為趕時程排在 §2／§3 實作之前提交，內容描述的行為與其後 GREEN 一致）。
 - [x] 4.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：`pnpm -r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck` 皆 exit 0（leader 於 GREEN 後實跑）。
-- [ ] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
+- [x] 4.3 驗收（指令）C2：雙鎖下 `pnpm lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行。
-- [ ] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數＝基線＋2、測試數＝基線＋12，後端與核心與基線相同
+  - 紀錄（coordinator，2026-11-06 04:11，HEAD `0ed929a`，雙鎖）：`pnpm lint` exit 0，0 errors／3 warnings（＝基線）。
+- [x] 4.4 驗收（指令）C3：雙鎖下 `pnpm test` 全綠；前端檔數＝基線＋2、測試數＝基線＋12，後端與核心與基線相同
   - 由 coordinator 於合併前執行。
-- [ ] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0，前端建置輸出的 route 清單含 `/_not-found`；建置後 `git status --porcelain` 為空。
+  - 紀錄（coordinator，04:12，雙鎖）：前端 111 檔／1103 tests（基線 109／1091，＋2 檔＋12）、核心 10 檔／27、後端 26 檔／215，全綠；三段 typecheck 皆 exit 0。
+- [x] 4.5 驗收（指令）C4：雙鎖下 `pnpm build` exit 0，前端建置輸出的 route 清單含 `/_not-found`；建置後 `git status --porcelain` 為空。
   （OpenNext／workerd 下的 404 狀態碼不在本機驗收範圍，design Risk 2；記為部署後人工確認項：正式站開一個不存在的路徑，確認 404 與中文標題）
   - 由 coordinator 於合併前執行。
-- [ ] 4.6 驗收（指令）C5：依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
+  - 紀錄（coordinator，04:29，雙鎖）：`pnpm build` exit 0，前端 route 清單含 `○ /_not-found`；建置後 `git status --porcelain` 只有未追蹤的 `openspec/changes/round-settings-follow-round/`（另一份同時撰寫中的 proposal，非建置產物）。
+- [x] 4.6 驗收（指令）C5：依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   五個 browser project 各＝基線＋3 且 0 failed（skip 只限既有瀏覽器條件）；user-data 與基線相同、0 failed、0 skipped。結果寫在本 task 後方；失敗不得自行判定為雜訊
   - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，04:12～04:28，雙鎖、`--workers=1`、每段前後清殘留）：chromium 153 passed；firefox 141 passed＋12 skipped；mobile-chrome 151 passed＋2 skipped；webkit 三個 shard 47＋43＋51＝141 passed、4＋8＋0＝12 skipped；mobile-safari 三個 shard 47＋43＋51＝141 passed、12 skipped；user-data 47 passed。五個 browser project 各 153（基線 150＋3），skip 數與基線相同（既有瀏覽器條件）；全部 0 failed、0 flaky。2.5、3.3 註記的 E2E 綠燈由此涵蓋。
 - [x] 4.7 驗收（指令）C6：test-plan C6 的 `git diff main --stat -- …` 輸出為空
   - 紀錄：輸出為空（leader 實跑）。
 - [x] 4.8 驗收（指令）C7：`DO_NOT_TRACK=1 openspec validate site-not-found-and-nav-active --strict` 通過
