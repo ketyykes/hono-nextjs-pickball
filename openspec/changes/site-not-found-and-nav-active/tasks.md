@@ -43,7 +43,8 @@ Depends on: §1
   2.1 五個 it 全綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors。commit（`feat:`）
 - [ ] 2.3 RED（TDD）：`nextjs-pickball/components/layout/SiteNavbar.test.tsx` 新增兩個 it——「路由為 %s 時對戰分配連結帶 aria-current 並套用 active 樣式」（`it.each` 四個 matchmaker 子頁）、「完全相等時只有 active 連結帶 aria-current=page」（斷言依 test-plan 與檔頭共同要求）；
   同一 commit 依檔頭授權 ① 修改既有 it「路由非 /matchmaker 時對戰分配連結不套用 active 樣式」。單檔 vitest 確認新 it 全紅（`it.each` 四列＋一個）並貼出輸出；被修改的既有 it 在現行程式碼下為綠，屬 regression guard（點名）。commit（`test:`）
-- [ ] 2.4 RED（TDD，E2E）：新增 `nextjs-pickball/tests/e2e/specs/navbar-active.spec.ts`，test「參賽者頁的 navbar 對戰分配連結帶 aria-current」（banner 範圍、`exact: true`；並驗區段導覽「參賽者」仍為 `aria-current="page"`、「對戰」不帶）。雙鎖下以單檔 E2E（chromium）確認紅燈並貼出輸出。commit（`test:`）
+- [x] 2.4 RED（TDD，E2E）：新增 `nextjs-pickball/tests/e2e/specs/navbar-active.spec.ts`，test「參賽者頁的 navbar 對戰分配連結帶 aria-current」（banner 範圍、`exact: true`；並驗區段導覽「參賽者」仍為 `aria-current="page"`、「對戰」不帶）。雙鎖下以單檔 E2E（chromium）確認紅燈並貼出輸出。commit（`test:`）
+  - 紀錄：commit `e050005`（依 coordinator 裁定提前於單元層之前執行，與 3.2 同一次取鎖、同一指令跑兩檔，chromium `--workers=1`，鎖 03:51:43～03:52:34，前後無殘留 dev server）。結果 `3 failed`：本 test 紅在 banner「對戰分配」`toHaveAttribute("aria-current","page")`（`unexpected value "null"`），locator 單一命中、無多重命中。真紅；leader 以 `git show e050005^:<path>` 複驗 RED 前檔案不存在。
 - [ ] 2.5 GREEN（TDD）：`SiteNavbar.tsx` 的 active 判定改為 `isNavLinkActive(link.href, pathname)`，導航連結加 `aria-current={active ? "page" : undefined}`（design Decision 2、3）；`NAV_LINKS`、class 組成、logo 連結不變。
   2.1、2.3 全綠、`SiteNavbar.test.tsx` 其餘既有 it 原樣綠；雙鎖下 `navbar-active.spec.ts` 與 `match-stage.spec.ts`（chromium）全綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors。commit（`feat:`）
 - [ ] 2.6 REFACTOR：檢查判定式是否清楚（具名變數、無巢狀三元）、檔頭註解是否只寫理由；無壞味道則註記 skipped
@@ -54,8 +55,9 @@ Depends on: §2
 
 - [ ] 3.1 RED（TDD；入口層例外，仍以單元測試先行，design Decision 6）：新增 `nextjs-pickball/app/not-found.test.tsx`，寫入兩個 it——「404 頁匯出中文 metadata 標題」「404 頁顯示中文標題、說明與回首頁、前往對戰分配兩個連結」（斷言依 test-plan）。
   單檔 vitest 確認紅燈（預期為 `./not-found` 無法解析）並貼出輸出。commit（`test:`）
-- [ ] 3.2 RED（TDD，E2E）：新增 `nextjs-pickball/tests/e2e/specs/site-not-found.spec.ts`，兩個 test——「造訪不存在的路徑回應 404 並顯示中文說明與導回連結」「404 頁點擊回首頁後導回首頁」（`main`／`banner` 範圍；不使用 `trackConsoleIssues`，理由寫在檔頭註解）。
+- [x] 3.2 RED（TDD，E2E）：新增 `nextjs-pickball/tests/e2e/specs/site-not-found.spec.ts`，兩個 test——「造訪不存在的路徑回應 404 並顯示中文說明與導回連結」「404 頁點擊回首頁後導回首頁」（`main`／`banner` 範圍；不使用 `trackConsoleIssues`，理由寫在檔頭註解）。
   雙鎖下以單檔 E2E（chromium）確認兩條皆紅並貼出輸出（預期「回應 404」斷言本身已成立，紅燈落在 title／heading／連結）。commit（`test:`）
+  - 紀錄：commit `a5e9865`（與 2.4 同一次執行）。「造訪不存在的路徑…」：`status() === 404` 已成立，紅在 `toHaveTitle`（Received 為首頁預設 title「匹克球新手完全入門：規則與球拍選購一次搞懂」，畫面為英文「404: This page could not be found.」）；「404 頁點擊回首頁…」：紅在 main 內「回首頁」連結找不到（click 逾時 30s）。兩條皆真紅；`git show a5e9865^:<path>` 複驗 RED 前檔案不存在。
 - [ ] 3.3 GREEN（TDD）：新增 `nextjs-pickball/app/not-found.tsx`（Server Component，不標 `"use client"`）：`metadata.title`「找不到頁面 | 匹克球指南」、`<main>` 以 `pt-(--site-nav-h)` 避開 navbar、`404` 小標、`h1`「找不到這個頁面」、說明段落、`Button asChild` 包 `Link` 的「回首頁」（`/`，`transitionTypes={["nav-back"]}`）與「前往對戰分配」（`/matchmaker`，`variant="outline"`、`transitionTypes={["nav-forward"]}`）（design Decision 5）。
   3.1 兩個 it 全綠；`app/emojiFree.test.ts` 綠（regression guard）；雙鎖下 `site-not-found.spec.ts`（chromium）全綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors。commit（`feat:`）
 - [ ] 3.4 REFACTOR：檢查文案是否集中、版面 token 是否與 `app/quiz/page.tsx` 一致、註解是否只寫理由；無壞味道則註記 skipped
