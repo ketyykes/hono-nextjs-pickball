@@ -845,4 +845,41 @@ test.describe("/matchmaker 對戰頁的計分板接線", () => {
 		expect(badgeRowText).toContain("我方");
 		expect(badgeRowText).toContain("分制");
 	});
+
+	// 使用者回報的真實路徑：上一輪打到一半（槽非 setup）就直接產生下一輪，舊槽殘留在
+	// LocalStorage，但不屬於新一輪任何場次，不得鎖死新一輪的設定。
+	test("前一輪殘留的計分板進度不鎖定新一輪的目標分數與計時設定", async ({ page }) => {
+		await seedRoster(page, 4);
+		await generateRound(page, 1);
+		const oldMatchId = await courtMatchId(page, 0);
+		const court = page.getByTestId(`court-${oldMatchId}`);
+
+		await court.getByRole("link", { name: "進入計分板" }).click();
+		await page.getByRole("button", { name: /我方贏這一球/ }).click();
+		await page.getByRole("link", { name: "返回對戰" }).click();
+		await expect(page).toHaveURL(/\/matchmaker$/);
+
+		// 前置條件：第一輪確實已鎖定，證明殘留槽非 setup。
+		await expect(page.getByText("本輪已開始計分，目標分數不可更改。")).toBeVisible();
+
+		// 不送出比分，直接產生下一輪；舊 grid 消失且網格數量為 1 才是新一輪就緒。
+		await page.getByRole("button", { name: "產生本輪對戰" }).click();
+		await expect(page.getByTestId(`court-${oldMatchId}-grid`)).toHaveCount(0);
+		await expect(
+			page.getByTestId("match-stage-courts").locator('[data-testid$="-grid"]'),
+		).toHaveCount(1);
+
+		const targetRadios = page.getByRole("radiogroup", { name: "目標分數" }).getByRole("radio");
+		await expect(targetRadios).toHaveCount(3);
+		for (const radio of await targetRadios.all()) {
+			await expect(radio).toBeEnabled();
+		}
+		const timerRadios = page.getByRole("radiogroup", { name: "計時" }).getByRole("radio");
+		await expect(timerRadios).toHaveCount(4);
+		for (const radio of await timerRadios.all()) {
+			await expect(radio).toBeEnabled();
+		}
+		await expect(page.getByText("本輪已開始計分，目標分數不可更改。")).toHaveCount(0);
+		await expect(page.getByText("本輪已開始計分，計時設定不可更改。")).toHaveCount(0);
+	});
 });
