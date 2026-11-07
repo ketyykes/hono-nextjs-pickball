@@ -946,6 +946,16 @@
 **全新**的 `timer` 物件（`startedAt` 重置為 `null`）——變更長度代表使用者想要一段新的倒數，
 沿用舊的 `startedAt` 會讓剩餘時間依新長度立即重新計算，等同於在使用者不知情的情況下悄悄跳秒。
 
+回合存在時把計時改回不計時（以下稱「取消計時」）MUST 同樣委派 `setTimerDuration`，以
+`durationMinutes` 為 `null` 呼叫，SHALL NOT 另立第二個入口（例如 `clearTimer`）而複製一份鎖定判定。
+成功時本輪 `timer` MUST 變為 `null`——整個 `timer` 清除，不保留 `durationMinutes` 或 `startedAt`；
+鎖定條件與變更計時長度**完全相同**（該輪所有場次仍為 `pending` 時才允許），被拒絕時 MUST 回傳
+可判讀的失敗結果且原回合 SHALL NOT 被修改。倒數已開始（`startedAt !== null`）時取消計時 MUST
+仍被允許——開始計時與比分無關，主持人可能按錯；取消後倒數顯示、「開始計時」操作與時間到提示
+MUST 隨 `timer` 為 `null` 一併消失，SHALL NOT 另行保留任何計時狀態。對戰頁在回合存在且未鎖定時，
+計時控制項的「不計時」選項（點擊或方向鍵）MUST 委派取消計時；鎖定時維持 `disabled` 並顯示既有的
+鎖定說明。訪客模式與雲端回合 MUST 經同一個純函式，雲端回合以 `timer: null` 寫入回合。
+
 「開始計時」操作 MUST 委派純函式 `startTimer(round, now)`：本輪已設定計時長度
 （`timer !== null`）且尚未開始（`timer.startedAt === null`）時，寫入 `startedAt` 為呼叫當下
 時間；本輪尚未設定計時長度、或已經開始計時，MUST 拒絕並回傳可判讀的失敗結果，SHALL NOT
@@ -1056,6 +1066,53 @@
 - **WHEN** 以相同的 `timerDurationMinutes: 10` 產生新一輪
 - **THEN** 新回合的 `timer` 為 `{ durationMinutes: 10, startedAt: null }`
 - **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「產生新一輪時即使沿用相同計時長度，timer 仍重新起算且 startedAt 為 null」
+
+#### Scenario: 回合存在時可把計時改回不計時
+
+- **WHEN** 本輪所有場次皆為 `pending`，`timer` 為 `{ durationMinutes: 10, startedAt: null }` 或已開始倒數，呼叫 `setTimerDuration(round, null)`
+- **THEN** 回傳成功，新回合的 `timer` 為 `null`
+- **AND** 原回合物件未被修改
+- **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「setTimerDuration 傳入 null 時把本輪改回不計時，計時已開始亦同」
+
+#### Scenario: 已開始計分後拒絕取消計時
+
+- **WHEN** 本輪任一場次已離開 `pending`，呼叫 `setTimerDuration(round, null)`
+- **THEN** 回傳失敗結果，`code` 為 `scoring-started`
+- **AND** 原回合與其 `timer` 未被修改
+- **驗收**：`nextjs-pickball/lib/matchmaker/round.test.ts`，it 名稱「已有場次離開 pending 時 setTimerDuration 傳入 null 亦拒絕且不改動回合」
+
+#### Scenario: 訪客模式取消計時寫回儲存
+
+- **WHEN** 訪客模式下回合存在且帶計時，經 `useRoundStore` 呼叫 `setTimerDuration(null)`
+- **THEN** store 回傳的 `round.timer` 為 `null`，且寫回 LocalStorage 的回合 `timer` 為 `null`
+- **驗收**：`nextjs-pickball/hooks/useRoundStore.test.tsx`，it 名稱「訪客模式 setTimerDuration(null) 取消本輪計時並寫回儲存」
+
+#### Scenario: 雲端回合取消計時以 timer 為 null 寫入
+
+- **WHEN** 登入模式下雲端回合存在且帶計時，經 `useRemoteRoundStore` 呼叫 `setTimerDuration(null)`
+- **THEN** 送往 `PUT /api/matchmaker/round` 的回合 `timer` 為 `null`
+- **AND** store 回傳的 `round.timer` 為 `null`
+- **驗收**：`nextjs-pickball/hooks/useRemoteRoundStore.test.tsx`，it 名稱「雲端回合 setTimerDuration(null) 以 timer 為 null 寫入回合」
+
+#### Scenario: 對戰頁回合存在時點選不計時委派取消計時
+
+- **WHEN** 回合存在、未鎖定且帶計時，使用者點擊計時控制項的「不計時」，或以方向鍵移到「不計時」
+- **THEN** 注入的 `setTimerDuration` 以 `null` 被呼叫一次
+- **AND** `onSettingsChange` 未被呼叫
+- **驗收**：`nextjs-pickball/components/matchmaker/RoundControls.test.tsx`，it 名稱「回合存在且未鎖定時點選不計時委派 setTimerDuration(null)」與「回合存在且未鎖定時方向鍵移到不計時亦委派 setTimerDuration(null)」
+
+#### Scenario: E2E 取消已開始的本輪計時
+
+- **WHEN** 訪客以 10 分鐘計時產生本輪並按下「開始計時」，再點選「不計時」
+- **THEN** 「不計時」為選中，倒數顯示與「開始計時」按鈕皆不存在
+- **AND** 重新載入對戰頁後仍為不計時
+- **驗收**：`nextjs-pickball/tests/e2e/specs/round-timer.spec.ts`，test 名稱「回合存在時選不計時可取消已開始的本輪計時」
+
+#### Scenario: E2E 取消計時後產生下一輪仍為不計時
+
+- **WHEN** 訪客以 10 分鐘計時產生本輪、點選「不計時」，再按「產生本輪對戰」
+- **THEN** 新一輪的計時控制項選中「不計時」，且不顯示「開始計時」按鈕
+- **驗收**：`nextjs-pickball/tests/e2e/specs/round-timer.spec.ts`，test 名稱「取消本輪計時後產生下一輪仍為不計時」
 
 ### Requirement: 回合與送出比分的雲端 API
 
