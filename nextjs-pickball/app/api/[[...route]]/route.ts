@@ -15,6 +15,10 @@ const proxyToHono = async (request: Request): Promise<Response> => {
     method: request.method,
     headers: request.headers,
     body: hasBody ? request.body : undefined,
+    // binding 的 fetch(url, init) 會建立新 Request，redirect 預設為 follow，
+    // 後端的 3xx 會在這裡被吞掉，瀏覽器收不到 OAuth callback 回應上的 Set-Cookie；
+    // 改為 manual，讓轉址與 cookie 原樣交給瀏覽器處理。
+    redirect: "manual",
     // 串流 request body 時 undici/workerd 要求 duplex: "half"
     ...(hasBody ? { duplex: "half" } : {}),
   });
