@@ -29,7 +29,7 @@ function load(): Promise<void> {
 	return fetchSession().then((state) => {
 		// 已有更新的請求，丟棄這份過時的回應（可能亂序到達）
 		if (id !== requestId) return;
-		snapshot = { status: "ready", authEnabled: state.authEnabled, user: state.user };
+		snapshot = { status: "ready", ...state };
 		notify();
 	});
 }
