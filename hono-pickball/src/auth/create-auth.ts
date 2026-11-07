@@ -9,7 +9,8 @@ import { isLocalAuthEnabled } from "./local-auth";
  * 但遠端實況可能缺值，因此收窄成允許 undefined 並於讀取時以值檢查。
  * GOOGLE_CLIENT_ID／GOOGLE_CLIENT_SECRET 不在範例檔內，需自行宣告。
  */
-export type AuthEnv = Pick<CloudflareBindings, "DB"> & {
+export type AuthEnv = {
+	DB?: D1Database;
 	ENVIRONMENT: string | undefined;
 	BETTER_AUTH_SECRET: string | undefined;
 	BETTER_AUTH_URL: string | undefined;

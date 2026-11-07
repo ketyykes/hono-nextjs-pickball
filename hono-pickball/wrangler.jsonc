@@ -9,9 +9,16 @@
   "observability": {
     "enabled": true
   },
-  // D1 只宣告在 env.local：Workers Builds 執行不帶 --env 的 wrangler deploy，只讀 top-level，
-  // 因此誤 push 不會在遠端建立或綁定任何 D1。正式環境的 D1 於 G1 才建立並宣告，
-  // 屆時禁止填 placeholder UUID（會讓遠端部署直接失敗）。
+  // 正式 D1 宣告於 top-level（Workers Builds 執行不帶 --env 的 wrangler deploy，只讀 top-level）；
+  // database_id 不是機密。bindings 不會繼承到具名環境，因此 env.local 另有自己的本機 D1。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hono-pickball",
+      "database_id": "9c3a73c2-9a06-4e92-bb6d-90f9cbfda513",
+      "migrations_dir": "drizzle"
+    }
+  ],
   "env": {
     "local": {
       // 具名環境預設會把 worker 命名為 hono-pickball-local，
