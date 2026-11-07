@@ -17,7 +17,7 @@
 
 - `pnpm dev` — `wrangler dev --env local`（http://localhost:8787）；走 `--env local` 才有本機 D1 binding（`DB`）
 - `pnpm db:generate` — `drizzle-kit generate`，由 `src/db/schema.ts` 產生 `drizzle/` 下的 migration；commit 前執行必須不產生新檔案（schema 與 migration 不得漂移）
-- `pnpm db:migrate:local` — `wrangler d1 migrations apply DB --local --env local`；首次 clone 或 `drizzle/` 變更後執行一次。**任何指令都不得帶 `--remote`**，遠端 D1 的建立與 migration 留待上線（改用 Google 登入）時處理
+- `pnpm db:migrate:local` — `wrangler d1 migrations apply DB --local --env local`；首次 clone 或 `drizzle/` 變更後執行一次。**任何 script 與 agent 執行的指令都不得帶 `--remote`**；正式 D1 的 migration（`wrangler d1 migrations apply DB --remote`，不帶 `--env`）只由使用者依 root `README.md`「正式站上線步驟」手動執行
 - `pnpm db:seed:local` — `node scripts/seed-test-account.ts`（Node 22 內建 type stripping，不需 `tsx`）；把 `.dev.vars` 的 `TEST_ACCOUNT_*` 寫入本機 D1。只讀 `.dev.vars`（以 `parseEnv` 解析，shell 已 export 的同名變數不影響）、只寫本機 D1（`--local --env local`），**不得帶 `--remote`**；重複執行會先刪除同 email 的 user（cascade 刪其 session）再重建。會建立**兩個帳號**：`TEST_ACCOUNT_EMAIL` 與由 `deriveSwitchAccountEmail()` 衍生的換帳號測試用第二帳號（plus addressing、同密碼）。可在 `wrangler dev` 執行中跑，結果立即可見
 - `pnpm test` — Vitest（在真正的 workerd runtime 中執行）；單檔用 `pnpm --filter ./hono-pickball test --run test/<檔>.test.ts`（**`--run` 前不可加 `--`**）
 - `pnpm typecheck` — `tsc --noEmit` + `tsc --noEmit -p test/tsconfig.json`（**兩段都要**：workspace tsconfig 的 include 不含 test/，root 的 `pnpm typecheck` 與 Stop hook 也都查不到 test/ 的型別）
@@ -29,20 +29,24 @@
 
 首次 clone 或換機器後，依序：
 
-1. `cp .dev.vars.example .dev.vars`，補齊 `ENVIRONMENT`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`（`http://localhost:3005`）、`TEST_ACCOUNT_EMAIL`、`TEST_ACCOUNT_PASSWORD`、`TEST_ACCOUNT_NAME`；`.dev.vars.example` 只放示意值，**真實帳密與 secret 不得寫入任何會 commit 的檔案**
+1. `cp .dev.vars.example .dev.vars`，補齊 `ENVIRONMENT`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`（`http://localhost:3005`）、`TEST_ACCOUNT_EMAIL`、`TEST_ACCOUNT_PASSWORD`、`TEST_ACCOUNT_NAME`；`.dev.vars.example` 只放示意值，**真實帳密與 secret 不得寫入任何會 commit 的檔案**。`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 為選填，範例檔刻意留空：兩者皆有值才啟用 Google 登入，本機預設留空即只有測試帳號登入，不會出現指向無效 client 的 Google 按鈕
 2. `pnpm db:migrate:local`
 3. `pnpm db:seed:local`
 
-`ENVIRONMENT` 不是 `"development"` 時 auth 整組停用（見「路由約定」），所以缺 `.dev.vars` 的環境無法登入是預期行為。
+`ENVIRONMENT` 不是 `"development"` 且 Google 設定不齊全時 auth 整組停用（見「路由約定」），所以缺 `.dev.vars` 的環境無法登入是預期行為。
 
 ## wrangler.jsonc 要點
 
 - `name: "hono-pickball"` **必須與 CF Dashboard 的 Worker 名稱一致**，否則 Workers Builds 會失敗
 - `compatibility_flags: ["nodejs_compat"]` 已開啟（better-auth / drizzle 依賴 node:crypto 等模組）
-- D1 只在 `env.local`（binding `DB`、`database_name: "hono-pickball-local"`、`migrations_dir: "drizzle"`，刻意不填 `database_id`）；**top-level 不得宣告 `d1_databases`**，正式 D1 於上線（改用 Google 登入）時以 `wrangler d1 create` 產生的真實 UUID 宣告。placeholder UUID 會讓遠端部署失敗，top-level 省略 `database_id` 則可能在誤 push 時遠端自動建立 D1
+- **正式 D1 宣告於 top-level**（`d1_databases` 恰一筆：binding `DB`、`database_name: "hono-pickball"`、真實 `database_id`、`migrations_dir: "drizzle"`）。Workers Builds 執行不帶 `--env` 的 `wrangler deploy`，只讀 top-level；`database_id` 不是機密，可進版控
+- **本機 D1 維持在 `env.local`**（binding `DB`、`database_name: "hono-pickball-local"`、`migrations_dir: "drizzle"`，刻意不填 `database_id`，也不得填看似真實的 UUID）。wrangler 的 bindings（`d1_databases`、`services`、`vars`）不會從 top-level 繼承到具名環境，所以 `env.local` 必須自己宣告；`wrangler dev --env local` 與 vitest（`environment: "local"`）因此仍只用本機 D1，不碰正式 D1
+- **`DB` 型別為必填**：top-level 宣告後 `wrangler types` 產出必填的 `DB: D1Database`（`GOOGLE_CLIENT_ID`／`GOOGLE_CLIENT_SECRET` 也因出現在範例檔而被產為必填 `string`）。但遠端 binding 可能遺失、測試也會注入 `DB: undefined`，所以讀取端（`getDb` 的參數、`createAuth` 的 `AuthEnv`）刻意收窄為允許 `undefined`／可選並以值檢查；**不得用 `!` 繞過**，一律經 `getDb(env)`
 - `env.local` 必須明確 `"name": "hono-pickball"`，否則 dev registry 名稱變 `hono-pickball-local`，前端 service binding 找不到
-- ⚠️ CF Dashboard 的 Workers Builds **不得設定 `CLOUDFLARE_ENV` 環境變數，deploy command 也不得帶 `--env`**；否則部署會改讀沒有 `database_id` 的 `env.local`。此風險 repo 內無法防範
-- `ENVIRONMENT` 只放 `.dev.vars`（範例見 `.dev.vars.example`，值 `development`），`wrangler.jsonc` 的 top-level 與 `env.local` 皆不設 `vars`；遠端沒有 `.dev.vars`，缺值即代表非開發環境。其型別為必填 `string` 但遠端實際為 `undefined`，讀取時只用 `env.ENVIRONMENT === "development"` 這種等值比較
+- ⚠️ CF Dashboard 的 Workers Builds **不得設定 `CLOUDFLARE_ENV` 環境變數，deploy command 也不得帶 `--env`**；否則部署會改讀沒有 `database_id` 的 `env.local`，wrangler 的自動 provisioning 可能在遠端建立新的 D1。此風險 repo 內無法防範，由使用者依 root `README.md`「正式站上線步驟」在 Dashboard 人工確認
+- `ENVIRONMENT` 只放 `.dev.vars`（範例見 `.dev.vars.example`，值 `development`），`wrangler.jsonc` 的 top-level 與 `env.local` 皆不設 `vars`；遠端沒有 `.dev.vars`，缺值即代表非開發環境。其型別為必填 `string` 但遠端實際為 `undefined`，讀取時只用 `env.ENVIRONMENT === "development"` 這種等值比較。**`ENVIRONMENT` 絕不以 secret、`vars` 或 Dashboard 變數設於遠端**，設了即在正式站開啟測試帳號登入
+- 正式站的 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 一律以 Worker secret（`wrangler secret put`）設定，不用 `vars`：`GOOGLE_CLIENT_ID` 與 secret 不得進 commit；`BETTER_AUTH_URL` 放 `vars` 雖可進版控，但會破壞「wrangler.jsonc 不存在 `vars`」這個防止有人順手把 `ENVIRONMENT` 也放進去的不變式。`.dev.vars.example` 變更**不會**觸發 cf-typegen 的 hook（hook 只看 `wrangler.(jsonc|json|toml)`），需手動重跑 `pnpm cf-typegen`
+- `wrangler secret put`／`list`、`d1 migrations apply --remote` 等遠端操作**只限使用者**依 README 執行；agent 只做 `--local` 與 `--dry-run`
 
 ## D1 schema 與 migration SQL 屬設定層
 
@@ -58,9 +62,9 @@
 - 用 `import { exports } from "cloudflare:workers"` 搭配 `exports.default.fetch()`；**不要用 `cloudflare:test` 的 `SELF` / `env`**——兩者在套件的 `@cloudflare/vitest-pool-workers/types`（`cloudflare-test.d.ts`，經 `test/tsconfig.json` 的 `types` 引入，非本 workspace 的檔案）皆已標 `@deprecated`。需直接存取 binding（如 D1）時，`env` 自 `cloudflare:workers` 匯入
 - **D1 夾具**：`vitest.config.ts` 以 `readD1Migrations` 讀 `drizzle/`，經 `miniflare.bindings.TEST_MIGRATIONS` 注入，`wrangler.environment` 設 `"local"` 取得 `DB`，`setupFiles` 的 `test/apply-migrations.ts` 以 `applyD1Migrations` 套用。測試**不得手寫 `CREATE TABLE`**，一律走 migration
 - **storage 以測試檔隔離**（本版已無 `isolatedStorage`）：同一測試檔內的 it 共用同一份 D1 資料，測試須自行使用不互相衝突的資料
-- `DB` 在型別上為可選，測試／setup 以 `if (!env.DB) throw ...` 處理，不用 `!`
-- vitest pool 會讀 `.dev.vars`（輸出可見 `Using secrets defined in .dev.vars`），但 `vitest.config.ts` 的 `miniflare.bindings` 注入了 `ENVIRONMENT`、`BETTER_AUTH_SECRET`（假值）、`BETTER_AUTH_URL`，且實測注入值優先於 `.dev.vars`；測試結果不依賴 `.dev.vars`（有／無該檔各跑一次，通過數相同）
-- **gating／替身情境的例外**：預設走 `exports.default.fetch()`，但要驗證停用（`ENVIRONMENT` 非 `"development"`）或替換 env 時，改用 `app.request(path, init, { ...env, 覆寫 })` 注入 env，因為 `exports` 無法逐次覆寫 binding
+- `DB` 在型別上為必填（見「wrangler.jsonc 要點」），但測試／setup 仍以 `if (!env.DB) throw ...` 處理、不用 `!`，因為替身情境會注入 `DB: undefined`
+- vitest pool 會讀 `.dev.vars`（輸出可見 `Using secrets defined in .dev.vars`），但 `vitest.config.ts` 的 `miniflare.bindings` 注入了 `ENVIRONMENT`、`BETTER_AUTH_SECRET`（假值）、`BETTER_AUTH_URL`，且實測注入值優先於 `.dev.vars`；`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 也固定注入空字串，否則在本機設了真 Google 值的開發者跑測試時，auth 啟用與 `signInMethods` 的斷言會隨機器而異；測試結果不依賴 `.dev.vars`（有／無該檔各跑一次，通過數相同）
+- **gating／替身情境的例外**：預設走 `exports.default.fetch()`，但要驗證停用（`ENVIRONMENT` 非 `"development"` 且 Google 未設定）或替換 env 時，改用 `app.request(path, init, { ...env, 覆寫 })` 注入 env，因為 `exports` 無法逐次覆寫 binding
 - 測試或 curl 呼叫 `POST /api/auth/*` 一律帶 `Origin`（屬於 trustedOrigins）：經前端 proxy 不帶會回 403；直打後端且不帶 cookie 時 better-auth 不檢查 Origin，不帶也會過，但不要依賴這個差異
 - 測試檔頂部要 `import "../src/index"`，`src/` 改動時才會自動重跑
 - 刻意不開 `globals`：一律顯式 `import { describe, it, expect } from "vitest"`，避免 workerd 全域污染
@@ -71,9 +75,11 @@
 
 - 對外 API **一律掛在 `/api/*` 之下**——Next.js 端的 catch-all proxy（`app/api/[[...route]]/route.ts`）只轉發 `/api/*`，掛在其他路徑的端點前端打不到
 - **root path（`GET /`）刻意不定義，回 404 是預期行為**，不代表部署失敗。原本的 `Hello Hono!` 樣板已於 change `backend-cleanup-and-tdd-enablement` 移除（驗收：`test/routing.test.ts`）
-- **auth 與 session 端點**（better-auth 1.6，email／password，註冊停用）：
-  - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`ENVIRONMENT` 非 `"development"`）回 404，不建立 auth、不碰 D1**
-  - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user }`；停用時 `authEnabled: false`、`user: null`，查詢例外降級為 `user: null` 並 `console.error`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
+- **auth 與 session 端點**（better-auth 1.6；登入方式為本機測試帳號 email／password 與 Google，註冊停用）：
+  - **auth 啟用規則**（`src/auth/local-auth.ts`）：拆成兩個述詞——`isLocalAuthEnabled(env)`（`ENVIRONMENT === "development"`，測試帳號登入）與 `isGoogleSignInConfigured(env)`（`GOOGLE_CLIENT_ID` 與 `GOOGLE_CLIENT_SECRET` **皆為非空字串**；只設一半視為未設定，避免 provider 半啟用）；`isAuthEnabled` 為兩者**聯集**，`localAuth` 閘門與 `/api/session` 一律看 `isAuthEnabled`。非 development 且 Google 不齊全 → auth 整組停用，即 fail-closed（忘了設變數預設為關）
+  - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`isAuthEnabled` 為假）回 404，不建立 auth、不碰 D1**
+  - **非 development 時 email 端點不存在**：`createAuth` 此時帶 `disabledPaths: ["/sign-in/email", "/sign-up/email"]`，兩端點回 404（第一道防線，與 auth 停用的回應一致）；`emailAndPassword.enabled` 同時為 `false`（第二道防線，`disabledPaths` 被誤刪時仍以 400 拒絕）。Google 以 `socialProviders.google` 註冊（僅在 `isGoogleSignInConfigured` 時），帶 `prompt: "select_account"`，讓場邊共用裝置換人登入時不會自動沿用上一位的 Google 帳號
+  - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user, signInMethods }`；`signInMethods` 為 `{ google: isGoogleSignInConfigured, emailPassword: isLocalAuthEnabled }`，停用時 `authEnabled: false`、`user: null`、`signInMethods` 兩者皆 `false`；查詢例外降級為 `user: null`（仍帶 `signInMethods`）並 `console.error`。前端顯示登入入口只看 `authEnabled`，登入頁顯示哪種登入方式只看 `signInMethods`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
 - **使用者資料 API**（所有使用者資料 feature 一律照此做）：
   - **批次寫入端點一律掛 `src/http/body-limit.ts` 的 `jsonBodyLimit(maxSize)`**，放在 `zValidator` 之前：超過上限回 JSON 413 `PAYLOAD_TOO_LARGE`（hono 內建 `bodyLimit` 預設回純文字、無錯誤碼，所以自訂 `onError`）。單筆端點（如 `PUT /players/:id`）沒有 body 上限
   - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
