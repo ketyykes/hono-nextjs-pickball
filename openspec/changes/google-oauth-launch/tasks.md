@@ -1,5 +1,7 @@
 # Tasks: google-oauth-launch
 
+> **archive 註記（coordinator，2026-11-08）**：勾選 31／40；§5 為使用者上線步驟，archive 時尚未執行；未勾選不代表遺漏（design Decision 11）。上線結果寫進 archived `design.md`「上線紀錄」一節，不回填本檔核取方塊。
+
 > **TDD 三步**（root `CLAUDE.md`）：RED（先寫失敗測試，以單檔指令在 shell 實際看到紅燈並貼出輸出）→ GREEN（最小實作至綠）→ REFACTOR（無壞味道註記 skipped）。
 > 單檔 vitest（免鎖）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/<workspace> test --run <path>`（**`--run` 前不可加 `--`**；**不要用 `pnpm --dir <root> --filter ./<ws>`**，cwd 不在 root 時 "No projects matched" 且 exit 0）。
 > 單檔 E2E（雙鎖）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --workers=1 --project=<p> <spec> [-g <test 名稱>]`，前後清殘留 dev server。
@@ -121,15 +123,21 @@ Depends on: §2、§3
     Stage 1（sonnet）PASS；Stage 2（opus）第一輪 FAIL（2 項必修）→ 全新 Implementer 修正 → 第二輪 PASS。
 - [x] C1 驗收（指令）：三段 typecheck 皆 exit 0（test-plan C1）
   - 紀錄（leader）：`tsc -r` exit 0、後端 typecheck exit 0、核心 typecheck exit 0（§3 完成後實跑；§4 後 `tsc -r` 由修正輪 Implementer 再跑 exit 0）。
-- [ ] C2 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warnings 不多於基線
+- [x] C2 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warnings 不多於基線
   - 由 coordinator 於合併前執行。
-- [ ] C3 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數不變、測試數＝基線＋12；後端檔數＋1、測試數＝基線＋8；核心與基線相同
+  - 紀錄（coordinator，2026-11-08，HEAD `b109de3`，雙鎖）：lint exit 0，`✖ 3 problems (0 errors, 3 warnings)`，與基線相同。
+- [x] C3 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數不變、測試數＝基線＋12；後端檔數＋1、測試數＝基線＋8；核心與基線相同
   - 由 coordinator 於合併前執行。
-- [ ] C4 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；hono-pickball 段的 dry-run binding 清單含 `env.DB (hono-pickball)`；建置後 `git status --porcelain` 為空
+  - 紀錄（coordinator，2026-11-08，HEAD `b109de3`，雙鎖）：前端 111 檔／1130 tests（基線 1118＋12）；後端 27 檔／223 tests（基線 26 檔 215＋1 檔＋8）；核心 10 檔／27 tests（與基線同）；三段 typecheck 亦 exit 0。
+- [x] C4 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；hono-pickball 段的 dry-run binding 清單含 `env.DB (hono-pickball)`；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行。
-- [ ] C5 驗收（指令）：`.dev.vars` 不含 `GOOGLE_` 鍵；記錄 `curl -s http://localhost:8787/api/session` 輸出；依 project 分開跑全套 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
+  - 紀錄（coordinator，2026-11-08，HEAD `b109de3`，雙鎖）：`pnpm build` exit 0；hono-pickball 段 dry-run 列出 `env.DB (hono-pickball)  D1 Database`；建置後 `git status --porcelain` 為空。
+- [x] C5 驗收（指令）：`.dev.vars` 不含 `GOOGLE_` 鍵；記錄 `curl -s http://localhost:8787/api/session` 輸出；依 project 分開跑全套 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   `--list`：五個瀏覽器 project 各＝基線＋2、user-data＝基線；執行：chromium 新增 2 passed，其餘四個瀏覽器 project 各新增 1 passed＋1 skipped，user-data 與基線相同；全部 0 failed、無因缺帳密 skip
   - 由 coordinator 於合併前執行。
+  - 紀錄（coordinator，2026-11-08，HEAD `b109de3`，雙鎖）：`.dev.vars` 不含 `GOOGLE_` 鍵（只檢查鍵名）。E2E 依 project 分開跑、`--workers=1`、每次前後清殘留：chromium 160 passed（基線 158＋2）；firefox 147 passed＋13 skipped（基線 146＋12 → ＋1 passed＋1 skipped）；mobile-chrome 157＋3（基線 156＋2）；webkit 三 shard 49＋45＋53＝147 passed、5＋8＝13 skipped；mobile-safari 三 shard 49＋45＋53＝147 passed、13 skipped；user-data 47 passed（與基線同，0 skipped）。全部 0 failed。
+    過程如實記錄：① 首次 firefox 全套在系統 load 142（另一專案未持鎖平行跑約 13 個 vite-node）時 3 failed（`scoreboard.spec.ts:211`、`tour.spec.ts:31`、`tour.spec.ts:75`，皆 5 秒逾時）——中止後在 load 降到 27 時單獨重跑這 3 條 3 passed，之後 firefox 全套重跑 147 passed、0 failed。② 第二次 firefox 全套途中 Playwright 的 firefox／webkit 瀏覽器快取被外部刪除（`~/Library/Caches/ms-playwright/firefox-1522` 消失，錯誤為 `browserType.launch: Executable doesn't exist`），中止、經使用者同意以 `playwright install firefox webkit` 重裝後重跑全部非 chromium project，結果即上列數字。
+    偏離：`curl -s http://localhost:8787/api/session` 未另行記錄——leader 的 C6 已記錄同一端點在本機 auth 啟用時的輸出 `{"authEnabled":true,"user":null,"signInMethods":{"google":false,"emailPassword":true}}`，且 `auth-session.spec.ts` 於五個瀏覽器皆通過。
 - [x] C6 驗收（指令）：雙鎖下起後端 dev 與前端 `preview`（workerd），curl `GET /api/auth/callback/google` 為 3xx 且 redirect_url 非空、`GET /api/session` 含 `"signInMethods":{"google":false,"emailPassword":true}`；結束後清掉自起的 process（test-plan C6）
   - 紀錄（leader，雙鎖）：後端 dev `/api/health` 200；`preview` 的 `Ready on http://localhost:8788`；`curl` callback → `302 http://localhost:3005/api/auth/error?error=state_not_found`；`/api/session` → `{"authEnabled":true,"user":null,"signInMethods":{"google":false,"emailPassword":true}}`。結束後只 kill 自起的 process tree，`lsof -i :3005 -i :8787 -i :8788` 為空。
 - [x] C7 驗收（指令）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball cf-typegen` 後 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；grep 確認 `DB: D1Database`、兩個 Google 變數為 `string`、全檔無 `DB?:`
