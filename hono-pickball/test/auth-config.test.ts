@@ -68,6 +68,14 @@ describe("createAuth", () => {
 		expect(disabled.options.emailAndPassword?.disableSignUp).toBe(true);
 	});
 
+	it("非 development 時 disabledPaths 封鎖 email 登入與註冊，development 時不封鎖", () => {
+		const development = createAuth({ ...env, ENVIRONMENT: "development" });
+		expect(development.options.disabledPaths).toEqual([]);
+
+		const remote = createAuth({ ...env, ENVIRONMENT: undefined });
+		expect([...(remote.options.disabledPaths ?? [])].sort()).toEqual(["/sign-in/email", "/sign-up/email"]);
+	});
+
 	it("Google provider 只在 client id 與 secret 皆存在時註冊", () => {
 		const none = createAuth({ ...env });
 		expect(none.options.socialProviders?.google).toBeUndefined();

@@ -49,6 +49,43 @@ describe("Google 設定不全的 gate", () => {
 	});
 });
 
+describe("Google 啟用時的 email 端點", () => {
+	it("非 development 且 Google 設定齊全時 email 登入與註冊回 404 且不發 cookie", async () => {
+		const email = "gating-google-email@example.com";
+		const signUpEmail = "gating-google-signup@example.com";
+		await seed(email);
+		const googleEnv = {
+			...env,
+			ENVIRONMENT: undefined,
+			GOOGLE_CLIENT_ID: "fake-client-id",
+			GOOGLE_CLIENT_SECRET: "fake-client-secret",
+		};
+
+		const signInRes = await app.request("/api/auth/sign-in/email", signInRequest(email), googleEnv);
+		const signUpRes = await app.request(
+			"/api/auth/sign-up/email",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json", Origin: "http://localhost:3005" },
+				body: JSON.stringify({ email: signUpEmail, password, name: "Gating Signup" }),
+			},
+			googleEnv,
+		);
+
+		expect(signInRes.status).toBe(404);
+		expect(signInRes.headers.get("set-cookie")).toBeNull();
+		expect(signUpRes.status).toBe(404);
+		expect(signUpRes.headers.get("set-cookie")).toBeNull();
+		if (!env.DB) {
+			throw new Error("D1 binding DB 不存在");
+		}
+		const created = await env.DB.prepare("SELECT count(*) AS total FROM user WHERE email = ?")
+			.bind(signUpEmail)
+			.first<{ total: number }>();
+		expect(created?.total).toBe(0);
+	});
+});
+
 describe("本機登入 gate", () => {
 	it("ENVIRONMENT 缺值時 sign-in 回 404 且不發 cookie", async () => {
 		await seed("gating-missing@example.com");
