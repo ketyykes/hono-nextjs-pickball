@@ -244,6 +244,10 @@ apply 期間 leader 的裁量（2026-11-07）：
 - **mutation ① 與 B4**：execution-plan 寫「① 閘門改回 `isLocalAuthEnabled`，B4 須轉紅」，但 `/api/session` 刻意不掛 `localAuth`，B4 在 ① 下必然維持綠；兩位 reviewer 另以「`/api/session` 自身閘門改 `isLocalAuthEnabled`」證明 B4 守得住，判定為計畫文字的瑕疵、非測試缺口。
 - **派工內容**：plan 片段（tasks、test-plan、spec、design、派工單必帶）逐字貼入；既有產品碼與測試檔改由 subagent 直接 Read repo 內現況（而非把全文貼進派工單），因為 Implementer 編輯前本來就須 Read，且可避免貼上內容與實檔不一致。subagent 一律不得讀 `openspec/**` 與 `docs/**`。
 - **已知限制（不擋）**：`isGoogleSignInConfigured` 改為 type guard 後，若傳入 cf-typegen 的 env（`GOOGLE_*` 為必填 `string`），否定分支會把 env 收窄為 `never`；目前所有呼叫端只當布林值使用，不受影響（Stage 2 第二輪實測）。日後若在否定分支內讀 `c.env`，需改為回傳 `{ clientId, clientSecret } | null` 的取值函式。
+- **§3「Google 在前」斷言的替代寫法**：test-plan 指定 `compareDocumentPosition(...) & DOCUMENT_POSITION_FOLLOWING`，但 happy-dom 對 React render 出的 DOM 回傳反向值（leader 以 scratch 測試重現：`render(<div><button/><form>…<input/></form></div>)` 下 button 對 input 得 `2`、反向得 `4`；以 `innerHTML` 直接建構時則正確）。改用 `querySelectorAll("button, input")` 的 tree order 以 `indexOf` 比較，另斷言 `indexOf >= 0` 防假綠；Stage 2 以「按鈕移到表單之後」變異實證會紅。斷言意圖不變，只換量測方式。
+- **§3 E2E「經 proxy 呼叫 OAuth callback…」為真紅**：design Decision 6 預期 `next dev` 下可能已是 3xx；實跑 RED 當下為 200（miniflare binding 會跟隨轉址），故此 test 是真紅而非 regression guard，也證實 `next dev` 與 workerd 同樣需要 `redirect: "manual"`。workerd 行為仍由 C6 驗證。
+- **存活變異 S6（不在本 change 處理）**：`fetchSession` 無條件寫入 `signInMethods`（鍵不存在時成為 `undefined` 屬性）不會讓任何 it 轉紅——既有 it 用 `toEqual`，忽略值為 `undefined` 的屬性，Decision 4「鍵不存在 → 回傳值不含此鍵」未被釘住。補強需把既有 it 改為 `toStrictEqual` 或新增 it，前者違反「既有斷言不得修改」、後者超出 test-plan 的 +12 計數；目前行為正確（`??` 對 `undefined` 照常運作），留待後續 change。
+- **§3 Stage 2 的非阻擋建議（未處理，留待後續）**：兩種登入方式皆啟用時 Google 失敗的 alert 出現在 email 表單內（「登入」按鈕上方），離 Google 按鈕較遠；`pending` 與 `googlePending` 未互鎖（刻意連點兩顆按鈕會讓導向競爭）；`ok: true` 後經 bfcache 返回時按鈕維持 disabled；`route.ts` 既有註解「未來 better-auth 的 Set-Cookie」的「未來」已過時；`session-client.ts` 檔頭「四個函式」的計數易漏改。皆屬 UI／措辭偏好或超出 spec 的行為，依「只做 spec 要求」不在本 change 修改。
 
 ## 上線紀錄（archive 後由使用者回填）
 

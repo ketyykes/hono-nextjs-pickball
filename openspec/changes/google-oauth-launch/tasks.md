@@ -79,23 +79,32 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD）：`lib/auth/session-client.test.ts` 新增 it「fetchSession 回傳後端提供的 signInMethods」「signInMethods 形狀不符時 fetchSession 回傳未啟用」
+- [x] 3.1 RED（TDD）：`lib/auth/session-client.test.ts` 新增 it「fetchSession 回傳後端提供的 signInMethods」「signInMethods 形狀不符時 fetchSession 回傳未啟用」
   「startGoogleSignIn 以 JSON POST 至 /api/auth/sign-in/social 並導向回傳的網址」「startGoogleSignIn 於非 200、缺少網址、非 https 或網路錯誤時回傳失敗且不導向」；
   `lib/auth/session-store.test.ts` 新增 it「fetchSession 回傳 signInMethods 時快照保留同一份 signInMethods」。
   單檔 vitest 逐檔確認新 it 全紅並貼出輸出（`startGoogleSignIn` 尚不存在，該兩個 it 以「不是函式」失敗屬預期）；commit（`test:`）
-- [ ] 3.2 GREEN（TDD）：`session-client.ts` 增列 `SignInMethods` 型別、`SessionState.signInMethods?`、`isValidPayload` 對 `signInMethods` 的檢查（鍵不存在 → 不帶此鍵；形狀不符 → 未啟用）、`startGoogleSignIn(navigate = …)`（design Decision 4、5）；
+  - 紀錄：`92d0c58`（test）。`session-client.test.ts` 4 failed｜6 passed：「fetchSession 回傳後端提供的 signInMethods」toEqual 缺 `signInMethods`；「signInMethods 形狀不符時…」預期 `authEnabled: false` 實得 `true`；兩個 startGoogleSignIn it 為 `TypeError: startGoogleSignIn is not a function`。`session-store.test.ts` 1 failed｜11 passed（快照缺 `signInMethods`）。無寫入即綠者。leader 機械複驗：`session-client.ts`、`session-store.ts` 在 `92d0c58^` 與 `92d0c58` 內容相同；5 個新名稱在 `92d0c58^` 皆 0 筆。
+- [x] 3.2 GREEN（TDD）：`session-client.ts` 增列 `SignInMethods` 型別、`SessionState.signInMethods?`、`isValidPayload` 對 `signInMethods` 的檢查（鍵不存在 → 不帶此鍵；形狀不符 → 未啟用）、`startGoogleSignIn(navigate = …)`（design Decision 4、5）；
   `session-store.ts` 的 ready 快照改為展開 `fetchSession()` 的結果。3.1 的 it 全綠；兩檔其餘既有 it 與 `hooks/useSession.test.ts`（若存在）原樣綠；`pnpm -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors；commit（`feat:`）
-- [ ] 3.3 RED（TDD）：`components/auth/LoginForm.test.tsx` 依檔頭例外 ② 增列 mock，新增 it「只啟用 Google 時顯示使用 Google 登入按鈕且不顯示測試帳號表單」「Google 與測試帳號皆啟用時兩種登入方式皆顯示且 Google 在前」
+  - 紀錄：`688b619`（feat）。單檔：session-client 10 passed、session-store 12 passed、`hooks/useSession.test.ts` 3 passed；`tsc -r` exit 0；改動檔 ESLint 0 errors。
+- [x] 3.3 RED（TDD）：`components/auth/LoginForm.test.tsx` 依檔頭例外 ② 增列 mock，新增 it「只啟用 Google 時顯示使用 Google 登入按鈕且不顯示測試帳號表單」「Google 與測試帳號皆啟用時兩種登入方式皆顯示且 Google 在前」
   「快照不含 signInMethods 時只顯示測試帳號表單」「點擊使用 Google 登入後呼叫 startGoogleSignIn 且按鈕維持 disabled」「Google 登入請求失敗時顯示錯誤訊息並恢復按鈕」。
   單檔 vitest 確認除「快照不含 signInMethods 時只顯示測試帳號表單」外全紅並貼出輸出；該 it 寫入即綠，**標 regression guard**（test-plan 已預先點名）；commit（`test:`）
-- [ ] 3.4 GREEN（TDD）：`LoginForm.tsx` 依 `signInMethods ?? { google: false, emailPassword: true }` 顯示「使用 Google 登入」按鈕（在表單之前）與測試帳號表單；點擊後 disabled、呼叫 `startGoogleSignIn()`，`ok: false` 時以 `role="alert"` 顯示「Google 登入失敗，請稍後再試」並恢復按鈕；
+  - 紀錄：`1025415`（test）。`LoginForm.test.tsx` 4 failed｜12 passed，四個 Google it 皆為 `Unable to find an accessible element with the role "button" and name "使用 Google 登入"`；「快照不含 signInMethods 時只顯示測試帳號表單」寫入即綠，**regression guard**（測試內註解點名）。檔頭 mock 依例外 ② 只增列 `startGoogleSignIn: vi.fn()`。**偏離 test-plan**：「Google 在前」改以 `Array.from(document.querySelectorAll("button, input")).indexOf` 比較先後，不用 `compareDocumentPosition`——happy-dom 對 React render 的 DOM 回傳反向值（leader 以 scratch 測試獨立重現：在前的 button 對 input 得 `2`）；Stage 2 以「Google 按鈕移到表單之後」變異實證替代斷言會紅（見 design `## Open Questions`）。leader 機械複驗：`LoginForm.tsx` 在 `1025415^` 與 `1025415` 內容相同；5 個新名稱在 `1025415^` 皆 0 筆。
+- [x] 3.4 GREEN（TDD）：`LoginForm.tsx` 依 `signInMethods ?? { google: false, emailPassword: true }` 顯示「使用 Google 登入」按鈕（在表單之前）與測試帳號表單；點擊後 disabled、呼叫 `startGoogleSignIn()`，`ok: false` 時以 `role="alert"` 顯示「Google 登入失敗，請稍後再試」並恢復按鈕；
   `app/login/page.tsx` 只更新「本機開發用的測試帳號登入頁」註解。3.3 的 it 全綠；`LoginForm.test.tsx` 其餘既有 it 與 `app/login/page.test.ts` 原樣綠；雙鎖下 chromium 跑 `auth-session.spec.ts` 全檔全綠；commit（`feat:`）
-- [ ] 3.5 RED（TDD）：`app/api/[[...route]]/route.test.ts` 新增 it「轉發時以 redirect: manual 呼叫 binding，不在 proxy 內跟隨轉址」「upstream 的 3xx 轉址連同 Location 與多個 Set-Cookie 原樣回傳」；
+  - 紀錄：`a468f06`（feat）。LoginForm 16 passed、`app/login/page.test.ts` 1 passed；雙鎖下 chromium `auth-session.spec.ts` 全檔 8 passed（含「登入頁的登入方式與後端回報一致」，無 skip）。
+- [x] 3.5 RED（TDD）：`app/api/[[...route]]/route.test.ts` 新增 it「轉發時以 redirect: manual 呼叫 binding，不在 proxy 內跟隨轉址」「upstream 的 3xx 轉址連同 Location 與多個 Set-Cookie 原樣回傳」；
   `tests/e2e/specs/auth-proxy.spec.ts` 的既有 describe「auth proxy 穿透」內新增 test「經 proxy 呼叫 OAuth callback 時轉址原樣回到瀏覽器」（沿用該 describe 的 chromium skip；只用 `request` fixture、`maxRedirects: 0`，不需帳密）。
   單檔 vitest 確認前者紅、後者寫入即綠（**regression guard**，test-plan 已預先點名）；雙鎖下 chromium 單檔 E2E 實跑該 test：紅即真紅，綠則**標 regression guard** 並記錄 `next dev` 下 binding 不跟隨轉址的事實（design Decision 6 驗證限制）；commit（`test:`）
-- [ ] 3.6 GREEN（TDD）：`route.ts` 的 init 增列 `redirect: "manual"`（附「為什麼」註解：binding 的 fetch 預設跟隨轉址，OAuth callback 的 Set-Cookie 會被吞掉）；3.5 的 it 與 E2E 全綠；`route.test.ts` 其餘既有 it 原樣綠；`auth-proxy.spec.ts` 其餘既有 test 原樣綠；commit（`fix:`）
-- [ ] 3.7 REFACTOR：`LoginForm` 的顯示條件是否以具名變數表達、無巢狀三元；`startGoogleSignIn` 與既有三個函式的錯誤處理風格一致；無壞味道則註記 skipped
-- [ ] 3.8 mutation 自檢（execution-plan b §3 的六條＋對照組）結果附於本 task 紀錄
+  - 紀錄：`e6d7390`（test）。`route.test.ts` 1 failed｜8 passed：「轉發時以 redirect: manual…」`expected undefined to be 'manual'`；「upstream 的 3xx 轉址連同 Location 與多個 Set-Cookie 原樣回傳」寫入即綠，**regression guard**。E2E（雙鎖、chromium、`-g "OAuth callback"`）**真紅**：`Expected: >= 300 / Received: 200`（webServer log 有 `state_not_found`）——`next dev` 下 miniflare binding **會**跟隨轉址，故非 regression guard。leader 機械複驗：`route.ts` 在 `e6d7390^` 與 `e6d7390` 內容相同；3 個新名稱在 `e6d7390^` 皆 0 筆。
+- [x] 3.6 GREEN（TDD）：`route.ts` 的 init 增列 `redirect: "manual"`（附「為什麼」註解：binding 的 fetch 預設跟隨轉址，OAuth callback 的 Set-Cookie 會被吞掉）；3.5 的 it 與 E2E 全綠；`route.test.ts` 其餘既有 it 原樣綠；`auth-proxy.spec.ts` 其餘既有 test 原樣綠；commit（`fix:`）
+  - 紀錄：`22a0a20`（fix）。route 9 passed；雙鎖下 chromium `auth-proxy.spec.ts` 全檔 3 passed（新 test 綠、既有 2 個綠）；`tsc -r` exit 0；`git status` 乾淨。
+- [x] 3.7 REFACTOR：`LoginForm` 的顯示條件是否以具名變數表達、無巢狀三元；`startGoogleSignIn` 與既有三個函式的錯誤處理風格一致；無壞味道則註記 skipped
+  - 紀錄：skipped。顯示條件以 `methods`／`showGoogle`／`showEmailPassword` 具名變數表達、無巢狀三元；`startGoogleSignIn` 與既有三個函式同為 try/catch、判 `status === 200`、絕不 throw。Stage 2 判 skipped 合理。
+- [x] 3.8 mutation 自檢（execution-plan b §3 的六條＋對照組）結果附於本 task 紀錄
+  - 紀錄：Implementer 自跑與 Stage 2 獨立 mutation 結果一致：① 不驗 `signInMethods` 形狀 → F2 紅；② 快照只挑兩欄 → F12 紅；③ Google 按鈕只看 `authEnabled` → F7 紅；④ 缺省 `{ google: false, emailPassword: false }` → F7＋7 個既有 LoginForm it 紅（8/16）；⑤ 移除 `https:` 檢查 → F4 紅；⑥ 移除 `redirect: "manual"` → F10 紅；對照組（`isValidSignInMethods` 兩檢查對調、`typeof object` 與 `null` 檢查對調）全綠。Stage 2 加碼 S1～S7：按鈕移到表單後、`ok:true` 時恢復、`ok:false` 時不恢復、`errorCallbackURL` 改值、移除 `status !== 200`、移除 `setGooglePending(true)` 皆紅；**存活 1 條（S6）**：無條件寫入 `session.signInMethods`（鍵不存在時成為 undefined 屬性）全綠——`toEqual` 忽略 undefined 屬性，「鍵不存在 → 回傳值不含此鍵」未被釘住；補強需改既有 it 斷言（`toStrictEqual`）或新增 it，皆超出授權範圍，不在本 change 處理（見 design `## Open Questions`）。代號：F1～F4 session-client、F5～F9 LoginForm、F10～F11 route、F12 session-store。
+    Stage 1（sonnet）PASS；Stage 2（opus）PASS，無必修項。
 
 ## 4. 文件與指令驗收
 
