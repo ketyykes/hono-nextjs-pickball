@@ -42,14 +42,15 @@
 
 Depends on: §1
 
-- [ ] 2.1 設定層（不需紅燈，`hono-pickball/CLAUDE.md`：wrangler／vitest 設定與型別產物屬設定層）：
+- [x] 2.1 設定層（不需紅燈，`hono-pickball/CLAUDE.md`：wrangler／vitest 設定與型別產物屬設定層）：
   ① `vitest.config.ts` 的 `miniflare.bindings` 增列 `GOOGLE_CLIENT_ID: ""`、`GOOGLE_CLIENT_SECRET: ""`（附「為什麼」註解：不讓開發者本機 `.dev.vars` 的 Google 值改變測試結果）；
   ② `.dev.vars.example` 增列空值的 `GOOGLE_CLIENT_ID=`、`GOOGLE_CLIENT_SECRET=` 與註解（正式站以 `wrangler secret put` 設定；本機留空即只有測試帳號）；
   ③ `wrangler.jsonc` top-level 增列 `d1_databases`（`DB`／`hono-pickball`／`9c3a73c2-9a06-4e92-bb6d-90f9cbfda513`／`drizzle`），`env.local`、`name`、`services` 不動、不加 `vars`；
   ④ 手動重跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball cf-typegen`（`.dev.vars.example` 的改動不會觸發 hook），確認 `worker-configuration.d.ts` 變為 `DB: D1Database`、`GOOGLE_CLIENT_ID: string`、`GOOGLE_CLIENT_SECRET: string`；
   ⑤ `src/db/client.ts` 的 `getDb` 參數與 `src/auth/create-auth.ts` 的 `AuthEnv.DB` 收窄為允許 `undefined`（design Decision 8）；
   驗收：前端 `pnpm -r exec tsc --noEmit` 與後端 typecheck 兩段 exit 0；後端全套單元測試（雙鎖）與基線相同、全綠；`pnpm --dir …/hono-pickball build` 的 dry-run 列出 `env.DB (hono-pickball)`。commit（`chore:`）
-- [ ] 2.2 RED（TDD）：
+  - 紀錄：`4fd0457`（chore）。`hono-pickball build`（雙鎖）exit 0，dry-run 列出 `env.DB (hono-pickball)  D1 Database`；`worker-configuration.d.ts` 為 `DB: D1Database`、`GOOGLE_CLIENT_ID: string`、`GOOGLE_CLIENT_SECRET: string`，無 `DB?:`；commit 前後端全套 26 檔／215 全綠；`tsc -r` 與後端 typecheck exit 0。`vitest.config.ts`、`wrangler.jsonc` 中因 top-level 新增正式 D1 而失實的既有註解一併改寫。
+- [x] 2.2 RED（TDD）：
   - `test/auth-config.test.ts` 新增 it「isGoogleSignInConfigured 只在 client id 與 secret 皆為非空字串時為真」「isAuthEnabled 在 development 或 Google 設定齊全時為真」；
   - 新檔 `test/auth-google.test.ts`：it「非 development 且 Google 設定齊全時 sign-in/social 回傳導向 Google 的授權網址」「非 development 且 Google 設定齊全時使用者資料 API 未登入回 401」；
   - `test/auth-session.test.ts` 新增 it「非 development 且 Google 設定齊全時回 authEnabled true 與只有 Google 的 signInMethods」，並依檔頭例外 ① 增列三個既有 it 的期望欄位；
@@ -57,16 +58,23 @@ Depends on: §1
   - E2E `tests/e2e/specs/auth-session.spec.ts` 的既有 describe「訪客」內新增 test「登入頁的登入方式與後端回報一致」（沿用 `guestState` 與檔頭的 storageState skip；必須在本組 GREEN 前寫入：其 `typeof signInMethods.google` 斷言只在後端尚未回報欄位時為紅，test-plan 該列）。
   斷言依 test-plan。單檔 vitest 逐檔確認新 it 與例外 ① 的三個 it 全紅並貼出輸出（`auth-config` 的兩個 it 因匯入不存在的函式而整檔失敗，屬預期）；雙鎖下以 chromium 單檔 E2E（`-g "登入頁的登入方式與後端回報一致"`）確認紅並貼出輸出；
   依 e 機械複驗後 commit（`test:`）
-- [ ] 2.3 GREEN（TDD）：`local-auth.ts` 新增 `isGoogleSignInConfigured`、`isAuthEnabled`；`local-auth-middleware.ts` 閘門改用 `isAuthEnabled`（同步更新註解）；`create-auth.ts` 的 Google 註冊條件改用 `isGoogleSignInConfigured` 並加 `prompt: "select_account"`；
+  - 紀錄：`8b02c8e`（test）。紅燈：`auth-config` 2 failed（`isGoogleSignInConfigured is not a function`／`isAuthEnabled is not a function`）；`auth-google` 2 failed（`expected 404 to be 200`、`expected 404 to be 401`）；`auth-gating` 新 it 紅（`expected { authEnabled: false, user: null } to deeply equal …`）；`auth-session` 4 failed（例外 ① 三個＋新 it）。E2E chromium 單檔（雙鎖）紅：`Expected: "boolean" / Received: "undefined"`（首版寫 `body.signInMethods.google` 得 TypeError，改 optional chaining 後為斷言紅，commit 後者；兩者皆紅，非偽造）。無寫入即綠者。leader 機械複驗：RED commit 只含 `hono-pickball/test/*` 與 E2E spec，`hono-pickball/src` diff 為空；7 個新名稱在 `8b02c8e^` 皆 0 筆。
+- [x] 2.3 GREEN（TDD）：`local-auth.ts` 新增 `isGoogleSignInConfigured`、`isAuthEnabled`；`local-auth-middleware.ts` 閘門改用 `isAuthEnabled`（同步更新註解）；`create-auth.ts` 的 Google 註冊條件改用 `isGoogleSignInConfigured` 並加 `prompt: "select_account"`；
   `src/index.ts` 的 `/api/session` 停用判斷改用 `isAuthEnabled`、三個分支皆回 `signInMethods`（design Decision 1、3、7）。
   2.2 的 it 與 E2E 全綠；`auth-*.test.ts`、`expected-user-guard.test.ts`、`db-client.test.ts` 其餘既有 it 原樣綠；後端全套單元測試（雙鎖）全綠；後端 typecheck 兩段 exit 0。commit（`feat:`）
-- [ ] 2.4 RED（TDD）：`test/auth-config.test.ts` 新增 it「非 development 時 disabledPaths 封鎖 email 登入與註冊，development 時不封鎖」；`test/auth-gating.test.ts` 新增 it「非 development 且 Google 設定齊全時 email 登入與註冊回 404 且不發 cookie」。
+  - 紀錄：`9b58955`（feat）。單檔全綠（auth-config 8、auth-google 2、auth-gating 4、auth-session 5、auth-env-types 1、db-client 3、expected-user-guard 6）；後端全套（雙鎖）27 檔／221 passed；E2E chromium「登入頁的登入方式與後端回報一致」1 passed。
+- [x] 2.4 RED（TDD）：`test/auth-config.test.ts` 新增 it「非 development 時 disabledPaths 封鎖 email 登入與註冊，development 時不封鎖」；`test/auth-gating.test.ts` 新增 it「非 development 且 Google 設定齊全時 email 登入與註冊回 404 且不發 cookie」。
   單檔 vitest 確認兩個 it 皆紅並貼出輸出（後者預期為 `expected 400 to be 404`：2.3 開啟閘門後 better-auth 以 `EMAIL_PASSWORD_DISABLED` 拒絕；若實際為其他狀態碼，記錄原文並向 coordinator 回報後再續）；commit（`test:`）
-- [ ] 2.5 GREEN（TDD）：`create-auth.ts` 傳入 `disabledPaths`，依 `isLocalAuthEnabled` 切換空陣列與 `["/sign-in/email", "/sign-up/email"]`（design Decision 2；不得以 Hono `app.post` 攔截）；
+  - 紀錄：`f558b2d`（test）。B8 `expected undefined to deeply equal []`；B7 `expected 400 to be 404`（與預期相符）。leader 複驗：RED commit 只含兩個測試檔、`hono-pickball/src` diff 為空；兩個新名稱在 `9b58955` 與 `f558b2d^` 皆 0 筆（確在第一輪 GREEN 之後寫入）。
+- [x] 2.5 GREEN（TDD）：`create-auth.ts` 傳入 `disabledPaths`，依 `isLocalAuthEnabled` 切換空陣列與 `["/sign-in/email", "/sign-up/email"]`（design Decision 2；不得以 Hono `app.post` 攔截）；
   2.4 的 it 全綠；後端全套單元測試（雙鎖）全綠，`expected-user-guard.test.ts` 列舉數不變；commit（`feat:`）
-- [ ] 2.6 REFACTOR：判斷是否只寫一處、`disabledPaths` 條件是否以具名常數或 if/else 表達、`local-auth.ts` 的檔頭註解是否已反映「兩個述詞＋聯集」；無壞味道則註記 skipped
-- [ ] 2.7 mutation 自檢（execution-plan b §2 的六條＋對照組）結果附於本 task 紀錄
+  - 紀錄：`33ee61b`（feat）。auth-config 9／auth-gating 5 全綠；後端全套（雙鎖）27 檔／223 passed；`expected-user-guard` 6 個 it 綠、列舉數不變。
+- [x] 2.6 REFACTOR：判斷是否只寫一處、`disabledPaths` 條件是否以具名常數或 if/else 表達、`local-auth.ts` 的檔頭註解是否已反映「兩個述詞＋聯集」；無壞味道則註記 skipped
+  - 紀錄：Implementer 初判 skipped；Stage 2 第一輪 FAIL（`AuthEnv` JSDoc 與 `emailAndPassword` 註解失實、`createAuth` 殘留第二份 truthy 判斷、`disabledPaths` 未以具名常數表達），leader 追加 `wrangler.jsonc` `env.local` 註解失實。全新 Implementer 修正於 `34a197e`（refactor：`isGoogleSignInConfigured` 改 type guard、`createAuth` 只留單一判斷、`localAuthEnabled`／`disabledPaths` 具名常數、三處註解改寫）；單檔全綠、後端全套（雙鎖）27／223、兩段 typecheck exit 0。
+- [x] 2.7 mutation 自檢（execution-plan b §2 的六條＋對照組）結果附於本 task 紀錄
 
+  - 紀錄：Implementer 自跑與 Stage 2 兩輪獨立 mutation 結果一致（第二輪以 `34a197e` 為準）：① 閘門改回 `isLocalAuthEnabled` → B3、B6 紅，**B4 維持綠**（`/api/session` 不經 `localAuth`，另以 X3「`/api/session` 閘門改 `isLocalAuthEnabled`」證明 B4 守住自身判斷；兩位 reviewer 皆判定非測試缺口）；② 只檢查 client id → B1、B2、B5、「Google provider 只在 client id 與 secret 皆存在時註冊」紅；③ 移除 `/sign-up/email` → B7、B8 紅；④ `disabledPaths` 恆空 → B7（收到 400）、B8 紅；⑤ `emailPassword` 寫死 true → B4 紅；⑥ 移除 prompt → B3 紅；對照組（`||` 兩側對調）全綠；加碼 X1 述詞寫死 true、X2 `emailAndPassword.enabled` 寫死 true 皆轉紅。存活變異：無（B4 於 ① 屬預期）。代號：B1 isGoogleSignInConfigured、B2 isAuthEnabled、B3 sign-in/social、B4 session 只有 Google、B5 Google 不全停用、B6 使用者資料 401、B7 email 404、B8 disabledPaths。
+    Stage 1（sonnet）PASS；Stage 2（opus）第一輪 FAIL（見 2.6）→ 第二輪 PASS，無必修項。
 ## 3. 前端：signInMethods、Google 按鈕、proxy 不跟隨轉址
 
 Depends on: §2

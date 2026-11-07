@@ -238,6 +238,13 @@ service binding 目標（`hono-pickball`）早已存在，前端先完成也不�
 
 無待人類裁決事項。apply 期間的偏差與 coordinator 裁定記錄於此。
 
+apply 期間 leader 的裁量（2026-11-07）：
+
+- **測試代號**：execution-plan 的 mutation 清單引用 B1～B7、F2～F12，但 artifact 未定義對照。leader 依 test-plan 列序定義並寫進每張派工單：B1 isGoogleSignInConfigured、B2 isAuthEnabled、B3 sign-in/social、B4 session 只有 Google、B5 Google 不全停用、B6 使用者資料 401、B7 email 404、B8 disabledPaths；F1～F4 session-client 四個 it、F5～F9 LoginForm 五個 it、F10～F11 route 兩個 it、F12 session-store。
+- **mutation ① 與 B4**：execution-plan 寫「① 閘門改回 `isLocalAuthEnabled`，B4 須轉紅」，但 `/api/session` 刻意不掛 `localAuth`，B4 在 ① 下必然維持綠；兩位 reviewer 另以「`/api/session` 自身閘門改 `isLocalAuthEnabled`」證明 B4 守得住，判定為計畫文字的瑕疵、非測試缺口。
+- **派工內容**：plan 片段（tasks、test-plan、spec、design、派工單必帶）逐字貼入；既有產品碼與測試檔改由 subagent 直接 Read repo 內現況（而非把全文貼進派工單），因為 Implementer 編輯前本來就須 Read，且可避免貼上內容與實檔不一致。subagent 一律不得讀 `openspec/**` 與 `docs/**`。
+- **已知限制（不擋）**：`isGoogleSignInConfigured` 改為 type guard 後，若傳入 cf-typegen 的 env（`GOOGLE_*` 為必填 `string`），否定分支會把 env 收窄為 `never`；目前所有呼叫端只當布林值使用，不受影響（Stage 2 第二輪實測）。日後若在否定分支內讀 `c.env`，需改為回傳 `{ clientId, clientSecret } | null` 的取值函式。
+
 ## 上線紀錄（archive 後由使用者回填）
 
 （尚未執行。使用者完成 tasks §5 後，於此記錄日期、U1～U8 各步結果、curl 輸出摘要與偏差處置；archived `tasks.md` 的 §5 核取方塊不回填。）
