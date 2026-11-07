@@ -52,5 +52,7 @@ export function createAuth(env: AuthEnv) {
 			disableSignUp: true,
 		},
 		socialProviders,
+		// 非 development 時 email 端點回 404（與 auth 停用一致），不留給 better-auth 以 400 回應
+		disabledPaths: isLocalAuthEnabled(env) ? [] : ["/sign-in/email", "/sign-up/email"],
 	});
 }
