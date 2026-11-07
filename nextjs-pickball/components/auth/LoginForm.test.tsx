@@ -9,6 +9,7 @@ vi.mock("@/hooks/useSession", () => ({
 vi.mock("@/lib/auth/session-client", () => ({
 	signInWithEmail: vi.fn(),
 	signOut: vi.fn(),
+	startGoogleSignIn: vi.fn(),
 }));
 
 const mockReplace = vi.fn();
@@ -17,18 +18,38 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { useSession } from "@/hooks/useSession";
-import { signInWithEmail, signOut } from "@/lib/auth/session-client";
+import {
+	signInWithEmail,
+	signOut,
+	startGoogleSignIn,
+} from "@/lib/auth/session-client";
 import { LoginForm } from "./LoginForm";
 
 const mockUseSession = vi.mocked(useSession);
 const mockSignIn = vi.mocked(signInWithEmail);
 const mockSignOut = vi.mocked(signOut);
+const mockStartGoogleSignIn = vi.mocked(startGoogleSignIn);
 
 function mockLoggedOut(refresh = vi.fn(async () => {})) {
 	mockUseSession.mockReturnValue({
 		status: "ready",
 		authEnabled: true,
 		user: null,
+		refresh,
+	});
+	return refresh;
+}
+
+function mockWithMethods(signInMethods: {
+	google: boolean;
+	emailPassword: boolean;
+}) {
+	const refresh = vi.fn(async () => {});
+	mockUseSession.mockReturnValue({
+		status: "ready",
+		authEnabled: true,
+		user: null,
+		signInMethods,
 		refresh,
 	});
 	return refresh;
@@ -203,6 +224,75 @@ describe("LoginForm", () => {
 		const button = screen.getByRole("button", { name: "登入" }) as HTMLButtonElement;
 		await waitFor(() => expect(button.disabled).toBe(true));
 		resolveSignIn({ ok: false, reason: "failed" });
+		await waitFor(() => expect(button.disabled).toBe(false));
+	});
+
+	it("只啟用 Google 時顯示使用 Google 登入按鈕且不顯示測試帳號表單", () => {
+		mockWithMethods({ google: true, emailPassword: false });
+		const { container } = render(<LoginForm />);
+		expect(screen.getByRole("button", { name: "使用 Google 登入" })).toBeTruthy();
+		expect(screen.queryAllByRole("textbox")).toEqual([]);
+		expect(container.querySelector("input[type=password]")).toBeNull();
+		expect(screen.queryByRole("button", { name: "登入" })).toBeNull();
+		expect(screen.queryByText("此環境未開放登入")).toBeNull();
+	});
+
+	it("Google 與測試帳號皆啟用時兩種登入方式皆顯示且 Google 在前", () => {
+		mockWithMethods({ google: true, emailPassword: true });
+		render(<LoginForm />);
+		const googleButton = screen.getByRole("button", { name: "使用 Google 登入" });
+		const emailInput = screen.getByLabelText("電子郵件");
+		expect(screen.getByLabelText("密碼")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "登入" })).toBeTruthy();
+		// 不用 compareDocumentPosition：happy-dom 對此 DOM 形狀回傳的前後關係是反的。
+		const ordered = Array.from(document.querySelectorAll("button, input"));
+		expect(ordered.indexOf(googleButton)).toBeGreaterThanOrEqual(0);
+		expect(ordered.indexOf(googleButton)).toBeLessThan(
+			ordered.indexOf(emailInput),
+		);
+	});
+
+	// 性質：regression guard。快照不含 signInMethods 時的缺省行為早已如此，
+	// 這裡釘住缺省值必須是「只有測試帳號」。
+	it("快照不含 signInMethods 時只顯示測試帳號表單", () => {
+		mockLoggedOut();
+		render(<LoginForm />);
+		expect(screen.getByLabelText("電子郵件")).toBeTruthy();
+		expect(screen.getByLabelText("密碼")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "使用 Google 登入" })).toBeNull();
+	});
+
+	it("點擊使用 Google 登入後呼叫 startGoogleSignIn 且按鈕維持 disabled", async () => {
+		mockWithMethods({ google: true, emailPassword: false });
+		mockStartGoogleSignIn.mockResolvedValue({ ok: true });
+		render(<LoginForm />);
+		const button = screen.getByRole("button", {
+			name: "使用 Google 登入",
+		}) as HTMLButtonElement;
+
+		await userEvent.click(button);
+
+		expect(mockStartGoogleSignIn).toHaveBeenCalledTimes(1);
+		await waitFor(() => expect(button.disabled).toBe(true));
+		// 結果回傳後頁面即將導向 Google，按鈕不得恢復可點擊
+		await Promise.resolve();
+		expect(button.disabled).toBe(true);
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(mockReplace).not.toHaveBeenCalled();
+	});
+
+	it("Google 登入請求失敗時顯示錯誤訊息並恢復按鈕", async () => {
+		mockWithMethods({ google: true, emailPassword: false });
+		mockStartGoogleSignIn.mockResolvedValue({ ok: false });
+		render(<LoginForm />);
+		const button = screen.getByRole("button", {
+			name: "使用 Google 登入",
+		}) as HTMLButtonElement;
+
+		await userEvent.click(button);
+
+		const alert = await screen.findByRole("alert");
+		expect(alert.textContent).toBe("Google 登入失敗，請稍後再試");
 		await waitFor(() => expect(button.disabled).toBe(false));
 	});
 });
