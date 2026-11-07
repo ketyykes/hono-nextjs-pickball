@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/LoginForm";
 
-// 本機開發用的測試帳號登入頁，不進搜尋索引，也不列入 NAV_LINKS。
+// 登入頁：依後端回報顯示 Google 登入與本機開發用的測試帳號登入，不進搜尋索引，也不列入 NAV_LINKS。
 export const metadata: Metadata = {
 	title: "登入 | 匹克球指南",
 	robots: { index: false, follow: false },
