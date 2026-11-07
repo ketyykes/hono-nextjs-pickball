@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 // 將 /api/* 的請求經 service binding 原樣轉發給 hono-pickball Worker。
-// 瀏覽器視角為 same-origin（請求的 URL host 不會被改寫），未來 better-auth
+// 瀏覽器視角為 same-origin（請求的 URL host 不會被改寫），better-auth
 // 的 Set-Cookie 會直接落在前端 origin，沒有跨域 cookie 問題。
 //
 // 注意：不能把任何 Request 實例（連 new Request() 重建的也不行）傳給 binding
