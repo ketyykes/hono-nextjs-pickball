@@ -11,7 +11,7 @@ TBD - created by archiving change scoreboard-backend. Update Purpose after archi
 並以 `app.route("/api/<feature>", <sub-app>)` 掛載。sub-app MUST 以 `use("*", localAuth, requireSession, requireExpectedUser)` 保護其下所有路由：
 
 - `localAuth` SHALL 位於 `hono-pickball/src/auth/local-auth-middleware.ts`，是 `/api/auth/*`、`/api/me` 與所有使用者資料 API **共用的唯一**停用閘門：
-  `isLocalAuthEnabled(env)` 為假時 MUST 回 `404`，且 SHALL NOT 建立 auth 實例、SHALL NOT 觸碰 D1（D4：正式站在 G1 前行為與現在相同）。
+  `isAuthEnabled(env)`（`auth`「Google 登入只在 client id 與 secret 皆有值時啟用」：`ENVIRONMENT === "development"` 或 Google 設定齊全）為假時 MUST 回 `404`，且 SHALL NOT 建立 auth 實例、SHALL NOT 觸碰 D1（未設定 Google 的遠端部署與 G1 之前的正式站行為相同）。正式站以 Google 啟用 auth 後，使用者資料 API 與本機同樣經 `requireSession`／`requireExpectedUser` 授權。
 - `requireSession` 無有效 session 時 MUST 回 `401 { "error": "UNAUTHORIZED" }`。
 - `requireExpectedUser` SHALL 位於 `hono-pickball/src/auth/require-expected-user.ts`，規則見「使用者資料請求的預期帳號守衛」。它只掛在使用者資料 sub-app；
   `requireSession` 本身 SHALL NOT 檢查預期帳號（`GET /api/me` 沿用 `localAuth, requireSession` 而不要求標頭）。
@@ -25,14 +25,14 @@ Hono 型別參數 SHALL 分為兩層：`AuthAppEnv`（`Variables` 只有 `auth`�
 （B2 時兩者為同一型別，漏掛 middleware 不會被 tsc 發現）。
 
 每個使用者資料端點 MUST 在 `hono-pickball/test/` 各有至少一個測試涵蓋四類情境：**未登入回 401**、**存取他人資料被拒**（以另一位使用者的 cookie 讀不到、改不到本人資料）、
-**auth 停用回 404**（以 `app.request(path, init, { ...env, ENVIRONMENT: undefined, DB: undefined })` 注入，證明不觸碰 D1）、
+**auth 停用回 404**（以 `app.request(path, init, { ...env, ENVIRONMENT: undefined, DB: undefined })` 注入，證明不觸碰 D1；`vitest.config.ts` 注入的 Google 變數為空字串，此 env 因此為停用）、
 **預期帳號缺少或不符回 401 `ACCOUNT_MISMATCH` 且資料不變**（由「使用者資料請求的預期帳號守衛」的列舉測試涵蓋，新增端點時補上該測試的樣本請求即可）。
 各 change 的 test-plan.md MUST 附「後端 API 授權覆蓋表」逐端點列出這四類測試的 it 名稱。
 後端測試以 cookie 送出的成功路徑請求 MUST 同時帶上該 cookie 所屬使用者的 `X-Expected-User-Id`（由 `hono-pickball/test/helpers/` 的請求 helper 集中處理）。
 
 #### Scenario: auth 停用時使用者資料 API 回 404 且不觸碰 D1
 
-- **GIVEN** env 不含 `ENVIRONMENT` 也不含 `DB`
+- **GIVEN** env 不含 `ENVIRONMENT` 也不含 `DB`，且未設定 Google
 - **WHEN** 分別呼叫 `GET /api/scoreboard/current` 與 `PUT /api/scoreboard/current`（合法 body）
 - **THEN** 兩者皆回 404（而非 500）
 - **驗收**：`hono-pickball/test/scoreboard-current.test.ts`，it 名稱「auth 停用且無 DB binding 時 GET 與 PUT /api/scoreboard/current 皆回 404」
@@ -57,6 +57,13 @@ Hono 型別參數 SHALL 分為兩層：`AuthAppEnv`（`Variables` 只有 `auth`�
 - **WHEN** 執行 `pnpm --filter ./hono-pickball typecheck`
 - **THEN** exit 0（該行確實是型別錯誤）；同檔另一個以 `SessionAppEnv` 經 `requireSession` 的 handler 讀取 `c.var.user.id` 無型別錯誤
 - **驗收**：tasks.md 中該 RED／GREEN 的 typecheck 實跑紀錄（RED 時為「Unused '@ts-expect-error' directive」）
+
+#### Scenario: 非 development 且 Google 設定齊全時使用者資料 API 改由 session 授權
+
+- **GIVEN** env 的 `ENVIRONMENT` 缺值，`GOOGLE_CLIENT_ID` 與 `GOOGLE_CLIENT_SECRET` 皆為非空字串，`DB` 為測試用 D1
+- **WHEN** 不帶 cookie 分別呼叫 `GET /api/scoreboard/current` 與 `GET /api/matchmaker/players`
+- **THEN** 兩者皆回 401，body 為 `{ "error": "UNAUTHORIZED" }`（閘門放行、由 `requireSession` 拒絕，而非 404）
+- **驗收**：`hono-pickball/test/auth-google.test.ts`，it 名稱「非 development 且 Google 設定齊全時使用者資料 API 未登入回 401」
 
 ### Requirement: 版本化讀寫契約
 
