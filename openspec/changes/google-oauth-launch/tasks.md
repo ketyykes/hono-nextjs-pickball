@@ -135,7 +135,7 @@ Depends on: §2、§3
 - [x] C7 驗收（指令）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball cf-typegen` 後 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；grep 確認 `DB: D1Database`、兩個 Google 變數為 `string`、全檔無 `DB?:`
   - 紀錄（leader）：`cf-typegen` exit 0；`git diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；含 `DB: D1Database`、`GOOGLE_CLIENT_ID: string`、`GOOGLE_CLIENT_SECRET: string`，`DB?:` 0 筆。
 - [x] C8 驗收（指令）：`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball log -p main..HEAD | grep -E 'apps\.googleusercontent\.com|GOCSPX-'` 無輸出
-  - 紀錄（leader）：grep 無輸出（exit 1），於最後一個 commit 後重跑仍無輸出。
+  - 紀錄（leader）：勾選本行前 grep 無輸出（exit 1）。勾選後原樣重跑會有命中，但每一筆都是本 C8 task 行自身在 diff 中的 `-`／`+`／前後文（行內含 C8 指令本身的搜尋字串），不是憑證；排除 `openspec/` 後同一指令計數為 0，Final Code Review 另行搜尋得到相同結論。
 - [x] C9 驗收（指令）：`DO_NOT_TRACK=1 openspec validate google-oauth-launch --strict`（repo root）valid
   - 紀錄（leader）：`Change 'google-oauth-launch' is valid`。
 - [x] C10 驗收（指令）：test-plan C10 各項檢查（scripts 無 `--remote`、範例檔與 vitest 注入、`env.local` 不變、README 字串順序與第 8 步、root CLAUDE.md 小節）通過；`git diff main --stat` ⊆ proposal Impact；範圍外路徑的 `git diff main --stat` 輸出為空
