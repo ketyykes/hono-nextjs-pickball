@@ -110,21 +110,36 @@ Depends on: §2
 
 Depends on: §2、§3
 
-- [ ] 4.1 `hono-pickball/CLAUDE.md`：auth 啟用規則（兩個述詞＋聯集、fail-closed）、`disabledPaths`、`signInMethods`、top-level 正式 D1 與 `env.local` 分工、`DB` 型別必填、`--remote` 只限使用者上線步驟、Google 變數在測試中注入空值；commit（`docs:`）
-- [ ] 4.2 `nextjs-pickball/CLAUDE.md`：`/login` 依 `signInMethods` 顯示、`startGoogleSignIn`、proxy `redirect: "manual"` 的理由；commit（`docs:`）
-- [ ] 4.3 root `CLAUDE.md`「CF Dashboard 側設定（不在 repo 內）」：列出四個 secret 名稱（不含值）、不得設定 `CLOUDFLARE_ENV`／`--env`／遠端 `ENVIRONMENT`；commit（`docs:`）
-- [ ] 4.4 root `README.md`：新增「正式站上線步驟」一節（內容與 §5 的指令逐字一致，依 `dev-workflow` 新 Requirement 的七項），「部署前手動檢查清單」第 8 步指向該節；commit（`docs:`）
-- [ ] C1 驗收（指令）：三段 typecheck 皆 exit 0（test-plan C1）
+- [x] 4.1 `hono-pickball/CLAUDE.md`：auth 啟用規則（兩個述詞＋聯集、fail-closed）、`disabledPaths`、`signInMethods`、top-level 正式 D1 與 `env.local` 分工、`DB` 型別必填、`--remote` 只限使用者上線步驟、Google 變數在測試中注入空值；commit（`docs:`）
+  - 紀錄：`aa9539e`（docs）；Stage 2 第一輪必修（「註冊停用」與 Google 首次登入自動建帳號矛盾）與採納建議（`if (!env.DB) throw` 理由、400 防線加註實測紀錄）修正於 `cd4ad4c`。
+- [x] 4.2 `nextjs-pickball/CLAUDE.md`：`/login` 依 `signInMethods` 顯示、`startGoogleSignIn`、proxy `redirect: "manual"` 的理由；commit（`docs:`）
+  - 紀錄：`25706b2`（docs）。`/login` 條目由「本機測試帳號登入頁」改寫為依 `signInMethods` 顯示；proxy 理由含實測「`next dev` 下 binding 同樣跟隨轉址」。另 `route.ts` 開頭失實註解（「未來」）於 `a165fb2` 修正（只改註解，route 9 passed）。
+- [x] 4.3 root `CLAUDE.md`「CF Dashboard 側設定（不在 repo 內）」：列出四個 secret 名稱（不含值）、不得設定 `CLOUDFLARE_ENV`／`--env`／遠端 `ENVIRONMENT`；commit（`docs:`）
+  - 紀錄：`65792c6`（docs）。小節檢查：四個名稱與 `CLOUDFLARE_ENV` 皆在、無任何值。
+- [x] 4.4 root `README.md`：新增「正式站上線步驟」一節（內容與 §5 的指令逐字一致，依 `dev-workflow` 新 Requirement 的七項），「部署前手動檢查清單」第 8 步指向該節；commit（`docs:`）
+  - 紀錄：`bbba07f`（docs）；Stage 2 第一輪必修（缺 redirect URI 前置條件、`redirect_uri_mismatch` 判讀會誤導）與採納建議（push 前分支確認、migration 清單僅首次為 0000～0004）修正於 `cd4ad4c`。bash 區塊與 §5 逐字比對 5 區塊全同（U4＋U5 合併為一區塊、`secret delete` 為行內 code，Stage 1 判可接受）。
+    Stage 1（sonnet）PASS；Stage 2（opus）第一輪 FAIL（2 項必修）→ 全新 Implementer 修正 → 第二輪 PASS。
+- [x] C1 驗收（指令）：三段 typecheck 皆 exit 0（test-plan C1）
+  - 紀錄（leader）：`tsc -r` exit 0、後端 typecheck exit 0、核心 typecheck exit 0（§3 完成後實跑；§4 後 `tsc -r` 由修正輪 Implementer 再跑 exit 0）。
 - [ ] C2 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warnings 不多於基線
+  - 由 coordinator 於合併前執行。
 - [ ] C3 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數不變、測試數＝基線＋12；後端檔數＋1、測試數＝基線＋8；核心與基線相同
+  - 由 coordinator 於合併前執行。
 - [ ] C4 驗收（指令）：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；hono-pickball 段的 dry-run binding 清單含 `env.DB (hono-pickball)`；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行。
 - [ ] C5 驗收（指令）：`.dev.vars` 不含 `GOOGLE_` 鍵；記錄 `curl -s http://localhost:8787/api/session` 輸出；依 project 分開跑全套 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   `--list`：五個瀏覽器 project 各＝基線＋2、user-data＝基線；執行：chromium 新增 2 passed，其餘四個瀏覽器 project 各新增 1 passed＋1 skipped，user-data 與基線相同；全部 0 failed、無因缺帳密 skip
-- [ ] C6 驗收（指令）：雙鎖下起後端 dev 與前端 `preview`（workerd），curl `GET /api/auth/callback/google` 為 3xx 且 redirect_url 非空、`GET /api/session` 含 `"signInMethods":{"google":false,"emailPassword":true}`；結束後清掉自起的 process（test-plan C6）
-- [ ] C7 驗收（指令）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball cf-typegen` 後 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；grep 確認 `DB: D1Database`、兩個 Google 變數為 `string`、全檔無 `DB?:`
-- [ ] C8 驗收（指令）：`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball log -p main..HEAD | grep -E 'apps\.googleusercontent\.com|GOCSPX-'` 無輸出
-- [ ] C9 驗收（指令）：`DO_NOT_TRACK=1 openspec validate google-oauth-launch --strict`（repo root）valid
-- [ ] C10 驗收（指令）：test-plan C10 各項檢查（scripts 無 `--remote`、範例檔與 vitest 注入、`env.local` 不變、README 字串順序與第 8 步、root CLAUDE.md 小節）通過；`git diff main --stat` ⊆ proposal Impact；範圍外路徑的 `git diff main --stat` 輸出為空
+  - 由 coordinator 於合併前執行。
+- [x] C6 驗收（指令）：雙鎖下起後端 dev 與前端 `preview`（workerd），curl `GET /api/auth/callback/google` 為 3xx 且 redirect_url 非空、`GET /api/session` 含 `"signInMethods":{"google":false,"emailPassword":true}`；結束後清掉自起的 process（test-plan C6）
+  - 紀錄（leader，雙鎖）：後端 dev `/api/health` 200；`preview` 的 `Ready on http://localhost:8788`；`curl` callback → `302 http://localhost:3005/api/auth/error?error=state_not_found`；`/api/session` → `{"authEnabled":true,"user":null,"signInMethods":{"google":false,"emailPassword":true}}`。結束後只 kill 自起的 process tree，`lsof -i :3005 -i :8787 -i :8788` 為空。
+- [x] C7 驗收（指令）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball cf-typegen` 後 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；grep 確認 `DB: D1Database`、兩個 Google 變數為 `string`、全檔無 `DB?:`
+  - 紀錄（leader）：`cf-typegen` exit 0；`git diff --exit-code -- hono-pickball/worker-configuration.d.ts` exit 0；含 `DB: D1Database`、`GOOGLE_CLIENT_ID: string`、`GOOGLE_CLIENT_SECRET: string`，`DB?:` 0 筆。
+- [x] C8 驗收（指令）：`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball log -p main..HEAD | grep -E 'apps\.googleusercontent\.com|GOCSPX-'` 無輸出
+  - 紀錄（leader）：grep 無輸出（exit 1），於最後一個 commit 後重跑仍無輸出。
+- [x] C9 驗收（指令）：`DO_NOT_TRACK=1 openspec validate google-oauth-launch --strict`（repo root）valid
+  - 紀錄（leader）：`Change 'google-oauth-launch' is valid`。
+- [x] C10 驗收（指令）：test-plan C10 各項檢查（scripts 無 `--remote`、範例檔與 vitest 注入、`env.local` 不變、README 字串順序與第 8 步、root CLAUDE.md 小節）通過；`git diff main --stat` ⊆ proposal Impact；範圍外路徑的 `git diff main --stat` 輸出為空
+  - 紀錄（leader）：兩個 workspace scripts 含 `--remote` 皆 false；`.dev.vars.example` 的 `GOOGLE_CLIENT_ID=`／`GOOGLE_CLIENT_SECRET=` 各一行；`vitest.config.ts` 注入兩者 `""` 且 `environment: "local"`；`env.local` 為 `name: hono-pickball`、`hono-pickball-local`、無 `database_id`、無 `vars`（diff 只有註解）；README 九個字串依序出現且第 8 步含「正式站上線步驟」；root CLAUDE.md 小節含四名稱與 `CLOUDFLARE_ENV`；`git diff main --stat` 31 檔皆屬 Impact 或本 change 目錄；範圍外路徑 diff 為空。
 
 ## 5. 使用者上線步驟（人工）
 
