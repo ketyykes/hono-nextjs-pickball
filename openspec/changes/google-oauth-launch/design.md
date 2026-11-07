@@ -249,6 +249,7 @@ apply 期間 leader 的裁量（2026-11-07）：
 - **存活變異 S6（不在本 change 處理）**：`fetchSession` 無條件寫入 `signInMethods`（鍵不存在時成為 `undefined` 屬性）不會讓任何 it 轉紅——既有 it 用 `toEqual`，忽略值為 `undefined` 的屬性，Decision 4「鍵不存在 → 回傳值不含此鍵」未被釘住。補強需把既有 it 改為 `toStrictEqual` 或新增 it，前者違反「既有斷言不得修改」、後者超出 test-plan 的 +12 計數；目前行為正確（`??` 對 `undefined` 照常運作），留待後續 change。
 - **§3 Stage 2 的非阻擋建議（未處理，留待後續）**：兩種登入方式皆啟用時 Google 失敗的 alert 出現在 email 表單內（「登入」按鈕上方），離 Google 按鈕較遠；`pending` 與 `googlePending` 未互鎖（刻意連點兩顆按鈕會讓導向競爭）；`ok: true` 後經 bfcache 返回時按鈕維持 disabled；`session-client.ts` 檔頭「四個函式」的計數易漏改。皆屬 UI／措辭偏好或超出 spec 的行為，依「只做 spec 要求」不在本 change 修改。
 - **§4 Stage 2 建議的取捨**：必修兩項（README 缺 Google redirect URI 前置條件、hono `CLAUDE.md`「註冊停用」與 Google 首次登入自動建帳號矛盾）已修；另採納會造成誤診或與事實不符的建議（push 前分支確認、`authEnabled:false` 判讀補「新版尚未部署」、migration 清單只在首次為 0000～0004、`if (!env.DB) throw` 理由、400 防線加註實測紀錄、`route.ts` 失實的「未來」註解）。未採納：三份文件理由重複、`git revert -m 1` 寫法、補設 secret 是否需再部署的措辭（沿用 Decision 11）——屬措辭或結構偏好。
+- **Final Code Review（opus）PASS，非阻擋建議留待後續**：`hono-pickball/src/index.ts` 與 `test/api-cookie-check.test.ts` 的「未來 better-auth 依賴 Set-Cookie」措辭已過時；`test/auth-gating.test.ts` 註解「等同正式部署設定：沒有 ENVIRONMENT 也沒有 DB」在正式 D1 與 Google 上線後失實（應為「等同 auth 停用的部署」）；`isGoogleSignInConfigured` 以 `Boolean()` 判斷，只含空白的值會被視為已設定（符合 spec「非空字串」，若要 `.trim()` 需另開 change）。前兩項只是註解，因審查已收斂、改動不影響行為，不再開修正輪。
 
 ## 上線紀錄（archive 後由使用者回填）
 
