@@ -62,7 +62,7 @@
 - 用 `import { exports } from "cloudflare:workers"` 搭配 `exports.default.fetch()`；**不要用 `cloudflare:test` 的 `SELF` / `env`**——兩者在套件的 `@cloudflare/vitest-pool-workers/types`（`cloudflare-test.d.ts`，經 `test/tsconfig.json` 的 `types` 引入，非本 workspace 的檔案）皆已標 `@deprecated`。需直接存取 binding（如 D1）時，`env` 自 `cloudflare:workers` 匯入
 - **D1 夾具**：`vitest.config.ts` 以 `readD1Migrations` 讀 `drizzle/`，經 `miniflare.bindings.TEST_MIGRATIONS` 注入，`wrangler.environment` 設 `"local"` 取得 `DB`，`setupFiles` 的 `test/apply-migrations.ts` 以 `applyD1Migrations` 套用。測試**不得手寫 `CREATE TABLE`**，一律走 migration
 - **storage 以測試檔隔離**（本版已無 `isolatedStorage`）：同一測試檔內的 it 共用同一份 D1 資料，測試須自行使用不互相衝突的資料
-- `DB` 在型別上為必填（見「wrangler.jsonc 要點」），但測試／setup 仍以 `if (!env.DB) throw ...` 處理、不用 `!`，因為替身情境會注入 `DB: undefined`
+- `DB` 在型別上為必填（見「wrangler.jsonc 要點」），但測試／setup 仍以 `if (!env.DB) throw ...` 處理、不用 `!`（`test/apply-migrations.ts` 以此在 vitest 設定未帶入 DB binding 時給出明確錯誤，替身情境也可能注入 `DB: undefined`）
 - vitest pool 會讀 `.dev.vars`（輸出可見 `Using secrets defined in .dev.vars`），但 `vitest.config.ts` 的 `miniflare.bindings` 注入了 `ENVIRONMENT`、`BETTER_AUTH_SECRET`（假值）、`BETTER_AUTH_URL`，且實測注入值優先於 `.dev.vars`；`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 也固定注入空字串，否則在本機設了真 Google 值的開發者跑測試時，auth 啟用與 `signInMethods` 的斷言會隨機器而異；測試結果不依賴 `.dev.vars`（有／無該檔各跑一次，通過數相同）
 - **gating／替身情境的例外**：預設走 `exports.default.fetch()`，但要驗證停用（`ENVIRONMENT` 非 `"development"` 且 Google 未設定）或替換 env 時，改用 `app.request(path, init, { ...env, 覆寫 })` 注入 env，因為 `exports` 無法逐次覆寫 binding
 - 測試或 curl 呼叫 `POST /api/auth/*` 一律帶 `Origin`（屬於 trustedOrigins）：經前端 proxy 不帶會回 403；直打後端且不帶 cookie 時 better-auth 不檢查 Origin，不帶也會過，但不要依賴這個差異
@@ -75,10 +75,10 @@
 
 - 對外 API **一律掛在 `/api/*` 之下**——Next.js 端的 catch-all proxy（`app/api/[[...route]]/route.ts`）只轉發 `/api/*`，掛在其他路徑的端點前端打不到
 - **root path（`GET /`）刻意不定義，回 404 是預期行為**，不代表部署失敗。原本的 `Hello Hono!` 樣板已於 change `backend-cleanup-and-tdd-enablement` 移除（驗收：`test/routing.test.ts`）
-- **auth 與 session 端點**（better-auth 1.6；登入方式為本機測試帳號 email／password 與 Google，註冊停用）：
+- **auth 與 session 端點**（better-auth 1.6；登入方式為本機測試帳號 email／password 與 Google；email 註冊停用（`disableSignUp`），Google 首次登入即自動建立帳號、不設允許名單）：
   - **auth 啟用規則**（`src/auth/local-auth.ts`）：拆成兩個述詞——`isLocalAuthEnabled(env)`（`ENVIRONMENT === "development"`，測試帳號登入）與 `isGoogleSignInConfigured(env)`（`GOOGLE_CLIENT_ID` 與 `GOOGLE_CLIENT_SECRET` **皆為非空字串**；只設一半視為未設定，避免 provider 半啟用）；`isAuthEnabled` 為兩者**聯集**，`localAuth` 閘門與 `/api/session` 一律看 `isAuthEnabled`。非 development 且 Google 不齊全 → auth 整組停用，即 fail-closed（忘了設變數預設為關）
   - `/api/auth/*`（GET、POST）— better-auth handler；`GET /api/me` — 回 `{ user: { id, email, name } }`，未登入 401。兩者都掛共用 middleware `localAuth`（gate → `createAuth` → `c.set("auth")`）。**停用時（`isAuthEnabled` 為假）回 404，不建立 auth、不碰 D1**
-  - **非 development 時 email 端點不存在**：`createAuth` 此時帶 `disabledPaths: ["/sign-in/email", "/sign-up/email"]`，兩端點回 404（第一道防線，與 auth 停用的回應一致）；`emailAndPassword.enabled` 同時為 `false`（第二道防線，`disabledPaths` 被誤刪時仍以 400 拒絕）。Google 以 `socialProviders.google` 註冊（僅在 `isGoogleSignInConfigured` 時），帶 `prompt: "select_account"`，讓場邊共用裝置換人登入時不會自動沿用上一位的 Google 帳號
+  - **非 development 時 email 端點不存在**：`createAuth` 此時帶 `disabledPaths: ["/sign-in/email", "/sign-up/email"]`，兩端點回 404（第一道防線，與 auth 停用的回應一致）；`emailAndPassword.enabled` 同時為 `false`（第二道防線，`disabledPaths` 被誤刪時仍以 400 拒絕（實測紀錄，無專屬斷言））。Google 以 `socialProviders.google` 註冊（僅在 `isGoogleSignInConfigured` 時），帶 `prompt: "select_account"`，讓場邊共用裝置換人登入時不會自動沿用上一位的 Google 帳號
   - `GET /api/session` — 狀態探針，**不掛 gate，永遠 200** `{ authEnabled, user, signInMethods }`；`signInMethods` 為 `{ google: isGoogleSignInConfigured, emailPassword: isLocalAuthEnabled }`，停用時 `authEnabled: false`、`user: null`、`signInMethods` 兩者皆 `false`；查詢例外降級為 `user: null`（仍帶 `signInMethods`）並 `console.error`。前端顯示登入入口只看 `authEnabled`，登入頁顯示哪種登入方式只看 `signInMethods`。**SHALL NOT 作為授權依據**；受保護端點一律掛 `localAuth, requireSession`
 - **使用者資料 API**（所有使用者資料 feature 一律照此做）：
   - **批次寫入端點一律掛 `src/http/body-limit.ts` 的 `jsonBodyLimit(maxSize)`**，放在 `zValidator` 之前：超過上限回 JSON 413 `PAYLOAD_TOO_LARGE`（hono 內建 `bodyLimit` 預設回純文字、無錯誤碼，所以自訂 `onError`）。單筆端點（如 `PUT /players/:id`）沒有 body 上限

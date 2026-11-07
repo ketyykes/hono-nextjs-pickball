@@ -80,6 +80,12 @@ pnpm --filter ./nextjs-pickball preview          # 7. workerd runtime 整合驗�
 
 正式站只開放 Google 登入；後端以 Worker secret 取得設定，正式 D1 為 `hono-pickball`。以下步驟**一律由使用者手動執行**（coding agent 不執行任何遠端 Cloudflare 操作，只做 `--local` 與 `--dry-run`），指令皆在 repo root 執行。**步驟 1～3 完成前不要 `git push`**：push 即觸發兩個 Worker 的正式部署，缺 secret 時正式站會退回訪客版（不會壞，但需要再部署一次）。OAuth 的 Client ID／Secret 與任何 secret 值不得寫入任何會 commit 的檔案。
 
+前置條件：
+
+1. 正式 D1 `hono-pickball` 已建立，且其 `database_id` 已寫入 `hono-pickball/wrangler.jsonc`（repo 內已完成）。
+2. Google Cloud Console 已建立「網頁應用程式」類型的 OAuth 用戶端，「已授權的重新導向 URI」須含 `https://nextjs-pickball.wedsatcoming.workers.dev/api/auth/callback/google`。這是前端網址，不是後端網址；本機開發另需 `http://localhost:3005/api/auth/callback/google`。
+3. 已先完成上方「部署前手動檢查清單」第 1～7 步。
+
 #### 1. 設定 hono-pickball 的四個 Worker secret
 
 ```bash
@@ -104,8 +110,8 @@ pnpm --dir hono-pickball exec wrangler d1 migrations apply DB --remote
 pnpm --dir hono-pickball exec wrangler d1 migrations list DB --remote
 ```
 
-- 驗收：apply 列出 `0000`～`0004` 並成功；list 回報沒有待套用的 migration；輸出中的資料庫為 `hono-pickball`（`9c3a73c2-9a06-4e92-bb6d-90f9cbfda513`），**不是** `hono-pickball-local`。
-- 不帶 `--env`：讀 top-level 的正式 D1 設定；帶 `--env local` 會對到沒有 `database_id` 的本機設定。
+- 驗收：首次上線 apply 列出 `0000`～`0004` 並成功（之後只列新增的 migration）；list 回報沒有待套用的 migration；資料庫名稱為 `hono-pickball`（**不是** `hono-pickball-local`）。
+- 不帶 `--env`：讀 top-level 的正式 D1 設定；帶 `--env local` 會對到沒有 `database_id` 的本機設定，可能在遠端自動建立新的 D1。
 - 未套用就部署時，登入 callback 會 500、session 查詢會降級為未登入。
 
 #### 3. CF Dashboard 確認（Workers & Pages → 各 Worker → Settings）
@@ -123,6 +129,7 @@ git log --oneline origin/main..main
 git push origin main
 ```
 
+- push 前先確認目前分支為 `main`（`git branch --show-current`），且上線內容已合併進 `main`。
 - 驗收：`status` 為空；`origin/main..main` 列出的 commit 都是預期要上線的內容。
 - push 時機由你決定。push 後在 Dashboard 確認部署順序與結果：`hono-pickball` 的 build 成功後再確認 `nextjs-pickball` 的 build 成功（兩者實際完成先後不受 repo 控制）；`hono-pickball` 的 deploy log 應列出 `env.DB (hono-pickball)`。任一失敗依步驟 7 回滾或重試。
 - 過渡期皆安全：前端新、後端舊時仍是訪客介面；後端新、前端舊時，登入頁送出會顯示「此環境未開放登入」，不會寫入任何資料。
@@ -147,9 +154,9 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
 - 驗收：health 回 200 JSON；`/api/session` 為 `{"authEnabled":true,"user":null,"signInMethods":{"google":true,"emailPassword":false}}`；兩個 email 端點皆 `404`；callback 為 `302`（或其他 3xx）且 redirect_url 指向 `https://nextjs-pickball.wedsatcoming.workers.dev/...`。
 - 瀏覽器：開 `/login` 只見「使用 Google 登入」→ 選帳號並同意 → 回到首頁、navbar 顯示登出；重整仍登入；DevTools 可見 `__Secure-better-auth.session_token`（`Secure`、`HttpOnly`）；在 `/matchmaker/players` 新增一位參賽者、重整仍在（遠端 D1 寫入可用）；登出後回到訪客。Dashboard → hono-pickball → Observability 檢查 callback 與 `/api/session` 無 `exceededCpu`／1102。
 - 判讀：
-  - `authEnabled:false` → Google secret 缺或為空（回步驟 1）。
+  - `authEnabled:false` → Google secret 缺或為空（回步驟 1），或 hono-pickball 新版尚未部署成功（例如未合併就 push）。
   - `/api/auth/*` 回 500 或 `user` 永遠為 null → `BETTER_AUTH_SECRET`／`BETTER_AUTH_URL` 缺，或步驟 2 未完成。
-  - Google 顯示 `redirect_uri_mismatch` → `BETTER_AUTH_URL` 與 Console 登記值不一致。
+  - Google 顯示 `redirect_uri_mismatch` → `BETTER_AUTH_URL` 與 Console 登記的重新導向 URI（應為 `<BETTER_AUTH_URL>/api/auth/callback/google`）不一致。
   - email 端點不是 404 → 遠端被誤設了 `ENVIRONMENT`，立即移除。
 
 #### 6. Google OAuth 同意畫面
