@@ -26,14 +26,17 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/google-oauth-launch`、工作樹乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/google-oauth-launch`、工作樹乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
   確認 `hono-pickball/.dev.vars` 含 `TEST_ACCOUNT_*` 與 `ENVIRONMENT`、**不含** `GOOGLE_` 開頭的鍵（只以 `grep -c '^GOOGLE_'` 計數，不得輸出值；不符時向 coordinator 回報）；
   雙鎖下跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（errors／warnings 數）、
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --list`（六個 project 各自數量）、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball build`（保存 dry-run 的 binding 清單作對照：預期**不含** `env.DB`）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 proposal「Impact」列出的產品檔與測試檔與 propose 時（`main` `35f71a4`）內容一致（`git diff --stat 35f71a4 HEAD -- <檔案清單>` 無輸出）；
+  - 紀錄：基線回填於 environment.md（commit `6bc2a53`）。單元與 lint 依 coordinator 指示沿用 `35f71a4` 實測（前端 111／1118、後端 26／215、核心 10／27；lint 0／3）；leader 實跑三段 typecheck 皆 exit 0、`--list` 五個瀏覽器各 158／user-data 47、`hono-pickball build`（雙鎖）exit 0 且 `No bindings found.`；lockfile 零變動；`.dev.vars` 無 `GOOGLE_` 鍵。
+- [x] 1.2 對齊 main：確認 proposal「Impact」列出的產品檔與測試檔與 propose 時（`main` `35f71a4`）內容一致（`git diff --stat 35f71a4 HEAD -- <檔案清單>` 無輸出）；
   以 python difflib 比對本 change 全部 MODIFIED Requirement（auth 4、api-connectivity 1、user-data-sync 1、backend-database 1、dev-workflow 2）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate google-oauth-launch --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   以 Context7（`/better-auth/better-auth`）複查 design Context 的四項前提：`disabledPaths`、`signIn.social` 的 `callbackURL`／`errorCallbackURL`、Google `prompt`、https baseURL 的 secure cookie；不符時停止回報
+  - 紀錄：`git diff --stat 35f71a4 HEAD -- <Impact 產品檔／測試檔／文件／openspec/specs>` 無輸出；difflib 比對九個 MODIFIED Requirement，主 spec 側被刪除的行全屬本 change 刻意改寫（停用敘述、回應形狀、G1 字樣），無既有 Scenario 遺失，主 spec 未被他 change 改動，不需重新套用。
+    Context7 `/better-auth/better-auth` 複查四項前提皆成立：`disabledPaths` 於 router `onRequest` 以正規化路徑比對並回 404（本機 1.6.15 `dist/api/index.mjs:164-166` 同）；`sign-in/social` body 接受 `callbackURL`／`errorCallbackURL`；Google `prompt: "select_account"`；靜態 `baseURL` 以 `https://` 開頭時 cookie 為 `Secure` 且帶 `__Secure-` 前綴。
 
 ## 2. 後端：auth 啟用規則、email 封鎖、signInMethods、正式 D1
 
