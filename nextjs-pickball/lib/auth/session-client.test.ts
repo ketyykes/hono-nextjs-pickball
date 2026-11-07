@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSession, signInWithEmail, signOut } from "./session-client";
+import {
+	fetchSession,
+	signInWithEmail,
+	signOut,
+	startGoogleSignIn,
+} from "./session-client";
 
 const DISABLED = { authEnabled: false, user: null };
 const USER = { id: "u1", email: "a@example.com", name: "A" };
@@ -104,6 +109,31 @@ describe("fetchSession", () => {
 		const init = (mock.mock.calls[0] as unknown[])[1] as RequestInit | undefined;
 		expect(init?.keepalive).toBe(true);
 	});
+
+	it("fetchSession 回傳後端提供的 signInMethods", async () => {
+		const payload = {
+			authEnabled: true,
+			user: null,
+			signInMethods: { google: true, emailPassword: false },
+		};
+		stubFetch(async () => jsonResponse(payload));
+		await expect(fetchSession()).resolves.toEqual(payload);
+	});
+
+	it("signInMethods 形狀不符時 fetchSession 回傳未啟用", async () => {
+		const malformed: unknown[] = [
+			null,
+			"google",
+			{ google: true },
+			{ google: "yes", emailPassword: false },
+		];
+		for (const signInMethods of malformed) {
+			stubFetch(async () =>
+				jsonResponse({ authEnabled: true, user: null, signInMethods }),
+			);
+			await expect(fetchSession()).resolves.toEqual(DISABLED);
+		}
+	});
 });
 
 describe("signInWithEmail", () => {
@@ -172,5 +202,53 @@ describe("signOut", () => {
 			throw new TypeError("network down");
 		});
 		await expect(signOut()).resolves.toBe(false);
+	});
+});
+
+describe("startGoogleSignIn", () => {
+	it("startGoogleSignIn 以 JSON POST 至 /api/auth/sign-in/social 並導向回傳的網址", async () => {
+		const url = "https://accounts.google.com/o/oauth2/v2/auth?client_id=x";
+		const mock = stubFetch(async () => jsonResponse({ url, redirect: true }));
+		const navigate = vi.fn();
+
+		await expect(startGoogleSignIn(navigate)).resolves.toEqual({ ok: true });
+
+		expect(mock).toHaveBeenCalledTimes(1);
+		const [requestUrl, init] = mock.mock.calls[0] as unknown as [
+			string,
+			RequestInit,
+		];
+		expect(requestUrl).toBe("/api/auth/sign-in/social");
+		expect(init.method).toBe("POST");
+		expect(new Headers(init.headers).get("Content-Type")).toBe(
+			"application/json",
+		);
+		expect(JSON.parse(init.body as string)).toEqual({
+			provider: "google",
+			callbackURL: "/",
+			errorCallbackURL: "/login",
+		});
+		expect(navigate).toHaveBeenCalledTimes(1);
+		expect(navigate).toHaveBeenCalledWith(url);
+	});
+
+	it("startGoogleSignIn 於非 200、缺少網址、非 https 或網路錯誤時回傳失敗且不導向", async () => {
+		const failures: Array<() => Promise<Response>> = [
+			async () => jsonResponse({ url: "https://accounts.google.com/" }, 500),
+			async () => new Response("not json", { status: 200 }),
+			async () => jsonResponse({ redirect: true }),
+			async () => jsonResponse({ url: "javascript:alert(1)" }),
+			async () => jsonResponse({ url: "http://accounts.google.com/" }),
+			async () => {
+				throw new TypeError("network down");
+			},
+		];
+
+		for (const failure of failures) {
+			stubFetch(failure);
+			const navigate = vi.fn();
+			await expect(startGoogleSignIn(navigate)).resolves.toEqual({ ok: false });
+			expect(navigate).not.toHaveBeenCalled();
+		}
 	});
 });

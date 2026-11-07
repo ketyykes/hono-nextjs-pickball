@@ -193,6 +193,24 @@ describe("session-store", () => {
 		});
 	});
 
+	it("fetchSession 回傳 signInMethods 時快照保留同一份 signInMethods", async () => {
+		mockedFetchSession.mockResolvedValue({
+			authEnabled: true,
+			user: null,
+			signInMethods: { google: true, emailPassword: false },
+		});
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		expect(getSnapshot()).toEqual({
+			status: "ready",
+			authEnabled: true,
+			user: null,
+			signInMethods: { google: true, emailPassword: false },
+		});
+	});
+
 	it("ready 之後新增訂閱者不再發請求", async () => {
 		subscribe(vi.fn());
 		await vi.waitFor(() => {
