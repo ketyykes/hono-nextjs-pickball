@@ -42,6 +42,26 @@ test.describe("auth session", () => {
 	test.describe("訪客", () => {
 		test.use({ storageState: guestState });
 
+		test("登入頁的登入方式與後端回報一致", async ({ page }) => {
+			const res = await page.request.get("/api/session");
+			const body = (await res.json()) as { signInMethods?: { google?: unknown; emailPassword?: unknown } };
+			expect(typeof body.signInMethods?.google).toBe("boolean");
+			expect(typeof body.signInMethods?.emailPassword).toBe("boolean");
+			const google = body.signInMethods?.google === true;
+			const emailPassword = body.signInMethods?.emailPassword === true;
+
+			await page.goto("/login");
+			// 先等任一登入方式渲染完成，再數 Google 按鈕，避免在 session 尚未回應時誤判為 0
+			if (emailPassword) {
+				await expectSession(page.getByLabel("電子郵件")).toBeVisible();
+			}
+			const googleButton = page.getByRole("button", { name: "使用 Google 登入" });
+			if (google) {
+				await expectSession(googleButton).toBeVisible();
+			}
+			await expect(googleButton).toHaveCount(google ? 1 : 0);
+		});
+
 		test("未登入時 navbar 顯示登入入口並可前往登入頁", async ({ page }) => {
 			await page.goto("/");
 			await page.locator("header").getByRole("link", { name: "登入" }).click();

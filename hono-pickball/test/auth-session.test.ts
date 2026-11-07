@@ -65,14 +65,14 @@ describe("GET /api/session", () => {
 		const res = await app.request("/api/session", {}, { ...env, ENVIRONMENT: undefined, DB: undefined });
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ authEnabled: false, user: null });
+		expect(await res.json()).toEqual({ authEnabled: false, user: null, signInMethods: { google: false, emailPassword: false } });
 	});
 
 	it("啟用但未登入時回 200 與 user null", async () => {
 		const res = await getSession();
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ authEnabled: true, user: null });
+		expect(await res.json()).toEqual({ authEnabled: true, user: null, signInMethods: { google: false, emailPassword: true } });
 	});
 
 	it("登入後回 200 與目前使用者的 id、email 與 name", async () => {
@@ -91,6 +91,21 @@ describe("GET /api/session", () => {
 		expect(body.user.name).toBe("Self");
 	});
 
+	it("非 development 且 Google 設定齊全時回 authEnabled true 與只有 Google 的 signInMethods", async () => {
+		const res = await app.request(
+			"/api/session",
+			{},
+			{ ...env, ENVIRONMENT: undefined, GOOGLE_CLIENT_ID: "fake-client-id", GOOGLE_CLIENT_SECRET: "fake-client-secret" },
+		);
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			authEnabled: true,
+			user: null,
+			signInMethods: { google: true, emailPassword: false },
+		});
+	});
+
 	it("session 查詢拋錯時仍回 200 與 user null", async () => {
 		// 用真實登入取得簽章正確的 cookie，確保 better-auth 一定會走到 DB 查詢而非提早判定無效
 		const email = "session-db-down@example.com";
@@ -104,7 +119,7 @@ describe("GET /api/session", () => {
 		try {
 			const res = await app.request("/api/session", init, brokenEnv);
 			expect(res.status).toBe(200);
-			expect(await res.json()).toEqual({ authEnabled: true, user: null });
+			expect(await res.json()).toEqual({ authEnabled: true, user: null, signInMethods: { google: false, emailPassword: true } });
 			// better-auth 自己也會 console.error，所以要認本路由的訊息，不能只看有沒有被呼叫
 			expect(spy.mock.calls.some(([message]) => typeof message === "string" && message.includes("查詢 session 失敗"))).toBe(true);
 		} finally {

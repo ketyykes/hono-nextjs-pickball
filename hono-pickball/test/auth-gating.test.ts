@@ -21,6 +21,34 @@ function signInRequest(email: string): RequestInit {
 	};
 }
 
+describe("Google 設定不全的 gate", () => {
+	it("非 development 且 Google 設定不全時 auth 整組停用且不觸碰 D1", async () => {
+		// 只設一半：不得半啟用，且沒有 DB binding 也不能 500
+		const halfConfiguredEnv = { ...env, ENVIRONMENT: undefined, DB: undefined, GOOGLE_CLIENT_ID: "fake-client-id", GOOGLE_CLIENT_SECRET: "" };
+
+		const sessionRes = await app.request("/api/session", {}, halfConfiguredEnv);
+		const socialRes = await app.request(
+			"/api/auth/sign-in/social",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json", Origin: "http://localhost:3005" },
+				body: JSON.stringify({ provider: "google", callbackURL: "/", errorCallbackURL: "/login" }),
+			},
+			halfConfiguredEnv,
+		);
+		const meRes = await app.request("/api/me", {}, halfConfiguredEnv);
+
+		expect(sessionRes.status).toBe(200);
+		expect(await sessionRes.json()).toEqual({
+			authEnabled: false,
+			user: null,
+			signInMethods: { google: false, emailPassword: false },
+		});
+		expect(socialRes.status).toBe(404);
+		expect(meRes.status).toBe(404);
+	});
+});
+
 describe("本機登入 gate", () => {
 	it("ENVIRONMENT 缺值時 sign-in 回 404 且不發 cookie", async () => {
 		await seed("gating-missing@example.com");
