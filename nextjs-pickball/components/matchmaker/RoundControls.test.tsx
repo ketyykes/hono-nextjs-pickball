@@ -659,6 +659,55 @@ describe("RoundControls", () => {
 		expect(onSettingsChangeWithRound).not.toHaveBeenCalled();
 	});
 
+	// 回合存在且未鎖定時，「不計時」代表取消本輪計時，MUST 以 null 委派 setTimerDuration，
+	// 且不得走 onSettingsChange（那是尚無回合時的預備設定入口）。
+	it("回合存在且未鎖定時點選不計時委派 setTimerDuration(null)", async () => {
+		const user = userEvent.setup();
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({ round, matchSlots: {}, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+
+		await user.click(
+			within(screen.getByRole("radiogroup", { name: "計時" })).getByRole("radio", {
+				name: "不計時",
+			}),
+		);
+
+		expect(setTimerDuration).toHaveBeenCalledTimes(1);
+		expect(setTimerDuration).toHaveBeenCalledWith(null);
+		expect(onSettingsChange).not.toHaveBeenCalled();
+	});
+
+	// 方向鍵與點擊走同一個 handler，需獨立釘住。選項順序為 [不計時, 10, 15, 20]，
+	// 從 10 分鐘（index 1）按 ArrowLeft 會移到 index 0 的「不計時」。
+	it("回合存在且未鎖定時方向鍵移到不計時亦委派 setTimerDuration(null)", () => {
+		const round = buildRound({
+			timer: { durationMinutes: 10, startedAt: null },
+			matches: [buildMatch({ status: "pending" })],
+		});
+		const onSettingsChange = vi.fn();
+		const setTimerDuration = vi.fn();
+		render(
+			<RoundControls
+				{...buildProps({ round, matchSlots: {}, onSettingsChange, setTimerDuration })}
+			/>,
+		);
+
+		fireEvent.keyDown(screen.getByRole("radiogroup", { name: "計時" }), { key: "ArrowLeft" });
+
+		expect(setTimerDuration).toHaveBeenCalledTimes(1);
+		expect(setTimerDuration).toHaveBeenCalledWith(null);
+		expect(onSettingsChange).not.toHaveBeenCalled();
+	});
+
 	// regression guard：比照目標分數既有的同款測試——鎖定時四顆
 	// radio 皆 disabled，真實鍵盤路徑進不了容器，handleTimerKeyDown 內的 if (locked) return;
 	// 只能用 fireEvent 直接對容器派發事件才命中得到。

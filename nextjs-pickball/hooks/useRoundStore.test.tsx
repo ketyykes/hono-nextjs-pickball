@@ -586,6 +586,28 @@ describe("useRoundStore", () => {
 		expect(result.current.round).toBe(roundAfterComplete);
 	});
 
+	it("訪客模式 setTimerDuration(null) 取消本輪計時並寫回儲存", () => {
+		const players: Player[] = [makePlayer({ id: "p1" }), makePlayer({ id: "p2" })];
+		const updatePlayer = vi.fn();
+		const { result } = renderHook(() => useRoundStore({ players, updatePlayer }));
+
+		act(() => {
+			result.current.generateRound({ format: "singles", courtCount: 1, timerDurationMinutes: 10 });
+		});
+		expect(result.current.round?.timer?.durationMinutes).toBe(10);
+
+		let clearResult: SetTimerDurationResult | undefined;
+		act(() => {
+			clearResult = result.current.setTimerDuration(null);
+		});
+
+		expect(clearResult?.ok).toBe(true);
+		expect(result.current.round?.timer).toBeNull();
+		const storedRound = readRound();
+		expect(storedRound).not.toBeNull();
+		expect(storedRound?.timer).toBeNull();
+	});
+
 	// regression guard（補充測試，非驗收錨點）：上方錨點 it 只走 startTimer 的成功
 	// 路徑，下方 null 防線 it 又在防線就 return，兩者都到不了「回合存在但純函式拒絕」這條路徑
 	// ——審查時實測把 startTimer 改成「失敗時也 dispatch」，全套測試仍然全綠。既有

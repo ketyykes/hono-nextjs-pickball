@@ -495,7 +495,7 @@ export function useRemoteRoundStore({
 		return result;
 	}
 
-	function setTimerDuration(durationMinutes: RoundTimerDurationMinutes): SetTimerDurationResult {
+	function setTimerDuration(durationMinutes: RoundTimerDurationMinutes | null): SetTimerDurationResult {
 		const current = roundRef.current;
 		if (notReady() || current === null) {
 			return {

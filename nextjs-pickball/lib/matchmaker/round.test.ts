@@ -898,6 +898,44 @@ describe("setTimerDuration", () => {
 			expect(lockedRound).toEqual(lockedRoundSnapshot);
 		}
 	});
+
+	it("setTimerDuration 傳入 null 時把本輪改回不計時，計時已開始亦同", () => {
+		const timers = [
+			{ durationMinutes: 10, startedAt: null },
+			{ durationMinutes: 10, startedAt: "2026-08-16T00:30:00.000Z" },
+		] as const;
+
+		for (const timer of timers) {
+			const round = makeRound({
+				matches: [makeRoundMatch({ id: "m-1" }), makeRoundMatch({ id: "m-2", courtNumber: 2 })],
+				timer,
+			});
+			const roundSnapshot = structuredClone(round);
+
+			const cleared = setTimerDuration(round, null);
+
+			expect(cleared.ok).toBe(true);
+			if (!cleared.ok) continue;
+			expect(cleared.round.timer).toBeNull();
+			expect({ ...cleared.round, timer: round.timer }).toEqual(round);
+			expect(round).toEqual(roundSnapshot);
+		}
+	});
+
+	it("已有場次離開 pending 時 setTimerDuration 傳入 null 亦拒絕且不改動回合", () => {
+		const lockedRound = makeRound({
+			matches: [makeRoundMatch({ id: "m-1" }), makeRoundMatch({ id: "m-2", courtNumber: 2, status: "scoring" })],
+			timer: { durationMinutes: 10, startedAt: null },
+		});
+		const lockedRoundSnapshot = structuredClone(lockedRound);
+
+		const rejected = setTimerDuration(lockedRound, null);
+
+		expect(rejected.ok).toBe(false);
+		if (rejected.ok) return;
+		expect(rejected.code).toBe(SET_TIMER_DURATION_FAILURE_CODE.SCORING_STARTED);
+		expect(lockedRound).toEqual(lockedRoundSnapshot);
+	});
 });
 
 describe("startTimer", () => {
