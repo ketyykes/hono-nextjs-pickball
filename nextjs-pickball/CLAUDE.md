@@ -52,9 +52,9 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   頁面本身零 store setter 呼叫
 - 上述**五頁**共用 `app/matchmaker/layout.tsx` 的區段導覽（「對戰／參賽者／歷史／資料／統計」；分頁清單與 active 判定在 `lib/matchmaker/section-nav.ts`，不寫在元件內）。
   **列印時整條區段導覽會被 `@media print` 隱藏**，新增分頁不需要另加 CSS 規則
-- `/login` — 本機測試帳號登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在所有寬度顯示（窄螢幕的空間由 `NAV_ITEM_BASE` 的連結內距與 navbar 容器間距讓出），載入中與 auth 停用時以隱形佔位元素保留寬度，回應前後導航連結位置不變
+- `/login` — 登入頁（`LoginForm`；已登入時顯示「登出」按鈕）。**顯示哪種登入方式只看 `/api/session` 的 `signInMethods`**：`google` 為真顯示「使用 Google 登入」按鈕、`emailPassword` 為真顯示測試帳號表單，兩者皆真時按鈕在上、表單在下，兩者皆假顯示「此環境未開放登入」；快照不含 `signInMethods`（舊後端）時視為 `{ google: false, emailPassword: true }`。正式站只有 Google，本機預設只有測試帳號（`.dev.vars` 填了 Google 才多出按鈕）。Google 登入由 `lib/auth/session-client.ts` 的 `startGoogleSignIn()` 發起：POST `/api/auth/sign-in/social`（`provider: "google"`、`callbackURL: "/"`、`errorCallbackURL: "/login"`），**只接受 `https:` 的回應 `url`** 才整頁導向（防止回應被竄改成 `javascript:` 等協定），絕不 throw、失敗回 `{ ok: false }`；`navigate` 參數只為單元測試替換導向。登入入口（navbar 的 `AccountEntry`）是否出現仍只看 `authEnabled`。**不在 navbar 的 `NAV_LINKS`**，由 navbar 的帳號圖示（`AccountEntry`）進入。帳號入口在所有寬度顯示（窄螢幕的空間由 `NAV_ITEM_BASE` 的連結內距與 navbar 容器間距讓出），載入中與 auth 停用時以隱形佔位元素保留寬度，回應前後導航連結位置不變
 - 未匹配路由 — 由 `app/not-found.tsx`（Server Component）顯示中文 404 頁，HTTP 404、含「回首頁」「前往對戰分配」；`/api/*` 不經此頁（仍由 proxy 轉發後端）
-- `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**
+- `app/api/[[...route]]/route.ts` — service binding proxy，把 `/api/*` 原樣轉發給 hono-pickball（瀏覽器視角 same-origin）。**不要在前端另寫 API route，後端邏輯一律放 hono-pickball**。轉發時 **`redirect: "manual"` 為必要**：binding 的 `fetch(url, init)` 預設跟隨轉址，後端的 3xx（OAuth callback 的轉址）會在 proxy 內被吞掉，瀏覽器收不到轉址與 callback 回應上的 `Set-Cookie`，登入就不會成立。實測 `next dev` 下 miniflare 的 service binding 同樣會跟隨轉址（加之前 GET `/api/auth/callback/google` 得 200 而非 3xx），所以本機與正式環境都需要這個設定
 
 matchmaker 的儲存依登入態分流（引擎的分配、評分等純邏輯仍在前端或核心套件，是刻意決策，不是待搬的後端邏輯）：
 - 訪客（含 auth 停用、session 載入中）仍全走 LocalStorage
