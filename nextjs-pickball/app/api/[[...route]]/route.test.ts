@@ -116,4 +116,43 @@ describe("/api/* service binding proxy", () => {
 		expect(response.headers.get("x-upstream")).toBe("yes");
 		expect(await response.text()).toBe("payload");
 	});
+
+	it("轉發時以 redirect: manual 呼叫 binding，不在 proxy 內跟隨轉址", async () => {
+		await GET(new Request("https://example.com/api/thing"));
+		expect(lastCall().init.redirect).toBe("manual");
+
+		await POST(
+			new Request("https://example.com/api/thing", {
+				method: "POST",
+				body: "{}",
+			}),
+		);
+		expect(lastCall().init.redirect).toBe("manual");
+	});
+
+	// 性質：regression guard。以 headers 重建 Response 本就會保留 Location 與多個 Set-Cookie，
+	// 這裡鎖住「改為 manual 之後瀏覽器真的拿得到 cookie」。
+	it("upstream 的 3xx 轉址連同 Location 與多個 Set-Cookie 原樣回傳", async () => {
+		fetchSpy.mockResolvedValueOnce(
+			new Response(null, {
+				status: 302,
+				headers: [
+					["location", "http://localhost:3005/"],
+					["set-cookie", "a=1; Path=/"],
+					["set-cookie", "b=2; Path=/"],
+				],
+			}),
+		);
+
+		const response = await GET(
+			new Request("https://example.com/api/auth/callback/google"),
+		);
+
+		expect(response.status).toBe(302);
+		expect(response.headers.get("location")).toBe("http://localhost:3005/");
+		expect(response.headers.getSetCookie()).toEqual([
+			"a=1; Path=/",
+			"b=2; Path=/",
+		]);
+	});
 });

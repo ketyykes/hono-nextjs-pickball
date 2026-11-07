@@ -29,8 +29,14 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：（apply §1.1 回填：三個 workspace 的檔數／測試數、三段 typecheck、lint errors／warnings、`playwright test --list` 六個 project 各自數量、`hono-pickball build` 的 dry-run binding 清單）
-- **Initial commit hash**：（apply §1.1 回填：`change/google-oauth-launch` 分出時的 `main` HEAD；propose 時為 `35f71a4`）
+- **Baseline tests**（§1.1，2026-11-07）：
+  - 單元（沿用 coordinator 於 `main` `35f71a4` 的實測，重負載不重跑）：前端 111 檔／1118 tests、後端 26 檔／215 tests、核心 10 檔／27 tests，全綠。
+  - lint（沿用 coordinator 實測）：0 errors／3 warnings。
+  - 三段 typecheck（leader 實跑，`b89f716`）：`pnpm -r exec tsc --noEmit` exit 0、`hono-pickball typecheck` exit 0、`pickball-core typecheck` exit 0。
+  - `playwright test --list`（leader 實跑）：chromium 158、firefox 158、webkit 158、mobile-chrome 158、mobile-safari 158、user-data 47（合計 837／26 檔）；chromium 執行 158 passed 沿用 coordinator 實測。
+  - `hono-pickball build`（leader 雙鎖實跑）：exit 0，dry-run 輸出 `No bindings found.`（不含 `env.DB`，符合預期）。
+  - `pnpm install` 後 lockfile 零變動；`db:migrate:local` 為 `No migrations to apply!`；`.dev.vars` 鍵名含 `ENVIRONMENT`、`BETTER_AUTH_*`、`TEST_ACCOUNT_*`，`grep -c '^GOOGLE_'` 為 0（未輸出值）。
+- **Initial commit hash**：`b89f716`（`change/google-oauth-launch` 分出時的 `main` HEAD；propose 時為 `35f71a4`，兩者之間只有本 change 的 propose commit）
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

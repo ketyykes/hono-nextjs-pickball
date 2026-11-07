@@ -80,4 +80,16 @@ test.describe("auth proxy 穿透", () => {
 			await anonymous.dispose();
 		}
 	});
+
+	test("經 proxy 呼叫 OAuth callback 時轉址原樣回到瀏覽器", async ({
+		request,
+	}) => {
+		// 不帶 state 時 better-auth 以轉址回報錯誤；proxy 若跟隨轉址，這裡會拿到 200 而非 3xx
+		const res = await request.get("/api/auth/callback/google", {
+			maxRedirects: 0,
+		});
+		expect(res.status()).toBeGreaterThanOrEqual(300);
+		expect(res.status()).toBeLessThan(400);
+		expect(res.headers()["location"]).toMatch(/^http:\/\/localhost:3005\//);
+	});
 });

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { createAuth } from './auth/create-auth'
 import { localAuth } from './auth/local-auth-middleware'
-import { isLocalAuthEnabled } from './auth/local-auth'
+import { isAuthEnabled, isGoogleSignInConfigured, isLocalAuthEnabled } from './auth/local-auth'
 import { toPublicUser } from './auth/public-user'
 import { requireSession, type AuthAppEnv } from './auth/require-session'
 import { importRoutes } from './routes/import'
@@ -60,8 +60,17 @@ app.route('/api/import', importRoutes)
 // 因此刻意不掛 localAuth（停用時要回 200 而非 404），停用分支也不建立 auth、不碰 D1。
 // 本端點只回報狀態，不可作為授權依據；需要授權的路由一律用 requireSession。
 app.get('/api/session', async (c) => {
-  if (!isLocalAuthEnabled(c.env)) {
-    return c.json({ authEnabled: false, user: null })
+  if (!isAuthEnabled(c.env)) {
+    return c.json({
+      authEnabled: false,
+      user: null,
+      signInMethods: { google: false, emailPassword: false },
+    })
+  }
+
+  const signInMethods = {
+    google: isGoogleSignInConfigured(c.env),
+    emailPassword: isLocalAuthEnabled(c.env),
   }
 
   // 包住 auth 建立與 session 查詢：最常見的失敗是本機尚未 migration 卻帶著舊 cookie，
@@ -72,10 +81,11 @@ app.get('/api/session', async (c) => {
     return c.json({
       authEnabled: true,
       user: result ? toPublicUser(result.user) : null,
+      signInMethods,
     })
   } catch (error) {
     console.error('查詢 session 失敗，降級為未登入', error)
-    return c.json({ authEnabled: true, user: null })
+    return c.json({ authEnabled: true, user: null, signInMethods })
   }
 })
 

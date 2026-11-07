@@ -15,3 +15,8 @@ BETTER_AUTH_URL=http://localhost:3005
 TEST_ACCOUNT_EMAIL=tester@example.com
 TEST_ACCOUNT_PASSWORD=change-me
 TEST_ACCOUNT_NAME=Local Tester
+
+# Google 登入（選填）：兩者皆有值才啟用，本機預設留空即只有測試帳號登入。
+# 正式站以 wrangler secret put 設定；真值不得寫入任何會 commit 的檔案。
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

@@ -113,6 +113,9 @@ environment 等 artifact，apply 階段強制 git worktree 隔離與 subagent �
 - 每個 Worker 的 **root directory** 與 **build command**：Dashboard → 該 Worker → Settings → Builds
 - `wrangler.jsonc` 的 `name` **必須與 Dashboard 上的 Worker 名稱一致**，否則會部署到錯的 Worker
 - 新增 `build` script 到某個 workspace 時要留意：Workers Builds 可能因此改用不同的 build command
+- `hono-pickball` 的四個 **Worker secret**：`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（只記名稱，值不得寫入任何檔案或 commit）。由使用者以 `wrangler secret put` 設定，`wrangler secret list` 應恰為這四個名稱；缺 Google 任一值時 auth 整組停用（看起來像什麼都沒變）。步驟與驗收見 [`README.md`](./README.md)「正式站上線步驟」
+- **不得設定 `CLOUDFLARE_ENV` 環境變數，build／deploy command 也不得帶 `--env`**：否則部署改讀沒有 `database_id` 的 `env.local`，wrangler 可能在遠端自動建立新的 D1
+- **遠端不得設定 `ENVIRONMENT`**（secret、`vars`、Dashboard 變數皆不可）：設了 `development` 會在正式站開啟測試帳號登入
 
 ### 部署前檢查
 
