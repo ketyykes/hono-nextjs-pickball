@@ -12,7 +12,9 @@ export function isLocalAuthEnabled(env: { ENVIRONMENT: string | undefined }): bo
  * Google 登入是否設定齊全：client id 與 secret 皆為非空字串才為真。
  * 只設一半時 provider 會半啟用（按鈕在、callback 失敗），因此缺值一律視為未設定。
  */
-export function isGoogleSignInConfigured(env: { GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string }): boolean {
+export function isGoogleSignInConfigured<T extends { GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string }>(
+	env: T,
+): env is T & { GOOGLE_CLIENT_ID: string; GOOGLE_CLIENT_SECRET: string } {
 	return Boolean(env.GOOGLE_CLIENT_ID) && Boolean(env.GOOGLE_CLIENT_SECRET);
 }
 

@@ -24,7 +24,7 @@
       // 具名環境預設會把 worker 命名為 hono-pickball-local，
       // 前端 HONO_API -> hono-pickball 的 service binding 就找不到目標，故明確覆寫
       "name": "hono-pickball",
-      // 刻意不填 database_id，避免出現看似真實的 ID
+      // 本機 D1 不需要 database_id，且不得填看似真實的 UUID
       "d1_databases": [
         {
           "binding": "DB",
