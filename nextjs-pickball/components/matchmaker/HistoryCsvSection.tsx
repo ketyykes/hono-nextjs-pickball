@@ -70,7 +70,7 @@ export function HistoryCsvSection() {
 			</CardHeader>
 			{mode === "pending" ? (
 				// 儲存模式未定時不提供匯出：本機與雲端的歷史來源不同
-				<CardContent>
+				<CardContent data-sync-status="pending">
 					<SyncStatusNotice status="pending" />
 				</CardContent>
 			) : (

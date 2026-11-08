@@ -125,7 +125,7 @@ export function JsonBackupSection() {
 			</CardHeader>
 			{mode === "pending" ? (
 				// 儲存模式未定時不提供匯出與還原：兩種模式的操作會讀寫不同來源
-				<CardContent>
+				<CardContent data-sync-status="pending">
 					<SyncStatusNotice status="pending" />
 				</CardContent>
 			) : (

@@ -114,7 +114,7 @@ export function RosterCsvImportSection() {
 			</CardHeader>
 			{mode === "pending" ? (
 				// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
-				<CardContent>
+				<CardContent data-sync-status="pending">
 					<SyncStatusNotice status="pending" />
 				</CardContent>
 			) : (
