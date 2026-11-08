@@ -3,6 +3,7 @@ import { test, expect, type Browser, type Page, type Response } from "@playwrigh
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { installFlashRecorder, readFlashHits } from "../helpers/flash-recorder";
+import { holdSession } from "../helpers/hold-session";
 import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
 // 登入後的 matchmaker 名單以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
@@ -136,29 +137,19 @@ test.describe("matchmaker 名單雲端同步", () => {
 
 		await installFlashRecorder(page, { texts: ["目前還沒有參賽者", "共 0 位參賽者"], selectors: [] });
 
-		let release: () => void = () => {};
-		const gate = new Promise<void>((resolve) => {
-			release = resolve;
-		});
-		await page.route("**/api/session", async (route) => {
-			await gate;
-			try {
-				await route.continue();
-			} catch {
-				// 頁面已換掉或關閉時請求會被取消，不影響測試結果
-			}
-		});
+		const release = await holdSession(page);
 		try {
 			await page.reload();
 			await expect(page.locator('main[data-sync-status="pending"]')).toBeVisible();
 			await expect(page.getByRole("status")).toHaveText("正在載入資料…");
+			release();
+			await expect(page.locator(SYNCED)).toBeVisible();
+			await expect(page.getByText("雲端甲")).toBeVisible();
+			expect(await readFlashHits(page)).toEqual([]);
 		} finally {
 			release();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
 		}
-		await expect(page.locator(SYNCED)).toBeVisible();
-		await expect(page.getByText("雲端甲")).toBeVisible();
-		expect(await readFlashHits(page)).toEqual([]);
-		await page.unrouteAll({ behavior: "ignoreErrors" });
 	});
 
 	test("登入後新增的參賽者在重新整理後由雲端還原且不寫入本機", async ({ page }) => {

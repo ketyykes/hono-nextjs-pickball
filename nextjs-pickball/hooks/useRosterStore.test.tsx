@@ -361,6 +361,17 @@ describe("useRosterStore 儲存模式選擇器", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
+	// regression guard：行為早已正確（等待中不帶本機資料），此條防止日後改成帶入本機 droppedCount。
+	it("session 等待中時即使本機資料含損壞筆數 droppedCount 仍為 0", () => {
+		seedLocalRoster([makePlayer({ id: "local-1" }), makePlayer({ id: "local-bad", rating: 99 })]);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		expect(result.current.syncStatus).toBe("pending");
+		expect(result.current.droppedCount).toBe(0);
+	});
+
 	it("等待中的 session 確認為未登入時改回本機名單", () => {
 		seedLocalRoster([makePlayer({ id: "local-1" })]);
 		vi.mocked(useSession).mockReturnValue(pendingSession);

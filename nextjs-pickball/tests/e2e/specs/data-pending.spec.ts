@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { SIGNED_IN_HINT_STORAGE_KEY } from "@/lib/auth/session-hint";
+import { DATA_PENDING_MESSAGE } from "@/lib/sync/sync-status";
 import {
 	HISTORY_STORAGE_KEY,
 	ROSTER_STORAGE_KEY,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/matchmaker/storage-keys";
 import { STORAGE_KEY as SCOREBOARD_STORAGE_KEY } from "@/lib/scoreboard/storage-keys";
 import { installFlashRecorder, readFlashHits } from "../helpers/flash-recorder";
+import { holdSession } from "../helpers/hold-session";
 
 // 資料來源確定前只能顯示等待中提示：訪客載入本機資料的過程中不可閃出空狀態或預設值，
 // 殘留上次登入提示時要先等待、確認非登入後才回到本機名單。
@@ -118,23 +120,6 @@ async function seedStorage(page: Page, entries: Record<string, string>) {
 	}, entries);
 }
 
-// 攔住 /api/session 直到呼叫 release；放行前的斷言要精簡（逾時為 10 秒）
-async function holdSession(page: Page) {
-	let release: () => void = () => {};
-	const gate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	await page.route("**/api/session", async (route) => {
-		await gate;
-		try {
-			await route.continue();
-		} catch {
-			// 頁面已換掉或關閉時請求會被取消，不影響測試結果
-		}
-	});
-	return release;
-}
-
 test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 	test("訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值", async ({ page }) => {
 		await seedStorage(page, {
@@ -173,19 +158,23 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.getByText("本機甲").first()).toBeVisible();
 
+		await installFlashRecorder(page, { texts: EMPTY_TEXTS, selectors: [] });
+
 		const release = await holdSession(page);
 		try {
 			await page.reload();
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
 			await expect(page.getByRole("status")).toHaveCount(0);
+			release();
+			await expect(page.getByText("本機甲").first()).toBeVisible();
+			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
+			await expect(page.getByRole("status")).toHaveCount(0);
+			expect(await readFlashHits(page), "重新整理過程的閃爍記錄").toEqual([]);
 		} finally {
 			release();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
 		}
-		await expect(page.getByText("本機甲").first()).toBeVisible();
-		await expect(page.locator("[data-sync-status]")).toHaveCount(0);
-		await expect(page.getByRole("status")).toHaveCount(0);
-		await page.unrouteAll({ behavior: "ignoreErrors" });
 	});
 
 	test("上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示", async ({ page }) => {
@@ -203,14 +192,17 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 			await page.goto(PLAYERS_PAGE);
 			await expect(page.locator(PENDING_MAIN)).toBeVisible();
 			await expect(page.getByText("本機甲")).toHaveCount(0);
+			await expect(page.getByRole("status")).toHaveText(DATA_PENDING_MESSAGE);
+			await expect(page.getByText("目前還沒有參賽者")).toHaveCount(0);
+			release();
+			await expect(page.getByText("本機甲").first()).toBeVisible();
+			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
+			await expect
+				.poll(() => page.evaluate((key) => window.localStorage.getItem(key), SIGNED_IN_HINT_STORAGE_KEY))
+				.toBeNull();
 		} finally {
 			release();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
 		}
-		await expect(page.getByText("本機甲").first()).toBeVisible();
-		await expect(page.locator("[data-sync-status]")).toHaveCount(0);
-		await expect
-			.poll(() => page.evaluate((key) => window.localStorage.getItem(key), SIGNED_IN_HINT_STORAGE_KEY))
-			.toBeNull();
-		await page.unrouteAll({ behavior: "ignoreErrors" });
 	});
 });
