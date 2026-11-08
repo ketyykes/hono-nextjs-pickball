@@ -23,13 +23,14 @@ interface HydratedHistory {
 // 規則會擋下「在 effect 內同步呼叫 useState setter」，但不適用於 useReducer 的 dispatch
 // （沿用 hooks/useRosterStore.ts、app/matchmaker/page.tsx 的既有寫法）。
 //
-// droppedCount 的潛在陷阱（已實測排除）：readHistory() 在 droppedCount > 0 時會把
-// 清理後的歷史回寫 localStorage（round-storage.ts），第二次呼叫會讀到 droppedCount: 0；
-// 若 React StrictMode 讓 hydration 的 useEffect 跑兩次，第二次 dispatch 理論上會把已偵測到
-// 的損毀筆數蓋回 0。實測（於 `pnpm dev` 下以 Node 端 console listener 計數）此 effect
-// 只執行一次，並未雙跑，故不需要為此加防禦式合併邏輯——以實測為準，不寫用不到的分支。
-function hydratedHistoryReducer(_current: HydratedHistory | null, next: HydratedHistory): HydratedHistory {
-	return next;
+// droppedCount 的陷阱：readHistory() 在 droppedCount > 0 時會把清理後的歷史回寫
+// localStorage（round-storage.ts），第二次呼叫會讀到 droppedCount: 0。本元件在 hydration
+// 後才由外層全新掛載，開發環境的 React StrictMode 會對全新掛載的元件模擬一次 unmount／remount，
+// 使 effect 跑兩次；若第二次的結果直接覆蓋，第一次偵測到的損毀筆數就被蓋回 0、提示消失。
+// 因此已有結果時保留較大的 droppedCount，entries 與 now 仍以最新一次為準。
+function hydratedHistoryReducer(current: HydratedHistory | null, next: HydratedHistory): HydratedHistory {
+	if (current === null) return next;
+	return { ...next, droppedCount: Math.max(current.droppedCount, next.droppedCount) };
 }
 
 // 歷史頁的畫面狀態與資料讀取：只讀 readHistory()，不 import
