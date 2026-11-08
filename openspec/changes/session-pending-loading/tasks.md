@@ -236,7 +236,7 @@ S6 變異證據（單檔 vitest，每次改完還原）：
 
 ### /opsx:verify 第二輪紀錄
 
-報告 2 SUGGESTION，查證屬實後處理（commit：test `ec7860a`、docs(openspec) 見本次提交）。
+報告 2 SUGGESTION，查證屬實後處理（commit：test `ec7860a`、docs(openspec) `ecdab97`）。
 
 | # | 查證 | 處置 |
 |---|---|---|
