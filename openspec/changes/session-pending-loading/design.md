@@ -111,6 +111,7 @@
 
 **Choice**：`useSession()` 的回傳值加 `hydrated: boolean`，以第二個 `useSyncExternalStore(subscribeNever, () => true, () => false)` 取得：伺服器端與 hydration 那次 render 為 `false`，hydration 完成後 React 以 client 快照同步重新 render 為 `true`；client 端非 hydration 的 mount（client 端導覽）第一次 render 就是 `true`。
 session 快照（store）本身不變，`getServerSnapshot()` 仍是 `{ status: "loading" }`。
+**apply 補註（型別）**：`UseSessionResult.hydrated` 宣告為 `hydrated?: boolean`（可省略）。既有 12 個元件／hook 測試檔以不含 `hydrated` 的物件 mock `useSession`，宣告為必填會讓 tsc 失敗，而既有測試不得修改；`useSession()` 執行期一律回傳 boolean，`resolveStorageMode` 將未提供視同 `true`（Decision 2），行為與 spec 一致。Stage 1 判定可接受。
 
 **Rationale**：所有使用端本來就把 `useSession()` 的結果交給 `resolveStorageMode`，旗標隨之生效，不必改 9 處接線；不新增 hook，不必更新 `pickleball-guide-page` 的 hooks 歸屬清單。
 

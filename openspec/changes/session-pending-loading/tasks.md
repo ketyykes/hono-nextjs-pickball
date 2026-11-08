@@ -42,20 +42,26 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：新檔 `nextjs-pickball/lib/auth/session-hint.test.ts`，寫入兩個 it——「寫入後讀取為 true 且只存固定值，清除後讀取為 false」「值不是固定值或 localStorage 不可用時讀取為 false 且讀寫清除皆不拋錯」。單檔 vitest 確認紅燈（模組不存在）並貼出輸出
-- [ ] 2.2 GREEN（TDD）：新增 `nextjs-pickball/lib/auth/session-hint.ts`（design Decision 5）。2.1 全綠
-- [ ] 2.3 RED（TDD）：`nextjs-pickball/lib/auth/session-store.test.ts` 新增四個 it——「有上次登入提示時 client 初始快照帶 signedInHint 而伺服器端快照不帶」「session 確認為已登入時寫入提示，確認為未登入或 auth 停用時清除提示」「被丟棄的過時 session 回應不改變提示」「帶提示等待逾時仍未取得 session 時快照改回不帶提示的 loading」；
+- [x] 2.1 RED（TDD）：新檔 `nextjs-pickball/lib/auth/session-hint.test.ts`，寫入兩個 it——「寫入後讀取為 true 且只存固定值，清除後讀取為 false」「值不是固定值或 localStorage 不可用時讀取為 false 且讀寫清除皆不拋錯」。單檔 vitest 確認紅燈（模組不存在）並貼出輸出
+- [x] 2.2 GREEN（TDD）：新增 `nextjs-pickball/lib/auth/session-hint.ts`（design Decision 5）。2.1 全綠
+- [x] 2.3 RED（TDD）：`nextjs-pickball/lib/auth/session-store.test.ts` 新增四個 it——「有上次登入提示時 client 初始快照帶 signedInHint 而伺服器端快照不帶」「session 確認為已登入時寫入提示，確認為未登入或 auth 停用時清除提示」「被丟棄的過時 session 回應不改變提示」「帶提示等待逾時仍未取得 session 時快照改回不帶提示的 loading」；
   `nextjs-pickball/hooks/useSession.test.ts` 新增一個 it——「有上次登入提示時伺服器端輸出不帶提示、hydration 不產生不一致且完成後反映提示」；同一 commit 依檔頭授權 ①② 各加一行 `localStorage.clear()`。
   兩檔各跑單檔 vitest，確認五個新 it 全紅、既有 it 全綠並貼出輸出（新 it 放在新的 `describe` 並自帶 localStorage 清理；fake timers 於 `finally` 還原）
-- [ ] 2.4 GREEN（TDD）：改 `nextjs-pickball/lib/auth/session-store.ts`（design Decision 4、6、11）。2.3 全綠、兩檔既有 it 全綠
-- [ ] 2.5 RED（TDD）：`nextjs-pickball/hooks/useSession.test.ts` 新增兩個 it——「hydrated 在伺服器端輸出與 hydration 時為 false，hydration 完成後為 true」「client 端一般 mount 的第一次 render 即為 hydrated」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 2.6 GREEN（TDD）：`useSession` 回傳值加 `hydrated`（design Decision 3）；`UseSessionResult` 型別同步。2.5 全綠、該檔既有 it 全綠；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` exit 0
-- [ ] 2.7 RED（TDD）：`nextjs-pickball/lib/auth/session-client.test.ts` 新增 it「signOut 成功時清除上次登入提示，失敗時保留」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 2.8 GREEN（TDD）：`signOut()` 在 `res.ok` 時呼叫 `clearSignedInHint()`（design Decision 6）。2.7 與該檔既有 it 全綠
-- [ ] 2.9 RED（TDD）：`nextjs-pickball/lib/sync/storage-mode.test.ts` 新增兩個 it——「session 載入中且帶上次登入提示時為 pending」「尚未 hydration 的 loading 快照為 pending，hydration 後無提示時為 local」。單檔 vitest 確認紅燈；既有「只有 session 就緒、auth 啟用且有 user 時為 remote」維持綠（regression guard，點名）
-- [ ] 2.10 GREEN（TDD）：`StorageMode` 加 `"pending"`、參數型別放寬、依 design Decision 2 判斷；更新檔頭註解。2.9 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 2.11 regression guard：`nextjs-pickball/lib/matchmaker/transfer-storage.test.ts` 新增 it「regression guard：clearAllLocalData 不移除上次登入提示」（design Decision 12）。寫入即綠，單檔 vitest 貼出輸出並註明 regression guard；`transfer-storage.ts` 一行不改
-- [ ] 2.12 REFACTOR：session-store 的提示判斷與 `resolveStorageMode` 的 remote 條件是否值得共用（預期不抽：兩處語意不同層、各一行）；註解是否只寫「為什麼」；無壞味道則註記 skipped
+- [x] 2.4 GREEN（TDD）：改 `nextjs-pickball/lib/auth/session-store.ts`（design Decision 4、6、11）。2.3 全綠、兩檔既有 it 全綠
+- [x] 2.5 RED（TDD）：`nextjs-pickball/hooks/useSession.test.ts` 新增兩個 it——「hydrated 在伺服器端輸出與 hydration 時為 false，hydration 完成後為 true」「client 端一般 mount 的第一次 render 即為 hydrated」。單檔 vitest 確認紅燈並貼出輸出
+- [x] 2.6 GREEN（TDD）：`useSession` 回傳值加 `hydrated`（design Decision 3）；`UseSessionResult` 型別同步。2.5 全綠、該檔既有 it 全綠；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` exit 0
+- [x] 2.7 RED（TDD）：`nextjs-pickball/lib/auth/session-client.test.ts` 新增 it「signOut 成功時清除上次登入提示，失敗時保留」。單檔 vitest 確認紅燈並貼出輸出
+- [x] 2.8 GREEN（TDD）：`signOut()` 在 `res.ok` 時呼叫 `clearSignedInHint()`（design Decision 6）。2.7 與該檔既有 it 全綠
+- [x] 2.9 RED（TDD）：`nextjs-pickball/lib/sync/storage-mode.test.ts` 新增兩個 it——「session 載入中且帶上次登入提示時為 pending」「尚未 hydration 的 loading 快照為 pending，hydration 後無提示時為 local」。單檔 vitest 確認紅燈；既有「只有 session 就緒、auth 啟用且有 user 時為 remote」維持綠（regression guard，點名）
+- [x] 2.10 GREEN（TDD）：`StorageMode` 加 `"pending"`、參數型別放寬、依 design Decision 2 判斷；更新檔頭註解。2.9 全綠；tsc exit 0；改動檔 ESLint 0 errors
+- [x] 2.11 regression guard：`nextjs-pickball/lib/matchmaker/transfer-storage.test.ts` 新增 it「regression guard：clearAllLocalData 不移除上次登入提示」（design Decision 12）。寫入即綠，單檔 vitest 貼出輸出並註明 regression guard；`transfer-storage.ts` 一行不改
+- [x] 2.12 REFACTOR：session-store 的提示判斷與 `resolveStorageMode` 的 remote 條件是否值得共用（預期不抽：兩處語意不同層、各一行）；註解是否只寫「為什麼」；無壞味道則註記 skipped
+  - 紀錄（§2 整組）：
+    - commit：2.1 RED `bf4bb8b`／2.2 GREEN `1f65aff`；2.3 RED `a90f3e6`／2.4 GREEN `fc91502`；2.5 RED `c3d75f2`／2.6 GREEN `bd7dff0`；2.7 RED `5fa4f20`／2.8 GREEN `798e18a`；2.9 RED `786b2b3`／2.10 GREEN `b1cd8c6`；2.11 regression guard `4df3362`；Stage 2 修正 `4290f13`（測試）、`246ba78`（註解）。2.12 REFACTOR：skipped（store 的提示判斷與 `resolveStorageMode` 的 remote 條件語意不同層、各一行，不抽）。
+    - 紅燈（leader 以 `git show <RED>^:<path>` 機械複驗：五個 RED commit 只動測試檔，新 it 名稱在 RED 前計數 0、RED 後 1）：2.1 `Failed to resolve import "./session-hint"`；2.3 session-store `4 failed | 12 passed`、useSession `1 failed | 3 passed`；2.5 `2 failed | 4 passed`（`hydrated` 為 undefined）；2.7 `1 failed | 10 passed`；2.9 `2 failed | 1 passed`（`expected 'local' to be 'pending'`），既有「只有 session 就緒、auth 啟用且有 user 時為 remote」維持綠（regression guard）。Stage 1 另以 `git archive <RED>` 於 /tmp 重跑複驗，皆真紅。新 it 無先綠者；2.11 寫入即綠（regression guard）。
+    - mutation（Implementer 與 Stage 2 各自獨立）：①～⑨ 全數轉紅；對照組（`!(hydrated ?? true)`、調換兩條 pending 判斷、`res.ok` 改寫為 2xx 範圍等）皆維持綠。存活：S1／S9（採用回應後不清計時器、計時器不檢查 ready——兩道防線互為備援，同時拿掉即紅）、S4（讀取接受 `"1 "`）、S6（模組載入時就讀提示：`beforeEach` 的 reset 會蓋掉初始值，風險低未補測）、S7（reset 不清計時器，只影響測試隔離）、S8（每次訂閱都排計時器，結果冪等）。
+    - Stage 1（sonnet）：PASS。Stage 2（opus）：第一輪 FAIL——`session-hint.test.ts` 以 `vi.spyOn(Storage.prototype, …)` 下 spy 在 happy-dom 對 `localStorage` 不生效（拿掉 try/catch 仍綠、單獨跑 `-t "不可用"` 反紅）；修正為 instance spy（`4290f13`，同時採納建議補 `{ authEnabled: false, user: USER }` 情境、`246ba78` 補註解），test-plan 對應列同步改寫；複審 PASS（三函式拿掉 try/catch 皆轉紅、寫入條件只看 user 轉紅）。此修正是測試品質修補，不是新的紅燈。
+    - 偏離：`UseSessionResult.hydrated` 型別為 `hydrated?: boolean`（見 design Decision 3 補註）。
 
 ## 3. 顯示狀態、選擇器與使用選擇器的頁面
 
