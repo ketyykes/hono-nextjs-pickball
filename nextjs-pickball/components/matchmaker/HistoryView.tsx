@@ -48,10 +48,6 @@ export function HistoryView() {
 		setHydrated({ now: new Date(), entries, droppedCount });
 	}, []);
 
-	const entries = hydrated?.entries ?? [];
-	// hydration 完成前不篩選（filteredEntries 維持空陣列），避免在尚未取樣「現在」時誤用系統時鐘。
-	const filteredEntries = hydrated === null ? [] : filterHistoryByRange(entries, selectedRange, hydrated.now);
-
 	if (hydrated === null) {
 		return (
 			<div data-sync-status="pending" className="flex flex-col gap-4">
@@ -59,6 +55,10 @@ export function HistoryView() {
 			</div>
 		);
 	}
+
+	// 走到這裡代表 hydration 已完成，「現在」與歷史紀錄都已取樣。
+	const { entries, now } = hydrated;
+	const filteredEntries = filterHistoryByRange(entries, selectedRange, now);
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -68,7 +68,7 @@ export function HistoryView() {
 			    capability，各自持有一份、不抽共用元件——抽象需要跨 capability 改動或
 			    新建第三個檔案，在只有兩個消費端且文案主詞本就不同（「參賽者資料」vs
 			    「歷史紀錄」）的情況下是提前抽象，故維持各自一份（記為 tech debt）。 */}
-			{hydrated !== null && hydrated.droppedCount > 0 && (
+			{hydrated.droppedCount > 0 && (
 				<div
 					role="alert"
 					className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"

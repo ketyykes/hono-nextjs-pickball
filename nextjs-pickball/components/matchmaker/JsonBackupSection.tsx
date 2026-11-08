@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
@@ -115,6 +116,58 @@ export function JsonBackupSection() {
 		setCloudImportResult(view);
 	}
 
+	let importPicker: ReactNode;
+	if (isRemote) {
+		// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
+		importPicker = (
+			<>
+				<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
+				<FileTextPicker
+					label="選擇備份檔匯入雲端…"
+					accept="application/json"
+					testId="json-backup-cloud-import-input"
+					onFileText={handleCloudImportText}
+				/>
+			</>
+		);
+	} else {
+		importPicker = (
+			<FileTextPicker
+				label="選擇備份檔…"
+				accept="application/json"
+				testId="json-backup-import-input"
+				onFileText={handleImportText}
+			/>
+		);
+	}
+
+	let content: ReactNode;
+	if (mode === "pending") {
+		// 儲存模式未定時不提供匯出與還原：兩種模式的操作會讀寫不同來源
+		content = (
+			<CardContent data-sync-status="pending">
+				<SyncStatusNotice status="pending" />
+			</CardContent>
+		);
+	} else {
+		content = (
+			<CardContent className="flex flex-wrap items-start gap-2">
+				<Button onClick={handleExport}>匯出 JSON</Button>
+				{importPicker}
+				{cloudImportResult !== null && (
+					<div className="flex w-full flex-col gap-1">
+						<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />
+					</div>
+				)}
+				{message !== null && (
+					<p role="alert" className="w-full text-sm text-destructive">
+						{message}
+					</p>
+				)}
+			</CardContent>
+		);
+	}
+
 	return (
 		<Card>
 			<CardHeader>
@@ -123,45 +176,7 @@ export function JsonBackupSection() {
 					含參賽者、目前回合、歷史與重複配對簽章，可完整還原本機資料。
 				</p>
 			</CardHeader>
-			{mode === "pending" ? (
-				// 儲存模式未定時不提供匯出與還原：兩種模式的操作會讀寫不同來源
-				<CardContent data-sync-status="pending">
-					<SyncStatusNotice status="pending" />
-				</CardContent>
-			) : (
-				<CardContent className="flex flex-wrap items-start gap-2">
-					<Button onClick={handleExport}>匯出 JSON</Button>
-					{isRemote ? (
-						// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
-						<>
-							<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
-							<FileTextPicker
-								label="選擇備份檔匯入雲端…"
-								accept="application/json"
-								testId="json-backup-cloud-import-input"
-								onFileText={handleCloudImportText}
-							/>
-						</>
-					) : (
-						<FileTextPicker
-							label="選擇備份檔…"
-							accept="application/json"
-							testId="json-backup-import-input"
-							onFileText={handleImportText}
-						/>
-					)}
-					{cloudImportResult !== null && (
-						<div className="flex w-full flex-col gap-1">
-							<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />
-						</div>
-					)}
-					{message !== null && (
-						<p role="alert" className="w-full text-sm text-destructive">
-							{message}
-						</p>
-					)}
-				</CardContent>
-			)}
+			{content}
 		</Card>
 	);
 }

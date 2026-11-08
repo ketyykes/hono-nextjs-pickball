@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
@@ -60,6 +61,27 @@ export function HistoryCsvSection() {
 		downloadTextFile(csv, historyCsvFileName(exportedAt), "text/csv;charset=utf-8");
 	}
 
+	let content: ReactNode;
+	if (mode === "pending") {
+		// 儲存模式未定時不提供匯出：本機與雲端的歷史來源不同
+		content = (
+			<CardContent data-sync-status="pending">
+				<SyncStatusNotice status="pending" />
+			</CardContent>
+		);
+	} else {
+		content = (
+			<CardContent>
+				<Button onClick={handleExport}>匯出 CSV</Button>
+				{message !== null && (
+					<p role="alert" className="mt-2 text-sm text-destructive">
+						{message}
+					</p>
+				)}
+			</CardContent>
+		);
+	}
+
 	return (
 		<Card>
 			<CardHeader>
@@ -68,21 +90,7 @@ export function HistoryCsvSection() {
 					匯出全部歷史賽果，可直接以 Excel／Google Sheets 開啟。
 				</p>
 			</CardHeader>
-			{mode === "pending" ? (
-				// 儲存模式未定時不提供匯出：本機與雲端的歷史來源不同
-				<CardContent data-sync-status="pending">
-					<SyncStatusNotice status="pending" />
-				</CardContent>
-			) : (
-				<CardContent>
-					<Button onClick={handleExport}>匯出 CSV</Button>
-					{message !== null && (
-						<p role="alert" className="mt-2 text-sm text-destructive">
-							{message}
-						</p>
-					)}
-				</CardContent>
-			)}
+			{content}
 		</Card>
 	);
 }

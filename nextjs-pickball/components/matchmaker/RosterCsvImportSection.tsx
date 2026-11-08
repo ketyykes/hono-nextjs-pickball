@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
@@ -104,6 +105,64 @@ export function RosterCsvImportSection() {
 
 	const canConfirm = preview.status === "ready" && preview.result.errors.length === 0;
 
+	let content: ReactNode;
+	if (mode === "pending") {
+		// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
+		content = (
+			<CardContent data-sync-status="pending">
+				<SyncStatusNotice status="pending" />
+			</CardContent>
+		);
+	} else {
+		content = (
+			<CardContent className="flex flex-col gap-3">
+				<div className="flex flex-wrap gap-2">
+					<FileTextPicker
+						label="選擇 CSV 檔…"
+						accept=".csv,text/csv"
+						testId="roster-csv-import-input"
+						onFileText={handleFileText}
+					/>
+					<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
+						確認匯入
+					</Button>
+					{preview.status !== "idle" && (
+						<Button variant="outline" onClick={handleCancel}>
+							取消
+						</Button>
+					)}
+				</div>
+
+				{preview.status === "structuralError" && (
+					<p role="alert" className="text-sm text-destructive">
+						{preview.message}
+					</p>
+				)}
+
+				{message !== null && (
+					<p role="alert" className="text-sm text-destructive">
+						{message}
+					</p>
+				)}
+
+				{preview.status === "ready" && (
+					<div className="flex flex-col gap-2 text-sm" data-testid="roster-csv-preview">
+						<p>可新增 {preview.result.rows.length} 人</p>
+						{preview.result.errors.length > 0 && (
+							<ul className="list-disc pl-5 text-destructive" data-testid="roster-csv-errors">
+								{preview.result.errors.map((error) => (
+									<li key={`${error.row}-${error.column}`}>
+										第 {error.row} 列．{error.column}：{error.reason}
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
+				)}
+			</CardContent>
+		);
+	}
+
 	return (
 		<Card>
 			<CardHeader>
@@ -112,58 +171,7 @@ export function RosterCsvImportSection() {
 					欄位：名稱／性別／強度分數／顏色起點／顏色終點。匯入採附加模式，不覆蓋既有參賽者。
 				</p>
 			</CardHeader>
-			{mode === "pending" ? (
-				// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
-				<CardContent data-sync-status="pending">
-					<SyncStatusNotice status="pending" />
-				</CardContent>
-			) : (
-				<CardContent className="flex flex-col gap-3">
-					<div className="flex flex-wrap gap-2">
-						<FileTextPicker
-							label="選擇 CSV 檔…"
-							accept=".csv,text/csv"
-							testId="roster-csv-import-input"
-							onFileText={handleFileText}
-						/>
-						<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
-							確認匯入
-						</Button>
-						{preview.status !== "idle" && (
-							<Button variant="outline" onClick={handleCancel}>
-								取消
-							</Button>
-						)}
-					</div>
-
-					{preview.status === "structuralError" && (
-						<p role="alert" className="text-sm text-destructive">
-							{preview.message}
-						</p>
-					)}
-
-					{message !== null && (
-						<p role="alert" className="text-sm text-destructive">
-							{message}
-						</p>
-					)}
-
-					{preview.status === "ready" && (
-						<div className="flex flex-col gap-2 text-sm" data-testid="roster-csv-preview">
-							<p>可新增 {preview.result.rows.length} 人</p>
-							{preview.result.errors.length > 0 && (
-								<ul className="list-disc pl-5 text-destructive" data-testid="roster-csv-errors">
-									{preview.result.errors.map((error) => (
-										<li key={`${error.row}-${error.column}`}>
-											第 {error.row} 列．{error.column}：{error.reason}
-										</li>
-									))}
-								</ul>
-							)}
-						</div>
-					)}
-				</CardContent>
-			)}
+			{content}
 		</Card>
 	);
 }
