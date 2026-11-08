@@ -122,4 +122,31 @@ describe("useSession hydration", () => {
 		expect(container.textContent).toBe("hinted");
 		container.remove();
 	});
+
+	it("hydrated 在伺服器端輸出與 hydration 時為 false，hydration 完成後為 true", async () => {
+		function Probe() {
+			const session = useSession();
+			return createElement("span", null, String(session.hydrated));
+		}
+
+		const { html, container, onRecoverableError, consoleErrorCalls } =
+			await hydrateFromServer(Probe);
+
+		expect(html).toContain("false");
+		expect(onRecoverableError).not.toHaveBeenCalled();
+		expect(consoleErrorCalls).toBe(0);
+		expect(container.textContent).toBe("true");
+		container.remove();
+	});
+
+	it("client 端一般 mount 的第一次 render 即為 hydrated", () => {
+		const seen: boolean[] = [];
+		renderHook(() => {
+			const session = useSession();
+			seen.push(session.hydrated);
+			return session;
+		});
+
+		expect(seen[0]).toBe(true);
+	});
 });
