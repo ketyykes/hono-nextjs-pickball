@@ -1,16 +1,16 @@
 // components/sync/SyncStatusNotice.tsx
-import { syncStatusMessage, type SyncStatus } from "@/lib/sync/sync-status";
+import { DATA_PENDING_MESSAGE, syncStatusMessage, type DataStatus } from "@/lib/sync/sync-status";
 import { cn } from "@/lib/utils";
 
 export interface SyncStatusNoticeProps {
-	status: SyncStatus;
+	status: DataStatus;
 	className?: string;
 }
 
 // 同步狀態提示：只有需要使用者注意的狀態才有文案；沒有文案（含本機模式）時
 // 不渲染任何元素，讓訪客的 DOM 與雲端同步功能加入前相同。
 export function SyncStatusNotice({ status, className }: SyncStatusNoticeProps) {
-	const message = syncStatusMessage(status);
+	const message = status === "pending" ? DATA_PENDING_MESSAGE : syncStatusMessage(status);
 	if (message === null) return null;
 
 	return (
