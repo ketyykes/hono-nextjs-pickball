@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +9,7 @@ vi.mock("@/lib/auth/session-client", () => ({
 }));
 
 import { fetchSession } from "@/lib/auth/session-client";
+import { SIGNED_IN_HINT_STORAGE_KEY } from "@/lib/auth/session-hint";
 import { getSnapshot, resetSessionStoreForTests, subscribe } from "@/lib/auth/session-store";
 import { useSession } from "./useSession";
 
@@ -17,6 +19,7 @@ const USER = { id: "u1", email: "tester@example.com", name: "測試員" };
 
 describe("useSession", () => {
 	beforeEach(() => {
+		localStorage.clear();
 		resetSessionStoreForTests();
 		mockedFetchSession.mockReset();
 		mockedFetchSession.mockResolvedValue({ authEnabled: true, user: null });
@@ -67,5 +70,56 @@ describe("useSession", () => {
 		}
 
 		expect(renderToString(createElement(Probe))).toContain("loading");
+	});
+});
+
+describe("useSession hydration", () => {
+	type State = { authEnabled: boolean; user: typeof USER | null };
+
+	beforeEach(() => {
+		localStorage.clear();
+		resetSessionStoreForTests();
+		mockedFetchSession.mockReset();
+		mockedFetchSession.mockReturnValue(new Promise<State>(() => {}));
+	});
+
+	/** 先以 renderToString 產生伺服器端輸出，再 hydrate，回傳 hydrate 過程的錯誤通報與容器。 */
+	async function hydrateFromServer(Probe: () => ReturnType<typeof createElement>) {
+		const element = createElement(Probe);
+		const html = renderToString(element);
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		let consoleErrorCalls = 0;
+		try {
+			await act(async () => {
+				hydrateRoot(container, element, { onRecoverableError });
+			});
+			consoleErrorCalls = consoleError.mock.calls.length;
+		} finally {
+			consoleError.mockRestore();
+		}
+		return { html, container, onRecoverableError, consoleErrorCalls };
+	}
+
+	it("有上次登入提示時伺服器端輸出不帶提示、hydration 不產生不一致且完成後反映提示", async () => {
+		localStorage.setItem(SIGNED_IN_HINT_STORAGE_KEY, "1");
+		resetSessionStoreForTests();
+		function Probe() {
+			const session = useSession();
+			const hinted = session.status === "loading" && session.signedInHint === true;
+			return createElement("span", null, hinted ? "hinted" : "plain");
+		}
+
+		const { html, container, onRecoverableError, consoleErrorCalls } =
+			await hydrateFromServer(Probe);
+
+		expect(html).toContain("plain");
+		expect(onRecoverableError).not.toHaveBeenCalled();
+		expect(consoleErrorCalls).toBe(0);
+		expect(container.textContent).toBe("hinted");
+		container.remove();
 	});
 });
