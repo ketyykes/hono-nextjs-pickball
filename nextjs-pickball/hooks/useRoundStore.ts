@@ -36,7 +36,7 @@ import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRoundStore } from "@/hooks/useRemoteRoundStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import type { DataStatus, SyncStatus } from "@/lib/sync/sync-status";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
 // 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate
@@ -104,7 +104,7 @@ export interface UseRoundStoreOptions {
 	readonly reloadRemotePlayers?: () => void;
 	/** 雲端模式用：名單的同步狀態。名單載入中或載入失敗時雲端 submitScore 不送出，
 	 * 頁面也應把它列入自動回填 effect 的依賴，讓載入完成後重跑。 */
-	readonly rosterSyncStatus?: SyncStatus;
+	readonly rosterSyncStatus?: DataStatus;
 }
 
 /** generateRound 對外的輸入：`players`／`previousRound` 取自 hook 目前握有的狀態，
@@ -428,6 +428,13 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	const isRemote = resolveStorageMode(session) === "remote";
 	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
+	// 雲端 hook 只認 SyncStatus：名單等待中對它而言與載入中相同（名單尚不可用）
+	let rosterSyncStatus: SyncStatus | undefined;
+	if (options.rosterSyncStatus === "pending") {
+		rosterSyncStatus = "loading";
+	} else {
+		rosterSyncStatus = options.rosterSyncStatus;
+	}
 	const remote = useRemoteRoundStore({
 		enabled: isRemote,
 		userId,
@@ -436,7 +443,7 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		applyRemotePlayers: options.applyRemotePlayers ?? doNothing,
 		reloadRemotePlayers: options.reloadRemotePlayers ?? doNothing,
 		onUnauthorized: session.refresh,
-		rosterSyncStatus: options.rosterSyncStatus,
+		rosterSyncStatus,
 	});
 	if (isRemote) return remote;
 	return { ...local, syncStatus: "local", remoteMatchSlots: null };

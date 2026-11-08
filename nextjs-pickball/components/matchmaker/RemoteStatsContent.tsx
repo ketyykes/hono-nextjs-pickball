@@ -8,12 +8,12 @@ import { useRemoteHistory } from "@/hooks/useRemoteHistory";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useSession } from "@/hooks/useSession";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import type { DataStatus, SyncStatus } from "@/lib/sync/sync-status";
 import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 
-function isBlockingStatus(status: SyncStatus): boolean {
+function isBlockingStatus(status: DataStatus): boolean {
 	return status === "loading" || status === "load-failed";
 }
 

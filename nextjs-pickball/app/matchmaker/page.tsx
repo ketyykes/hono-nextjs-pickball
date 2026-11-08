@@ -13,7 +13,7 @@ import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import type { DataStatus } from "@/lib/sync/sync-status";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
 import { jpgExportFileName } from "@/lib/matchmaker/export-filename";
@@ -34,9 +34,10 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 
 // 名單與回合各有自己的同步狀態，頁面只顯示一個：取最需要使用者注意的那個。
 // local 排在最後，兩者皆為 local（訪客）時才會是 local。
-const SYNC_STATUS_PRIORITY: readonly SyncStatus[] = [
+const SYNC_STATUS_PRIORITY: readonly DataStatus[] = [
 	"load-failed",
 	"loading",
+	"pending",
 	"rejected",
 	"conflict",
 	"retrying",
@@ -45,7 +46,7 @@ const SYNC_STATUS_PRIORITY: readonly SyncStatus[] = [
 	"local",
 ];
 
-function mergeSyncStatus(first: SyncStatus, second: SyncStatus): SyncStatus {
+function mergeSyncStatus(first: DataStatus, second: DataStatus): DataStatus {
 	const found = SYNC_STATUS_PRIORITY.find((status) => status === first || status === second);
 	return found ?? "local";
 }
