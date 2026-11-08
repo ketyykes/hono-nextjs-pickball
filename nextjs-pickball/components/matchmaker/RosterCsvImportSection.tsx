@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useSession } from "@/hooks/useSession";
 import { REMOTE_TRANSFER_MESSAGES, importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
 import { readRoster } from "@/lib/matchmaker/storage";
@@ -38,7 +39,8 @@ export function RosterCsvImportSection() {
 	// 雲端匯入先 GET 再 POST，往返期間若可重複點擊，每次都會產生新的 UUID 而附加重複參賽者
 	const [isImporting, setIsImporting] = useState(false);
 	const session = useSession();
-	const isRemote = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
+	const isRemote = mode === "remote";
 	// 以觸發當下畫面所見的帳號送出（匯入前的 GET 與匯入的 POST 共用）；
 	// 帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
@@ -110,51 +112,58 @@ export function RosterCsvImportSection() {
 					欄位：名稱／性別／強度分數／顏色起點／顏色終點。匯入採附加模式，不覆蓋既有參賽者。
 				</p>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-3">
-				<div className="flex flex-wrap gap-2">
-					<FileTextPicker
-						label="選擇 CSV 檔…"
-						accept=".csv,text/csv"
-						testId="roster-csv-import-input"
-						onFileText={handleFileText}
-					/>
-					<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
-						確認匯入
-					</Button>
-					{preview.status !== "idle" && (
-						<Button variant="outline" onClick={handleCancel}>
-							取消
+			{mode === "pending" ? (
+				// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
+				<CardContent>
+					<SyncStatusNotice status="pending" />
+				</CardContent>
+			) : (
+				<CardContent className="flex flex-col gap-3">
+					<div className="flex flex-wrap gap-2">
+						<FileTextPicker
+							label="選擇 CSV 檔…"
+							accept=".csv,text/csv"
+							testId="roster-csv-import-input"
+							onFileText={handleFileText}
+						/>
+						<Button disabled={!canConfirm || isImporting} onClick={handleConfirm}>
+							確認匯入
 						</Button>
-					)}
-				</div>
-
-				{preview.status === "structuralError" && (
-					<p role="alert" className="text-sm text-destructive">
-						{preview.message}
-					</p>
-				)}
-
-				{message !== null && (
-					<p role="alert" className="text-sm text-destructive">
-						{message}
-					</p>
-				)}
-
-				{preview.status === "ready" && (
-					<div className="flex flex-col gap-2 text-sm" data-testid="roster-csv-preview">
-						<p>可新增 {preview.result.rows.length} 人</p>
-						{preview.result.errors.length > 0 && (
-							<ul className="list-disc pl-5 text-destructive" data-testid="roster-csv-errors">
-								{preview.result.errors.map((error) => (
-									<li key={`${error.row}-${error.column}`}>
-										第 {error.row} 列．{error.column}：{error.reason}
-									</li>
-								))}
-							</ul>
+						{preview.status !== "idle" && (
+							<Button variant="outline" onClick={handleCancel}>
+								取消
+							</Button>
 						)}
 					</div>
-				)}
-			</CardContent>
+
+					{preview.status === "structuralError" && (
+						<p role="alert" className="text-sm text-destructive">
+							{preview.message}
+						</p>
+					)}
+
+					{message !== null && (
+						<p role="alert" className="text-sm text-destructive">
+							{message}
+						</p>
+					)}
+
+					{preview.status === "ready" && (
+						<div className="flex flex-col gap-2 text-sm" data-testid="roster-csv-preview">
+							<p>可新增 {preview.result.rows.length} 人</p>
+							{preview.result.errors.length > 0 && (
+								<ul className="list-disc pl-5 text-destructive" data-testid="roster-csv-errors">
+									{preview.result.errors.map((error) => (
+										<li key={`${error.row}-${error.column}`}>
+											第 {error.row} 列．{error.column}：{error.reason}
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+					)}
+				</CardContent>
+			)}
 		</Card>
 	);
 }

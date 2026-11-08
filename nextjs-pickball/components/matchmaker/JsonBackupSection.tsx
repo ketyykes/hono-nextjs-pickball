@@ -12,6 +12,7 @@ import {
 } from "@/components/matchmaker/local-import-view";
 import type { ImportResultView } from "@/components/matchmaker/local-import-view";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useSession } from "@/hooks/useSession";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
@@ -36,7 +37,8 @@ export function JsonBackupSection() {
 	// 雲端匯入成功的結果；失敗與驗證錯誤沿用 message
 	const [cloudImportResult, setCloudImportResult] = useState<ImportResultView | null>(null);
 	const session = useSession();
-	const isRemote = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
+	const isRemote = mode === "remote";
 	// 以觸發當下畫面所見的帳號送出；帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 
@@ -121,38 +123,45 @@ export function JsonBackupSection() {
 					含參賽者、目前回合、歷史與重複配對簽章，可完整還原本機資料。
 				</p>
 			</CardHeader>
-			<CardContent className="flex flex-wrap items-start gap-2">
-				<Button onClick={handleExport}>匯出 JSON</Button>
-				{isRemote ? (
-					// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
-					<>
-						<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
+			{mode === "pending" ? (
+				// 儲存模式未定時不提供匯出與還原：兩種模式的操作會讀寫不同來源
+				<CardContent>
+					<SyncStatusNotice status="pending" />
+				</CardContent>
+			) : (
+				<CardContent className="flex flex-wrap items-start gap-2">
+					<Button onClick={handleExport}>匯出 JSON</Button>
+					{isRemote ? (
+						// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
+						<>
+							<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
+							<FileTextPicker
+								label="選擇備份檔匯入雲端…"
+								accept="application/json"
+								testId="json-backup-cloud-import-input"
+								onFileText={handleCloudImportText}
+							/>
+						</>
+					) : (
 						<FileTextPicker
-							label="選擇備份檔匯入雲端…"
+							label="選擇備份檔…"
 							accept="application/json"
-							testId="json-backup-cloud-import-input"
-							onFileText={handleCloudImportText}
+							testId="json-backup-import-input"
+							onFileText={handleImportText}
 						/>
-					</>
-				) : (
-					<FileTextPicker
-						label="選擇備份檔…"
-						accept="application/json"
-						testId="json-backup-import-input"
-						onFileText={handleImportText}
-					/>
-				)}
-				{cloudImportResult !== null && (
-					<div className="flex w-full flex-col gap-1">
-						<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />
-					</div>
-				)}
-				{message !== null && (
-					<p role="alert" className="w-full text-sm text-destructive">
-						{message}
-					</p>
-				)}
-			</CardContent>
+					)}
+					{cloudImportResult !== null && (
+						<div className="flex w-full flex-col gap-1">
+							<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />
+						</div>
+					)}
+					{message !== null && (
+						<p role="alert" className="w-full text-sm text-destructive">
+							{message}
+						</p>
+					)}
+				</CardContent>
+			)}
 		</Card>
 	);
 }

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { downloadTextFile } from "@/components/matchmaker/downloadTextFile";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useSession } from "@/hooks/useSession";
 import { historyCsvFileName, historyToCsv } from "@/lib/matchmaker/history-csv";
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteHistoryCsv } from "@/lib/matchmaker/remote-transfer";
@@ -27,7 +28,8 @@ import { resolveStorageMode } from "@/lib/sync/storage-mode";
 export function HistoryCsvSection() {
 	const [message, setMessage] = useState<string | null>(null);
 	const session = useSession();
-	const isRemote = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
+	const isRemote = mode === "remote";
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 
 	async function handleRemoteExport() {
@@ -66,14 +68,21 @@ export function HistoryCsvSection() {
 					匯出全部歷史賽果，可直接以 Excel／Google Sheets 開啟。
 				</p>
 			</CardHeader>
-			<CardContent>
-				<Button onClick={handleExport}>匯出 CSV</Button>
-				{message !== null && (
-					<p role="alert" className="mt-2 text-sm text-destructive">
-						{message}
-					</p>
-				)}
-			</CardContent>
+			{mode === "pending" ? (
+				// 儲存模式未定時不提供匯出：本機與雲端的歷史來源不同
+				<CardContent>
+					<SyncStatusNotice status="pending" />
+				</CardContent>
+			) : (
+				<CardContent>
+					<Button onClick={handleExport}>匯出 CSV</Button>
+					{message !== null && (
+						<p role="alert" className="mt-2 text-sm text-destructive">
+							{message}
+						</p>
+					)}
+				</CardContent>
+			)}
 		</Card>
 	);
 }
