@@ -259,3 +259,6 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 - **apply 狀態（2026-11-08，leader 被要求提前交回）**：§1、§2 完成（Stage 1／Stage 2 皆 PASS，tasks 已勾選並回填紀錄）。§3 的 3.1～3.13 已實作並 commit（`bb32f6c`～`f363553`，3.13 REFACTOR skipped），Stage 1 PASS；**Stage 2（opus）審查在交回時仍在進行**（含雙鎖 chromium `data-pending.spec.ts` 與變異 ⑩），結論未取得，因此 §3 尚未在 tasks.md 勾選。§4、§5 未開始。
 - 接手者請：重新派 §3 Stage 2（或取回其結論）→ 依結論修正並勾選 §3 → 依序 §4 → §5 → Final Code Review。
+- **第二任 leader 狀態（2026-11-08，同樣被 harness 要求提前交回）**：開工時工作樹乾淨、`pnpm -r exec tsc --noEmit` exit 0。leader 以腳本對 §3 七個 RED commit（`bb32f6c`、`29e828f`、`d7531d0`、`b15f91e`、`2725df2`、`8197a5e`、`a6957df`）做了機械複驗：都只動測試檔，16 個新 it／test 名稱在 RED 前計數 0、RED 後 1（`roster-sync.spec.ts` 既有 test 未被改動：該檔只有新增行、沒有刪除行）。
+  已重新派 §3 Stage 2（opus），涵蓋 `272f9e3..f363553`：獨立 mutation ①～⑩ 加上計分板 state 參考穩定的變異，另以雙鎖複驗 chromium `data-pending.spec.ts` 與 user-data roster-sync 新 test。交回時它仍在排隊等重負載鎖，結論未取得。前一任派的 §3 Stage 2 也還在背景執行（鎖的 note 為「s2 reviewer §3 head-chromium」），coordinator 表示會轉交它的結論，採用任一份 PASS 結論即可。§3 仍未勾選，§4、§5、Final Code Review 未開始。
+  §4 Implementer 派工單所需的既有檔案（`HistoryModeSwitch`、`HistoryView`、`EmptyHistory`、`SyncStatusNotice`、`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`、`LocalDataImportSection` 與三個既有測試檔）leader 已讀過，自 `main` 起未被本 change 改動（`SyncStatusNotice.tsx` 除外，§3 改了它）。
