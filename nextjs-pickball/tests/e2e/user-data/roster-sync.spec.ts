@@ -138,11 +138,14 @@ test.describe("matchmaker 名單雲端同步", () => {
 		await installFlashRecorder(page, { texts: ["目前還沒有參賽者", "共 0 位參賽者"], selectors: [] });
 
 		const release = await holdSession(page);
+		const sessionResponse = page.waitForResponse("**/api/session");
 		try {
 			await page.reload();
 			await expect(page.locator('main[data-sync-status="pending"]')).toBeVisible();
 			await expect(page.getByRole("status")).toHaveText("正在載入資料…");
 			release();
+			// 等 session 回應到達，放行後的斷言才確實涵蓋回應之後的畫面
+			await sessionResponse;
 			await expect(page.locator(SYNCED)).toBeVisible();
 			await expect(page.getByText("雲端甲")).toBeVisible();
 			expect(await readFlashHits(page)).toEqual([]);

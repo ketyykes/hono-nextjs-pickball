@@ -161,12 +161,15 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		await installFlashRecorder(page, { texts: EMPTY_TEXTS, selectors: [] });
 
 		const release = await holdSession(page);
+		const sessionResponse = page.waitForResponse("**/api/session");
 		try {
 			await page.reload();
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
 			await expect(page.getByRole("status")).toHaveCount(0);
 			release();
+			// 等 session 回應到達，放行後的斷言才確實涵蓋回應之後的畫面
+			await sessionResponse;
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
 			await expect(page.getByRole("status")).toHaveCount(0);
@@ -188,6 +191,7 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		}, SIGNED_IN_HINT_STORAGE_KEY);
 
 		const release = await holdSession(page);
+		const sessionResponse = page.waitForResponse("**/api/session");
 		try {
 			await page.goto(PLAYERS_PAGE);
 			await expect(page.locator(PENDING_MAIN)).toBeVisible();
@@ -195,6 +199,7 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 			await expect(page.getByRole("status")).toHaveText(DATA_PENDING_MESSAGE);
 			await expect(page.getByText("目前還沒有參賽者")).toHaveCount(0);
 			release();
+			await sessionResponse;
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
 			await expect
