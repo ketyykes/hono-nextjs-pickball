@@ -233,3 +233,21 @@ S6 變異證據（單檔 vitest，每次改完還原）：
 | 對照：兩處 pending 回傳加 `droppedCount: 0` | 綠 |
 
 實跑：兩個 hook 單檔 44 passed；user-data 該條 E2E 1 passed、0 skipped（雙鎖，已 release）；`pnpm -r exec tsc --noEmit` exit 0；改動檔 eslint 0 errors；`openspec validate --strict` 通過。
+
+### /opsx:verify 第二輪紀錄
+
+報告 2 SUGGESTION，查證屬實後處理（commit：test `ec7860a`、docs(openspec) 見本次提交）。
+
+| # | 查證 | 處置 |
+|---|---|---|
+| S1 | 屬實：fixture 僅四位參賽者，雙打 1 場無人休息，本機版 `swapMatchPlayer` 亦回 `ok: false`，等待中誤走本機路徑不會轉紅 | 該 it 改用五位參賽者建立回合並傳給 hook，換人改為「第一隊第一位 ↔ 休息者」，本機版可成功（`ec7860a`）。it 名稱與原有斷言不變 |
+| S2 | 屬實：test-plan 的 Assertion 欄仍只列 add／toggle／reset 與 generateRound | 補上 `d72d54a` 與本次新增的操作並註明 regression guard；`[四位]` 改為五位 |
+
+變異證據（單檔 vitest，每次改完還原，三重落地檢查通過）：
+
+| 變異 | 結果 |
+|---|---|
+| 回合 pending 回傳改用 `local.swapMatchPlayer` | 紅（等待中回合 it，1 failed／27 passed） |
+| 對照：回合 pending 回傳加 `droppedCount: 0` | 綠（28 passed） |
+
+實跑：`useRoundStore.test.tsx` 28 passed。
