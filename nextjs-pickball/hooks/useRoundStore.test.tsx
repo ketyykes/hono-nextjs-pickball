@@ -1092,10 +1092,25 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 	}
 
 	it("session 等待中時不回傳本機回合與歷史、syncStatus 為 pending 且操作不生效", () => {
-		const localRound = seedLocalRound();
+		// 5 位參賽者：雙打 1 場會有 1 人休息，本機版 swapMatchPlayer 才能成功，
+		// 等待中若誤走本機路徑，換人結果會變 ok: true 而讓測試轉紅
+		const swapPlayers: Player[] = Array.from({ length: 5 }, (_, index) =>
+			makePlayer({ id: `p${index + 1}` }),
+		);
+		const created = createRound({
+			players: swapPlayers,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		writeRound(created.round);
+		const localRound = created.round;
 		const submitted = submitScore({
 			round: localRound,
-			players,
+			players: swapPlayers,
 			matchId: localRound.matches[0].id,
 			rawScoreA: "11",
 			rawScoreB: "5",
@@ -1109,7 +1124,7 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		const updatePlayer = vi.fn();
 
 		const { result } = renderHook(() =>
-			useRoundStore({ players, updatePlayer, applyRemotePlayers, reloadRemotePlayers }),
+			useRoundStore({ players: swapPlayers, updatePlayer, applyRemotePlayers, reloadRemotePlayers }),
 		);
 
 		expect(result.current.round).toBeNull();
@@ -1132,7 +1147,11 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 				result.current.setTargetScore(15),
 				result.current.setTimerDuration(10),
 				result.current.startTimer(),
-				result.current.swapMatchPlayer(localRound.matches[0].id, "p1", "p2"),
+				result.current.swapMatchPlayer(
+					localRound.matches[0].id,
+					localRound.matches[0].teams[0].playerIds[0],
+					localRound.restingPlayerIds[0],
+				),
 			);
 		});
 		expect(otherResults).toHaveLength(6);
