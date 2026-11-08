@@ -69,7 +69,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 - 參賽者頁、對戰頁、`LocalStatsContent`、`RemoteStatsContent`（名單）與 `Scoreboard` 在 `isContentBlocked(syncStatus)` 時以 `SyncStatusNotice` 取代主要內容，根元素帶 `data-sync-status={syncStatus}`（等待中為 `"pending"`）；`local` 時照舊不輸出任何同步元素或屬性。
 - 歷史頁：`HistoryModeSwitch` 在儲存模式為 `"pending"` 時 MUST 渲染帶 `data-sync-status="pending"` 的容器與 `SyncStatusNotice`（`pending`），SHALL NOT 掛載 `HistoryView` 或 `RemoteHistoryView`；`HistoryView` 在本機歷史讀入前 MUST 渲染同一個等待中容器，SHALL NOT 渲染區間篩選與空狀態。
 - 統計頁入口 `nextjs-pickball/app/matchmaker/stats/page.tsx`：`"pending"` 時 MUST 渲染 `LocalStatsContent`（由選擇器的 `pending` 顯示提示），SHALL NOT 掛載 `RemoteStatsContent`——雲端內容只在 `"remote"` 時掛載。
-- 資料頁：`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection` 在 `"pending"` 時保留區塊標題與說明，操作區 MUST 只渲染 `SyncStatusNotice`（`pending`）——「匯出 JSON」「匯出 CSV」「確認匯入」按鈕與三種選檔（`json-backup-import-input`、`json-backup-cloud-import-input`、`roster-csv-import-input`）皆不渲染；
+- 資料頁：`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection` 在 `"pending"` 時保留區塊標題與說明，操作區（帶 `data-sync-status="pending"` 的 `CardContent`）MUST 只渲染 `SyncStatusNotice`（`pending`）——「匯出 JSON」「匯出 CSV」「確認匯入」按鈕與三種選檔（`json-backup-import-input`、`json-backup-cloud-import-input`、`roster-csv-import-input`）皆不渲染；
   `LocalDataImportSection` 在 `"pending"` 時不渲染（與本機模式相同）；`ClearLocalDataSection` 兩種模式語意相同（只清本機 key），不受儲存模式影響。
 
 不在本 Requirement 範圍：首頁導覽列與目錄的捲動樣式、減少動態偏好（不屬資料狀態，伺服器端無從得知）；client 端導覽時本機資料於 effect 讀入前的那一次 render（顯示等待中提示）。

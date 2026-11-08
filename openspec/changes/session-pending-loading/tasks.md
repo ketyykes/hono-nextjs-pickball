@@ -144,6 +144,8 @@ Depends on: §3
 - [x] 4.8 REFACTOR：歷史兩處等待中容器、資料頁三區塊的等待中分支是否一致；是否值得抽共用元件（預期不抽：各兩三行 JSX，抽出後要多一個跨 capability 的檔案）；無壞味道則註記 skipped
   - 紀錄：skipped（無壞味道）。歷史兩處等待中容器 JSX 逐字相同（同 class、同 `data-sync-status`、同 `SyncStatusNotice`）；資料頁三區塊的等待中分支同形（`mode === "pending"` 三元、保留 `CardHeader`、`CardContent data-sync-status="pending"` 只放提示）。各只有 2～5 行 JSX，抽共用元件要新增跨 capability 的檔案，不抽。
 
+**§4 審查（coordinator 派）**：Stage 1（sonnet）PASS，無必修；4.2、4.4 RED 已重新實跑，確認為真紅。Stage 2（opus）PASS，無必修：mutation ①～⑥ 全紅、對照組全綠；chromium `data-pending.spec.ts` HEAD 5 passed；user-data 新增那條 1 passed、0 skipped。E3（拿掉 HistoryView 等待中分支）只有「訪客載入本機歷史…」轉紅；「JavaScript 載入前…」不紅，因為伺服器輸出走 HistoryModeSwitch 的 pending 分支，HistoryView 的伺服器輸出改由 `renderToString` 單元測試涵蓋。E4（只拿掉單一區塊的屬性）不紅；E5（三區塊全拿掉）在 `/matchmaker/data` 轉紅。不擋的建議五條，處理方式：delta spec 資料頁段落補「帶 `data-sync-status="pending"` 的 `CardContent`」由 coordinator 同步；HistoryView 早退後的多餘判斷、資料頁三區塊改以 if/else 算出內容、`waitForResponse` 改在 `release()` 前一刻建立、等待中 it 移到正確的 describe，這四條併入 §5 前置修正。
+
 ## 5. 文件同步與總驗收
 
 Depends on: §4
