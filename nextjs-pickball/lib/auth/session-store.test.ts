@@ -279,6 +279,15 @@ describe("session-store 上次登入提示", () => {
 		expect(readSignedInHint()).toBe(true);
 		await refresh();
 		expect(readSignedInHint()).toBe(false);
+
+		// auth 停用卻帶 user 的不一致 payload：先讓提示為 true，再確認會被清除
+		mockedFetchSession
+			.mockResolvedValueOnce({ authEnabled: true, user: USER })
+			.mockResolvedValueOnce({ authEnabled: false, user: USER });
+		await refresh();
+		expect(readSignedInHint()).toBe(true);
+		await refresh();
+		expect(readSignedInHint()).toBe(false);
 	});
 
 	it("被丟棄的過時 session 回應不改變提示", async () => {

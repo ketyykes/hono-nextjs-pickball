@@ -36,13 +36,13 @@ describe("session-hint", () => {
 		}
 
 		try {
-			vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+			vi.spyOn(localStorage, "getItem").mockImplementation(() => {
 				throw new Error("unavailable");
 			});
-			vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			vi.spyOn(localStorage, "setItem").mockImplementation(() => {
 				throw new Error("unavailable");
 			});
-			vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+			vi.spyOn(localStorage, "removeItem").mockImplementation(() => {
 				throw new Error("unavailable");
 			});
 			expect(() => readSignedInHint()).not.toThrow();
