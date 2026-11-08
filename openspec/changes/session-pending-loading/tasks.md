@@ -206,3 +206,30 @@ Stage 2（opus）PASS：
 - 確認本 change 新造成的「hydration 後才全新掛載」只有 `HistoryView`。參賽者頁 `readRoster()` 在 client 端導覽時的 StrictMode 覆蓋是既有潛在問題，掛載時機未被本 change 改變，不在範圍內。
 
 完整驗收重跑（HEAD `1b21a86`）全綠，數字見 5.3～5.6 紀錄。
+
+### /opsx:verify 第一輪紀錄
+
+報告無 CRITICAL，1 WARNING、7 SUGGESTION，逐項查證屬實後處理（commit：docs `583c1ab`、test `d72d54a`、docs(openspec) `a83605f`）。
+
+| # | 查證 | 處置 |
+|---|---|---|
+| W1 | 屬實：`nextjs-pickball/CLAUDE.md` 稱「其餘為 `HistoryView`」，pending 時兩個歷史元件皆不掛載 | 補 pending 例外（`583c1ab`） |
+| S1 | 屬實：「本機資料讀入前」與儲存模式 pending 混淆 | 改為依選擇器顯示狀態，並分述兩種 pending 來源（`583c1ab`） |
+| S2 | 屬實：design 無 `e534149` 的決定記錄；overview 缺 `localDataStatus` | design Decision 9 補 apply 補註；overview 兩處同步（a83605f） |
+| S3 | 屬實 | 「審查修正紀錄」該句加註複審 PASS 後已勾選，原句保留（a83605f） |
+| S4 | 屬實：計分板 Scenario 為三條（選擇器、同一 state 參考、讀入前） | 「兩條」改「三條」（a83605f） |
+| S5 | 屬實：`roster-sync.spec.ts` 寫死字面字串；`@/lib` 別名在 E2E 可用（該檔已 import `@/lib/matchmaker/roster-csv`） | 改 import `DATA_PENDING_MESSAGE`（`d72d54a`） |
+| S6 | 屬實：名單只測 3 個、回合只測 1 個操作 | 名單補 updatePlayer、removePlayer、applyRemotePlayers、reloadRemotePlayers；回合補其餘六個操作（皆斷言 ok: false）；沿用既有 localStorage 與 fetchMock 斷言（`d72d54a`）。regression guard，寫入即綠 |
+| S7 | 屬實 | 三份 spec 既有 Scenario 的 GIVEN 補「不帶上次登入提示（`signedInHint`）」，標題不變（a83605f） |
+
+S6 變異證據（單檔 vitest，每次改完還原）：
+
+| 變異 | 結果 |
+|---|---|
+| 名單 pending 回傳改用 `local.removePlayer` | 紅（等待中名單 it） |
+| 名單 pending 回傳改用 `local.updatePlayer` | 紅（同上） |
+| 回合 pending 回傳改用 `local.setTargetScore` | 紅（等待中回合 it） |
+| 回合 pending 回傳改用 `local.swapMatchPlayer` | 仍綠：本機版在該輸入下也回 ok: false，此呼叫是弱保護，如實記錄 |
+| 對照：兩處 pending 回傳加 `droppedCount: 0` | 綠 |
+
+實跑：兩個 hook 單檔 44 passed；user-data 該條 E2E 1 passed、0 skipped（雙鎖，已 release）；`pnpm -r exec tsc --noEmit` exit 0；改動檔 eslint 0 errors；`openspec validate --strict` 通過。
