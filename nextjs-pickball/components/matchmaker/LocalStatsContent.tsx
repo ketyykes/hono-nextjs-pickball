@@ -11,6 +11,7 @@ import { useRoundStore } from "@/hooks/useRoundStore";
 import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
 import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 
 // 統計頁（球員排行榜）。本檔標 "use client" 並直接持有 useRosterStore 與 useRoundStore
 // 兩個既有 store（形態比照 app/matchmaker/page.tsx）：不另呼叫
@@ -53,9 +54,9 @@ export function LocalStatsContent() {
 	// players 的 rating 決定的，篩選只改變出場數／勝負／淨變化／搭檔對手等期間內統計。
 	const stats = computePlayerStats(filteredHistory, players);
 
-	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 資料等待中、雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
 	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<main
 				data-sync-status={syncStatus}
