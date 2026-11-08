@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { CLEAR_ALL_KEYS, clearAllLocalData, readSnapshot, writeBackup, writeRosterPlayers } from "./transfer-storage";
+import { SIGNED_IN_HINT_STORAGE_KEY } from "../auth/session-hint";
 import { ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY, HISTORY_STORAGE_KEY } from "./storage-keys";
 // 取 scoreboard 實際匯出的 key 而非硬編碼字面值——比照 storage.test.ts 既有慣例
 // （見 player-roster delta 的「單一來源」條款：日後 scoreboard 改 key 名，硬編碼的測試
@@ -148,6 +149,17 @@ describe("transfer-storage", () => {
 		// 集合相等，SHALL NOT 斷言固定筆數——寫死筆數會讓日後新增資料域卻漏列
 		// 的情況仍然是綠燈。
 		expect(new Set(CLEAR_ALL_KEYS)).toEqual(new Set(expectedKeys));
+	});
+
+	it("regression guard：clearAllLocalData 不移除上次登入提示", () => {
+		localStorage.setItem(SIGNED_IN_HINT_STORAGE_KEY, "1");
+		localStorage.setItem(ROSTER_STORAGE_KEY, "[]");
+
+		clearAllLocalData();
+
+		expect(localStorage.getItem(ROSTER_STORAGE_KEY)).toBeNull();
+		expect(localStorage.getItem(SIGNED_IN_HINT_STORAGE_KEY)).toBe("1");
+		expect((CLEAR_ALL_KEYS as readonly string[]).includes(SIGNED_IN_HINT_STORAGE_KEY)).toBe(false);
 	});
 
 	it("clearAllLocalData 不呼叫 clear，列舉範圍外的 key 完全不受影響", () => {
