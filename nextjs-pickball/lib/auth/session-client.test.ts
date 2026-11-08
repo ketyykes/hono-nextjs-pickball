@@ -5,6 +5,7 @@ import {
 	signOut,
 	startGoogleSignIn,
 } from "./session-client";
+import { readSignedInHint, writeSignedInHint } from "./session-hint";
 
 const DISABLED = { authEnabled: false, user: null };
 const USER = { id: "u1", email: "a@example.com", name: "A" };
@@ -177,6 +178,19 @@ describe("signInWithEmail", () => {
 });
 
 describe("signOut", () => {
+	it("signOut 成功時清除上次登入提示，失敗時保留", async () => {
+		localStorage.clear();
+		writeSignedInHint();
+		stubFetch(async () => new Response("{}", { status: 200 }));
+		await signOut();
+		expect(readSignedInHint()).toBe(false);
+
+		writeSignedInHint();
+		stubFetch(async () => new Response("{}", { status: 500 }));
+		await signOut();
+		expect(readSignedInHint()).toBe(true);
+	});
+
 	it("signOut 以 POST 呼叫 /api/auth/sign-out 並回傳是否成功", async () => {
 		const ok = stubFetch(async () => new Response("{}", { status: 200 }));
 		await expect(signOut()).resolves.toBe(true);
