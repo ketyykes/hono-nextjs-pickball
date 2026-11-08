@@ -59,7 +59,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
   - `useRosterStore()`：`players` 為空陣列、`droppedCount` 為 0、`syncStatus` 為 `"pending"`；`addPlayer`、`updatePlayer`、`removePlayer`、`togglePlayerActive`、`resetRoster`、`applyRemotePlayers`、`reloadRemotePlayers` 皆不改變回傳的名單、不寫入本機、不發請求。
   - `useRoundStore(options)`：`round` 為 `null`、`history` 為空陣列、`droppedCount` 為 0、`syncStatus` 為 `"pending"`、`remoteMatchSlots` 為 `null`；七個操作皆回傳 `ok: false` 且不改變回合、不寫入本機、不發請求。
     因 `round` 為 `null`，對戰頁的分槽回填 effect 在等待中不會讀取或清除本機分槽、不會把本機比分送進本機歷史。
-  - `useScoreboardStore(matchId)`：`state` 為計分板初始狀態、`dispatch` 不改變狀態也不寫入本機、`syncStatus` 為 `"pending"`；`bindingStatus` 在 `matchId === null` 時為 `"standalone"`，否則為 `"pending"`——SHALL NOT 為 `"missing"`，否則已登入者開啟 `/scoreboard?match=` 會先閃「場次已失效」。
+  - `useScoreboardStore(matchId)`：`state` 為計分板初始狀態（多次 render 間 MUST 為同一個參考：`Scoreboard` 以 state 參考變化在 render 中更新衍生狀態，每次給新物件會無限 re-render）、`dispatch` 不改變狀態也不寫入本機、`syncStatus` 為 `"pending"`；`bindingStatus` 在 `matchId === null` 時為 `"standalone"`，否則為 `"pending"`——SHALL NOT 為 `"missing"`，否則已登入者開啟 `/scoreboard?match=` 會先閃「場次已失效」。
 - 儲存模式為 `"local"` 時，三個本機 hook MUST 各自回報本機資料是否已讀入（在既有讀取 effect 內，**無論有沒有本機資料**都標記為已讀入）；讀入前選擇器回傳本機結果、`syncStatus` 為 `"pending"`，讀入後為 `"local"`。既有「沒有本機資料時不 dispatch `HYDRATE`」與寫入守門不變。
 
 本機 hook 依 hooks 規則在等待中仍會 mount：其 mount 時讀取並把**同一份**本機資料寫回的既有行為（雲端模式下同樣發生）不變；等待中 SHALL NOT 有任何會改變本機資料內容的寫入。
@@ -128,6 +128,13 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 - **THEN** 前者 `state` 等於計分板初始狀態且 dispatch 後不變、`bindingStatus` 為 `standalone`、`syncStatus` 為 `pending`，`scoreboard:current:v1` 解析後與 mount 前相同；後者 `bindingStatus` 為 `pending`（不是 `missing`）、`syncStatus` 為 `pending`；沒有任何 `fetch`
 - **驗收**：`nextjs-pickball/hooks/useScoreboardStore.test.tsx`，it 名稱「session 等待中時不回傳本機計分且 syncStatus 為 pending，帶 matchId 時綁定狀態為 pending」
 
+#### Scenario: 等待中：計分板選擇器在多次 render 間回傳同一個 state 參考
+
+- **GIVEN** mock `useSession` 為 `{ status: "loading", signedInHint: true, hydrated: true }`
+- **WHEN** `useScoreboardStore(null)` mount 後再 rerender 一次
+- **THEN** 兩次回傳的 `state` 為同一個參考（`Object.is`）
+- **驗收**：`nextjs-pickball/hooks/useScoreboardStore.test.tsx`，it 名稱「session 等待中時多次 render 回傳同一個 state 參考」
+
 #### Scenario: 本機計分讀入前為等待中
 
 - **GIVEN** mock `useSession` 為訪客；`scoreboard:current:v1` 有比分 5:3；`scoreboard:matches:v1` 沒有 `gone`
@@ -193,7 +200,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 
 #### Scenario: 訪客載入本機資料的過程中從未出現空狀態或預設值
 
-- **GIVEN** 訪客、本機有一位參賽者、一輪回合、一筆今日歷史、比分 5:3 的獨立計分板；以閃爍記錄器監看整個載入過程
+- **GIVEN** 訪客、本機有兩位可出場的參賽者、一輪回合、一筆今日歷史、比分 5:3 的獨立計分板；以閃爍記錄器監看整個載入過程
 - **WHEN** 依序開啟 `/matchmaker/players`、`/matchmaker`、`/matchmaker/stats`、`/scoreboard`，各等到本機資料可見
 - **THEN** 每頁的記錄皆為空：從未出現「目前還沒有參賽者」「共 0 位參賽者」「目前沒有可出場的參賽者」「尚未產生任何回合」「還沒有任何對戰紀錄」或 `[aria-label="我方目前 0 分"]`；本機資料可見後 `[data-sync-status]` 不存在
 - **驗收**：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts`，test 名稱「訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值」

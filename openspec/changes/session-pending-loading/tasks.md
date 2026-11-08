@@ -107,7 +107,7 @@ Depends on: §4
   「對戰、參賽者、統計三頁在 loading／load-failed 時」改為 `isContentBlocked`；`lib/sync/` 的 `storage-mode`、`sync-status` 說明補「三態」「`DataStatus`」，`lib/auth/` 補 `session-hint`、`hooks/` 的 `useSession` 補 `hydrated`。commit（`docs:`）
 - [ ] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
-- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋29，後端與核心與基線相同
+- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋30，後端與核心與基線相同
 - [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
 - [ ] 5.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋1 全 passed、0 skipped；五個 browser project 各＝基線＋5、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊，附證據上報 coordinator

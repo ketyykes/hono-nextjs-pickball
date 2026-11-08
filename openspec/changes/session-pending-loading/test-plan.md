@@ -19,7 +19,7 @@
 >   以 `try／finally` 確保放行，並在結束前 `page.unrouteAll({ behavior: "ignoreErrors" })`。放行前的斷言數量保持精簡（Decision 11 的 10 秒逾時）。
 > - 閃爍記錄器 `tests/e2e/helpers/flash-recorder.ts`：`installFlashRecorder(page, { texts, selectors })` 以 `page.addInitScript` 注入（每個文件、含 reload 都重新開始），`MutationObserver` 監看 `document`（`childList`、`subtree`、`characterData`），每批變動檢查 `document.body?.innerText` 與 `document.querySelector`，命中即記入 `window.__flashHits`；
 >   `readFlashHits(page)` 讀出。斷言時機：本機（或雲端）資料已以 web-first 斷言可見之後。
-> - 種本機資料：先 `page.goto("/")` 再 `page.evaluate` 寫入，key 一律自 `@/lib/matchmaker/storage-keys`、`@/lib/scoreboard/storage-keys`、`@/lib/auth/session-hint` 匯入，不抄字面值。
+> - 種本機資料：先 `page.goto("/")` 再 `page.evaluate` 寫入（例外：上次登入提示改以 `page.addInitScript` 在下一個文件載入前寫入——首頁的 `/api/session` 回應若仍在途，確認為訪客後會清掉以 `evaluate` 寫入的提示），key 一律自 `@/lib/matchmaker/storage-keys`、`@/lib/scoreboard/storage-keys`、`@/lib/auth/session-hint` 匯入，不抄字面值。
 > - SHALL NOT 使用 `waitForTimeout`。
 
 ## auth
@@ -68,6 +68,7 @@
 | 本機回合讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local | 本機回合讀入前為等待中 | mock 訪客；第一輪種一輪：記錄 `[syncStatus, round !== null]`，第一筆 `pending`、最後一筆 `["local", true]`、不含 `["local", false]`；第二輪無資料：第一筆 `pending`、最後 `local` | 現行恆 `local` → **真紅** | unit |
 | session 等待中時不回傳本機計分且 syncStatus 為 pending，帶 matchId 時綁定狀態為 pending | 等待中：計分板選擇器不交出本機計分且綁定場次不顯示為失效 | 種 `scoreboard:current:v1`（非初始比分）；mock 等待中 → `useScoreboardStore(null)`：`[0]` 等於 `createInitialState()`、`[2]` `standalone`、`[3]` `pending`；`act` dispatch `RALLY_WON` 後 `[0]` 仍等於初始、本機 key 深度相等；`useScoreboardStore("m1")`（無分槽）：`[2]` `pending`、`[3]` `pending`；`fetchMock` 未被呼叫 | 現行回本機與 `missing` → **真紅** | unit |
 | 本機計分讀入前 syncStatus 為 pending，讀入後為 local | 本機計分讀入前為等待中 | mock 訪客；種比分 5:3；`useScoreboardStore(null)` 記錄 `[syncStatus, scores.us]`：第一筆 `pending`、最後 `["local", 5]`、不含 `["local", 0]`；`useScoreboardStore("gone")`：第一筆 `pending`、最後 `syncStatus` `local`、`bindingStatus` `missing` | 現行恆 `local` → **真紅** | unit |
+| session 等待中時多次 render 回傳同一個 state 參考 | 等待中：計分板選擇器在多次 render 間回傳同一個 state 參考 | mock 等待中；`renderHook(() => useScoreboardStore(null))` → 記下 `result.current[0]` → `rerender()` → `toBe` 同一參考 | apply §3.12 實跑 E2E 時發現等待中每次回傳新的初始狀態，`Scoreboard` 在 render 中依 state 參考更新衍生狀態而無限 re-render（`Too many re-renders`）；apply 時追加 → **真紅** | unit |
 | session 等待中時顯示等待中提示且不渲染本機歷史 | 等待中：歷史頁顯示等待中且不讀本機歷史 | 新檔；種一筆今日歷史；`vi.mock("./RemoteHistoryView", …)` 為 testid stub；mock 等待中 → status 文字「正在載入資料…」、`[data-sync-status="pending"]` 存在；`queryByRole("radiogroup", { name: "歷史區間" })` null；紀錄卡片不存在；stub 不存在 | 現行掛 `HistoryView` → **真紅** | unit |
 | 伺服器端輸出為等待中提示而非空狀態，讀入後顯示本機紀錄 | 本機歷史讀入前為等待中而非空狀態 | 新檔；種一筆今日歷史；`renderToString(<HistoryView />)` 含「正在載入資料…」與 `data-sync-status="pending"`、不含「還沒有任何對戰紀錄」與「歷史區間」；`render(<HistoryView />)` 後該筆卡片可見、`container.querySelector("[data-sync-status]")` null | 現行伺服器輸出為空狀態 → **真紅** | unit |
 | session 等待中時統計頁顯示等待中提示且不掛載雲端統計內容 | 等待中：統計頁顯示等待中且不掛載雲端統計 | 新檔；`vi.mock("@/components/matchmaker/RemoteStatsContent", …)` 為 stub；mock 等待中；`render(<MatchmakerStatsPage />)` → status 文字「正在載入資料…」、`main[data-sync-status="pending"]` 存在、heading「球員統計」不存在、stub 不存在；`fetchMock` 未被呼叫 | 現行 `=== "local"` 二分 → 掛雲端 → **真紅** | unit |
@@ -76,7 +77,7 @@
 | session 等待中時以等待中提示取代選檔與確認匯入 | 等待中：參賽者 CSV 匯入區塊不提供選檔與確認 | 新檔，`vi.mock("@/hooks/useSession", () => ({ useSession: vi.fn() }))`；mock 等待中 → heading「參賽者名單 CSV 匯入」存在；status 文字固定；`roster-csv-import-input` 與按鈕「確認匯入」皆不存在 | 現行可寫入本機名單並 reload → **真紅** | unit |
 | regression guard：session 等待中時不渲染匯入區塊 | 等待中：匯入本機資料區塊不渲染 | 種一位本機參賽者；mock 等待中 → `queryByTestId("local-import-section")` null；`fetchMock` 未被呼叫 | 現行 `=== "remote"` 已正確 → 寫入即綠（regression guard；mutation `isRemote` 改 `mode !== "local"` 須轉紅） | unit |
 | JavaScript 載入前各頁只顯示等待中提示而不顯示空狀態或預設值 | JavaScript 載入前各頁只顯示等待中提示 | 新檔 `data-pending.spec.ts` 的 `describe` 內 `test.use({ javaScriptEnabled: false })`；七個路徑逐一 goto → `[data-sync-status="pending"]` 與「正在載入資料…」可見；spec 列出的空狀態文字、「選擇備份檔…」、按鈕「匯出 CSV」「確認匯入」、`[aria-label="我方目前 0 分"]` 皆 `toHaveCount(0)` | 使用者要求的「靜態 HTML 不出現空名單」直接證據；現行伺服器輸出為空狀態 → **真紅** | e2e |
-| 訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值 | 訪客載入本機資料的過程中從未出現空狀態或預設值 | 種一位參賽者（`isActive`）、一輪回合、一筆今日歷史、比分 5:3；`installFlashRecorder`（texts：五個空狀態文字；selectors：`[aria-label="我方目前 0 分"]`）；四頁逐一 goto → 本機資料可見（參賽者名、場地卡、排行榜列、`[aria-label="我方目前 5 分"]`）→ `readFlashHits` 為 `[]`、`[data-sync-status]` `toHaveCount(0)` | 「hydration 後不閃空狀態」的直接證據；現行伺服器輸出即命中 → **真紅** | e2e |
+| 訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值 | 訪客載入本機資料的過程中從未出現空狀態或預設值 | 種兩位參賽者（`isActive`，單打回合需要兩位）、一輪回合、一筆今日歷史、比分 5:3；`installFlashRecorder`（texts：五個空狀態文字；selectors：`[aria-label="我方目前 0 分"]`）；四頁逐一 goto → 本機資料可見（參賽者名、場地卡、排行榜列、`[aria-label="我方目前 5 分"]`）→ `readFlashHits` 為 `[]`、`[data-sync-status]` `toHaveCount(0)` | 「hydration 後不閃空狀態」的直接證據；現行伺服器輸出即命中 → **真紅** | e2e |
 | 訪客載入本機歷史的過程中從未出現空狀態 | 訪客載入本機歷史的過程中從未出現空狀態 | 種一筆今日歷史；recorder（texts：「還沒有任何對戰紀錄」）；goto `/matchmaker/history` → 卡片可見 → hits 為 `[]`、`[data-sync-status]` `toHaveCount(0)` | 現行 `hydrated === null` 時畫空狀態 → **真紅** | e2e |
 | 已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單 | 已登入者重新整理時在 session 回應前顯示等待中而非空名單 | `seedCloudPlayers` 一位「雲端甲」→ goto → synced 與「雲端甲」可見 → `installFlashRecorder`（texts：「目前還沒有參賽者」「共 0 位參賽者」）→ route 暫停 → `page.reload()` → `main[data-sync-status="pending"]` 可見、status 文字「正在載入資料…」→ 放行 → synced 與「雲端甲」可見 → hits 為 `[]` | 使用者回報的原始情境 → **真紅** | e2e |
 | 訪客重新整理參賽者頁時在 session 回應前即顯示本機名單 | 訪客重新整理時 session 回應前即顯示本機名單 | 寫一位本機參賽者 → route 暫停 → reload → 該參賽者可見、`[data-sync-status]` 與 `getByRole("status")` `toHaveCount(0)` → 放行 → 仍可見、兩者仍為 0 | regression guard：hydration 後訪客不等 session（寫入即綠） | e2e |
@@ -138,7 +139,7 @@
 |---|---|---|---|
 | C1 | （型別） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit`；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball typecheck`；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/packages/pickball-core typecheck`（不 `cd`；不用 `pnpm --dir <root> --filter`） | 皆 exit 0 |
 | C2 | （lint） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖） | 0 errors、warning 不多於基線 |
-| C3 | （單元） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖） | 三組皆綠；前端檔數＝基線＋6、測試數＝基線＋29；後端、核心與基線相同 |
+| C3 | （單元） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖） | 三組皆綠；前端檔數＝基線＋6、測試數＝基線＋30；後端、核心與基線相同 |
 | C4 | （建置） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖） | exit 0；建置後 `git status --porcelain` 為空 |
 | C5 | （E2E） | 依 project 分開跑（雙鎖）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --workers=1 --project=<p>`（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`） | user-data＝基線＋1，全 passed、0 skipped；五個 browser project 各＝基線＋5 且 0 failed（skip 只限既有瀏覽器條件）；無因缺帳密 skip |
 | C6 | （使用端清單，Decision 2） | `grep -rn "resolveStorageMode(" /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/app /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/components /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/hooks /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/lib \| grep -v "\.test\." \| grep -v "export function"` | 檔案集合恰為 Decision 2 表格的 9 個檔案 |
@@ -151,5 +152,5 @@
 - [x] 每個 Requirement 至少一列（auth 2、user-data-sync 2、player-roster 1、round-lifecycle 1、scoreboard 1、match-history 1、data-transfer 1）
 - [x] 每個新增 Scenario（auth 10、user-data-sync 24、data-transfer 1）至少一列；MODIFIED 帶入的既有 Scenario 以「（既有）」列合併
 - [x] 每列皆有 Tier（unit | e2e）
-- [x] 新 it 共 29（真紅 27、regression guard 2）；新 E2E 6（真紅 5、regression guard 1）
+- [x] 新 it 共 30（真紅 28、regression guard 2；其中「session 等待中時多次 render 回傳同一個 state 參考」為 apply 時追加）；新 E2E 6（真紅 5、regression guard 1）
 - [x] 授權修改的既有測試只有兩處 `beforeEach` 各加一行 `localStorage.clear()`，不改任何 it 名稱與斷言

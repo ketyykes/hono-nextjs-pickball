@@ -59,7 +59,7 @@
     E2E 輔助新檔 `tests/e2e/helpers/flash-recorder.ts`。
   - 新增 it 的既有檔：`lib/sync/storage-mode.test.ts`、`lib/sync/sync-status.test.ts`、`lib/auth/session-store.test.ts`、`lib/auth/session-client.test.ts`、`hooks/useSession.test.ts`、`hooks/useRosterStore.test.tsx`、`hooks/useRoundStore.test.tsx`、`hooks/useScoreboardStore.test.tsx`、
     `components/matchmaker/JsonBackupSection.test.tsx`、`components/matchmaker/HistoryCsvSection.test.tsx`、`components/matchmaker/LocalDataImportSection.test.tsx`、`lib/matchmaker/transfer-storage.test.ts`、`tests/e2e/user-data/roster-sync.spec.ts`。
-  - 新 it 共 29 個（其中 2 個 regression guard），前端新測試檔 6 個；新 E2E 6 條（`data-pending.spec.ts` 5 條在五個 browser project 各跑一次、`roster-sync.spec.ts` 1 條在 `user-data`）。
+  - 新 it 共 30 個（其中 2 個 regression guard；1 個為 apply 時追加的計分板等待中 state 參考穩定性），前端新測試檔 6 個；新 E2E 6 條（`data-pending.spec.ts` 5 條在五個 browser project 各跑一次、`roster-sync.spec.ts` 1 條在 `user-data`）。
   - **授權修改的既有測試（僅限下列兩處，皆為測試隔離，不改任何 it 名稱與斷言）**：`lib/auth/session-store.test.ts` 與 `hooks/useSession.test.ts` 既有 `describe` 的 `beforeEach` 各加一行 `localStorage.clear()`——store 現在會把提示寫進 localStorage，前一個 it 寫入的提示會讓後面 it 的初始快照多出 `signedInHint`。
 - **文件**：`nextjs-pickball/CLAUDE.md` 中「訪客（含 auth 停用、session 載入中）仍全走 LocalStorage」、統計頁「訪客與 session 載入中為 `LocalStatsContent`」、「對戰、參賽者、統計三頁在 loading／load-failed 時」、`lib/sync/`／`lib/auth/` 目錄說明（apply 階段改）。
 - **相依**：不新增。**migration**：無。**後端／核心套件**：零變更。

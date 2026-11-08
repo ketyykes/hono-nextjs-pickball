@@ -164,6 +164,10 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 可以沿用未啟用的雲端 hook，是因為等待中只出現在第一次取得 session 之前：雲端 hook 在這之前從未啟用過，內部一定是初始狀態。
 
+**apply 補註**：
+- 計分板等待中的 `state` 以模組層級常數提供（多次 render 為同一參考）。apply §3.12 實跑 E2E 時發現每次 render 回傳新的 `createInitialState()` 會讓 `Scoreboard` 依 state 參考在 render 中更新衍生狀態而無限 re-render；追加 it「session 等待中時多次 render 回傳同一個 state 參考」（先紅後綠）與對應 Scenario，新 it 總數由 29 改為 30。
+- `UseRosterStoreResult` 與 `UseRoundStoreResult` 改為以 `syncStatus` 型別為參數的泛型（預設 `SyncStatus`），選擇器回傳 `<DataStatus>`：雲端 hook 與其既有測試（把 `syncStatus` 推進 `SyncStatus[]`）維持 `SyncStatus`，不必改動。
+
 **Alternatives considered**：pending 時回傳本機結果但把 `syncStatus` 改成 `pending`：本機 `round` 非 null，回填 effect 會在等待中把本機分槽寫進本機歷史，操作也仍會寫本機。不選。
 
 ### Decision 9：頁面與元件的處置
