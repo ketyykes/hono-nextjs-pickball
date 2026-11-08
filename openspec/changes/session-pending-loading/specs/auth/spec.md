@@ -14,7 +14,9 @@
 - **等待逾時**：快照帶 `signedInHint` 時，自第一次訂閱起 10 秒（`SIGNED_IN_HINT_WAIT_MS = 10_000`）仍未採用任何回應，快照 MUST 改為不帶提示的 `{ status: "loading" }` 並通知訂閱者——
   已登入者在 session 請求遲遲不回時回到現行行為（先顯示本機畫面），SHALL NOT 永遠停在等待中；之後回應到達仍照常轉為 ready。已轉為 ready 後逾時 SHALL NOT 改變快照。
 
-`nextjs-pickball/hooks/useSession.ts` SHALL 以 `useSyncExternalStore` 讀取該 store，回傳快照與 `refresh`。
+`nextjs-pickball/hooks/useSession.ts` SHALL 以 `useSyncExternalStore` 讀取該 store，回傳快照、`refresh` 與 `hydrated: boolean`。
+`hydrated` 以第二個 `useSyncExternalStore`（不訂閱任何來源，client 快照為 `true`、server snapshot 為 `false`）取得：伺服器端 render 與 hydration 那次 render 為 `false`，hydration 完成後為 `true`；
+client 端非 hydration 的 mount（例如 client 端導覽）第一次 render 即為 `true`。它供 `user-data-sync`「前端依 session 選擇儲存模式」判斷「伺服器輸出與 hydration 時儲存模式未定」，不改變 session 快照本身。
 server snapshot MUST 固定為 `{ status: "loading" }`（**不帶** `signedInHint`，伺服器端無從得知提示）——伺服器端與 hydration 時的第一次 render 一致，不產生 hydration mismatch；
 hydration 完成後 React 依 client 快照重新 render，此時才反映提示。這是專案讀取瀏覽器狀態而不造成 hydration mismatch 的既有做法（同一個 store），SHALL NOT 改用在 render 期間直接讀 localStorage。
 
@@ -72,6 +74,19 @@ hydration 完成後 React 依 client 快照重新 render，此時才反映提示
 - **WHEN** 以 `renderToString` 產生伺服器端輸出，放進容器後以 `hydrateRoot` hydrate
 - **THEN** 伺服器端輸出為「不帶提示」；hydrate 過程 `onRecoverableError` 與 `console.error` 皆未被呼叫；hydrate 完成後畫面為「帶提示」
 - **驗收**：`nextjs-pickball/hooks/useSession.test.ts`，it 名稱「有上次登入提示時伺服器端輸出不帶提示、hydration 不產生不一致且完成後反映提示」
+
+#### Scenario: hydrated 在伺服器端與 hydration 時為 false，完成後為 true
+
+- **GIVEN** `fetchSession` 為永不完成的假函式；一個顯示 `String(useSession().hydrated)` 的元件
+- **WHEN** 以 `renderToString` 產生伺服器端輸出，放進容器後以 `hydrateRoot` hydrate
+- **THEN** 伺服器端輸出為 `false`；hydrate 過程 `onRecoverableError` 與 `console.error` 皆未被呼叫；hydrate 完成後畫面為 `true`
+- **驗收**：`nextjs-pickball/hooks/useSession.test.ts`，it 名稱「hydrated 在伺服器端輸出與 hydration 時為 false，hydration 完成後為 true」
+
+#### Scenario: client 端非 hydration 的 mount 第一次 render 即為 hydrated
+
+- **WHEN** 以 `renderHook` 渲染 `useSession`，並在 render 階段同步記錄每次 render 的 `hydrated`
+- **THEN** 第一筆即為 `true`
+- **驗收**：`nextjs-pickball/hooks/useSession.test.ts`，it 名稱「client 端一般 mount 的第一次 render 即為 hydrated」
 
 ## ADDED Requirements
 

@@ -10,7 +10,7 @@
 - **Base branch**: `main`
 
 > 開分支由 coordinator 負責；leader 啟動時分支已就緒，不要重建。
-> propose 當下（2026-11-08）`main` HEAD 為 `fa2d4e5`（加上本 change 的 propose commit），`openspec/changes/` 下沒有其他進行中的 change；
+> propose 當下（2026-11-08）`main` HEAD 為 `fa2d4e5`，之後依序加上本 change 的 propose commit `d371225` 與範圍擴大後的修訂 commit；`openspec/changes/` 下沒有其他進行中的 change；
 > 開分支前由 coordinator 確認 `main` 已含其他並行工作中會動到 proposal Impact 所列檔案的提交（若有），避免合併衝突。
 
 ## Setup commands
@@ -44,11 +44,12 @@ git -C /Users/m2_24gb/Desktop/project/nextjs-pickball branch -d change/session-p
 
 ## 注意事項
 
-- 本 change **只改前端**；**沒有** migration、不動後端與核心套件。`db:migrate:local` 只為讓 `user-data` E2E 有可用的本機 D1。
+- 本 change **只改前端**（21 個產品檔，見 proposal Impact）；**沒有** migration、不動後端與核心套件。`db:migrate:local` 只為讓 `user-data` E2E 有可用的本機 D1。
 - `user-data` E2E 需要 `hono-pickball/.dev.vars` 齊備（`TEST_ACCOUNT_*`、`ENVIRONMENT=development`）；leader 開工前向 coordinator 確認。**帳密不得寫進任何 commit**。skip 不算通過。
+- `data-pending.spec.ts` 的「JavaScript 載入前…」以 `javaScriptEnabled: false` 只看伺服器輸出，五個 browser project 都要跑；閃爍記錄器以 `addInitScript` 注入，不需額外套件。
 - 重負載（E2E、eslint 全套、全套 vitest、build）一律雙鎖：先 `/tmp/lock-fast.sh nextjspickball "<說明>"`（每秒輪詢 mkdir 鎖 `/tmp/heavy-compute.lock`）→ `python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label nextjspickball -- <指令>` → `/tmp/heavy-lock.sh release nextjspickball`；
   不得在 heavy.py 內再包 heavy.py；單檔 vitest 免鎖。
 - 單檔 vitest：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball test --run <path>`（`--run` 前不可加 `--`；不要用 `pnpm --dir <root> --filter ./<ws>`）。
 - E2E 前後 MUST 用 `lsof -i :3005 -i :8787` ＋ `ps aux | grep -E "next-server|wrangler|workerd|playwright" | grep -v grep` 清殘留，只 kill 路徑含本 repo 的 PID，禁止 `pkill -f`。
 - **禁止任何遠端 CF 操作**（deploy、d1 create、`--remote`、secret put）；只允許 `--local`、`--dry-run`。
-- 編輯器診斷不可信，以 `tsc` exit code 為準；本 change 在主 repo 進行，Stop hook 會擋主 worktree 的 tsc 紅燈——RED 與其 GREEN 須在同一張派工單內完成（§2.1 的 RED import 尚不存在的 `lib/auth/session-hint.ts`，屬型別紅燈）。
+- 編輯器診斷不可信，以 `tsc` exit code 為準；本 change 在主 repo 進行，Stop hook 會擋主 worktree 的 tsc 紅燈——RED 與其 GREEN 須在同一張派工單內完成（§2.1、§3.2、§4.2 等 RED import 尚不存在的模組或匯出，屬型別紅燈）。
