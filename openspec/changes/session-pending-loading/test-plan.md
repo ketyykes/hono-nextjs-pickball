@@ -124,7 +124,7 @@
 |-----------|----------|-----------|-----------|------|
 | （新增行為的錨點）伺服器端輸出為等待中提示而非空狀態，讀入後顯示本機紀錄；訪客載入本機歷史的過程中從未出現空狀態 | 見 user-data-sync 對應 Scenario | 同上表 | 本 Requirement 只改「首次伺服器輸出」與「SSR 時顯示空狀態」兩句 | unit／e2e |
 | （既有）瀏覽與切換區間後 matchmaker:history:v1 內容不變；紀錄於 hydration 後顯示且無 console error；登入時歷史頁唯讀的 E2E | 瀏覽與切換區間不改動持久化資料／紀錄於 hydration 後才出現且無 console error／歷史頁唯讀 | 原樣通過 | regression guard：hydration 無 console error 仍成立 | e2e |
-| StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示 | 歷史頁 effect 重跑時保留損毀筆數提示 | 沿用既有檔；種 2 筆損毀加 1 筆合法紀錄；`<StrictMode>` 包住 `render(<HistoryView />)` → `getByRole("alert")` 文字含「有 2 筆損毀的歷史紀錄」、合法紀錄卡片可見 | 合併前驗收 E2E 發現回歸：`readHistory()` 回寫清理結果使第二次 effect 讀到 `droppedCount` 0 並蓋掉提示；現行 reducer 直接覆蓋 → **真紅** | unit |
+| StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示 | StrictMode 重跑 effect 時保留損毀筆數提示 | 沿用既有檔；種 2 筆損毀加 1 筆合法紀錄；`<StrictMode>` 包住 `render(<HistoryView />)` → `getByRole("alert")` 文字含「有 2 筆損毀的歷史紀錄」、合法紀錄卡片可見 | 合併前驗收 E2E 發現回歸：`readHistory()` 回寫清理結果使第二次 effect 讀到 `droppedCount` 0 並蓋掉提示；現行 reducer 直接覆蓋 → **真紅** | unit |
 
 ## data-transfer
 

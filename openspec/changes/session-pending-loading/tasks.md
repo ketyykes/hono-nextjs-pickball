@@ -183,7 +183,26 @@ Final Code Review（opus）判定 FAIL，原因全是 artifact 的數字與清�
 - 新 it 數：以腳本比對 `main` 與 HEAD 各測試檔的 it 名稱，實為 32（非 30）；regression guard 4 個（transfer-storage、LocalDataImport、droppedCount、localDataStatus），真紅 28 不變。已改 proposal、test-plan（C3 與 Checklist）、tasks 5.4、execution-plan Final checklist、design Decision 8 apply 補註。
 - proposal Impact 與 `git diff main --stat` 比對：只缺新檔 `tests/e2e/helpers/hold-session.ts`，已補；其餘（21 個產品檔、測試檔）一致。
 - user-data-sync delta spec「SHALL NOT 各自內聯比較」補明 `RemoteHistoryView.tsx` 雲端歷史專屬例外與理由。
-- Scenario 計數：以與主 spec 逐行比對確認 auth 10、user-data-sync 25（原寫 24，已更正）、data-transfer 1，其餘 capability 0。
+- Scenario 計數：以與主 spec 逐行比對確認 auth 10、user-data-sync 25（原寫 24，已更正）、data-transfer 1，其餘 capability 0（Final Code Review 當時；合併前驗收後 match-history 另增 1，見下方回歸紀錄）。
 - 兩個 guard it 補上 delta spec 驗收錨點；「上次登入提示殘留」Scenario 的 WHEN 改為與測試一致的 `addInitScript` 後 `goto`（標題未動）；`waitForResponse` 建立時機與兩個 describe 的檔名已更正（見 §4 審查建議處置）；5.9 過時的 bash 說明已更新；`nextjs-pickball/CLAUDE.md` 改正「本機資料讀入前」為顯示狀態並補 `localDataStatus`。
 - 錨點比對腳本：delta spec 所有驗收錨點各恰好被 grep 到 1 次，本 change 新增的 33 個 it 皆有錨點（含合併前驗收追加的 1 個）。
 - 處置 commit：見 `git log`（`docs(openspec):` 與 `docs:` 各一，主題為「同步 Final Code Review 指出的數字與清單」）。
+
+**合併前驗收發現的回歸（coordinator 執行）**：第一次完整驗收（HEAD `d0464bb`）的結果：
+- 通過：lint 0 errors／3 warnings；三段 tsc 皆為 0；unit 前端 117 檔／1162、後端 27／223、核心 10／27；user-data 48 passed；build exit 0。
+- 失敗：五個 browser project 都在同一條 `matchmaker-history.spec.ts:546`「有損毀歷史紀錄時顯示提示且其餘紀錄正常顯示」失敗。
+
+根因：`HistoryModeSwitch` 在 pending 時不掛載 `HistoryView`，`HistoryView` 因此在 hydration 後才全新掛載。dev 的 React StrictMode 會讓 effect 跑兩次；第二次 `readHistory()` 讀到已回寫的清理結果，`droppedCount` 為 0，蓋掉了損毀提示。
+
+修正：
+- 紅燈 `9c2c94d`：新 it「StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示」，單檔 1 failed。
+- 修正 `e534149`：reducer 在已有結果時保留較大的 `droppedCount`。
+- artifact 同步：`aab9bcf` 及本次 commit。
+
+Stage 2（opus）PASS：
+- 機械複驗確認是真紅。
+- mutation M1、M2、M4 紅；對照組 E1 綠；M3（取 `current`）存活，語意等價，可接受。
+- tsc 0、eslint 0。
+- 確認本 change 新造成的「hydration 後才全新掛載」只有 `HistoryView`。參賽者頁 `readRoster()` 在 client 端導覽時的 StrictMode 覆蓋是既有潛在問題，掛載時機未被本 change 改變，不在範圍內。
+
+完整驗收重跑結果見下一段。
