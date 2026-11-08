@@ -85,6 +85,29 @@ Depends on: §2
   雙鎖下重跑 3.1 的兩個 E2E 檔（chromium 全檔、user-data 該條），四條全綠並貼出輸出；tsc exit 0；改動檔 ESLint 0 errors
 - [ ] 3.13 REFACTOR：三個選擇器的三態分流寫法是否一致（具名 `mode` 變數與 if，不用巢狀三元）；三個本機 hook 的讀入旗標寫法是否一致；舊註解（「session 載入中視為本機」「本機模式恆為 local」等）是否更新；無壞味道則註記 skipped
 
+### 審查修正紀錄（§3 Stage 2 兩份 FAIL 之後）
+
+兩位 Stage 2 reviewer 的 FAIL 都只因兩處過時註解，程式行為無誤；必修與建議全數處理，task 尚未勾選（待複審）。
+
+| # | 類型 | 處置 | commit |
+|---|---|---|---|
+| 1 | 必修：`LocalStatsContent.tsx` 時鐘註解仍稱 history 為空陣列 | 改為「首次伺服器輸出與 hydration 當下 syncStatus 皆為 pending，走等待中提示分支」 | `876356e` |
+| 2 | 必修：`app/matchmaker/page.tsx` 註解稱本機模式名單恆就緒 | 改為「remoteMatchSlots 恆為 null；名單就緒在本機讀入的同一次 render 由 false 轉 true」 | `876356e` |
+| 3 | 建議：X4 缺測（等待中 `droppedCount` 改帶本機值不會紅） | `useRosterStore.test.tsx` 新增 it「session 等待中時即使本機資料含損壞筆數 droppedCount 仍為 0」，**regression guard**（行為早已正確，寫入即綠） | `68d32d0` |
+| 4 | 建議：E2E 放行前錨點太弱 | `data-pending.spec.ts` 追加：殘留提示那條斷言 `getByRole("status")` 為 `DATA_PENDING_MESSAGE` 並斷言空名單文案為 0；訪客重新整理那條加閃爍記錄器 | `68d32d0` |
+| 5 | 建議：`unrouteAll` 移進 `finally` | 三處（data-pending 兩處、roster-sync 一處）改為 try 內放行並斷言、finally 內再 release 與 unrouteAll | `68d32d0` |
+| 6 | 建議：暫停邏輯重複 | 抽出 `tests/e2e/helpers/hold-session.ts`，兩個 spec 共用 | `68d32d0` |
+| 7 | 建議：型別寫法不一 | `useRoundStore.ts` 的 `LocalRoundStoreResult` 改明確寫 `UseRoundStoreResult<DataStatus>`，與名單一致 | `8dad6aa` |
+| 8 | 建議：三選擇器重複本機狀態判定 | `sync-status.ts` 新增 `localDataStatus(hydrated)`（if 寫法），三選擇器改用；單元 it 標 regression guard | `8dad6aa` |
+
+**X4 變異**：把 `useRosterStore` 等待中分支改為帶本機 `droppedCount`（先解構 local 再回傳 `{ ...remote, droppedCount: localStore.droppedCount, syncStatus: "pending" }`）。單檔 vitest：`Test Files 1 failed`、`Tests 1 failed | 15 passed`，紅的正是新 it（`AssertionError: expected 1 to be +0`）。等價對照組（`mode === "pending"` 改寫為 `mode !== "local" && mode !== "remote"`）：`16 passed`。每次變異後已還原、git status 乾淨。
+
+**E2E 錨點變異**（參賽者頁取代條件改回只看 `loading`／`load-failed`）：
+- 只追加 status 文案斷言時，變異下只有第一條紅，另兩條仍綠——放行前畫面的 `main[data-sync-status="pending"]` 與狀態文案由別處渲染，與是否取代內容無關；因此再追加「空名單文案為 0」與閃爍記錄器。
+- 追加後變異下 3 條皆紅（`1 failed`/`2 passed` → `3 failed`）；等價對照組（`isContentBlocked(syncStatus)` 展開成三個狀態的 `||`）3 passed。
+
+**實跑數字**：單檔 vitest（三個 store 測試與 `sync-status.test.ts`）4 files、69 tests 全綠，`useRosterStore.test.tsx` 16 passed；chromium `data-pending.spec.ts` 3 passed（HEAD）；user-data `roster-sync.spec.ts -g` 1 passed、0 skipped；`pnpm -r exec tsc --noEmit` exit 0；改動檔 eslint 0 errors。
+
 ## 4. 歷史頁與資料頁
 
 Depends on: §3
