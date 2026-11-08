@@ -27,10 +27,10 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/session-hint-failure-no-local-fallback`、工作樹除本 change artifact 外乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/session-hint-failure-no-local-fallback`、工作樹除本 change artifact 外乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
   雙鎖下跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck（test-plan C1）、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（errors／warnings 數）、
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 proposal Impact 列出的產品檔與測試檔自 `0de9ad9` 後未被其他提交改動（`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat 0de9ad9 HEAD -- nextjs-pickball/{lib,hooks,components,app,tests}` 只含本 change 的提交）；
+- [x] 1.2 對齊 main：確認 proposal Impact 列出的產品檔與測試檔自 `0de9ad9` 後未被其他提交改動（`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat 0de9ad9 HEAD -- nextjs-pickball/{lib,hooks,components,app,tests}` 只含本 change 的提交）；
   以 python difflib 比對本 change 九個 MODIFIED Requirement（`auth` 三個、`user-data-sync` 三個、`player-roster`、`round-lifecycle`、`scoreboard` 各一個）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   另以 Context7 查證並記錄：Playwright `route.fulfill({ status })`、`route.abort()`、`page.addInitScript`、`page.unrouteAll({ behavior: "ignoreErrors" })`；Next.js 16 的 page 模組只允許特定匯出（design Decision 9 不從 `page.tsx` 匯出 `mergeSyncStatus` 的根據）。與 design 假設不符時停止並回報
