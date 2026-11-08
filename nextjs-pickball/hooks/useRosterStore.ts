@@ -13,7 +13,7 @@ import { readRoster, writeRoster, resetMatchmakerData } from "@/lib/matchmaker/s
 import type { Player } from "@pickball/core/matchmaker/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRosterStore } from "@/hooks/useRemoteRosterStore";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 import { localDataStatus, type DataStatus, type SyncStatus } from "@/lib/sync/sync-status";
 
 // 名單 store 的 state 形狀。
@@ -123,6 +123,9 @@ type LocalRosterStoreResult = Omit<
 
 function doNothing(): void {}
 
+// 等待中交出的空名單：模組常數，多次 render 參考穩定
+const NO_PLAYERS: Player[] = [];
+
 // 整合 reducer 與 localStorage，比照 useScoreboardStore 的 write/read effect 順序與
 // hasHydratedRef 守門模式：write effect 放前面（mount 時 ref=false 故跳過）、
 // read/hydrate effect 放後面（讀取後視情況 dispatch HYDRATE，最後把 ref 設 true）。
@@ -207,8 +210,8 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 
 // 儲存模式選擇器：本機 hook 在其他模式下仍會 mount（hooks 規則不允許條件呼叫），
 // 它只會讀取並把同一份本機名單寫回，使用者動作一律走雲端 hook 或等待中結果，不會改到本機名單。
-// 等待中（儲存模式未定）沿用未啟用的雲端 hook 結果：它在第一次取得 session 之前從未啟用過，
-// 內部必為初始狀態（空名單、操作因沒有 controller 而直接返回）。
+// 等待中（儲存模式未定）明確回傳空名單：已登入使用中 session 轉為無法確認時，
+// 未啟用的雲端 hook 仍保有先前的雲端名單，不能沿用；操作因雲端 hook 沒有 controller 而直接返回。
 export function useRosterStore(): UseRosterStoreResult<DataStatus> {
 	const session = useSession();
 	const local = useLocalRosterStore();
@@ -225,7 +228,12 @@ export function useRosterStore(): UseRosterStoreResult<DataStatus> {
 		return remote;
 	}
 	if (mode === "pending") {
-		return { ...remote, syncStatus: "pending" };
+		return {
+			...remote,
+			players: NO_PLAYERS,
+			droppedCount: 0,
+			syncStatus: pendingDataStatus(session),
+		};
 	}
 	const { hydrated, ...localStore } = local;
 	return {
