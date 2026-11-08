@@ -253,4 +253,13 @@ apply 期間 leader 的裁量（2026-11-07）：
 
 ## 上線紀錄（archive 後由使用者回填）
 
-（尚未執行。使用者完成 tasks §5 後，於此記錄日期、U1～U8 各步結果、curl 輸出摘要與偏差處置；archived `tasks.md` 的 §5 核取方塊不回填。）
+日期：2026-11-08（使用者執行；coordinator 代為記錄 curl 與瀏覽器驗收結果）。
+
+- U1 secrets：使用者於自己的終端機設定；`wrangler secret list` 恰為 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 四個（`secret_text`），無 `ENVIRONMENT`。
+- U2 遠端 migration：`wrangler d1 migrations apply DB --remote` 對 `9c3a73c2-9a06-4e92-bb6d-90f9cbfda513` 依序套用 `0000`～`0004`，全部成功。
+- U3 Dashboard：使用者確認 root directory、build／deploy command 無 `--env`、無 `CLOUDFLARE_ENV`、無 `ENVIRONMENT`。
+- U4／U5：push `35f71a4..09ebe7f`。
+- U6：push 後約 2 分 15 秒前後端新版皆上線（以 `/api/session` 出現 `signInMethods` 判定）。
+- U7 curl：health `{"status":"ok",…}`；`/api/session` → `{"authEnabled":true,"user":null,"signInMethods":{"google":true,"emailPassword":false}}`；`sign-in/email`、`sign-up/email` 皆 `404`；`callback/google` → `302 https://nextjs-pickball.wedsatcoming.workers.dev/api/auth/error?error=state_not_found`；`/login`、`/`、`/matchmaker` 皆 200。
+- U7 瀏覽器（使用者桌機 Chrome，coordinator 經 Claude in Chrome 檢查）：Google 登入成功，navbar 登出圖示 title 為「已登入：<使用者 Google 名稱>」；`/matchmaker/players` 顯示使用者新增的參賽者，`GET /api/matchmaker/players`（帶 `X-Expected-User-Id`）200、`items` 1 筆——遠端 D1 讀寫可用；不帶該標頭為 401 `ACCOUNT_MISMATCH`（既有帳號守衛，符合預期）。
+- 偏差：使用者初次以為 navbar 沒有「登出」——登入／登出入口皆為圖示（名稱在 `aria-label`／`title`），非本 change 引入；是否改為顯示頭像或名稱留待使用者決定另開 change。iPhone Safari 實機登入、U8 同意畫面發布決定尚待使用者執行。
