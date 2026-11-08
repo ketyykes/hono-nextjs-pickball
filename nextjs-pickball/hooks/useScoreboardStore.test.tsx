@@ -574,4 +574,78 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		}
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+
+	const pendingSession = {
+		status: "loading",
+		signedInHint: true,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+	const guestSession = {
+		status: "ready",
+		authEnabled: true,
+		user: null,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+
+	function seedLocalScoreboard(us: number, them: number): void {
+		const seeded = {
+			...createInitialState(),
+			scores: { us, them },
+			isFirstServiceOfGame: false,
+		};
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+	}
+
+	it("session 等待中時不回傳本機計分且 syncStatus 為 pending，帶 matchId 時綁定狀態為 pending", () => {
+		seedLocalScoreboard(5, 3);
+		const before = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const standalone = renderHook(() => useScoreboardStore(null));
+		expect(standalone.result.current[0]).toEqual(createInitialState());
+		expect(standalone.result.current[2]).toBe("standalone");
+		expect(standalone.result.current[3]).toBe("pending");
+
+		act(() => {
+			standalone.result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		expect(standalone.result.current[0]).toEqual(createInitialState());
+		expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(before);
+		standalone.unmount();
+
+		const bound = renderHook(() => useScoreboardStore("m1"));
+		expect(bound.result.current[2]).toBe("pending");
+		expect(bound.result.current[3]).toBe("pending");
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("本機計分讀入前 syncStatus 為 pending，讀入後為 local", () => {
+		vi.mocked(useSession).mockReturnValue(guestSession);
+		seedLocalScoreboard(5, 3);
+
+		const seen: Array<[string, number]> = [];
+		const standalone = renderHook(() => {
+			const [state, , , syncStatus] = useScoreboardStore(null);
+			// 於 render 階段（effect 執行前）同步記錄，第一筆即為讀入前的值
+			seen.push([syncStatus, state.scores.us]);
+			return state;
+		});
+		expect(seen[0][0]).toBe("pending");
+		expect(seen[seen.length - 1]).toEqual(["local", 5]);
+		expect(seen).not.toContainEqual(["local", 0]);
+		standalone.unmount();
+
+		// 帶 matchId 但沒有對應分槽：讀入後仍為 local，綁定狀態沿用本機判定
+		const seenGone: string[] = [];
+		const gone = renderHook(() => {
+			const store = useScoreboardStore("gone");
+			seenGone.push(store[3]);
+			return store;
+		});
+		expect(seenGone[0]).toBe("pending");
+		expect(gone.result.current[3]).toBe("local");
+		expect(gone.result.current[2]).toBe("missing");
+	});
 });
