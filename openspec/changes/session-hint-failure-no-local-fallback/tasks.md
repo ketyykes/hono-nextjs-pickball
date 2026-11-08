@@ -39,17 +39,25 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD；含 改寫既有 it ①②③）：`nextjs-pickball/lib/auth/session-client.test.ts` 依檔頭授權改寫 ①②；`nextjs-pickball/lib/auth/session-store.test.ts` 依檔頭授權改寫 ③，並新增六個 it——
+- [x] 2.1 RED（TDD；含 改寫既有 it ①②③）：`nextjs-pickball/lib/auth/session-client.test.ts` 依檔頭授權改寫 ①②；`nextjs-pickball/lib/auth/session-store.test.ts` 依檔頭授權改寫 ③，並新增六個 it——
   「session 請求失敗且有上次登入提示時快照改為無法確認且保留提示」「session 請求失敗且沒有上次登入提示時快照為 auth 停用的 ready」「已登入使用中 refresh 失敗時快照改為無法確認且保留提示」
   「無法確認之後才到達的 session 回應仍照常採用」「chooseLocalFallback 在無法確認時改為本機備援並丟棄進行中請求的結果」「不是無法確認時呼叫 chooseLocalFallback 不改變快照也不通知」。
   兩檔各跑單檔 vitest，確認兩個改寫 it、一個改寫 it 與六個新 it 全紅、其餘既有 it 全綠並貼出輸出（新 it 放在新的 `describe` 並自帶 localStorage 清理；fake timers 於 `finally` 還原）
-- [ ] 2.2 GREEN（TDD）：`fetchSession()` 回傳型別改為 `Promise<SessionState | null>`、失敗回 `null`（design Decision 1）；`session-store.ts` 依 design Decision 2、3、4、5 加入無法確認與本機備援快照、採用 `null` 的規則、逾時改為無法確認、`chooseLocalFallback()`；更新兩檔的檔頭與相關註解。
+  - RED commit `c3e2570`（改寫既有 it ①②③）。紅燈：session-client.test.ts 2 failed（兩個改寫 it：`expected { authEnabled: false, user: null } to be null`）；session-store.test.ts 7 failed（改寫 it 逾時：`expected { status: 'loading' } to deeply equal {…}`；六個新 it：兩個 TypeError `null.authEnabled`／`chooseLocalFallback is not a function`、其餘快照不符或停在 loading）；其餘既有 it 全綠。regression guard：無（八個皆真紅）。mutation 見 §2.4 後。
+- [x] 2.2 GREEN（TDD）：`fetchSession()` 回傳型別改為 `Promise<SessionState | null>`、失敗回 `null`（design Decision 1）；`session-store.ts` 依 design Decision 2、3、4、5 加入無法確認與本機備援快照、採用 `null` 的規則、逾時改為無法確認、`chooseLocalFallback()`；更新兩檔的檔頭與相關註解。
   2.1 全綠、兩檔既有 it 全綠；`hooks/useSession.test.ts` 全綠（不改）；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 2.3 RED（TDD）：`nextjs-pickball/lib/sync/storage-mode.test.ts` 新增兩個 it——「本機備援的 loading 快照為 local，無法確認的 loading 快照為 pending」「pendingDataStatus 在無法確認時為 unavailable，其餘為 pending」。
+  - GREEN commit `e6fbc7e`。session-client 11/11、session-store 22/22、useSession 6/6 綠；tsc exit 0；改動檔 ESLint exit 0。
+- [x] 2.3 RED（TDD）：`nextjs-pickball/lib/sync/storage-mode.test.ts` 新增兩個 it——「本機備援的 loading 快照為 local，無法確認的 loading 快照為 pending」「pendingDataStatus 在無法確認時為 unavailable，其餘為 pending」。
   單檔 vitest 貼出輸出：後者紅（import 不存在）；前者預期寫入即綠，點名標 regression guard（design Decision 6）
-- [ ] 2.4 GREEN（TDD）：`resolveStorageMode` 的 loading 分支最前面加入本機備援判斷；新增 `pendingDataStatus`（design Decision 6）；更新檔頭註解。2.3 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 2.5 REFACTOR：store 中「採用一份結果」的分支（非 `null`／`null`＋提示／`null` 無提示）是否以 if/else 清楚表達、無巢狀三元；union 型別窄化寫法全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 是否值得共用判斷（預期不抽：一個回儲存模式、一個回顯示狀態）；無壞味道則註記 skipped
+  - RED commit `5f451d9`。`pendingDataStatus` 新 it 紅（`TypeError: pendingDataStatus is not a function`）；「本機備援的 loading 快照為 local，無法確認的 loading 快照為 pending」寫入即綠（4 passed），**regression guard**。
+- [x] 2.4 GREEN（TDD）：`resolveStorageMode` 的 loading 分支最前面加入本機備援判斷；新增 `pendingDataStatus`（design Decision 6）；更新檔頭註解。2.3 全綠；tsc exit 0；改動檔 ESLint 0 errors
+  - GREEN commit `3e66dca`。storage-mode 5/5 綠；tsc exit 0；ESLint exit 0。
+  - §2 mutation（單檔 vitest，三重落地檢查，每次還原後 git status 乾淨）：① 三處失敗分支（非 ok／catch／形狀不符）各改回 DISABLED 皆轉紅；② null 一律 ready 紅；③ null 清除提示 紅；④ null 改讀快照 signedInHint 紅（refresh 失敗那條）；⑤ 逾時回 LOADING 紅；⑥ 逾時遞增 requestId 紅；⑦ choose 不遞增 requestId 紅；⑧ choose 不檢查快照 紅；
+    ⑨ `getSnapshot` 對無法確認／本機備援每次回新物件，各自轉紅（先試過「採用時才建新物件」的版本因參考仍穩定而未紅，屬等價變異，改為每次讀取回新物件）；⑩ 本機備援改回 pending 紅（regression guard 轉紅）；補充：無法確認改回 local 紅；⑪ pendingDataStatus 一律 pending 紅。
+    對照組（須維持綠）：`"unavailable" in snapshot && snapshot.unavailable` 改寫維持綠；調換 resolveStorageMode 本機備援與提示判斷順序維持綠。
+- [x] 2.5 REFACTOR：store 中「採用一份結果」的分支（非 `null`／`null`＋提示／`null` 無提示）是否以 if/else 清楚表達、無巢狀三元；union 型別窄化寫法全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 是否值得共用判斷（預期不抽：一個回儲存模式、一個回顯示狀態）；無壞味道則註記 skipped
 
+  - skipped：採用結果分支以 if/else 表達、無巢狀三元；union 以 `?: never` 補齊，全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 不抽共用（一個回儲存模式、一個回顯示狀態）。
 ## 3. 顯示狀態、按鈕、選擇器、對戰頁與本機提示
 
 Depends on: §2
