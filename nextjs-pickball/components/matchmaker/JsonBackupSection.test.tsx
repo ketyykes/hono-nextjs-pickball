@@ -218,7 +218,9 @@ describe("JsonBackupSection 雲端分支", () => {
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+});
 
+describe("JsonBackupSection 等待中", () => {
 	it("session 等待中時以等待中提示取代匯出與還原操作", () => {
 		mockPendingSession();
 

@@ -176,12 +176,13 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		await installFlashRecorder(page, { texts: EMPTY_TEXTS, selectors: [] });
 
 		const release = await holdSession(page);
-		const sessionResponse = page.waitForResponse("**/api/session");
 		try {
 			await page.reload();
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
 			await expect(page.getByRole("status")).toHaveCount(0);
+			// 在放行前一刻才建立，避免前一頁晚到的 session 回應提早滿足
+			const sessionResponse = page.waitForResponse("**/api/session");
 			release();
 			// 等 session 回應到達，放行後的斷言才確實涵蓋回應之後的畫面
 			await sessionResponse;

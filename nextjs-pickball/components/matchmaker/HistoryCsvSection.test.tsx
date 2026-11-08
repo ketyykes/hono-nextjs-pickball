@@ -118,7 +118,9 @@ describe("HistoryCsvSection 雲端分支", () => {
 
 		expect(buildRemoteHistoryCsv).not.toHaveBeenCalled();
 	});
+});
 
+describe("HistoryCsvSection 等待中", () => {
 	it("session 等待中時以等待中提示取代匯出操作", () => {
 		mockPendingSession();
 
