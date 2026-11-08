@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionSnapshot } from "@/lib/auth/session-store";
-import { resolveStorageMode } from "./storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "./storage-mode";
 
 const USER = { id: "u1", email: "a@example.com", name: "A" };
 
@@ -89,5 +89,49 @@ describe("resolveStorageMode", () => {
 				hydrated: false,
 			}),
 		).toBe("remote");
+	});
+
+	it("本機備援的 loading 快照為 local，無法確認的 loading 快照為 pending", () => {
+		const localFallback: SessionSnapshot = {
+			status: "loading",
+			localFallback: true,
+		};
+		const unavailable: SessionSnapshot = {
+			status: "loading",
+			signedInHint: true,
+			unavailable: true,
+		};
+
+		expect(resolveStorageMode(localFallback)).toBe("local");
+		expect(resolveStorageMode({ ...localFallback, hydrated: true })).toBe(
+			"local",
+		);
+		expect(resolveStorageMode(unavailable)).toBe("pending");
+		expect(resolveStorageMode({ ...unavailable, hydrated: true })).toBe(
+			"pending",
+		);
+	});
+});
+
+describe("pendingDataStatus", () => {
+	it("pendingDataStatus 在無法確認時為 unavailable，其餘為 pending", () => {
+		const unavailable: SessionSnapshot = {
+			status: "loading",
+			signedInHint: true,
+			unavailable: true,
+		};
+		const others: SessionSnapshot[] = [
+			{ status: "loading", signedInHint: true },
+			{ status: "loading" },
+			{ status: "loading", localFallback: true },
+			{ status: "ready", authEnabled: false, user: null },
+			{ status: "ready", authEnabled: true, user: null },
+			{ status: "ready", authEnabled: true, user: USER },
+		];
+
+		expect(pendingDataStatus(unavailable)).toBe("unavailable");
+		for (const snapshot of others) {
+			expect(pendingDataStatus(snapshot)).toBe("pending");
+		}
 	});
 });
