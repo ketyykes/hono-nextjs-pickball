@@ -2,6 +2,7 @@
 "use client";
 
 import { useSession } from "@/hooks/useSession";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
 import { HistoryView } from "./HistoryView";
 import { RemoteHistoryView } from "./RemoteHistoryView";
@@ -9,7 +10,15 @@ import { RemoteHistoryView } from "./RemoteHistoryView";
 // 歷史頁的模式分支：讓 app/matchmaker/history/page.tsx 維持 server component，
 // client 邊界只放在這個小元件。雲端元件只在 remote 時掛載——RemoteHistoryView 在
 // userId 為 null 時會顯示引導型空狀態，不該在 session 載入中或訪客時出現。
+// 儲存模式未定時兩邊都不掛載，只顯示等待中提示。
 export function HistoryModeSwitch() {
 	const mode = resolveStorageMode(useSession());
+	if (mode === "pending") {
+		return (
+			<div data-sync-status="pending" className="flex flex-col gap-4">
+				<SyncStatusNotice status="pending" />
+			</div>
+		);
+	}
 	return mode === "remote" ? <RemoteHistoryView /> : <HistoryView />;
 }

@@ -4,6 +4,7 @@
 import { useEffect, useReducer, useState } from "react";
 import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
 import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { readHistory } from "@/lib/matchmaker/round-storage";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import { EmptyHistory } from "./EmptyHistory";
@@ -40,16 +41,24 @@ export function HistoryView() {
 	const [selectedRange, setSelectedRange] = useState<HistoryRange>("today");
 
 	// hydration 的 useEffect 內取一次 new Date() 與 readHistory() 的結果：
-	// 首次伺服器輸出固定為空狀態，避免 render 期間取用系統時鐘或 localStorage。
+	// 讀入前（含首次伺服器輸出）顯示等待中提示，避免 render 期間取用系統時鐘或 localStorage，
+	// 也避免讀入前先畫出空狀態。
 	useEffect(() => {
 		const { entries, droppedCount } = readHistory();
 		setHydrated({ now: new Date(), entries, droppedCount });
 	}, []);
 
 	const entries = hydrated?.entries ?? [];
-	// hydration 完成前 now 為 null，此時不篩選（filteredEntries 維持空陣列）——
-	// 與首次伺服器輸出的空狀態一致，避免在尚未取樣「現在」時誤用系統時鐘。
+	// hydration 完成前不篩選（filteredEntries 維持空陣列），避免在尚未取樣「現在」時誤用系統時鐘。
 	const filteredEntries = hydrated === null ? [] : filterHistoryByRange(entries, selectedRange, hydrated.now);
+
+	if (hydrated === null) {
+		return (
+			<div data-sync-status="pending" className="flex flex-col gap-4">
+				<SyncStatusNotice status="pending" />
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex flex-col gap-4">
