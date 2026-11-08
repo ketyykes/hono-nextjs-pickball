@@ -48,7 +48,7 @@ MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名�
 
 #### Scenario: 訪客或 session 載入中時走本機
 
-- **GIVEN** mock `useSession` 分別為 `loading` 與 `ready`／`authEnabled: false`
+- **GIVEN** mock `useSession` 分別為 `loading`（不帶上次登入提示 `signedInHint`） 與 `ready`／`authEnabled: false`
 - **WHEN** `useRosterStore()` mount 並新增一位參賽者
 - **THEN** `syncStatus` 為 `local`；`matchmaker:roster:v1` 含該參賽者；沒有任何對 `/api/matchmaker/*` 的請求
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「session 載入中或訪客時走本機且 syncStatus 為 local」

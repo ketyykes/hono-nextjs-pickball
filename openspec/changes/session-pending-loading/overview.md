@@ -236,13 +236,13 @@ hydration  : [正在載入資料...]            <- 本機尚未讀入
 | `lib/auth/session-client.ts` | §2 | `signOut` 成功時清除 |
 | `hooks/useSession.ts` | §2 | 回傳 `hydrated` |
 | `lib/sync/storage-mode.ts` | §2 | 三態 `pending` |
-| `lib/sync/sync-status.ts` | §3 | `DataStatus`、文案、`isContentBlocked` |
+| `lib/sync/sync-status.ts` | §3 | `DataStatus`、文案、`isContentBlocked`、`localDataStatus` |
 | `components/sync/SyncStatusNotice.tsx` | §3 | 支援 `pending` |
 | `hooks/useRosterStore.ts`、`useRoundStore.ts`、`useScoreboardStore.ts` | §3 | 本機讀入旗標、等待中結果 |
 | `app/matchmaker/players/page.tsx`、`app/matchmaker/page.tsx` | §3 | 改用 `isContentBlocked` |
 | `app/matchmaker/stats/page.tsx`、`LocalStatsContent.tsx`、`RemoteStatsContent.tsx` | §3 | 入口三態、改用 `isContentBlocked` |
 | `components/scoreboard/Scoreboard.tsx` | §3 | 改用 `isContentBlocked` |
-| `components/matchmaker/HistoryModeSwitch.tsx`、`HistoryView.tsx` | §4 | 等待中容器 |
+| `components/matchmaker/HistoryModeSwitch.tsx`、`HistoryView.tsx` | §4 | 等待中容器；`HistoryView` reducer 保留較大的 `droppedCount`（合併前驗收補，Decision 9 apply 補註） |
 | `components/matchmaker/JsonBackupSection.tsx`、`HistoryCsvSection.tsx`、`RosterCsvImportSection.tsx` | §4 | 操作區換提示 |
 | `CLAUDE.md` | §5 | 敘述同步 |
 | 後端、核心套件、雲端 hook、navbar、登入頁、quiz／tour／guide、`LocalDataImportSection`、`ClearLocalDataSection`、`RemoteHistoryView`、`transfer-storage.ts` | — | 零變更（C8） |

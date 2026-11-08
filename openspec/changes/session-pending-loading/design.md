@@ -176,6 +176,7 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 - **參賽者頁、對戰頁、`LocalStatsContent`、`RemoteStatsContent`（名單）、`Scoreboard`**：既有「取代內容」分支的條件改用 `isContentBlocked(syncStatus)`；根元素的 `data-sync-status` 照舊輸出實際值（`pending` 時為 `"pending"`），`local` 時照舊不輸出。對戰頁 `mergeSyncStatus` 的優先序在 `loading` 之後加入 `pending`，`isRosterReady` 改為 `!isContentBlocked(rosterSyncStatus)`。
 - **`HistoryModeSwitch`**：`"pending"` 時渲染 `<div data-sync-status="pending" className="flex flex-col gap-4"><SyncStatusNotice status="pending" /></div>`（與 `HistoryView`／`RemoteHistoryView` 根元素同 class），不掛載任何歷史元件。
 - **`HistoryView`**：`hydrated === null`（本機歷史尚未讀入）時渲染同一個等待中區塊，SHALL NOT 渲染篩選器與空狀態。歷史頁標題由 server component 輸出，維持顯示。
+  - **apply 補註（合併前驗收，`e534149`）**：`HistoryModeSwitch` 在 pending 時不掛載 `HistoryView`，使它在 hydration 後才全新掛載；dev 的 StrictMode 會讓 effect 跑兩次，而 `readHistory()` 第一次讀到損毀筆數時會回寫清理結果，第二次 `droppedCount` 為 0。因此 `HistoryView` 的 reducer 在已有結果時保留較大的 `droppedCount`（`entries` 與 `now` 仍取最新一次），避免損毀提示消失。
 - **統計頁入口**：改為 `mode === "remote" ? 雲端 : LocalStatsContent`，等待中由 `LocalStatsContent` 的選擇器狀態顯示提示；維持「雲端內容只在 `"remote"` 時掛載」。
 - **`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`**：`"pending"` 時保留 `CardHeader`（兩種模式文字相同），`CardContent` 只放 `SyncStatusNotice status="pending"`，且該 `CardContent` 帶 `data-sync-status="pending"`（與其他頁的根元素標示一致，停用 JavaScript 的 E2E 以它辨識資料頁）。判斷在所有 hook 呼叫之後。
 - **`LocalDataImportSection`、`ClearLocalDataSection`**：不改（N5、N6）。
