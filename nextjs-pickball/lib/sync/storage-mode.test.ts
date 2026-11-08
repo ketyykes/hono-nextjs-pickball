@@ -43,4 +43,51 @@ describe("resolveStorageMode", () => {
 		expect(resolveStorageMode(disabledWithUser)).toBe("local");
 		expect(resolveStorageMode(signedIn)).toBe("remote");
 	});
+
+	it("session 載入中且帶上次登入提示時為 pending", () => {
+		const hinted: SessionSnapshot = { status: "loading", signedInHint: true };
+		const plain: SessionSnapshot = { status: "loading" };
+		// 提示只在 loading 時有作用：型別上不會出現，這裡硬塞以鎖住行為
+		const disabledWithHint = {
+			status: "ready",
+			authEnabled: false,
+			user: null,
+			signedInHint: true,
+		} as unknown as SessionSnapshot;
+		const guestWithHint = {
+			status: "ready",
+			authEnabled: true,
+			user: null,
+			signedInHint: true,
+		} as unknown as SessionSnapshot;
+		const signedInWithHint = {
+			status: "ready",
+			authEnabled: true,
+			user: USER,
+			signedInHint: true,
+		} as unknown as SessionSnapshot;
+
+		expect(resolveStorageMode(hinted)).toBe("pending");
+		expect(resolveStorageMode(plain)).toBe("local");
+		expect(resolveStorageMode(disabledWithHint)).toBe("local");
+		expect(resolveStorageMode(guestWithHint)).toBe("local");
+		expect(resolveStorageMode(signedInWithHint)).toBe("remote");
+	});
+
+	it("尚未 hydration 的 loading 快照為 pending，hydration 後無提示時為 local", () => {
+		expect(resolveStorageMode({ status: "loading", hydrated: false })).toBe(
+			"pending",
+		);
+		expect(resolveStorageMode({ status: "loading", hydrated: true })).toBe(
+			"local",
+		);
+		expect(
+			resolveStorageMode({
+				status: "ready",
+				authEnabled: true,
+				user: USER,
+				hydrated: false,
+			}),
+		).toBe("remote");
+	});
 });
