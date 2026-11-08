@@ -191,8 +191,12 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 	test("上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示", async ({ page }) => {
 		await seedStorage(page, {
 			[ROSTER_STORAGE_KEY]: JSON.stringify({ version: 1, players: [rosterPlayer("p-a", "本機甲")] }),
-			[SIGNED_IN_HINT_STORAGE_KEY]: "1",
 		});
+		// 提示改在下一個文件載入前才寫入：seedStorage 開的首頁若還有 session 回應在途，
+		// 回應確認為訪客時會清掉提示，先寫入會被它沖掉
+		await page.addInitScript((key: string) => {
+			window.localStorage.setItem(key, "1");
+		}, SIGNED_IN_HINT_STORAGE_KEY);
 
 		const release = await holdSession(page);
 		try {
