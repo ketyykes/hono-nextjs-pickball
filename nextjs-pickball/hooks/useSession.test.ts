@@ -140,7 +140,7 @@ describe("useSession hydration", () => {
 	});
 
 	it("client 端一般 mount 的第一次 render 即為 hydrated", () => {
-		const seen: boolean[] = [];
+		const seen: Array<boolean | undefined> = [];
 		renderHook(() => {
 			const session = useSession();
 			seen.push(session.hydrated);
