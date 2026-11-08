@@ -33,7 +33,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   各場地色塊的「進入計分板」入口導向 `/scoreboard?match=<matchId>` 時，兩隊名稱行會顯示該隊球員姓名與雙色漸層色塊；獨立開啟 `/scoreboard`（無 `match` 參數）維持「我方」／「對方」純文字
 - `/matchmaker/players` — 參賽者名單。**不在全站 navbar**，由 matchmaker 區段導覽抵達。navbar 的「對戰分配」在 `/matchmaker/*` 子頁亦標示 active（`aria-current="page"`），判定在 `lib/navActive.ts`
 - `/matchmaker/history`、`/matchmaker/data` — 歷史賽果與資料匯入匯出，同樣不在全站 navbar
-  - `/matchmaker/history` 登入態：`app/matchmaker/history/page.tsx` 為 server component，由 client 小元件 `HistoryModeSwitch` 依 `resolveStorageMode` 擇一渲染；remote 掛 `RemoteHistoryView`（經 `useRemoteHistory` 讀雲端），其餘為 `HistoryView`（本機）。區間界線由前端以核心 `rangeBounds` 計算後傳給後端，後端不推算區間。雲端歷史 loading／load-failed 時保留區間篩選，只把紀錄區塊換成 `SyncStatusNotice`（且不顯示損毀提示），篩選器不卸載、焦點不遺失；失敗後改選區間即重新載入
+  - `/matchmaker/history` 登入態：`app/matchmaker/history/page.tsx` 為 server component，由 client 小元件 `HistoryModeSwitch` 依 `resolveStorageMode` 擇一渲染；remote 掛 `RemoteHistoryView`（經 `useRemoteHistory` 讀雲端），其餘為 `HistoryView`（本機）；例外是儲存模式 `pending`（session 尚未確認）時只渲染等待中容器（`data-sync-status="pending"`），兩個歷史元件都不掛載。區間界線由前端以核心 `rangeBounds` 計算後傳給後端，後端不推算區間。雲端歷史 loading／load-failed 時保留區間篩選，只把紀錄區塊換成 `SyncStatusNotice`（且不顯示損毀提示），篩選器不卸載、焦點不遺失；失敗後改選區間即重新載入
   - `/matchmaker/data` 登入態差異：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），history 取自雲端（`GET /api/matchmaker/history?order=asc`）；JSON 還原改為「從 JSON 備份匯入到雲端」（見下方「本機資料匯入雲端」），本機覆寫式還原只在訪客時渲染；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 登入時改讀雲端（`buildRemoteHistoryCsv`）；清除本機資料兩種模式相同（只清本機）
   - **本機資料匯入雲端**：登入後把訪客時期留在本機的五個 key（名單、回合、歷史、`scoreboard:matches:v1` 中屬於回合未完成場次的分槽、`scoreboard:current:v1`）一次 `POST /api/import`。
     - 入口：資料頁的 `LocalDataImportSection`（錨點 `#local-import`；本機無資料顯示「本機沒有可匯入的資料」且無按鈕、超過單次上限顯示 oversize 說明）；參賽者頁在名單 `synced` 且為空、本機有可匯入資料時顯示 `LocalImportNotice`（連到該錨點）；兩者只在雲端模式渲染，訪客 DOM 不變
@@ -42,7 +42,7 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
     - 一次性雲端操作：以點擊當下 `useSession()` 的 user id 呼叫、`null` 時不送出，`unauthorized` 時 `refresh()`；兩個入口的文案與結果轉換集中在 `components/matchmaker/local-import-view.ts`（`LOCAL_IMPORT_MESSAGES`、`describeImportOutcome`），結果呈現共用 `LocalImportResultMessage`
   - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後不清除任何本機 key（本機資料是訪客時期的資料，留作匯入來源）；雲端的名單、回合、分槽與歷史由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜，同樣不在全站 navbar。
-  統計頁入口：`app/matchmaker/stats/page.tsx` 依 `resolveStorageMode` 擇一渲染，登入時為 `RemoteStatsContent`（經 `useRemoteHistory` 讀雲端歷史），訪客與 session 載入中為 `LocalStatsContent`（本機內容；`pending` 時同樣掛它，由它在本機資料讀入前顯示等待中提示）；兩者共用下列計算與呈現元件。雲端歷史 loading／load-failed 時保留標題與區間篩選，只把排行榜區塊換成 `SyncStatusNotice`，焦點不遺失；失敗後改選區間即重新載入。名單 loading／load-failed 時仍整段以提示取代（不顯示標題與篩選器）。
+  統計頁入口：`app/matchmaker/stats/page.tsx` 依 `resolveStorageMode` 擇一渲染，登入時為 `RemoteStatsContent`（經 `useRemoteHistory` 讀雲端歷史），訪客與 session 載入中為 `LocalStatsContent`（本機內容；`pending` 時同樣掛它，由它依選擇器回報的顯示狀態顯示等待中提示；`pending` 有兩種來源：儲存模式未定〔等 session 確認，選擇器不交出本機資料〕與本機資料讀入前）；兩者共用下列計算與呈現元件。雲端歷史 loading／load-failed 時保留標題與區間篩選，只把排行榜區塊換成 `SyncStatusNotice`，焦點不遺失；失敗後改選區間即重新載入。名單 loading／load-failed 時仍整段以提示取代（不顯示標題與篩選器）。
   統計計算為 `lib/matchmaker/player-stats.ts` 的純函式 `computePlayerStats(history, players)`
   （球員範圍為「目前名單」與「歷史紀錄」的**聯集**，回傳已排序完成），呈現層為
   `components/matchmaker/PlayerStatsTable.tsx`（九欄）。區間篩選與空狀態**重用歷史頁的既有元件**
