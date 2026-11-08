@@ -1123,6 +1123,21 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 			generated = result.current.generateRound({ format: "doubles", courtCount: 1 });
 		});
 
+		// 其餘六個操作同樣必須回 ok: false，且不碰本機 key、不通知名單、不發請求
+		const otherResults: Array<{ ok: boolean }> = [];
+		act(() => {
+			otherResults.push(
+				result.current.resetIncompleteMatches(),
+				result.current.submitScore(localRound.matches[0].id, "11", "5"),
+				result.current.setTargetScore(15),
+				result.current.setTimerDuration(10),
+				result.current.startTimer(),
+				result.current.swapMatchPlayer(localRound.matches[0].id, "p1", "p2"),
+			);
+		});
+		expect(otherResults).toHaveLength(6);
+		expect(otherResults.every((r) => r.ok === false)).toBe(true);
+
 		expect(generated?.ok).toBe(false);
 		expect(result.current.round).toBeNull();
 		expect(JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY)!)).toEqual(roundBefore);

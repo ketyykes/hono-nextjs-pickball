@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
+import { DATA_PENDING_MESSAGE } from "@/lib/sync/sync-status";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
 import { installFlashRecorder, readFlashHits } from "../helpers/flash-recorder";
 import { holdSession } from "../helpers/hold-session";
@@ -141,7 +142,7 @@ test.describe("matchmaker 名單雲端同步", () => {
 		try {
 			await page.reload();
 			await expect(page.locator('main[data-sync-status="pending"]')).toBeVisible();
-			await expect(page.getByRole("status")).toHaveText("正在載入資料…");
+			await expect(page.getByRole("status")).toHaveText(DATA_PENDING_MESSAGE);
 			// 在放行前一刻才建立，避免前一頁晚到的 session 回應提早滿足
 			const sessionResponse = page.waitForResponse("**/api/session");
 			release();

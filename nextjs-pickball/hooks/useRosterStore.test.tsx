@@ -354,6 +354,10 @@ describe("useRosterStore 儲存模式選擇器", () => {
 			result.current.addPlayer({ name: "等待中新增", gender: "male", rating: 3 });
 			result.current.togglePlayerActive("local-1");
 			result.current.resetRoster();
+			result.current.updatePlayer("local-1", { name: "等待中改名" });
+			result.current.removePlayer("local-1");
+			result.current.applyRemotePlayers([{ data: makePlayer({ id: "remote-1" }), version: 1 }]);
+			result.current.reloadRemotePlayers();
 		});
 
 		expect(result.current.players).toEqual([]);
