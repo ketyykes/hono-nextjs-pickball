@@ -146,20 +146,32 @@ Depends on: §3
 
 **§4 審查（coordinator 派）**：Stage 1（sonnet）PASS，無必修；4.2、4.4 RED 已重新實跑，確認為真紅。Stage 2（opus）PASS，無必修：mutation ①～⑥ 全紅、對照組全綠；chromium `data-pending.spec.ts` HEAD 5 passed；user-data 新增那條 1 passed、0 skipped。E3（拿掉 HistoryView 等待中分支）只有「訪客載入本機歷史…」轉紅；「JavaScript 載入前…」不紅，因為伺服器輸出走 HistoryModeSwitch 的 pending 分支，HistoryView 的伺服器輸出改由 `renderToString` 單元測試涵蓋。E4（只拿掉單一區塊的屬性）不紅；E5（三區塊全拿掉）在 `/matchmaker/data` 轉紅。不擋的建議五條，處理方式：delta spec 資料頁段落補「帶 `data-sync-status="pending"` 的 `CardContent`」由 coordinator 同步；HistoryView 早退後的多餘判斷、資料頁三區塊改以 if/else 算出內容、`waitForResponse` 改在 `release()` 前一刻建立、等待中 it 移到正確的 describe，這四條併入 §5 前置修正。
 
+**§4 審查建議處置（§5 前置修正）**：四條皆已處理——`HistoryView` 把 `entries`／`filteredEntries` 移到早退之後並刪掉三處多餘判斷、資料頁三區塊改以 if/else 先算出 `content`（`JsonBackupSection` 的 `isRemote` 巢狀三元一併改為 if/else 的 `importPicker`），commit `649ea8d`（refactor，`components/matchmaker` 17 檔 162 個測試全綠）；`data-pending.spec.ts` 與 `user-data/roster-sync.spec.ts` 的 `waitForResponse("**/api/session")` 改在 `release()` 前一刻建立、兩個等待中 it 移入各自新開的「等待中」describe（名稱與斷言不變），commit `bcf087c`（雙鎖 chromium `data-pending.spec.ts` 5 passed；user-data 該條 1 passed、0 skipped）。其他 `waitForResponse` 皆為先註冊再觸發的寫入請求，或在無 hold 的新頁面上註冊，不屬同一問題；`local-import.spec.ts` 訪客那條在 `NEUTRAL_PAGE` 之後註冊，理論上可能被前一頁的 session 回應滿足，但它只是等待回應落地再斷言空狀態，本次未改。
+
 ## 5. 文件同步與總驗收
 
 Depends on: §4
 
-- [ ] 5.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——「訪客（含 auth 停用、session 載入中）仍全走 LocalStorage」改為說明三態與等待中（伺服器輸出、有提示的 session 等待、本機讀入前皆顯示「正在載入資料…」）；統計頁條目「訪客與 session 載入中為 `LocalStatsContent`」補上 `pending`；
+- [x] 5.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——「訪客（含 auth 停用、session 載入中）仍全走 LocalStorage」改為說明三態與等待中（伺服器輸出、有提示的 session 等待、本機讀入前皆顯示「正在載入資料…」）；統計頁條目「訪客與 session 載入中為 `LocalStatsContent`」補上 `pending`；
   「對戰、參賽者、統計三頁在 loading／load-failed 時」改為 `isContentBlocked`；`lib/sync/` 的 `storage-mode`、`sync-status` 說明補「三態」「`DataStatus`」，`lib/auth/` 補 `session-hint`、`hooks/` 的 `useSession` 補 `hydrated`。commit（`docs:`）
-- [ ] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄：commit `5cb1cc2`（docs）。`nextjs-pickball/CLAUDE.md` 六處同步（儲存三態與等待中、統計頁 `pending`、`isContentBlocked`、`Scoreboard` 取代條件、`lib/sync`、`lib/auth/session-hint`、`useSession.hydrated`）。
+- [x] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 紀錄：`pnpm --dir <root> -r exec tsc --noEmit`、`hono-pickball typecheck`、`packages/pickball-core typecheck` 皆 exit 0（含 A 的前置修正之後）。
 - [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
+  - 由 coordinator 於合併前執行。
 - [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋30，後端與核心與基線相同
+  - 由 coordinator 於合併前執行。
 - [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行。
 - [ ] 5.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋1 全 passed、0 skipped；五個 browser project 各＝基線＋5、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊，附證據上報 coordinator
-- [ ] 5.7 驗收（指令）C6：使用端清單 grep 的檔案集合恰為 design Decision 2 表格的 9 個檔案
-- [ ] 5.8 驗收（指令）C7：`"load-failed"` grep 只剩 test-plan C7 列出的兩處
-- [ ] 5.9 驗收（指令）C8：範圍 diff 輸出為空
-- [ ] 5.10 驗收（指令）C9：`DO_NOT_TRACK=1 openspec validate session-pending-loading --strict` 通過
-- [ ] 5.11 提醒：本 change 無使用者人工上線步驟；合併後是否 push（push 即觸發正式站部署）由使用者決定
+  - 由 coordinator 於合併前執行。
+- [x] 5.7 驗收（指令）C6：使用端清單 grep 的檔案集合恰為 design Decision 2 表格的 9 個檔案
+  - 紀錄：9 個檔案＝`app/matchmaker/stats/page.tsx`、`HistoryCsvSection`、`HistoryModeSwitch`、`JsonBackupSection`、`LocalDataImportSection`、`RosterCsvImportSection`、`useRosterStore`、`useRoundStore`、`useScoreboardStore`，與 Decision 2 表格一致。
+- [x] 5.8 驗收（指令）C7：`"load-failed"` grep 只剩 test-plan C7 列出的兩處
+  - 紀錄：只剩 `app/matchmaker/page.tsx:39`（`SYNC_STATUS_PRIORITY`）與 `components/matchmaker/RemoteHistoryView.tsx:32`。
+- [x] 5.9 驗收（指令）C8：範圍 diff 輸出為空
+  - 紀錄：`git diff main --stat` 範圍輸出為空（含 `hooks/useRemote*.ts` 的 glob 以 bash 展開，zsh 下會因無匹配而中止，需用 bash 執行）。
+- [x] 5.10 驗收（指令）C9：`DO_NOT_TRACK=1 openspec validate session-pending-loading --strict` 通過
+  - 紀錄：`Change 'session-pending-loading' is valid`。
+- [x] 5.11 提醒：本 change 無使用者人工上線步驟；合併後是否 push（push 即觸發正式站部署）由使用者決定
