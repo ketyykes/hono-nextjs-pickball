@@ -187,7 +187,7 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 ### Decision 10：等待中的顯示狀態與文案
 
-**Choice**：`lib/sync/sync-status.ts` 新增 `type DataStatus = SyncStatus | "pending"`、`DATA_PENDING_MESSAGE = "正在載入資料…"`、`isContentBlocked(status: DataStatus): boolean`；`SyncStatus` 與其 8 個固定文案不變。
+**Choice**：`lib/sync/sync-status.ts` 新增 `type DataStatus = SyncStatus | "pending"`、`DATA_PENDING_MESSAGE = "正在載入資料…"`、`isContentBlocked(status: DataStatus): boolean`、`localDataStatus(hydrated: boolean): DataStatus`（三個選擇器共用的本機讀入前／後判斷）；`SyncStatus` 與其 8 個固定文案不變。
 `SyncStatusNotice` 的 `status` 型別放寬為 `DataStatus`：`pending` 時以同一個 `role="status"` 外觀顯示「正在載入資料…」，其餘照舊。
 
 **Rationale**：伺服器輸出對訪客與登入者相同，沿用「正在載入雲端資料…」會讓訪客在每次載入時看到「雲端」字樣（錯誤內容）。「正在載入資料…」是唯一新增的文案，取既有文案的前半段，不指涉來源。

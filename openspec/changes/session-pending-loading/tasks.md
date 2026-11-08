@@ -67,23 +67,23 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD，E2E）：新檔 `nextjs-pickball/tests/e2e/helpers/flash-recorder.ts`（`installFlashRecorder`、`readFlashHits`；寫法依 test-plan「E2E 共同要求」）；
+- [x] 3.1 RED（TDD，E2E）：新檔 `nextjs-pickball/tests/e2e/helpers/flash-recorder.ts`（`installFlashRecorder`、`readFlashHits`；寫法依 test-plan「E2E 共同要求」）；
   新檔 `nextjs-pickball/tests/e2e/specs/data-pending.spec.ts`（不設 storage state）新增 test「訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值」「訪客重新整理參賽者頁時在 session 回應前即顯示本機名單」「上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示」；
   `nextjs-pickball/tests/e2e/user-data/roster-sync.spec.ts` 新增 test「已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單」（沿用 `seedCloudPlayers`／`buildPlayer`）。
   雙鎖下各跑一次（`--project=chromium` 跑 `data-pending.spec.ts`；`--project=user-data` 跑 roster-sync 的 `-g` 該條）：三條紅、訪客 session 暫停那條綠（regression guard，點名）並貼出輸出
-- [ ] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「pending、loading、load-failed 取代內容，pending 的文案為正在載入資料」；新檔 `nextjs-pickball/components/sync/SyncStatusNotice.test.tsx`，it「pending 顯示正在載入資料，loading 顯示雲端文案，local 不渲染」。兩檔單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.3 GREEN（TDD）：`sync-status.ts` 新增 `DataStatus`、`DATA_PENDING_MESSAGE`、`isContentBlocked`；`SyncStatusNotice` 的 `status` 改為 `DataStatus`（design Decision 10）。3.2 全綠、`sync-status.test.ts` 既有 it 全綠
-- [ ] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 等待中時不回傳本機名單、syncStatus 為 pending 且操作不寫入本機也不發請求」「等待中的 session 確認為未登入時改回本機名單」「本機名單讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.5 GREEN（TDD）：`useLocalRosterStore` 加讀入旗標（design Decision 7）；`useRosterStore` 依 design Decision 8 回傳，`syncStatus` 型別改為 `DataStatus`；為通過型別所需的最小改動：`app/matchmaker/page.tsx` 的 `SYNC_STATUS_PRIORITY`／`mergeSyncStatus` 改用 `DataStatus` 並在 `loading` 之後加入 `pending`、`components/matchmaker/RemoteStatsContent.tsx` 的參數型別改為 `DataStatus`。3.4 全綠、該檔既有 it 全綠；tsc exit 0
-- [ ] 3.6 RED（TDD）：`nextjs-pickball/hooks/useRoundStore.test.tsx` 新增兩個 it——「session 等待中時不回傳本機回合與歷史、syncStatus 為 pending 且操作不生效」「本機回合讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.7 GREEN（TDD）：`useLocalRoundStore` 加讀入旗標；`useRoundStore` 依 design Decision 8 回傳（`rosterSyncStatus` 選項型別放寬為 `DataStatus`，傳給雲端 hook 時 `pending` 以 `loading` 傳入）。3.6 全綠、該檔既有 it 全綠；tsc exit 0
-- [ ] 3.8 RED（TDD）：`nextjs-pickball/hooks/useScoreboardStore.test.tsx` 新增兩個 it——「session 等待中時不回傳本機計分且 syncStatus 為 pending，帶 matchId 時綁定狀態為 pending」「本機計分讀入前 syncStatus 為 pending，讀入後為 local」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.9 GREEN（TDD）：`useLocalScoreboardStore` 加讀入旗標；`useScoreboardStore` 依 design Decision 8 回傳。3.8 全綠、該檔既有 it 全綠（含兩條「首次 render 的綁定狀態」）；tsc exit 0
-- [ ] 3.10 RED（TDD）：新檔 `nextjs-pickball/app/matchmaker/stats/page.test.tsx`，it「session 等待中時統計頁顯示等待中提示且不掛載雲端統計內容」（`RemoteStatsContent` 以 stub 取代）。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.11 GREEN（TDD）：統計頁入口改為只有 `remote` 掛雲端內容、其餘（含 `pending`）掛 `LocalStatsContent`，並更新檔頭註解（design Decision 9）；同時 `LocalStatsContent` 的取代條件改用 `isContentBlocked`（3.10 的提示由它渲染）。3.10 全綠
-- [ ] 3.12 GREEN（TDD，E2E 驅動）：`app/matchmaker/players/page.tsx`、`app/matchmaker/page.tsx`（取代條件與 `isRosterReady`）、`components/matchmaker/RemoteStatsContent.tsx`（以 `isContentBlocked` 取代 `isBlockingStatus`）、`components/scoreboard/Scoreboard.tsx` 的取代條件改用 `isContentBlocked`（design Decision 9）。
+- [x] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「pending、loading、load-failed 取代內容，pending 的文案為正在載入資料」；新檔 `nextjs-pickball/components/sync/SyncStatusNotice.test.tsx`，it「pending 顯示正在載入資料，loading 顯示雲端文案，local 不渲染」。兩檔單檔 vitest 確認紅燈並貼出輸出
+- [x] 3.3 GREEN（TDD）：`sync-status.ts` 新增 `DataStatus`、`DATA_PENDING_MESSAGE`、`isContentBlocked`；`SyncStatusNotice` 的 `status` 改為 `DataStatus`（design Decision 10）。3.2 全綠、`sync-status.test.ts` 既有 it 全綠
+- [x] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 等待中時不回傳本機名單、syncStatus 為 pending 且操作不寫入本機也不發請求」「等待中的 session 確認為未登入時改回本機名單」「本機名單讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local」。單檔 vitest 確認紅燈並貼出輸出
+- [x] 3.5 GREEN（TDD）：`useLocalRosterStore` 加讀入旗標（design Decision 7）；`useRosterStore` 依 design Decision 8 回傳，`syncStatus` 型別改為 `DataStatus`；為通過型別所需的最小改動：`app/matchmaker/page.tsx` 的 `SYNC_STATUS_PRIORITY`／`mergeSyncStatus` 改用 `DataStatus` 並在 `loading` 之後加入 `pending`、`components/matchmaker/RemoteStatsContent.tsx` 的參數型別改為 `DataStatus`。3.4 全綠、該檔既有 it 全綠；tsc exit 0
+- [x] 3.6 RED（TDD）：`nextjs-pickball/hooks/useRoundStore.test.tsx` 新增兩個 it——「session 等待中時不回傳本機回合與歷史、syncStatus 為 pending 且操作不生效」「本機回合讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local」。單檔 vitest 確認紅燈並貼出輸出
+- [x] 3.7 GREEN（TDD）：`useLocalRoundStore` 加讀入旗標；`useRoundStore` 依 design Decision 8 回傳（`rosterSyncStatus` 選項型別放寬為 `DataStatus`，傳給雲端 hook 時 `pending` 以 `loading` 傳入）。3.6 全綠、該檔既有 it 全綠；tsc exit 0
+- [x] 3.8 RED（TDD）：`nextjs-pickball/hooks/useScoreboardStore.test.tsx` 新增兩個 it——「session 等待中時不回傳本機計分且 syncStatus 為 pending，帶 matchId 時綁定狀態為 pending」「本機計分讀入前 syncStatus 為 pending，讀入後為 local」。單檔 vitest 確認紅燈並貼出輸出
+- [x] 3.9 GREEN（TDD）：`useLocalScoreboardStore` 加讀入旗標；`useScoreboardStore` 依 design Decision 8 回傳。3.8 全綠、該檔既有 it 全綠（含兩條「首次 render 的綁定狀態」）；tsc exit 0
+- [x] 3.10 RED（TDD）：新檔 `nextjs-pickball/app/matchmaker/stats/page.test.tsx`，it「session 等待中時統計頁顯示等待中提示且不掛載雲端統計內容」（`RemoteStatsContent` 以 stub 取代）。單檔 vitest 確認紅燈並貼出輸出
+- [x] 3.11 GREEN（TDD）：統計頁入口改為只有 `remote` 掛雲端內容、其餘（含 `pending`）掛 `LocalStatsContent`，並更新檔頭註解（design Decision 9）；同時 `LocalStatsContent` 的取代條件改用 `isContentBlocked`（3.10 的提示由它渲染）。3.10 全綠
+- [x] 3.12 GREEN（TDD，E2E 驅動）：`app/matchmaker/players/page.tsx`、`app/matchmaker/page.tsx`（取代條件與 `isRosterReady`）、`components/matchmaker/RemoteStatsContent.tsx`（以 `isContentBlocked` 取代 `isBlockingStatus`）、`components/scoreboard/Scoreboard.tsx` 的取代條件改用 `isContentBlocked`（design Decision 9）。
   雙鎖下重跑 3.1 的兩個 E2E 檔（chromium 全檔、user-data 該條），四條全綠並貼出輸出；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 3.13 REFACTOR：三個選擇器的三態分流寫法是否一致（具名 `mode` 變數與 if，不用巢狀三元）；三個本機 hook 的讀入旗標寫法是否一致；舊註解（「session 載入中視為本機」「本機模式恆為 local」等）是否更新；無壞味道則註記 skipped
+- [x] 3.13 REFACTOR：三個選擇器的三態分流寫法是否一致（具名 `mode` 變數與 if，不用巢狀三元）；三個本機 hook 的讀入旗標寫法是否一致；舊註解（「session 載入中視為本機」「本機模式恆為 local」等）是否更新；無壞味道則註記 skipped
 
 ### 審查修正紀錄（§3 Stage 2 兩份 FAIL 之後）
 
@@ -106,7 +106,9 @@ Depends on: §2
 - 只追加 status 文案斷言時，變異下只有第一條紅，另兩條仍綠——放行前畫面的 `main[data-sync-status="pending"]` 與狀態文案由別處渲染，與是否取代內容無關；因此再追加「空名單文案為 0」與閃爍記錄器。
 - 追加後變異下 3 條皆紅（`1 failed`/`2 passed` → `3 failed`）；等價對照組（`isContentBlocked(syncStatus)` 展開成三個狀態的 `||`）3 passed。
 
-**實跑數字**：單檔 vitest（三個 store 測試與 `sync-status.test.ts`）4 files、69 tests 全綠，`useRosterStore.test.tsx` 16 passed；chromium `data-pending.spec.ts` 3 passed（HEAD）；user-data `roster-sync.spec.ts -g` 1 passed、0 skipped；`pnpm -r exec tsc --noEmit` exit 0；改動檔 eslint 0 errors。
+**實跑數字**：單檔 vitest（三個 store 測試與 `sync-status.test.ts`）4 files、70 tests 全綠（roster 16、round 28、scoreboard 23、sync-status 3；Stage 2 複審實跑更正），`useRosterStore.test.tsx` 16 passed；chromium `data-pending.spec.ts` 3 passed（HEAD）；user-data `roster-sync.spec.ts -g` 1 passed、0 skipped；`pnpm -r exec tsc --noEmit` exit 0；改動檔 eslint 0 errors。
+
+**Stage 2 複審（opus，coordinator 派，涵蓋 `30b4265..bddd70e`）**：程式碼與測試 PASS；X4 變異紅（1 failed／15 passed）、`localDataStatus` 回傳反轉紅（四檔共 8 failed）、對照組（改寫為三元）全綠；chromium `data-pending.spec.ts` HEAD 3 passed、M10 變異 3 failed、對照組（`isContentBlocked` 展開為三個 `||`）3 passed；tsc exit 0、改動 11 檔 eslint 0 errors。所列必修皆為 artifact 未同步（test-plan 兩條 E2E 的 Assertion／Why first、兩個 regression guard it 缺列、design Decision 10 缺 `localDataStatus`、tests 數 69→70），已由 coordinator 於本次 commit 同步；建議「E2E 共同要求點名 `hold-session.ts`」已併入 test-plan，建議「放行後先 await `/api/session` 回應再斷言」併入 §4 派工處理。§3 完成。
 
 ## 4. 歷史頁與資料頁
 

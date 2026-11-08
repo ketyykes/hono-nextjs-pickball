@@ -15,8 +15,8 @@
 > **localStorage 隔離**：新 it 自行在開頭 `localStorage.clear()`；`session-store.test.ts` 與 `useSession.test.ts` 既有 `beforeEach` 各加一行 `localStorage.clear()`（proposal 授權的唯一既有測試修改）。
 >
 > **E2E 共同要求**：
-> - session 暫停：`page.route("**/api/session", handler)`，handler 內 `await` 一個 Promise resolver 後 `route.continue()`；放行前所有斷言 MUST 先以 `main[data-sync-status="pending"]`（或訪客情境的本機參賽者）可見作為錨點，再斷言其他元素不存在；
->   以 `try／finally` 確保放行，並在結束前 `page.unrouteAll({ behavior: "ignoreErrors" })`。放行前的斷言數量保持精簡（Decision 11 的 10 秒逾時）。
+> - session 暫停：共用 helper `tests/e2e/helpers/hold-session.ts`（`page.route("**/api/session", handler)`，handler 內 `await` 一個 Promise resolver 後 `route.continue()`）；放行前所有斷言 MUST 先以 `main[data-sync-status="pending"]`（或訪客情境的本機參賽者）可見作為錨點，再斷言其他元素不存在；
+>   以 `try／finally` 確保放行，並在 `finally` 內 `page.unrouteAll({ behavior: "ignoreErrors" })`。放行前的斷言數量保持精簡（Decision 11 的 10 秒逾時）。
 > - 閃爍記錄器 `tests/e2e/helpers/flash-recorder.ts`：`installFlashRecorder(page, { texts, selectors })` 以 `page.addInitScript` 注入（每個文件、含 reload 都重新開始），`MutationObserver` 監看 `document`（`childList`、`subtree`、`characterData`），每批變動檢查 `document.body?.innerText` 與 `document.querySelector`，命中即記入 `window.__flashHits`；
 >   `readFlashHits(page)` 讀出。斷言時機：本機（或雲端）資料已以 web-first 斷言可見之後。
 > - 種本機資料：先 `page.goto("/")` 再 `page.evaluate` 寫入（例外：上次登入提示改以 `page.addInitScript` 在下一個文件載入前寫入——首頁的 `/api/session` 回應若仍在途，確認為訪客後會清掉以 `evaluate` 寫入的提示），key 一律自 `@/lib/matchmaker/storage-keys`、`@/lib/scoreboard/storage-keys`、`@/lib/auth/session-hint` 匯入，不抄字面值。
@@ -76,12 +76,14 @@
 | session 等待中時以等待中提示取代匯出操作 | 等待中：歷史 CSV 區塊不提供匯出 | mock 等待中 → heading「歷史賽果 CSV 匯出」存在；status 文字固定；按鈕「匯出 CSV」不存在 | 現行可匯出本機 CSV → **真紅** | unit |
 | session 等待中時以等待中提示取代選檔與確認匯入 | 等待中：參賽者 CSV 匯入區塊不提供選檔與確認 | 新檔，`vi.mock("@/hooks/useSession", () => ({ useSession: vi.fn() }))`；mock 等待中 → heading「參賽者名單 CSV 匯入」存在；status 文字固定；`roster-csv-import-input` 與按鈕「確認匯入」皆不存在 | 現行可寫入本機名單並 reload → **真紅** | unit |
 | regression guard：session 等待中時不渲染匯入區塊 | 等待中：匯入本機資料區塊不渲染 | 種一位本機參賽者；mock 等待中 → `queryByTestId("local-import-section")` null；`fetchMock` 未被呼叫 | 現行 `=== "remote"` 已正確 → 寫入即綠（regression guard；mutation `isRemote` 改 `mode !== "local"` 須轉紅） | unit |
+| session 等待中時即使本機資料含損壞筆數 droppedCount 仍為 0 | 等待中：名單選擇器不交出本機名單且操作無效 | 種一筆損壞資料與一位有效參賽者；mock 等待中 → `droppedCount` 為 0、`players` `[]` | 行為已正確 → 寫入即綠（regression guard；變異「等待中改帶本機 droppedCount」須轉紅） | unit |
+| 本機資料讀入前為 pending，讀入後為 local | 本機名單讀入前為等待中 | `localDataStatus(false)` 為 `pending`、`localDataStatus(true)` 為 `local` | 三個選擇器共用判斷抽出時的 refactor 守護 → 寫入即綠（regression guard；回傳反轉須轉紅） | unit |
 | JavaScript 載入前各頁只顯示等待中提示而不顯示空狀態或預設值 | JavaScript 載入前各頁只顯示等待中提示 | 新檔 `data-pending.spec.ts` 的 `describe` 內 `test.use({ javaScriptEnabled: false })`；七個路徑逐一 goto → `[data-sync-status="pending"]` 與「正在載入資料…」可見；spec 列出的空狀態文字、「選擇備份檔…」、按鈕「匯出 CSV」「確認匯入」、`[aria-label="我方目前 0 分"]` 皆 `toHaveCount(0)` | 使用者要求的「靜態 HTML 不出現空名單」直接證據；現行伺服器輸出為空狀態 → **真紅** | e2e |
 | 訪客載入本機資料的過程中參賽者、對戰、統計與計分板頁從未出現空狀態或預設值 | 訪客載入本機資料的過程中從未出現空狀態或預設值 | 種兩位參賽者（`isActive`，單打回合需要兩位）、一輪回合、一筆今日歷史、比分 5:3；`installFlashRecorder`（texts：五個空狀態文字；selectors：`[aria-label="我方目前 0 分"]`）；四頁逐一 goto → 本機資料可見（參賽者名、場地卡、排行榜列、`[aria-label="我方目前 5 分"]`）→ `readFlashHits` 為 `[]`、`[data-sync-status]` `toHaveCount(0)` | 「hydration 後不閃空狀態」的直接證據；現行伺服器輸出即命中 → **真紅** | e2e |
 | 訪客載入本機歷史的過程中從未出現空狀態 | 訪客載入本機歷史的過程中從未出現空狀態 | 種一筆今日歷史；recorder（texts：「還沒有任何對戰紀錄」）；goto `/matchmaker/history` → 卡片可見 → hits 為 `[]`、`[data-sync-status]` `toHaveCount(0)` | 現行 `hydrated === null` 時畫空狀態 → **真紅** | e2e |
 | 已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單 | 已登入者重新整理時在 session 回應前顯示等待中而非空名單 | `seedCloudPlayers` 一位「雲端甲」→ goto → synced 與「雲端甲」可見 → `installFlashRecorder`（texts：「目前還沒有參賽者」「共 0 位參賽者」）→ route 暫停 → `page.reload()` → `main[data-sync-status="pending"]` 可見、status 文字「正在載入資料…」→ 放行 → synced 與「雲端甲」可見 → hits 為 `[]` | 使用者回報的原始情境 → **真紅** | e2e |
-| 訪客重新整理參賽者頁時在 session 回應前即顯示本機名單 | 訪客重新整理時 session 回應前即顯示本機名單 | 寫一位本機參賽者 → route 暫停 → reload → 該參賽者可見、`[data-sync-status]` 與 `getByRole("status")` `toHaveCount(0)` → 放行 → 仍可見、兩者仍為 0 | regression guard：hydration 後訪客不等 session（寫入即綠） | e2e |
-| 上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示 | 上次登入提示殘留但已非登入時短暫等待後回到本機 | 寫一位本機參賽者與提示 `"1"` → route 暫停 → reload → `main[data-sync-status="pending"]` 可見、該參賽者 `toHaveCount(0)` → 放行 → 參賽者可見、`[data-sync-status]` 0、該 key 讀回 `null` | 殘留提示的完整路徑 → **真紅** | e2e |
+| 訪客重新整理參賽者頁時在 session 回應前即顯示本機名單 | 訪客重新整理時 session 回應前即顯示本機名單 | 寫一位本機參賽者 → goto 後可見 → `installFlashRecorder`（texts：參賽者頁空狀態文字）→ route 暫停 → reload → 該參賽者可見、`[data-sync-status]` 與 `getByRole("status")` `toHaveCount(0)` → 放行 → 仍可見、兩者仍為 0 → `readFlashHits` 為 `[]` | regression guard：hydration 後訪客不等 session（寫入即綠）；閃爍記錄器使「參賽者頁取代條件改回只看 loading／load-failed」變異轉紅 | e2e |
+| 上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示 | 上次登入提示殘留但已非登入時短暫等待後回到本機 | 寫一位本機參賽者，提示 `"1"` 以 `addInitScript` 於下一個文件載入前寫入 → route 暫停 → goto 參賽者頁 → `main[data-sync-status="pending"]` 可見、該參賽者 `toHaveCount(0)`、`getByRole("status")` 文字為 `DATA_PENDING_MESSAGE`、「目前還沒有參賽者」`toHaveCount(0)` → 放行 → 參賽者可見、`[data-sync-status]` 0、該 key 讀回 `null` | 殘留提示的完整路徑 → **真紅** | e2e |
 | （既有）`user-data` 全部 spec 與五個 browser project 全部 spec（含 `matchmaker-local-mode`、`scoreboard-local-mode` 的訪客守護） | 既有 Scenario | 原樣通過 | regression guard：伺服器輸出改為等待中、登入後 reload 路徑改變（design Risks） | e2e |
 
 ## player-roster
