@@ -28,7 +28,8 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：待 §1.1 實跑後回填（PASS／FAIL 與三個 workspace 的檔數／測試數、三段 typecheck、lint errors／warnings、六個 E2E project 的 `--list` 數量）。
+- **Baseline tests**（§1.1 實跑，HEAD `e78b456`，雙鎖）：**PASS**。前端 117 檔／1163 tests、後端 27／223、核心 10／27；三段 typecheck（`-r exec tsc --noEmit`、hono-pickball typecheck、pickball-core typecheck）皆 exit 0；lint 0 errors／3 warnings；`playwright test --list` 共 873 tests：chromium、firefox、mobile-chrome、mobile-safari、webkit 各 165，user-data 48。
+  `pnpm install` 後 lockfile 零變動、`db:migrate:local` 為 No migrations to apply。
   參考值（上一個 change 合併前驗收，HEAD `1b21a86`）：前端 117 檔／1163 tests、後端 27／223、核心 10／27；lint 0 errors／3 warnings；E2E 五個 browser project 各 165、user-data 48。
 - **Initial commit hash**：`0de9ad9`（`change/session-hint-failure-no-local-fallback` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）

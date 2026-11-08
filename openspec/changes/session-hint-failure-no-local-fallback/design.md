@@ -208,3 +208,6 @@ openspec validator 不允許 MODIFIED 刪除或改名既有 Scenario（archive �
 ## Open Questions
 
 （設計裁量皆已於 Decisions 定案。）
+
+- §1.2 對齊結果：自 `0de9ad9` 後 `nextjs-pickball/{lib,hooks,components,app,tests}` 與 `openspec/specs` 皆無其他提交改動（diff --stat 為空），主 spec 未變，delta 無需重新套用；`openspec validate --strict` 通過。
+
