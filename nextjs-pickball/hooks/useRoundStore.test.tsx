@@ -1193,4 +1193,66 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		expect(seenEmpty[0]).toBe("pending");
 		expect(seenEmpty[seenEmpty.length - 1]).toBe("local");
 	});
+
+	it("session 無法確認時 syncStatus 為 unavailable 且不回傳本機回合與歷史", () => {
+		// 5 位參賽者的 fixture 與上一條相同：等待中若誤走本機路徑，換人結果會變 ok: true
+		const swapPlayers: Player[] = Array.from({ length: 5 }, (_, index) =>
+			makePlayer({ id: `p${index + 1}` }),
+		);
+		const created = createRound({
+			players: swapPlayers,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		writeRound(created.round);
+		const localRound = created.round;
+		const submitted = submitScore({
+			round: localRound,
+			players: swapPlayers,
+			matchId: localRound.matches[0].id,
+			rawScoreA: "11",
+			rawScoreB: "5",
+			now: "2026-08-23T00:05:00.000Z",
+		});
+		if (!submitted.ok) throw new Error("測試前置失敗：submitScore 未成功");
+		writeHistory([submitted.historyEntry]);
+		const roundBefore = JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY)!);
+		const historyBefore = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue({
+			status: "loading",
+			signedInHint: true,
+			unavailable: true,
+			hydrated: true,
+			refresh: vi.fn(),
+		});
+
+		const { result } = renderHook(() =>
+			useRoundStore({
+				players: swapPlayers,
+				updatePlayer: vi.fn(),
+				applyRemotePlayers,
+				reloadRemotePlayers,
+				rosterSyncStatus: "unavailable",
+			}),
+		);
+
+		expect(result.current.round).toBeNull();
+		expect(result.current.history).toEqual([]);
+		expect(result.current.syncStatus).toBe("unavailable");
+		expect(result.current.remoteMatchSlots).toBeNull();
+
+		let generated: ReturnType<typeof result.current.generateRound> | undefined;
+		act(() => {
+			generated = result.current.generateRound({ format: "doubles", courtCount: 1 });
+		});
+
+		expect(generated?.ok).toBe(false);
+		expect(JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY)!)).toEqual(roundBefore);
+		expect(JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!)).toEqual(historyBefore);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });
