@@ -19,6 +19,7 @@ import {
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { nextAutoGradient } from "@/lib/matchmaker/roster";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 import type { Player } from "@pickball/core/matchmaker/types";
 
 // 參賽者名單頁。全站 navbar 的 matchmaker 入口指向對戰頁 /matchmaker（主畫面），
@@ -51,9 +52,9 @@ export default function PlayersPage() {
 		setEditingPlayer(null);
 	}
 
-	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 資料等待中、雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
 	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<main
 				data-sync-status={syncStatus}

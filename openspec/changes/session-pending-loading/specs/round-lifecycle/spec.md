@@ -72,7 +72,7 @@
 
 #### Scenario: 訪客或 session 載入中時走本機回合
 
-- **GIVEN** mock `useSession` 為 `loading` 或訪客
+- **GIVEN** mock `useSession` 為 `loading`（不帶上次登入提示 `signedInHint`）或訪客
 - **WHEN** `useRoundStore()` mount 並產生一輪
 - **THEN** `syncStatus` 為 `local`、`remoteMatchSlots` 為 `null`；`matchmaker:round:v1` 有資料；沒有任何 `/api/matchmaker/*` 請求
 - **驗收**：`nextjs-pickball/hooks/useRoundStore.test.tsx`，it 名稱「session 載入中或訪客時走本機回合且 syncStatus 為 local」

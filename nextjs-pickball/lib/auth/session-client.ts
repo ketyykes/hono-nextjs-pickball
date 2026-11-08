@@ -1,6 +1,7 @@
 // 瀏覽器端的登入狀態與登入／登出請求。
 // 對應 hono-pickball 的 GET /api/session 與 better-auth 的 /api/auth/*（皆 same-origin）。
 // 四個函式絕不 throw：呼叫端（store、表單）不需要 try/catch。
+import { clearSignedInHint } from "./session-hint";
 
 export interface SessionUser {
 	id: string;
@@ -103,6 +104,8 @@ export async function signOut(): Promise<boolean> {
 			headers: { "Content-Type": "application/json" },
 			body: "{}",
 		});
+		// 不等之後的 refresh：期間重新整理也不該進入等待中
+		if (res.ok) clearSignedInHint();
 		return res.ok;
 	} catch {
 		return false;

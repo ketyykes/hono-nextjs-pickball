@@ -319,4 +319,103 @@ describe("useRosterStore 儲存模式選擇器", () => {
 		}
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+
+	// 等待中：儲存模式未定，名單選擇器不得交出本機名單，操作也不得生效。
+	const pendingSession = {
+		status: "loading",
+		signedInHint: true,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+	const guestSession = {
+		status: "ready",
+		authEnabled: true,
+		user: null,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+
+	function seedLocalRoster(players: Player[]): void {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, players }));
+	}
+
+	it("session 等待中時不回傳本機名單、syncStatus 為 pending 且操作不寫入本機也不發請求", () => {
+		seedLocalRoster([makePlayer({ id: "local-1" })]);
+		const before = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		expect(result.current.players).toEqual([]);
+		expect(result.current.syncStatus).toBe("pending");
+		expect(result.current.droppedCount).toBe(0);
+
+		act(() => {
+			result.current.addPlayer({ name: "等待中新增", gender: "male", rating: 3 });
+			result.current.togglePlayerActive("local-1");
+			result.current.resetRoster();
+			result.current.updatePlayer("local-1", { name: "等待中改名" });
+			result.current.removePlayer("local-1");
+			result.current.applyRemotePlayers([{ data: makePlayer({ id: "remote-1" }), version: 1 }]);
+			result.current.reloadRemotePlayers();
+		});
+
+		expect(result.current.players).toEqual([]);
+		expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(before);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	// regression guard：行為早已正確（等待中不帶本機資料），此條防止日後改成帶入本機 droppedCount。
+	it("session 等待中時即使本機資料含損壞筆數 droppedCount 仍為 0", () => {
+		seedLocalRoster([makePlayer({ id: "local-1" }), makePlayer({ id: "local-bad", rating: 99 })]);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		expect(result.current.syncStatus).toBe("pending");
+		expect(result.current.droppedCount).toBe(0);
+	});
+
+	it("等待中的 session 確認為未登入時改回本機名單", () => {
+		seedLocalRoster([makePlayer({ id: "local-1" })]);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const { result, rerender } = renderHook(() => useRosterStore());
+		expect(result.current.players).toEqual([]);
+
+		vi.mocked(useSession).mockReturnValue(guestSession);
+		rerender();
+
+		expect(result.current.players.map((player) => player.id)).toEqual(["local-1"]);
+		expect(result.current.syncStatus).toBe("local");
+	});
+
+	it("本機名單讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local", () => {
+		vi.mocked(useSession).mockReturnValue(guestSession);
+
+		// 第一輪：有一位本機參賽者
+		seedLocalRoster([makePlayer({ id: "local-1" })]);
+		const seen: Array<[string, number]> = [];
+		const first = renderHook(() => {
+			const store = useRosterStore();
+			// 於 render 階段（effect 執行前）同步記錄，第一筆即為讀入前的值
+			seen.push([store.syncStatus, store.players.length]);
+			return store;
+		});
+		expect(seen[0][0]).toBe("pending");
+		expect(seen[seen.length - 1]).toEqual(["local", 1]);
+		expect(seen).not.toContainEqual(["local", 0]);
+		first.unmount();
+
+		// 第二輪：沒有本機資料，讀入旗標仍要標記
+		localStorage.clear();
+		const seenEmpty: string[] = [];
+		renderHook(() => {
+			const store = useRosterStore();
+			seenEmpty.push(store.syncStatus);
+			return store;
+		});
+		expect(seenEmpty[0]).toBe("pending");
+		expect(seenEmpty[seenEmpty.length - 1]).toBe("local");
+	});
 });

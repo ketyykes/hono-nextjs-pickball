@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
+import { DATA_PENDING_MESSAGE } from "@/lib/sync/sync-status";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
+import { installFlashRecorder, readFlashHits } from "../helpers/flash-recorder";
+import { holdSession } from "../helpers/hold-session";
 import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
 // 登入後的 matchmaker 名單以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
@@ -127,6 +130,33 @@ function buildRosterCsv(rows: readonly { name: string; gender: string; rating: s
 }
 
 test.describe("matchmaker 名單雲端同步", () => {
+	test("已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單", async ({ page }) => {
+		await seedCloudPlayers(page, [buildPlayer({ id: "pending-p1", name: "雲端甲" })]);
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByText("雲端甲")).toBeVisible();
+
+		await installFlashRecorder(page, { texts: ["目前還沒有參賽者", "共 0 位參賽者"], selectors: [] });
+
+		const release = await holdSession(page);
+		try {
+			await page.reload();
+			await expect(page.locator('main[data-sync-status="pending"]')).toBeVisible();
+			await expect(page.getByRole("status")).toHaveText(DATA_PENDING_MESSAGE);
+			// 在放行前一刻才建立，避免前一頁晚到的 session 回應提早滿足
+			const sessionResponse = page.waitForResponse("**/api/session");
+			release();
+			// 等 session 回應到達，放行後的斷言才確實涵蓋回應之後的畫面
+			await sessionResponse;
+			await expect(page.locator(SYNCED)).toBeVisible();
+			await expect(page.getByText("雲端甲")).toBeVisible();
+			expect(await readFlashHits(page)).toEqual([]);
+		} finally {
+			release();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
+	});
+
 	test("登入後新增的參賽者在重新整理後由雲端還原且不寫入本機", async ({ page }) => {
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();

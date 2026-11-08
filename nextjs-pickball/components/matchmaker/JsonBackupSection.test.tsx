@@ -39,6 +39,11 @@ function mockGuestSession(): void {
 	vi.mocked(useSession).mockReturnValue(session);
 }
 
+function mockPendingSession(): void {
+	const session: UseSessionResult = { status: "loading", signedInHint: true, hydrated: true, refresh };
+	vi.mocked(useSession).mockReturnValue(session);
+}
+
 // 模擬「session 資料殘缺」：已登入但 user 沒有 id。元件的 null 防線只有在這種輸入下才走得到
 function mockSessionWithoutUserId(): void {
 	const session = {
@@ -212,5 +217,19 @@ describe("JsonBackupSection 雲端分支", () => {
 		);
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("JsonBackupSection 等待中", () => {
+	it("session 等待中時以等待中提示取代匯出與還原操作", () => {
+		mockPendingSession();
+
+		render(<JsonBackupSection />);
+
+		expect(screen.getByRole("heading", { name: "JSON 完整備份" })).not.toBeNull();
+		expect(screen.getByRole("status").textContent).toBe("正在載入資料…");
+		expect(screen.queryByRole("button", { name: "匯出 JSON" })).toBeNull();
+		expect(screen.queryByTestId("json-backup-import-input")).toBeNull();
+		expect(screen.queryByTestId("json-backup-cloud-import-input")).toBeNull();
 	});
 });

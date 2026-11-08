@@ -2,11 +2,13 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { applyRosterImport, parseRosterCsv } from "@/lib/matchmaker/roster-csv";
 import type { ParseRosterCsvResult } from "@/lib/matchmaker/roster-csv";
+import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useSession } from "@/hooks/useSession";
 import { REMOTE_TRANSFER_MESSAGES, importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
 import { readRoster } from "@/lib/matchmaker/storage";
@@ -38,7 +40,8 @@ export function RosterCsvImportSection() {
 	// 雲端匯入先 GET 再 POST，往返期間若可重複點擊，每次都會產生新的 UUID 而附加重複參賽者
 	const [isImporting, setIsImporting] = useState(false);
 	const session = useSession();
-	const isRemote = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
+	const isRemote = mode === "remote";
 	// 以觸發當下畫面所見的帳號送出（匯入前的 GET 與匯入的 POST 共用）；
 	// 帳號被其他分頁換掉時伺服器回 401，下面會刷新 session
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
@@ -102,14 +105,16 @@ export function RosterCsvImportSection() {
 
 	const canConfirm = preview.status === "ready" && preview.result.errors.length === 0;
 
-	return (
-		<Card>
-			<CardHeader>
-				<h2 className="text-lg leading-none font-semibold">參賽者名單 CSV 匯入</h2>
-				<p className="text-sm text-muted-foreground">
-					欄位：名稱／性別／強度分數／顏色起點／顏色終點。匯入採附加模式，不覆蓋既有參賽者。
-				</p>
-			</CardHeader>
+	let content: ReactNode;
+	if (mode === "pending") {
+		// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
+		content = (
+			<CardContent data-sync-status="pending">
+				<SyncStatusNotice status="pending" />
+			</CardContent>
+		);
+	} else {
+		content = (
 			<CardContent className="flex flex-col gap-3">
 				<div className="flex flex-wrap gap-2">
 					<FileTextPicker
@@ -155,6 +160,18 @@ export function RosterCsvImportSection() {
 					</div>
 				)}
 			</CardContent>
+		);
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<h2 className="text-lg leading-none font-semibold">參賽者名單 CSV 匯入</h2>
+				<p className="text-sm text-muted-foreground">
+					欄位：名稱／性別／強度分數／顏色起點／顏色終點。匯入採附加模式，不覆蓋既有參賽者。
+				</p>
+			</CardHeader>
+			{content}
 		</Card>
 	);
 }

@@ -14,7 +14,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRosterStore } from "@/hooks/useRemoteRosterStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import { localDataStatus, type DataStatus, type SyncStatus } from "@/lib/sync/sync-status";
 
 // 名單 store 的 state 形狀。
 // droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數，
@@ -94,7 +94,9 @@ function rosterReducer(state: RosterState, action: RosterAction): RosterState {
 	}
 }
 
-export interface UseRosterStoreResult {
+// 泛型參數是 syncStatus 的值域：雲端 hook 只會回報 SyncStatus（預設值），
+// 只有選擇器會多回報 pending，所以選擇器才宣告 UseRosterStoreResult<DataStatus>。
+export interface UseRosterStoreResult<Status extends DataStatus = SyncStatus> {
 	players: Player[];
 	/** 讀取持久化資料時被丟棄的損壞筆數，> 0 時 UI 需提示使用者。 */
 	droppedCount: number;
@@ -103,19 +105,21 @@ export interface UseRosterStoreResult {
 	removePlayer: (id: string) => void;
 	togglePlayerActive: (id: string) => void;
 	resetRoster: () => void;
-	/** 本機模式恆為 local；雲端模式反映載入與儲存狀態。 */
-	syncStatus: SyncStatus;
+	/** 本機模式在名單讀入前為 pending、讀入後恆為 local；儲存模式未定時為 pending；
+	 * 雲端模式反映載入與儲存狀態。 */
+	syncStatus: Status;
 	/** 以後端已寫入的參賽者取代畫面上的同 id 資料；不送請求。本機模式為不做事的函式。 */
 	applyRemotePlayers: (items: { data: Player; version: number }[]) => void;
 	/** 停止所有佇列並重新載入雲端名單。本機模式為不做事的函式。 */
 	reloadRemotePlayers: () => void;
 }
 
-// 本機實作不知道同步狀態，由選擇器補上 local。
+// 本機實作不知道同步狀態，由選擇器補上；hydrated 是本機名單是否已讀入，供選擇器決定
+// syncStatus 要回 pending 還是 local。
 type LocalRosterStoreResult = Omit<
-	UseRosterStoreResult,
+	UseRosterStoreResult<DataStatus>,
 	"syncStatus" | "applyRemotePlayers" | "reloadRemotePlayers"
->;
+> & { hydrated: boolean };
 
 function doNothing(): void {}
 
@@ -130,6 +134,10 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 		(_arg: undefined) => createInitialState(),
 	);
 	const hasHydratedRef = useRef(false);
+	// 讀入旗標是獨立 state，不放進 reducer：無資料時不 dispatch HYDRATE 是為了不產生新的
+	// state 參考（否則 write effect 會把初始值寫回 localStorage），旗標則不影響 state 參考。
+	// 用 useReducer 而非 useState：react-hooks/set-state-in-effect 不適用於 dispatch。
+	const [hydrated, markHydrated] = useReducer(() => true, false);
 
 	useEffect(() => {
 		if (!hasHydratedRef.current) return;
@@ -148,6 +156,8 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 			dispatch({ type: "HYDRATE", players, droppedCount });
 		}
 		hasHydratedRef.current = true;
+		// 無論有沒有本機資料都標記，讀入後選擇器才會從 pending 轉為 local
+		markHydrated();
 		return () => {
 			// React Strict Mode 下 dev 會 unmount 再重新 mount，重置 ref 使下一次 mount
 			// 的 write effect 不會以初始（空）state 覆蓋 localStorage。
@@ -191,22 +201,36 @@ export function useLocalRosterStore(): LocalRosterStoreResult {
 		removePlayer,
 		togglePlayerActive,
 		resetRoster,
+		hydrated,
 	};
 }
 
-// 儲存模式選擇器：本機 hook 在雲端模式下仍會 mount（hooks 規則不允許條件呼叫），
-// 它只會讀取並把同一份本機名單寫回，使用者動作一律走雲端 hook，不會改到本機名單。
-export function useRosterStore(): UseRosterStoreResult {
+// 儲存模式選擇器：本機 hook 在其他模式下仍會 mount（hooks 規則不允許條件呼叫），
+// 它只會讀取並把同一份本機名單寫回，使用者動作一律走雲端 hook 或等待中結果，不會改到本機名單。
+// 等待中（儲存模式未定）沿用未啟用的雲端 hook 結果：它在第一次取得 session 之前從未啟用過，
+// 內部必為初始狀態（空名單、操作因沒有 controller 而直接返回）。
+export function useRosterStore(): UseRosterStoreResult<DataStatus> {
 	const session = useSession();
 	const local = useLocalRosterStore();
-	const isRemote = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
 	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
-	const remote = useRemoteRosterStore({ enabled: isRemote, userId, onUnauthorized: session.refresh });
-	if (isRemote) return remote;
+	const remote = useRemoteRosterStore({
+		enabled: mode === "remote",
+		userId,
+		onUnauthorized: session.refresh,
+	});
+
+	if (mode === "remote") {
+		return remote;
+	}
+	if (mode === "pending") {
+		return { ...remote, syncStatus: "pending" };
+	}
+	const { hydrated, ...localStore } = local;
 	return {
-		...local,
-		syncStatus: "local",
+		...localStore,
+		syncStatus: localDataStatus(hydrated),
 		applyRemotePlayers: doNothing,
 		reloadRemotePlayers: doNothing,
 	};

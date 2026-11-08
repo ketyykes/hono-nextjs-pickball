@@ -17,7 +17,7 @@ subagent 不繼承主對話 context。每次派工 MUST **逐字貼進 prompt**�
 2. **test-plan.md 對應列**（五欄一字不改）＋檔頭「等待中 mock 的共同寫法」「localStorage 隔離」「E2E 共同要求」＋本組用到的指令驗收列。
 3. **相關 spec 片段**：
    - §2 → 本 change `specs/auth/spec.md` 全文、`specs/user-data-sync/spec.md` 的「前端依 session 選擇儲存模式」、`specs/data-transfer/spec.md` 新增的「不屬清除範圍的 key」段落與 Scenario。
-   - §3 → `specs/user-data-sync/spec.md`「資料來源確定前的等待中畫面」的顯示狀態、選擇器、頁面（參賽者、對戰、統計、計分板）段落與對應 Scenario（`isContentBlocked`、`SyncStatusNotice`、名單三條、回合兩條、計分板兩條、統計頁、三條 `data-pending.spec.ts` 訪客 E2E、`roster-sync.spec.ts` 登入 E2E）；
+   - §3 → `specs/user-data-sync/spec.md`「資料來源確定前的等待中畫面」的顯示狀態、選擇器、頁面（參賽者、對戰、統計、計分板）段落與對應 Scenario（`isContentBlocked`、`SyncStatusNotice`、名單三條、回合兩條、計分板三條、統計頁、三條 `data-pending.spec.ts` 訪客 E2E、`roster-sync.spec.ts` 登入 E2E）；
      `specs/player-roster/spec.md`、`specs/round-lifecycle/spec.md`、`specs/scoreboard/spec.md` 改寫的段落。
    - §4 → `specs/user-data-sync/spec.md`「資料來源確定前的等待中畫面」的歷史頁與資料頁段落與對應 Scenario（歷史兩條、資料頁四條、「JavaScript 載入前…」「訪客載入本機歷史…」兩條 E2E）；`specs/match-history/spec.md` 改寫的段落。
 4. **相關 design 片段**：§2 → Decision 1、2、3、4、5、6、11、12、13；§3 → Context 與盤點清單 F1～F6、Decision 1、7、8、9、10、13，Risks 中 E2E 與測試隔離各條；§4 → 盤點清單 F4、F7～F9、Decision 2 表格、Decision 9、13；§5 → Migration Plan、Non-Goals。
@@ -114,7 +114,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
   - [ ] `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff main --stat` ⊆ proposal Impact；主 spec 無任何改動。
   - [ ] C6 使用端清單恰為 9 處且每處都有測試；C7 取代判斷只剩雲端歷史專屬的一處；沒有頁面漏掉 `pending`。
   - [ ] lib、hooks、元件三層對 `pending` 的命名與判斷寫法一致，取代內容一律經 `isContentBlocked`，沒有各自發明一套。
-  - [ ] 指令驗收 C1～C9 皆有紀錄；前端測試數＝基線＋29、檔數＝基線＋6；user-data E2E＝基線＋1；五個 browser project 各＝基線＋5 且全綠。
+  - [ ] 指令驗收 C1～C9 皆有紀錄；前端測試數＝基線＋33、檔數＝基線＋6；user-data E2E＝基線＋1；五個 browser project 各＝基線＋5 且全綠。
   - [ ] `nextjs-pickball/CLAUDE.md` 的敘述與新行為一致。
 - **SHALL NOT**：重審單一 task 細節。
 

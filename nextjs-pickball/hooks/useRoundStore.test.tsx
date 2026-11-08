@@ -1062,4 +1062,135 @@ describe("useRoundStore 的儲存模式選擇器", () => {
 		}
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
+
+	const pendingSession = {
+		status: "loading",
+		signedInHint: true,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+	const guestSession = {
+		status: "ready",
+		authEnabled: true,
+		user: null,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+
+	function seedLocalRound() {
+		const created = createRound({
+			players,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		writeRound(created.round);
+		return created.round;
+	}
+
+	it("session 等待中時不回傳本機回合與歷史、syncStatus 為 pending 且操作不生效", () => {
+		// 5 位參賽者：雙打 1 場會有 1 人休息，本機版 swapMatchPlayer 才能成功，
+		// 等待中若誤走本機路徑，換人結果會變 ok: true 而讓測試轉紅
+		const swapPlayers: Player[] = Array.from({ length: 5 }, (_, index) =>
+			makePlayer({ id: `p${index + 1}` }),
+		);
+		const created = createRound({
+			players: swapPlayers,
+			format: "doubles",
+			courtCount: 1,
+			previousRound: null,
+			now: "2026-08-23T00:00:00.000Z",
+			newMatchId: () => "match-1",
+		});
+		if (!created.ok) throw new Error("測試前置失敗：createRound 未成功");
+		writeRound(created.round);
+		const localRound = created.round;
+		const submitted = submitScore({
+			round: localRound,
+			players: swapPlayers,
+			matchId: localRound.matches[0].id,
+			rawScoreA: "11",
+			rawScoreB: "5",
+			now: "2026-08-23T00:05:00.000Z",
+		});
+		if (!submitted.ok) throw new Error("測試前置失敗：submitScore 未成功");
+		writeHistory([submitted.historyEntry]);
+		const roundBefore = JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY)!);
+		const historyBefore = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+		const updatePlayer = vi.fn();
+
+		const { result } = renderHook(() =>
+			useRoundStore({ players: swapPlayers, updatePlayer, applyRemotePlayers, reloadRemotePlayers }),
+		);
+
+		expect(result.current.round).toBeNull();
+		expect(result.current.history).toEqual([]);
+		expect(result.current.droppedCount).toBe(0);
+		expect(result.current.syncStatus).toBe("pending");
+		expect(result.current.remoteMatchSlots).toBeNull();
+
+		let generated: ReturnType<typeof result.current.generateRound> | undefined;
+		act(() => {
+			generated = result.current.generateRound({ format: "doubles", courtCount: 1 });
+		});
+
+		// 其餘六個操作同樣必須回 ok: false，且不碰本機 key、不通知名單、不發請求
+		const otherResults: Array<{ ok: boolean }> = [];
+		act(() => {
+			otherResults.push(
+				result.current.resetIncompleteMatches(),
+				result.current.submitScore(localRound.matches[0].id, "11", "5"),
+				result.current.setTargetScore(15),
+				result.current.setTimerDuration(10),
+				result.current.startTimer(),
+				result.current.swapMatchPlayer(
+					localRound.matches[0].id,
+					localRound.matches[0].teams[0].playerIds[0],
+					localRound.restingPlayerIds[0],
+				),
+			);
+		});
+		expect(otherResults).toHaveLength(6);
+		expect(otherResults.every((r) => r.ok === false)).toBe(true);
+
+		expect(generated?.ok).toBe(false);
+		expect(result.current.round).toBeNull();
+		expect(JSON.parse(localStorage.getItem(ROUND_STORAGE_KEY)!)).toEqual(roundBefore);
+		expect(JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!)).toEqual(historyBefore);
+		expect(updatePlayer).not.toHaveBeenCalled();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("本機回合讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local", () => {
+		vi.mocked(useSession).mockReturnValue(guestSession);
+
+		// 第一輪：有一輪本機回合
+		seedLocalRound();
+		const seen: Array<[string, boolean]> = [];
+		const first = renderHook(() => {
+			const store = useRoundStore({ players, updatePlayer: vi.fn() });
+			// 於 render 階段（effect 執行前）同步記錄，第一筆即為讀入前的值
+			seen.push([store.syncStatus, store.round !== null]);
+			return store;
+		});
+		expect(seen[0][0]).toBe("pending");
+		expect(seen[seen.length - 1]).toEqual(["local", true]);
+		expect(seen).not.toContainEqual(["local", false]);
+		first.unmount();
+
+		// 第二輪：沒有本機資料，讀入旗標仍要標記
+		localStorage.clear();
+		const seenEmpty: string[] = [];
+		renderHook(() => {
+			const store = useRoundStore({ players, updatePlayer: vi.fn() });
+			seenEmpty.push(store.syncStatus);
+			return store;
+		});
+		expect(seenEmpty[0]).toBe("pending");
+		expect(seenEmpty[seenEmpty.length - 1]).toBe("local");
+	});
 });

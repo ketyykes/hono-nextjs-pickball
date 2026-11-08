@@ -48,7 +48,7 @@
 
 #### Scenario: 訪客或 session 載入中時走本機
 
-- **GIVEN** mock `useSession` 分別為 `loading` 與 `ready`／`authEnabled: false`
+- **GIVEN** mock `useSession` 分別為 `loading`（不帶上次登入提示 `signedInHint`） 與 `ready`／`authEnabled: false`
 - **WHEN** `useScoreboardStore(null)` mount 並 dispatch `RALLY_WON`
 - **THEN** `syncStatus` 為 `local`；分數寫入 `localStorage["scoreboard:current:v1"]`；沒有任何對 `/api/scoreboard/*` 的請求
 - **驗收**：`nextjs-pickball/hooks/useScoreboardStore.test.tsx`，it 名稱「session 載入中或訪客時走本機且 syncStatus 為 local」

@@ -29,8 +29,14 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：待 apply §1.1 回填（三個 workspace 的檔數／測試數、三段 typecheck、lint errors／warnings、`playwright test --list` 六個 project 各自數量）。
-- **Initial commit hash**：待 apply §1.1 回填（`change/session-pending-loading` 分出時的 `main` HEAD）。
+- **Baseline tests**（2026-11-08，HEAD `df699cd`，雙鎖下實跑）：
+  - `pnpm install`：lockfile 零變動；`hono-pickball db:migrate:local`：No migrations to apply（exit 0）。
+  - `pnpm test`：前端 111 檔／1130 tests、後端 27 檔／223 tests、核心 27 tests／10 檔，全綠（exit 0）。
+  - 三段 typecheck（C1）：`-r exec tsc --noEmit`、`hono-pickball typecheck`、`pickball-core typecheck` 皆 exit 0。
+  - `pnpm lint`：0 errors、3 warnings（皆既有的 `_correctIndex`／`_arg` no-unused-vars）。
+  - E2E 基線（`playwright test --list --project=<p>`，不起 server）：chromium 160、firefox 160、webkit 160、mobile-chrome 160、mobile-safari 160（各 20 檔）、user-data 47（6 檔）。
+  - `hono-pickball/.dev.vars` 鍵名齊備（`TEST_ACCOUNT_EMAIL`／`NAME`／`PASSWORD`、`ENVIRONMENT`、`BETTER_AUTH_*`；只檢查鍵名）。
+- **Initial commit hash**：`df699cd`（`change/session-pending-loading` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
 ## Teardown

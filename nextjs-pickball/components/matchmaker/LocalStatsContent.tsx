@@ -11,6 +11,7 @@ import { useRoundStore } from "@/hooks/useRoundStore";
 import { filterHistoryByRange } from "@pickball/core/matchmaker/history-range";
 import type { HistoryRange } from "@pickball/core/matchmaker/history-range";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 
 // 統計頁（球員排行榜）。本檔標 "use client" 並直接持有 useRosterStore 與 useRoundStore
 // 兩個既有 store（形態比照 app/matchmaker/page.tsx）：不另呼叫
@@ -34,8 +35,7 @@ export function LocalStatsContent() {
 	const [selectedRange, setSelectedRange] = useState<HistoryRange>("today");
 
 	// 在 render 期間取「現在」不會造成 hydration mismatch：首次伺服器輸出與 hydration
-	// 當下的 history 皆為空陣列（useRoundStore 於 effect 內才灌入資料），兩邊都走下方
-	// 的空狀態分支，時鐘取值根本不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
+	// 當下 syncStatus 皆為 pending，兩邊都走等待中提示分支，時鐘取值不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
 	// 「統計頁載入後無 console error」即為此推論的實證。
 	//
 	// 與 HistoryView.tsx 的差異是刻意留下的、而非疏漏：該元件
@@ -53,9 +53,9 @@ export function LocalStatsContent() {
 	// players 的 rating 決定的，篩選只改變出場數／勝負／淨變化／搭檔對手等期間內統計。
 	const stats = computePlayerStats(filteredHistory, players);
 
-	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 資料等待中、雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
 	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<main
 				data-sync-status={syncStatus}

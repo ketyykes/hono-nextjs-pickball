@@ -49,6 +49,11 @@ function mockSessionWithoutUserId(): void {
 	vi.mocked(useSession).mockReturnValue(session);
 }
 
+function mockPendingSession(): void {
+	const session: UseSessionResult = { status: "loading", signedInHint: true, hydrated: true, refresh };
+	vi.mocked(useSession).mockReturnValue(session);
+}
+
 function seedLocalData(): void {
 	const player = (id: string, name: string) => ({
 		id,
@@ -170,5 +175,18 @@ describe("LocalDataImportSection", () => {
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(snapshotKeys()).toEqual(before);
+	});
+
+	// regression guard（加入即綠）：現行 isRemote 已只在 remote 模式為 true
+	it("regression guard：session 等待中時不渲染匯入區塊", () => {
+		seedLocalData();
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+		mockPendingSession();
+
+		render(<LocalDataImportSection />);
+
+		expect(screen.queryByTestId("local-import-section")).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

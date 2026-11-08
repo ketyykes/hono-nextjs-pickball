@@ -13,7 +13,8 @@ import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import { isContentBlocked } from "@/lib/sync/sync-status";
+import type { DataStatus } from "@/lib/sync/sync-status";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
 import { jpgExportFileName } from "@/lib/matchmaker/export-filename";
@@ -34,9 +35,10 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 
 // 名單與回合各有自己的同步狀態，頁面只顯示一個：取最需要使用者注意的那個。
 // local 排在最後，兩者皆為 local（訪客）時才會是 local。
-const SYNC_STATUS_PRIORITY: readonly SyncStatus[] = [
+const SYNC_STATUS_PRIORITY: readonly DataStatus[] = [
 	"load-failed",
 	"loading",
+	"pending",
 	"rejected",
 	"conflict",
 	"retrying",
@@ -45,7 +47,7 @@ const SYNC_STATUS_PRIORITY: readonly SyncStatus[] = [
 	"local",
 ];
 
-function mergeSyncStatus(first: SyncStatus, second: SyncStatus): SyncStatus {
+function mergeSyncStatus(first: DataStatus, second: DataStatus): DataStatus {
 	const found = SYNC_STATUS_PRIORITY.find((status) => status === first || status === second);
 	return found ?? "local";
 }
@@ -82,8 +84,8 @@ export default function MatchmakerPage() {
 		rosterSyncStatus,
 	});
 	const syncStatus = mergeSyncStatus(rosterSyncStatus, roundSyncStatus);
-	// 名單載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
-	const isRosterReady = rosterSyncStatus !== "loading" && rosterSyncStatus !== "load-failed";
+	// 名單等待中、載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
+	const isRosterReady = !isContentBlocked(rosterSyncStatus);
 
 	// draft 只記錄使用者於本次進入對戰頁後變更過的設定（null 為尚未變更）；
 	// 實際使用的設定由 draft 與目前回合在 render 中解析，離開再回來時才會跟隨回合而非回到預設值。
@@ -145,8 +147,9 @@ export default function MatchmakerPage() {
 		//
 		// 依賴陣列刻意不放 players／submitScore：它們每次 render 都換新參考，
 		// 列入 deps 會讓本 effect 在每次 render 後都重跑，而非只在「回合資料就緒
-		// 或變動」時才觸發。remoteMatchSlots 與名單就緒只在雲端模式會變動
-		// （本機模式恆為 null／true），不影響訪客的觸發時機。
+		// 或變動」時才觸發。本機模式下 remoteMatchSlots 恆為 null；名單就緒
+		// 只會在本機資料讀入的同一次 render 由 false 轉 true，與 round 讀入同時發生，
+		// 不影響訪客的觸發時機。
 		setMatchSlots(slots);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [round, remoteMatchSlots, isRosterReady]);
@@ -204,9 +207,9 @@ export default function MatchmakerPage() {
 		[round],
 	);
 
-	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 資料等待中、雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
 	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<main
 				data-sync-status={syncStatus}

@@ -15,6 +15,7 @@ import { OrientationHint } from "@/components/scoreboard/OrientationHint";
 import { GameOverDialog } from "@/components/scoreboard/GameOverDialog";
 import { MatchBindingNotice } from "@/components/scoreboard/MatchBindingNotice";
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 import { cn } from "@/lib/utils";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 
@@ -96,10 +97,10 @@ export function Scoreboard({ matchId = null }: ScoreboardProps) {
 		return <MatchBindingNotice />;
 	}
 
-	// 雲端資料載入中或載入失敗時沒有可信的比分；顯示初始 0:0 會誤導使用者
+	// 資料等待中、雲端資料載入中或載入失敗時沒有可信的比分；顯示初始 0:0 會誤導使用者
 	// 以為比賽被清空而按下 RESET，因此以提示取代整個計分畫面。
 	// 同樣須排在所有 hook 之後。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<div
 				data-sync-status={syncStatus}

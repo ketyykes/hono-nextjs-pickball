@@ -111,6 +111,7 @@
 
 **Choice**：`useSession()` 的回傳值加 `hydrated: boolean`，以第二個 `useSyncExternalStore(subscribeNever, () => true, () => false)` 取得：伺服器端與 hydration 那次 render 為 `false`，hydration 完成後 React 以 client 快照同步重新 render 為 `true`；client 端非 hydration 的 mount（client 端導覽）第一次 render 就是 `true`。
 session 快照（store）本身不變，`getServerSnapshot()` 仍是 `{ status: "loading" }`。
+**apply 補註（型別）**：`UseSessionResult.hydrated` 宣告為 `hydrated?: boolean`（可省略）。既有 12 個元件／hook 測試檔以不含 `hydrated` 的物件 mock `useSession`，宣告為必填會讓 tsc 失敗，而既有測試不得修改；`useSession()` 執行期一律回傳 boolean，`resolveStorageMode` 將未提供視同 `true`（Decision 2），行為與 spec 一致。Stage 1 判定可接受。
 
 **Rationale**：所有使用端本來就把 `useSession()` 的結果交給 `resolveStorageMode`，旗標隨之生效，不必改 9 處接線；不新增 hook，不必更新 `pickleball-guide-page` 的 hooks 歸屬清單。
 
@@ -163,6 +164,10 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 可以沿用未啟用的雲端 hook，是因為等待中只出現在第一次取得 session 之前：雲端 hook 在這之前從未啟用過，內部一定是初始狀態。
 
+**apply 補註**：
+- 計分板等待中的 `state` 以模組層級常數提供（多次 render 為同一參考）。apply §3.12 實跑 E2E 時發現每次 render 回傳新的 `createInitialState()` 會讓 `Scoreboard` 依 state 參考在 render 中更新衍生狀態而無限 re-render；追加 it「session 等待中時多次 render 回傳同一個 state 參考」（先紅後綠）與對應 Scenario，新 it 總數由 29 改為 30；後續審查又追加 2 個 regression guard（`68d32d0`、`8dad6aa`），共 32；合併前驗收再追加歷史頁 StrictMode 回歸的紅燈 it（`9c2c94d`），最終為 33。
+- `UseRosterStoreResult` 與 `UseRoundStoreResult` 改為以 `syncStatus` 型別為參數的泛型（預設 `SyncStatus`），選擇器回傳 `<DataStatus>`：雲端 hook 與其既有測試（把 `syncStatus` 推進 `SyncStatus[]`）維持 `SyncStatus`，不必改動。
+
 **Alternatives considered**：pending 時回傳本機結果但把 `syncStatus` 改成 `pending`：本機 `round` 非 null，回填 effect 會在等待中把本機分槽寫進本機歷史，操作也仍會寫本機。不選。
 
 ### Decision 9：頁面與元件的處置
@@ -171,8 +176,9 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 - **參賽者頁、對戰頁、`LocalStatsContent`、`RemoteStatsContent`（名單）、`Scoreboard`**：既有「取代內容」分支的條件改用 `isContentBlocked(syncStatus)`；根元素的 `data-sync-status` 照舊輸出實際值（`pending` 時為 `"pending"`），`local` 時照舊不輸出。對戰頁 `mergeSyncStatus` 的優先序在 `loading` 之後加入 `pending`，`isRosterReady` 改為 `!isContentBlocked(rosterSyncStatus)`。
 - **`HistoryModeSwitch`**：`"pending"` 時渲染 `<div data-sync-status="pending" className="flex flex-col gap-4"><SyncStatusNotice status="pending" /></div>`（與 `HistoryView`／`RemoteHistoryView` 根元素同 class），不掛載任何歷史元件。
 - **`HistoryView`**：`hydrated === null`（本機歷史尚未讀入）時渲染同一個等待中區塊，SHALL NOT 渲染篩選器與空狀態。歷史頁標題由 server component 輸出，維持顯示。
+  - **apply 補註（合併前驗收，`e534149`）**：`HistoryModeSwitch` 在 pending 時不掛載 `HistoryView`，使它在 hydration 後才全新掛載；dev 的 StrictMode 會讓 effect 跑兩次，而 `readHistory()` 第一次讀到損毀筆數時會回寫清理結果，第二次 `droppedCount` 為 0。因此 `HistoryView` 的 reducer 在已有結果時保留較大的 `droppedCount`（`entries` 與 `now` 仍取最新一次），避免損毀提示消失。
 - **統計頁入口**：改為 `mode === "remote" ? 雲端 : LocalStatsContent`，等待中由 `LocalStatsContent` 的選擇器狀態顯示提示；維持「雲端內容只在 `"remote"` 時掛載」。
-- **`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`**：`"pending"` 時保留 `CardHeader`（兩種模式文字相同），`CardContent` 只放 `SyncStatusNotice status="pending"`。判斷在所有 hook 呼叫之後。
+- **`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`**：`"pending"` 時保留 `CardHeader`（兩種模式文字相同），`CardContent` 只放 `SyncStatusNotice status="pending"`，且該 `CardContent` 帶 `data-sync-status="pending"`（與其他頁的根元素標示一致，停用 JavaScript 的 E2E 以它辨識資料頁）。判斷在所有 hook 呼叫之後。
 - **`LocalDataImportSection`、`ClearLocalDataSection`**：不改（N5、N6）。
 
 **Alternatives considered**：
@@ -182,7 +188,7 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 ### Decision 10：等待中的顯示狀態與文案
 
-**Choice**：`lib/sync/sync-status.ts` 新增 `type DataStatus = SyncStatus | "pending"`、`DATA_PENDING_MESSAGE = "正在載入資料…"`、`isContentBlocked(status: DataStatus): boolean`；`SyncStatus` 與其 8 個固定文案不變。
+**Choice**：`lib/sync/sync-status.ts` 新增 `type DataStatus = SyncStatus | "pending"`、`DATA_PENDING_MESSAGE = "正在載入資料…"`、`isContentBlocked(status: DataStatus): boolean`、`localDataStatus(hydrated: boolean): DataStatus`（三個選擇器共用的本機讀入前／後判斷）；`SyncStatus` 與其 8 個固定文案不變。
 `SyncStatusNotice` 的 `status` 型別放寬為 `DataStatus`：`pending` 時以同一個 `role="status"` 外觀顯示「正在載入資料…」，其餘照舊。
 
 **Rationale**：伺服器輸出對訪客與登入者相同，沿用「正在載入雲端資料…」會讓訪客在每次載入時看到「雲端」字樣（錯誤內容）。「正在載入資料…」是唯一新增的文案，取既有文案的前半段，不指涉來源。
@@ -250,4 +256,4 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 ## Open Questions
 
-（無。所有設計裁量已於 Decisions 定案。）
+（設計裁量皆已於 Decisions 定案。）

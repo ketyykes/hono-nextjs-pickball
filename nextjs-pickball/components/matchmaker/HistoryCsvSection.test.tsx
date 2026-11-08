@@ -36,6 +36,11 @@ function mockGuestSession(): void {
 	vi.mocked(useSession).mockReturnValue(session);
 }
 
+function mockPendingSession(): void {
+	const session: UseSessionResult = { status: "loading", signedInHint: true, hydrated: true, refresh };
+	vi.mocked(useSession).mockReturnValue(session);
+}
+
 // 與真實 unauthorizedFailure() 相同：unauthorized 是不可列舉屬性，元件仍須讀得到
 function buildUnauthorizedFailure(): RemoteHistoryCsvResult {
 	const failure = { ok: false, message: REMOTE_TRANSFER_MESSAGES.unauthorized };
@@ -112,5 +117,17 @@ describe("HistoryCsvSection 雲端分支", () => {
 		await user.click(screen.getByRole("button", { name: "匯出 CSV" }));
 
 		expect(buildRemoteHistoryCsv).not.toHaveBeenCalled();
+	});
+});
+
+describe("HistoryCsvSection 等待中", () => {
+	it("session 等待中時以等待中提示取代匯出操作", () => {
+		mockPendingSession();
+
+		render(<HistoryCsvSection />);
+
+		expect(screen.getByRole("heading", { name: "歷史賽果 CSV 匯出" })).not.toBeNull();
+		expect(screen.getByRole("status").textContent).toBe("正在載入資料…");
+		expect(screen.queryByRole("button", { name: "匯出 CSV" })).toBeNull();
 	});
 });
