@@ -157,15 +157,15 @@ Depends on: §4
   - 紀錄：commit `5cb1cc2`（docs）。`nextjs-pickball/CLAUDE.md` 六處同步（儲存三態與等待中、統計頁 `pending`、`isContentBlocked`、`Scoreboard` 取代條件、`lib/sync`、`lib/auth/session-hint`、`useSession.hydrated`）。
 - [x] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
   - 紀錄：`pnpm --dir <root> -r exec tsc --noEmit`、`hono-pickball typecheck`、`packages/pickball-core typecheck` 皆 exit 0（含 A 的前置修正之後）。
-- [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
-  - 由 coordinator 於合併前執行。
-- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋33，後端與核心與基線相同
-  - 由 coordinator 於合併前執行。
-- [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
-  - 由 coordinator 於合併前執行。
-- [ ] 5.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
+- [x] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
+  - 由 coordinator 於合併前執行（HEAD `1b21a86`，2026-11-08 17:17）：lint exit 0，0 errors／3 warnings（與基線相同）。
+- [x] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋33，後端與核心與基線相同
+  - 由 coordinator 於合併前執行（HEAD `1b21a86`）：前端 117 檔／1163 tests（基線 111／1130 ＋6／＋33）、後端 27／223、核心 10／27，全綠，後端與核心與基線相同。
+- [x] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
+  - 由 coordinator 於合併前執行（HEAD `1b21a86`）：build exit 0；建置後 `git status --porcelain` 為空。
+- [x] 5.6 驗收（指令）C5：`.dev.vars` 齊備下依 project 分開跑 E2E（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`），每次雙鎖、前後清殘留；
   user-data＝基線＋1 全 passed、0 skipped；五個 browser project 各＝基線＋5、0 failed（skip 只限既有瀏覽器條件）。結果寫在本 task 後方；失敗不得自行判定為雜訊，附證據上報 coordinator
-  - 由 coordinator 於合併前執行。
+  - 由 coordinator 於合併前執行（HEAD `1b21a86`，雙鎖，每個 project 前後清殘留）：chromium 165 passed；firefox 152 passed／13 skipped；mobile-chrome 162 passed／3 skipped；webkit 三個 shard 50＋47＋55 passed／5＋8＋0 skipped；mobile-safari 三個 shard 50＋47＋55 passed／5＋8＋0 skipped；user-data 48 passed、0 skipped；全部 0 failed。五個 browser project 各＝基線 160＋5＝165，user-data＝基線 47＋1。skip 只出現在既有的瀏覽器條件 spec（api-health、auth-proxy、navbar-account-entry、navbar-rwd），本 change 新增的 test 一條都沒被 skip。
 - [x] 5.7 驗收（指令）C6：使用端清單 grep 的檔案集合恰為 design Decision 2 表格的 9 個檔案
   - 紀錄：9 個檔案＝`app/matchmaker/stats/page.tsx`、`HistoryCsvSection`、`HistoryModeSwitch`、`JsonBackupSection`、`LocalDataImportSection`、`RosterCsvImportSection`、`useRosterStore`、`useRoundStore`、`useScoreboardStore`，與 Decision 2 表格一致。
 - [x] 5.8 驗收（指令）C7：`"load-failed"` grep 只剩 test-plan C7 列出的兩處
@@ -205,4 +205,4 @@ Stage 2（opus）PASS：
 - tsc 0、eslint 0。
 - 確認本 change 新造成的「hydration 後才全新掛載」只有 `HistoryView`。參賽者頁 `readRoster()` 在 client 端導覽時的 StrictMode 覆蓋是既有潛在問題，掛載時機未被本 change 改變，不在範圍內。
 
-完整驗收重跑結果見下一段。
+完整驗收重跑（HEAD `1b21a86`）全綠，數字見 5.3～5.6 紀錄。
