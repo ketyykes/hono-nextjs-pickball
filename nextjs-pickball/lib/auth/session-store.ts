@@ -6,7 +6,8 @@ import { fetchSession, type SessionState } from "./session-client";
 import { clearSignedInHint, readSignedInHint, writeSignedInHint } from "./session-hint";
 
 // loading 有三種：一般載入中、無法確認（必帶提示）、本機備援（使用者在無法確認時選擇先用本機資料）。
-// 以 ?: never 補齊各變體的欄位，讓使用端可直接讀 snapshot.unavailable／localFallback 而不需 in 判斷。
+// 以 ?: never 補齊各變體的欄位，讓 lib/sync/storage-mode.ts 可直接讀 snapshot.unavailable／localFallback 而不需 in 判斷；
+// 其他使用端一律經 pendingDataStatus 與 resolveStorageMode，不自行讀這兩個欄位。
 export type SessionSnapshot =
 	| {
 			status: "loading";

@@ -53,7 +53,7 @@ Depends on: §1
 - [x] 2.4 GREEN（TDD）：`resolveStorageMode` 的 loading 分支最前面加入本機備援判斷；新增 `pendingDataStatus`（design Decision 6）；更新檔頭註解。2.3 全綠；tsc exit 0；改動檔 ESLint 0 errors
   - GREEN commit `3e66dca`。storage-mode 5/5 綠；tsc exit 0；ESLint exit 0。
   - §2 mutation（單檔 vitest，三重落地檢查，每次還原後 git status 乾淨）：① 三處失敗分支（非 ok／catch／形狀不符）各改回 DISABLED 皆轉紅；② null 一律 ready 紅；③ null 清除提示 紅；④ null 改讀快照 signedInHint 紅（refresh 失敗那條）；⑤ 逾時回 LOADING 紅；⑥ 逾時遞增 requestId 紅；⑦ choose 不遞增 requestId 紅；⑧ choose 不檢查快照 紅；
-    ⑨ `getSnapshot` 對無法確認／本機備援每次回新物件，各自轉紅（先試過「採用時才建新物件」的版本因參考仍穩定而未紅，屬等價變異，改為每次讀取回新物件）；⑩ 本機備援改回 pending 紅（regression guard 轉紅）；補充：無法確認改回 local 紅；⑪ pendingDataStatus 一律 pending 紅。
+    ⑨ `getSnapshot` 對無法確認／本機備援每次回新物件，各自轉紅（Stage 2 更正：「`load()` 採用 `null` 的分支改建新物件」維持綠，但**不是**等價變異——`chooseLocalFallback` 以參考比對無法確認快照，請求失敗後按鈕會失效；單元層只涵蓋逾時路徑，改由 §3 必做變異 ⑫ 以 `data-pending.spec.ts` 的 500 那條 E2E 涵蓋）；⑩ 本機備援改回 pending 紅（regression guard 轉紅）；補充：無法確認改回 local 紅；⑪ pendingDataStatus 一律 pending 紅。
     對照組（須維持綠）：`"unavailable" in snapshot && snapshot.unavailable` 改寫維持綠；調換 resolveStorageMode 本機備援與提示判斷順序維持綠。
 - [x] 2.5 REFACTOR：store 中「採用一份結果」的分支（非 `null`／`null`＋提示／`null` 無提示）是否以 if/else 清楚表達、無巢狀三元；union 型別窄化寫法全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 是否值得共用判斷（預期不抽：一個回儲存模式、一個回顯示狀態）；無壞味道則註記 skipped
 
