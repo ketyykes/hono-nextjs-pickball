@@ -8,7 +8,7 @@ import { useRemoteHistory } from "@/hooks/useRemoteHistory";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useSession } from "@/hooks/useSession";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
-import type { DataStatus, SyncStatus } from "@/lib/sync/sync-status";
+import type { DataStatus } from "@/lib/sync/sync-status";
 import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { PlayerStatsTable } from "./PlayerStatsTable";
