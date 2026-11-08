@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
 import { ROSTER_CSV_HEADERS } from "@/lib/matchmaker/roster-csv";
 import { AUTH_SKIP_REASON, storageStatePath } from "../helpers/storage-state";
+import { installFlashRecorder, readFlashHits } from "../helpers/flash-recorder";
 import { clearTestAccountUserData, expectedUserHeaders } from "../helpers/user-data";
 
 // 登入後的 matchmaker 名單以雲端為準。所有等待都以 data-sync-status 或 response 為依據，
@@ -127,6 +128,39 @@ function buildRosterCsv(rows: readonly { name: string; gender: string; rating: s
 }
 
 test.describe("matchmaker 名單雲端同步", () => {
+	test("已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單", async ({ page }) => {
+		await seedCloudPlayers(page, [buildPlayer({ id: "pending-p1", name: "雲端甲" })]);
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByText("雲端甲")).toBeVisible();
+
+		await installFlashRecorder(page, { texts: ["目前還沒有參賽者", "共 0 位參賽者"], selectors: [] });
+
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route("**/api/session", async (route) => {
+			await gate;
+			try {
+				await route.continue();
+			} catch {
+				// 頁面已換掉或關閉時請求會被取消，不影響測試結果
+			}
+		});
+		try {
+			await page.reload();
+			await expect(page.locator('main[data-sync-status="pending"]')).toBeVisible();
+			await expect(page.getByRole("status")).toHaveText("正在載入資料…");
+		} finally {
+			release();
+		}
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByText("雲端甲")).toBeVisible();
+		expect(await readFlashHits(page)).toEqual([]);
+		await page.unrouteAll({ behavior: "ignoreErrors" });
+	});
+
 	test("登入後新增的參賽者在重新整理後由雲端還原且不寫入本機", async ({ page }) => {
 		await page.goto(PLAYERS_PAGE);
 		await expect(page.locator(SYNCED)).toBeVisible();
