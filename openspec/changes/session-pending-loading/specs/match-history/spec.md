@@ -31,6 +31,13 @@ LocalStorage 不可用（私密模式）或無資料時，讀取完成後 SHALL 
 - **AND** 整個載入過程沒有任何 console error（含 hydration mismatch 警告）
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，test 名稱「紀錄於 hydration 後顯示且無 console error」
 
+#### Scenario: StrictMode 重跑 effect 時保留損毀筆數提示
+
+- **GIVEN** `matchmaker:history:v1` 中有 2 筆損毀紀錄與 1 筆合法紀錄
+- **WHEN** 歷史頁在 React StrictMode 下全新掛載，hydration 的 effect 被執行兩次（第二次 `readHistory()` 因已回寫清理結果而回報 `droppedCount` 為 0）
+- **THEN** 損毀提示仍顯示「2」筆，合法紀錄正常顯示
+- **驗收**：`nextjs-pickball/components/matchmaker/HistoryView.test.tsx`，it 名稱「StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示」
+
 #### Scenario: 歷史頁唯讀：登入時瀏覽歷史頁只發出 GET 且不寫入本機
 
 - **GIVEN** 以測試帳號登入，雲端已有一筆今日的歷史；本機 `matchmaker:history:v1` 有一份訪客歷史

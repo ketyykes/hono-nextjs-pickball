@@ -124,6 +124,7 @@
 |-----------|----------|-----------|-----------|------|
 | （新增行為的錨點）伺服器端輸出為等待中提示而非空狀態，讀入後顯示本機紀錄；訪客載入本機歷史的過程中從未出現空狀態 | 見 user-data-sync 對應 Scenario | 同上表 | 本 Requirement 只改「首次伺服器輸出」與「SSR 時顯示空狀態」兩句 | unit／e2e |
 | （既有）瀏覽與切換區間後 matchmaker:history:v1 內容不變；紀錄於 hydration 後顯示且無 console error；登入時歷史頁唯讀的 E2E | 瀏覽與切換區間不改動持久化資料／紀錄於 hydration 後才出現且無 console error／歷史頁唯讀 | 原樣通過 | regression guard：hydration 無 console error 仍成立 | e2e |
+| StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示 | 歷史頁 effect 重跑時保留損毀筆數提示 | 沿用既有檔；種 2 筆損毀加 1 筆合法紀錄；`<StrictMode>` 包住 `render(<HistoryView />)` → `getByRole("alert")` 文字含「有 2 筆損毀的歷史紀錄」、合法紀錄卡片可見 | 合併前驗收 E2E 發現回歸：`readHistory()` 回寫清理結果使第二次 effect 讀到 `droppedCount` 0 並蓋掉提示；現行 reducer 直接覆蓋 → **真紅** | unit |
 
 ## data-transfer
 
@@ -141,7 +142,7 @@
 |---|---|---|---|
 | C1 | （型別） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit`；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball typecheck`；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/packages/pickball-core typecheck`（不 `cd`；不用 `pnpm --dir <root> --filter`） | 皆 exit 0 |
 | C2 | （lint） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖） | 0 errors、warning 不多於基線 |
-| C3 | （單元） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖） | 三組皆綠；前端檔數＝基線＋6、測試數＝基線＋32；後端、核心與基線相同 |
+| C3 | （單元） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖） | 三組皆綠；前端檔數＝基線＋6、測試數＝基線＋33；後端、核心與基線相同 |
 | C4 | （建置） | `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖） | exit 0；建置後 `git status --porcelain` 為空 |
 | C5 | （E2E） | 依 project 分開跑（雙鎖）：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --workers=1 --project=<p>`（chromium、firefox、mobile-chrome、user-data 各一次；webkit、mobile-safari 各 `--shard=1/3`～`3/3`） | user-data＝基線＋1，全 passed、0 skipped；五個 browser project 各＝基線＋5 且 0 failed（skip 只限既有瀏覽器條件）；無因缺帳密 skip |
 | C6 | （使用端清單，Decision 2） | `grep -rn "resolveStorageMode(" /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/app /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/components /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/hooks /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball/lib \| grep -v "\.test\." \| grep -v "export function"` | 檔案集合恰為 Decision 2 表格的 9 個檔案 |
@@ -152,7 +153,7 @@
 ## Checklist
 
 - [x] 每個 Requirement 至少一列（auth 2、user-data-sync 2、player-roster 1、round-lifecycle 1、scoreboard 1、match-history 1、data-transfer 1）
-- [x] 每個新增 Scenario（auth 10、user-data-sync 25、data-transfer 1）至少一列；MODIFIED 帶入的既有 Scenario 以「（既有）」列合併
+- [x] 每個新增 Scenario（auth 10、user-data-sync 25、match-history 1、data-transfer 1）至少一列；MODIFIED 帶入的既有 Scenario 以「（既有）」列合併
 - [x] 每列皆有 Tier（unit | e2e）
-- [x] 新 it 共 32（真紅 28、regression guard 4：transfer-storage、LocalDataImport，以及 §3 審查追加的 droppedCount、localDataStatus；其中「session 等待中時多次 render 回傳同一個 state 參考」為 apply 時追加的真紅 it）；新 E2E 6（真紅 5、regression guard 1）
+- [x] 新 it 共 33（真紅 29、regression guard 4：transfer-storage、LocalDataImport，以及 §3 審查追加的 droppedCount、localDataStatus；其中「session 等待中時多次 render 回傳同一個 state 參考」為 apply 時追加的真紅 it；「StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示」為合併前驗收發現回歸後追加的真紅 it）；新 E2E 6（真紅 5、regression guard 1）
 - [x] 授權修改的既有測試只有兩處 `beforeEach` 各加一行 `localStorage.clear()`，不改任何 it 名稱與斷言

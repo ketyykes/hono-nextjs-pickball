@@ -159,7 +159,7 @@ Depends on: §4
   - 紀錄：`pnpm --dir <root> -r exec tsc --noEmit`、`hono-pickball typecheck`、`packages/pickball-core typecheck` 皆 exit 0（含 A 的前置修正之後）。
 - [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
   - 由 coordinator 於合併前執行。
-- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋32，後端與核心與基線相同
+- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋6、測試數＝基線＋33，後端與核心與基線相同
   - 由 coordinator 於合併前執行。
 - [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
   - 由 coordinator 於合併前執行。
@@ -185,5 +185,5 @@ Final Code Review（opus）判定 FAIL，原因全是 artifact 的數字與清�
 - user-data-sync delta spec「SHALL NOT 各自內聯比較」補明 `RemoteHistoryView.tsx` 雲端歷史專屬例外與理由。
 - Scenario 計數：以與主 spec 逐行比對確認 auth 10、user-data-sync 25（原寫 24，已更正）、data-transfer 1，其餘 capability 0。
 - 兩個 guard it 補上 delta spec 驗收錨點；「上次登入提示殘留」Scenario 的 WHEN 改為與測試一致的 `addInitScript` 後 `goto`（標題未動）；`waitForResponse` 建立時機與兩個 describe 的檔名已更正（見 §4 審查建議處置）；5.9 過時的 bash 說明已更新；`nextjs-pickball/CLAUDE.md` 改正「本機資料讀入前」為顯示狀態並補 `localDataStatus`。
-- 錨點比對腳本：delta spec 所有驗收錨點各恰好被 grep 到 1 次，本 change 新增的 32 個 it 皆有錨點。
+- 錨點比對腳本：delta spec 所有驗收錨點各恰好被 grep 到 1 次，本 change 新增的 33 個 it 皆有錨點（含合併前驗收追加的 1 個）。
 - 處置 commit：見 `git log`（`docs(openspec):` 與 `docs:` 各一，主題為「同步 Final Code Review 指出的數字與清單」）。

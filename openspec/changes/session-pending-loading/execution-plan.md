@@ -114,7 +114,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
   - [ ] `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff main --stat` ⊆ proposal Impact；主 spec 無任何改動。
   - [ ] C6 使用端清單恰為 9 處且每處都有測試；C7 取代判斷只剩雲端歷史專屬的一處；沒有頁面漏掉 `pending`。
   - [ ] lib、hooks、元件三層對 `pending` 的命名與判斷寫法一致，取代內容一律經 `isContentBlocked`，沒有各自發明一套。
-  - [ ] 指令驗收 C1～C9 皆有紀錄；前端測試數＝基線＋32、檔數＝基線＋6；user-data E2E＝基線＋1；五個 browser project 各＝基線＋5 且全綠。
+  - [ ] 指令驗收 C1～C9 皆有紀錄；前端測試數＝基線＋33、檔數＝基線＋6；user-data E2E＝基線＋1；五個 browser project 各＝基線＋5 且全綠。
   - [ ] `nextjs-pickball/CLAUDE.md` 的敘述與新行為一致。
 - **SHALL NOT**：重審單一 task 細節。
 
