@@ -62,24 +62,41 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD，E2E）：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 既有的訪客 describe 內新增 test「有上次登入提示而 session 請求失敗時先擋住畫面，按下先用這台裝置的資料後顯示本機名單與本機提示」「有上次登入提示而 session 請求網路中斷時顯示無法載入提示與按鈕」（寫法依 test-plan「E2E 共同要求」）。
+- [x] 3.1 RED（TDD，E2E）：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 既有的訪客 describe 內新增 test「有上次登入提示而 session 請求失敗時先擋住畫面，按下先用這台裝置的資料後顯示本機名單與本機提示」「有上次登入提示而 session 請求網路中斷時顯示無法載入提示與按鈕」（寫法依 test-plan「E2E 共同要求」）。
+  - RED commit `1021096`。chromium 單檔 E2E：兩條新 test 紅（`main[data-sync-status="unavailable"]` 找不到），既有五條綠；regression guard：無。（首次嘗試因 heavy.py 排隊後 webServer 逾時 120s，非測試結果，重跑得上述結果。）
   雙鎖下 `--project=chromium` 跑該檔並貼出輸出：兩條新 test 紅、既有五條綠
-- [ ] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「unavailable 取代內容，按鈕與本機提示文案為固定值」；`nextjs-pickball/components/sync/SyncStatusNotice.test.tsx` 新增 it「unavailable 顯示無法載入雲端資料與先用這台裝置的資料按鈕，按下後呼叫 chooseLocalFallback」。兩檔單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.3 GREEN（TDD）：`sync-status.ts` 的 `DataStatus` 加 `"unavailable"`、`isContentBlocked` 含它、新增兩個文案常數（design Decision 7）；`SyncStatusNotice` 依 design Decision 8 渲染 `unavailable`（加 `"use client"`）。
+- [x] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「unavailable 取代內容，按鈕與本機提示文案為固定值」；`nextjs-pickball/components/sync/SyncStatusNotice.test.tsx` 新增 it「unavailable 顯示無法載入雲端資料與先用這台裝置的資料按鈕，按下後呼叫 chooseLocalFallback」。兩檔單檔 vitest 確認紅燈並貼出輸出
+  - RED commit `1895de8`。sync-status：`isContentBlocked("unavailable")` 得 false；SyncStatusNotice：status 文字為空；皆真紅，regression guard：無。
+- [x] 3.3 GREEN（TDD）：`sync-status.ts` 的 `DataStatus` 加 `"unavailable"`、`isContentBlocked` 含它、新增兩個文案常數（design Decision 7）；`SyncStatusNotice` 依 design Decision 8 渲染 `unavailable`（加 `"use client"`）。
+  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。
   為通過型別所需的最小改動：`hooks/useRoundStore.ts` 傳給雲端 hook 的名單狀態在 `unavailable` 時與 `pending` 同樣以 `loading` 傳入（design Decision 9）。3.2 全綠、兩檔既有 it 全綠；tsc exit 0
-- [ ] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」「已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求」「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」。
+- [x] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」「已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求」「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」。
+  - RED commit `6c6f9e6`。前兩個真紅（`pending`≠`unavailable`；殘留雲端名單 `[c1]`≠`[]`）；「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」寫入即綠，**regression guard**。
   單檔 vitest 貼出輸出：前兩個紅；第三個預期寫入即綠，點名標 regression guard
-- [ ] 3.5 GREEN（TDD）：`useRosterStore` 等待中分支明確回傳空名單、`syncStatus` 為 `pendingDataStatus(session)`（design Decision 9）；更新「沿用未啟用的雲端 hook 結果，它從未啟用過」的註解。3.4 全綠、該檔既有 it 全綠；tsc exit 0
-- [ ] 3.6 RED（TDD）：`nextjs-pickball/hooks/useRoundStore.test.tsx` 新增 it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機回合與歷史」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.7 GREEN（TDD）：`useRoundStore` 等待中分支 `syncStatus` 改為 `pendingDataStatus(session)`；同步更新註解。3.6 全綠、該檔既有 it 全綠；tsc exit 0
-- [ ] 3.8 RED（TDD）：`nextjs-pickball/hooks/useScoreboardStore.test.tsx` 新增 it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機計分，帶 matchId 時綁定狀態為 pending」。單檔 vitest 確認紅燈並貼出輸出
-- [ ] 3.9 GREEN（TDD）：`useScoreboardStore` 等待中分支的顯示狀態改為 `pendingDataStatus(session)`。3.8 全綠、該檔既有 it 全綠（含「session 等待中時多次 render 回傳同一個 state 參考」）；tsc exit 0
-- [ ] 3.10 RED（TDD）：新檔 `nextjs-pickball/app/matchmaker/page.test.tsx`，it「session 無法確認時對戰頁以無法載入提示與按鈕取代場次舞台」（寫法依 test-plan 該列；若有子模組以 stub 取代，紀錄中逐一列出與理由）。單檔 vitest 確認紅燈並貼出輸出（此時選擇器已回 `unavailable`，紅因是優先序落到 `local`）
-- [ ] 3.11 GREEN（TDD）：`app/matchmaker/page.tsx` 的 `SYNC_STATUS_PRIORITY` 第一位加入 `"unavailable"`（design Decision 9）。3.10 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 3.12 RED（TDD）：新檔 `nextjs-pickball/components/sync/LocalFallbackBanner.test.tsx`，it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」。單檔 vitest 確認紅燈（模組不存在）並貼出輸出
-- [ ] 3.13 GREEN（TDD）：新增 `components/sync/LocalFallbackBanner.tsx`，並在 `app/layout.tsx` 的 `<body>` 內、`SiteNavbar` 之後、`ViewTransition` 之外掛載（design Decision 10）。3.12 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 3.14 驗證：雙鎖下 `--project=chromium` 重跑 `data-pending.spec.ts` 全檔，七條全綠並貼出輸出
-- [ ] 3.15 REFACTOR：三個選擇器等待中分支的寫法是否一致（具名 `mode`／顯示狀態變數與 if，不用巢狀三元）；`SyncStatusNotice` 兩種回傳形態是否清楚；舊註解是否已更新；無壞味道則註記 skipped
+- [x] 3.5 GREEN（TDD）：`useRosterStore` 等待中分支明確回傳空名單、`syncStatus` 為 `pendingDataStatus(session)`（design Decision 9）；更新「沿用未啟用的雲端 hook 結果，它從未啟用過」的註解。3.4 全綠、該檔既有 it 全綠；tsc exit 0
+  - GREEN commit `0567708`。useRosterStore 19/19 綠。
+- [x] 3.6 RED（TDD）：`nextjs-pickball/hooks/useRoundStore.test.tsx` 新增 it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機回合與歷史」。單檔 vitest 確認紅燈並貼出輸出
+  - RED commit `1d69669`。`expected 'pending' to be 'unavailable'`，真紅。
+- [x] 3.7 GREEN（TDD）：`useRoundStore` 等待中分支 `syncStatus` 改為 `pendingDataStatus(session)`；同步更新註解。3.6 全綠、該檔既有 it 全綠；tsc exit 0
+  - GREEN commit `2319c84`。useRoundStore 全綠。
+- [x] 3.8 RED（TDD）：`nextjs-pickball/hooks/useScoreboardStore.test.tsx` 新增 it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機計分，帶 matchId 時綁定狀態為 pending」。單檔 vitest 確認紅燈並貼出輸出
+  - RED commit `f5f8ad3`。`expected 'pending' to be 'unavailable'`，真紅。
+- [x] 3.9 GREEN（TDD）：`useScoreboardStore` 等待中分支的顯示狀態改為 `pendingDataStatus(session)`。3.8 全綠、該檔既有 it 全綠（含「session 等待中時多次 render 回傳同一個 state 參考」）；tsc exit 0
+  - GREEN commit `37ee625`。useScoreboardStore 全綠（含同一 state 參考 it）。
+- [x] 3.10 RED（TDD）：新檔 `nextjs-pickball/app/matchmaker/page.test.tsx`，it「session 無法確認時對戰頁以無法載入提示與按鈕取代場次舞台」（寫法依 test-plan 該列；若有子模組以 stub 取代，紀錄中逐一列出與理由）。單檔 vitest 確認紅燈並貼出輸出（此時選擇器已回 `unavailable`，紅因是優先序落到 `local`）
+  - RED commit `db51c86`。`main[data-sync-status="unavailable"]` 找不到（優先序落到 `local`），真紅。無需 stub 任何子模組，只 mock `useSession` 與 `next/navigation` 的 `useRouter`。
+- [x] 3.11 GREEN（TDD）：`app/matchmaker/page.tsx` 的 `SYNC_STATUS_PRIORITY` 第一位加入 `"unavailable"`（design Decision 9）。3.10 全綠；tsc exit 0；改動檔 ESLint 0 errors
+  - GREEN commit `8a88a7b`。page.test 1/1 綠；ESLint 0 errors。
+- [x] 3.12 RED（TDD）：新檔 `nextjs-pickball/components/sync/LocalFallbackBanner.test.tsx`，it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」。單檔 vitest 確認紅燈（模組不存在）並貼出輸出
+  - RED commit `54bc0b1`。模組不存在（import 解析失敗），真紅。
+- [x] 3.13 GREEN（TDD）：新增 `components/sync/LocalFallbackBanner.tsx`，並在 `app/layout.tsx` 的 `<body>` 內、`SiteNavbar` 之後、`ViewTransition` 之外掛載（design Decision 10）。3.12 全綠；tsc exit 0；改動檔 ESLint 0 errors
+  - GREEN commit `aeef1ba`。Banner 1/1 綠；tsc exit 0；改動檔 ESLint 0 errors（僅既有 `_arg` 警告）。
+- [x] 3.14 驗證：雙鎖下 `--project=chromium` 重跑 `data-pending.spec.ts` 全檔，七條全綠並貼出輸出
+  - 雙鎖下 chromium 跑 data-pending.spec.ts：7 passed（16.3m，含排隊等待另一專案的鎖）。
+- [x] 3.15 REFACTOR：三個選擇器等待中分支的寫法是否一致（具名 `mode`／顯示狀態變數與 if，不用巢狀三元）；`SyncStatusNotice` 兩種回傳形態是否清楚；舊註解是否已更新；無壞味道則註記 skipped
+  - skipped：三個選擇器等待中分支皆以具名呼叫 `pendingDataStatus(session)`、無巢狀三元；`SyncStatusNotice` 兩種回傳形態清楚；舊註解已更新。
+  - §3 mutation（單檔 vitest／單檔 E2E，三重落地檢查，每次還原後 git status 乾淨）：① isContentBlocked 漏 unavailable 紅；② Notice 不渲染按鈕 紅；③ 按鈕放進 role="status" 內 紅；④ onClick 不呼叫 chooseLocalFallback 紅；⑤ 名單等待中沿用 remote.players 紅；⑥ 名單等待中 syncStatus 寫死 pending 紅；⑦ 回合 寫死 pending 紅；⑧ 計分板 寫死 pending 紅；⑨ SYNC_STATUS_PRIORITY 拿掉 unavailable 紅；⑩ Banner 在無法確認時也渲染 紅；
+    ⑪ layout 不掛 LocalFallbackBanner：500 那條 E2E 紅（本機提示 getByText 找不到）；⑫ load() 的 null＋提示分支每次建新物件：同一條 E2E 紅（按鈕按下後本機甲不可見）。對照組 isContentBlocked 改為四值 includes：維持綠。
 
 ## 4. 歷史頁與資料頁
 
