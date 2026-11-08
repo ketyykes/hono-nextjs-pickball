@@ -8,7 +8,7 @@ import { useSession } from "@/hooks/useSession";
 import { useRemoteScoreboardStore } from "@/hooks/useRemoteScoreboardStore";
 import { useRemoteMatchSlotStore } from "@/hooks/useRemoteMatchSlotStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { SyncStatus } from "@/lib/sync/sync-status";
+import type { DataStatus } from "@/lib/sync/sync-status";
 import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 
 // 對戰場次綁定狀態：
@@ -19,6 +19,9 @@ import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 // - bound：帶 matchId 且分槽（scoreboard:matches:v1）內有對應條目
 // - missing：帶 matchId 但分槽內無對應條目，場次已失效（重排或刪除）
 export type ScoreboardBindingStatus = "standalone" | "pending" | "bound" | "missing";
+
+// 等待中的 dispatch：不改變狀態、不寫入本機。
+function doNothingDispatch(): void {}
 
 // 整合 reducer 與 localStorage：
 // - 初始用 createInitialState 避免 SSR/CSR 不一致
@@ -39,6 +42,7 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 	ScoreboardState,
 	Dispatch<Action>,
 	ScoreboardBindingStatus,
+	boolean,
 ] {
 	// 空字串（如 `/scoreboard?match=`）正規化為 null，視為未綁定——
 	// 正規化交給呼叫端邊界，reducer 不處理這件事。
@@ -50,6 +54,10 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 		(_arg: undefined) => createInitialState(),
 	);
 	const hasHydratedRef = useRef(false);
+	// 本機計分是否已讀入：交給選擇器決定 syncStatus 要回 pending 還是 local。
+	// 與 bindingStatus 同理用 useReducer（react-hooks/set-state-in-effect 不適用於 dispatch）；
+	// 無資料時不 dispatch HYDRATE，旗標獨立於 state，不會讓寫入 effect 多跑。
+	const [hydrated, markHydrated] = useReducer(() => true, false);
 	// 未帶 matchId 時綁定狀態在 mount 前就確定為 standalone；帶 matchId 時
 	// 初值為 pending（尚未判定），實際結果（bound／missing）留給 read effect 判定，
 	// 讀取完成前不寫入任何槽（write effect 另外受 hasHydratedRef 守門，
@@ -89,6 +97,8 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 			}
 		}
 		hasHydratedRef.current = true;
+		// 無論有沒有本機資料都標記，讀入後選擇器才會從 pending 轉為 local
+		markHydrated();
 		return () => {
 			// Strict Mode 在 dev 下會 unmount 再重新 mount，重置 ref 使下一次 mount
 			// 的 write effect 不會以初始 state 覆蓋 localStorage。
@@ -99,22 +109,23 @@ function useLocalScoreboardStore(matchIdParam?: string | null): readonly [
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	return [state, dispatch, bindingStatus] as const;
+	return [state, dispatch, bindingStatus, hydrated] as const;
 }
 
-// 儲存模式選擇器：兩個 hook 每次 render 都呼叫（hooks 規則），未被選用的一方不發請求。
+// 儲存模式選擇器：三個 hook 每次 render 都呼叫（hooks 規則），未被選用的一方不發請求。
 // 已登入時：未綁定場次走獨立計分板的雲端實作，帶 matchId 走雲端分槽。
-// session 載入中視為本機，訪客首屏時序不因等待 /api/session 而改變。
+// 儲存模式未定（pending）時不交出本機計分，也不啟用雲端；本機模式在本機計分讀入前同樣回報 pending。
 export function useScoreboardStore(matchIdParam?: string | null): readonly [
 	ScoreboardState,
 	Dispatch<Action>,
 	ScoreboardBindingStatus,
-	SyncStatus,
+	DataStatus,
 ] {
 	const session = useSession();
 	const matchId = matchIdParam === "" || matchIdParam === undefined ? null : matchIdParam;
 	const local = useLocalScoreboardStore(matchIdParam);
-	const isRemoteMode = resolveStorageMode(session) === "remote";
+	const mode = resolveStorageMode(session);
+	const isRemoteMode = mode === "remote";
 	// 雲端 store 以這個帳號為世代界線；loading 或訪客時為 null（此時也不會啟用雲端）
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 	const remote = useRemoteScoreboardStore({
@@ -130,11 +141,25 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 		onUnauthorized: session.refresh,
 	});
 
-	if (isRemoteMode && matchId === null) {
-		return [remote[0], remote[1], "standalone", remote[2]] as const;
+	if (mode === "pending") {
+		// 不沿用未啟用的雲端計分板 hook：它在未啟用時回傳的是真正的 dispatch。
+		// 綁定狀態用 pending 而非 missing，否則帶 ?match= 的已登入者會先閃「場次已失效」。
+		let pendingBinding: ScoreboardBindingStatus = "pending";
+		if (matchId === null) {
+			pendingBinding = "standalone";
+		}
+		return [createInitialState(), doNothingDispatch, pendingBinding, "pending"] as const;
 	}
-	if (isRemoteMode) {
+	if (mode === "remote") {
+		if (matchId === null) {
+			return [remote[0], remote[1], "standalone", remote[2]] as const;
+		}
 		return remoteSlot;
 	}
-	return [local[0], local[1], local[2], "local"] as const;
+	const [localState, localDispatch, localBinding, hydrated] = local;
+	let localStatus: DataStatus = "local";
+	if (!hydrated) {
+		localStatus = "pending";
+	}
+	return [localState, localDispatch, localBinding, localStatus] as const;
 }
