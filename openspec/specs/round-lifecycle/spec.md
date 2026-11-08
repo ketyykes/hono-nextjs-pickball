@@ -1300,10 +1300,10 @@ MUST 隨 `timer` 為 `null` 一併消失，SHALL NOT 另行保留任何計時狀
 
 ### Requirement: 登入時回合與場次分槽以雲端為準
 
-`useRoundStore(options)` SHALL 為選擇器：`resolveStorageMode(useSession())` 為 `"remote"` 時回傳 `hooks/useRemoteRoundStore.ts` 的結果，否則回傳本機實作
-`useLocalRoundStore`（同檔，函式本體與本 change 前的 `useRoundStore` 相同）。回傳物件 MUST 保留既有的 `round`、`history`、`droppedCount` 與七個操作（簽章不變），另加：
+`useRoundStore(options)` SHALL 為選擇器：`resolveStorageMode(useSession())` 為 `"remote"` 時回傳 `hooks/useRemoteRoundStore.ts` 的結果，為 `"local"` 時回傳本機實作
+`useLocalRoundStore`（同檔，函式本體與本 change 前的 `useRoundStore` 相同），為 `"pending"` 時回傳等待中結果（`round` 為 `null`、`history` 為空陣列、`syncStatus` 為 `"pending"`、`remoteMatchSlots` 為 `null`、操作皆回傳 `ok: false`，見 `user-data-sync`「資料來源確定前的等待中畫面」）。回傳物件 MUST 保留既有的 `round`、`history`、`droppedCount` 與七個操作（簽章不變），另加：
 
-- `syncStatus: SyncStatus`（本機模式恆為 `"local"`）。
+- `syncStatus: DataStatus`（本機模式在本機回合讀入前為 `"pending"`、讀入後恆為 `"local"`）。
 - `remoteMatchSlots: Record<string, ScoreboardState> | null`：雲端模式為雲端目前回合的分槽；本機模式恆為 `null`（呼叫端沿用既有的 `readMatchSlots()`）。
 
 `UseRoundStoreOptions` 加入 `applyRemotePlayers: (items: { data: Player; version: number }[]) => void` 與 `reloadRemotePlayers: () => void`（皆由 `useRosterStore` 提供，見 `player-roster`）。
@@ -1326,7 +1326,7 @@ MUST 隨 `timer` 為 `null` 一併消失，SHALL NOT 另行保留任何計時狀
 
 對戰頁（`app/matchmaker/page.tsx`）在雲端模式 MUST 以 `remoteMatchSlots` 作為自動回填與目標分數鎖定（`isTargetScoreLocked`）的分槽來源；
 自動回填 MUST 呼叫 `submitScore`（同一入口），SHALL NOT 呼叫 `clearMatchSlots`——伺服器已在送出比分的 batch 內刪除該分槽（滿足「計分板結果的自動回填共用送出 pipeline」的「回填成功後清除分槽」）。
-`syncStatus` 為 `loading`／`load-failed` 時以 `SyncStatusNotice` 取代主要內容，其餘非 `local` 狀態疊加提示；`local` 時不渲染任何同步元素（與 B6 相同）。
+`isContentBlocked(syncStatus)`（`pending`、`loading`／`load-failed`）時以 `SyncStatusNotice` 取代主要內容，其餘非 `local` 狀態疊加提示；`local` 時不渲染任何同步元素（與 B6 相同）。
 
 `CourtCard` 在雲端模式導向 `/scoreboard?match=<id>` 前 MUST 先以 `PUT /api/matchmaker/slots/:matchId`（version 0，種子資料沿用 `buildMatchSlotSeed`）建立分槽並等待結果：
 成功或 409（分槽已存在）即導向；其他結果 MUST 顯示繁體中文錯誤且不導向。本機模式沿用既有 `ensureMatchSlot`。
@@ -1368,7 +1368,7 @@ MUST 隨 `timer` 為 `null` 一併消失，SHALL NOT 另行保留任何計時狀
 
 #### Scenario: 訪客或 session 載入中時走本機回合
 
-- **GIVEN** mock `useSession` 為 `loading` 或訪客
+- **GIVEN** mock `useSession` 為 `loading`（不帶上次登入提示 `signedInHint`）或訪客
 - **WHEN** `useRoundStore()` mount 並產生一輪
 - **THEN** `syncStatus` 為 `local`、`remoteMatchSlots` 為 `null`；`matchmaker:round:v1` 有資料；沒有任何 `/api/matchmaker/*` 請求
 - **驗收**：`nextjs-pickball/hooks/useRoundStore.test.tsx`，it 名稱「session 載入中或訪客時走本機回合且 syncStatus 為 local」

@@ -513,8 +513,8 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
 ### Requirement: 登入時名單以雲端為準
 
 `useRosterStore()` SHALL 為選擇器（`user-data-sync`「前端依 session 選擇儲存模式」）：`resolveStorageMode(useSession())` 為 `"remote"` 時回傳
-`hooks/useRemoteRosterStore.ts` 的結果，否則回傳本機實作 `useLocalRosterStore`。回傳物件 MUST 保留既有的 `players`、`droppedCount`、`addPlayer`、`updatePlayer`、
-`removePlayer`、`togglePlayerActive`、`resetRoster`（簽章不變），另加 `syncStatus`（本機模式恆為 `"local"`）、`applyRemotePlayers` 與 `reloadRemotePlayers`（本機模式皆為不做任何事的函式）。
+`hooks/useRemoteRosterStore.ts` 的結果，為 `"local"` 時回傳本機實作 `useLocalRosterStore`，為 `"pending"` 時回傳等待中結果（空名單、`syncStatus` 為 `"pending"`、操作不生效，見 `user-data-sync`「資料來源確定前的等待中畫面」）。回傳物件 MUST 保留既有的 `players`、`droppedCount`、`addPlayer`、`updatePlayer`、
+`removePlayer`、`togglePlayerActive`、`resetRoster`（簽章不變），另加 `syncStatus`（型別為 `DataStatus`；本機模式在本機名單讀入前為 `"pending"`、讀入後恆為 `"local"`）、`applyRemotePlayers` 與 `reloadRemotePlayers`（本機模式皆為不做任何事的函式）。
 呼叫端（含 `useRoundStore` 經 `updatePlayer` port 寫入的休息次數）不需要知道目前模式；送出比分的評分在雲端模式改由後端寫入，前端以 `applyRemotePlayers` 接收（見下方第 9 點）。
 
 雲端實作 `useRemoteRosterStore({ enabled, onUnauthorized })` MUST 依 `user-data-sync`「多筆使用者資料的逐筆版本化契約」：
@@ -533,7 +533,7 @@ foreground = argmax( min( contrast(colorFrom, fg), contrast(colorTo, fg) ) )   f
    否則待送的 PUT 會帶著舊 version 得到 409，或覆蓋後端剛寫入的評分。
 10. `reloadRemotePlayers()` MUST 停止所有佇列、重新 GET 並以雲端名單取代；狀態轉為 `synced`（呼叫端已自行回報衝突），失敗時為 `load-failed`。
 
-使用 `useRosterStore` 的頁面（`app/matchmaker/page.tsx`、`app/matchmaker/players/page.tsx`、`app/matchmaker/stats/page.tsx`）在 `syncStatus` 為 `loading` 或 `load-failed` 時
+使用 `useRosterStore` 的頁面（`app/matchmaker/page.tsx`、`app/matchmaker/players/page.tsx`、`app/matchmaker/stats/page.tsx`）在 `isContentBlocked(syncStatus)`（`pending`、`loading` 或 `load-failed`）時
 MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名單可供產生對戰或統計），其餘非 `local` 狀態照常顯示並疊加 `SyncStatusNotice`，
 頁面主要內容的根元素 MUST 帶 `data-sync-status`；`local` 時 SHALL NOT 渲染任何同步元素或屬性。
 
@@ -556,7 +556,7 @@ MUST 以 `SyncStatusNotice` 取代頁面主要內容（此時沒有可信的名�
 
 #### Scenario: 訪客或 session 載入中時走本機
 
-- **GIVEN** mock `useSession` 分別為 `loading` 與 `ready`／`authEnabled: false`
+- **GIVEN** mock `useSession` 分別為 `loading`（不帶上次登入提示 `signedInHint`） 與 `ready`／`authEnabled: false`
 - **WHEN** `useRosterStore()` mount 並新增一位參賽者
 - **THEN** `syncStatus` 為 `local`；`matchmaker:roster:v1` 含該參賽者；沒有任何對 `/api/matchmaker/*` 的請求
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「session 載入中或訪客時走本機且 syncStatus 為 local」

@@ -428,9 +428,9 @@ C3 = min(上月 1 日 00:00, C2)
 
 讀取 MUST 透過 M4 的 `readHistory()`（`nextjs-pickball/lib/matchmaker/round-storage.ts`）進行，SHALL NOT 自行 `JSON.parse(localStorage.getItem(...))`，也 SHALL NOT 於本 capability 重複寫死 key 字串（key 常數由 `nextjs-pickball/lib/matchmaker/storage-keys.ts` 單一來源匯出）——繞過 reader 會讓損壞資料的逐筆降級規則出現第二套實作，兩套一旦不一致就是資料靜默漏失。
 
-讀取 MUST 在 client 端的 effect 中進行，首次伺服器輸出 SHALL 為空狀態；SHALL NOT 於 render 期間直接讀 LocalStorage 或取用系統時鐘，否則 SSR 與 CSR 的輸出必然不一致而產生 hydration 錯誤（沿用 `player-roster` 的 HYDRATE 模式）。
+讀取 MUST 在 client 端的 effect 中進行，首次伺服器輸出與讀取完成前 SHALL 為等待中提示（`data-sync-status="pending"` 的容器與「正在載入資料…」，見 `user-data-sync`「資料來源確定前的等待中畫面」），SHALL NOT 為區間篩選或空狀態；SHALL NOT 於 render 期間直接讀 LocalStorage 或取用系統時鐘，否則 SSR 與 CSR 的輸出必然不一致而產生 hydration 錯誤（沿用 `player-roster` 的 HYDRATE 模式）。
 
-LocalStorage 不可用（SSR、私密模式）或無資料時 SHALL 顯示空狀態，SHALL NOT 拋出例外中斷畫面。
+LocalStorage 不可用（私密模式）或無資料時，讀取完成後 SHALL 顯示空狀態，SHALL NOT 拋出例外中斷畫面（伺服器端沒有 LocalStorage，輸出依上一段為等待中提示）。
 
 實作位於 `nextjs-pickball/components/matchmaker/HistoryView.tsx`（本機）與 `nextjs-pickball/components/matchmaker/RemoteHistoryView.tsx`（雲端）；`nextjs-pickball/app/matchmaker/history/page.tsx` 依儲存模式擇一渲染。
 
@@ -448,6 +448,13 @@ LocalStorage 不可用（SSR、私密模式）或無資料時 SHALL 顯示空狀
 - **THEN** 紀錄正確顯示
 - **AND** 整個載入過程沒有任何 console error（含 hydration mismatch 警告）
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-history.spec.ts`，test 名稱「紀錄於 hydration 後顯示且無 console error」
+
+#### Scenario: StrictMode 重跑 effect 時保留損毀筆數提示
+
+- **GIVEN** `matchmaker:history:v1` 中有 2 筆損毀紀錄與 1 筆合法紀錄
+- **WHEN** 歷史頁在 React StrictMode 下全新掛載，hydration 的 effect 被執行兩次（第二次 `readHistory()` 因已回寫清理結果而回報 `droppedCount` 為 0）
+- **THEN** 損毀提示仍顯示「2」筆，合法紀錄正常顯示
+- **驗收**：`nextjs-pickball/components/matchmaker/HistoryView.test.tsx`，it 名稱「StrictMode 重跑 effect 時仍保留第一次偵測到的損毀筆數提示」
 
 #### Scenario: 歷史頁唯讀：登入時瀏覽歷史頁只發出 GET 且不寫入本機
 

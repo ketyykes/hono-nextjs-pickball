@@ -459,6 +459,10 @@ key 名稱多一處來源就多一處漏改，而漏改的失敗模式是「清�
 純顯示偏好），而使用者無從檢視被刪掉了什麼；列舉清單則強制在新增任何資料域時主動決定它是否
 屬於清除範圍，與 `player-roster` 重置範圍的既有原則一致。
 
+**不屬清除範圍的 key**：`auth` 的上次登入提示（`auth:signed-in-hint:v1`，常數 `SIGNED_IN_HINT_STORAGE_KEY` 匯出自 `nextjs-pickball/lib/auth/session-hint.ts`）
+SHALL NOT 列入清單。它不是使用者資料（只存固定值、不含任何個資），生命週期跟隨 session——登入確認時寫入、登出或確認未登入時清除（`auth`「上次登入提示的儲存與清除」）；
+「清除本機資料」不會登出，登入中清掉它只會在下一次 session 確認時被寫回，徒增一次重新整理時的本機畫面閃現。上述「涵蓋本 app 寫入 LocalStorage 的全部 key」的承諾以本段為唯一例外。
+
 清除完成後參賽者頁與場次頁 MUST 呈現空白狀態（`prd.md` §10）。
 
 實作位於 `nextjs-pickball/lib/matchmaker/transfer-storage.ts` 與
@@ -505,7 +509,12 @@ key 名稱多一處來源就多一處漏改，而漏改的失敗模式是「清�
 - **THEN** 參賽者頁顯示空白狀態與新增入口
 - **驗收**：`nextjs-pickball/tests/e2e/specs/matchmaker-data-transfer.spec.ts`，test 名稱「確認清除本機資料後參賽者頁回到空白狀態」
 
----
+#### Scenario: 清除本機資料不移除上次登入提示
+
+- **GIVEN** LocalStorage 有上次登入提示（`SIGNED_IN_HINT_STORAGE_KEY` 為 `"1"`）與名單資料
+- **WHEN** 呼叫 `clearAllLocalData()`
+- **THEN** 名單 key 被移除；上次登入提示仍為 `"1"`；`CLEAR_ALL_KEYS` 不含 `SIGNED_IN_HINT_STORAGE_KEY`
+- **驗收**：`nextjs-pickball/lib/matchmaker/transfer-storage.test.ts`，it 名稱「regression guard：clearAllLocalData 不移除上次登入提示」
 
 ### Requirement: 匯入匯出的錯誤處理與 LocalStorage 邊界
 
