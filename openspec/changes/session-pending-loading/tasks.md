@@ -26,9 +26,10 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/session-pending-loading`、工作樹乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/session-pending-loading`、工作樹乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
   雙鎖下跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck（test-plan C1）、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（errors／warnings 數）、
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
+  - 紀錄：基線見 environment.md Verification（前端 111／1130、後端 27／223、核心 10／27；C1 三段 exit 0；lint 0 errors／3 warnings；E2E list 五個 browser 各 160、user-data 47）。
 - [ ] 1.2 對齊 main：確認 proposal Impact 列出的產品檔與測試檔、`tests/e2e/user-data/roster-sync.spec.ts` 與 propose 時（`main` `d371225`）內容一致（`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat d371225 HEAD -- <路徑…>` 無輸出）；
   以 python difflib 比對本 change 七個 MODIFIED Requirement（`user-data-sync`「前端依 session 選擇儲存模式」、`auth`「全頁共用的 session store 與 useSession」、`player-roster`「登入時名單以雲端為準」、`round-lifecycle`「登入時回合與場次分槽以雲端為準」、`scoreboard`「登入時獨立計分板以雲端為準」、`match-history`「歷史頁唯讀消費既有紀錄」、`data-transfer`「清除本機資料與其確認流程」）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate session-pending-loading --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
