@@ -255,4 +255,7 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 
 ## Open Questions
 
-（無。所有設計裁量已於 Decisions 定案。）
+（設計裁量皆已於 Decisions 定案。以下為 apply 中途停止時的狀態紀錄。）
+
+- **apply 狀態（2026-11-08，leader 被要求提前交回）**：§1、§2 完成（Stage 1／Stage 2 皆 PASS，tasks 已勾選並回填紀錄）。§3 的 3.1～3.13 已實作並 commit（`bb32f6c`～`f363553`，3.13 REFACTOR skipped），Stage 1 PASS；**Stage 2（opus）審查在交回時仍在進行**（含雙鎖 chromium `data-pending.spec.ts` 與變異 ⑩），結論未取得，因此 §3 尚未在 tasks.md 勾選。§4、§5 未開始。
+- 接手者請：重新派 §3 Stage 2（或取回其結論）→ 依結論修正並勾選 §3 → 依序 §4 → §5 → Final Code Review。
