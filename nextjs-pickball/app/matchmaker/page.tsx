@@ -13,6 +13,7 @@ import { RoundTimerBanner } from "@/components/matchmaker/RoundTimerBanner";
 import { SyncStatusNotice } from "@/components/sync/SyncStatusNotice";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useRoundStore } from "@/hooks/useRoundStore";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 import type { DataStatus } from "@/lib/sync/sync-status";
 import { buildExportScene } from "@/lib/matchmaker/export-scene";
 import type { ExportScene } from "@/lib/matchmaker/export-scene";
@@ -83,8 +84,8 @@ export default function MatchmakerPage() {
 		rosterSyncStatus,
 	});
 	const syncStatus = mergeSyncStatus(rosterSyncStatus, roundSyncStatus);
-	// 名單載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
-	const isRosterReady = rosterSyncStatus !== "loading" && rosterSyncStatus !== "load-failed";
+	// 名單等待中、載入中或失敗時前端沒有可信的名單可預測評分，雲端模式的回填要等名單就緒
+	const isRosterReady = !isContentBlocked(rosterSyncStatus);
 
 	// draft 只記錄使用者於本次進入對戰頁後變更過的設定（null 為尚未變更）；
 	// 實際使用的設定由 draft 與目前回合在 render 中解析，離開再回來時才會跟隨回合而非回到預設值。
@@ -205,9 +206,9 @@ export default function MatchmakerPage() {
 		[round],
 	);
 
-	// 雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
+	// 資料等待中、雲端名單載入中或失敗時沒有可信的名單；顯示空名單會誤導使用者重新建立，
 	// 所以以提示取代主要內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (syncStatus === "loading" || syncStatus === "load-failed") {
+	if (isContentBlocked(syncStatus)) {
 		return (
 			<main
 				data-sync-status={syncStatus}

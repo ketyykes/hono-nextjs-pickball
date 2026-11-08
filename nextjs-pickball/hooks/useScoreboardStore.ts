@@ -23,6 +23,10 @@ export type ScoreboardBindingStatus = "standalone" | "pending" | "bound" | "miss
 // 等待中的 dispatch：不改變狀態、不寫入本機。
 function doNothingDispatch(): void {}
 
+// 等待中的計分狀態必須是穩定參考：Scoreboard 以「state 參考變了」偵測轉換並在 render 中 setState，
+// 每次 render 都回傳新物件會造成無限 render。
+const PENDING_STATE = createInitialState();
+
 // 整合 reducer 與 localStorage：
 // - 初始用 createInitialState 避免 SSR/CSR 不一致
 // - mount 後讀 localStorage 並 dispatch HYDRATE
@@ -148,7 +152,7 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 		if (matchId === null) {
 			pendingBinding = "standalone";
 		}
-		return [createInitialState(), doNothingDispatch, pendingBinding, "pending"] as const;
+		return [PENDING_STATE, doNothingDispatch, pendingBinding, "pending"] as const;
 	}
 	if (mode === "remote") {
 		if (matchId === null) {

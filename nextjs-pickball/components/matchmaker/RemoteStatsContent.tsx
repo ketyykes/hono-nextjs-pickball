@@ -8,14 +8,10 @@ import { useRemoteHistory } from "@/hooks/useRemoteHistory";
 import { useRosterStore } from "@/hooks/useRosterStore";
 import { useSession } from "@/hooks/useSession";
 import { computePlayerStats } from "@/lib/matchmaker/player-stats";
-import type { DataStatus } from "@/lib/sync/sync-status";
+import { isContentBlocked } from "@/lib/sync/sync-status";
 import { EmptyHistory } from "./EmptyHistory";
 import { HistoryRangeFilter } from "./HistoryRangeFilter";
 import { PlayerStatsTable } from "./PlayerStatsTable";
-
-function isBlockingStatus(status: DataStatus): boolean {
-	return status === "loading" || status === "load-failed";
-}
 
 // 雲端模式的統計頁內容：只掛名單與雲端歷史兩個 hook，
 // 刻意不掛 useRoundStore——統計不需要回合，掛了會多出回合與分槽的讀取請求。
@@ -34,9 +30,9 @@ export function RemoteStatsContent() {
 		onUnauthorized: session.refresh,
 	});
 
-	// 名單載入中、失敗時沒有可信的名單；切換區間無法恢復名單，保留篩選器沒有意義，
+	// 名單等待中、載入中、失敗時沒有可信的名單；切換區間無法恢復名單，保留篩選器沒有意義，
 	// 所以以提示取代整段內容。須排在所有 hook 之後，避免條件式呼叫 hook。
-	if (isBlockingStatus(rosterSyncStatus)) {
+	if (isContentBlocked(rosterSyncStatus)) {
 		return (
 			<div data-sync-status={rosterSyncStatus} className="flex flex-col gap-6">
 				<SyncStatusNotice status={rosterSyncStatus} />
@@ -54,7 +50,7 @@ export function RemoteStatsContent() {
 	// 篩選器與它前後的槽位在各狀態下位置固定，React 才會沿用同一個 DOM 節點：
 	// 每次換區間 hook 都會先回到 loading，篩選器若卸載重建，鍵盤使用者的焦點會掉回 body。
 	// 載入失敗時篩選器仍可操作，改選其他區間即以新區間重新載入。
-	const isHistoryBlocking = isBlockingStatus(historySyncStatus);
+	const isHistoryBlocking = isContentBlocked(historySyncStatus);
 	// 阻斷時 hook 回傳的 total 恆為 0，所以條件不能只看 total，否則載入中與失敗時篩選器會被藏起來
 	const showRangeFilter = isHistoryBlocking || total > 0;
 
