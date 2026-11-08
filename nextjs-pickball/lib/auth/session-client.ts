@@ -25,8 +25,6 @@ export type SignInResult =
 	| { ok: true }
 	| { ok: false; reason: "invalid-credentials" | "unavailable" | "failed" };
 
-const DISABLED: SessionState = { authEnabled: false, user: null };
-
 function isValidUser(value: unknown): value is SessionUser {
 	if (typeof value !== "object" || value === null) return false;
 	const user = value as Record<string, unknown>;
@@ -56,15 +54,16 @@ function isValidPayload(value: unknown): value is SessionState {
 	);
 }
 
-// 取不到狀態一律視為「未啟用」（fail-closed），訪客介面才不會因後端異常出現半套登入 UI。
-export async function fetchSession(): Promise<SessionState> {
+// 回傳 null 代表「這次無法確認登入狀態」（非 200、格式不符、網路錯誤），不等於未登入或未啟用。
+// 是否降級為未啟用由 session store 依上次登入提示決定，避免登入者在不知情時改用本機資料。
+export async function fetchSession(): Promise<SessionState | null> {
 	try {
 		// keepalive：hydration 晚於 beforeunload 時（快速整頁換頁），WebKit 會擋下一般 fetch
 		// 並輸出 console 錯誤，catch 擋不住；keepalive 請求不受導覽中止。
 		const res = await fetch("/api/session", { keepalive: true });
-		if (!res.ok) return DISABLED;
+		if (!res.ok) return null;
 		const payload: unknown = await res.json();
-		if (!isValidPayload(payload)) return DISABLED;
+		if (!isValidPayload(payload)) return null;
 		const session: SessionState = {
 			authEnabled: payload.authEnabled,
 			user: payload.user,
@@ -74,7 +73,7 @@ export async function fetchSession(): Promise<SessionState> {
 		}
 		return session;
 	} catch {
-		return DISABLED;
+		return null;
 	}
 }
 
