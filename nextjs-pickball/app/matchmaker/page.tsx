@@ -147,8 +147,9 @@ export default function MatchmakerPage() {
 		//
 		// 依賴陣列刻意不放 players／submitScore：它們每次 render 都換新參考，
 		// 列入 deps 會讓本 effect 在每次 render 後都重跑，而非只在「回合資料就緒
-		// 或變動」時才觸發。remoteMatchSlots 與名單就緒只在雲端模式會變動
-		// （本機模式恆為 null／true），不影響訪客的觸發時機。
+		// 或變動」時才觸發。本機模式下 remoteMatchSlots 恆為 null；名單就緒
+		// 只會在本機資料讀入的同一次 render 由 false 轉 true，與 round 讀入同時發生，
+		// 不影響訪客的觸發時機。
 		setMatchSlots(slots);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [round, remoteMatchSlots, isRosterReady]);

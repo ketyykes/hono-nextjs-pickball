@@ -35,8 +35,7 @@ export function LocalStatsContent() {
 	const [selectedRange, setSelectedRange] = useState<HistoryRange>("today");
 
 	// 在 render 期間取「現在」不會造成 hydration mismatch：首次伺服器輸出與 hydration
-	// 當下的 history 皆為空陣列（useRoundStore 於 effect 內才灌入資料），兩邊都走下方
-	// 的空狀態分支，時鐘取值根本不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
+	// 當下 syncStatus 皆為 pending，兩邊都走等待中提示分支，時鐘取值不影響輸出。tests/e2e/specs/player-stats.spec.ts 的
 	// 「統計頁載入後無 console error」即為此推論的實證。
 	//
 	// 與 HistoryView.tsx 的差異是刻意留下的、而非疏漏：該元件
