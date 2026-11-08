@@ -32,7 +32,8 @@ describe("syncStatusMessage", () => {
 
 describe("isContentBlocked", () => {
 	it("pending、loading、load-failed 取代內容，pending 的文案為正在載入資料", () => {
-		const expected: Record<DataStatus, boolean> = {
+		// unavailable 由後面新增的 it 鎖定；此處只維持原本九個值
+		const expected: Record<Exclude<DataStatus, "unavailable">, boolean> = {
 			pending: true,
 			loading: true,
 			"load-failed": true,
