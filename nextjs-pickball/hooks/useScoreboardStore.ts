@@ -7,7 +7,7 @@ import { readScoreboard, writeScoreboard } from "@/lib/scoreboard/storage";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteScoreboardStore } from "@/hooks/useRemoteScoreboardStore";
 import { useRemoteMatchSlotStore } from "@/hooks/useRemoteMatchSlotStore";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 import { localDataStatus, type DataStatus } from "@/lib/sync/sync-status";
 import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 
@@ -152,7 +152,7 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 		if (matchId === null) {
 			pendingBinding = "standalone";
 		}
-		return [PENDING_STATE, doNothingDispatch, pendingBinding, "pending"] as const;
+		return [PENDING_STATE, doNothingDispatch, pendingBinding, pendingDataStatus(session)] as const;
 	}
 	if (mode === "remote") {
 		if (matchId === null) {
