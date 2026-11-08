@@ -16,7 +16,7 @@
 >
 > **E2E 共同要求**：
 > - session 暫停：共用 helper `tests/e2e/helpers/hold-session.ts`（`page.route("**/api/session", handler)`，handler 內 `await` 一個 Promise resolver 後 `route.continue()`）；放行前所有斷言 MUST 先以 `main[data-sync-status="pending"]`（或訪客情境的本機參賽者）可見作為錨點，再斷言其他元素不存在；
->   以 `try／finally` 確保放行，並在 `finally` 內 `page.unrouteAll({ behavior: "ignoreErrors" })`。放行前的斷言數量保持精簡（Decision 11 的 10 秒逾時）。
+>   以 `try／finally` 確保放行，並在 `finally` 內 `page.unrouteAll({ behavior: "ignoreErrors" })`。放行前的斷言數量保持精簡（Decision 11 的 10 秒逾時）。放行前先建立 `page.waitForResponse("**/api/session")`，放行後 `await` 它再做放行後的斷言與讀閃爍記錄，確保斷言涵蓋回應之後的畫面（helper 介面不變）。
 > - 閃爍記錄器 `tests/e2e/helpers/flash-recorder.ts`：`installFlashRecorder(page, { texts, selectors })` 以 `page.addInitScript` 注入（每個文件、含 reload 都重新開始），`MutationObserver` 監看 `document`（`childList`、`subtree`、`characterData`），每批變動檢查 `document.body?.innerText` 與 `document.querySelector`，命中即記入 `window.__flashHits`；
 >   `readFlashHits(page)` 讀出。斷言時機：本機（或雲端）資料已以 web-first 斷言可見之後。
 > - 種本機資料：先 `page.goto("/")` 再 `page.evaluate` 寫入（例外：上次登入提示改以 `page.addInitScript` 在下一個文件載入前寫入——首頁的 `/api/session` 回應若仍在途，確認為訪客後會清掉以 `evaluate` 寫入的提示），key 一律自 `@/lib/matchmaker/storage-keys`、`@/lib/scoreboard/storage-keys`、`@/lib/auth/session-hint` 匯入，不抄字面值。

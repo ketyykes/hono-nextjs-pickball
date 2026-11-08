@@ -177,7 +177,7 @@ Context7 `/reactjs/react.dev`（reference/react/useSyncExternalStore「Adding su
 - **`HistoryModeSwitch`**：`"pending"` 時渲染 `<div data-sync-status="pending" className="flex flex-col gap-4"><SyncStatusNotice status="pending" /></div>`（與 `HistoryView`／`RemoteHistoryView` 根元素同 class），不掛載任何歷史元件。
 - **`HistoryView`**：`hydrated === null`（本機歷史尚未讀入）時渲染同一個等待中區塊，SHALL NOT 渲染篩選器與空狀態。歷史頁標題由 server component 輸出，維持顯示。
 - **統計頁入口**：改為 `mode === "remote" ? 雲端 : LocalStatsContent`，等待中由 `LocalStatsContent` 的選擇器狀態顯示提示；維持「雲端內容只在 `"remote"` 時掛載」。
-- **`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`**：`"pending"` 時保留 `CardHeader`（兩種模式文字相同），`CardContent` 只放 `SyncStatusNotice status="pending"`。判斷在所有 hook 呼叫之後。
+- **`JsonBackupSection`、`HistoryCsvSection`、`RosterCsvImportSection`**：`"pending"` 時保留 `CardHeader`（兩種模式文字相同），`CardContent` 只放 `SyncStatusNotice status="pending"`，且該 `CardContent` 帶 `data-sync-status="pending"`（與其他頁的根元素標示一致，停用 JavaScript 的 E2E 以它辨識資料頁）。判斷在所有 hook 呼叫之後。
 - **`LocalDataImportSection`、`ClearLocalDataSection`**：不改（N5、N6）。
 
 **Alternatives considered**：

@@ -114,15 +114,35 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD，E2E）：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 新增 test「JavaScript 載入前各頁只顯示等待中提示而不顯示空狀態或預設值」（`describe` 內 `test.use({ javaScriptEnabled: false })`）與「訪客載入本機歷史的過程中從未出現空狀態」。
+- [x] 4.1 RED（TDD，E2E）：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 新增 test「JavaScript 載入前各頁只顯示等待中提示而不顯示空狀態或預設值」（`describe` 內 `test.use({ javaScriptEnabled: false })`）與「訪客載入本機歷史的過程中從未出現空狀態」。
   雙鎖下 `--project=chromium` 跑兩條並貼出輸出：兩條皆紅（前者在 `/matchmaker/history` 與 `/matchmaker/data` 失敗；在紀錄中逐頁註明哪些頁面已因 §3 通過）
-- [ ] 4.2 RED（TDD）：新檔 `nextjs-pickball/components/matchmaker/HistoryModeSwitch.test.tsx`，it「session 等待中時顯示等待中提示且不渲染本機歷史」（`RemoteHistoryView` 以 stub 取代）；新檔 `nextjs-pickball/components/matchmaker/HistoryView.test.tsx`，it「伺服器端輸出為等待中提示而非空狀態，讀入後顯示本機紀錄」。兩檔單檔 vitest 確認紅燈並貼出輸出
-- [ ] 4.3 GREEN（TDD）：`HistoryModeSwitch` 在 `pending` 時渲染等待中容器；`HistoryView` 在 `hydrated === null` 時渲染同一個等待中容器（design Decision 9）。4.2 全綠
-- [ ] 4.4 RED（TDD）：`JsonBackupSection.test.tsx` 新增 it「session 等待中時以等待中提示取代匯出與還原操作」；`HistoryCsvSection.test.tsx` 新增 it「session 等待中時以等待中提示取代匯出操作」；新檔 `RosterCsvImportSection.test.tsx`，it「session 等待中時以等待中提示取代選檔與確認匯入」（皆在 `nextjs-pickball/components/matchmaker/`）。三檔各跑單檔 vitest 確認三個新 it 全紅並貼出輸出
-- [ ] 4.5 GREEN（TDD）：三個區塊在 `pending` 時保留 `CardHeader`、`CardContent` 只放 `SyncStatusNotice status="pending"`（判斷在所有 hook 之後；design Decision 9）。4.4 全綠、兩個既有測試檔的既有 it 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 4.6 regression guard：`LocalDataImportSection.test.tsx` 新增 it「regression guard：session 等待中時不渲染匯入區塊」。寫入即綠，單檔 vitest 貼出輸出並註明 regression guard；`LocalDataImportSection.tsx` 一行不改
-- [ ] 4.7 驗證：雙鎖下 `--project=chromium` 重跑 `data-pending.spec.ts` 全檔，五條全綠並貼出輸出
-- [ ] 4.8 REFACTOR：歷史兩處等待中容器、資料頁三區塊的等待中分支是否一致；是否值得抽共用元件（預期不抽：各兩三行 JSX，抽出後要多一個跨 capability 的檔案）；無壞味道則註記 skipped
+  - 紀錄：前置修正 `c885061`（`test:`）：data-pending 兩條與 roster-sync 一條在 `release()` 後先 `await` 事先建立的 `page.waitForResponse("**/api/session")` 再斷言；既有斷言與 test 名稱未動，`hold-session.ts` 介面不變。RED commit `e79f9fb`。
+  - 紅燈（雙鎖、chromium、`data-pending.spec.ts` 全檔，`/tmp/g4-red41.log`）：`2 failed, 3 passed`。①「訪客載入本機歷史的過程中從未出現空狀態」紅：閃爍記錄 `readFlashHits` 非空（現行 `hydrated === null` 時畫空狀態）；②「JavaScript 載入前各頁只顯示等待中提示…」紅：`/matchmaker/history 應顯示等待中 … element(s) not found`。既有三條仍綠（同時驗證前置修正）。
+  - 逐頁：七個路徑依序驗，`/matchmaker/players`、`/matchmaker`、`/matchmaker/stats` 已因 §3 通過；`/matchmaker/history` 失敗（迴圈停在此處，之後的路徑未檢查）。§4.3 後同一條改在 `/matchmaker/data` 失敗，證明資料頁亦為紅；4.5 後 `/matchmaker/data`、`/scoreboard`、`/scoreboard?match=m1` 皆通過。
+  - 實作取捨：`test.use` 作用於整個 `describe`，故停用 JavaScript 的 test 獨立放在第二個 `describe`（「…（只看伺服器輸出）」），未放進既有 describe，避免影響其餘四條。
+  - RED 複驗：`git show e79f9fb^:nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 不含兩個新 test 名稱（grep 計數 0）。
+- [x] 4.2 RED（TDD）：新檔 `nextjs-pickball/components/matchmaker/HistoryModeSwitch.test.tsx`，it「session 等待中時顯示等待中提示且不渲染本機歷史」（`RemoteHistoryView` 以 stub 取代）；新檔 `nextjs-pickball/components/matchmaker/HistoryView.test.tsx`，it「伺服器端輸出為等待中提示而非空狀態，讀入後顯示本機紀錄」。兩檔單檔 vitest 確認紅燈並貼出輸出
+  - 紀錄：RED commit `5e0e2cd`。兩檔單檔 vitest 皆紅（`Test Files 2 failed (2)`、`Tests 2 failed (2)`）：`HistoryModeSwitch` 為 `Unable to find an accessible element with the role "status"`（現行掛 `HistoryView`）；`HistoryView` 為 `expected '<div class="flex flex-col gap-4"><div…' to contain '正在載入資料…'`（伺服器輸出為篩選器與空狀態）。兩檔皆新檔，皆非 regression guard。產品檔 `HistoryModeSwitch.tsx`、`HistoryView.tsx` 在 `5e0e2cd^` 與 `5e0e2cd` 相同。
+- [x] 4.3 GREEN（TDD）：`HistoryModeSwitch` 在 `pending` 時渲染等待中容器；`HistoryView` 在 `hydrated === null` 時渲染同一個等待中容器（design Decision 9）。4.2 全綠
+  - 紀錄：GREEN commit `a1df7cd`。`HistoryModeSwitch.test.tsx`、`HistoryView.test.tsx`、既有 `RemoteHistoryView.test.tsx` 共 `3 passed`／18 tests。等待中容器為 `<div data-sync-status="pending" className="flex flex-col gap-4"><SyncStatusNotice status="pending" /></div>`，兩處相同。
+- [x] 4.4 RED（TDD）：`JsonBackupSection.test.tsx` 新增 it「session 等待中時以等待中提示取代匯出與還原操作」；`HistoryCsvSection.test.tsx` 新增 it「session 等待中時以等待中提示取代匯出操作」；新檔 `RosterCsvImportSection.test.tsx`，it「session 等待中時以等待中提示取代選檔與確認匯入」（皆在 `nextjs-pickball/components/matchmaker/`）。三檔各跑單檔 vitest 確認三個新 it 全紅並貼出輸出
+  - 紀錄：RED commit `342a55d`。三個新 it 單檔 vitest 皆紅，錯誤皆為 `Unable to find an accessible element with the role "status"`：`JsonBackupSection`（`1 failed | 4 passed`）、`HistoryCsvSection`（`1 failed | 4 passed`）、`RosterCsvImportSection`（新檔，`1 failed`）。三者皆非 regression guard；既有 it 全綠。
+- [x] 4.5 GREEN（TDD）：三個區塊在 `pending` 時保留 `CardHeader`、`CardContent` 只放 `SyncStatusNotice status="pending"`（判斷在所有 hook 之後；design Decision 9）。4.4 全綠、兩個既有測試檔的既有 it 全綠；tsc exit 0；改動檔 ESLint 0 errors
+  - 紀錄：GREEN commit `b94ad8b`，補強 `6df1a41`。四檔（含 `LocalDataImportSection.test.tsx`）單檔 vitest `4 passed`／13 tests；`tsc` exit 0；改動檔 ESLint exit 0（含 `components/matchmaker/*.test.tsx` 與兩個 E2E spec）。判斷放在所有 hook 之後；三區塊的 `CardHeader` 保留，`CardContent` 只放 `SyncStatusNotice`。
+  - 偏離：4.7 首次實跑時 `/matchmaker/data` 因等待中提示本身不帶 `data-sync-status` 而使「各頁 `[data-sync-status="pending"]` 可見」失敗；`6df1a41` 讓三個等待中的 `CardContent` 帶 `data-sync-status="pending"`（與其他頁一致），design Decision 9 已同步寫明。
+  - mutation（單檔 vitest，harness 三重落地檢查，每次還原後 `git status` 乾淨）：
+    - ① `HistoryModeSwitch` 的 `mode === "pending"` 改為永不成立（等價於等待中改掛 `HistoryView`）→ 紅；對照 `mode !== "local" && mode !== "remote"` → 綠。
+    - ② `HistoryView` 的 `hydrated === null` 改為 `=== undefined`（讀入前渲染篩選器與空狀態）→ 紅；對照 `!hydrated` → 綠。
+    - ③ `JsonBackupSection` 等待中改走本機分支 → 紅；對照 → 綠。
+    - ④ `HistoryCsvSection` 等待中仍渲染「匯出 CSV」→ 紅；對照 → 綠。
+    - ⑤ `RosterCsvImportSection` 等待中仍渲染選檔 → 紅；對照 → 綠。
+    - ⑥ `LocalDataImportSection` 的 `isRemote` 改為 `!== "local"` → 紅（regression guard 轉紅）；對照 `!(… !== "remote")` → 綠。
+- [x] 4.6 regression guard：`LocalDataImportSection.test.tsx` 新增 it「regression guard：session 等待中時不渲染匯入區塊」。寫入即綠，單檔 vitest 貼出輸出並註明 regression guard；`LocalDataImportSection.tsx` 一行不改
+  - 紀錄：commit `831f480`。**regression guard**（寫入即綠）：單檔 vitest `Test Files 1 passed (1)`、`Tests 2 passed (2)`；`LocalDataImportSection.tsx` 未改。mutation ⑥ 見 4.5。
+- [x] 4.7 驗證：雙鎖下 `--project=chromium` 重跑 `data-pending.spec.ts` 全檔，五條全綠並貼出輸出
+  - 紀錄：雙鎖、chromium、`data-pending.spec.ts` 全檔（`/tmp/g4-green47c.log`）：`5 passed (10.7s)`、EXIT=0。user-data `roster-sync.spec.ts -g "已登入者重新整理參賽者頁時在 session 回應前顯示等待中而非空名單"`：`1 passed`、0 skipped、EXIT=0（含前置修正的 `await sessionResponse`）。
+- [x] 4.8 REFACTOR：歷史兩處等待中容器、資料頁三區塊的等待中分支是否一致；是否值得抽共用元件（預期不抽：各兩三行 JSX，抽出後要多一個跨 capability 的檔案）；無壞味道則註記 skipped
+  - 紀錄：skipped（無壞味道）。歷史兩處等待中容器 JSX 逐字相同（同 class、同 `data-sync-status`、同 `SyncStatusNotice`）；資料頁三區塊的等待中分支同形（`mode === "pending"` 三元、保留 `CardHeader`、`CardContent data-sync-status="pending"` 只放提示）。各只有 2～5 行 JSX，抽共用元件要新增跨 capability 的檔案，不抽。
 
 ## 5. 文件同步與總驗收
 
