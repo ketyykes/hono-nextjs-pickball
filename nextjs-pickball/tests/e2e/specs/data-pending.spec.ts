@@ -151,6 +151,21 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		}
 	});
 
+	test("訪客載入本機歷史的過程中從未出現空狀態", async ({ page }) => {
+		await seedStorage(page, {
+			[HISTORY_STORAGE_KEY]: JSON.stringify({
+				version: 1,
+				entries: [buildHistoryEntry("h-1", "本機甲", "本機乙")],
+			}),
+		});
+		await installFlashRecorder(page, { texts: ["還沒有任何對戰紀錄"], selectors: [] });
+
+		await page.goto("/matchmaker/history");
+		await expect(page.getByText("本機甲").first()).toBeVisible();
+		expect(await readFlashHits(page), "歷史頁的閃爍記錄").toEqual([]);
+		await expect(page.locator("[data-sync-status]")).toHaveCount(0);
+	});
+
 	test("訪客重新整理參賽者頁時在 session 回應前即顯示本機名單", async ({ page }) => {
 		await seedStorage(page, {
 			[ROSTER_STORAGE_KEY]: JSON.stringify({ version: 1, players: [rosterPlayer("p-a", "本機甲")] }),
@@ -208,6 +223,36 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 		} finally {
 			release();
 			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
+	});
+});
+
+// test.use 會套用到所在 describe 的全部 test，停用 JavaScript 的情境因此獨立成一組
+test.describe("資料來源確定前的等待中畫面（只看伺服器輸出）", () => {
+	test.use({ javaScriptEnabled: false });
+
+	test("JavaScript 載入前各頁只顯示等待中提示而不顯示空狀態或預設值", async ({ page }) => {
+		const paths = [
+			PLAYERS_PAGE,
+			"/matchmaker",
+			"/matchmaker/stats",
+			"/matchmaker/history",
+			"/matchmaker/data",
+			"/scoreboard",
+			"/scoreboard?match=m1",
+		];
+
+		for (const path of paths) {
+			await page.goto(path);
+			await expect(page.locator('[data-sync-status="pending"]').first(), `${path} 應顯示等待中`).toBeVisible();
+			await expect(page.getByText(DATA_PENDING_MESSAGE).first(), `${path} 應顯示等待中文案`).toBeVisible();
+			for (const text of [...EMPTY_TEXTS, "選擇備份檔…"]) {
+				await expect(page.getByText(text), `${path} 不應出現「${text}」`).toHaveCount(0);
+			}
+			for (const name of ["匯出 CSV", "確認匯入"]) {
+				await expect(page.getByRole("button", { name }), `${path} 不應有按鈕「${name}」`).toHaveCount(0);
+			}
+			await expect(page.locator(ZERO_SCORE_SELECTOR), `${path} 不應有預設比分`).toHaveCount(0);
 		}
 	});
 });
