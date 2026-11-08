@@ -648,4 +648,16 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 		expect(gone.result.current[3]).toBe("local");
 		expect(gone.result.current[2]).toBe("missing");
 	});
+
+	// Scoreboard 以「state 參考變了」偵測轉換並在 render 中 setState，
+	// 等待中回傳的初始狀態若每次 render 都是新物件，會造成無限 render。
+	it("session 等待中時多次 render 回傳同一個 state 參考", () => {
+		vi.mocked(useSession).mockReturnValue(pendingSession);
+
+		const { result, rerender } = renderHook(() => useScoreboardStore(null));
+		const first = result.current[0];
+		rerender();
+
+		expect(result.current[0]).toBe(first);
+	});
 });
