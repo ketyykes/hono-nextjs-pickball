@@ -14,7 +14,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRosterStore } from "@/hooks/useRemoteRosterStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { DataStatus, SyncStatus } from "@/lib/sync/sync-status";
+import { localDataStatus, type DataStatus, type SyncStatus } from "@/lib/sync/sync-status";
 
 // 名單 store 的 state 形狀。
 // droppedCount：讀取持久化資料時被逐筆降級丟棄的筆數，
@@ -228,13 +228,9 @@ export function useRosterStore(): UseRosterStoreResult<DataStatus> {
 		return { ...remote, syncStatus: "pending" };
 	}
 	const { hydrated, ...localStore } = local;
-	let localStatus: DataStatus = "local";
-	if (!hydrated) {
-		localStatus = "pending";
-	}
 	return {
 		...localStore,
-		syncStatus: localStatus,
+		syncStatus: localDataStatus(hydrated),
 		applyRemotePlayers: doNothing,
 		reloadRemotePlayers: doNothing,
 	};

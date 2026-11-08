@@ -8,7 +8,7 @@ import { useSession } from "@/hooks/useSession";
 import { useRemoteScoreboardStore } from "@/hooks/useRemoteScoreboardStore";
 import { useRemoteMatchSlotStore } from "@/hooks/useRemoteMatchSlotStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { DataStatus } from "@/lib/sync/sync-status";
+import { localDataStatus, type DataStatus } from "@/lib/sync/sync-status";
 import type { Action, ScoreboardState } from "@pickball/core/scoreboard/types";
 
 // 對戰場次綁定狀態：
@@ -161,9 +161,5 @@ export function useScoreboardStore(matchIdParam?: string | null): readonly [
 		return remoteSlot;
 	}
 	const [localState, localDispatch, localBinding, hydrated] = local;
-	let localStatus: DataStatus = "local";
-	if (!hydrated) {
-		localStatus = "pending";
-	}
-	return [localState, localDispatch, localBinding, localStatus] as const;
+	return [localState, localDispatch, localBinding, localDataStatus(hydrated)] as const;
 }

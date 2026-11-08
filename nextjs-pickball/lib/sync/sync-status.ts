@@ -39,3 +39,11 @@ export function syncStatusMessage(status: SyncStatus): string | null {
 export function isContentBlocked(status: DataStatus): boolean {
 	return status === "pending" || status === "loading" || status === "load-failed";
 }
+
+/** 本機模式的顯示狀態：本機資料讀入前為 pending，讀入後為 local。 */
+export function localDataStatus(hydrated: boolean): DataStatus {
+	if (!hydrated) {
+		return "pending";
+	}
+	return "local";
+}

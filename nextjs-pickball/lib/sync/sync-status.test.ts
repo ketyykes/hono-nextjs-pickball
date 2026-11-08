@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	DATA_PENDING_MESSAGE,
 	isContentBlocked,
+	localDataStatus,
 	syncStatusMessage,
 	type DataStatus,
 	type SyncStatus,
@@ -47,5 +48,13 @@ describe("isContentBlocked", () => {
 		expect(Object.keys(expected)).toHaveLength(9);
 		expect(DATA_PENDING_MESSAGE).toBe("正在載入資料…");
 		expect(DATA_PENDING_MESSAGE).not.toBe(syncStatusMessage("loading"));
+	});
+});
+
+describe("localDataStatus", () => {
+	// regression guard：行為由既有選擇器測試涵蓋，抽成函式時補上單元層的鎖定。
+	it("本機資料讀入前為 pending，讀入後為 local", () => {
+		expect(localDataStatus(false)).toBe("pending");
+		expect(localDataStatus(true)).toBe("local");
 	});
 });

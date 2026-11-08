@@ -36,7 +36,7 @@ import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRoundStore } from "@/hooks/useRemoteRoundStore";
 import { resolveStorageMode } from "@/lib/sync/storage-mode";
-import type { DataStatus, SyncStatus } from "@/lib/sync/sync-status";
+import { localDataStatus, type DataStatus, type SyncStatus } from "@/lib/sync/sync-status";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
 // 送出比分時（submitScore）把新完成的一場附加進來。droppedCount 只由 hydrate
@@ -154,9 +154,10 @@ export interface UseRoundStoreResult<Status extends DataStatus = SyncStatus> {
 
 // 本機實作不知道同步狀態，由選擇器補上；hydrated 是本機回合與歷史是否已讀入，
 // 供選擇器決定 syncStatus 要回 pending 還是 local。
-type LocalRoundStoreResult = Omit<UseRoundStoreResult, "syncStatus" | "remoteMatchSlots"> & {
-	hydrated: boolean;
-};
+type LocalRoundStoreResult = Omit<
+	UseRoundStoreResult<DataStatus>,
+	"syncStatus" | "remoteMatchSlots"
+> & { hydrated: boolean };
 
 function doNothing(): void {}
 
@@ -469,9 +470,5 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return { ...remote, syncStatus: "pending" };
 	}
 	const { hydrated, ...localStore } = local;
-	let localStatus: DataStatus = "local";
-	if (!hydrated) {
-		localStatus = "pending";
-	}
-	return { ...localStore, syncStatus: localStatus, remoteMatchSlots: null };
+	return { ...localStore, syncStatus: localDataStatus(hydrated), remoteMatchSlots: null };
 }
