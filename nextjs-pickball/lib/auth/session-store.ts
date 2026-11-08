@@ -36,6 +36,7 @@ function clearHintTimer(): void {
 }
 
 function startHintTimer(): void {
+	// 第一次訂閱可能早於任何一次 render 讀快照，這裡要先初始化快取（讀提示），才能判斷是否帶提示
 	if (getSnapshot() !== LOADING_WITH_HINT) return;
 	hintTimer = setTimeout(() => {
 		hintTimer = null;
