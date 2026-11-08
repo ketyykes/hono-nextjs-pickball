@@ -50,7 +50,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 
 - `type DataStatus = SyncStatus | "pending"`；`SyncStatus` 的 8 個值與其固定文案不變。
 - `DATA_PENDING_MESSAGE` 為「正在載入資料…」，是本 change 唯一新增的文案（不指涉本機或雲端：伺服器輸出對訪客與登入者相同）。
-- `isContentBlocked(status: DataStatus): boolean`：`pending`、`loading`、`load-failed` 為 true，其餘為 false。所有「以提示取代主要內容」的判斷 MUST 使用它，SHALL NOT 各自內聯比較。
+- `isContentBlocked(status: DataStatus): boolean`：`pending`、`loading`、`load-failed` 為 true，其餘為 false。所有「以提示取代主要內容」的判斷 MUST 使用它，SHALL NOT 各自內聯比較。唯一例外是 `components/matchmaker/RemoteHistoryView.tsx` 內雲端歷史專屬的那一處（`syncStatus === "loading" || syncStatus === "load-failed"`，test-plan C7 已豁免）：該元件只在雲端模式掛載，狀態來自 `useRemoteHistory`，型別為 `SyncStatus` 而不含 `pending`，不可能出現等待中；本 change 不改該檔（Impact「不改」清單），改用 `isContentBlocked` 也不會改變任何行為。
 - `nextjs-pickball/components/sync/SyncStatusNotice.tsx` 的 `status` 型別為 `DataStatus`；`pending` 時以既有 `role="status"` 外觀顯示 `DATA_PENDING_MESSAGE`。
 
 **選擇器的等待中結果**：
@@ -92,6 +92,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 - **WHEN** `useRosterStore()` mount 後呼叫 `addPlayer`
 - **THEN** `players` 為空陣列、`syncStatus` 為 `pending`；`matchmaker:roster:v1` 解析後仍只有原本那一位；沒有任何 `fetch`
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「session 等待中時不回傳本機名單、syncStatus 為 pending 且操作不寫入本機也不發請求」
+- **驗收**（損壞筆數，regression guard）：同檔，it 名稱「session 等待中時即使本機資料含損壞筆數 droppedCount 仍為 0」——本機資料含一筆損壞資料時，等待中的 `droppedCount` 仍為 0、`players` 為空陣列
 
 #### Scenario: 等待中：確認為未登入後改回本機名單
 
@@ -106,6 +107,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 - **WHEN** `useRosterStore()` mount，並在 render 階段同步記錄每次 render 的 `syncStatus`
 - **THEN** 兩輪的第一筆皆為 `pending`；兩輪的最終值皆為 `local`；第一輪最終 `players` 為那一位，且沒有任何一次 render 是「`syncStatus` 為 `local` 而 `players` 為空」
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「本機名單讀入前 syncStatus 為 pending，讀入後為 local 且無資料時也會轉為 local」
+- **驗收**（三個選擇器共用的判斷，regression guard）：`nextjs-pickball/lib/sync/sync-status.test.ts`，it 名稱「本機資料讀入前為 pending，讀入後為 local」——`localDataStatus(false)` 為 `pending`、`localDataStatus(true)` 為 `local`
 
 #### Scenario: 等待中：回合選擇器不交出本機回合與歷史且操作無效
 
@@ -228,7 +230,7 @@ hydration 完成後，session 仍在載入且**沒有**上次登入提示時 MUS
 
 #### Scenario: 上次登入提示殘留但已非登入時短暫等待後回到本機
 
-- **GIVEN** 訪客、本機名單有一位參賽者，且 localStorage 殘留上次登入提示（模擬 cookie 已過期）
-- **WHEN** 以 `page.route` 暫停 `/api/session` 後重新整理 `/matchmaker/players`，並在放行前檢查畫面，之後放行
+- **GIVEN** 訪客、本機名單有一位參賽者；以 `addInitScript` 讓下一個文件載入前就寫入上次登入提示（模擬 cookie 已過期）
+- **WHEN** 以 `page.route` 暫停 `/api/session` 後開啟（或重新整理）`/matchmaker/players`（測試以 `goto` 進入），並在放行前檢查畫面，之後放行
 - **THEN** 放行前 `main[data-sync-status="pending"]` 可見且該參賽者不存在；放行後該參賽者可見、`[data-sync-status]` 不存在，且上次登入提示已被清除
 - **驗收**：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts`，test 名稱「上次登入提示殘留但已非登入時先顯示等待中再顯示本機名單並清除提示」
