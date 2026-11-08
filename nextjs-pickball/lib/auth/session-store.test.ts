@@ -11,6 +11,7 @@ import {
 	writeSignedInHint,
 } from "./session-hint";
 import {
+	chooseLocalFallback,
 	getServerSnapshot,
 	getSnapshot,
 	refresh,
@@ -318,7 +319,7 @@ describe("session-store 上次登入提示", () => {
 		expect(getSnapshot()).toMatchObject({ status: "ready", user: USER });
 	});
 
-	it("帶提示等待逾時仍未取得 session 時快照改回不帶提示的 loading", async () => {
+	it("帶提示等待逾時仍未取得 session 時快照改為無法確認", async () => {
 		vi.useFakeTimers();
 		try {
 			writeSignedInHint();
@@ -334,8 +335,13 @@ describe("session-store 上次登入提示", () => {
 			expect(listener).not.toHaveBeenCalled();
 
 			vi.advanceTimersByTime(1);
-			expect(getSnapshot()).toEqual({ status: "loading" });
+			expect(getSnapshot()).toEqual({
+				status: "loading",
+				signedInHint: true,
+				unavailable: true,
+			});
 			expect(listener).toHaveBeenCalled();
+			expect(readSignedInHint()).toBe(true);
 
 			// 第二輪：逾時前已回應已登入，逾時不得改變 ready 快照
 			resetSessionStoreForTests();
@@ -355,5 +361,192 @@ describe("session-store 上次登入提示", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe("session-store 無法確認與本機備援", () => {
+	type State = { authEnabled: boolean; user: typeof USER | null };
+
+	const UNAVAILABLE = {
+		status: "loading",
+		signedInHint: true,
+		unavailable: true,
+	} as const;
+
+	beforeEach(() => {
+		localStorage.clear();
+		resetSessionStoreForTests();
+		mockedFetchSession.mockReset();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("session 請求失敗且有上次登入提示時快照改為無法確認且保留提示", async () => {
+		writeSignedInHint();
+		resetSessionStoreForTests();
+		mockedFetchSession.mockResolvedValue(null);
+
+		const listener = vi.fn();
+		subscribe(listener);
+		await vi.waitFor(() => {
+			expect(getSnapshot()).toEqual(UNAVAILABLE);
+		});
+		expect(getSnapshot()).toBe(getSnapshot());
+		expect(listener).toHaveBeenCalled();
+		expect(readSignedInHint()).toBe(true);
+	});
+
+	it("session 請求失敗且沒有上次登入提示時快照為 auth 停用的 ready", async () => {
+		mockedFetchSession.mockResolvedValue(null);
+
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		expect(getSnapshot()).toEqual({
+			status: "ready",
+			authEnabled: false,
+			user: null,
+		});
+		expect(localStorage.length).toBe(0);
+	});
+
+	it("已登入使用中 refresh 失敗時快照改為無法確認且保留提示", async () => {
+		mockedFetchSession
+			.mockResolvedValueOnce({ authEnabled: true, user: USER })
+			.mockResolvedValueOnce(null);
+
+		subscribe(vi.fn());
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		expect(readSignedInHint()).toBe(true);
+
+		await refresh();
+		expect(getSnapshot()).toEqual(UNAVAILABLE);
+		expect(readSignedInHint()).toBe(true);
+	});
+
+	it("無法確認之後才到達的 session 回應仍照常採用", async () => {
+		vi.useFakeTimers();
+		try {
+			writeSignedInHint();
+			resetSessionStoreForTests();
+			let resolveFetch: (value: State) => void = () => {};
+			mockedFetchSession.mockReturnValue(
+				new Promise<State>((r) => {
+					resolveFetch = r;
+				}),
+			);
+
+			const listener = vi.fn();
+			subscribe(listener);
+			vi.advanceTimersByTime(10_000);
+			expect(getSnapshot()).toEqual(UNAVAILABLE);
+			listener.mockClear();
+
+			resolveFetch({ authEnabled: true, user: USER });
+			await vi.advanceTimersByTimeAsync(0);
+
+			expect(getSnapshot()).toEqual({
+				status: "ready",
+				authEnabled: true,
+				user: USER,
+			});
+			expect(listener).toHaveBeenCalled();
+			expect(readSignedInHint()).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("chooseLocalFallback 在無法確認時改為本機備援並丟棄進行中請求的結果", async () => {
+		vi.useFakeTimers();
+		try {
+			writeSignedInHint();
+			resetSessionStoreForTests();
+			let resolveFetch: (value: State) => void = () => {};
+			mockedFetchSession.mockReturnValue(
+				new Promise<State>((r) => {
+					resolveFetch = r;
+				}),
+			);
+
+			const listener = vi.fn();
+			subscribe(listener);
+			vi.advanceTimersByTime(10_000);
+			expect(getSnapshot()).toEqual(UNAVAILABLE);
+			listener.mockClear();
+
+			chooseLocalFallback();
+			expect(getSnapshot()).toEqual({ status: "loading", localFallback: true });
+			expect(getSnapshot()).toBe(getSnapshot());
+			expect(listener).toHaveBeenCalled();
+			expect(readSignedInHint()).toBe(true);
+
+			resolveFetch({ authEnabled: true, user: USER });
+			await vi.advanceTimersByTimeAsync(0);
+			expect(getSnapshot()).toEqual({ status: "loading", localFallback: true });
+			expect(mockedFetchSession).toHaveBeenCalledTimes(1);
+
+			mockedFetchSession.mockResolvedValue({ authEnabled: true, user: USER });
+			await refresh();
+			expect(getSnapshot()).toEqual({
+				status: "ready",
+				authEnabled: true,
+				user: USER,
+			});
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("不是無法確認時呼叫 chooseLocalFallback 不改變快照也不通知", async () => {
+		// 三輪各自 reset：① 無提示請求中 ② 有提示未逾時 ③ 已 ready
+		for (const withHint of [false, true]) {
+			localStorage.clear();
+			if (withHint) writeSignedInHint();
+			resetSessionStoreForTests();
+			mockedFetchSession.mockReset();
+			let resolveFetch: (value: State) => void = () => {};
+			mockedFetchSession.mockReturnValue(
+				new Promise<State>((r) => {
+					resolveFetch = r;
+				}),
+			);
+
+			const listener = vi.fn();
+			subscribe(listener);
+			const before = getSnapshot();
+			chooseLocalFallback();
+			expect(getSnapshot()).toBe(before);
+			expect(listener).not.toHaveBeenCalled();
+
+			resolveFetch({ authEnabled: true, user: USER });
+			await vi.waitFor(() => {
+				expect(getSnapshot()).toEqual({
+					status: "ready",
+					authEnabled: true,
+					user: USER,
+				});
+			});
+		}
+
+		localStorage.clear();
+		resetSessionStoreForTests();
+		mockedFetchSession.mockReset();
+		mockedFetchSession.mockResolvedValue({ authEnabled: true, user: USER });
+		const listener = vi.fn();
+		subscribe(listener);
+		await vi.waitFor(() => {
+			expect(getSnapshot().status).toBe("ready");
+		});
+		listener.mockClear();
+		const ready = getSnapshot();
+		chooseLocalFallback();
+		expect(getSnapshot()).toBe(ready);
+		expect(listener).not.toHaveBeenCalled();
 	});
 });
