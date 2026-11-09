@@ -23,6 +23,7 @@ const NOTICE_CLASS =
 // 不渲染任何元素，讓訪客的 DOM 與雲端同步功能加入前相同。
 // unavailable（session 無法確認）沿用載入失敗文案，另附一顆讓使用者改用本機資料的按鈕；
 // 按鈕放在 role="status" 之外，避免 live region 更新時重複朗讀互動元素。
+// 此時 className 套在包住提示與按鈕的外層容器；其他狀態則套在 role="status" 本體。
 export function SyncStatusNotice({ status, className }: SyncStatusNoticeProps) {
 	if (status === "unavailable") {
 		return (

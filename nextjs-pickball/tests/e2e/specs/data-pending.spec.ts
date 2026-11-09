@@ -116,7 +116,7 @@ function buildScoreboard(us: number, them: number) {
 	};
 }
 
-function readSignedInHint(page: Page): Promise<string | null> {
+function readHintRaw(page: Page): Promise<string | null> {
 	return page.evaluate((key) => window.localStorage.getItem(key), SIGNED_IN_HINT_STORAGE_KEY);
 }
 
@@ -256,14 +256,14 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 			await expect(page.getByRole("status")).toHaveText(syncStatusMessage("load-failed") ?? "");
 			await expect(page.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL })).toBeVisible();
 			await expect(page.getByText("本機甲")).toHaveCount(0);
-			expect(await readSignedInHint(page)).toBe("1");
+			expect(await readHintRaw(page)).toBe("1");
 
 			await page.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL }).click();
 
 			await expect(page.getByText("本機甲").first()).toBeVisible();
 			await expect(page.getByText(LOCAL_FALLBACK_NOTICE)).toBeVisible();
 			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
-			expect(await readSignedInHint(page)).toBe("1");
+			expect(await readHintRaw(page)).toBe("1");
 		} finally {
 			await page.unrouteAll({ behavior: "ignoreErrors" });
 		}

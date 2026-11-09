@@ -97,6 +97,7 @@ Depends on: §2
   - skipped：三個選擇器等待中分支皆以具名呼叫 `pendingDataStatus(session)`、無巢狀三元；`SyncStatusNotice` 兩種回傳形態清楚；舊註解已更新。
   - §3 mutation（單檔 vitest／單檔 E2E，三重落地檢查，每次還原後 git status 乾淨）：① isContentBlocked 漏 unavailable 紅；② Notice 不渲染按鈕 紅；③ 按鈕放進 role="status" 內 紅；④ onClick 不呼叫 chooseLocalFallback 紅；⑤ 名單等待中沿用 remote.players 紅；⑥ 名單等待中 syncStatus 寫死 pending 紅；⑦ 回合 寫死 pending 紅；⑧ 計分板 寫死 pending 紅；⑨ SYNC_STATUS_PRIORITY 拿掉 unavailable 紅；⑩ Banner 在無法確認時也渲染 紅；
     ⑪ layout 不掛 LocalFallbackBanner：500 那條 E2E 紅（本機提示 getByText 找不到）；⑫ load() 的 null＋提示分支每次建新物件：同一條 E2E 紅（按鈕按下後本機甲不可見）。對照組 isContentBlocked 改為四值 includes：維持綠。
+  - Stage 1 PASS、Stage 2 PASS（無必修）。Stage 2 三項建議由 coordinator 處理：`SyncStatusNotice` 新 it 補斷言按鈕 `type="button"`（regression guard，加入即綠；X1 變異原本漏網）；`unavailable` 分支 `className` 套在外層容器的差異補註解；`data-pending.spec.ts` 內 helper 改名 `readHintRaw` 以免與 `lib/auth/session-hint` 的 `readSignedInHint` 混淆（僅改名）。
 
 ## 4. 歷史頁與資料頁
 

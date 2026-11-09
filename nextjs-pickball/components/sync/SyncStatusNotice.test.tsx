@@ -31,6 +31,7 @@ describe("SyncStatusNotice", () => {
 
 		const button = screen.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL });
 		expect(status.contains(button)).toBe(false);
+		expect(button.getAttribute("type")).toBe("button");
 
 		fireEvent.click(button);
 		expect(chooseLocalFallback).toHaveBeenCalledTimes(1);
