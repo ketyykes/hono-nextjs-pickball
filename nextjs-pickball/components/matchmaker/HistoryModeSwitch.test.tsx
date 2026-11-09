@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { useSession } from "@/hooks/useSession";
 import { HISTORY_STORAGE_KEY } from "@/lib/matchmaker/storage-keys";
 import { HistoryModeSwitch } from "./HistoryModeSwitch";
+import { LOCAL_FALLBACK_ACTION_LABEL, syncStatusMessage } from "@/lib/sync/sync-status";
 
 vi.mock("@/hooks/useSession", () => ({ useSession: vi.fn() }));
 
@@ -55,6 +56,26 @@ describe("HistoryModeSwitch", () => {
 
 		expect(screen.getByRole("status").textContent).toBe("正在載入資料…");
 		expect(container.querySelector('[data-sync-status="pending"]')).not.toBeNull();
+		expect(screen.queryByRole("radiogroup", { name: "歷史區間" })).toBeNull();
+		expect(screen.queryByText("本機甲")).toBeNull();
+		expect(screen.queryByTestId("remote-history-stub")).toBeNull();
+	});
+
+	it("session 無法確認時顯示無法載入提示與按鈕且不渲染歷史", () => {
+		seedTodayHistory();
+		vi.mocked(useSession).mockReturnValue({
+			status: "loading",
+			signedInHint: true,
+			unavailable: true,
+			hydrated: true,
+			refresh: vi.fn(),
+		});
+
+		const { container } = render(<HistoryModeSwitch />);
+
+		expect(screen.getByRole("status").textContent).toBe(syncStatusMessage("load-failed"));
+		expect(screen.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL })).not.toBeNull();
+		expect(container.querySelector('[data-sync-status="unavailable"]')).not.toBeNull();
 		expect(screen.queryByRole("radiogroup", { name: "歷史區間" })).toBeNull();
 		expect(screen.queryByText("本機甲")).toBeNull();
 		expect(screen.queryByTestId("remote-history-stub")).toBeNull();
