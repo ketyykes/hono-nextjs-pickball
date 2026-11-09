@@ -103,11 +103,15 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：`HistoryModeSwitch.test.tsx` 新增 it「session 無法確認時顯示無法載入提示與按鈕且不渲染歷史」；`JsonBackupSection.test.tsx` 新增 it「session 無法確認時以無法載入提示與按鈕取代匯出與還原操作」；
+- [x] 4.1 RED（TDD）：`HistoryModeSwitch.test.tsx` 新增 it「session 無法確認時顯示無法載入提示與按鈕且不渲染歷史」；`JsonBackupSection.test.tsx` 新增 it「session 無法確認時以無法載入提示與按鈕取代匯出與還原操作」；
   `HistoryCsvSection.test.tsx` 新增 it「session 無法確認時以無法載入提示與按鈕取代匯出操作」；`RosterCsvImportSection.test.tsx` 新增 it「session 無法確認時以無法載入提示與按鈕取代選檔與確認匯入」（皆在 `nextjs-pickball/components/matchmaker/`，新 it 放入各檔既有的「等待中」describe 或新開「無法確認」describe）。
   四檔各跑單檔 vitest，確認四個新 it 全紅並貼出輸出
-- [ ] 4.2 GREEN（TDD）：四個元件 `mode === "pending"` 分支的 `data-sync-status` 與 `SyncStatusNotice status` 改為 `pendingDataStatus(session)` 的值（`HistoryModeSwitch` 先取 `const session = useSession()`；判斷位置不變，仍在所有 hook 之後；design Decision 9）。4.1 全綠、四檔既有 it 全綠；tsc exit 0；改動檔 ESLint 0 errors
-- [ ] 4.3 REFACTOR：四處等待中分支的寫法是否一致（同一個具名變數、同樣的屬性順序）；是否值得抽共用元件（預期不抽：各兩三行 JSX）；無壞味道則註記 skipped
+  - RED commit `9a69264`。四檔各 1 failed（`expected '正在載入資料…' to be '無法載入雲端資料，請重新整理頁面'`），既有 it 全綠；四個新 it 皆真紅，regression guard：無。（新 it 放入各檔既有的「等待中」describe 或 HistoryModeSwitch 既有 describe。）
+- [x] 4.2 GREEN（TDD）：四個元件 `mode === "pending"` 分支的 `data-sync-status` 與 `SyncStatusNotice status` 改為 `pendingDataStatus(session)` 的值（`HistoryModeSwitch` 先取 `const session = useSession()`；判斷位置不變，仍在所有 hook 之後；design Decision 9）。4.1 全綠、四檔既有 it 全綠；tsc exit 0；改動檔 ESLint 0 errors
+  - GREEN commit `d0c9628`。四檔 2/6/6/2 全綠；tsc exit 0；改動檔與四個測試檔 ESLint exit 0。
+  - §4 mutation（單檔 vitest，三重落地檢查，每次還原後 git status 乾淨）：① HistoryModeSwitch 容器與提示寫死 pending 紅；② JsonBackupSection 紅；③ HistoryCsvSection 紅；④ RosterCsvImportSection 紅；另單獨只改容器屬性（①b）、只改提示（③b）各自皆紅。對照組 `pendingDataStatus(session)` 改寫為 `=== "unavailable" ? "unavailable" : "pending"` 維持綠。
+- [x] 4.3 REFACTOR：四處等待中分支的寫法是否一致（同一個具名變數、同樣的屬性順序）；是否值得抽共用元件（預期不抽：各兩三行 JSX）；無壞味道則註記 skipped
+  - skipped：四處等待中分支皆以同名 `pendingStatus` 先取值再用於 `data-sync-status` 與 `SyncStatusNotice status`，屬性順序一致；不抽共用元件（各兩三行 JSX）。
 
 ## 5. 文件同步、總驗收與合併
 
