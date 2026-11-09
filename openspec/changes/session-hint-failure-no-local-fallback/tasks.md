@@ -112,6 +112,7 @@ Depends on: §3
   - §4 mutation（單檔 vitest，三重落地檢查，每次還原後 git status 乾淨）：① HistoryModeSwitch 容器與提示寫死 pending 紅；② JsonBackupSection 紅；③ HistoryCsvSection 紅；④ RosterCsvImportSection 紅；另單獨只改容器屬性（①b）、只改提示（③b）各自皆紅。對照組 `pendingDataStatus(session)` 改寫為 `=== "unavailable" ? "unavailable" : "pending"` 維持綠。
 - [x] 4.3 REFACTOR：四處等待中分支的寫法是否一致（同一個具名變數、同樣的屬性順序）；是否值得抽共用元件（預期不抽：各兩三行 JSX）；無壞味道則註記 skipped
   - skipped：四處等待中分支皆以同名 `pendingStatus` 先取值再用於 `data-sync-status` 與 `SyncStatusNotice status`，屬性順序一致；不抽共用元件（各兩三行 JSX）。
+  - Stage 1 PASS、Stage 2 PASS（皆無必修、無建議項）。
 
 ## 5. 文件同步、總驗收與合併
 
