@@ -19,7 +19,7 @@ import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backu
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
 import { backupToImportRequest, importLocalData } from "@/lib/sync/local-import";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // JSON 完整備份區塊：涵蓋匯出（Blob + <a download>）與匯入
 // （選檔 → File.text() → parseBackup → writeBackup → location.reload()，
@@ -144,9 +144,10 @@ export function JsonBackupSection() {
 	let content: ReactNode;
 	if (mode === "pending") {
 		// 儲存模式未定時不提供匯出與還原：兩種模式的操作會讀寫不同來源
+		const pendingStatus = pendingDataStatus(session);
 		content = (
-			<CardContent data-sync-status="pending">
-				<SyncStatusNotice status="pending" />
+			<CardContent data-sync-status={pendingStatus}>
+				<SyncStatusNotice status={pendingStatus} />
 			</CardContent>
 		);
 	} else {

@@ -11,7 +11,7 @@ import { useSession } from "@/hooks/useSession";
 import { historyCsvFileName, historyToCsv } from "@/lib/matchmaker/history-csv";
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteHistoryCsv } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot } from "@/lib/matchmaker/transfer-storage";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // 歷史賽果 CSV 匯出區塊。只匯出，不提供匯入——CSV 匯出入不對稱
 // （頁面頂部的說明已標示），本區塊 SHALL NOT 另外提供「匯入歷史 CSV」入口。
@@ -64,9 +64,10 @@ export function HistoryCsvSection() {
 	let content: ReactNode;
 	if (mode === "pending") {
 		// 儲存模式未定時不提供匯出：本機與雲端的歷史來源不同
+		const pendingStatus = pendingDataStatus(session);
 		content = (
-			<CardContent data-sync-status="pending">
-				<SyncStatusNotice status="pending" />
+			<CardContent data-sync-status={pendingStatus}>
+				<SyncStatusNotice status={pendingStatus} />
 			</CardContent>
 		);
 	} else {
