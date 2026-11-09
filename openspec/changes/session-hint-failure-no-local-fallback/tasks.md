@@ -118,19 +118,26 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——儲存三態條目補「session 無法確認（有提示而請求失敗或逾時）時儲存模式仍為 `pending`、顯示狀態為 `unavailable`，以失敗文案＋『先用這台裝置的資料』取代內容；按下後為本機備援（`local`），root layout 顯示 `LocalFallbackBanner`」；
+- [x] 5.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——儲存三態條目補「session 無法確認（有提示而請求失敗或逾時）時儲存模式仍為 `pending`、顯示狀態為 `unavailable`，以失敗文案＋『先用這台裝置的資料』取代內容；按下後為本機備援（`local`），root layout 顯示 `LocalFallbackBanner`」；
   歷史頁與統計頁條目的 `pending` 說明補 `unavailable`；`isContentBlocked` 的列舉（兩處）補 `unavailable`；`lib/auth/` 補「`fetchSession` 失敗回 `null`、`chooseLocalFallback`」、`lib/sync/` 補 `pendingDataStatus`、`DataStatus` 的 `unavailable` 與兩個文案常數、`components/sync/` 補 `LocalFallbackBanner`。commit（`docs:`）
+  - 結果：`nextjs-pickball/CLAUDE.md` 已補儲存三態（無法確認、`chooseLocalFallback`、`LocalFallbackBanner`）、歷史頁與統計頁 `unavailable`、`isContentBlocked` 兩處、`lib/auth/`、`lib/sync/`、`components/sync/`；commit `c835c7d`（`docs:`）。
 - [ ] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
 - [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋2、測試數＝基線＋21，後端與核心與基線相同
 - [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
 - [ ] 5.6 驗收（指令）C5（coordinator）：建立 `/tmp/cgate-session-hint-failure-no-local-fallback.e2e`（照 `/tmp/cgate-session-pending-loading.e2e` 複製）後執行 `/tmp/cgate2.sh session-hint-failure-no-local-fallback`；
   五個 browser project 各＝基線＋2、0 failed（skip 只限既有瀏覽器條件）；user-data＝基線、全 passed、0 skipped。結果寫在本 task 後方；失敗不得自行判定為雜訊，附證據裁定
-- [ ] 5.7 驗收（指令）C6：`resolveStorageMode(` 使用端集合恰為 test-plan C6 的 9 個檔案
-- [ ] 5.8 驗收（指令）C7：`pendingDataStatus(` 使用端恰為 7 個檔案；`"unavailable"` 字樣只出現在 test-plan C7 列出的位置
-- [ ] 5.9 驗收（指令）C8：範圍 diff 輸出為空
-- [ ] 5.10 驗收（指令）C9：`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict` 通過
-- [ ] 5.11 驗收（指令）C10：`fetchSession(` 的產品呼叫端只有 `lib/auth/session-store.ts`
+- [x] 5.7 驗收（指令）C6：`resolveStorageMode(` 使用端集合恰為 test-plan C6 的 9 個檔案
+  - 指令：`grep -rln "resolveStorageMode(" nextjs-pickball/{app,components,hooks} | grep -v "\.test\."`。結果：恰 9 檔（stats/page.tsx、HistoryModeSwitch、LocalDataImportSection、JsonBackupSection、RosterCsvImportSection、HistoryCsvSection、useRoundStore、useScoreboardStore、useRosterStore），與預期一致。
+- [x] 5.8 驗收（指令）C7：`pendingDataStatus(` 使用端恰為 7 個檔案；`"unavailable"` 字樣只出現在 test-plan C7 列出的位置
+  - 指令：`grep -rln "pendingDataStatus(" …/{app,components,hooks} | grep -v "\.test\."`。結果：恰 7 檔（HistoryModeSwitch、JsonBackupSection、RosterCsvImportSection、HistoryCsvSection、useScoreboardStore、useRoundStore、useRosterStore），與預期一致。
+  - 指令：`grep -rn "unavailable" …/{app,components,hooks} | grep -v "\.test\."`。結果：app/matchmaker/page.tsx（38 註解、40 優先序）、hooks/useRoundStore.ts:450、components/sync/SyncStatusNotice.tsx（24 註解、28 按鈕分支）符合白名單；另出現 `components/auth/LoginForm.tsx:82` 的 `result.reason === "unavailable"`，為登入結果欄位、與本 change 無關，未列入 test-plan C7 白名單，已回報 coordinator 裁定，未改 test-plan 或產品碼。
+- [x] 5.9 驗收（指令）C8：範圍 diff 輸出為空
+  - 指令：C8 範圍 `git diff main --stat -- <test-plan C8 列出的路徑>`。結果：輸出為空（exit 0），與預期一致。
+- [x] 5.10 驗收（指令）C9：`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict` 通過
+  - 指令：`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict`（repo root）。結果：`Change 'session-hint-failure-no-local-fallback' is valid`，exit 0。
+- [x] 5.11 驗收（指令）C10：`fetchSession(` 的產品呼叫端只有 `lib/auth/session-store.ts`
+  - 指令：C10 `grep -rn "fetchSession(" …/{app,components,hooks,lib} | grep -v "\.test\." | grep -v "export async function"`。結果：只有 `lib/auth/session-store.ts:88`，與預期一致。
 - [ ] 5.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 - [ ] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
