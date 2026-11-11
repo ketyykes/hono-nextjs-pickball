@@ -97,6 +97,7 @@ function load(): Promise<void> {
 			} else {
 				snapshot = { status: "ready", authEnabled: false, user: null };
 			}
+			// 已是無法確認時又採用到 null，快照參考不變，仍照常 notify：useSyncExternalStore 會略過，無害，刻意不特判。
 			notify();
 			return;
 		}
