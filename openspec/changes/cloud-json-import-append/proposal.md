@@ -17,9 +17,10 @@
   - 回應 `200 { appended: { players: { added, skipped }, history: { added, skipped } } }`；沒有 409。
 - **核心 `@pickball/core/api/import` 新增附加契約**：`AppendImportRequestSchema`、`AppendImportResponseSchema`、`serializeAppendSegments`（同名只留第一位，另產生供 id 改寫用的參賽者對照段）、`checkAppendLimits`（前後端同一個判定）。
 - **前端「從 JSON 備份匯入到雲端」**（`JsonBackupSection` 雲端分支）：照舊先送 `POST /api/import`；雲端為空時行為完全不變。
-  回 `409` 時改顯示**附加確認**：備份內的參賽者數與歷史筆數、四條固定說明（同名略過、重複歷史略過、回合不匯入、分數不變需手動調整），以及按鈕「附加到雲端」與「取消」；按下才送附加請求。
-  備份沒有任何參賽者與歷史時顯示無可附加、不渲染按鈕。附加成功顯示新增與略過筆數；401、413、其他錯誤沿用既有文案與 `refresh()` 規則；不寫本機、不重新載入。
-- `lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`；`components/matchmaker/local-import-view.ts` 新增附加文案與 `describeAppendOutcome`，並改寫雲端 JSON 匯入的說明文字 `jsonCloudImportHint`。
+  回 `409` 時先以既有 `fetchRemotePlayers`（選檔當下的帳號）讀取雲端名單，再顯示**附加確認**：備份內的參賽者數與歷史筆數、**會新增到雲端的參賽者名單**與已在雲端而視為同一人的名單（使用者追加定案：送出前先看一眼，名字打錯會變成另一位且目前無法合併）、名字要完全相同才算同一人的提醒、四條固定說明（同名略過〔含名稱比對規則〕、重複歷史略過、回合不匯入、分數不變需手動調整），以及按鈕「附加到雲端」與「取消」；按下才送附加請求（帳號取按下當下）。
+  名單的計算是前端純函式 `previewAppendPlayers`，規則與後端逐字一致，只作提示，實際結果以後端回應為準；名單讀取 401 時刷新 session、其他失敗顯示讀取失敗，兩者皆不顯示確認、不送附加。
+  備份沒有任何參賽者與歷史時顯示無可附加、不渲染按鈕、不讀名單。附加成功顯示新增與略過筆數；401、413、其他錯誤沿用既有文案與 `refresh()` 規則；不寫本機、不重新載入。
+- `lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`、`previewAppendPlayers`、`fetchAppendPreview(expectedUserId, request)`；`components/matchmaker/local-import-view.ts` 新增附加與預覽名單文案、`describeAppendOutcome`，並改寫雲端 JSON 匯入的說明文字 `jsonCloudImportHint`。
 - **BREAKING（規格層）**：`data-transfer`「登入時的資料工具頁」中「從 JSON 備份匯入到雲端」由「雲端已有資料時拒絕、不覆寫、不合併」改為「雲端已有資料時經使用者確認後附加、仍不覆寫」；舊 409 文案「…請先在參賽者頁重置名單。」在此入口不再出現。
   「匯入本機資料到雲端」區塊的 409 行為與文案**不變**。
 
@@ -52,7 +53,7 @@
 - **核心套件**：`packages/pickball-core/src/api/import.ts`（新增匯出，不改既有匯出；不新增模組，`CORE_MODULES` 不變）。
 - **後端**：`hono-pickball/src/routes/import.ts`（新增 `POST /append`）、`hono-pickball/src/import/local-import-repository.ts`（新增附加寫入函式）。不新增表、不改 migration。
 - **前端產品程式碼**：`nextjs-pickball/lib/sync/local-import.ts`、`nextjs-pickball/components/matchmaker/local-import-view.ts`、`nextjs-pickball/components/matchmaker/JsonBackupSection.tsx`。
-  - 不改：`LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`LocalImportResultMessage.tsx`、`ClearLocalDataSection.tsx`、`RosterCsvImportSection.tsx`、`HistoryCsvSection.tsx`、`lib/matchmaker/remote-transfer.ts`、`lib/matchmaker/backup.ts`、`lib/matchmaker/transfer-storage.ts`、雲端 hook（`hooks/useRemote*.ts`）、`lib/matchmaker/player-stats.ts`、`components/layout/**`、`components/auth/**`、quiz／tour／guide、`hono-pickball/src/db/**`、`hono-pickball/drizzle/**`、`hono-pickball/src/matchmaker/**`。
+  - 不改：`lib/sync/roster-api.ts`（只呼叫既有 `fetchRemotePlayers`）、`LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`LocalImportResultMessage.tsx`、`ClearLocalDataSection.tsx`、`RosterCsvImportSection.tsx`、`HistoryCsvSection.tsx`、`lib/matchmaker/remote-transfer.ts`、`lib/matchmaker/backup.ts`、`lib/matchmaker/transfer-storage.ts`、雲端 hook（`hooks/useRemote*.ts`）、`lib/matchmaker/player-stats.ts`、`components/layout/**`、`components/auth/**`、quiz／tour／guide、`hono-pickball/src/db/**`、`hono-pickball/drizzle/**`、`hono-pickball/src/matchmaker/**`。
 - **測試**：
   - 新增檔（1）：`hono-pickball/test/local-import-append.test.ts`。
   - 新增 it 的既有檔：`packages/pickball-core/test/api/import.test.ts`、`packages/pickball-core/test/api/import-limits.test.ts`、`nextjs-pickball/lib/sync/local-import.test.ts`、`nextjs-pickball/components/matchmaker/local-import-view.test.ts`、`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx`、`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts`。
@@ -62,4 +63,4 @@
     ③ `nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 的 test「登入時以 JSON 備份匯入到空的雲端且不寫入本機」：第二次選檔後的 `getByText(CONFLICT_TEXT)` 可見斷言改為「附加確認可見且 `CONFLICT_TEXT` 數量為 0」（不按附加，其後斷言不變）。
 - **文件**：`hono-pickball/CLAUDE.md`（本機資料匯入 API 段落補附加端點、守衛樣本 16 條）、`nextjs-pickball/CLAUDE.md`（資料頁雲端 JSON 匯入的敘述，若有）。
 - **相依**：不新增。**migration**：無。**遠端**：無；部署順序照舊先 `hono-pickball` 後 `nextjs-pickball`（前端新流程依賴新端點）。
-- **使用者可見**：已登入且雲端有資料時，在資料頁「從 JSON 備份匯入到雲端」選檔，會看到附加確認與四條說明；按「附加到雲端」後顯示新增與略過筆數，參賽者頁與歷史頁出現附加的資料，統計頁中與雲端同名者的出場數包含附加的比賽。雲端為空時的整份匯入、訪客的本機覆寫式還原、「匯入本機資料到雲端」區塊皆不變。
+- **使用者可見**：已登入且雲端有資料時，在資料頁「從 JSON 備份匯入到雲端」選檔，會看到附加確認、會新增與視為同一人的參賽者名單、名稱提醒與四條說明；按「附加到雲端」後顯示新增與略過筆數，參賽者頁與歷史頁出現附加的資料，統計頁中與雲端同名者的出場數包含附加的比賽。雲端為空時的整份匯入、訪客的本機覆寫式還原、「匯入本機資料到雲端」區塊皆不變。

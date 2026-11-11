@@ -20,16 +20,17 @@ subagent 不繼承主對話 context。每次派工 MUST **逐字貼進 prompt**�
 3. **相關 spec 片段**：
    - §2 → 本 change `specs/user-data-sync/spec.md` 的「本機備份附加到雲端的 API」中請求、上限、共用參數形狀三段，以及四個核心 Scenario；「批次寫入端點的筆數與 body 上限」全文。
    - §3 → `specs/user-data-sync/spec.md` 的「本機備份附加到雲端的 API」全文（含全部 Scenario）、「刪除後重建的使用者資料版本不得重複」全文、「本機資料匯入雲端的 API」的預期帳號守衛段落與「匯入 API：守衛樣本表含匯入端點」Scenario。
-   - §4 → `specs/data-transfer/spec.md`「登入時的資料工具頁」的「附加到雲端」段落、JSON 還原列與「JSON 還原在雲端模式的語意」，以及 Scenario「附加請求的組成與結果分類」「附加結果與確認的文案」；§2 完成的核心附加契約（型別與 schema）。
+   - §4 → `specs/data-transfer/spec.md`「登入時的資料工具頁」的「附加到雲端」段落（含預覽名單的讀取與計算）、JSON 還原列、「雲端分支的資料讀取」例外句與「JSON 還原在雲端模式的語意」，以及 Scenario「附加預覽依後端規則列出會新增與視為同一人的參賽者」「附加預覽以呼叫端給的帳號讀取雲端名單」「附加請求的組成與結果分類」「附加結果與確認的文案」；
+     `specs/user-data-sync/spec.md`「本機備份附加到雲端的 API」的「共用的參數形狀」與「寫入規則」中參賽者一條（預覽規則必須與之一致）；§2 完成的核心附加契約（型別與 schema）。
    - §5 → `specs/data-transfer/spec.md`「登入時的資料工具頁」全文（含全部 Scenario）。
 4. **相關 design 片段**：§2 → Context（同名規則、SQLite 同表 INSERT…SELECT）、Decision 3、7、11；§3 → Context 全文、Decision 1、4、5、6、11，Risks 中 drizzle、id 改寫 SQL、TEMP TABLE、沙箱 EPERM 各條；
-   §4 → Decision 2、7、8；§5 → Decision 2、8、9，Risks 中 E2E 字面值同步點、`.dev.vars` 各條；§6 → Migration Plan、Non-Goals。
+   §4 → Decision 2、3、7、8、12；§5 → Decision 2、8、9、12，Risks 中 E2E 字面值同步點、`.dev.vars` 各條；§6 → Migration Plan、Non-Goals。
 5. **既有介面與範本**（全文貼上）：
    - §2：`packages/pickball-core/src/api/import.ts`、`packages/pickball-core/src/api/players.ts`（`PlayerWriteSchema`、`MAX_PLAYERS_PER_IMPORT`）、`packages/pickball-core/src/matchmaker/history.ts`（`MatchHistoryEntrySchema`）與 `test/api/import.test.ts`、`test/api/import-limits.test.ts` 全文。
    - §3：`hono-pickball/src/routes/import.ts`、`hono-pickball/src/import/local-import-repository.ts`、`hono-pickball/src/matchmaker/version-floor.ts`、`hono-pickball/src/matchmaker/players-repository.ts`（`sort_order` 與 `initialVersion` 寫法）、`hono-pickball/src/db/schema.ts`（兩張表）、`hono-pickball/src/http/body-limit.ts`（或 `jsonBodyLimit` 所在檔）；
      `hono-pickball/test/local-import.test.ts`、`hono-pickball/test/expected-user-guard.test.ts`、`hono-pickball/test/helpers/matchmaker-fixtures.ts`、`hono-pickball/test/helpers/session.ts` 全文；`hono-pickball/CLAUDE.md` 的 drizzle batch 限制段落。
-   - §4：`nextjs-pickball/lib/sync/local-import.ts`、`nextjs-pickball/components/matchmaker/local-import-view.ts`、`nextjs-pickball/lib/sync/api-client.ts`（`requestJson` 結果型別）、`nextjs-pickball/lib/matchmaker/remote-transfer.ts`（`REMOTE_TRANSFER_MESSAGES`）與 `local-import.test.ts`、`local-import-view.test.ts` 全文；三個 user-data E2E 檔中 `JSON_CLOUD_IMPORT_HINT_TEXT` 的定義行。
-   - §5：`nextjs-pickball/components/matchmaker/JsonBackupSection.tsx`、`JsonBackupSection.test.tsx`、`LocalImportResultMessage.tsx`、§4 完成的 `local-import.ts` 與 `local-import-view.ts`；`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 全文、`tests/e2e/helpers/` 中 `clearTestAccountUserData`、`expectedUserHeaders`、`readLocalKeys`、`markNoReload`、`expectNotReloaded` 所在檔；`components/matchmaker/PlayerStatsTable.tsx`（`player-stat-row-<id>` 與欄位順序）。
+   - §4：`nextjs-pickball/lib/sync/local-import.ts`、`nextjs-pickball/components/matchmaker/local-import-view.ts`、`nextjs-pickball/lib/sync/api-client.ts`（`requestJson` 結果型別）、`nextjs-pickball/lib/sync/roster-api.ts`（`fetchRemotePlayers`；不改）、`packages/pickball-core/src/api/players.ts`（`PlayerListResponseSchema`）、§3 `hono-pickball/test/local-import-append.test.ts` 中「雲端已有資料時附加略過同名或已存在 id 的參賽者…」「備份內同名的參賽者只新增第一位」兩個 it 的夾具段落（預覽 it 的共同 fixture）、`nextjs-pickball/lib/matchmaker/remote-transfer.ts`（`REMOTE_TRANSFER_MESSAGES`）與 `local-import.test.ts`、`local-import-view.test.ts` 全文；三個 user-data E2E 檔中 `JSON_CLOUD_IMPORT_HINT_TEXT` 的定義行。
+   - §5：`nextjs-pickball/components/matchmaker/JsonBackupSection.tsx`、`JsonBackupSection.test.tsx`、`LocalImportResultMessage.tsx`、§4 完成的 `local-import.ts` 與 `local-import-view.ts`、`nextjs-pickball/lib/sync/roster-api.ts`（名單 GET 的路徑與回應形狀，供 fetch mock 使用；不改）；`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 全文、`tests/e2e/helpers/` 中 `clearTestAccountUserData`、`expectedUserHeaders`、`readLocalKeys`、`markNoReload`、`expectNotReloaded` 所在檔；`components/matchmaker/PlayerStatsTable.tsx`（`player-stat-row-<id>` 與欄位順序）。
 6. **「不給你」清單**：其他群組 task、與本組無關的 capability spec、前一個 change 的 artifact、overview.md。缺 context 回報 `NEEDS_CONTEXT`。
 7. **工作位置**：主 repo `/Users/m2_24gb/Desktop/project/nextjs-pickball`，分支 `change/cloud-json-import-append`（environment.md）。
    禁止 `git worktree add`、切換分支、`git merge`、`git push`。
@@ -43,9 +44,11 @@ b. Implementer 交件前 MUST 自跑 mutation 並列出「幾次／改什麼／�
    - §3：① 參賽者陳述式拿掉「雲端同名」的排除條件；② 拿掉「id 已存在」的排除機制（`NOT EXISTS` 或 `ON CONFLICT` 擇其實作者）；③ `sort_order` 不加附加前的最大值（從 0 起）；④ 序號改為依 `key` 遞減；⑤ 新參賽者 `version` 寫死 1；
      ⑥ 同名判定不限本人 `user_id`；⑦ 歷史 `ON CONFLICT DO NOTHING` 改為 `DO UPDATE SET data = excluded.data`；⑧ 歷史 `data` 不改寫（原樣寫入）；⑨ 只改寫 `teamA`；⑩ 對應目標改取同名者中 `sort_order` 最大者；⑪ 對應表不排除「id 已在雲端名單」者；
      ⑫ `checkAppendLimits` 移除（只靠 body 上限）；⑬ 路由拿掉 `jsonBodyLimit`；⑭ `added` 改用請求筆數；⑮ 附加路由改掛到不經 `requireExpectedUser` 的位置（regression guard 須轉紅）。
-   - §4：① `backupToAppendRequest` 帶上 `currentRound`；② `appendBackupToCloud` 的 409 分類為 `unauthorized`；③ 413 分類為 `failed`；④ 不以 `AppendImportResponseSchema` 驗證 200 回應；⑤ 略過皆為 0 時仍回傳 `note`；⑥ 兩句補充說明的連接改為「，」；⑦ `APPEND_RULES` 調換兩條順序；⑧ `jsonCloudImportHint` 改回舊文字。
+   - §4：① `backupToAppendRequest` 帶上 `currentRound`；② `appendBackupToCloud` 的 409 分類為 `unauthorized`；③ 413 分類為 `failed`；④ 不以 `AppendImportResponseSchema` 驗證 200 回應；⑤ 略過皆為 0 時仍回傳 `note`；⑥ 兩句補充說明的連接改為「，」；⑦ `APPEND_RULES` 調換兩條順序；⑧ `jsonCloudImportHint` 改回舊文字；
+     ⑨ `previewAppendPlayers` 忽略「id 已在雲端」規則；⑩ 不做備份內同名去重；⑪ 先判定雲端再去重（同名的第一位被略過時改由第二位計入）；⑫ 比對前轉小寫或 trim 以外的正規化；⑬ `fetchAppendPreview` 的 401 分類為 `failed`；⑭ 不以 `PlayerListResponseSchema` 驗證名單回應。
    - §5：① 409 仍顯示 `cloudNotEmpty`、不進入附加確認；② 409 後不經確認直接送附加；③ 附加改用選檔當下的 user id；④ 請求進行中不停用按鈕；⑤ 401 不呼叫 `refresh()`；⑥ 無可附加時仍渲染確認；⑦ 按取消仍送出附加；⑧ 重新選檔不收起確認；⑨ 200 也進入附加流程（regression guard 須轉紅）；
-     ⑩ 附加成功後寫入本機 `pickball-matchmaker-players`（由 E2E 的本機 key 不變斷言轉紅，`--project=user-data` 單檔，雙鎖）。
+     ⑩ 附加成功後寫入本機 `pickball-matchmaker-players`（由 E2E 的本機 key 不變斷言轉紅，`--project=user-data` 單檔，雙鎖）；
+     ⑪ 名單讀取失敗時仍顯示附加確認（不含預覽）；⑫ 名單讀取 401 不呼叫 `refresh()`；⑬ `added` 為空時隱藏「附加到雲端」按鈕；⑭ 無可附加時仍讀取名單；⑮ 預覽清單改顯示 `matched` 於「會新增」清單。
    - 每組另放至少一條等價變異作對照組（例：重複判定的 `Set` 改寫為 `Map`；`NOT EXISTS` 改寫為 `LEFT JOIN … IS NULL`；`coalesce(<對應 id>, 原 id)` 改寫為 `CASE WHEN … IS NULL THEN … ELSE … END`；補充說明以陣列 `join("、")` 與逐句串接互換），須維持綠。
 c. mutation harness 三重落地檢查：`src.count(old) == 1`、替換後 `new != old`、`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball --no-pager diff --stat -- <file>` 有輸出；每次變異後還原並確認 `git status` 乾淨。用單檔 vitest（輸出須含 `Test Files`）。
 d. Stage 2 Reviewer MUST 獨立再做 mutation，不採信 Implementer 自述。
@@ -57,7 +60,7 @@ g. 單檔 E2E：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextj
 h. 編輯器診斷不可信，以 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit`、`pnpm --dir …/hono-pickball typecheck`、`pnpm --dir …/packages/pickball-core typecheck` 的 exit code 為準。測試一律顯式匯入 `describe`／`it`／`expect`／`vi`（`beforeEach`／`afterEach` 亦同）。**E2E SHALL NOT 使用 `waitForTimeout`**。
 i. **禁止任何遠端 CF 操作**（deploy、d1 create、`--remote`、secret put）；只允許 `--local`、`--dry-run`。**測試帳密禁止寫進任何會被 commit 的檔案或 commit 訊息**。
 j. **SHALL NOT 新增任何 npm 相依**；SHALL NOT 改動 proposal Impact「不改」清單中的檔案（`LocalDataImportSection.tsx`、`LocalImportNotice.tsx`、`LocalImportResultMessage.tsx`、`ClearLocalDataSection.tsx`、`RosterCsvImportSection.tsx`、`HistoryCsvSection.tsx`、
-   `lib/matchmaker/remote-transfer.ts`、`lib/matchmaker/backup.ts`、`lib/matchmaker/transfer-storage.ts`、`lib/matchmaker/player-stats.ts`、雲端 hook `hooks/useRemote*.ts`、`components/layout/**`、`components/auth/**`、quiz／tour／guide、`hono-pickball/src/db/**`、`hono-pickball/drizzle/**`、`hono-pickball/src/matchmaker/**`），
+   `lib/sync/roster-api.ts`、`lib/matchmaker/remote-transfer.ts`、`lib/matchmaker/backup.ts`、`lib/matchmaker/transfer-storage.ts`、`lib/matchmaker/player-stats.ts`、雲端 hook `hooks/useRemote*.ts`、`components/layout/**`、`components/auth/**`、quiz／tour／guide、`hono-pickball/src/db/**`、`hono-pickball/drizzle/**`、`hono-pickball/src/matchmaker/**`），
    也不改 `POST /api/import` 既有的 `importLocalData`、`LocalImportRequestSchema`、`serializeImportSegments`、`checkImportLimits` 的行為。需要時回報 `BLOCKED`。
 k. **既有 it／test 的名稱與斷言一律不得修改**，唯一例外為 tasks 檔頭列出的三處授權改寫（守衛樣本表、三個 E2E 檔的說明文字常數、`local-import.spec.ts` 一處斷言）。
 l. Commit：Conventional Commits、繁體中文；**commit 訊息不得加任何 attribution／footer 行**（不加 Claude-Session、Generated、Co-Authored-By）。一個 commit 只做一件事（`test:` 只含測試、`feat:` 只含產品碼與授權的同步，不混入 tasks 紀錄）。註解只寫「為什麼」，不寫 change 名稱、task 編號或審查流程。
@@ -95,7 +98,8 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
   - [ ] RED 對應正確 Scenario，且為真紅（依 e 機械複驗）；regression guard 已誠實標註。
   - [ ] GREEN 只滿足 RED：沒有改 `POST /api/import`、沒有整批守衛、沒有匯入回合、沒有重算分數、沒有改寫雲端既有列、沒有自動重試或跨分頁通知（scope creep）。
   - [ ] 同名略過、id 已存在略過、備份內同名去重、歷史 id 改寫 ①②③ 與 spec 逐條一致；姓名快照與分數未改（§2、§3）。
-  - [ ] 409 進入附加確認而非拒絕文案；按下當下取帳號；取消與重新選檔不送附加；不寫本機、不重新載入（§5）。
+  - [ ] 409 進入附加確認而非拒絕文案；預覽名單以選檔當下的帳號讀取、讀完才顯示確認、讀取失敗不顯示確認；按下當下取帳號；取消與重新選檔不送附加；不寫本機、不重新載入（§5）。
+  - [ ] `previewAppendPlayers` 的規則與 `user-data-sync` 寫入規則及 `serializeAppendSegments` 去重逐條一致，共同 fixture 與後端 it 相同（§4）。
   - [ ] 「不改」清單中的檔案未改動。
 - **SHALL NOT**：評論命名與結構。
 
@@ -105,7 +109,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
 - **rationale**：兩條陳述式之間的可見性、CTE 與巢狀 JSON 改寫的正確性、drizzle batch 結果形狀與前端兩段式請求的狀態管理最需要最強模型。
 - **required first action**：同 Stage 1。
 - **review checklist**（審查準則，不逐項勾選；各次審查的實際結論見 tasks.md 2.4、3.5、4.4、5.6 的紀錄）：
-  - [ ] 獨立 mutation（b～d），特別是 §2 ③ ④、§3 ① ② ⑥ ⑧ ⑩ ⑪ ⑫ ⑮、§4 ② ④、§5 ② ③ ⑧ ⑨ 與對照組。
+  - [ ] 獨立 mutation（b～d），特別是 §2 ③ ④、§3 ① ② ⑥ ⑧ ⑩ ⑪ ⑫ ⑮、§4 ② ④ ⑨ ⑩ ⑪、§5 ② ③ ⑧ ⑨ ⑪ 與對照組。
   - [ ] 參數形狀與上限只在核心定義一次；後端送進 `json_each` 的就是 `checkAppendLimits` 回傳的 `segments`，沒有另組 JSON。
   - [ ] SQL 的所有子查詢都帶 `user_id` 條件；對應 CTE 只算一次，沒有在每位球員的子查詢內重複掃描名單。
   - [ ] 沒有 `db.run`／`db.all` 帶參數的 raw 陳述式、沒有 batch 外讀名單、沒有 `meta.changes` 計數。
@@ -121,7 +125,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
 - **review checklist**（審查準則，不逐項勾選；實際結論見 tasks.md 6.12 的紀錄）：
   - [ ] `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff main --stat` ⊆ proposal Impact；主 spec 無任何改動。
   - [ ] C6、C7、C9、C10 的結果與 test-plan 一致；`POST /api/import` 的既有行為與測試未被改動。
-  - [ ] 指令驗收 C1～C10 皆有紀錄；前端測試數＝基線＋9、後端＝基線＋15（檔數＋1）、核心＝基線＋4；五個 browser project 各＝基線且全綠；user-data＝基線＋1。
+  - [ ] 指令驗收 C1～C10 皆有紀錄；前端測試數＝基線＋13、後端＝基線＋15（檔數＋1）、核心＝基線＋4；五個 browser project 各＝基線且全綠；user-data＝基線＋1。
   - [ ] 回應欄位、文案常數、函式命名在核心、後端、前端三層一致；`hono-pickball/CLAUDE.md` 與 `nextjs-pickball/CLAUDE.md` 的敘述與新行為一致。
 - **SHALL NOT**：重審單一 task 細節。
 

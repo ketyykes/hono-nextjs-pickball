@@ -16,7 +16,7 @@
 >
 > **範圍**：產品程式碼只改 proposal Impact 列出的 6 個檔案（核心 1、後端 2、前端 3）；文件只改兩份 workspace `CLAUDE.md`。**不新增相依、無 migration、禁止任何遠端 CF 操作、不 push**。
 > it／test 名稱 MUST 與 delta spec「驗收」錨點逐字一致；測試一律顯式匯入 `describe`／`it`／`expect`／`vi`（`beforeEach`、`afterEach` 亦同）；E2E 不得使用 `waitForTimeout`。
-> 文案以 delta spec `data-transfer`「登入時的資料工具頁」為準（附加確認、四條說明、兩顆按鈕、無可附加、結果與補充說明、新 `jsonCloudImportHint`）；SHALL NOT 新增 spec 以外的文案。
+> 文案以 delta spec `data-transfer`「登入時的資料工具頁」為準（附加確認、預覽名單標題與名稱提醒、沒有新增者與名單讀取失敗、四條說明、兩顆按鈕、無可附加、結果與補充說明、新 `jsonCloudImportHint`）；SHALL NOT 新增 spec 以外的文案。
 >
 > **授權改寫的既有測試（僅限下列；其餘既有 it／test 的名稱、斷言與 setup 一律不得修改）**：
 > ① `hono-pickball/test/expected-user-guard.test.ts`：`SAMPLES` 補一條 `POST /api/import/append`（合法附加 body），it「列舉出的使用者資料路由恰與守衛樣本表一致」的 `toHaveLength(15)` 改為 `toHaveLength(16)`；
@@ -78,26 +78,29 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：`nextjs-pickball/lib/sync/local-import.test.ts` 新增 it「backupToAppendRequest 只取備份的參賽者與歷史」「appendBackupToCloud 依回應分類為已附加、未授權、資料過大或失敗且不改動本機」；
-  `nextjs-pickball/components/matchmaker/local-import-view.test.ts` 新增 it「附加結果依略過筆數組成新增與略過的文案」「附加確認的說明、四條說明與按鈕文字為固定值」。兩檔單檔 vitest 確認四個新 it 紅、既有 it 全綠並貼出輸出（與 4.2 同一張派工單）
-- [ ] 4.2 GREEN（TDD；含 E2E 常數同步 ②）：`lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`、`AppendImportOutcome`（附加路徑字串只在此檔）；
-  `components/matchmaker/local-import-view.ts` 新增 `APPEND_RULES`、`APPEND_ACTION_LABEL`、`APPEND_CANCEL_LABEL`、`LOCAL_IMPORT_MESSAGES.appendNothing`、`describeAppendPreview`、`describeAppendOutcome`，改寫 `jsonCloudImportHint`（design Decision 7、8）；
+- [ ] 4.1 RED（TDD）：`nextjs-pickball/lib/sync/local-import.test.ts` 新增 it「backupToAppendRequest 只取備份的參賽者與歷史」「appendBackupToCloud 依回應分類為已附加、未授權、資料過大或失敗且不改動本機」
+  「previewAppendPlayers 依後端的同名與 id 規則列出會新增與視為同一人的參賽者」「fetchAppendPreview 以呼叫端給的帳號讀取雲端名單並分類為預覽、未授權或失敗」（前者的 ①② fixture 與 §3 後端兩個對應 it 相同，見 test-plan）；
+  `nextjs-pickball/components/matchmaker/local-import-view.test.ts` 新增 it「附加結果依略過筆數組成新增與略過的文案」「附加確認的說明、預覽名單標題與提醒、四條說明與按鈕文字為固定值」。兩檔單檔 vitest 確認六個新 it 紅、既有 it 全綠並貼出輸出（與 4.2 同一張派工單）
+- [ ] 4.2 GREEN（TDD；含 E2E 常數同步 ②）：`lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`、`AppendImportOutcome`（附加路徑字串只在此檔）、
+  純函式 `previewAppendPlayers(backupPlayers, cloudPlayers)`（先依名稱去重、再判定 id 或名稱已在雲端，不做正規化）與 `fetchAppendPreview(expectedUserId, request)`（經既有 `fetchRemotePlayers`，`roster-api.ts` 不改）；
+  `components/matchmaker/local-import-view.ts` 新增 `APPEND_RULES`、`APPEND_ACTION_LABEL`、`APPEND_CANCEL_LABEL`、`APPEND_NAME_CHECK_HINT`、`LOCAL_IMPORT_MESSAGES.appendNothing`／`appendNoNewPlayers`／`appendPreviewFailed`、`describeAppendPreview`、`describeAppendNewPlayers`、`describeAppendMatchedPlayers`、`describeAppendOutcome`，改寫 `jsonCloudImportHint`（design Decision 7、8、12）；
   同一個 commit 依檔頭授權 ② 同步三個 E2E 檔的 `JSON_CLOUD_IMPORT_HINT_TEXT`。4.1 全綠；`JsonBackupSection.test.tsx`、`LocalDataImportSection.test.tsx` 既有 it 全綠；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 4.3 REFACTOR：`describeAppendOutcome` 與 `describeImportOutcome` 的錯誤分支是否值得共用（預期不抽：結果型別不同）；補充說明的組字是否以 if/else 表達、無巢狀三元；無壞味道則註記 skipped
+- [ ] 4.3 REFACTOR：`describeAppendOutcome` 與 `describeImportOutcome` 的錯誤分支是否值得共用（預期不抽：結果型別不同）；補充說明的組字是否以 if/else 表達、無巢狀三元；`previewAppendPlayers` 的去重與判定是否以具名步驟表達、註解寫明「必須與後端規則一致」的理由；無壞味道則註記 skipped
 - [ ] 4.4 Stage 1（sonnet）→ Stage 2（opus）審查 §4：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 5. JSON 雲端匯入的附加流程（元件與 E2E）
 
 Depends on: §4
 
-- [ ] 5.1 RED（TDD，E2E；含 改寫既有 test ③）：`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端」（寫法依 test-plan「E2E 共同要求」與該列斷言，含統計頁出場數），並依檔頭授權改寫 ③。
+- [ ] 5.1 RED（TDD，E2E；含 改寫既有 test ③）：`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端」（寫法依 test-plan「E2E 共同要求」與該列斷言，含預覽名單「新人丙」／「共同甲」與統計頁出場數），並依檔頭授權改寫 ③。
   雙鎖下 `--project=user-data` 跑該檔並貼出輸出：新 test 與改寫的 ③ 紅（附加確認不存在）、該檔其餘 test 綠；`.dev.vars` 不齊備導致 skip 時停止並向 coordinator 索取
-- [ ] 5.2 RED（TDD）：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx` 新增 5 個 it——「雲端已有資料時顯示附加確認與四條說明，按下附加到雲端才以當下帳號送出附加請求」「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
-  「附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機」「備份沒有可附加的參賽者與歷史時顯示無可附加且不渲染附加按鈕」「雲端沒有資料時照舊整份匯入且不顯示附加確認」。
-  單檔 vitest 貼出輸出：前四個紅；最後一個預期寫入即綠，點名標 regression guard（與 5.3 同一張派工單）
-- [ ] 5.3 GREEN（TDD）：`components/matchmaker/JsonBackupSection.tsx` 的雲端分支依 delta spec「附加到雲端」與 design Decision 2、8 實作：409 進入附加確認、無可附加提示、按下當下取 `useSession()` 的 user id、進行中停用兩顆按鈕、取消與重新選檔收起確認、`describeAppendOutcome` 顯示結果、401 時 `refresh()`；
+- [ ] 5.2 RED（TDD）：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx` 新增 7 個 it——「雲端已有資料時顯示附加確認、預覽名單與四條說明，按下附加到雲端才以當下帳號送出附加請求」「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
+  「附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機」「備份沒有可附加的參賽者與歷史時顯示無可附加且不渲染附加按鈕」「附加確認在沒有會新增的參賽者時顯示提示且仍可附加歷史」
+  「讀取雲端名單未授權時刷新 session，其他失敗顯示讀取失敗，兩者皆不顯示附加確認」「雲端沒有資料時照舊整份匯入且不顯示附加確認」。
+  單檔 vitest 貼出輸出：前六個紅；最後一個預期寫入即綠，點名標 regression guard（與 5.3 同一張派工單）
+- [ ] 5.3 GREEN（TDD）：`components/matchmaker/JsonBackupSection.tsx` 的雲端分支依 delta spec「附加到雲端」與 design Decision 2、8、12 實作：409 後以選檔當下的 user id 呼叫 `fetchAppendPreview`、讀完才顯示附加確認（預覽兩份名單、名稱提醒、沒有新增者的提示；讀取 401 時 `refresh()`、其他失敗顯示 `appendPreviewFailed`，皆不顯示確認）、無可附加提示（不讀名單）、按下當下取 `useSession()` 的 user id、進行中停用兩顆按鈕、取消與重新選檔收起確認、`describeAppendOutcome` 顯示結果、401 時 `refresh()`；
   不寫本機、不重新載入。5.2 全綠、該檔既有 6 個 it 全綠；tsc exit 0；改動檔 ESLint 0 errors；雙鎖下 `--project=user-data` 跑 `local-import.spec.ts`，5.1 兩條轉綠、其餘綠
-- [ ] 5.4 REFACTOR：附加確認是否抽成同檔內的小元件（只有一處使用則不抽）；狀態（確認中的請求、進行中）是否以單一 state 表達、無互斥 boolean；舊註解（「只有雲端沒有資料時才寫入」等）依新行為更新；無壞味道則註記 skipped
+- [ ] 5.4 REFACTOR：附加確認是否抽成同檔內的小元件（只有一處使用則不抽）；狀態（名單讀取中、確認中、附加請求進行中）是否以單一 state 表達、無互斥 boolean；重新選檔後才回應的名單讀取結果不覆寫新狀態；舊註解（「只有雲端沒有資料時才寫入」等）依新行為更新；無壞味道則註記 skipped
 - [ ] 5.5 驗收（E2E）：雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`，全數 passed、0 skipped，數量＝基線＋1；`--project=chromium` 跑 `tests/e2e/specs/` 中含 `JsonBackupSection` 或資料頁的 spec（以 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出），全綠
 - [ ] 5.6 Stage 1（sonnet）→ Stage 2（opus）審查 §5：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
@@ -108,7 +111,7 @@ Depends on: §5
 - [ ] 6.1 設定層（文件）：`hono-pickball/CLAUDE.md` 的本機資料匯入 API 段落補 `POST /api/import/append`（兩條陳述式、無整批守衛、歷史 id 改寫在 SQL 內）與守衛樣本「目前 16 條」；`nextjs-pickball/CLAUDE.md` 若有描述資料頁雲端 JSON 匯入或 `jsonCloudImportHint` 同步點，依新行為更新。commit（`docs:`）
 - [ ] 6.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 6.3 驗收（指令）C2：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖）0 errors、warning 不多於基線
-- [ ] 6.4 驗收（指令）C3：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖）三組皆綠；前端測試數＝基線＋9、檔數＝基線；後端檔數＝基線＋1、測試數＝基線＋15；核心測試數＝基線＋4、檔數＝基線
+- [ ] 6.4 驗收（指令）C3：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖）三組皆綠；前端測試數＝基線＋13、檔數＝基線；後端檔數＝基線＋1、測試數＝基線＋15；核心測試數＝基線＋4、檔數＝基線
 - [ ] 6.5 驗收（指令）C4：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖）exit 0；建置後 `git status --porcelain` 為空
 - [ ] 6.6 驗收（指令）C6：`/api/import/append` 在前端產品碼只出現在 `lib/sync/local-import.ts`
 - [ ] 6.7 驗收（指令）C7：範圍 `git diff main --stat -- <test-plan C7 列出的路徑>` 輸出為空

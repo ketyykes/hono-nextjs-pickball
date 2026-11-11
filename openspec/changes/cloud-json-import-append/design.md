@@ -7,6 +7,7 @@
 - **前端雲端 JSON 匯入**（`components/matchmaker/JsonBackupSection.tsx` 的 `handleCloudImportText`）：`parseBackup` → `backupToImportRequest`（`lib/sync/local-import.ts`）→ `importLocalData(userId, …)` → `describeImportOutcome`（`components/matchmaker/local-import-view.ts`）。409 對應 `LOCAL_IMPORT_MESSAGES.cloudNotEmpty`，與「匯入本機資料到雲端」區塊共用。
   說明文字 `LOCAL_IMPORT_MESSAGES.jsonCloudImportHint` 寫著「只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料」，三個 user-data E2E spec 以它的字面值當「已切到雲端分支」的同步點（`local-import.spec.ts`、`history-sync.spec.ts`、`roster-sync.spec.ts` 共 5 處）。
   `local-import.spec.ts` 的 test「登入時以 JSON 備份匯入到空的雲端且不寫入本機」後半段再選同一份檔，斷言看到 `CONFLICT_TEXT`——本 change 後該入口改顯示附加確認，這一行必須改寫（proposal 授權）。
+- **雲端名單的讀取**：`lib/sync/roster-api.ts` 的 `fetchRemotePlayers(expectedUserId)` 以 `requestJson` 送 `GET /api/matchmaker/players`、以 `PlayerListResponseSchema`（`{ items: [{ data: Player, version }] }`）驗證，結果為 `ok`／`conflict`／`unauthorized`／`rejected`／`failed`。雲端名單的 `data.name` 寫入時同樣經 `PlayerSchema` trim。
 - **名單的同名規則**：`PlayerSchema.name` 為 `z.string().trim().min(1)`，寫入雲端前已 trim；`player-roster` 沒有名稱唯一性；`data-transfer` 的參賽者 CSV 匯入明定「同名視為不同人」。本 change 依使用者定案在 JSON 附加入口採相反規則（同名視為同一人），只限此入口。
 - **sort_order 與版本**（`src/matchmaker/players-repository.ts`、`version-floor.ts`）：單筆建立為 `coalesce(max(sort_order), -1) + 1`、版本為 `initialVersion(userId)`（下限加一，子查詢在同一條陳述式）；`importPlayers` 在 batch 外先讀 max（既有寫法，不沿用）。
   歷史 `version` 恆為 1；`matchmaker_history` 主鍵 `(user_id, match_id)`；`matchmaker_players` 主鍵 `(user_id, id)`。
@@ -54,14 +55,15 @@
 
 ### Decision 2：前端兩段式——先送整份匯入，409 才顯示附加確認
 
-**Choice**：選檔後照舊送 `POST /api/import`；200 沿用既有文案；`cloud-not-empty` 時以 `backupToAppendRequest` 取出 `{ players, history }`：兩段皆空 → 顯示 `appendNothing`、不渲染按鈕；否則在區塊內顯示附加確認（備份的參賽者數與歷史筆數、四條說明、「附加到雲端」與「取消」）。按下才送 `POST /api/import/append`。
-確認顯示的是**備份**的筆數（去重前）；實際新增與略過筆數由後端回應決定並在結果顯示。
+**Choice**：選檔後照舊送 `POST /api/import`；200 沿用既有文案；`cloud-not-empty` 時以 `backupToAppendRequest` 取出 `{ players, history }`：兩段皆空 → 顯示 `appendNothing`、不渲染按鈕、不讀名單；否則先讀雲端名單算出參賽者預覽（Decision 12），讀完才在區塊內顯示附加確認（備份的參賽者數與歷史筆數、會新增與視為同一人的參賽者名單、名稱提醒、四條說明、「附加到雲端」與「取消」）。按下才送 `POST /api/import/append`。
+確認開頭的筆數是**備份**的筆數（去重前）；參賽者名單是送出前的預覽；實際新增與略過筆數由後端回應決定並在結果顯示。
 
-**Rationale**：雲端為空時行為零變更（含回合與分槽）；409 由後端權威判定，前端不必先讀雲端。確認前就算出「實際會新增幾位」需要先 GET 名單與歷史（兩個請求、與附加之間有競態），而後端回應本來就會給準確數字。
+**Rationale**：雲端為空時行為零變更（含回合與分槽、不多讀名單）；409 由後端權威判定。歷史不做預覽：重複的歷史略過不會造成資料分裂，而且要讀全部雲端歷史；參賽者則因「名字打錯就多一位、無法合併」而由使用者追加定案必須預覽（Decision 12）。
 
 **Alternatives considered**：
 - 選檔後一律先顯示確認：雲端為空的使用者多一步，且會改變既有 E2E 與 Scenario。不選。
-- 確認前先 GET 雲端算出淨新增數：多兩個請求、仍可能與實際不符（其他裝置同時寫入）。不選。
+- 確認前先 GET 雲端名單與歷史、算出兩段的淨新增數：歷史需讀全部且不影響使用者判斷。只讀名單（Decision 12）。
+- 不預覽、只在結果顯示新增筆數（原設計）：使用者送出後才發現打錯名字的參賽者已被新增，且無法合併。已被使用者定案推翻。
 - 以 `role="dialog"` 對話框呈現：要處理焦點陷阱與 Esc，區塊內的確認已足夠且與 CSV 匯入預覽一致（區塊內呈現）。不選。
 
 ### Decision 3：同名的判定與備份內去重放在核心
@@ -122,8 +124,8 @@
 
 ### Decision 8：文案與畫面結構
 
-**Choice**：`local-import-view.ts` 新增 `APPEND_RULES`（四條，`readonly` 陣列）、`APPEND_ACTION_LABEL`、`APPEND_CANCEL_LABEL`、`LOCAL_IMPORT_MESSAGES.appendNothing`、`describeAppendPreview(players, history)`、`describeAppendOutcome(outcome)`，並改寫 `jsonCloudImportHint`；文字以 delta spec 為準。
-成功結果沿用 `ImportResultView` 的 `note` 與 `LocalImportResultMessage`（`json-backup-import-message`／`-note`），錯誤沿用既有 `role="alert"` 訊息區；附加確認是 `CardContent` 內的區塊（`data-testid="json-backup-append-confirm"`），說明以 `<ul>` 清單呈現。
+**Choice**：`local-import-view.ts` 新增 `APPEND_RULES`（四條，`readonly` 陣列）、`APPEND_ACTION_LABEL`、`APPEND_CANCEL_LABEL`、`APPEND_NAME_CHECK_HINT`、`LOCAL_IMPORT_MESSAGES.appendNothing`／`appendNoNewPlayers`／`appendPreviewFailed`、`describeAppendPreview(players, history)`、`describeAppendNewPlayers(count)`、`describeAppendMatchedPlayers(count)`、`describeAppendOutcome(outcome)`，並改寫 `jsonCloudImportHint`；文字以 delta spec 為準。
+成功結果沿用 `ImportResultView` 的 `note` 與 `LocalImportResultMessage`（`json-backup-import-message`／`-note`），錯誤沿用既有 `role="alert"` 訊息區；附加確認是 `CardContent` 內的區塊（`data-testid="json-backup-append-confirm"`），預覽的兩份名單與四條說明各為一個帶 `data-testid` 的 `<ul>`（`json-backup-append-new-players`、`json-backup-append-matched-players`、`json-backup-append-rules`），測試以 testid 區分三份清單。
 `LOCAL_IMPORT_MESSAGES.cloudNotEmpty` 保留（「匯入本機資料到雲端」仍用），只是 JSON 入口不再顯示。
 
 **Rationale**：文案集中可被逐字斷言；成功與補充說明的呈現已有元件，不另寫。
@@ -141,7 +143,7 @@
 
 ### Decision 10：spec 切法
 
-**Choice**：`user-data-sync` ADDED「本機備份附加到雲端的 API」；MODIFIED 三個敘述會變錯的 Requirement（批次寫入端點清單、版本下限的建立路徑、匯入 API 的守衛樣本總數與新端點指引）。`data-transfer` MODIFIED「登入時的資料工具頁」，既有 Scenario 全數保留、新增 8 個。
+**Choice**：`user-data-sync` ADDED「本機備份附加到雲端的 API」；MODIFIED 三個敘述會變錯的 Requirement（批次寫入端點清單、版本下限的建立路徑、匯入 API 的守衛樣本總數與新端點指引）。`data-transfer` MODIFIED「登入時的資料工具頁」，既有 Scenario 全數保留、新增 12 個（其中 4 個為參賽者預覽）。
 `match-history`「登入時歷史以雲端為準」中「列舉出的使用者資料路由由 13 條變為 14 條」「共 14 條」早在 `POST /api/import` 加入時就已過時而未改（前例），本 change 比照不動（列入 Open Questions）。
 
 ### Decision 11：歷史球員 id 的改寫在後端同一條 SQL 內完成
@@ -161,7 +163,30 @@
 - 後端 handler 在 batch 外先讀名單、在 JS 改寫：同樣是先讀後寫的競態（D1 batch 外沒有交易）。不選。
 - 不改寫（原設計）：統計頁分列、附加的比賽不算到雲端那位。已被使用者定案推翻。
 
+### Decision 12：附加前的參賽者預覽在前端計算，不新增後端 dry-run 端點
+
+**Choice**（使用者追加定案：送出前列出會新增到雲端的參賽者）：409 之後、顯示確認之前，前端以 `fetchAppendPreview(expectedUserId, request)`（`lib/sync/local-import.ts`）呼叫既有 `fetchRemotePlayers` 讀雲端名單，再以純函式 `previewAppendPlayers(backupPlayers, cloudPlayers)` 算出 `{ added, matched }`，依序列在確認畫面；
+`added` 不為空時加一句名稱提醒（要完全相同才算同一人、寫法不同請先取消並在本機改名）。四條說明的 ① 補上實際的名稱比對規則（前後空白不計；大小寫、全形半形、中間空白不同即不同人）。
+名單 GET 用選檔當下的帳號（與 `POST /api/import` 相同）；附加請求仍取按下當下的帳號。名單讀取 401 → `unauthorized`＋`refresh()`；其他失敗 → `appendPreviewFailed`；兩者都不顯示確認、不送附加。預覽只是提示，結果文案仍依後端回應。
+
+**Rationale**：
+- 名字打錯或大小寫不同時，後端依規則把它當新的參賽者新增，戰績與分數被拆成兩位，而目前沒有合併參賽者的功能——事後無法補救，只能在送出前讓使用者看到。
+- 預覽只需要雲端名單（既有端點與既有函式），不需要新的後端程式碼；前端已經有 `Player[]` 的備份與雲端名單，規則只有「先依名稱去重，再看 id 或名稱是否已在雲端」兩步，寫成純函式即可單元測試。
+- 讀取函式放 `local-import.ts`：與附加請求同檔、元件仍只負責顯示（「雲端分支的資料讀取 MUST 經 remote-transfer.ts」的例外寫進 spec，因 `remote-transfer.ts` 在不改清單中，且此讀取屬於匯入流程）。
+
+**與後端規則一致的保證**：規則以文字寫在 delta spec 兩處（`user-data-sync` 的寫入規則、`data-transfer` 的預覽計算），前端單元 it「previewAppendPlayers 依後端的同名與 id 規則…」的 ①② 兩組 fixture 與後端 it「雲端已有資料時附加略過同名或已存在 id 的參賽者…」「備份內同名的參賽者只新增第一位」相同，兩邊各自斷言同一組結果（前端 `added` 長度＝後端 `added`）；
+另以 ③（名稱的第一位因 id 已存在而略過、第二位因去重不出現）鎖住「先去重再判定」的順序，④ 鎖住不做大小寫正規化。§4 必做變異包含「忽略 id 已存在」「不去重」「先判定再去重」「比對前轉小寫」。
+
+**Alternatives considered**：
+- 後端新增 dry-run 端點（例如 `POST /api/import/append?dryRun=1` 或 `POST /api/import/append/preview`）回傳會新增的名單：規則只寫一次、與實際寫入同一段 SQL，最不會漂移；但要多一個路由、守衛樣本（16 → 17）、schema 與後端測試，§3 尚未開始時加入會擴大本 change，且預覽本來就只是提示（與實際寫入之間仍可能被其他裝置改動）。不選；若日後前後端規則漂移成為實際問題再改。
+- 由元件直接呼叫 `fetchRemotePlayers`：元件要自己分類結果與處理形狀不符，且難以單元測試帳號與分類。不選。
+- 預覽也列出會略過的歷史：見 Decision 2。不選。
+
 ## Risks / Trade-offs
+
+- [Risk] 前端預覽規則與後端寫入規則日後漂移（例如後端改為正規化比對而前端沒跟上）→ Mitigation：Decision 12 的共同 fixture；任何一邊改規則都必須先走 openspec change，同時改 delta spec 兩處與兩邊的 it。預覽只是提示，漂移時結果文案仍正確反映後端實際新增與略過。
+- [Risk] 名單讀取與按下附加之間，其他裝置新增或改名參賽者、或使用者換了帳號（附加取按下當下的帳號）→ 預覽與實際結果不符；結果文案以後端回應的新增與略過筆數為準，接受。
+- [Trade-off] 雲端已有資料時，選檔到出現確認多一個 GET（名單，與參賽者頁掛載時讀取的是同一個端點），接受。
 
 - [Risk] 歷史 id 改寫的 SQL 較複雜（CTE、巢狀 `json_each`、`json_group_array`、`json_set`）：子查詢 `ORDER BY key` 後再聚合的順序是 SQLite 的實際行為而非文件保證 → Mitigation：本機 D1（miniflare）亦支援聚合函式內的 `ORDER BY`（`json_group_array(x ORDER BY key)`，SQLite 3.44 起；propose 階段已實測），Implementer 可擇一並以 Scenario 的雙打陣列順序斷言鎖住；2,000 筆時對照 CTE 只算一次，不要在每位球員的子查詢內重複掃描名單。
   `INSERT … WITH … SELECT` 若 drizzle 的 `insert().select(sql\`…\`)` 無法產生，可把 CTE 改寫為 FROM 子句內的子查詢；必須用 raw 陳述式才能達成 → 停止並升級。
@@ -172,7 +197,7 @@
 - [Risk] 附加的歷史不反映在強度分數 → 確認畫面第四條說明要求手動調整（使用者定案）。
 - [Risk] 備份中的進行中回合遺失 → 第三條說明要求先在本機結束回合再匯出。
 - [Risk] 其他已開啟裝置看到舊名單、在附加後才新增同名參賽者 → 單筆新增不做同名檢查是既有行為，接受；重新載入即看到完整名單。
-- [Risk] 確認顯示的是備份筆數，與實際新增數不同 → 結果文案顯示實際新增與略過筆數；確認文字寫「可以把這份備份的 N 位參賽者、M 筆歷史附加到雲端」而非「將新增」。
+- [Risk] 確認開頭顯示的是備份筆數，與實際新增數不同 → 其下列出會新增與視為同一人的參賽者名單（Decision 12）；結果文案顯示實際新增與略過筆數；確認開頭寫「可以把這份備份的 N 位參賽者、M 筆歷史附加到雲端」而非「將新增」。
 - [Risk] 409 只代表「雲端有對戰分配機資料」，使用者按下附加前雲端可能被清空 → 附加端點在雲端為空時同樣成立（全部新增），結果正確。
 - [Risk] 既有 E2E 的字面值同步點與第二次選檔斷言 → proposal 明列授權改寫範圍（3 檔常數、1 處斷言、守衛樣本表），其餘既有 test 不得修改；Final review 以 `git diff` 核對。
 - [Risk] 主 repo 的 Stop hook 擋型別紅燈：核心與前端的 RED 會 import 尚不存在的匯出 → RED 與其 GREEN MUST 在同一張派工單內完成；後端 `test/**` 不在 Stop hook 範圍，但交件前 MUST 跑 `pnpm --dir …/hono-pickball typecheck`。
@@ -192,4 +217,5 @@
 - `id` 已存在但名稱不同的參賽者也略過（視為同一筆、不覆寫），計入 `skipped`。
 - 第一條說明補上「附加的歷史會算在雲端那位參賽者身上」（因 id 改寫定案而加；仍為四條）。
 - id 改寫的對應目標為雲端同名者中 `sort_order` 最小的一位（雲端本身就有同名兩位時取第一位）；`id` 已存在者不改寫；找不到同名者（例如該名稱的第一位因 id 已存在而略過）時不改寫。
+- 附加前的參賽者預覽（使用者追加定案）採前端計算而非後端 dry-run 端點（Decision 12）；名單讀取失敗新增文案 `appendPreviewFailed`，未沿用 `LOCAL_IMPORT_MESSAGES.failed`（後者寫「匯入失敗」，此時尚未送出匯入，且需提示檢查網路）。
 - `match-history` 中過時的「共 14 條」比照前例不動；`user-data-sync`「本機資料匯入雲端的 API」的「共 15 條」則以 MODIFIED 改為 16。
