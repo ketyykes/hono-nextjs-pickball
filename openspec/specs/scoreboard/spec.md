@@ -550,7 +550,7 @@ UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 
 ### Requirement: 登入時獨立計分板以雲端為準
 
 `useScoreboardStore(matchId)` SHALL 為選擇器：`resolveStorageMode(useSession())` 為 `"remote"` 時，`matchId === null` 回傳
-`hooks/useRemoteScoreboardStore.ts` 的狀態、`matchId` 非 `null` 回傳 `hooks/useRemoteMatchSlotStore.ts` 的狀態；`"pending"` 時回傳等待中結果（初始狀態、不做事的 `dispatch`、`bindingStatus` 為 `standalone`／`pending`、`syncStatus` 為 `"pending"`，見 `user-data-sync`「資料來源確定前的等待中畫面」）；本機模式回傳本機實作（`hooks/useScoreboardStore.ts` 內的 `useLocalScoreboardStore`，程式碼與 B5 前的
+`hooks/useRemoteScoreboardStore.ts` 的狀態、`matchId` 非 `null` 回傳 `hooks/useRemoteMatchSlotStore.ts` 的狀態；`"pending"` 時回傳等待中結果（初始狀態、不做事的 `dispatch`、`bindingStatus` 為 `standalone`／`pending`、`syncStatus` 為 `"pending"`（session 無法確認時為 `"unavailable"`），見 `user-data-sync`「資料來源確定前的等待中畫面」與「session 無法確認時的阻擋畫面與本機備援」）；本機模式回傳本機實作（`hooks/useScoreboardStore.ts` 內的 `useLocalScoreboardStore`，程式碼與 B5 前的
 `useScoreboardStore` 相同）。回傳值 MUST 為 `[state, dispatch, bindingStatus, syncStatus]`：前三個元素語意不變，`syncStatus` 型別為 `DataStatus`，本機模式在本機計分讀入前為 `"pending"`、讀入後恆為 `"local"`。
 
 雲端實作 `useRemoteScoreboardStore({ enabled, onUnauthorized })` MUST：
@@ -573,7 +573,7 @@ UNDO 同樣 MUST 保留 `targetScore` 與 `matchId`：`UNDO` 以「重建初始 
 
 後端 `PUT /api/scoreboard/current` 只存獨立計分板：`data.matchId` 非 `null` 時 MUST 回 `400 { "error": "INVALID_BODY" }`（場次分槽走 `/api/matchmaker/slots/*`，見 `round-lifecycle`「回合與送出比分的雲端 API」）。
 
-`components/scoreboard/Scoreboard.tsx` 在 `isContentBlocked(syncStatus)`（`pending`、`loading` 或 `load-failed`）時 MUST 以 `SyncStatusNotice` 取代計分畫面（此時沒有可信的比分可顯示）；
+`components/scoreboard/Scoreboard.tsx` 在 `isContentBlocked(syncStatus)`（`pending`、`unavailable`、`loading` 或 `load-failed`）時 MUST 以 `SyncStatusNotice` 取代計分畫面（此時沒有可信的比分可顯示）；
 其餘非 `local` 狀態照常顯示計分畫面，並在畫面上方疊加 `SyncStatusNotice`。非 `local` 時計分板根元素 MUST 帶 `data-sync-status={syncStatus}`（E2E 等待依據），
 `local` 時 SHALL NOT 帶此屬性。
 

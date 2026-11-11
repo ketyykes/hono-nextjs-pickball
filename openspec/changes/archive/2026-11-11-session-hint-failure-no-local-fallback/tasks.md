@@ -201,4 +201,4 @@ Depends on: §4
     S1 按鈕 `type="button"` 的斷言（`020dc49`）未寫進 Scenario THEN 與 test-plan → 同步（只動文件）。
   - 最新產品程式碼的完整 gate（coordinator，HEAD `20e9f2a`，含第二輪全部程式修正；之後的 `f9f5735`、`78fe44c` 只動 openspec 文件，`git diff --stat 20e9f2a HEAD -- nextjs-pickball hono-pickball packages` 為空）：lint 0 errors／3 warnings；三段 tsc exit 0；前端 119 檔／1184、核心 10／27、後端 27／223；E2E chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55、user-data 48，全數 exit 0；build exit 0；porcelain 空。
   - 結論：第四輪 CRITICAL／WARNING 皆 0，唯一 SUGGESTION 已處理；可封存。
-- [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
+- [x] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
