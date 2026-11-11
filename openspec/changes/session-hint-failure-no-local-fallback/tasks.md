@@ -68,7 +68,7 @@ Depends on: §2
 - [x] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「unavailable 取代內容，按鈕與本機提示文案為固定值」；`nextjs-pickball/components/sync/SyncStatusNotice.test.tsx` 新增 it「unavailable 顯示無法載入雲端資料與先用這台裝置的資料按鈕，按下後呼叫 chooseLocalFallback」。兩檔單檔 vitest 確認紅燈並貼出輸出
   - RED commit `1895de8`。sync-status：`isContentBlocked("unavailable")` 得 false；SyncStatusNotice：status 文字為空；皆真紅，regression guard：無。
 - [x] 3.3 GREEN（TDD）：`sync-status.ts` 的 `DataStatus` 加 `"unavailable"`、`isContentBlocked` 含它、新增兩個文案常數（design Decision 7）；`SyncStatusNotice` 依 design Decision 8 渲染 `unavailable`（加 `"use client"`）。
-  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。
+  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。**coordinator 裁定：接受**——只改型別標註、行為不變，且不改則主 worktree 的 tsc 無法通過；不視為改寫既有 it（Stage 1 已核實只改標註）。
   為通過型別所需的最小改動：`hooks/useRoundStore.ts` 傳給雲端 hook 的名單狀態在 `unavailable` 時與 `pending` 同樣以 `loading` 傳入（design Decision 9）。3.2 全綠、兩檔既有 it 全綠；tsc exit 0
 - [x] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」「已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求」「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」。
   - RED commit `6c6f9e6`。前兩個真紅（`pending`≠`unavailable`；殘留雲端名單 `[c1]`≠`[]`）；「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」寫入即綠，**regression guard**。
@@ -147,6 +147,8 @@ Depends on: §4
   - 指令：`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict`（repo root）。結果：`Change 'session-hint-failure-no-local-fallback' is valid`，exit 0。
 - [x] 5.11 驗收（指令）C10：`fetchSession(` 的產品呼叫端只有 `lib/auth/session-store.ts`
   - 指令：C10 `grep -rn "fetchSession(" …/{app,components,hooks,lib} | grep -v "\.test\." | grep -v "export async function"`。結果：只有 `lib/auth/session-store.ts:88`，與預期一致。
-- [ ] 5.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+- [x] 5.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+  - Final Code Review（opus）：第一次 FAIL，唯一必修為 `nextjs-pickball/CLAUDE.md` 把 `pendingDataStatus` 寫在 `sync-status` 名下（實際在 `storage-mode.ts`）；建議兩項：`session-store.ts` 型別註解未提 `LocalFallbackBanner` 直接讀 `localFallback`、tasks 3.3 未記 coordinator 裁定。三項皆已修正（本 task 的 commit）。程式碼無必修；C6、C7、C8、C10 由 reviewer 重跑一致；範圍 ⊆ Impact、主 spec 無改動、新 it 21 個與 gate 計數一致。修正只涉及文件與註解，不需重跑 gate。
+
 - [ ] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
