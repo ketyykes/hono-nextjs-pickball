@@ -121,12 +121,21 @@ Depends on: §4
 - [x] 5.1 設定層（文件）：`nextjs-pickball/CLAUDE.md`——儲存三態條目補「session 無法確認（有提示而請求失敗或逾時）時儲存模式仍為 `pending`、顯示狀態為 `unavailable`，以失敗文案＋『先用這台裝置的資料』取代內容；按下後為本機備援（`local`），root layout 顯示 `LocalFallbackBanner`」；
   歷史頁與統計頁條目的 `pending` 說明補 `unavailable`；`isContentBlocked` 的列舉（兩處）補 `unavailable`；`lib/auth/` 補「`fetchSession` 失敗回 `null`、`chooseLocalFallback`」、`lib/sync/` 補 `pendingDataStatus`、`DataStatus` 的 `unavailable` 與兩個文案常數、`components/sync/` 補 `LocalFallbackBanner`。commit（`docs:`）
   - 結果：`nextjs-pickball/CLAUDE.md` 已補儲存三態（無法確認、`chooseLocalFallback`、`LocalFallbackBanner`）、歷史頁與統計頁 `unavailable`、`isContentBlocked` 兩處、`lib/auth/`、`lib/sync/`、`components/sync/`；commit `c835c7d`（`docs:`）。
-- [ ] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
-- [ ] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋2、測試數＝基線＋21，後端與核心與基線相同
-- [ ] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
-- [ ] 5.6 驗收（指令）C5（coordinator）：建立 `/tmp/cgate-session-hint-failure-no-local-fallback.e2e`（照 `/tmp/cgate-session-pending-loading.e2e` 複製）後執行 `/tmp/cgate2.sh session-hint-failure-no-local-fallback`；
+- [x] 5.2 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 2026-11-11 gate（HEAD `3148070`）：`-r exec tsc`、hono-pickball typecheck、pickball-core typecheck 皆 exit 0。
+- [x] 5.3 驗收（指令）C2：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint` 0 errors、warning 不多於基線
+  - 同次 gate：lint 0 errors／3 warnings（與基線相同，皆既有 unused-vars）。
+- [x] 5.4 驗收（指令）C3：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test` 全綠；前端檔數＝基線＋2、測試數＝基線＋21，後端與核心與基線相同
+  - 同次 gate：前端 119 檔／1184 tests（基線 117／1163，＋2 檔、＋21），後端 27／223、核心 10／27 與基線相同，全綠。
+- [x] 5.5 驗收（指令）C4：雙鎖下 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build` exit 0；建置後 `git status --porcelain` 為空
+  - 同次 gate：`pnpm build` exit 0；建置後 `git status --porcelain` 為空。
+- [x] 5.6 驗收（指令）C5（coordinator）：建立 `/tmp/cgate-session-hint-failure-no-local-fallback.e2e`（照 `/tmp/cgate-session-pending-loading.e2e` 複製）後執行 `/tmp/cgate2.sh session-hint-failure-no-local-fallback`；
   五個 browser project 各＝基線＋2、0 failed（skip 只限既有瀏覽器條件）；user-data＝基線、全 passed、0 skipped。結果寫在本 task 後方；失敗不得自行判定為雜訊，附證據裁定
+  - 第一次 gate（2026-11-09 12:28 起，結果保存於 `/tmp/cg-session-hint-failure-no-local-fallback.prev/`）：E2E 各 project 皆有失敗、build 失敗。逐項查證為執行環境問題，非本 change：
+    當時機器嚴重過載（tsc 平常 4s 跑 937s、chromium 平常約 2 分跑 27.3 分、user-data 出現 `browserType.launch: Timeout 180000ms exceeded`），失敗訊息集中在後端回 503（console 守衛與 `取得目前帳號失敗，HTTP 503`）與逾時；build 失敗於下載 Google Fonts（網路）。
+    負載恢復後同一 HEAD 先單獨重跑 chromium（167 passed）與 build（exit 0）再重跑整個 gate，全部通過，判定為環境因素。
+  - 第二次 gate（2026-11-11 11:31–11:52，HEAD `3148070`，`/tmp/cgate2.sh`）：chromium 167 passed；firefox 154 passed／13 skipped；mobile-chrome 164／3；webkit 三片 51／5、48／8、55／0（共 167）；mobile-safari 三片 51／5、48／8、55／0（共 167）；user-data 48 passed、0 skipped；0 failed。
+    五個 browser project 各為基線 165＋2；skip 數與基線相同（既有瀏覽器條件）。
 - [x] 5.7 驗收（指令）C6：`resolveStorageMode(` 使用端集合恰為 test-plan C6 的 9 個檔案
   - 指令：`grep -rln "resolveStorageMode(" nextjs-pickball/{app,components,hooks} | grep -v "\.test\."`。結果：恰 9 檔（stats/page.tsx、HistoryModeSwitch、LocalDataImportSection、JsonBackupSection、RosterCsvImportSection、HistoryCsvSection、useRoundStore、useScoreboardStore、useRosterStore），與預期一致。
 - [x] 5.8 驗收（指令）C7：`pendingDataStatus(` 使用端恰為 7 個檔案；`"unavailable"` 字樣只出現在 test-plan C7 列出的位置
