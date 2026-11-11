@@ -1002,6 +1002,18 @@ describe("local-import", () => {
 				[makePlayer({ id: "cloud-amy", name: "Amy" })],
 			),
 		).toEqual({ added: ["amy"], matched: ["Amy"] });
+
+		// ④ 全形與中間空白也不做正規化：與雲端「Amy」不同名者皆會新增
+		expect(
+			previewAppendPlayers(
+				[
+					makePlayer({ id: "a3", name: "Amy" }),
+					makePlayer({ id: "a4", name: "Ａmy" }),
+					makePlayer({ id: "a5", name: "A my" }),
+				],
+				[makePlayer({ id: "cloud-amy", name: "Amy" })],
+			),
+		).toEqual({ added: ["Ａmy", "A my"], matched: ["Amy"] });
 	});
 
 	it("fetchAppendPreview 以呼叫端給的帳號讀取雲端名單並分類為預覽、未授權或失敗", async () => {
