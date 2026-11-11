@@ -145,7 +145,11 @@ Depends on: §4
 - [x] 5.5 驗收（E2E）：雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`，全數 passed、0 skipped，數量＝基線＋1；`--project=chromium` 跑 `tests/e2e/specs/` 中含 `JsonBackupSection` 或資料頁的 spec（以 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出），全綠
   - 雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`：`49 passed`（基線 48＋1），0 skipped、0 failed；`--project=chromium` 跑 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出的 `data-pending.spec.ts`、`matchmaker-data-transfer.spec.ts`：`22 passed`。E2E 前後 `lsof -i :3005 -i :8787` 與 `ps` 皆無殘留。
   - mutation（單檔 vitest，每次三重落地檢查通過〔`count(old)==1`〔④ 為 2 處同改〕、`new != old`、`git diff --stat` 有輸出〕、還原後 `git status` 乾淨，輸出皆含 `Test Files`）：① 轉紅（6 failed）；② 紅（4）；③ 紅（1）；④ 紅（1）；⑤ 紅（1）；⑥ 紅（1）；⑦ 紅（1）；⑧ 紅（1）；⑨ 紅（3，regression guard 轉紅）；⑩ 附加成功後寫入本機 `matchmaker:roster:v1`：E2E 單檔（雙鎖）轉紅（`toEqual` 本機 key 不變斷言失敗）；⑪ 紅（1）；⑫ 紅（1）；⑬ 紅（1）；⑭ 紅（1）；⑮ 紅（1）。對照組 A（`selectionRef.current += 1` 改寫為 `++selectionRef.current`）、B（`added.length === 0` 改 `< 1`）維持綠。額外變異 X1～X3（過期結果檢查）存活，見 5.4。
-- [ ] 5.6 Stage 1（sonnet）→ Stage 2（opus）審查 §5：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+- [x] 5.6 Stage 1（sonnet）→ Stage 2（opus）審查 §5：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+  - Implementer 首次交件 DONE_WITH_CONCERNS：過期結果（X1～X3）無測試 → coordinator 裁定擴充既有新 it「附加確認按下取消或重新選檔時…」補三種晚到情境（`eed434b`，regression guard），並接受「帳號為 null／失敗時收起確認」「選檔開頭清除狀態」兩項判斷、寫進 spec（`654d8b9`）。
+  - Stage 1（sonnet）：PASS，無必修。複驗兩個 RED；獨立 mutation 22 條（含 ⑩ 以雙鎖 E2E 轉紅）皆紅、對照 2 條綠。建議：檔頭註解段落相連。
+  - Stage 2（opus）：FAIL，必修 1：選檔開頭清除前次結果與錯誤訊息（spec MUST）無測試，Z1～Z3 存活。建議：註解空行、序號註解漏列整份匯入、`settleLateResponse` 依賴 20ms 計時。
+  - 處置：`ec62026`（同一 it 補「200 成功後再 409 不留舊成功訊息」「失敗 alert 後再選檔 alert 消失」，regression guard，Z1～Z3 轉紅；`settleLateResponse` 改為 await＋microtask flush，X1～X3 仍轉紅）、`46d065a`（只動註解）、`034910a`（test-plan／tasks 同步）。產品邏輯未變，E2E 沿用 5.5 結果；最終 gate 於 6.11 重跑全部。
 
 ## 6. 文件、指令驗收與合併前流程
 
