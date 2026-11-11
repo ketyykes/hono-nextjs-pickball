@@ -386,5 +386,19 @@ describe("本機資料匯入 API 契約", () => {
         appended: { players: valid.appended.players, history: { added: 0, skipped: 1.5 } },
       }).success,
     ).toBe(false);
+
+    // 四個筆數欄位各自都必須是非負整數
+    for (const segment of ["players", "history"] as const) {
+      for (const field of ["added", "skipped"] as const) {
+        for (const bad of [-1, 1.5]) {
+          const appended = {
+            players: { ...valid.appended.players },
+            history: { ...valid.appended.history },
+          };
+          appended[segment] = { ...appended[segment], [field]: bad };
+          expect(AppendImportResponseSchema.safeParse({ appended }).success).toBe(false);
+        }
+      }
+    }
   });
 });
