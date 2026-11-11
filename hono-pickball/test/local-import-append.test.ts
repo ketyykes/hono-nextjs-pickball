@@ -329,17 +329,26 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 			teamB: team(["z1", "b2"]),
 		};
 
+		// teamB 也要改寫：對手方含因同名而略過的 b1、b9
+		const r3: MatchHistoryEntry = {
+			...historyAt("r3", T2),
+			format: "doubles",
+			doublesComposition: "general",
+			teamA: team(["z2", "z3"]),
+			teamB: team(["b1", "b9"]),
+		};
+
 		const result = await appendOk(cookie, {
 			players: [
 				makePlayer("b1", { name: "甲" }),
 				makePlayer("b2", { name: "丙" }),
 				makePlayer("b9", { name: "丙" }),
 			],
-			history: [r1, r2],
+			history: [r1, r2, r3],
 		});
 
 		expect(result.appended.players).toEqual({ added: 1, skipped: 2 });
-		const [readR1, readR2] = await listHistory(cookie);
+		const [readR1, readR2, readR3] = await listHistory(cookie);
 		const idsOf = (entry: MatchHistoryEntry, side: "teamA" | "teamB") =>
 			entry[side].players.map((player) => player.id);
 		expect(idsOf(readR1, "teamA")).toEqual(["c1"]);
@@ -359,9 +368,29 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 		};
 		expect(restoreIds(readR1, r1)).toEqual(r1);
 		expect(restoreIds(readR2, r2)).toEqual(r2);
-		const serialized = JSON.stringify([readR1, readR2]);
+		expect(idsOf(readR3, "teamA")).toEqual(["z2", "z3"]);
+		expect(idsOf(readR3, "teamB")).toEqual(["c1", "b2"]);
+		expect(restoreIds(readR3, r3)).toEqual(r3);
+		const serialized = JSON.stringify([readR1, readR2, readR3]);
 		expect(serialized).not.toContain('"b1"');
 		expect(serialized).not.toContain('"b9"');
+
+		// 規則 ①：備份參賽者的 id 已在雲端名單時，歷史中的該 id 不變，即使它的名稱與雲端另一位同名
+		const otherCookie = await seedAndSignIn("append-rewrite-keep@example.com");
+		await putPlayer(otherCookie, makePlayer("c1", { name: "甲" }));
+		await putPlayer(otherCookie, makePlayer("c5", { name: "甲" }));
+		const keep: MatchHistoryEntry = {
+			...historyAt("k1", T1),
+			format: "singles",
+			teamA: team(["c5"]),
+			teamB: team(["c1"]),
+		};
+		const keepResult = await appendOk(otherCookie, { players: [makePlayer("c5", { name: "甲" })], history: [keep] });
+		expect(keepResult.appended).toEqual({ players: { added: 0, skipped: 1 }, history: { added: 1, skipped: 0 } });
+		const [readKeep] = await listHistory(otherCookie);
+		expect(idsOf(readKeep, "teamA")).toEqual(["c5"]);
+		expect(idsOf(readKeep, "teamB")).toEqual(["c1"]);
+		expect(readKeep).toEqual(keep);
 	});
 
 	it("附加的參賽者版本為版本下限加一，附加的歷史版本為 1", async () => {
