@@ -50,6 +50,7 @@ import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 //
 // parseBackup／writeBackup 的失敗分支只有 message，沒有機器可讀的 code：語法／版本／結構三種失敗一律原樣顯示 message，不做分類、
 // 不用字串比對 message 內容判斷類別。
+
 // 附加確認的狀態：確認顯示中與請求進行中共用同一份內容，只差按鈕是否停用
 type AppendState =
 	| { kind: "idle" }
@@ -61,7 +62,7 @@ export function JsonBackupSection() {
 	// 雲端匯入成功的結果；失敗與驗證錯誤沿用 message
 	const [cloudImportResult, setCloudImportResult] = useState<ImportResultView | null>(null);
 	const [appendState, setAppendState] = useState<AppendState>({ kind: "idle" });
-	// 每次選檔遞增；名單讀取或附加請求回來時若已不是同一次選檔，結果直接丟棄，不覆寫新的狀態
+	// 每次選檔遞增；名單讀取、整份匯入或附加請求回來時若已不是同一次選檔，結果直接丟棄，不覆寫新的狀態
 	const selectionRef = useRef(0);
 	const session = useSession();
 	const mode = resolveStorageMode(session);
