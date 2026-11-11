@@ -98,14 +98,19 @@ Depends on: §2
 
 Depends on: §3
 
-- [ ] 4.1 RED（TDD）：`nextjs-pickball/lib/sync/local-import.test.ts` 新增 it「backupToAppendRequest 只取備份的參賽者與歷史」「appendBackupToCloud 依回應分類為已附加、未授權、資料過大或失敗且不改動本機」
+- [x] 4.1 RED（TDD）：`nextjs-pickball/lib/sync/local-import.test.ts` 新增 it「backupToAppendRequest 只取備份的參賽者與歷史」「appendBackupToCloud 依回應分類為已附加、未授權、資料過大或失敗且不改動本機」
   「previewAppendPlayers 依後端的同名與 id 規則列出會新增與視為同一人的參賽者」「fetchAppendPreview 以呼叫端給的帳號讀取雲端名單並分類為預覽、未授權或失敗」（前者的 ①② fixture 與 §3 後端兩個對應 it 相同，見 test-plan）；
   `nextjs-pickball/components/matchmaker/local-import-view.test.ts` 新增 it「附加結果依略過筆數組成新增與略過的文案」「附加確認的說明、預覽名單標題與提醒、四條說明與按鈕文字為固定值」。兩檔單檔 vitest 確認六個新 it 紅、既有 it 全綠並貼出輸出（與 4.2 同一張派工單）
-- [ ] 4.2 GREEN（TDD；含 E2E 常數同步 ②）：`lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`、`AppendImportOutcome`（附加路徑字串只在此檔）、
+  - RED commit `255d18a`（只改兩個測試檔：`local-import.test.ts` 新增 4 個 it、`local-import-view.test.ts` 新增 2 個 it）。六個新 it 皆真紅：`appendBackupToCloud`／`previewAppendPlayers`／`fetchAppendPreview`／`backupToAppendRequest` 皆 `is not a function`、view 兩個 it 的 `describeAppend*`／`APPEND_*` 不存在；單檔 vitest 兩檔 `Tests 6 failed | 14 passed (20)`，既有 it 全綠。無 regression guard。
+  - 機械複驗：`git show 255d18a^:` 兩個測試檔皆不含四個新 it 名稱（view 檔既有的「附加」字樣僅為舊註解）；產品檔 RED 前後未動；`previewAppendPlayers` fixture ①② 與後端對應 it 的名單相同（測試內註解註明對應 it）。
+- [x] 4.2 GREEN（TDD；含 E2E 常數同步 ②）：`lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)`、`AppendImportOutcome`（附加路徑字串只在此檔）、
   純函式 `previewAppendPlayers(backupPlayers, cloudPlayers)`（先依名稱去重、再判定 id 或名稱已在雲端，不做正規化）與 `fetchAppendPreview(expectedUserId, request)`（經既有 `fetchRemotePlayers`，`roster-api.ts` 不改）；
   `components/matchmaker/local-import-view.ts` 新增 `APPEND_RULES`、`APPEND_ACTION_LABEL`、`APPEND_CANCEL_LABEL`、`APPEND_NAME_CHECK_HINT`、`LOCAL_IMPORT_MESSAGES.appendNothing`／`appendNoNewPlayers`／`appendPreviewFailed`、`describeAppendPreview`、`describeAppendNewPlayers`、`describeAppendMatchedPlayers`、`describeAppendOutcome`，改寫 `jsonCloudImportHint`（design Decision 7、8、12）；
   同一個 commit 依檔頭授權 ② 同步三個 E2E 檔的 `JSON_CLOUD_IMPORT_HINT_TEXT`。4.1 全綠；`JsonBackupSection.test.tsx`、`LocalDataImportSection.test.tsx` 既有 it 全綠；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball -r exec tsc --noEmit` exit 0；改動檔 ESLint 0 errors
-- [ ] 4.3 REFACTOR：`describeAppendOutcome` 與 `describeImportOutcome` 的錯誤分支是否值得共用（預期不抽：結果型別不同）；補充說明的組字是否以 if/else 表達、無巢狀三元；`previewAppendPlayers` 的去重與判定是否以具名步驟表達、註解寫明「必須與後端規則一致」的理由；無壞味道則註記 skipped
+  - GREEN commit `d54c7a5`（`lib/sync/local-import.ts`、`local-import-view.ts`，並依授權 ② 同步三個 E2E 檔的 `JSON_CLOUD_IMPORT_HINT_TEXT`，非紅燈、E2E 本組未跑）。四檔（含 `JsonBackupSection.test.tsx`、`LocalDataImportSection.test.tsx`）28 tests 全綠；root `-r exec tsc --noEmit`、hono、core typecheck 皆 exit 0；改動的 7 個前端檔逐檔 ESLint 0 errors。
+  - mutation（單檔雙檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：①～⑭ 全數轉紅（各 1 failed）：① `backupToAppendRequest` 帶 `currentRound`；② 409 分類為 `unauthorized`；③ 413 分類為 `failed`；④ 不以 `AppendImportResponseSchema` 驗證 200；⑤ 略過皆 0 仍回 `note`；⑥ 兩句連接改「，」；⑦ `APPEND_RULES` 調換前兩條；⑧ `jsonCloudImportHint` 改回舊文字；⑨ 預覽忽略 id 規則；⑩ 不做備份內同名去重；⑪ 先判定雲端再去重；⑫ 比對前轉小寫；⑬ `fetchAppendPreview` 401 分類為 `failed`；⑭ 不以 `PlayerListResponseSchema` 驗證名單。對照組 A（雲端名稱 `Set.has` 改 `some`）、B（`join` 改 `reduce` 串接）維持綠。
+- [x] 4.3 REFACTOR：`describeAppendOutcome` 與 `describeImportOutcome` 的錯誤分支是否值得共用（預期不抽：結果型別不同）；補充說明的組字是否以 if/else 表達、無巢狀三元；`previewAppendPlayers` 的去重與判定是否以具名步驟表達、註解寫明「必須與後端規則一致」的理由；無壞味道則註記 skipped
+  - skipped：`describeAppendOutcome` 與 `describeImportOutcome` 結果型別不同，不抽共用；補充說明以 `skippedParts` 陣列加 if 組字、無三元；`previewAppendPlayers` 已是「先去重、再判定」兩個具名步驟，並以註解寫明必須與後端 `appendLocalBackup` 一致與順序的理由。無壞味道，未產生 `refactor:` commit。
 - [ ] 4.4 Stage 1（sonnet）→ Stage 2（opus）審查 §4：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 5. JSON 雲端匯入的附加流程（元件與 E2E）
