@@ -15,7 +15,7 @@
   - **歷史中的球員 id 改寫**（coordinator 追加的使用者定案）：附加的歷史中，因與雲端同名而被略過的參賽者（及備份內同名的第二位以後）其 `teamA`／`teamB` 的 `players[].id` 在同一條 SQL 內改寫為雲端同名者的 id，讓附加的比賽算到雲端那位的統計上；姓名快照、`ratingBefore`／`ratingAfter` 不改。
   - 不碰回合、分槽、獨立計分板、版本下限與整批守衛表；同一份備份附加兩次，第二次全部略過。
   - 回應 `200 { appended: { players: { added, skipped }, history: { added, skipped } } }`；沒有 409。
-- **核心 `@pickball/core/api/import` 新增附加契約**：`AppendImportRequestSchema`、`AppendImportResponseSchema`、`serializeAppendSegments`（同名只留第一位，另產生供 id 改寫用的參賽者對照段）、`checkAppendLimits`（前後端同一個判定）。
+- **核心 `@pickball/core/api/import` 新增附加契約**：`AppendImportRequestSchema`、`AppendImportResponseSchema`、`serializeAppendSegments`（同名只留第一位，另產生供 id 改寫用的參賽者對照段）、`checkAppendLimits`（核心定義一次、後端使用；前端不另做預檢）。
 - **前端「從 JSON 備份匯入到雲端」**（`JsonBackupSection` 雲端分支）：照舊先送 `POST /api/import`；雲端為空時行為完全不變。
   回 `409` 時先以既有 `fetchRemotePlayers`（選檔當下的帳號）讀取雲端名單，再顯示**附加確認**：備份內的參賽者數與歷史筆數、**會新增到雲端的參賽者名單**與已在雲端而視為同一人的名單（使用者追加定案：送出前先看一眼，名字打錯會變成另一位且目前無法合併）、名字要完全相同才算同一人的提醒、四條固定說明（同名略過〔含名稱比對規則〕、重複歷史略過、回合不匯入、分數不變需手動調整），以及按鈕「附加到雲端」與「取消」；按下才送附加請求（帳號取按下當下）。
   名單的計算是前端純函式 `previewAppendPlayers`，規則與後端逐字一致，只作提示，實際結果以後端回應為準；名單讀取 401 時刷新 session、其他失敗顯示讀取失敗，兩者皆不顯示確認、不送附加。

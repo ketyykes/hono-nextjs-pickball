@@ -28,7 +28,7 @@
 
 - 已登入且雲端有資料時，使用者能從 JSON 備份把參賽者與歷史救回雲端，由使用者看過說明後自行決定。
 - 附加只新增、絕不覆寫或刪除雲端任何既有列；同名參賽者與重複歷史略過；同一份備份重送不產生重複。
-- 單一 D1 batch、常數條陳述式；上限判定前後端同一個函式；預期帳號守衛、413、401 規則與既有批次寫入端點一致。
+- 單一 D1 batch、常數條陳述式；上限判定只在核心定義一次、由後端使用（前端不另做預檢，理由見 Decision 7）；預期帳號守衛、413、401 規則與既有批次寫入端點一致。
 - 附加的比賽算到雲端同名參賽者身上：統計頁不因附加而出現同名的第二列。
 - 雲端為空時的整份匯入、訪客的本機覆寫式還原、「匯入本機資料到雲端」區塊完全不變。
 
@@ -119,7 +119,7 @@
 **Choice**：核心 `@pickball/core/api/import` 新增 `AppendImportRequestSchema`、`AppendImportResponseSchema`、`AppendImportRequest`／`AppendImportResponse` 型別、`serializeAppendSegments`、`checkAppendLimits`（不新增模組，`CORE_MODULES` 不變；歷史段建議與 `serializeImportSegments` 共用私有 helper）。
 前端 `lib/sync/local-import.ts` 新增 `backupToAppendRequest`、`appendBackupToCloud(expectedUserId, request)` 與 `AppendImportOutcome`（`appended`／`unauthorized`／`too-large`／`failed`），附加路徑字串只出現在此檔。
 
-**Rationale**：上限與參數形狀必須前後端同一份（「批次寫入端點的筆數與 body 上限」）；`Backup → 請求` 的轉換只有前端用，比照既有 `backupToImportRequest` 放在前端同檔。
+**Rationale**：參數形狀與上限只在核心定義一次（「批次寫入端點的筆數與 body 上限」），由後端使用；前端不另做上限預檢，因為會出現附加確認就代表 409，即整份匯入已通過後端 `checkImportLimits`，而附加的三段（參賽者段為整份匯入參賽者段的子集、對照段比參賽者段小、歷史段與整份匯入逐字相同）不會比整份匯入的對應段大，所以前端預檢不會擋到任何請求；`Backup → 請求` 的轉換只有前端用，比照既有 `backupToImportRequest` 放在前端同檔。
 
 **Alternatives considered**：轉換函式放核心：後端不需要，徒增核心匯出。`appendBackupToCloud` 放 `remote-transfer.ts`：匯入路徑集中在 `local-import.ts` 是既有慣例。皆不選。
 

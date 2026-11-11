@@ -144,6 +144,8 @@ B9 原定的「不合併」只在本入口改為附加，用於救回 session �
 - **GIVEN** 同上，`POST /api/import` 依序回 409、409、200，`GET /api/matchmaker/players` 回合法名單
 - **WHEN** 選檔後在附加確認按「取消」；再選一次同一份檔（409）讓附加確認出現，接著改選另一份備份檔且這次 `POST /api/import` 回 200
 - **THEN** 按下取消後附加確認消失，沒有 `role="alert"` 與 `json-backup-import-message`；改選檔後附加確認消失並顯示整份匯入的成功文案；三次選檔共三個 `POST /api/import`、兩個 `GET /api/matchmaker/players`（只在 409 之後），`POST /api/import/append` 從未送出；本機 key 皆未改變
+- **AND** 名單 GET、整份匯入 POST、附加 POST 尚未回應時重新選檔，晚到的舊結果皆被丟棄、不覆寫新狀態（選檔元素進行中不停用，三者皆可能發生）
+- **AND** 選檔開頭清除前次的成功文案與 alert：先以 200 顯示成功文案、再選檔得 409 時，附加確認旁沒有舊的成功訊息；失敗 alert 出現後再選檔，alert 消失
 - **驗收**：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx`，it 名稱「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
 
 #### Scenario: 登入資料工具：附加請求失敗的文案與 session 刷新
@@ -151,7 +153,7 @@ B9 原定的「不合併」只在本入口改為附加，用於救回 session �
 - **GIVEN** 雲端模式，`POST /api/import` 一律回 409，`GET /api/matchmaker/players` 回合法名單
 - **WHEN** 分別在附加請求回 401、413、500 時按「附加到雲端」；另在確認出現後把 `useSession` 換成 user 沒有 id 的 session 再按
 - **THEN** 401 顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized` 且 `refresh` 被呼叫一次；413 顯示 `LOCAL_IMPORT_MESSAGES.tooLarge`；500 顯示 `LOCAL_IMPORT_MESSAGES.failed`；後兩者不呼叫 `refresh`；
-  user 沒有 id 時不送出附加請求並顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized`；每一輪皆無成功訊息、本機 key 皆未改變
+  user 沒有 id 時不送出附加請求並顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized`；每一輪皆無成功訊息、本機 key 皆未改變；每一輪結束後 `json-backup-append-confirm` 已收起（含帳號為 null 那輪）
 - **驗收**：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx`，it 名稱「附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機」
 
 #### Scenario: 登入資料工具：備份沒有可附加的內容

@@ -153,7 +153,7 @@ Before / after 對照（已登入、雲端已有資料、選取 JSON 備份）�
               AppendImportRequestSchema ◄───────┤ (read) floors     │
               AppendImportResponseSchema        └───────────────────┘
               serializeAppendSegments
-              checkAppendLimits  (shared by both sides)
+              checkAppendLimits  (defined once, used by backend only)
 ```
 
 ---

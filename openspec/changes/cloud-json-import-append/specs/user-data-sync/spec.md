@@ -101,6 +101,7 @@ AppendImportRequestSchema = { players: PlayerWriteSchema[], history: MatchHistor
 - **GIVEN** 雲端名單只有「甲」
 - **WHEN** 附加 `x1`「戊」、`x2`「戊」、`x3`「己」
 - **THEN** `appended.players` 為 `{ added: 2, skipped: 1 }`；新增的「戊」為 `x1`，`x2` 不存在
+- **AND** 同名比對區分大小寫、全半形與中間空白：另一位使用者雲端有 `Ann`，附加 `ann` → `added` 1、`skipped` 0（兩位並存）；再一位使用者雲端有 `Ann`，附加 `Ａnn`、`A nn` → `added` 2、`skipped` 0
 - **驗收**：`hono-pickball/test/local-import-append.test.ts`，it 名稱「備份內同名的參賽者只新增第一位」
 
 #### Scenario: 附加 API：附加的歷史中因同名而略過的參賽者 id 改寫為雲端那位的 id
@@ -109,6 +110,8 @@ AppendImportRequestSchema = { players: PlayerWriteSchema[], history: MatchHistor
 - **WHEN** 附加參賽者 `b1`「甲」、`b2`「丙」、`b9`「丙」；歷史 `r1`（單打：teamA `[b1]`、teamB `[b2]`）與 `r2`（雙打：teamA `[b1, b9]`、teamB `[z1, b2]`，`z1` 不在備份名單）
 - **THEN** `appended.players` 為 `{ added: 1, skipped: 2 }`（新增 `b2`）；讀回的 `r1` teamA 為 `[c1]`、teamB 為 `[b2]`；`r2` teamA 為 `[c1, b2]`、teamB 為 `[z1, b2]`；
   每位球員的 `name`、`ratingBefore`、`ratingAfter` 與陣列順序不變，兩筆歷史除上述 id 外與請求深度相等（含 `doublesComposition`）
+- **AND** 再加入 `r3`（teamA `[z2, z3]`、teamB `[b1, b9]`）時，讀回的 `r3` teamB 為 `[c1, b2]`、teamA 不變（`[z2, z3]`）：對手方的 id 同樣改寫
+- **AND** 規則 ①（備份參賽者的 id 已在雲端名單時，歷史中的該 id 不變）：另一位使用者雲端有 `c1`「甲」、`c5`「甲」，附加參賽者 `c5`「甲」與引用 `c5`、`c1` 的歷史 → `players` `{ added: 0, skipped: 1 }`、`history` `{ added: 1, skipped: 0 }`，讀回的歷史 teamA 仍為 `c5`、teamB 為 `c1`，且與請求深度相等
 - **AND** 讀回的兩筆歷史中不再出現 `b1`、`b9`（`player-stats` 以球員 id 為統計鍵，故 `c1` 的出場會包含這兩場；統計頁的端到端證據見 `data-transfer`「登入資料工具：雲端已有資料時以 JSON 備份附加參賽者與歷史」）
 - **驗收**：`hono-pickball/test/local-import-append.test.ts`，it 名稱「附加的歷史中因同名而略過的參賽者 id 改寫為雲端同名者的 id，其餘欄位不變」
 
@@ -121,9 +124,10 @@ AppendImportRequestSchema = { players: PlayerWriteSchema[], history: MatchHistor
 
 #### Scenario: 附加 API：附加只寫入本人且不受他人資料影響
 
-- **GIVEN** 使用者 A 有參賽者「甲」（id `s1`）與歷史 `h1`；B 的雲端只有一位「乙」
+- **GIVEN** 使用者 A 有參賽者「甲」（id `s1`）、另兩位參賽者（`sort_order` 最大值為 2）與歷史 `h1`；B 的雲端只有一位「乙」（`sort_order` 最大值為 0）
 - **WHEN** B 附加參賽者 `s1`「甲」與歷史 `h1`
-- **THEN** B 回 200 且 `added` 為 1 與 1；A 的各表逐列不變
+- **THEN** B 回 200 且 `added` 為 1 與 1；A 的各表逐列不變；B 新增者的 `sort_order` 只取 B 自己的最大值加 1（A 的最大值較大，使用全域最大值會得到不同序號）
+- **AND** A2／B2 情境：A2 先有 `a1`「甲」，B2 雲端有 `cb2`「甲」；B2 附加參賽者 `b1`「甲」、`a1`「甲」與引用兩者的歷史（teamA `[b1]`、teamB `[a1]`）→ `players` `{ added: 0, skipped: 2 }`、`history` `{ added: 1, skipped: 0 }`，讀回的 teamA、teamB 皆為 `cb2`（`b1` 不得對應到 A2 的 `a1`，`a1` 在 B2 雲端沒有故依同名改寫）；A2 的各表逐列不變
 - **驗收**：`hono-pickball/test/local-import-append.test.ts`，it 名稱「B 的附加不受 A 的資料影響且不改動 A」
 
 #### Scenario: 附加 API：不合法的附加請求
