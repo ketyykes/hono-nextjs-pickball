@@ -197,4 +197,6 @@ Depends on: §4
   - verify 第三輪（opus，2026-11-11）：CRITICAL 0、WARNING 1、SUGGESTION 1；前兩輪處置經複核皆到位，程式無須修改。處置：
     W1 Scenario「選擇本機備援後丟棄進行中請求的結果」的 WHEN／THEN 與 test-plan 仍寫「回應已登入」，與第二輪改寫後的測試（未登入回應、refresh 回 `null`）不一致 → spec 與 test-plan 同步。
     S1 第二輪另兩處補強斷言（逾時後才回 `null` 維持同一參考；名單無法確認時 `droppedCount` 為 0）未寫進 spec／test-plan → 同步。
+  - verify 第四輪（opus，2026-11-11）：CRITICAL 0、WARNING 0、SUGGESTION 1；逐條核對 23 個新 Scenario 與 3 個改寫 Scenario 的 GIVEN／WHEN／THEN 與驗收 it 皆一致，130 個驗收錨點逐字存在。處置：
+    S1 按鈕 `type="button"` 的斷言（`020dc49`）未寫進 Scenario THEN 與 test-plan → 同步（只動文件）。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）

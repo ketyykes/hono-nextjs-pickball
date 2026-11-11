@@ -329,7 +329,7 @@ session 請求失敗或帶提示等待逾時 SHALL NOT 結束它（改為無法�
 
 - **GIVEN** `chooseLocalFallback` 被替換為假函式
 - **WHEN** 以 `unavailable` 渲染 `SyncStatusNotice` 並按下按鈕；另以 `pending`、`load-failed` 渲染
-- **THEN** `unavailable` 時 `role="status"` 的文字為「無法載入雲端資料，請重新整理頁面」、按鈕「先用這台裝置的資料」存在且不在 `role="status"` 元素內，按下後假函式被呼叫一次；`pending` 與 `load-failed` 時沒有任何按鈕
+- **THEN** `unavailable` 時 `role="status"` 的文字為「無法載入雲端資料，請重新整理頁面」、按鈕「先用這台裝置的資料」存在、不在 `role="status"` 元素內且 `type` 為 `button`，按下後假函式被呼叫一次；`pending` 與 `load-failed` 時沒有任何按鈕
 - **驗收**：`nextjs-pickball/components/sync/SyncStatusNotice.test.tsx`，it 名稱「unavailable 顯示無法載入雲端資料與先用這台裝置的資料按鈕，按下後呼叫 chooseLocalFallback」
 
 #### Scenario: 無法確認：名單選擇器回報 unavailable 且不交出本機名單
