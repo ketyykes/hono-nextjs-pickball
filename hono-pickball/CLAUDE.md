@@ -6,7 +6,7 @@
 > matchmaker（對戰分配機）的**參賽者名單在雲端**（`src/routes/matchmaker.ts`，表 `matchmaker_players`），
 > **回合、場次分槽與送出比分（含歷史寫入）也在雲端**（表 `matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history`）。
 > **歷史有讀取端點**（`GET /api/matchmaker/history`），登入時歷史頁、統計頁與歷史 CSV 皆讀雲端；
-> **訪客時期的本機資料可一次匯入雲端**（`POST /api/import`，`src/routes/import.ts`，見「本機資料匯入 API」）；
+> **訪客時期的本機資料可一次匯入雲端**（`POST /api/import`；雲端已有資料時 JSON 備份可改以 `POST /api/import/append` 附加，皆在 `src/routes/import.ts`，見「本機資料匯入 API」）；
 > 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。
@@ -83,7 +83,7 @@
 - **使用者資料 API**（所有使用者資料 feature 一律照此做）：
   - **批次寫入端點一律掛 `src/http/body-limit.ts` 的 `jsonBodyLimit(maxSize)`**，放在 `zValidator` 之前：超過上限回 JSON 413 `PAYLOAD_TOO_LARGE`（hono 內建 `bodyLimit` 預設回純文字、無錯誤碼，所以自訂 `onError`）。單筆端點（如 `PUT /players/:id`）沒有 body 上限
   - 結構：`src/routes/<feature>.ts` sub-app（型別用 `SessionAppEnv`，開頭 `use("*", localAuth, requireSession, requireExpectedUser)`）、`src/<feature>/repository.ts`（D1 讀寫）、在 `src/index.ts` 以 `app.route` 掛載。`localAuth` 位於 `src/auth/local-auth-middleware.ts`
-  - **預期帳號守衛**（`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 15 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
+  - **預期帳號守衛**（`src/auth/require-expected-user.ts`）：每個使用者資料請求（所有方法）MUST 帶 `X-Expected-User-Id`（常數 `EXPECTED_USER_ID_HEADER` 在 `@pickball/core/api/headers`），缺少或與 session 的 user id 不符一律回 401 `ACCOUNT_MISMATCH`，防止換帳號後舊分頁把資料寫進新帳號。`test/expected-user-guard.test.ts` 以 `app.routes` 列舉使用者資料路由並與守衛樣本表比對（目前 16 條），**新增端點必須同時補樣本**，漏掛守衛或漏補樣本都會紅。curl 範例：`curl -b cookies.txt -H 'X-Expected-User-Id: <user id>' http://localhost:8787/api/scoreboard`
   - 新表依「使用者資料表慣例」：`user_id` 參照 `user.id` 並 cascade 刪除、`version`、`updated_at`；表名加進 `@pickball/core/api/user-data-tables` 的 `USER_DATA_TABLES`（`test/user-data-tables.test.ts` 會比對實際資料表，漏列即失敗）；migration 一律用 `db:generate` 產生
   - `sync_version_floors` 為版本下限表，不屬任何 feature（`user_id` 為主鍵，每位使用者最多一列），用途見下方「新增或修改使用者資料端點時須遵守」第 6 點
   - 版本化契約（單筆資料）：`GET` 回 `{ data | null, version }`，尚無資料時 `version` 為 0；`PUT { data, version }` 版本不符回 409 `VERSION_CONFLICT`、body 不合法回 400 `INVALID_BODY`、未登入回 401 `UNAUTHORIZED`。共用 schema 在 `@pickball/core/api/versioned`、錯誤碼在 `@pickball/core/api/errors`。多筆資料則各筆帶 `version`，衝突一律 409，前端整份重載
@@ -109,7 +109,7 @@
     1. **歷史只增不改**：歷史沒有 PUT 更新，只能以 import 式附加寫入；讀取走 `GET /api/matchmaker/history`（見下方「matchmaker 歷史讀取 API」）。前端 `buildRemoteBackupSnapshot()` 的 `history` 取自雲端
     2. **「雲端為空才寫入」用整批守衛**（`POST /api/import` 即如此）；「雲端已有資料」沿用 409 `VERSION_CONFLICT`，不另增錯誤碼，由前端依端點語意顯示文案。寫入的分槽 MUST 屬於同批回合的未完成場次；歷史主鍵使重複的 `matchId` 整批失敗
     3. **守衛 batch 不抽共用包裝**：`guardedBatch` **不是程式碼中的具名函式**；守衛 → 寫入 → 刪守衛與 `try/catch` 分類直接寫在呼叫端（`src/matchmaker/score-repository.ts` 的送出比分函式、`src/import/local-import-repository.ts`）。不抽的理由：匯入為固定 7 條且需取回計分板 `RETURNING` 結果，共用包裝需泛型與額外分類參數，複雜度高於兩處各數行的重複。`errorChainMatches` 在 `src/matchmaker/batch-guard.ts`，未匯出；`isConstraintError` 在 `src/matchmaker/players-repository.ts`，未匯出且自行處理 cause 鏈
-    4. **預期帳號守衛**：新 sub-app 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)`；掛在既有 sub-app 內的新端點雖自動受守衛保護，守衛樣本表仍 MUST 補一條（`GET /api/matchmaker/history`、`POST /api/import` 皆已在表內）
+    4. **預期帳號守衛**：新 sub-app 開頭 MUST 為 `use("*", localAuth, requireSession, requireExpectedUser)`；掛在既有 sub-app 內的新端點雖自動受守衛保護，守衛樣本表仍 MUST 補一條（`GET /api/matchmaker/history`、`POST /api/import`、`POST /api/import/append` 皆已在表內）
     5. **寫入歷史的規則**：① MUST 寫入 `played_at`（`Date.parse(playedAt)`），否則 `GET /history` 的區間查詢會漏掉；② 以 `asc` 讀回時順序為 `played_at` 加 `rowid`，批次寫入時 MUST 依本機的追加順序插入，同時間的紀錄才會維持原順序；③ 登入時重置不碰本機，本機五個 key 皆可作為匯入來源
     6. **版本下限（防 ABA）**：刪除列後重建同 id 的列若 version 從頭起算，舊裝置手上的舊 version 會誤判為相符。因此：① 新增任何會刪除 `matchmaker_players`／`matchmaker_round`／`matchmaker_match_slots` 之列的寫入，MUST 在同一 batch、刪除之前呼叫 `raiseVersionFloor`；新增建立路徑 MUST 以 `initialVersion` 取初始 version。兩者位於 `src/matchmaker/version-floor.ts`；② 提高下限的選取條件 MUST 與刪除條件相同（`putRound` 以 `orphanSlotCondition` 共用）；③ 沒有列被刪除時不寫入下限列（外層 `WHERE v IS NOT NULL`）；④ `scoreboard_current`、`matchmaker_history`、`sync_batch_guards` 不適用，建立時 version 維持 1；⑤ `POST /api/import` 的守衛條件與重置的 DELETE 都不含 `sync_version_floors`
 - **本機資料匯入 API**（`src/routes/import.ts`、`src/import/local-import-repository.ts`，請求／回應契約在 `@pickball/core/api/import`）：
@@ -117,6 +117,10 @@
   - **上限（超過回 413 `PAYLOAD_TOO_LARGE`，不送出 batch）**：路由掛 `jsonBodyLimit(IMPORT_BODY_LIMIT_BYTES)`（body 10,000,000 位元組，在 `zValidator` 之前）；repository 第一步以核心 `checkImportLimits` 判定，五段 JSON 參數各 ≤ `IMPORT_SEGMENT_LIMIT_BYTES`（1,900,000）、參賽者 ≤ 500 位，不通過即回 `too-large` 且不呼叫 `db.batch()`。理由：每段 JSON 參數在 D1 是一個字串，D1 單一字串上限為 2,000,000 位元組（1,900,000 保留 5% 餘裕），先在 batch 之前擋下，才不會讓整批在資料庫端失敗
   - **單一 batch、固定 7 條陳述式**：整批守衛（`insertBatchGuard`，條件為 `matchmaker_players`／`matchmaker_round`／`matchmaker_match_slots`／`matchmaker_history` 四張表皆無本人列，**不含** `scoreboard_current`）→ 參賽者 → 回合 → 分槽 → 歷史 → 獨立計分板（`onConflictDoNothing().returning({ userId })`，無回傳列即 `skipped`）→ `releaseBatchGuard`。守衛失敗（`isBatchGuardViolation`）回 409 `VERSION_CONFLICT` 且整份不寫入；其他未預期的錯誤照常 500（整批回滾、零列）
   - **大量插入用 `json_each`，陳述式數量為常數**：每段陣列整個序列化為**一個** JSON 參數，以 `` db.insert(<table>).select(sql`SELECT … FROM json_each(${json}) WHERE true ORDER BY key`) `` 在資料庫內展開（同檔 `selectFromJsonEach`）。不可改成逐筆 `values`（D1 每條陳述式最多 100 個參數，數十筆即失敗，千筆會超過 Free 方案每次呼叫 50 個 query）；不可用 `db.run`／`db.all`（見下方禁止事項）。`ORDER BY key` 讓 `rowid` 依本機追加順序遞增；歷史 `played_at = Date.parse(playedAt)`，歷史讀取 API 的區間查詢與同時間排序因此成立；`WHERE true` 是 drizzle `insert().select()` 搭配 ON CONFLICT 時避免解析歧義的寫法
+  - `POST /api/import/append`（同一 sub-app、同一組 middleware 與 `jsonBodyLimit`）：雲端已有資料時把 JSON 備份的參賽者與歷史**附加**到雲端，不碰回合、分槽、獨立計分板與版本下限。請求 `AppendImportRequestSchema`（`{ players, history }`，拒絕重複 id／matchId 與兩段皆空）；`checkAppendLimits` 判定 500 位與三段（參賽者、參賽者對照段 `playerNames`、歷史）各自的位元組上限，回傳的 `segments` 原樣送進 `json_each`
+    - **單一 batch、兩條陳述式、無整批守衛**（附加是逐列略過，沒有「全有或全無」的前提，失敗時 batch 本身整批回滾）：① 參賽者——名稱與本人雲端名單任一位完全相同（大小寫、全半形、中間空白不同即為不同人）或 id 已存在者略過，`sort_order` 接在本人最大值之後、依備份順序，`version` 為 `initialVersion`；② 歷史——`(user_id, match_id)` 已存在者略過（`ON CONFLICT DO NOTHING`），`version` 為 1
+    - **歷史球員 id 改寫在同一條 SQL 內**：以 `WITH id_map AS MATERIALIZED` 建對應表（對照段中 id 不在本人雲端名單者 → 本人名單中同名、`sort_order` 最小者），再以 `json_set`＋`json_group_array` 改寫 `teamA`／`teamB` 的 `players[].id`，讓附加的比賽算到雲端同名球員（`player-stats` 以 id 為統計鍵）。第二條看得到第一條剛新增的列（同一 batch 依序執行）。**所有子查詢 MUST 帶 `user_id`**，否則會改寫成別人的球員 id
+    - 計數取兩條陳述式 `RETURNING` 的列數（不用 `meta.changes`，其在 ON CONFLICT 時語意未定義）；回應 `{ appended: { players: { added, skipped }, history: { added, skipped } } }`
 - **matchmaker 歷史讀取 API**（同在 `src/routes/matchmaker.ts`；`src/matchmaker/history-repository.ts`，查詢契約在 `@pickball/core/api/history`）：
   - `GET /api/matchmaker/history?from=&to=&order=`：皆選填的毫秒界線，**`from` 含、`to` 不含**（`played_at >= from AND played_at < to`），同時給兩者時 `from` 不得大於 `to`（相等為合法的空區間，回空 `items`，`total` 仍為全部筆數，因前端 `rangeBounds` 會在週一的「本週」等情況產生 `from === to`）；格式不合（非十進位整數、`from > to`、`order` 不是 `desc`／`asc`）回 400 `INVALID_BODY`。`order` 預設 `desc`（`ORDER BY played_at DESC, rowid ASC`），`asc` 為 `played_at ASC, rowid ASC`；`rowid` 即追加順序，與前端 `filterHistoryByRange` 的穩定排序一致
   - 回應 `{ items: [{ data, version }], total, droppedCount }`：`total` 為本人**全部**筆數（不受界線影響，讓前端分得出「完全沒有歷史」與「此區間沒有」）；`droppedCount` 為本次範圍內被略過的列數

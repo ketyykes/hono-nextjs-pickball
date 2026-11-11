@@ -20,7 +20,7 @@ const LOADING = '[data-sync-status="loading"]';
 const COURT_GRIDS = '[data-testid="match-stage-courts"] [data-testid$="-grid"]';
 const RANGE_LABELS = ["今日", "本週", "本月", "上月", "更早"] as const;
 const JSON_CLOUD_IMPORT_HINT_TEXT =
-	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
+	"登入時選擇的備份檔會匯入到雲端，不會寫入本機；雲端已有對戰分配機資料時，可確認後把備份中的參賽者與歷史附加到雲端，不會覆寫雲端既有的資料";
 const GUEST_PLAYER_NAME_A = "訪客歷史甲";
 const GUEST_PLAYER_NAME_B = "訪客歷史乙";
 // 統計表欄位索引：名次、球員、目前強度、出場數、勝負和

@@ -1,14 +1,24 @@
 // components/matchmaker/JsonBackupSection.tsx
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
+import type { AppendImportRequest } from "@pickball/core/api/import";
+import type { Backup } from "@pickball/core/matchmaker/transfer-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileTextPicker } from "@/components/matchmaker/FileTextPicker";
 import { LocalImportResultMessage } from "@/components/matchmaker/LocalImportResultMessage";
 import {
+	APPEND_ACTION_LABEL,
+	APPEND_CANCEL_LABEL,
+	APPEND_NAME_CHECK_HINT,
+	APPEND_RULES,
 	LOCAL_IMPORT_MESSAGES,
+	describeAppendMatchedPlayers,
+	describeAppendNewPlayers,
+	describeAppendOutcome,
+	describeAppendPreview,
 	describeImportOutcome,
 } from "@/components/matchmaker/local-import-view";
 import type { ImportResultView } from "@/components/matchmaker/local-import-view";
@@ -18,7 +28,14 @@ import { useSession } from "@/hooks/useSession";
 import { backupFileName, buildBackup, parseBackup } from "@/lib/matchmaker/backup";
 import { REMOTE_TRANSFER_MESSAGES, buildRemoteBackupSnapshot } from "@/lib/matchmaker/remote-transfer";
 import { readSnapshot, writeBackup } from "@/lib/matchmaker/transfer-storage";
-import { backupToImportRequest, importLocalData } from "@/lib/sync/local-import";
+import {
+	appendBackupToCloud,
+	backupToAppendRequest,
+	backupToImportRequest,
+	fetchAppendPreview,
+	importLocalData,
+} from "@/lib/sync/local-import";
+import type { AppendPlayersPreview } from "@/lib/sync/local-import";
 import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // JSON 完整備份區塊：涵蓋匯出（Blob + <a download>）與匯入
@@ -33,10 +50,20 @@ import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 //
 // parseBackup／writeBackup 的失敗分支只有 message，沒有機器可讀的 code：語法／版本／結構三種失敗一律原樣顯示 message，不做分類、
 // 不用字串比對 message 內容判斷類別。
+
+// 附加確認的狀態：確認顯示中與請求進行中共用同一份內容，只差按鈕是否停用
+type AppendState =
+	| { kind: "idle" }
+	| { kind: "confirm"; request: AppendImportRequest; preview: AppendPlayersPreview }
+	| { kind: "appending"; request: AppendImportRequest; preview: AppendPlayersPreview };
+
 export function JsonBackupSection() {
 	const [message, setMessage] = useState<string | null>(null);
 	// 雲端匯入成功的結果；失敗與驗證錯誤沿用 message
 	const [cloudImportResult, setCloudImportResult] = useState<ImportResultView | null>(null);
+	const [appendState, setAppendState] = useState<AppendState>({ kind: "idle" });
+	// 每次選檔遞增；名單讀取、整份匯入或附加請求回來時若已不是同一次選檔，結果直接丟棄，不覆寫新的狀態
+	const selectionRef = useRef(0);
 	const session = useSession();
 	const mode = resolveStorageMode(session);
 	const isRemote = mode === "remote";
@@ -89,24 +116,7 @@ export function JsonBackupSection() {
 		location.reload();
 	}
 
-	// 雲端分支：備份檔只匯入雲端，不寫入任何本機 key、不 reload（與本機的覆寫式還原相反）。
-	// userId 取自選檔當下的 render，onFileText 在 File.text() 讀完後才被呼叫，仍是同一份 closure。
-	async function handleCloudImportText(text: string) {
-		const parsed = parseBackup(text);
-		if (!parsed.ok) {
-			setCloudImportResult(null);
-			setMessage(parsed.message);
-			return;
-		}
-		if (userId === null) {
-			setCloudImportResult(null);
-			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
-			return;
-		}
-
-		const outcome = await importLocalData(userId, backupToImportRequest(parsed.backup));
-		if (outcome.kind === "unauthorized") void session.refresh();
-		const view = describeImportOutcome(outcome);
+	function showImportView(view: ImportResultView) {
 		if (view.tone === "error") {
 			setCloudImportResult(null);
 			setMessage(view.text);
@@ -116,9 +126,79 @@ export function JsonBackupSection() {
 		setCloudImportResult(view);
 	}
 
+	// 雲端已有資料時的附加流程前半：先讀雲端名單算出預覽，讀完才顯示確認（讀取失敗不退回無預覽的確認）。
+	async function prepareAppend(expectedUserId: string, backup: Backup, selection: number) {
+		const request = backupToAppendRequest(backup);
+		if (request.players.length === 0 && request.history.length === 0) {
+			setMessage(LOCAL_IMPORT_MESSAGES.appendNothing);
+			return;
+		}
+
+		const previewOutcome = await fetchAppendPreview(expectedUserId, request);
+		if (selection !== selectionRef.current) return;
+		if (previewOutcome.kind === "unauthorized") {
+			void session.refresh();
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
+		if (previewOutcome.kind === "failed") {
+			setMessage(LOCAL_IMPORT_MESSAGES.appendPreviewFailed);
+			return;
+		}
+		setAppendState({ kind: "confirm", request, preview: previewOutcome.preview });
+	}
+
+	// 雲端分支：備份檔只匯入雲端，不寫入任何本機 key、不 reload（與本機的覆寫式還原相反）。
+	// userId 取自選檔當下的 render，onFileText 在 File.text() 讀完後才被呼叫，仍是同一份 closure。
+	async function handleCloudImportText(text: string) {
+		selectionRef.current += 1;
+		const selection = selectionRef.current;
+		setAppendState({ kind: "idle" });
+		setMessage(null);
+		setCloudImportResult(null);
+
+		const parsed = parseBackup(text);
+		if (!parsed.ok) {
+			setMessage(parsed.message);
+			return;
+		}
+		if (userId === null) {
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
+
+		const outcome = await importLocalData(userId, backupToImportRequest(parsed.backup));
+		if (selection !== selectionRef.current) return;
+		if (outcome.kind === "cloud-not-empty") {
+			await prepareAppend(userId, parsed.backup, selection);
+			return;
+		}
+		if (outcome.kind === "unauthorized") void session.refresh();
+		showImportView(describeImportOutcome(outcome));
+	}
+
+	// 按下當下才取 userId：確認顯示期間帳號可能已被換掉，送出的必須是目前畫面所見的帳號
+	async function handleAppend() {
+		if (appendState.kind !== "confirm") return;
+		const { request, preview } = appendState;
+		if (userId === null) {
+			setAppendState({ kind: "idle" });
+			setMessage(REMOTE_TRANSFER_MESSAGES.unauthorized);
+			return;
+		}
+
+		const selection = selectionRef.current;
+		setAppendState({ kind: "appending", request, preview });
+		const outcome = await appendBackupToCloud(userId, request);
+		if (selection !== selectionRef.current) return;
+		setAppendState({ kind: "idle" });
+		if (outcome.kind === "unauthorized") void session.refresh();
+		showImportView(describeAppendOutcome(outcome));
+	}
+
 	let importPicker: ReactNode;
 	if (isRemote) {
-		// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
+		// 雲端資料不能被備份檔覆蓋：雲端為空時整份匯入，已有資料時改由使用者確認後只附加參賽者與歷史
 		importPicker = (
 			<>
 				<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
@@ -155,6 +235,56 @@ export function JsonBackupSection() {
 			<CardContent className="flex flex-wrap items-start gap-2">
 				<Button onClick={handleExport}>匯出 JSON</Button>
 				{importPicker}
+				{appendState.kind !== "idle" && (
+					<div
+						data-testid="json-backup-append-confirm"
+						className="flex w-full flex-col gap-3 rounded-md border p-4 text-sm"
+					>
+						<p>{describeAppendPreview(appendState.request.players.length, appendState.request.history.length)}</p>
+						{appendState.preview.added.length > 0 && (
+							<div className="flex flex-col gap-1">
+								<p>{describeAppendNewPlayers(appendState.preview.added.length)}</p>
+								<ul data-testid="json-backup-append-new-players" className="list-disc pl-5">
+									{appendState.preview.added.map((name) => (
+										<li key={name}>{name}</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{appendState.preview.added.length === 0 && (
+							<p data-testid="json-backup-append-no-new-players">{LOCAL_IMPORT_MESSAGES.appendNoNewPlayers}</p>
+						)}
+						{appendState.preview.matched.length > 0 && (
+							<div className="flex flex-col gap-1">
+								<p>{describeAppendMatchedPlayers(appendState.preview.matched.length)}</p>
+								<ul data-testid="json-backup-append-matched-players" className="list-disc pl-5">
+									{appendState.preview.matched.map((name) => (
+										<li key={name}>{name}</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{appendState.preview.added.length > 0 && <p>{APPEND_NAME_CHECK_HINT}</p>}
+						<ul data-testid="json-backup-append-rules" className="list-disc pl-5 text-muted-foreground">
+							{APPEND_RULES.map((rule) => (
+								<li key={rule}>{rule}</li>
+							))}
+						</ul>
+						<div className="flex gap-2">
+							<Button type="button" onClick={handleAppend} disabled={appendState.kind === "appending"}>
+								{APPEND_ACTION_LABEL}
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setAppendState({ kind: "idle" })}
+								disabled={appendState.kind === "appending"}
+							>
+								{APPEND_CANCEL_LABEL}
+							</Button>
+						</div>
+					</div>
+				)}
 				{cloudImportResult !== null && (
 					<div className="flex w-full flex-col gap-1">
 						<LocalImportResultMessage view={cloudImportResult} testId="json-backup-import-message" />

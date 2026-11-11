@@ -1,4 +1,11 @@
-import { checkImportLimits, type LocalImportRequest, type LocalImportResponse } from "@pickball/core/api/import";
+import {
+	type AppendImportRequest,
+	type AppendImportResponse,
+	checkAppendLimits,
+	checkImportLimits,
+	type LocalImportRequest,
+	type LocalImportResponse,
+} from "@pickball/core/api/import";
 import { type SQL, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { matchmakerHistory, matchmakerMatchSlots, matchmakerPlayers, matchmakerRound, scoreboardCurrent } from "../db/schema";
@@ -97,4 +104,94 @@ export async function importLocalData(db: Db, userId: string, input: LocalImport
 		}
 		throw error;
 	}
+}
+
+/**
+ * too-large 對應 413：參賽者筆數或任一段 JSON 參數超過上限，尚未碰 D1。
+ * 附加沒有 409：逐列略過即為預期語意。
+ */
+export type AppendOutcome = { kind: "ok"; value: AppendImportResponse["appended"] } | { kind: "too-large" };
+
+/**
+ * 把備份中的參賽者與歷史附加到雲端：只新增雲端沒有的，不覆寫任何既有的列。
+ * 固定兩條陳述式、同一個 batch，不使用整批守衛（逐列略過就是預期語意，略過條件都在各自的 SQL 內判定）：
+ * - 第一條（參賽者）看不到同批資料自己插入的列，所以備份內的同名去重已由核心 serializeAppendSegments 完成。
+ * - 第二條（歷史）在 batch 內依序執行，看得到第一條插入之後的名單，
+ *   因此歷史的球員 id 改寫與參賽者的略過判定看到的是同一份名單。
+ * 送進 json_each 的三個字串就是 checkAppendLimits 量測過的 segments，不另組 JSON。
+ * 新增筆數取自 RETURNING 的列數：ON CONFLICT DO NOTHING 下 meta.changes 的語意沒有文件保證。
+ */
+export async function appendLocalBackup(db: Db, userId: string, input: AppendImportRequest): Promise<AppendOutcome> {
+	const limits = checkAppendLimits(input);
+	if (!limits.ok) {
+		return { kind: "too-large" };
+	}
+	const { players: playersJson, playerNames: playerNamesJson, history: historyJson } = limits.segments;
+	const updatedAt = Date.now();
+
+	// 新增者的 sort_order 接在附加前的最大值之後；row_number 在 WHERE 過濾之後才計算，所以序號連續
+	// 略過條件：本人雲端已有同名者，或 id 已存在（同一筆資料，即使名稱不同）
+	const playersSelect = sql`SELECT ${userId}, json_extract(j.value, '$.id'), json_extract(j.value, '$.data'),
+		(SELECT coalesce(max(m.sort_order), -1) FROM matchmaker_players m WHERE m.user_id = ${userId}) + row_number() OVER (ORDER BY j.key),
+		${initialVersion(userId)}, ${updatedAt}
+		FROM json_each(${playersJson}) AS j
+		WHERE NOT EXISTS (
+			SELECT 1 FROM matchmaker_players m
+			WHERE m.user_id = ${userId} AND json_extract(m.data, '$.name') = json_extract(j.value, '$.data.name')
+		)
+		AND NOT EXISTS (
+			SELECT 1 FROM matchmaker_players m
+			WHERE m.user_id = ${userId} AND m.id = json_extract(j.value, '$.id')
+		)
+		ORDER BY j.key`;
+
+	// id 對應表：備份名單中「id 不在本人雲端名單」的每位參賽者，對應到雲端同名且 sort_order 最小（同值依 rowid）者。
+	// 這張表在第二條陳述式執行時才計算，所以已包含第一條新增的參賽者；找不到同名者時 dst 為 NULL，歷史維持原 id。
+	// 用 MATERIALIZED 讓它只算一次，而不是在每位歷史球員的子查詢內重複掃描名單。
+	const idMap = sql`WITH id_map AS MATERIALIZED (
+			SELECT json_extract(n.value, '$.id') AS src,
+				(SELECT m.id FROM matchmaker_players m
+					WHERE m.user_id = ${userId} AND json_extract(m.data, '$.name') = json_extract(n.value, '$.name')
+					ORDER BY m.sort_order, m.rowid LIMIT 1) AS dst
+			FROM json_each(${playerNamesJson}) AS n
+			WHERE NOT EXISTS (
+				SELECT 1 FROM matchmaker_players m
+				WHERE m.user_id = ${userId} AND m.id = json_extract(n.value, '$.id')
+			)
+		)`;
+	const rewriteTeam = (team: "teamA" | "teamB") => sql.raw(`json((
+			SELECT json_group_array(json_set(t.value, '$.id', coalesce((SELECT dst FROM id_map WHERE src = t.value ->> '$.id'), t.value ->> '$.id')))
+			FROM (SELECT value FROM json_each(h.value, '$.data.${team}.players') ORDER BY key) AS t
+		))`);
+	// 只改寫球員 id；姓名、分數與陣列順序原樣保留
+	const historySelect = sql`${idMap}
+		SELECT ${userId}, json_extract(h.value, '$.matchId'), json_extract(h.value, '$.playedAt'),
+			json_set(json_extract(h.value, '$.data'), '$.teamA.players', ${rewriteTeam("teamA")}, '$.teamB.players', ${rewriteTeam("teamB")}),
+			1, ${updatedAt}
+		FROM json_each(${historyJson}) AS h
+		WHERE true
+		ORDER BY h.key`;
+
+	const [playerRows, historyRows] = await db.batch([
+		db
+			.insert(matchmakerPlayers)
+			.select(playersSelect)
+			.onConflictDoNothing()
+			.returning({ id: matchmakerPlayers.id }),
+		db
+			.insert(matchmakerHistory)
+			.select(historySelect)
+			.onConflictDoNothing()
+			.returning({ matchId: matchmakerHistory.matchId }),
+	]);
+
+	const playersAdded = playerRows.length;
+	const historyAdded = historyRows.length;
+	return {
+		kind: "ok",
+		value: {
+			players: { added: playersAdded, skipped: input.players.length - playersAdded },
+			history: { added: historyAdded, skipped: input.history.length - historyAdded },
+		},
+	};
 }

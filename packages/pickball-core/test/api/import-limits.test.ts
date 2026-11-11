@@ -3,9 +3,12 @@ import {
   IMPORT_BODY_LIMIT_BYTES,
   IMPORT_SEGMENT_LIMIT_BYTES,
   LocalImportRequestSchema,
+  checkAppendLimits,
   checkImportLimits,
+  serializeAppendSegments,
   serializeImportSegments,
   utf8ByteLength,
+  type AppendImportRequest,
   type LocalImportRequest,
 } from "../../src/api/import";
 import { MAX_PLAYERS_PER_IMPORT, PLAYER_IMPORT_BODY_LIMIT_BYTES } from "../../src/api/players";
@@ -338,5 +341,130 @@ describe("本機資料匯入的共用參數形狀與上限判定", () => {
     expect(IMPORT_BODY_LIMIT_BYTES).toBe(10_000_000);
     expect(IMPORT_SEGMENT_LIMIT_BYTES).toBeLessThan(D1_MAX_STRING_BYTES);
     expect(PLAYER_IMPORT_BODY_LIMIT_BYTES).toBeLessThan(D1_MAX_STRING_BYTES);
+  });
+});
+
+/** 附加請求用的參賽者：名稱由呼叫端指定，才能做出同名情境。 */
+function makeNamedPlayer(id: string, name: string): AppendImportRequest["players"][number] {
+  return { ...makePlayer(id), gender: "male", name };
+}
+
+/** 附加請求的基準：兩筆歷史、三位參賽者且其中兩位同名。 */
+function makeAppendRequest(): AppendImportRequest {
+  return {
+    players: [makeNamedPlayer("x1", "戊"), makeNamedPlayer("x2", "己"), makeNamedPlayer("x3", "戊")],
+    history: structuredClone(makeBaseRequest().history),
+  };
+}
+
+describe("本機備份附加到雲端的共用參數形狀與上限判定", () => {
+  it("serializeAppendSegments 同名只保留第一位參賽者，對照段含全部參賽者，歷史段與整份匯入的歷史段相同", () => {
+    const request = makeAppendRequest();
+    const segments = serializeAppendSegments(request);
+    const [x1, x2] = request.players;
+
+    // 參賽者段：同名只留第一位，順序為請求順序
+    expect(segments.players).toBe(
+      JSON.stringify([
+        { id: "x1", data: x1 },
+        { id: "x2", data: x2 },
+      ]),
+    );
+    // 對照段：全部參賽者，不去重
+    expect(segments.playerNames).toBe(
+      JSON.stringify([
+        { id: "x1", name: "戊" },
+        { id: "x2", name: "己" },
+        { id: "x3", name: "戊" },
+      ]),
+    );
+    // 歷史段與整份匯入對同一個歷史陣列產生的歷史段逐字相同
+    expect(segments.history).toBe(
+      serializeImportSegments({
+        version: 1,
+        players: [],
+        currentRound: null,
+        history: request.history,
+        scoreboard: { current: null, matches: [] },
+      }).history,
+    );
+
+    // 名稱完全相同才算同名：大小寫不同視為不同人
+    const caseDifferent = serializeAppendSegments({
+      players: [makeNamedPlayer("a1", "Amy"), makeNamedPlayer("a2", "amy")],
+      history: [],
+    });
+    expect(JSON.parse(caseDifferent.players).map((item: { id: string }) => item.id)).toEqual(["a1", "a2"]);
+
+    // 沒有資料的段落是空陣列
+    expect(serializeAppendSegments({ players: [], history: [] })).toEqual({
+      players: "[]",
+      playerNames: "[]",
+      history: "[]",
+    });
+  });
+
+  it("checkAppendLimits 三段各自恰為上限時通過，多一位元組或超過 500 位參賽者即不通過", () => {
+    const base = makeAppendRequest();
+    expect(checkAppendLimits(base)).toEqual({ ok: true, segments: serializeAppendSegments(base) });
+
+    type AppendSegmentName = "players" | "playerNames" | "history";
+
+    /** 讓指定段落的 UTF-8 位元組數恰為 targetBytes；先量基準再補長，並斷言結果。 */
+    const makeWithSegmentBytes = (segment: AppendSegmentName, targetBytes: number): AppendImportRequest => {
+      const build = (pad: string): AppendImportRequest => {
+        const request = structuredClone(base);
+        if (segment === "players") {
+          // 補在沒有同名者的第二位：補長同名者的名稱會讓第三位不再被去重，段落多出一位參賽者
+          request.players[1].name += pad;
+        } else if (segment === "playerNames") {
+          // 對照段含全部參賽者，參賽者段只含每個名稱的第一位：補長與第一位同名者的 id，只有對照段變長
+          request.players[2].id += pad;
+        } else {
+          request.history[0].teamA.players[0].name += pad;
+        }
+        return request;
+      };
+      const baseBytes = encodedLength(serializeAppendSegments(build(""))[segment]);
+      const request = build("x".repeat(targetBytes - baseBytes));
+      expect(encodedLength(serializeAppendSegments(request)[segment]), segment).toBe(targetBytes);
+      return request;
+    };
+
+    for (const segment of ["players", "playerNames", "history"] as const) {
+      const atLimit = makeWithSegmentBytes(segment, IMPORT_SEGMENT_LIMIT_BYTES);
+      const atLimitResult = checkAppendLimits(atLimit);
+      expect(atLimitResult.ok, `${segment} 恰為上限`).toBe(true);
+      if (atLimitResult.ok) {
+        expect(atLimitResult.segments).toEqual(serializeAppendSegments(atLimit));
+      }
+
+      const overLimit = makeWithSegmentBytes(segment, IMPORT_SEGMENT_LIMIT_BYTES + 1);
+      expect(checkAppendLimits(overLimit), `${segment} 多一位元組`).toEqual({ ok: false });
+    }
+
+    // 500 位通過；501 位（含同名，去重後不到 500）以請求筆數判定而不通過
+    const withPlayerCount = (count: number, nameOf: (index: number) => string): AppendImportRequest => ({
+      players: Array.from({ length: count }, (_, index) => makeNamedPlayer(`p${index}`, nameOf(index))),
+      history: [],
+    });
+    expect(checkAppendLimits(withPlayerCount(500, (index) => `名${index}`)).ok).toBe(true);
+    const overCount = withPlayerCount(501, (index) => `名${index % 10}`);
+    expect(JSON.parse(serializeAppendSegments(overCount).players)).toHaveLength(10);
+    expect(checkAppendLimits(overCount)).toEqual({ ok: false });
+
+    // 參賽者段與歷史段各約 1,200,000 位元組：加總超過單段上限，但各段都沒超過
+    const split = structuredClone(base);
+    split.players[0].name += "x".repeat(1_200_000);
+    split.history[0].teamA.players[0].name += "x".repeat(1_200_000);
+    const splitSegments = serializeAppendSegments(split);
+    expect(encodedLength(splitSegments.players) + encodedLength(splitSegments.history)).toBeGreaterThan(
+      IMPORT_SEGMENT_LIMIT_BYTES,
+    );
+    const splitResult = checkAppendLimits(split);
+    expect(splitResult.ok).toBe(true);
+    if (splitResult.ok) {
+      expect(splitResult.segments).toEqual(splitSegments);
+    }
   });
 });

@@ -37,8 +37,9 @@ Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui。**
   - `/matchmaker/data` 登入態差異：JSON 匯出的 players 與 currentRound 取自雲端（`GET /api/matchmaker/round`），history 取自雲端（`GET /api/matchmaker/history?order=asc`）；JSON 還原改為「從 JSON 備份匯入到雲端」（見下方「本機資料匯入雲端」），本機覆寫式還原只在訪客時渲染；參賽者 CSV 匯入以雲端名單計算後一次 `POST` import；歷史 CSV 登入時改讀雲端（`buildRemoteHistoryCsv`）；清除本機資料兩種模式相同（只清本機）
   - **本機資料匯入雲端**：登入後把訪客時期留在本機的五個 key（名單、回合、歷史、`scoreboard:matches:v1` 中屬於回合未完成場次的分槽、`scoreboard:current:v1`）一次 `POST /api/import`。
     - 入口：資料頁的 `LocalDataImportSection`（錨點 `#local-import`；本機無資料顯示「本機沒有可匯入的資料」且無按鈕、超過單次上限顯示 oversize 說明）；參賽者頁在名單 `synced` 且為空、本機有可匯入資料時顯示 `LocalImportNotice`（連到該錨點）；兩者只在雲端模式渲染，訪客 DOM 不變
-    - JSON 還原在登入時的語意：`JsonBackupSection` 雲端分支選檔 → `parseBackup` → `backupToImportRequest`（計分板段為空）→ 同一端點、同一拒絕規則；不寫入本機、不 reload
-    - **使用者定案**：匯入成功後**保留**本機資料（不寫入、不清除任何本機 key）；雲端四張對戰分配機表任一已有本人資料即 409、整份不寫入（不覆寫、不合併；要以本機取代須先「重置名單」）；雲端已有獨立計分板時略過該段並標 `skipped`；重複匯入被守衛拒絕，不產生重複歷史
+    - JSON 還原在登入時的語意：`JsonBackupSection` 雲端分支選檔 → `parseBackup` → `backupToImportRequest`（計分板段為空）→ `POST /api/import`；雲端為空時整份匯入。回 409（雲端已有資料）時改走**附加**：`fetchAppendPreview` 以選檔當下的帳號讀雲端名單、`previewAppendPlayers` 算出「會新增／視為同一人」名單（規則 MUST 與後端 `appendLocalBackup` 逐字一致，前後端以同一組 fixture 各自測試），顯示附加確認與四條說明，使用者按「附加到雲端」才以按下當下的帳號 `appendBackupToCloud`（`POST /api/import/append`，回合不送）。每次選檔先清除前次狀態，晚到的舊結果以選檔序號丟棄。不寫入本機、不 reload
+    - E2E 同步點：`tests/e2e/user-data/{local-import,history-sync,roster-sync}.spec.ts` 的 `JSON_CLOUD_IMPORT_HINT_TEXT` 必須與 `LOCAL_IMPORT_MESSAGES.jsonCloudImportHint` 逐字相同
+    - **使用者定案**：匯入成功後**保留**本機資料（不寫入、不清除任何本機 key）；雲端四張對戰分配機表任一已有本人資料即 409、整份不寫入（不覆寫；「匯入本機資料到雲端」區塊不合併，要以本機取代須先「重置名單」；JSON 備份入口則可確認後附加，見上一條）；雲端已有獨立計分板時略過該段並標 `skipped`；重複匯入被守衛拒絕，不產生重複歷史
     - 一次性雲端操作：以點擊當下 `useSession()` 的 user id 呼叫、`null` 時不送出，`unauthorized` 時 `refresh()`；兩個入口的文案與結果轉換集中在 `components/matchmaker/local-import-view.ts`（`LOCAL_IMPORT_MESSAGES`、`describeImportOutcome`），結果呈現共用 `LocalImportResultMessage`
   - `/matchmaker/players` 的「重置名單」在登入時呼叫 `POST /api/matchmaker/reset`，成功後不清除任何本機 key（本機資料是訪客時期的資料，留作匯入來源）；雲端的名單、回合、分槽與歷史由後端 reset batch 一併刪除
 - `/matchmaker/stats` — 球員統計與排行榜，同樣不在全站 navbar。

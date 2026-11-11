@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MatchHistoryEntrySchema, type MatchHistoryEntry } from "../matchmaker/history";
 import { BackupSchema } from "../matchmaker/transfer-types";
 import { MAX_PLAYERS_PER_IMPORT, PlayerWriteSchema } from "./players";
 import { MatchSlotSchema } from "./round";
@@ -98,6 +99,17 @@ export interface ImportSegments {
   current: string;
 }
 
+/** 歷史段的 json_each 參數；整份匯入與附加共用同一個函式，兩邊的歷史段才會逐字相同。 */
+function serializeHistorySegment(history: MatchHistoryEntry[]): string {
+  return JSON.stringify(
+    history.map((data) => ({
+      matchId: data.matchId,
+      playedAt: Date.parse(data.playedAt),
+      data,
+    })),
+  );
+}
+
 /**
  * 產生送進 D1 json_each 的五段 JSON。
  * 前後端都用這個函式量測與送出，量測的字串與寫入的字串才不會漂移。
@@ -109,13 +121,7 @@ export function serializeImportSegments(request: LocalImportRequest): ImportSegm
     ),
     round: JSON.stringify(request.currentRound === null ? [] : [{ data: request.currentRound }]),
     slots: JSON.stringify(request.scoreboard.matches.map((data) => ({ matchId: data.matchId, data }))),
-    history: JSON.stringify(
-      request.history.map((data) => ({
-        matchId: data.matchId,
-        playedAt: Date.parse(data.playedAt),
-        data,
-      })),
-    ),
+    history: serializeHistorySegment(request.history),
     current: JSON.stringify(
       request.scoreboard.current === null ? [] : [{ data: request.scoreboard.current }],
     ),
@@ -161,6 +167,98 @@ export function checkImportLimits(request: LocalImportRequest): ImportLimitCheck
   }
   const segments = serializeImportSegments(request);
   const texts = [segments.players, segments.round, segments.slots, segments.history, segments.current];
+  for (const text of texts) {
+    if (utf8ByteLength(text) > IMPORT_SEGMENT_LIMIT_BYTES) {
+      return { ok: false };
+    }
+  }
+  return { ok: true, segments };
+}
+
+/**
+ * 本機備份附加到雲端的請求：只含參賽者與歷史，備份中的進行中回合不屬於附加。
+ * 未知欄位由 zod 預設剝除。
+ */
+export const AppendImportRequestSchema = z
+  .object({
+    players: z.array(PlayerWriteSchema),
+    history: z.array(MatchHistoryEntrySchema),
+  })
+  .superRefine((data, ctx) => {
+    // 附加端點以 ON CONFLICT DO NOTHING 略過已存在的列；請求內重複若放行，會被當成「略過」悄悄吞掉而計數失真，所以在契約層拒絕。
+    const playerIds = data.players.map((player) => player.id);
+    if (new Set(playerIds).size !== playerIds.length) {
+      ctx.addIssue({ code: "custom", message: "players 內的 id 不可重複", path: ["players"] });
+    }
+
+    const historyMatchIds = data.history.map((entry) => entry.matchId);
+    if (new Set(historyMatchIds).size !== historyMatchIds.length) {
+      ctx.addIssue({ code: "custom", message: "history 內的 matchId 不可重複", path: ["history"] });
+    }
+
+    if (data.players.length === 0 && data.history.length === 0) {
+      ctx.addIssue({ code: "custom", message: "附加內容不可全部為空" });
+    }
+  });
+
+const AppendCountSchema = z.object({
+  added: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+});
+
+/** 附加成功回應：參賽者與歷史各自實際新增與略過的筆數。 */
+export const AppendImportResponseSchema = z.object({
+  appended: z.object({
+    players: AppendCountSchema,
+    history: AppendCountSchema,
+  }),
+});
+
+export type AppendImportRequest = z.infer<typeof AppendImportRequestSchema>;
+export type AppendImportResponse = z.infer<typeof AppendImportResponseSchema>;
+
+/** 後端附加端點 json_each 的三個參數，皆為 JSON 字串。 */
+export interface AppendSegments {
+  /** 每個名稱只含第一位的參賽者，寫入 matchmaker_players。 */
+  players: string;
+  /** 請求中全部參賽者的 id 與名稱，只用來改寫歷史中的球員 id，不寫入任何表。 */
+  playerNames: string;
+  history: string;
+}
+
+/**
+ * 產生附加端點送進 D1 json_each 的三段 JSON。
+ * 同名去重必須在這裡完成：同一條 INSERT ... SELECT 看不到自己剛插入的列，SQL 無法替同批資料去重。
+ */
+export function serializeAppendSegments(request: AppendImportRequest): AppendSegments {
+  const seenNames = new Set<string>();
+  const uniquePlayers = request.players.filter((player) => {
+    if (seenNames.has(player.name)) {
+      return false;
+    }
+    seenNames.add(player.name);
+    return true;
+  });
+
+  return {
+    players: JSON.stringify(uniquePlayers.map((data) => ({ id: data.id, data }))),
+    playerNames: JSON.stringify(request.players.map((player) => ({ id: player.id, name: player.name }))),
+    history: serializeHistorySegment(request.history),
+  };
+}
+
+export type AppendLimitCheck = { ok: true; segments: AppendSegments } | { ok: false };
+
+/**
+ * 判定附加請求是否超過筆數或單段位元組上限。
+ * 筆數以去重前的請求計算；三段各自比較、不加總，恰等於上限時通過。
+ */
+export function checkAppendLimits(request: AppendImportRequest): AppendLimitCheck {
+  if (request.players.length > MAX_PLAYERS_PER_IMPORT) {
+    return { ok: false };
+  }
+  const segments = serializeAppendSegments(request);
+  const texts = [segments.players, segments.playerNames, segments.history];
   for (const text of texts) {
     if (utf8ByteLength(text) > IMPORT_SEGMENT_LIMIT_BYTES) {
       return { ok: false };
