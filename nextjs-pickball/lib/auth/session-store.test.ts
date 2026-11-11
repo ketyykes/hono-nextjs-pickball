@@ -461,6 +461,25 @@ describe("session-store 無法確認與本機備援", () => {
 			});
 			expect(listener).toHaveBeenCalled();
 			expect(readSignedInHint()).toBe(true);
+
+			// 後半段：逾時進入無法確認後，進行中的請求才回 null，維持同一個無法確認參考且提示仍在
+			resetSessionStoreForTests();
+			let resolveNull: (value: State | null) => void = () => {};
+			mockedFetchSession.mockReset();
+			mockedFetchSession.mockReturnValue(
+				new Promise<State | null>((r) => {
+					resolveNull = r;
+				}),
+			);
+			subscribe(vi.fn());
+			vi.advanceTimersByTime(10_000);
+			const unavailable = getSnapshot();
+			expect(unavailable).toEqual(UNAVAILABLE);
+
+			resolveNull(null);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(getSnapshot()).toBe(unavailable);
+			expect(readSignedInHint()).toBe(true);
 		} finally {
 			vi.useRealTimers();
 		}
@@ -490,10 +509,18 @@ describe("session-store 無法確認與本機備援", () => {
 			expect(listener).toHaveBeenCalled();
 			expect(readSignedInHint()).toBe(true);
 
-			resolveFetch({ authEnabled: true, user: USER });
+			// 被丟棄的回應即使是未登入也不能清除提示
+			resolveFetch({ authEnabled: true, user: null });
 			await vi.advanceTimersByTimeAsync(0);
 			expect(getSnapshot()).toEqual({ status: "loading", localFallback: true });
+			expect(readSignedInHint()).toBe(true);
 			expect(mockedFetchSession).toHaveBeenCalledTimes(1);
+
+			// 本機備援期間 refresh 失敗：依採用 null 的規則回到無法確認，提示仍在
+			mockedFetchSession.mockResolvedValue(null);
+			await refresh();
+			expect(getSnapshot()).toEqual(UNAVAILABLE);
+			expect(readSignedInHint()).toBe(true);
 
 			mockedFetchSession.mockResolvedValue({ authEnabled: true, user: USER });
 			await refresh();

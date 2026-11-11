@@ -443,6 +443,7 @@ describe("useRosterStore 儲存模式選擇器", () => {
 
 		expect(result.current.players).toEqual([]);
 		expect(result.current.syncStatus).toBe("unavailable");
+		expect(result.current.droppedCount).toBe(0);
 
 		act(() => {
 			result.current.addPlayer({ name: "無法確認時新增", gender: "male", rating: 3 });
