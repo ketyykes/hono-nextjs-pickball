@@ -141,7 +141,7 @@ export async function appendLocalBackup(db: Db, userId: string, input: AppendImp
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM matchmaker_players m
-			WHERE m.user_id = ${userId} AND m.id = json_extract(j.value, '$.data.id')
+			WHERE m.user_id = ${userId} AND m.id = json_extract(j.value, '$.id')
 		)
 		ORDER BY j.key`;
 
