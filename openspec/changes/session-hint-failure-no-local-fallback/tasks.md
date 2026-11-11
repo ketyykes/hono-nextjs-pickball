@@ -183,4 +183,15 @@ Depends on: §4
       | `chooseLocalFallback` 不遞增 `requestId` | 紅（目標 it「chooseLocalFallback 在無法確認時…」） |
       | 對照組 `readSignedInHint()` 改 `!!readSignedInHint() === true` | 綠（22 tests） |
     - 驗收：`components/sync` 、`lib/auth`、`hooks/useRosterStore.test.tsx` 單檔 vitest 綠（6 檔 57 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
+  - verify 第二輪（opus，2026-11-11）：CRITICAL 0、WARNING 1、SUGGESTION 9；第一輪處置經複核皆到位。處置：
+    W1 gate 證據早於第一輪的產品修正 → coordinator 於 HEAD `b5b92dc` 重跑完整 gate 全綠（lint 0 errors／3 warnings；三段 tsc exit 0；前端 119／1184、後端 27／223、核心 10／27；chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55、user-data 48；build exit 0；porcelain 空）；第二輪程式修正後於最新 HEAD 再跑一次，結果記於下方。
+    S1 專注模式提示中段被浮動操作列遮住 → 規格／design／test-plan 補 `[.sb-focus_&]:bottom-16`（`65546ff`），程式 TDD（`766ef02` RED、`f433e2c` GREEN；RED 前產品檔不含 `sb-focus`，coordinator 機械複驗）。
+    S2 導覽「跳過」按鈕在窄螢幕蓋住提示右段 → design Risks 記為接受（`6d3cc84`）。
+    S3 spec／test-plan 未跟上第一輪補的斷言 → 同步（`6d3cc84`）。
+    S4 逾時後才到的 `null`、本機備援期間 refresh 失敗、被丟棄回應不清除提示未測 → 擴充既有新 it 為 regression guard（`21a6a24`），mutation 轉紅證明有效。
+    S5 無法確認時名單 `droppedCount` 未斷言 → 補斷言（`21a6a24`）。
+    S6 卡片外觀 class 重複 → `SyncStatusNotice` 匯出 `NOTICE_CLASS` 共用（`765527f`）。
+    S7 兩個 commit 單獨 tsc 不過 → 3.3 紀錄補註（`6d3cc84`），不改寫歷史。
+    S8 `020dc49` 標 `test:` 卻混入註解與 tasks → 記錄於此，不改寫歷史；之後依 execution-plan l 拆分。
+    S9 tasks 5.12／5.13 排版 → 修正（`6d3cc84`）。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
