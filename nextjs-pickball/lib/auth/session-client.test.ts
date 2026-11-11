@@ -49,7 +49,7 @@ describe("fetchSession", () => {
 		await expect(fetchSession()).resolves.toEqual(DISABLED);
 	});
 
-	it("fetchSession 於非 200、形狀不符或網路錯誤時回傳未啟用且不拋錯", async () => {
+	it("fetchSession 於非 200、形狀不符或網路錯誤時回傳 null 且不拋錯", async () => {
 		const failures: Array<() => Promise<Response>> = [
 			// 非 200：即使 body 形狀正確也不採信
 			async () =>
@@ -96,7 +96,7 @@ describe("fetchSession", () => {
 
 		for (const failure of failures) {
 			stubFetch(failure);
-			await expect(fetchSession()).resolves.toEqual(DISABLED);
+			await expect(fetchSession()).resolves.toBeNull();
 		}
 	});
 
@@ -121,7 +121,7 @@ describe("fetchSession", () => {
 		await expect(fetchSession()).resolves.toEqual(payload);
 	});
 
-	it("signInMethods 形狀不符時 fetchSession 回傳未啟用", async () => {
+	it("signInMethods 形狀不符時 fetchSession 回傳 null", async () => {
 		const malformed: unknown[] = [
 			null,
 			"google",
@@ -132,7 +132,7 @@ describe("fetchSession", () => {
 			stubFetch(async () =>
 				jsonResponse({ authEnabled: true, user: null, signInMethods }),
 			);
-			await expect(fetchSession()).resolves.toEqual(DISABLED);
+			await expect(fetchSession()).resolves.toBeNull();
 		}
 	});
 });

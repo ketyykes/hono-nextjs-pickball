@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ViewTransition } from "react";
 import { Noto_Sans_TC, Bebas_Neue, Outfit } from "next/font/google";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { LocalFallbackBanner } from "@/components/sync/LocalFallbackBanner";
 import "./globals.css";
 
 // 主文本字型：繁體中文（需啟用 latin subset 作為 fallback）
@@ -46,6 +47,7 @@ export default function RootLayout({
     >
       <body>
         <SiteNavbar />
+        <LocalFallbackBanner />
         {/*
           以 React 19 <ViewTransition> 包住路由內容；
           enter / exit 依 transition type 對應到 globals.css 的 nav-forward / nav-back 動畫。

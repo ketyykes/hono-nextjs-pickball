@@ -35,7 +35,9 @@ const NO_ROUND_FILE_NAME_PLACEHOLDER = "export.jpg";
 
 // 名單與回合各有自己的同步狀態，頁面只顯示一個：取最需要使用者注意的那個。
 // local 排在最後，兩者皆為 local（訪客）時才會是 local。
+// unavailable 必須排第一：沒列出的值會落到 local 而畫出空舞台。
 const SYNC_STATUS_PRIORITY: readonly DataStatus[] = [
+	"unavailable",
 	"load-failed",
 	"loading",
 	"pending",

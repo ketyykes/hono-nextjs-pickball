@@ -418,4 +418,78 @@ describe("useRosterStore 儲存模式選擇器", () => {
 		expect(seenEmpty[0]).toBe("pending");
 		expect(seenEmpty[seenEmpty.length - 1]).toBe("local");
 	});
+
+	// 無法確認：有上次登入提示而 session 請求失敗或逾時，要擋住畫面等使用者選擇，不得悄悄交出本機名單。
+	const unavailableSession = {
+		status: "loading",
+		signedInHint: true,
+		unavailable: true,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+	const localFallbackSession = {
+		status: "loading",
+		localFallback: true,
+		hydrated: true,
+		refresh: vi.fn(),
+	} as const;
+
+	it("session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求", () => {
+		seedLocalRoster([makePlayer({ id: "local-1" })]);
+		const before = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue(unavailableSession);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		expect(result.current.players).toEqual([]);
+		expect(result.current.syncStatus).toBe("unavailable");
+		expect(result.current.droppedCount).toBe(0);
+
+		act(() => {
+			result.current.addPlayer({ name: "無法確認時新增", gender: "male", rating: 3 });
+		});
+
+		expect(result.current.players).toEqual([]);
+		expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(before);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求", async () => {
+		vi.mocked(useSession).mockReturnValue(loggedIn);
+		const cloudPlayers = [makePlayer({ id: "c1" })];
+		fetchMock.mockImplementation(() =>
+			Promise.resolve(
+				jsonResponse({ items: cloudPlayers.map((data) => ({ data, version: 3 })) }),
+			),
+		);
+
+		const { result, rerender } = renderHook(() => useRosterStore());
+		await waitFor(() => expect(result.current.syncStatus).toBe("synced"));
+		expect(result.current.players).toHaveLength(1);
+		const callsBefore = fetchMock.mock.calls.length;
+
+		vi.mocked(useSession).mockReturnValue(unavailableSession);
+		rerender();
+
+		expect(result.current.players).toEqual([]);
+		expect(result.current.syncStatus).toBe("unavailable");
+
+		act(() => {
+			result.current.addPlayer({ name: "無法確認時新增", gender: "male", rating: 3 });
+		});
+
+		expect(fetchMock.mock.calls.length).toBe(callsBefore);
+	});
+
+	// regression guard：本機備援快照早已被 resolveStorageMode 判為 local，寫入即綠。
+	it("選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local", async () => {
+		seedLocalRoster([makePlayer({ id: "local-1" })]);
+		vi.mocked(useSession).mockReturnValue(localFallbackSession);
+
+		const { result } = renderHook(() => useRosterStore());
+
+		await waitFor(() => expect(result.current.syncStatus).toBe("local"));
+		expect(result.current.players.map((player) => player.id)).toEqual(["local-1"]);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });

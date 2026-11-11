@@ -35,7 +35,7 @@ import type { Player } from "@pickball/core/matchmaker/types";
 import type { ScoreboardState } from "@pickball/core/scoreboard/types";
 import { useSession } from "@/hooks/useSession";
 import { useRemoteRoundStore } from "@/hooks/useRemoteRoundStore";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 import { localDataStatus, type DataStatus, type SyncStatus } from "@/lib/sync/sync-status";
 
 // 回合 store 的 state 形狀。history 由兩條路徑寫入：mount 時 hydrate 既有歷史，
@@ -436,9 +436,9 @@ export function useLocalRoundStore(options: UseRoundStoreOptions): LocalRoundSto
 
 // 儲存模式選擇器：本機 hook 在其他模式下仍會 mount（hooks 規則不允許條件呼叫），
 // 它只會讀取並把同一份本機回合與歷史寫回，使用者動作一律走雲端 hook 或等待中結果，不會改到本機資料。
-// 等待中（儲存模式未定）沿用未啟用的雲端 hook 結果：它在第一次取得 session 之前從未啟用過，
-// 內部必為初始狀態（round 為 null、操作回 ok: false）。不回傳本機結果，否則對戰頁的分槽回填
-// effect 會在等待中把本機分槽寫進本機歷史。
+// 等待中（儲存模式未定，含 session 無法確認）沿用未啟用的雲端 hook 結果：未啟用時雲端回合 hook
+// 的 round 與 remoteMatchSlots 為 null、操作回 ok: false，沒有殘留資料。
+// 不回傳本機結果，否則對戰頁的分槽回填 effect 會在等待中把本機分槽寫進本機歷史。
 export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResult<DataStatus> {
 	const session = useSession();
 	const local = useLocalRoundStore(options);
@@ -447,7 +447,7 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 	const userId = session.status === "ready" ? (session.user?.id ?? null) : null;
 	// 雲端 hook 只認 SyncStatus：名單等待中對它而言與載入中相同（名單尚不可用）
 	let rosterSyncStatus: SyncStatus | undefined;
-	if (options.rosterSyncStatus === "pending") {
+	if (options.rosterSyncStatus === "pending" || options.rosterSyncStatus === "unavailable") {
 		rosterSyncStatus = "loading";
 	} else {
 		rosterSyncStatus = options.rosterSyncStatus;
@@ -467,7 +467,7 @@ export function useRoundStore(options: UseRoundStoreOptions): UseRoundStoreResul
 		return remote;
 	}
 	if (mode === "pending") {
-		return { ...remote, syncStatus: "pending" };
+		return { ...remote, syncStatus: pendingDataStatus(session) };
 	}
 	const { hydrated, ...localStore } = local;
 	return { ...localStore, syncStatus: localDataStatus(hydrated), remoteMatchSlots: null };

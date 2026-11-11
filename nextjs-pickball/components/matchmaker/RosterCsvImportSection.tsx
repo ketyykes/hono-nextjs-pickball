@@ -13,7 +13,7 @@ import { useSession } from "@/hooks/useSession";
 import { REMOTE_TRANSFER_MESSAGES, importRemoteRoster } from "@/lib/matchmaker/remote-transfer";
 import { readRoster } from "@/lib/matchmaker/storage";
 import { writeRosterPlayers } from "@/lib/matchmaker/transfer-storage";
-import { resolveStorageMode } from "@/lib/sync/storage-mode";
+import { pendingDataStatus, resolveStorageMode } from "@/lib/sync/storage-mode";
 
 // 匯入分兩階段：選檔後先解析出預覽（可新增人數＋問題列），使用者確認後才寫入
 // （spec「參賽者 CSV 匯入的預覽、附加寫入與整份原子性」）。取消／關閉預覽不寫入任何資料。
@@ -108,9 +108,10 @@ export function RosterCsvImportSection() {
 	let content: ReactNode;
 	if (mode === "pending") {
 		// 儲存模式未定時不提供選檔與匯入：寫入目標（本機或雲端）還沒確定
+		const pendingStatus = pendingDataStatus(session);
 		content = (
-			<CardContent data-sync-status="pending">
-				<SyncStatusNotice status="pending" />
+			<CardContent data-sync-status={pendingStatus}>
+				<SyncStatusNotice status={pendingStatus} />
 			</CardContent>
 		);
 	} else {

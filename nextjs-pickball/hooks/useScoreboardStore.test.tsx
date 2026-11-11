@@ -660,4 +660,33 @@ describe("useScoreboardStore 儲存模式選擇器", () => {
 
 		expect(result.current[0]).toBe(first);
 	});
+
+	it("session 無法確認時 syncStatus 為 unavailable 且不回傳本機計分，帶 matchId 時綁定狀態為 pending", () => {
+		seedLocalScoreboard(5, 3);
+		const before = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		vi.mocked(useSession).mockReturnValue({
+			status: "loading",
+			signedInHint: true,
+			unavailable: true,
+			hydrated: true,
+			refresh: vi.fn(),
+		});
+
+		const standalone = renderHook(() => useScoreboardStore(null));
+		expect(standalone.result.current[0]).toEqual(createInitialState());
+		expect(standalone.result.current[2]).toBe("standalone");
+		expect(standalone.result.current[3]).toBe("unavailable");
+
+		act(() => {
+			standalone.result.current[1]({ type: "RALLY_WON", winner: "us" });
+		});
+		expect(standalone.result.current[0]).toEqual(createInitialState());
+		expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(before);
+		standalone.unmount();
+
+		const bound = renderHook(() => useScoreboardStore("m1"));
+		expect(bound.result.current[2]).toBe("pending");
+		expect(bound.result.current[3]).toBe("unavailable");
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
 });

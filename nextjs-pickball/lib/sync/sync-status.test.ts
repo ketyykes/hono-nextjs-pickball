@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	DATA_PENDING_MESSAGE,
+	LOCAL_FALLBACK_ACTION_LABEL,
+	LOCAL_FALLBACK_NOTICE,
 	isContentBlocked,
 	localDataStatus,
 	syncStatusMessage,
@@ -30,7 +32,8 @@ describe("syncStatusMessage", () => {
 
 describe("isContentBlocked", () => {
 	it("pending、loading、load-failed 取代內容，pending 的文案為正在載入資料", () => {
-		const expected: Record<DataStatus, boolean> = {
+		// unavailable 由後面新增的 it 鎖定；此處只維持原本九個值
+		const expected: Record<Exclude<DataStatus, "unavailable">, boolean> = {
 			pending: true,
 			loading: true,
 			"load-failed": true,
@@ -56,5 +59,16 @@ describe("localDataStatus", () => {
 	it("本機資料讀入前為 pending，讀入後為 local", () => {
 		expect(localDataStatus(false)).toBe("pending");
 		expect(localDataStatus(true)).toBe("local");
+	});
+});
+
+describe("無法確認的顯示狀態", () => {
+	it("unavailable 取代內容，按鈕與本機提示文案為固定值", () => {
+		expect(isContentBlocked("unavailable")).toBe(true);
+		expect(LOCAL_FALLBACK_ACTION_LABEL).toBe("先用這台裝置的資料");
+		expect(LOCAL_FALLBACK_NOTICE).toBe(
+			"目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端",
+		);
+		expect(syncStatusMessage("load-failed")).toBe("無法載入雲端資料，請重新整理頁面");
 	});
 });

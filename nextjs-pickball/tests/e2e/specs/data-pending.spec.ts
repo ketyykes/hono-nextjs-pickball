@@ -1,6 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { SIGNED_IN_HINT_STORAGE_KEY } from "@/lib/auth/session-hint";
-import { DATA_PENDING_MESSAGE } from "@/lib/sync/sync-status";
+import {
+	DATA_PENDING_MESSAGE,
+	LOCAL_FALLBACK_ACTION_LABEL,
+	LOCAL_FALLBACK_NOTICE,
+	syncStatusMessage,
+} from "@/lib/sync/sync-status";
 import {
 	HISTORY_STORAGE_KEY,
 	ROSTER_STORAGE_KEY,
@@ -24,6 +29,7 @@ const EMPTY_TEXTS = [
 const ZERO_SCORE_SELECTOR = '[aria-label="我方目前 0 分"]';
 const PENDING_MAIN = 'main[data-sync-status="pending"]';
 const PLAYERS_PAGE = "/matchmaker/players";
+const UNAVAILABLE_MAIN = 'main[data-sync-status="unavailable"]';
 
 function isoToday(hour = 10): string {
 	const now = new Date();
@@ -108,6 +114,10 @@ function buildScoreboard(us: number, them: number) {
 		courtNumber: null,
 		teamPlayers: null,
 	};
+}
+
+function readHintRaw(page: Page): Promise<string | null> {
+	return page.evaluate((key) => window.localStorage.getItem(key), SIGNED_IN_HINT_STORAGE_KEY);
 }
 
 async function seedStorage(page: Page, entries: Record<string, string>) {
@@ -223,6 +233,58 @@ test.describe("資料來源確定前的等待中畫面（訪客）", () => {
 				.toBeNull();
 		} finally {
 			release();
+			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
+	});
+
+	test("有上次登入提示而 session 請求失敗時先擋住畫面，按下先用這台裝置的資料後顯示本機名單與本機提示", async ({
+		page,
+	}) => {
+		await seedStorage(page, {
+			[ROSTER_STORAGE_KEY]: JSON.stringify({ version: 1, players: [rosterPlayer("p-a", "本機甲")] }),
+		});
+		// 提示改在下一個文件載入前才寫入，理由同上一條
+		await page.addInitScript((key: string) => {
+			window.localStorage.setItem(key, "1");
+		}, SIGNED_IN_HINT_STORAGE_KEY);
+		// 攔截 MUST 在 seedStorage 之後註冊，否則首頁的 session 請求也會被攔到
+		await page.route("**/api/session", (route) => route.fulfill({ status: 500, body: "" }));
+
+		try {
+			await page.goto(PLAYERS_PAGE);
+			await expect(page.locator(UNAVAILABLE_MAIN)).toBeVisible();
+			await expect(page.getByRole("status")).toHaveText(syncStatusMessage("load-failed") ?? "");
+			await expect(page.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL })).toBeVisible();
+			await expect(page.getByText("本機甲")).toHaveCount(0);
+			expect(await readHintRaw(page)).toBe("1");
+
+			await page.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL }).click();
+
+			await expect(page.getByText("本機甲").first()).toBeVisible();
+			await expect(page.getByText(LOCAL_FALLBACK_NOTICE)).toBeVisible();
+			await expect(page.locator("[data-sync-status]")).toHaveCount(0);
+			expect(await readHintRaw(page)).toBe("1");
+		} finally {
+			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
+	});
+
+	test("有上次登入提示而 session 請求網路中斷時顯示無法載入提示與按鈕", async ({ page }) => {
+		await seedStorage(page, {
+			[ROSTER_STORAGE_KEY]: JSON.stringify({ version: 1, players: [rosterPlayer("p-a", "本機甲")] }),
+		});
+		await page.addInitScript((key: string) => {
+			window.localStorage.setItem(key, "1");
+		}, SIGNED_IN_HINT_STORAGE_KEY);
+		await page.route("**/api/session", (route) => route.abort());
+
+		try {
+			await page.goto(PLAYERS_PAGE);
+			await expect(page.locator(UNAVAILABLE_MAIN)).toBeVisible();
+			await expect(page.getByRole("status")).toHaveText(syncStatusMessage("load-failed") ?? "");
+			await expect(page.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL })).toBeVisible();
+			await expect(page.getByText("本機甲")).toHaveCount(0);
+		} finally {
 			await page.unrouteAll({ behavior: "ignoreErrors" });
 		}
 	});

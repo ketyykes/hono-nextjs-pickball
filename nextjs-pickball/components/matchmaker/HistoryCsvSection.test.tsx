@@ -8,6 +8,7 @@ import { REMOTE_TRANSFER_MESSAGES, buildRemoteHistoryCsv } from "@/lib/matchmake
 import type { RemoteHistoryCsvResult } from "@/lib/matchmaker/remote-transfer";
 import { downloadTextFile } from "./downloadTextFile";
 import { HistoryCsvSection } from "./HistoryCsvSection";
+import { LOCAL_FALLBACK_ACTION_LABEL, syncStatusMessage } from "@/lib/sync/sync-status";
 
 vi.mock("@/hooks/useSession", () => ({ useSession: vi.fn() }));
 vi.mock("./downloadTextFile", () => ({ downloadTextFile: vi.fn() }));
@@ -48,6 +49,17 @@ function buildUnauthorizedFailure(): RemoteHistoryCsvResult {
 		value: true,
 		enumerable: false,
 	}) as RemoteHistoryCsvResult;
+}
+
+function mockUnavailableSession(): void {
+	const session: UseSessionResult = {
+		status: "loading",
+		signedInHint: true,
+		unavailable: true,
+		hydrated: true,
+		refresh,
+	};
+	vi.mocked(useSession).mockReturnValue(session);
 }
 
 beforeEach(() => {
@@ -128,6 +140,18 @@ describe("HistoryCsvSection 等待中", () => {
 
 		expect(screen.getByRole("heading", { name: "歷史賽果 CSV 匯出" })).not.toBeNull();
 		expect(screen.getByRole("status").textContent).toBe("正在載入資料…");
+		expect(screen.queryByRole("button", { name: "匯出 CSV" })).toBeNull();
+	});
+
+	it("session 無法確認時以無法載入提示與按鈕取代匯出操作", () => {
+		mockUnavailableSession();
+
+		const { container } = render(<HistoryCsvSection />);
+
+		expect(screen.getByRole("heading", { name: "歷史賽果 CSV 匯出" })).not.toBeNull();
+		expect(screen.getByRole("status").textContent).toBe(syncStatusMessage("load-failed"));
+		expect(screen.getByRole("button", { name: LOCAL_FALLBACK_ACTION_LABEL })).not.toBeNull();
+		expect(container.querySelector('[data-sync-status="unavailable"]')).not.toBeNull();
 		expect(screen.queryByRole("button", { name: "匯出 CSV" })).toBeNull();
 	});
 });
