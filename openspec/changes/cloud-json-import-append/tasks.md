@@ -85,8 +85,10 @@ Depends on: §2
   - mutation（單檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：① 轉紅（2 failed）；② 同時移除 `NOT EXISTS` 與 `ON CONFLICT` 轉紅（1）；②b 只移除 id 的 `NOT EXISTS`（`ON CONFLICT DO NOTHING` 仍在）維持綠——兩者互為備援，屬等價變異；③ 紅（2）；④ 紅（1）；⑤ 紅（1）；⑥ 紅（3）；⑦ 紅（2）；⑧ 紅（1）；⑨ 只改寫 `teamA` 紅（1，補 fixture 後）；⑩ 紅（1）；⑪ 對應表不排除「id 已在雲端」者紅（1，補 fixture 後）；⑫ 紅（1）；⑬ 紅（1）；⑭ 紅（4）；⑮ 紅（1，regression guard 轉紅）；對照組（`coalesce` 改 `CASE WHEN`、id `NOT EXISTS` 改 `NOT IN`）維持綠。
   - 補強（coordinator 裁定，commit `272d56b`，regression guard，寫入即綠）：「附加的歷史中因同名而略過…」it 內新增 `r3`（teamB `[b1, b9]` 斷言改寫為 `[c1, b2]`）與第二位使用者的規則 ① 情境（雲端 `c1`「甲」、`c5`「甲」，附加 `c5`「甲」，歷史 teamA `[c5]`、teamB `[c1]` 斷言 id 不變）；原斷言全保留。重跑 ⑨、⑪ 皆轉紅（各 1 failed）並還原，對照組維持綠。②b 為等價變異（`ON CONFLICT DO NOTHING` 備援），不處理。
   - 跨使用者隔離補強（Stage 1 發現，commit `ffa5911`、`27bfeb4`，regression guard，寫入即綠）：「B 的附加不受 A 的資料影響且不改動 A」it 後半段新增 A2／B2 情境（A2 `a1`「甲」先建立；B2 雲端 `cb2`「甲」，附加 `b1`「甲」、`a1`「甲」與引用兩者的歷史，斷言兩隊皆改寫為 `cb2`、A2 不變；`cb2` 刻意不與同檔其他 it 的 id 重複，首版用 `c1` 時 X 因碰巧同 id 而存活）。額外變異：X（id_map 同名子查詢拿掉 `user_id`）紅（1）、Y（id_map 排除條件拿掉 `user_id`）紅（1），對照組（`user_id = ?` 改寫為 `user_id IN (?)`）與對照 A 維持綠；每次還原後 `git status` 乾淨。
+  - Stage 2 建議補強（commit `f4e2721`，regression guard，寫入即綠）：「備份內同名的參賽者只新增第一位」it 補「雲端 `Ann`、附加 `ann` 會新增」；「B 的附加不受 A 的資料影響且不改動 A」it 讓 A 先多建兩位（`sort_order` 最大值 2 > B 的 0），並斷言 B 新增的 `s1` 之 `sort_order` 為 B 自己最大值加 1。變異 Z9（同名比對改 `lower()`）紅（1）、Z2（`sort_order` 子查詢拿掉 `user_id`）紅（1）、對照組（`user_id = ?` 改 `user_id IN (?)`）維持綠；每次還原後 `git status` 乾淨。
 - [x] 3.4 REFACTOR：附加與整份匯入共用的 json_each 寫法（`selectFromJsonEach` 等）是否沿用而非複製；兩條 SQL 的略過條件與 id 對應 CTE 是否有註解說明「為什麼」（同一條陳述式看不到自己的插入、第二條看得到第一條）；無壞味道則註記 skipped
   - skipped：附加的兩條 SQL 的欄位抽取、過濾與改寫都與 `selectFromJsonEach` 不同（需 `NOT EXISTS`、窗函式、CTE、`json_set`），強行共用會讓 helper 多出一堆參數，故不抽、不複製；兩條 SQL 的「為什麼」（同條陳述式看不到自己的插入、第二條看得到第一條、`MATERIALIZED` 只算一次）已寫在函式註解與 CTE 註解。無壞味道，未產生 `refactor:` commit。
+  - REFACTOR commit `3a30362`（Stage 2 建議）：參賽者 id 排除條件由 `json_extract(j.value, '$.data.id')` 統一為與插入欄位相同的 `'$.id'`；同檔、整份匯入與守衛測試 42 個全綠、typecheck exit 0；mutation ②、對照 B 於新寫法下重跑結果不變。
 - [ ] 3.5 Stage 1（sonnet）→ Stage 2（opus）審查 §3：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 4. 前端請求函式與文案（lib／view 層）
