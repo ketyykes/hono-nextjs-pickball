@@ -66,15 +66,26 @@ Depends on: §1
 
 Depends on: §2
 
-- [ ] 3.1 RED（TDD；改寫既有 it ①）：`hono-pickball/test/expected-user-guard.test.ts` 依檔頭授權改寫 ①。單檔 vitest 貼出輸出：「列舉出的使用者資料路由恰與守衛樣本表一致」紅（列舉 15 條、樣本 16 條）；
+- [x] 3.1 RED（TDD；改寫既有 it ①）：`hono-pickball/test/expected-user-guard.test.ts` 依檔頭授權改寫 ①。單檔 vitest 貼出輸出：「列舉出的使用者資料路由恰與守衛樣本表一致」紅（列舉 15 條、樣本 16 條）；
   另兩個 it 對新樣本的 401 斷言在路由加入前也成立（middleware 對未定義路由先執行），點名標 regression guard
-- [ ] 3.2 RED（TDD）：新檔 `hono-pickball/test/local-import-append.test.ts`，寫入 test-plan「本機備份附加到雲端的 API（ADDED）」中後端的 15 個 it（名稱見 delta spec 驗收錨點；夾具與 D1 替身依 test-plan 檔頭「後端」說明）。
+  - RED commit `1abcb6d`（改寫既有 it ①：`SAMPLES` 補 `POST /api/import/append`、`toHaveLength(15)` 改 16）。單檔 vitest `Tests 1 failed | 5 passed (6)`：「列舉出的使用者資料路由恰與守衛樣本表一致」紅（列舉 15 條、樣本 16 條，差 `POST /api/import/append`）。
+  - regression guard：「每條使用者資料路由在預期帳號與 session 不符時皆回 401 ACCOUNT_MISMATCH 且資料不變」「缺少或空白的預期帳號標頭使使用者資料路由回 401 ACCOUNT_MISMATCH 且資料不變」對新樣本在路由加入前即為 401（middleware 先執行）。
+  - 機械複驗：`git show 1abcb6d^:` 為 15 與舊樣本表；RED commit 只改該測試檔。
+- [x] 3.2 RED（TDD）：新檔 `hono-pickball/test/local-import-append.test.ts`，寫入 test-plan「本機備份附加到雲端的 API（ADDED）」中後端的 15 個 it（名稱見 delta spec 驗收錨點；夾具與 D1 替身依 test-plan 檔頭「後端」說明）。
   單檔 vitest 貼出輸出：12 個紅（404 或斷言不符）；「auth 停用且無 DB binding 時附加端點回 404」「未登入呼叫附加端點回 401」「預期帳號缺少或與 session 不符時附加回 401 ACCOUNT_MISMATCH 且雲端不寫入」預期寫入即綠，點名標 regression guard；
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball typecheck` 的 test 段因核心匯出已在 §2 存在而 exit 0
-- [ ] 3.3 GREEN（TDD）：`hono-pickball/src/routes/import.ts` 新增 `.post("/append", jsonBodyLimit(IMPORT_BODY_LIMIT_BYTES), zValidator("json", AppendImportRequestSchema, invalidBodyHook), …)`；
+  - RED commit `627e459`（新檔 `hono-pickball/test/local-import-append.test.ts`，15 個 it，名稱與 delta spec 驗收錨點逐字相同）。單檔 vitest `Tests 12 failed | 3 passed (15)`：12 個紅皆為路由不存在的 404（斷言收到 `expected 404 to be 200／400／413／500`）。
+  - regression guard（寫入即綠）：「auth 停用且無 DB binding 時附加端點回 404」「未登入呼叫附加端點回 401」「預期帳號缺少或與 session 不符時附加回 401 ACCOUNT_MISMATCH 且雲端不寫入」。
+  - `pnpm --dir …/hono-pickball typecheck` exit 0。機械複驗：`git show 627e459^:hono-pickball/test/local-import-append.test.ts` 不存在，RED commit 只新增該檔。
+- [x] 3.3 GREEN（TDD）：`hono-pickball/src/routes/import.ts` 新增 `.post("/append", jsonBodyLimit(IMPORT_BODY_LIMIT_BYTES), zValidator("json", AppendImportRequestSchema, invalidBodyHook), …)`；
   `hono-pickball/src/import/local-import-repository.ts` 新增附加函式（例如 `appendLocalBackup`）：`checkAppendLimits` 於 batch 前判定（413）、單一 `db.batch()` 固定兩條 `db.insert(…).select(sql\`… FROM json_each(${segment}) … ORDER BY key\`)`（design Decision 4、5、6、11），以 `RETURNING` 列數計算 `added`。
   SHALL NOT 使用 `db.run`／`db.all` 帶參數的 raw 陳述式、SHALL NOT 使用整批守衛、SHALL NOT 在 batch 外讀名單。3.1、3.2 全綠；`hono-pickball/test/local-import.test.ts` 與後端全部既有 it 全綠（單檔逐一或雙鎖全套）；`pnpm --dir …/hono-pickball typecheck` exit 0
-- [ ] 3.4 REFACTOR：附加與整份匯入共用的 json_each 寫法（`selectFromJsonEach` 等）是否沿用而非複製；兩條 SQL 的略過條件與 id 對應 CTE 是否有註解說明「為什麼」（同一條陳述式看不到自己的插入、第二條看得到第一條）；無壞味道則註記 skipped
+  - GREEN commit `3cfde3e`（`src/routes/import.ts`、`src/import/local-import-repository.ts` 的 `appendLocalBackup`）。新檔 15 個 it 全綠；`local-import.test.ts` 與 `expected-user-guard.test.ts` 全綠；後端全套（雙鎖）28 檔 238 測試全綠；三段 typecheck（root `-r exec tsc`、hono、core）皆 exit 0。
+  - 實作：兩條 `db.insert().select(sql…).onConflictDoNothing().returning()`；參賽者條件以 `NOT EXISTS`（同名、id）排除，`sort_order` 為子查詢最大值加 `row_number()`；歷史以 `WITH id_map AS MATERIALIZED` 對應表加 `json_set` 改寫 `teamA`／`teamB` 球員 id；送進 `json_each` 的就是 `checkAppendLimits` 的 `segments`；無 `db.run`／`db.all`、無整批守衛、無 batch 外讀名單、`added` 取 RETURNING 列數。
+  - mutation（單檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：① 轉紅（2 failed）；② 同時移除 `NOT EXISTS` 與 `ON CONFLICT` 轉紅（1）；②b 只移除 id 的 `NOT EXISTS`（`ON CONFLICT DO NOTHING` 仍在）維持綠——兩者互為備援，屬等價變異；③ 紅（2）；④ 紅（1）；⑤ 紅（1）；⑥ 紅（3）；⑦ 紅（2）；⑧ 紅（1）；**⑨ 只改寫 `teamA` 存活**；⑩ 紅（1）；**⑪ 對應表不排除「id 已在雲端」者存活**；⑫ 紅（1）；⑬ 紅（1）；⑭ 紅（4）；⑮ 紅（1，regression guard 轉紅）；對照組（`coalesce` 改 `CASE WHEN`、id `NOT EXISTS` 改 `NOT IN`）維持綠。
+  - 存活原因：⑨ test-plan 規定的改寫 fixture 中只有 `teamA` 的 id 會被改寫（`teamB` 為 `[b2]`、`[z1, b2]`，改寫前後相同）；⑪ 只有「備份參賽者 id 已在雲端、但名稱與雲端另一位同名」時才與規則 ① 有差，fixture 未涵蓋。兩者需 coordinator 決定是否補 fixture（超出 test-plan 的 15 個 it 範圍，Implementer 未擅自增減）。
+- [x] 3.4 REFACTOR：附加與整份匯入共用的 json_each 寫法（`selectFromJsonEach` 等）是否沿用而非複製；兩條 SQL 的略過條件與 id 對應 CTE 是否有註解說明「為什麼」（同一條陳述式看不到自己的插入、第二條看得到第一條）；無壞味道則註記 skipped
+  - skipped：附加的兩條 SQL 的欄位抽取、過濾與改寫都與 `selectFromJsonEach` 不同（需 `NOT EXISTS`、窗函式、CTE、`json_set`），強行共用會讓 helper 多出一堆參數，故不抽、不複製；兩條 SQL 的「為什麼」（同條陳述式看不到自己的插入、第二條看得到第一條、`MATERIALIZED` 只算一次）已寫在函式註解與 CTE 註解。無壞味道，未產生 `refactor:` commit。
 - [ ] 3.5 Stage 1（sonnet）→ Stage 2（opus）審查 §3：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 4. 前端請求函式與文案（lib／view 層）
