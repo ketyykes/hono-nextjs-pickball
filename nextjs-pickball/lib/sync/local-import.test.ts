@@ -18,10 +18,14 @@ import type { ScoreboardState, Team } from "@pickball/core/scoreboard/types";
 import { HISTORY_STORAGE_KEY, ROSTER_STORAGE_KEY, ROUND_STORAGE_KEY } from "../matchmaker/storage-keys";
 import { MATCH_SLOTS_KEY, STORAGE_KEY as SCOREBOARD_CURRENT_KEY } from "../scoreboard/storage-keys";
 import {
+	appendBackupToCloud,
+	backupToAppendRequest,
 	backupToImportRequest,
 	buildLocalImportPayload,
+	fetchAppendPreview,
 	hasImportableLocalData,
 	importLocalData,
+	previewAppendPlayers,
 } from "./local-import";
 
 const ALL_KEYS = [
@@ -893,5 +897,151 @@ describe("local-import", () => {
 		seedHistory([makeHistoryEntry("h1", 11, "x".repeat(LIMIT_BYTES))]);
 		expect(buildLocalImportPayload().oversize).toBe(true);
 		expect(hasImportableLocalData()).toBe(true);
+	});
+
+	it("backupToAppendRequest 只取備份的參賽者與歷史", () => {
+		const backup = BackupSchema.parse({
+			version: 1,
+			players: [makePlayer(), makePlayer({ id: "p2", name: "Bob" })],
+			currentRound: makeRound([makeRoundMatch()]),
+			history: [makeHistoryEntry("h1"), makeHistoryEntry("h2")],
+		});
+
+		const request = backupToAppendRequest(backup);
+
+		expect(request).toEqual({ players: backup.players, history: backup.history });
+		expect(Object.keys(request)).toEqual(["players", "history"]);
+	});
+
+	it("appendBackupToCloud 依回應分類為已附加、未授權、資料過大或失敗且不改動本機", async () => {
+		seedFullLocalData();
+		const before = snapshotKeys();
+		const request = {
+			players: [makePlayer({ id: "b1", name: "甲" })],
+			history: [makeHistoryEntry("h1")],
+		};
+		const appendedBody = {
+			appended: { players: { added: 1, skipped: 0 }, history: { added: 1, skipped: 0 } },
+		};
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+		const json = (status: number, body: unknown) =>
+			new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+		fetchMock.mockResolvedValueOnce(json(200, appendedBody));
+		fetchMock.mockResolvedValueOnce(json(200, {}));
+		fetchMock.mockResolvedValueOnce(json(401, { error: "ACCOUNT_MISMATCH" }));
+		fetchMock.mockResolvedValueOnce(json(409, { error: "VERSION_CONFLICT" }));
+		fetchMock.mockResolvedValueOnce(json(413, { error: "PAYLOAD_TOO_LARGE" }));
+		fetchMock.mockResolvedValueOnce(json(500, { error: "INTERNAL" }));
+		fetchMock.mockRejectedValueOnce(new TypeError("network"));
+
+		const outcomes = [];
+		for (let index = 0; index < 7; index += 1) {
+			outcomes.push(await appendBackupToCloud("user-a", request));
+		}
+
+		expect(outcomes).toEqual([
+			{ kind: "appended", appended: appendedBody.appended },
+			{ kind: "failed" },
+			{ kind: "unauthorized" },
+			{ kind: "failed" },
+			{ kind: "too-large" },
+			{ kind: "failed" },
+			{ kind: "failed" },
+		]);
+		expect(fetchMock).toHaveBeenCalledTimes(7);
+		for (const [path, init] of fetchMock.mock.calls) {
+			expect(path).toBe("/api/import/append");
+			expect(init?.method).toBe("POST");
+			const headers = init?.headers as Record<string, string>;
+			expect(headers[EXPECTED_USER_ID_HEADER]).toBe("user-a");
+			expect(JSON.parse(init?.body as string)).toEqual(JSON.parse(JSON.stringify(request)));
+		}
+		expect(snapshotKeys()).toEqual(before);
+	});
+
+	it("previewAppendPlayers 依後端的同名與 id 規則列出會新增與視為同一人的參賽者", () => {
+		// ① 對應後端 it「雲端已有資料時附加略過同名或已存在 id 的參賽者與重複歷史，其餘依備份順序接在後面」的名單
+		expect(
+			previewAppendPlayers(
+				[
+					makePlayer({ id: "b1", name: "甲" }),
+					makePlayer({ id: "b2", name: "丙" }),
+					makePlayer({ id: "c2", name: "改名乙" }),
+					makePlayer({ id: "b3", name: "丁" }),
+				],
+				[makePlayer({ id: "c1", name: "甲" }), makePlayer({ id: "c2", name: "乙" })],
+			),
+		).toEqual({ added: ["丙", "丁"], matched: ["甲", "改名乙"] });
+
+		// ② 對應後端 it「備份內同名的參賽者只新增第一位」的名單
+		expect(
+			previewAppendPlayers(
+				[
+					makePlayer({ id: "x1", name: "戊" }),
+					makePlayer({ id: "x2", name: "戊" }),
+					makePlayer({ id: "x3", name: "己" }),
+				],
+				[makePlayer({ id: "s-cloud", name: "甲" })],
+			),
+		).toEqual({ added: ["戊", "己"], matched: [] });
+
+		// ③ 名稱的第一位因 id 已在雲端而略過，第二位因先去重而不出現
+		expect(
+			previewAppendPlayers(
+				[makePlayer({ id: "c1", name: "戊" }), makePlayer({ id: "x2", name: "戊" })],
+				[makePlayer({ id: "c1", name: "甲" })],
+			),
+		).toEqual({ added: [], matched: ["戊"] });
+
+		// ④ 不做大小寫正規化
+		expect(
+			previewAppendPlayers(
+				[makePlayer({ id: "a1", name: "amy" }), makePlayer({ id: "a2", name: "Amy" })],
+				[makePlayer({ id: "cloud-amy", name: "Amy" })],
+			),
+		).toEqual({ added: ["amy"], matched: ["Amy"] });
+	});
+
+	it("fetchAppendPreview 以呼叫端給的帳號讀取雲端名單並分類為預覽、未授權或失敗", async () => {
+		seedFullLocalData();
+		const before = snapshotKeys();
+		const request = {
+			players: [makePlayer({ id: "b1", name: "甲" }), makePlayer({ id: "b2", name: "丙" })],
+			history: [],
+		};
+		const cloudPlayers = [makePlayer({ id: "c1", name: "甲" })];
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+		const json = (status: number, body: unknown) =>
+			new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+		fetchMock.mockResolvedValueOnce(json(200, { items: cloudPlayers.map((data) => ({ data, version: 1 })) }));
+		fetchMock.mockResolvedValueOnce(json(200, {}));
+		fetchMock.mockResolvedValueOnce(json(401, { error: "ACCOUNT_MISMATCH" }));
+		fetchMock.mockResolvedValueOnce(json(500, { error: "INTERNAL" }));
+		fetchMock.mockRejectedValueOnce(new TypeError("network"));
+
+		const outcomes = [];
+		for (let index = 0; index < 5; index += 1) {
+			outcomes.push(await fetchAppendPreview("user-a", request));
+		}
+
+		expect(outcomes).toEqual([
+			{ kind: "ready", preview: previewAppendPlayers(request.players, cloudPlayers) },
+			{ kind: "failed" },
+			{ kind: "unauthorized" },
+			{ kind: "failed" },
+			{ kind: "failed" },
+		]);
+		expect(fetchMock).toHaveBeenCalledTimes(5);
+		for (const [path, init] of fetchMock.mock.calls) {
+			expect(path).toBe("/api/matchmaker/players");
+			expect(init?.method).toBe("GET");
+			const headers = init?.headers as Record<string, string>;
+			expect(headers[EXPECTED_USER_ID_HEADER]).toBe("user-a");
+		}
+		expect(snapshotKeys()).toEqual(before);
 	});
 });
