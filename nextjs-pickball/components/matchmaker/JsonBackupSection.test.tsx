@@ -477,10 +477,14 @@ describe("JsonBackupSection 雲端附加流程", () => {
 			});
 			return { promise, resolve };
 		}
-		async function settleLateResponse(resolve: () => void) {
+		// 不用固定延遲：先讓晚到的回應完成，再以多輪 microtask 讓元件內接在 fetch 之後的處理跑完
+		async function settleLateResponse(late: { promise: Promise<Response>; resolve: (response: Response) => void }, response: Response) {
 			await act(async () => {
-				resolve();
-				await new Promise((done) => setTimeout(done, 20));
+				late.resolve(response);
+				await late.promise;
+				for (let turn = 0; turn < 50; turn += 1) {
+					await Promise.resolve();
+				}
 			});
 		}
 
@@ -504,7 +508,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await waitFor(() => expect(callsTo(listFetch, "/api/matchmaker/players", "GET")).toHaveLength(1));
 		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
 		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
-		await settleLateResponse(() => lateList.resolve(jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")]))));
+		await settleLateResponse(lateList, jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")])));
 		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.getByTestId("json-backup-import-message").textContent).toBe(IMPORTED_TEXT);
 
@@ -527,7 +531,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await waitFor(() => expect(importCalls).toBe(1));
 		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
 		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
-		await settleLateResponse(() => lateImport.resolve(jsonResponse(409, { error: "VERSION_CONFLICT" })));
+		await settleLateResponse(lateImport, jsonResponse(409, { error: "VERSION_CONFLICT" }));
 		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(callsTo(importFetch, "/api/matchmaker/players", "GET")).toHaveLength(0);
@@ -555,10 +559,36 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await waitFor(() => expect(callsTo(appendFetch, "/api/import/append", "POST")).toHaveLength(1));
 		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
 		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
-		await settleLateResponse(() => lateAppend.resolve(jsonResponse(500, { error: "X" })));
+		await settleLateResponse(lateAppend, jsonResponse(500, { error: "X" }));
 		expect(screen.queryByRole("alert")).toBeNull();
 		expect(screen.getByTestId("json-backup-import-message").textContent).toBe(IMPORTED_TEXT);
 		expect(snapshotKeys()).toEqual(before);
+
+		// 選檔開頭清除前次結果與錯誤（regression guard）：新的確認不得與舊成功文案或舊錯誤並存
+		cleanup();
+		const clearImportStatuses = [200, 409, 409];
+		const clearFetch = vi.fn<typeof fetch>();
+		clearFetch.mockImplementation(async (input) => {
+			if (input === "/api/import") {
+				return clearImportStatuses.shift() === 200
+					? jsonResponse(200, importedBody)
+					: jsonResponse(409, { error: "VERSION_CONFLICT" });
+			}
+			return jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")]));
+		});
+		vi.stubGlobal("fetch", clearFetch);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), makeAppendBackupFile());
+		await screen.findByTestId("json-backup-append-confirm");
+		expect(screen.queryByTestId("json-backup-import-message")).toBeNull();
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildUnsupportedVersionFile());
+		expect(await screen.findByRole("alert")).not.toBeNull();
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), makeAppendBackupFile());
+		await screen.findByTestId("json-backup-append-confirm");
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機", async () => {
