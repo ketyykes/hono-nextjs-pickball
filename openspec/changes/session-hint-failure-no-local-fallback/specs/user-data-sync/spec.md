@@ -316,7 +316,7 @@ session 請求失敗或帶提示等待逾時 SHALL NOT 結束它（改為無法�
 
 - 按下按鈕後快照為 `{ status: "loading", localFallback: true }`，儲存模式為 `"local"`：各頁依本機模式顯示本機資料（本機讀入規則不變），使用者的修改只寫入本機；本次頁面期間不會被晚到的 session 回應切回雲端。
 - `nextjs-pickball/components/sync/LocalFallbackBanner.tsx`（client 元件，掛在 `nextjs-pickball/app/layout.tsx` 的 `<body>` 內）MUST 只在本機備援快照時渲染 `role="status"` 的提示，文字為 `LOCAL_FALLBACK_NOTICE`；
-  它 MUST 以固定定位呈現、不佔版面（計分板 `h-dvh` 的零垂直捲動版面不受影響）、不攔截指標事件（不擋住下方操作）、列印時隱藏，且層級 MUST 低於計分板專注模式操作列（`z-40`）與對話框遮罩（`z-50`）——不得蓋住計分操作列或浮在對話框之上。其他快照（含伺服器輸出與 hydration 那次 render）SHALL NOT 渲染任何元素，因此不影響 hydration。
+  它 MUST 以固定定位呈現、不佔版面（計分板 `h-dvh` 的零垂直捲動版面不受影響）、不攔截指標事件（不擋住下方操作）、列印時隱藏，且層級 MUST 低於計分板專注模式操作列（`z-40`）與對話框遮罩（`z-50`）——不得蓋住計分操作列或浮在對話框之上；計分板專注模式（`html` 帶 `sb-focus`）時 MUST 移到浮動操作列上方，文字不被操作列遮住。其他快照（含伺服器輸出與 hydration 那次 render）SHALL NOT 渲染任何元素，因此不影響 hydration。
 - 已知取捨：navbar `AccountEntry` 與登入頁 `LoginForm` 只看 `status === "loading"`，在無法確認與本機備援時仍顯示載入中佔位（沒有登入或登出入口）；重新整理頁面即重新確認 session。
 
 #### Scenario: 無法確認的顯示狀態取代內容且新文案為固定值
@@ -405,7 +405,7 @@ session 請求失敗或帶提示等待逾時 SHALL NOT 結束它（改為無法�
 #### Scenario: 本機提示只在本機備援時出現
 
 - **WHEN** mock `useSession` 依序為本機備援快照、無法確認快照、`{ status: "loading", signedInHint: true }`、`{ status: "loading" }`、訪客的 ready、auth 停用的 ready、已登入的 ready，各自渲染 `LocalFallbackBanner`
-- **THEN** 只有本機備援時渲染 `role="status"`、文字為「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」，且最外層元素的 class 含 `fixed`、`pointer-events-none`、`print:hidden` 與 `z-30`；其餘六種 `container` 皆為空
+- **THEN** 只有本機備援時渲染 `role="status"`、文字為「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」，且最外層元素的 class 含 `fixed`、`pointer-events-none`、`print:hidden`、`z-30` 與 `[.sb-focus_&]:bottom-16`；其餘六種 `container` 皆為空
 - **驗收**：`nextjs-pickball/components/sync/LocalFallbackBanner.test.tsx`，it 名稱「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」
 
 #### Scenario: 有上次登入提示而 session 請求失敗時先擋住畫面，選擇後改用本機名單
