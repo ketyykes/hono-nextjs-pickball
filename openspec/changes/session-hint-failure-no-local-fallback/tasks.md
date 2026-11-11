@@ -171,4 +171,16 @@ Depends on: §4
     - `7c9ba21 docs:` 在 `session-store.ts` 採用 `null` 後的 `notify()` 補註解（參考相同、useSyncExternalStore 略過、刻意保留，不改行為）。
     - mutation（三重落地檢查通過、每次還原且 status 乾淨）：`z-30`→`z-[100]` 紅；拿掉 `pointer-events-none` 紅；拿掉 `print:hidden` 紅；對照組 class 字串順序調換（`fixed pointer-events-none …`）綠；`load()` 的 `snapshot = LOADING_UNAVAILABLE` 改為每次新物件 `{ status: "loading", signedInHint: true, unavailable: true }` 紅；對照組 `readSignedInHint()` 改 `readSignedInHint() === true` 綠。
     - 驗收：兩個單檔 vitest 綠（2 檔 23 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
+  - verify 第二輪程式修正（Implementer，sonnet）：
+    - 專注模式讓位（TDD）：`766ef02 test:` 在 it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」補斷言外層 classList 含 `[.sb-focus_&]:bottom-16`，單檔 vitest 真紅（`expect(root?.classList.contains("[.sb-focus_&]:bottom-16")).toBe(true)` 收到 false，Tests 1 failed）；`f433e2c fix:` 外層加上該 class 並更新註解（專注模式操作列 `fixed bottom-2`，提示讓到其上方），綠。
+    - 共用卡片外觀：`765527f refactor:` 由 `SyncStatusNotice.tsx` 匯出 `NOTICE_CLASS`，`LocalFallbackBanner.tsx` 改用，消除重複字串；`components/sync/` 兩檔測試維持綠。
+    - store regression guard（`21a6a24 test:`，全部寫入即綠）：① it「無法確認之後才到達的 session 回應仍照常採用」後半段：reset 後逾時進入無法確認，進行中請求才回 `null`，快照仍 `toBe` 同一個無法確認參考、提示仍在；② it「chooseLocalFallback 在無法確認時改為本機備援並丟棄進行中請求的結果」：被丟棄的晚到回應改為 `{ authEnabled: true, user: null }`，快照仍為本機備援且提示仍在；本機備援期間 `refresh()` 而 `fetchSession` 回 `null`，快照回到無法確認、提示仍在（與 auth spec「採用到 `null`」規則一致）；③ `hooks/useRosterStore.test.tsx` it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」補 `droppedCount` 為 0。未新增 it，前端測試總數不變。
+    - mutation（對 `lib/auth/session-store.ts`，三重落地檢查通過：`count(old)==1`、`new != old`、`git diff --stat` 有輸出；每次還原且 status 乾淨；單檔 vitest）：
+      | 變異 | 結果 |
+      | --- | --- |
+      | `load()` 採用 `null`＋提示分支改為每次新物件 | 紅（目標 it「無法確認之後才到達的 session 回應仍照常採用」與「session 請求失敗且有上次登入提示…」） |
+      | 被丟棄的回應分支照常 `clearSignedInHint()` | 紅（目標 it「chooseLocalFallback 在無法確認時…」與既有「被丟棄的過時 session 回應不改變提示」） |
+      | `chooseLocalFallback` 不遞增 `requestId` | 紅（目標 it「chooseLocalFallback 在無法確認時…」） |
+      | 對照組 `readSignedInHint()` 改 `!!readSignedInHint() === true` | 綠（22 tests） |
+    - 驗收：`components/sync` 、`lib/auth`、`hooks/useRosterStore.test.tsx` 單檔 vitest 綠（6 檔 57 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
