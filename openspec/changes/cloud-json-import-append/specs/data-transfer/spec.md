@@ -56,13 +56,15 @@ B9 原定的「不合併」只在本入口改為附加，用於救回 session �
     ④ 「雲端參賽者的強度分數維持不變，附加的歷史不會反映在分數上，需要時請在參賽者頁手動調整」
   - 兩顆 `<button type="button">`：`APPEND_ACTION_LABEL`「附加到雲端」與 `APPEND_CANCEL_LABEL`「取消」。
 - **使用者自行決定**：只有按下「附加到雲端」才 MUST 以 `appendBackupToCloud(expectedUserId, request)` 送出 `POST /api/import/append`；按下「取消」MUST 收起附加確認、不送出請求、不顯示訊息。
-  `expectedUserId` MUST 為**按下當下** `useSession()` 的 user id（不沿用預覽名單讀取時的選檔當下 id；兩者不同時預覽可能與實際結果不符，實際結果以後端回應為準）；為 `null` 時 MUST 不送出請求並顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized`。請求進行中兩顆按鈕 MUST 停用。重新選檔 MUST 收起前一份的附加確認。
+  `expectedUserId` MUST 為**按下當下** `useSession()` 的 user id（不沿用預覽名單讀取時的選檔當下 id；兩者不同時預覽可能與實際結果不符，實際結果以後端回應為準）；為 `null` 時 MUST 不送出請求、收起附加確認並顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized`。請求進行中兩顆按鈕 MUST 停用。
+  每次選檔 MUST 先收起前一份的附加確認並清除前一次的結果與錯誤訊息；選檔時尚未回應的名單讀取、整份匯入或附加請求，其結果晚到時 MUST 丟棄，SHALL NOT 覆寫新一次選檔的狀態。
 - **結果**（`describeAppendOutcome`，請求完成後收起附加確認）：
   - `appended`：以 `role="status"`（`data-testid="json-backup-import-message"`）顯示「已新增 N 位參賽者、M 筆歷史。」；有略過時另以補充說明（`data-testid="json-backup-import-message-note"`）顯示略過筆數：
     參賽者略過 K 位時含「略過同名或已在雲端的參賽者 K 位」、歷史略過 L 筆時含「略過已在雲端的歷史 L 筆」，兩者皆有時以「、」連接，句尾為「。」；K 與 L 皆為 0 時 SHALL NOT 顯示補充說明。
   - `unauthorized`（401，含 `ACCOUNT_MISMATCH`）：顯示 `REMOTE_TRANSFER_MESSAGES.unauthorized` 並呼叫 `useSession().refresh()`。
   - `too-large`（413）：顯示 `LOCAL_IMPORT_MESSAGES.tooLarge`。
   - `failed`（其他狀態碼、回應形狀不符、網路錯誤）：顯示 `LOCAL_IMPORT_MESSAGES.failed`。SHALL NOT 自動重試。
+  - 三種失敗與成功相同，請求完成後 MUST 收起附加確認（結果顯示在訊息區，要再附加須重新選檔）。
   - 任一結果皆 SHALL NOT 寫入任何本機 key、SHALL NOT 重新載入頁面。附加後各頁在下次掛載時自雲端讀取，本元件不另行通知其他 store。
 - **請求函式**：`appendBackupToCloud(expectedUserId, request)` MUST 以 `expectedUserId` 為第一參數並原樣交給 `requestJson`；回應以 `AppendImportResponseSchema` 驗證；結果分類為 `appended`（含回應的 `appended`）、`unauthorized`、`too-large`、`failed`（409 亦為 `failed`：此端點不應回 409）。
   附加路徑字串 `/api/import/append` 只出現在 `lib/sync/local-import.ts`。
