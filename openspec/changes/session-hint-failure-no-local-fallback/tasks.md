@@ -156,4 +156,10 @@ Depends on: §4
   - Final Code Review（opus）：第一次 FAIL，唯一必修為 `nextjs-pickball/CLAUDE.md` 把 `pendingDataStatus` 寫在 `sync-status` 名下（實際在 `storage-mode.ts`）；建議兩項：`session-store.ts` 型別註解未提 `LocalFallbackBanner` 直接讀 `localFallback`、tasks 3.3 未記 coordinator 裁定。三項皆已修正（本 task 的 commit）。程式碼無必修；C6、C7、C8、C10 由 reviewer 重跑一致；範圍 ⊆ Impact、主 spec 無改動、新 it 21 個與 gate 計數一致。修正只涉及文件與註解，不需重跑 gate。
 
 - [ ] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
+  - verify 第一輪程式修正（Implementer，sonnet）：
+    - 本機提示層級（TDD）：`63abb06 test:` 擴充 it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」，單檔 vitest 真紅（`expect(root?.classList.contains("z-30")).toBe(true)` 收到 false，Tests 1 failed）；`2372c68 fix:` 把 `z-[100]` 改為 `z-30` 並註明低於 ActionBar z-40 與對話框 z-50，綠。`fixed`、`pointer-events-none`、`print:hidden` 三個 class 斷言與 auth 停用 ready 那一種預期為空，寫入即綠，標 regression guard。
+    - 請求失敗後按按鈕：`259b5ae test:` 在 it「session 請求失敗且有上次登入提示時快照改為無法確認且保留提示」尾端補 `chooseLocalFallback()` 後快照為 `{ status: "loading", localFallback: true }`，寫入即綠，標 regression guard。
+    - `7c9ba21 docs:` 在 `session-store.ts` 採用 `null` 後的 `notify()` 補註解（參考相同、useSyncExternalStore 略過、刻意保留，不改行為）。
+    - mutation（三重落地檢查通過、每次還原且 status 乾淨）：`z-30`→`z-[100]` 紅；拿掉 `pointer-events-none` 紅；拿掉 `print:hidden` 紅；對照組 class 字串順序調換（`fixed pointer-events-none …`）綠；`load()` 的 `snapshot = LOADING_UNAVAILABLE` 改為每次新物件 `{ status: "loading", signedInHint: true, unavailable: true }` 紅；對照組 `readSignedInHint()` 改 `readSignedInHint() === true` 綠。
+    - 驗收：兩個單檔 vitest 綠（2 檔 23 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
