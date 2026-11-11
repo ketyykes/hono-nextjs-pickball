@@ -189,8 +189,8 @@ B9 原定的「不合併」只在本入口改為附加，用於救回 session �
   ① 雲端 `c1`「甲」、`c2`「乙」；備份 `b1`「甲」、`b2`「丙」、`c2`「改名乙」、`b3`「丁」
   ② 雲端「甲」；備份 `x1`「戊」、`x2`「戊」、`x3`「己」
   ③ 雲端 `c1`「甲」；備份 `c1`「戊」、`x2`「戊」（名稱的第一位因 id 已在雲端而略過）
-  ④ 雲端「Amy」；備份「amy」、「Amy」
-- **THEN** 依序為 ① `{ added: ["丙", "丁"], matched: ["甲", "改名乙"] }`（與後端 `added` 2、`skipped` 2 一致）；② `{ added: ["戊", "己"], matched: [] }`（與後端 `added` 2、`skipped` 1 一致）；③ `{ added: [], matched: ["戊"] }`；④ `{ added: ["amy"], matched: ["Amy"] }`
+  ④ 雲端「Amy」；備份「amy」、「Amy」（另一次呼叫：備份「Amy」、「Ａmy」（全形）、「A my」（中間空白），結果須為全形與中間空白者皆會新增）
+- **THEN** 依序為 ① `{ added: ["丙", "丁"], matched: ["甲", "改名乙"] }`（與後端 `added` 2、`skipped` 2 一致）；② `{ added: ["戊", "己"], matched: [] }`（與後端 `added` 2、`skipped` 1 一致）；③ `{ added: [], matched: ["戊"] }`；④ `{ added: ["amy"], matched: ["Amy"] }`；另一次呼叫為 `{ added: ["Ａmy", "A my"], matched: ["Amy"] }`
 - **驗收**：`nextjs-pickball/lib/sync/local-import.test.ts`，it 名稱「previewAppendPlayers 依後端的同名與 id 規則列出會新增與視為同一人的參賽者」
 
 #### Scenario: 登入資料工具：附加預覽以呼叫端給的帳號讀取雲端名單

@@ -186,6 +186,7 @@
 
 - [Risk] 前端預覽規則與後端寫入規則日後漂移（例如後端改為正規化比對而前端沒跟上）→ Mitigation：Decision 12 的共同 fixture；任何一邊改規則都必須先走 openspec change，同時改 delta spec 兩處與兩邊的 it。預覽只是提示，漂移時結果文案仍正確反映後端實際新增與略過。
 - [Risk] 名單讀取與按下附加之間，其他裝置新增或改名參賽者、或使用者換了帳號（附加取按下當下的帳號）→ 預覽與實際結果不符；結果文案以後端回應的新增與略過筆數為準，接受。
+- [Risk] 備份內參賽者 id 重複時（`BackupSchema` 不檢查、`AppendImportRequestSchema` 會 400），預覽會把兩位都列為會新增，送出卻顯示匯入失敗 → 正常匯出的備份不會出現，已知缺口，接受，不處理。
 - [Trade-off] 雲端已有資料時，選檔到出現確認多一個 GET（名單，與參賽者頁掛載時讀取的是同一個端點），接受。
 
 - [Risk] 歷史 id 改寫的 SQL 較複雜（CTE、巢狀 `json_each`、`json_group_array`、`json_set`）：子查詢 `ORDER BY key` 後再聚合的順序是 SQLite 的實際行為而非文件保證 → Mitigation：本機 D1（miniflare）亦支援聚合函式內的 `ORDER BY`（`json_group_array(x ORDER BY key)`，SQLite 3.44 起；propose 階段已實測），Implementer 可擇一並以 Scenario 的雙打陣列順序斷言鎖住；2,000 筆時對照 CTE 只算一次，不要在每位球員的子查詢內重複掃描名單。

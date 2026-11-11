@@ -26,7 +26,7 @@ AppendImportRequestSchema = { players: PlayerWriteSchema[], history: MatchHistor
 
 **共用的參數形狀**（`serializeAppendSegments`，純函式）：
 
-- 參賽者段為 `[{ id, data }]` 的 `JSON.stringify` 結果，只含請求中**每個名稱的第一位**（名稱以 `data.name` 完全相同判定；`PlayerSchema` 已 trim 名稱，大小寫與全半形視為不同），順序為請求順序。
+- 參賽者段為 `[{ id, data }]` 的 `JSON.stringify` 結果，只含請求中**每個名稱的第一位**（名稱以 `data.name` 完全相同判定；`PlayerSchema` 已 trim 名稱，大小寫、全半形與中間空白視為不同），順序為請求順序。
   同一份請求內的同名去重在這裡完成，因為同一條 `INSERT … SELECT` 看不到自己剛插入的列，SQL 無法替同批資料去重。
 - 參賽者對照段為請求中**全部**參賽者（不去重）的 `[{ id, name }]`（`name` 為 `data.name`），順序為請求順序；只用於下方歷史球員 id 的改寫，不寫入任何表。
 - 歷史段 MUST 與 `serializeImportSegments` 對同一個歷史陣列產生的歷史段逐字相同（`[{ matchId, playedAt: Date.parse(playedAt), data }]`）。
