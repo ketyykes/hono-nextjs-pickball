@@ -32,6 +32,8 @@ describe("LocalFallbackBanner", () => {
 		expect(root?.classList.contains("pointer-events-none")).toBe(true);
 		expect(root?.classList.contains("print:hidden")).toBe(true);
 		expect(root?.classList.contains("z-30")).toBe(true);
+		// 專注模式的操作列固定在 bottom-2，提示要讓到其上方
+		expect(root?.classList.contains("[.sb-focus_&]:bottom-16")).toBe(true);
 		fallback.unmount();
 
 		const others: UseSessionResult[] = [
