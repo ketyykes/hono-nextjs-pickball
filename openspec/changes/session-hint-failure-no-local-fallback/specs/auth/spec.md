@@ -163,8 +163,8 @@ hydration 完成後 React 依 client 快照重新 render，此時才反映提示
 #### Scenario: session 請求失敗且有上次登入提示時改為無法確認並保留提示
 
 - **GIVEN** localStorage 有上次登入提示；`fetchSession` 回傳 `null`
-- **WHEN** 訂閱並等待請求完成，之後讀取 `getSnapshot()` 兩次
-- **THEN** 快照為 `{ status: "loading", signedInHint: true, unavailable: true }` 且兩次為同一個參考；訂閱者被通知；提示仍在
+- **WHEN** 訂閱並等待請求完成，之後讀取 `getSnapshot()` 兩次，接著呼叫 `chooseLocalFallback()`
+- **THEN** 快照為 `{ status: "loading", signedInHint: true, unavailable: true }` 且兩次為同一個參考；訂閱者被通知；提示仍在；呼叫 `chooseLocalFallback()` 後快照為 `{ status: "loading", localFallback: true }`（請求失敗而進入的無法確認，按鈕同樣有效）
 - **驗收**：`nextjs-pickball/lib/auth/session-store.test.ts`，it 名稱「session 請求失敗且有上次登入提示時快照改為無法確認且保留提示」
 
 #### Scenario: session 請求失敗且沒有提示時仍降級為 auth 停用

@@ -195,7 +195,7 @@ openspec validator 不允許 MODIFIED 刪除或改名既有 Scenario（archive �
 - [Risk] 本機備援期間若有東西呼叫 `refresh()` 且失敗，會回到阻擋畫面 → 目前沒有入口會呼叫（雲端 hook 未啟用、登入入口為佔位）；接受並記錄。
 - [Risk] `route.abort()` 或 500 在部分瀏覽器輸出 console 錯誤（`Failed to load resource`）→ `data-pending.spec.ts` 沒有 console 守衛，新 test 也 SHALL NOT 加；若既有含 console 守衛的 spec 受影響，依「E2E 失敗不得當雜訊」上報。
 - [Risk] 資料頁三區塊各有一顆按鈕 → 任一顆效果相同，可接受。
-- [Risk] 本機提示固定於底部，窄螢幕會折成兩行，可能疊在頁面底部內容與非專注模式計分板的最底列上 → `pointer-events-none` 不擋操作；層級 `z-30` 低於專注模式操作列（`z-40`）與對話框遮罩（`z-50`），不會蓋住計分操作列或浮在對話框之上；其餘遮蓋接受（verify 第一輪更正原本「只有一行」的前提）。
+- [Risk] 本機提示固定於底部，窄螢幕會折成兩行，可能疊在頁面底部內容與非專注模式計分板的最底列上 → `pointer-events-none` 不擋操作；層級 `z-30` 低於專注模式操作列（`z-40`）與對話框遮罩（`z-50`），不會蓋住計分操作列或浮在對話框之上；其餘遮蓋接受（verify 第一輪更正原本「只有一行」的前提）。專注模式（`html.sb-focus`）時浮動操作列固定在 `bottom-2`，提示以 `[.sb-focus_&]:bottom-16` 讓到操作列上方，文字不被遮住（verify 第二輪）。導覽頁右下角的「跳過導覽」按鈕（`TourSkipButton`，`fixed right-6 bottom-6 z-50`）在窄螢幕會蓋住提示右段：該按鈕是導覽唯一出口、提示仍可讀主要文字，接受。
 - [Risk] 既有 E2E 依賴「session 失敗時退回本機」→ 已查 `tests/e2e/**` 的 `/api/session` 攔截：`navbar-account-entry.spec.ts` 以 200 fulfill、`data-pending.spec.ts` 以 hold 後 `continue()`，皆非失敗回應；訪客（無提示）仍 fail-closed。Mitigation：合併前全瀏覽器 gate。
 - [Risk] 本 change 在主 repo 進行，Stop hook 會擋主 worktree 的 tsc 紅燈；§2 的 RED（`mockResolvedValue(null)`、`chooseLocalFallback` 匯入）是型別紅燈 → RED 與其 GREEN MUST 在同一張派工單內完成。
 - [Risk] 單元測試之間的提示洩漏 → 既有 `beforeEach` 已有 `localStorage.clear()`；新 it 自帶清理。

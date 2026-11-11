@@ -74,7 +74,7 @@ Depends on: §2
   - RED commit `1895de8`。sync-status：`isContentBlocked("unavailable")` 得 false；SyncStatusNotice：status 文字為空；皆真紅，regression guard：無。
 - [x] 3.3 GREEN（TDD）：`sync-status.ts` 的 `DataStatus` 加 `"unavailable"`、`isContentBlocked` 含它、新增兩個文案常數（design Decision 7）；`SyncStatusNotice` 依 design Decision 8 渲染 `unavailable`（加 `"use client"`）。
   為通過型別所需的最小改動：`hooks/useRoundStore.ts` 傳給雲端 hook 的名單狀態在 `unavailable` 時與 `pending` 同樣以 `loading` 傳入（design Decision 9）。3.2 全綠、兩檔既有 it 全綠；tsc exit 0
-  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。**coordinator 裁定：接受**——只改型別標註、行為不變，且不改則主 worktree 的 tsc 無法通過；不視為改寫既有 it（Stage 1 已核實只改標註）。
+  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。**coordinator 裁定：接受**——只改型別標註、行為不變，且不改則主 worktree 的 tsc 無法通過；不視為改寫既有 it（Stage 1 已核實只改標註）。另註：本 task 與 3.5 的「tsc exit 0」指該組完成後的工作樹；`17ca0f4`、`0567708` 兩個 commit 單獨 checkout 時 tsc 不過（`useRoundStore` 的名單狀態對應到 `2319c84` 才補上），不改寫歷史（verify 第二輪 S7）。
 - [x] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」「已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求」「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」。
   單檔 vitest 貼出輸出：前兩個紅；第三個預期寫入即綠，點名標 regression guard
   - RED commit `6c6f9e6`。前兩個真紅（`pending`≠`unavailable`；殘留雲端名單 `[c1]`≠`[]`）；「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」寫入即綠，**regression guard**。
@@ -154,14 +154,7 @@ Depends on: §4
   - 指令：C10 `grep -rn "fetchSession(" …/{app,components,hooks,lib} | grep -v "\.test\." | grep -v "export async function"`。結果：只有 `lib/auth/session-store.ts:88`，與預期一致。
 - [x] 5.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
   - Final Code Review（opus）：第一次 FAIL，唯一必修為 `nextjs-pickball/CLAUDE.md` 把 `pendingDataStatus` 寫在 `sync-status` 名下（實際在 `storage-mode.ts`）；建議兩項：`session-store.ts` 型別註解未提 `LocalFallbackBanner` 直接讀 `localFallback`、tasks 3.3 未記 coordinator 裁定。三項皆已修正（本 task 的 commit）。程式碼無必修；C6、C7、C8、C10 由 reviewer 重跑一致；範圍 ⊆ Impact、主 spec 無改動、新 it 21 個與 gate 計數一致。修正只涉及文件與註解，不需重跑 gate。
-
 - [ ] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
-  - verify 第一輪程式修正（Implementer，sonnet）：
-    - 本機提示層級（TDD）：`63abb06 test:` 擴充 it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」，單檔 vitest 真紅（`expect(root?.classList.contains("z-30")).toBe(true)` 收到 false，Tests 1 failed）；`2372c68 fix:` 把 `z-[100]` 改為 `z-30` 並註明低於 ActionBar z-40 與對話框 z-50，綠。`fixed`、`pointer-events-none`、`print:hidden` 三個 class 斷言與 auth 停用 ready 那一種預期為空，寫入即綠，標 regression guard。
-    - 請求失敗後按按鈕：`259b5ae test:` 在 it「session 請求失敗且有上次登入提示時快照改為無法確認且保留提示」尾端補 `chooseLocalFallback()` 後快照為 `{ status: "loading", localFallback: true }`，寫入即綠，標 regression guard。
-    - `7c9ba21 docs:` 在 `session-store.ts` 採用 `null` 後的 `notify()` 補註解（參考相同、useSyncExternalStore 略過、刻意保留，不改行為）。
-    - mutation（三重落地檢查通過、每次還原且 status 乾淨）：`z-30`→`z-[100]` 紅；拿掉 `pointer-events-none` 紅；拿掉 `print:hidden` 紅；對照組 class 字串順序調換（`fixed pointer-events-none …`）綠；`load()` 的 `snapshot = LOADING_UNAVAILABLE` 改為每次新物件 `{ status: "loading", signedInHint: true, unavailable: true }` 紅；對照組 `readSignedInHint()` 改 `readSignedInHint() === true` 綠。
-    - 驗收：兩個單檔 vitest 綠（2 檔 23 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
   - verify 第一輪（opus，2026-11-11）：CRITICAL 0、WARNING 1、SUGGESTION 7。處置：
     W1 §1.2 Context7 查證未記錄 → 補記於 1.2（`c8dfa4c`）。
     S1 本機提示 `z-[100]` 會蓋住計分板專注模式操作列（z-40）並浮在對話框遮罩（z-50）之上、窄螢幕兩行 → 規格／design／test-plan 改為 `z-30` 並更正風險敘述（`c8dfa4c`），程式 TDD 修正（`63abb06` RED、`2372c68` GREEN）。
@@ -172,4 +165,10 @@ Depends on: §4
     S6 execution-plan 審查清單未勾 → 註明為準則、實際結論見 tasks 紀錄（`c8dfa4c`）。
     S7 計分板與統計頁的 `unavailable` 阻擋無元件層測試 → **不採納**：兩者經選擇器取得 `unavailable` 後由既有 `isContentBlocked` 分支取代內容（Decision 9），選擇器已各有 `unavailable` 單元測試、`isContentBlocked` 含 `unavailable` 亦有單元測試，參賽者頁另有 E2E；再加元件測試只是重複同一條判斷，且會使前端測試數偏離 test-plan 定額。
     RED 機械複驗（coordinator）：`63abb06` 只動測試檔，產品檔在 RED 前後皆含 `z-[100]`。
+  - verify 第一輪程式修正（Implementer，sonnet）：
+    - 本機提示層級（TDD）：`63abb06 test:` 擴充 it「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」，單檔 vitest 真紅（`expect(root?.classList.contains("z-30")).toBe(true)` 收到 false，Tests 1 failed）；`2372c68 fix:` 把 `z-[100]` 改為 `z-30` 並註明低於 ActionBar z-40 與對話框 z-50，綠。`fixed`、`pointer-events-none`、`print:hidden` 三個 class 斷言與 auth 停用 ready 那一種預期為空，寫入即綠，標 regression guard。
+    - 請求失敗後按按鈕：`259b5ae test:` 在 it「session 請求失敗且有上次登入提示時快照改為無法確認且保留提示」尾端補 `chooseLocalFallback()` 後快照為 `{ status: "loading", localFallback: true }`，寫入即綠，標 regression guard。
+    - `7c9ba21 docs:` 在 `session-store.ts` 採用 `null` 後的 `notify()` 補註解（參考相同、useSyncExternalStore 略過、刻意保留，不改行為）。
+    - mutation（三重落地檢查通過、每次還原且 status 乾淨）：`z-30`→`z-[100]` 紅；拿掉 `pointer-events-none` 紅；拿掉 `print:hidden` 紅；對照組 class 字串順序調換（`fixed pointer-events-none …`）綠；`load()` 的 `snapshot = LOADING_UNAVAILABLE` 改為每次新物件 `{ status: "loading", signedInHint: true, unavailable: true }` 紅；對照組 `readSignedInHint()` 改 `readSignedInHint() === true` 綠。
+    - 驗收：兩個單檔 vitest 綠（2 檔 23 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
