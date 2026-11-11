@@ -177,7 +177,7 @@ Depends on: §5
 - [x] 6.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 6.11）
   - Final Code Review（opus）：PASS，無必修。範圍 28 檔皆在 Impact 內、主 spec／schemas 未動；同名與 id 規則在核心、後端 SQL、前端預覽三處一致；回應欄位、文案常數、兩份 CLAUDE.md 與實作一致；`POST /api/import` 行為未變。自跑 C6、C7、C9、C10 與相關單檔測試（核心 13、後端 42、前端 33）皆符合。
   - 建議處置（coordinator，只動文件）：① 附加確認不以登入狀態包住、② 附加進行中重新選檔會丟棄已送出的結果 → design Risks 記為接受的取捨；③ `hono-pickball/CLAUDE.md` 開頭摘要補附加端點；④ design Open Questions 標為已定案。產品程式碼未改，gate 不重跑。
-- [ ] 6.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
+- [x] 6.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
   - verify 第一輪（opus，2026-11-12）：CRITICAL 0、WARNING 2、SUGGESTION 2；程式碼在 gate（`2d5fd5c`）後未變，相關單檔測試全綠。處置（`444f1c4`，只動文件）：
     W1 後端三個 Scenario（同名只新增第一位、略過者 id 改寫、只寫入本人）未跟上 regression guard 擴充 → 依測試補 AND（大小寫／全半形／中間空白、`r3` teamB 改寫與規則 ①、B 的 sort_order 只看本人與 A2／B2 id 對應）。
     W2 前端兩個 Scenario 未跟上 `654d8b9` 的 MUST → 補晚到結果丟棄、選檔開頭清除前次狀態、每輪失敗後收起確認。
@@ -190,4 +190,8 @@ Depends on: §5
     W1 E2E 雲端種子與備份同為 `buildPendingRound()`，「雲端回合 data 不變」無鑑別力 → `b61e976` 備份回合改為 `roundNumber: 2`（regression guard），雙鎖單檔 `--project=user-data` `local-import.spec.ts` 7 passed、0 skipped；只動 E2E 測試檔，產品碼仍與 gate（`2d5fd5c`）相同。
     S1 test-plan 與 spec 用語未跟上第二輪處置 → `8363d3e` 同步（四段重新 render、`r3` 深度相等與三筆、E2E 回合區分）。
     S2 Decision 9 的元件層 reload 斷言未落實 → 改以 E2E `expectNotReloaded` 為準，tasks 5.3 補註（`8363d3e`）。
+  - verify 第四輪（opus，2026-11-12）：CRITICAL 0、WARNING 0、SUGGESTION 2；前三輪處置到位，85 個錨點各恰出現 1 次，31 個 Scenario 與測試逐條一致。處置（coordinator，只動文件）：
+    S1 test-plan「只有一筆歷史、只有一位參賽者」與測試資料不符 → 改為「只有歷史（`players: []`）、只有參賽者（`history: []`）」。
+    S2 design Decision 9 列了未使用的 `throwingDb` → 改為同檔自訂的 `batchCountingDb`。
+    兩項皆為文件用語，無 critical／warning 殘留，結束 verify。
 - [ ] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）

@@ -137,7 +137,7 @@
 
 **Choice**：
 - 核心：`test/api/import.test.ts` 兩個 it（請求、回應 schema）、`test/api/import-limits.test.ts` 兩個 it（參數形狀、上限），寫法比照既有同檔 it。
-- 後端：新檔 `hono-pickball/test/local-import-append.test.ts`，夾具沿用 `test/helpers/matchmaker-fixtures.ts`（`seedAndSignIn`、`seedRound`、`seedSlot`、`seedHistory`、`rowsOf`、`throwingDb`）與 `local-import.test.ts` 的 D1 替身寫法（計數 batch 呼叫、委派 `prepare`）；每個 it 用不同 email 避免同檔資料互相干擾。
+- 後端：新檔 `hono-pickball/test/local-import-append.test.ts`，夾具沿用 `test/helpers/matchmaker-fixtures.ts`（`seedAndSignIn`、`seedRound`、`seedSlot`、`seedHistory`、`rowsOf`）；batch 替身比照 `local-import.test.ts` 的寫法在同檔自訂（`batchCountingDb`：`prepare` 委派真實 D1、`batch` 計數後拋錯）；每個 it 用不同 email 避免同檔資料互相干擾。
   守衛樣本表依 proposal 授權補樣本與長度。
 - 前端單元：`local-import.test.ts`、`local-import-view.test.ts`、`JsonBackupSection.test.tsx` 新 it，沿用既有 `vi.stubGlobal("fetch")`、`mockRemoteSession`、`snapshotKeys` 與 `userEvent.upload`；延後回應以可控 Promise 斷言按鈕停用；「不重新載入」在元件層改以「結果訊息在同一個已掛載的元件內顯示」替代（不使用 `vi.spyOn(location, "reload")`），不重新載入以 E2E `expectNotReloaded`（`local-import.spec.ts`）驗收。
 - E2E：`local-import.spec.ts` 新增一條；雲端資料以 `page.request.post("/api/import", { headers: await expectedUserHeaders(page.request), data })` 建立（`beforeEach` 已清空），備份以 `setInputFiles` 的 buffer 提供；雲端狀態以 `page.request.get` 讀回斷言；web-first 斷言、不得 `waitForTimeout`、帳密不進檔案。
