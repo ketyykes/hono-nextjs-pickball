@@ -396,6 +396,10 @@ describe("session-store 無法確認與本機備援", () => {
 		expect(getSnapshot()).toBe(getSnapshot());
 		expect(listener).toHaveBeenCalled();
 		expect(readSignedInHint()).toBe(true);
+
+		// 請求失敗後的快照必須是同一個常數參考，按鈕的 chooseLocalFallback 才認得出無法確認
+		chooseLocalFallback();
+		expect(getSnapshot()).toEqual({ status: "loading", localFallback: true });
 	});
 
 	it("session 請求失敗且沒有上次登入提示時快照為 auth 停用的 ready", async () => {
