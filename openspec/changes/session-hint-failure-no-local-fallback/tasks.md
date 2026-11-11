@@ -162,4 +162,14 @@ Depends on: §4
     - `7c9ba21 docs:` 在 `session-store.ts` 採用 `null` 後的 `notify()` 補註解（參考相同、useSyncExternalStore 略過、刻意保留，不改行為）。
     - mutation（三重落地檢查通過、每次還原且 status 乾淨）：`z-30`→`z-[100]` 紅；拿掉 `pointer-events-none` 紅；拿掉 `print:hidden` 紅；對照組 class 字串順序調換（`fixed pointer-events-none …`）綠；`load()` 的 `snapshot = LOADING_UNAVAILABLE` 改為每次新物件 `{ status: "loading", signedInHint: true, unavailable: true }` 紅；對照組 `readSignedInHint()` 改 `readSignedInHint() === true` 綠。
     - 驗收：兩個單檔 vitest 綠（2 檔 23 tests）、`pnpm -r exec tsc --noEmit` exit 0、改動檔 ESLint exit 0。
+  - verify 第一輪（opus，2026-11-11）：CRITICAL 0、WARNING 1、SUGGESTION 7。處置：
+    W1 §1.2 Context7 查證未記錄 → 補記於 1.2（`c8dfa4c`）。
+    S1 本機提示 `z-[100]` 會蓋住計分板專注模式操作列（z-40）並浮在對話框遮罩（z-50）之上、窄螢幕兩行 → 規格／design／test-plan 改為 `z-30` 並更正風險敘述（`c8dfa4c`），程式 TDD 修正（`63abb06` RED、`2372c68` GREEN）。
+    S2 提示版面 MUST 無測試鎖住 → 同一個 it 補 `fixed`、`pointer-events-none`、`print:hidden`、`z-30` 斷言與 auth 停用 ready（`63abb06`）。
+    S3「請求失敗後按按鈕」單元層未覆蓋 → 補斷言（`259b5ae`，regression guard；原本漏網的 ⑨c 變異現已由單元測試轉紅）。
+    S4 快照未變仍 notify → 補註解說明刻意保留、無害（`7c9ba21`）。
+    S5 tasks 紀錄插錯位置 → 排版修正（`c8dfa4c`）。
+    S6 execution-plan 審查清單未勾 → 註明為準則、實際結論見 tasks 紀錄（`c8dfa4c`）。
+    S7 計分板與統計頁的 `unavailable` 阻擋無元件層測試 → **不採納**：兩者經選擇器取得 `unavailable` 後由既有 `isContentBlocked` 分支取代內容（Decision 9），選擇器已各有 `unavailable` 單元測試、`isContentBlocked` 含 `unavailable` 亦有單元測試，參賽者頁另有 E2E；再加元件測試只是重複同一條判斷，且會使前端測試數偏離 test-plan 定額。
+    RED 機械複驗（coordinator）：`63abb06` 只動測試檔，產品檔在 RED 前後皆含 `z-[100]`。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
