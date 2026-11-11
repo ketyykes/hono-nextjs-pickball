@@ -262,7 +262,8 @@ test.describe("本機資料匯入雲端", () => {
 		const backup = {
 			version: 1,
 			players: [backupCommon, backupNew],
-			currentRound: buildPendingRound(),
+			// 與雲端回合的 roundNumber 不同，roundAfter 與 roundBefore 相等才能證明雲端回合沒被備份覆寫
+			currentRound: { ...buildPendingRound(), roundNumber: 2 },
 			history: [
 				buildHistoryEntryWithPlayers("ch1", backupCommon, backupNew),
 				buildHistoryEntryWithPlayers("bh2", backupCommon, backupNew),
