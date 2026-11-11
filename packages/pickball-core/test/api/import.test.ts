@@ -1,5 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import {
+  AppendImportRequestSchema,
+  AppendImportResponseSchema,
   LocalImportRequestSchema,
   LocalImportResponseSchema,
   type LocalImportRequest,
@@ -313,5 +315,76 @@ describe("本機資料匯入 API 契約", () => {
       expect(LocalImportResponseSchema.safeParse({ imported: { ...imported, [key]: 1.5 } }).success, `${key}=1.5`).toBe(false);
       expect(LocalImportResponseSchema.safeParse({ imported: { ...imported, [key]: -1 } }).success, `${key}=-1`).toBe(false);
     }
+  });
+
+  it("AppendImportRequestSchema 拒絕空字串或重複的參賽者 id、重複的歷史 matchId 與兩段皆空", () => {
+    const players = [makePlayer("a"), makePlayer("b")];
+    const history = [makeHistoryEntry("h1"), makeHistoryEntry("h2")];
+
+    // 合法基準：兩段皆有資料
+    expect(AppendImportRequestSchema.safeParse({ players, history }).success).toBe(true);
+
+    // 參賽者 id 為空字串、參賽者 id 重複（id 相同但 name 不同仍要拒絕）
+    expect(
+      AppendImportRequestSchema.safeParse({ players: [{ ...makePlayer("a"), id: "" }], history }).success,
+    ).toBe(false);
+    expect(
+      AppendImportRequestSchema.safeParse({
+        players: [makePlayer("a"), { ...makePlayer("b"), id: "a" }],
+        history,
+      }).success,
+    ).toBe(false);
+
+    // 歷史 matchId 重複
+    expect(
+      AppendImportRequestSchema.safeParse({
+        players,
+        history: [makeHistoryEntry("h1"), makeHistoryEntry("h1")],
+      }).success,
+    ).toBe(false);
+
+    // 兩段皆空沒有可附加的內容
+    expect(AppendImportRequestSchema.safeParse({ players: [], history: [] }).success).toBe(false);
+
+    // 只有一段有資料仍是合法附加
+    expect(AppendImportRequestSchema.safeParse({ players: [], history }).success).toBe(true);
+    expect(AppendImportRequestSchema.safeParse({ players, history: [] }).success).toBe(true);
+
+    // 帶回合的備份形狀可以通過，但回合不屬於附加請求，解析結果不得保留
+    const withRound = AppendImportRequestSchema.safeParse({
+      players,
+      history,
+      currentRound: makeRound([makeRoundMatch("m1", "pending")]),
+    });
+    expect(withRound.success).toBe(true);
+    if (withRound.success) {
+      expect(Object.keys(withRound.data).sort()).toEqual(["history", "players"]);
+    }
+  });
+
+  it("AppendImportResponseSchema 只接受新增與略過筆數的固定形狀", () => {
+    const valid = { appended: { players: { added: 1, skipped: 0 }, history: { added: 0, skipped: 2 } } };
+    expect(AppendImportResponseSchema.safeParse(valid).success).toBe(true);
+
+    // 缺欄位
+    expect(AppendImportResponseSchema.safeParse({}).success).toBe(false);
+    expect(AppendImportResponseSchema.safeParse({ appended: { players: valid.appended.players } }).success).toBe(false);
+    expect(
+      AppendImportResponseSchema.safeParse({
+        appended: { players: { added: 1 }, history: valid.appended.history },
+      }).success,
+    ).toBe(false);
+
+    // 負數與小數
+    expect(
+      AppendImportResponseSchema.safeParse({
+        appended: { players: { added: -1, skipped: 0 }, history: valid.appended.history },
+      }).success,
+    ).toBe(false);
+    expect(
+      AppendImportResponseSchema.safeParse({
+        appended: { players: valid.appended.players, history: { added: 0, skipped: 1.5 } },
+      }).success,
+    ).toBe(false);
   });
 });
