@@ -445,6 +445,36 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 			history: { added: 1, skipped: 0 },
 		});
 		expect(await snapshotOf([idA])).toEqual(aBefore);
+
+		// 歷史球員 id 的對應也只看本人名單：A2 先建立同名「甲」a1（sort_order 最小、rowid 最早），
+		// B2 的雲端有「甲」c1；B2 的備份含 b1「甲」與 id 恰為 A2 名單中 a1 的「甲」
+		const cookieA2 = await seedAndSignIn("append-iso-a2@example.com");
+		const cookieB2 = await seedAndSignIn("append-iso-b2@example.com");
+		const idA2 = await userIdOf("append-iso-a2@example.com");
+		await putPlayer(cookieA2, makePlayer("a1", { name: "甲" }));
+		await putPlayer(cookieB2, makePlayer("c1", { name: "甲" }));
+		const a2Before = await snapshotOf([idA2]);
+		const crossHistory: MatchHistoryEntry = {
+			...historyAt("x1", T1),
+			format: "singles",
+			teamA: team(["b1"]),
+			teamB: team(["a1"]),
+		};
+
+		const crossResult = await appendOk(cookieB2, {
+			players: [makePlayer("b1", { name: "甲" }), makePlayer("a1", { name: "甲" })],
+			history: [crossHistory],
+		});
+
+		expect(crossResult.appended).toEqual({
+			players: { added: 0, skipped: 2 },
+			history: { added: 1, skipped: 0 },
+		});
+		// b1 不得對應到 A2 的 a1；a1 在 B2 的雲端沒有，所以依同名改寫為 c1，而不是被誤判為「已在雲端」
+		const [readCross] = await listHistory(cookieB2);
+		expect(readCross.teamA.players.map((player) => player.id)).toEqual(["c1"]);
+		expect(readCross.teamB.players.map((player) => player.id)).toEqual(["c1"]);
+		expect(await snapshotOf([idA2])).toEqual(a2Before);
 	});
 
 	it("空字串或重複的參賽者 id、重複的歷史 matchId 或兩段皆空的附加請求回 400 且不寫入", async () => {
