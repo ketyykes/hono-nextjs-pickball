@@ -177,6 +177,8 @@ Depends on: §5
   - 結果：只有 `components/matchmaker/local-import-view.ts:13`（常數）與 `:70`（`describeImportOutcome`），`JsonBackupSection.tsx` 不出現。
 - [x] 6.11 驗收（指令）C5，全瀏覽器 gate（coordinator）：`/tmp/cgate-cloud-json-import-append.e2e` 由 coordinator 照 `/tmp/cgate-session-hint-failure-no-local-fallback.e2e` 複製後執行 `/tmp/cgate2.sh cloud-json-import-append`；五個 browser project 各＝基線且 0 failed、user-data＝基線＋1 全 passed；結果寫在本 task 後方
   - 結果（gate，HEAD `2d5fd5c`，雙鎖，2026-11-12）：chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55（五個 browser project 各＝基線 167、0 failed，skip 皆既有瀏覽器條件）；user-data 49（基線 48＋1）全 passed、0 skipped；porcelain 空。之後 `4fe8628` 只動 openspec 文件。
-- [ ] 6.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 6.11）
+- [x] 6.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 6.11）
+  - Final Code Review（opus）：PASS，無必修。範圍 28 檔皆在 Impact 內、主 spec／schemas 未動；同名與 id 規則在核心、後端 SQL、前端預覽三處一致；回應欄位、文案常數、兩份 CLAUDE.md 與實作一致；`POST /api/import` 行為未變。自跑 C6、C7、C9、C10 與相關單檔測試（核心 13、後端 42、前端 33）皆符合。
+  - 建議處置（coordinator，只動文件）：① 附加確認不以登入狀態包住、② 附加進行中重新選檔會丟棄已送出的結果 → design Risks 記為接受的取捨；③ `hono-pickball/CLAUDE.md` 開頭摘要補附加端點；④ design Open Questions 標為已定案。產品程式碼未改，gate 不重跑。
 - [ ] 6.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
 - [ ] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）

@@ -6,7 +6,7 @@
 > matchmaker（對戰分配機）的**參賽者名單在雲端**（`src/routes/matchmaker.ts`，表 `matchmaker_players`），
 > **回合、場次分槽與送出比分（含歷史寫入）也在雲端**（表 `matchmaker_round`、`matchmaker_match_slots`、`matchmaker_history`）。
 > **歷史有讀取端點**（`GET /api/matchmaker/history`），登入時歷史頁、統計頁與歷史 CSV 皆讀雲端；
-> **訪客時期的本機資料可一次匯入雲端**（`POST /api/import`，`src/routes/import.ts`，見「本機資料匯入 API」）；
+> **訪客時期的本機資料可一次匯入雲端**（`POST /api/import`；雲端已有資料時 JSON 備份可改以 `POST /api/import/append` 附加，皆在 `src/routes/import.ts`，見「本機資料匯入 API」）；
 > 引擎純邏輯（分配、評分等）在 `@pickball/core`。
 
 以下指令除特別標註外皆假設 cwd 在 `hono-pickball/`；從 repo root 執行請用 `pnpm --filter ./hono-pickball <script>`。

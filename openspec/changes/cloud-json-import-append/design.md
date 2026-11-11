@@ -205,6 +205,8 @@
 - [Risk] 主 repo 的 Stop hook 擋型別紅燈：核心與前端的 RED 會 import 尚不存在的匯出 → RED 與其 GREEN MUST 在同一張派工單內完成；後端 `test/**` 不在 Stop hook 範圍，但交件前 MUST 跑 `pnpm --dir …/hono-pickball typecheck`。
 - [Risk] 後端測試在受限沙箱噴 `listen EPERM 127.0.0.1` → 不是設定錯誤，放行後重跑。
 - [Risk] user-data E2E 依賴 `.dev.vars` 測試帳號 → 不齊備時停止並向 coordinator 索取，skip 不算通過。
+- [Trade-off] 附加確認區塊不以登入狀態包住：確認顯示期間登出時區塊仍在，按下後因 user id 為 `null` 只顯示未授權、不送出請求，無資料風險；與既有 `cloudImportResult` 的呈現方式一致，接受（Final Code Review 建議）。
+- [Trade-off] 附加請求進行中重新選檔時，已送出的附加結果依選檔序號丟棄：雲端可能已寫入成功但畫面不顯示該次結果；使用者重新選同一份檔會進入附加確認，再按附加時後端全部略過、不產生重複。屬罕見操作，接受（Decision 2）。
 
 ## Migration Plan
 
@@ -213,7 +215,7 @@
 
 ## Open Questions
 
-（設計裁量已於 Decisions 定案；下列為 propose 階段的判斷，請 coordinator 確認。）
+（以下為 propose 階段的判斷，coordinator 已確認定案，皆已落實於 spec 與 tasks；無未決事項。）
 
 - 回應欄位命名為 `skipped`（而非 `skippedSameName`／`skippedDuplicate`）：參賽者的略過同時包含「雲端同名」「id 已存在」「備份內同名的第二位」，單一名稱較準確；畫面文案為「略過同名或已在雲端的參賽者 K 位」。
 - `id` 已存在但名稱不同的參賽者也略過（視為同一筆、不覆寫），計入 `skipped`。
