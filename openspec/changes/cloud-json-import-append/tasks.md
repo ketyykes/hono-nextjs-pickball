@@ -155,16 +155,22 @@ Depends on: §4
 
 Depends on: §5
 
-- [ ] 6.1 設定層（文件）：`hono-pickball/CLAUDE.md` 的本機資料匯入 API 段落補 `POST /api/import/append`（兩條陳述式、無整批守衛、歷史 id 改寫在 SQL 內）與守衛樣本「目前 16 條」；`nextjs-pickball/CLAUDE.md` 若有描述資料頁雲端 JSON 匯入或 `jsonCloudImportHint` 同步點，依新行為更新。commit（`docs:`）
+- [x] 6.1 設定層（文件）：`hono-pickball/CLAUDE.md` 的本機資料匯入 API 段落補 `POST /api/import/append`（兩條陳述式、無整批守衛、歷史 id 改寫在 SQL 內）與守衛樣本「目前 16 條」；`nextjs-pickball/CLAUDE.md` 若有描述資料頁雲端 JSON 匯入或 `jsonCloudImportHint` 同步點，依新行為更新。commit（`docs:`）
+  - `2d5fd5c`：hono-pickball/CLAUDE.md 守衛樣本 15→16、樣本列表補 `POST /api/import/append`、本機資料匯入 API 段落補附加端點（兩條陳述式、無整批守衛、id 改寫在 SQL 內且子查詢 MUST 帶 user_id、RETURNING 計數）；nextjs-pickball/CLAUDE.md 的 JSON 還原語意改為 409 走附加流程、補 E2E 同步點、更正「不合併」只限匯入本機資料區塊。
 - [ ] 6.2 驗收（指令）C1：三段 typecheck 皆 exit 0
 - [ ] 6.3 驗收（指令）C2：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖）0 errors、warning 不多於基線
 - [ ] 6.4 驗收（指令）C3：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖）三組皆綠；前端測試數＝基線＋13、檔數＝基線；後端檔數＝基線＋1、測試數＝基線＋15；核心測試數＝基線＋4、檔數＝基線
 - [ ] 6.5 驗收（指令）C4：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖）exit 0；建置後 `git status --porcelain` 為空
-- [ ] 6.6 驗收（指令）C6：`/api/import/append` 在前端產品碼只出現在 `lib/sync/local-import.ts`
-- [ ] 6.7 驗收（指令）C7：範圍 `git diff main --stat -- <test-plan C7 列出的路徑>` 輸出為空
-- [ ] 6.8 驗收（指令）C8：`DO_NOT_TRACK=1 openspec validate cloud-json-import-append --strict` 通過
-- [ ] 6.9 驗收（指令）C9：既有匯入測試只增不刪（`git diff main -- <C9 路徑> | grep -E "^-[^-]"` 為空）
-- [ ] 6.10 驗收（指令）C10：`cloudNotEmpty` 在前端產品碼只出現在 `components/matchmaker/local-import-view.ts`
+- [x] 6.6 驗收（指令）C6：`/api/import/append` 在前端產品碼只出現在 `lib/sync/local-import.ts`
+  - 結果：只有 `nextjs-pickball/lib/sync/local-import.ts:19`（`APPEND_PATH`）一行，與預期一致。
+- [x] 6.7 驗收（指令）C7：範圍 `git diff main --stat -- <test-plan C7 列出的路徑>` 輸出為空
+  - 結果：`git diff main --stat -- <C7 路徑>` 輸出為空、exit 0。
+- [x] 6.8 驗收（指令）C8：`DO_NOT_TRACK=1 openspec validate cloud-json-import-append --strict` 通過
+  - 結果：`Change 'cloud-json-import-append' is valid`。
+- [x] 6.9 驗收（指令）C9：既有匯入測試只增不刪（`git diff main -- <C9 路徑> | grep -E "^-[^-]"` 為空）
+  - 結果：`grep -E "^-[^-]"` 無輸出（exit 1），既有匯入測試只增不刪。
+- [x] 6.10 驗收（指令）C10：`cloudNotEmpty` 在前端產品碼只出現在 `components/matchmaker/local-import-view.ts`
+  - 結果：只有 `components/matchmaker/local-import-view.ts:13`（常數）與 `:70`（`describeImportOutcome`），`JsonBackupSection.tsx` 不出現。
 - [ ] 6.11 驗收（指令）C5，全瀏覽器 gate（coordinator）：`/tmp/cgate-cloud-json-import-append.e2e` 由 coordinator 照 `/tmp/cgate-session-hint-failure-no-local-fallback.e2e` 複製後執行 `/tmp/cgate2.sh cloud-json-import-append`；五個 browser project 各＝基線且 0 failed、user-data＝基線＋1 全 passed；結果寫在本 task 後方
 - [ ] 6.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 6.11）
 - [ ] 6.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
