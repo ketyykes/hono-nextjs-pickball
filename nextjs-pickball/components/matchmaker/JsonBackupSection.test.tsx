@@ -1,6 +1,6 @@
 // components/matchmaker/JsonBackupSection.test.tsx
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EXPECTED_USER_ID_HEADER } from "@pickball/core/api/headers";
 import { useSession } from "@/hooks/useSession";
@@ -463,6 +463,102 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		expect(callsTo(fetchMock, "/api/matchmaker/players", "GET")).toHaveLength(2);
 		expect(callsTo(fetchMock, "/api/import/append", "POST")).toHaveLength(0);
 		expect(snapshotKeys()).toEqual(before);
+
+		// 過期結果（regression guard）：重新選檔後才回應的請求，不得覆寫新一次選檔的狀態。
+		// 選檔元素在請求進行中不會停用，所以三種情境都可能發生。
+		const IMPORTED_TEXT = "已匯入 2 位參賽者、0 筆歷史、0 個回合、0 個場次計分板。";
+		const importedBody = {
+			imported: { players: 2, round: false, slots: 0, history: 0, scoreboardCurrent: "none" },
+		};
+		function deferredResponse() {
+			let resolve: (response: Response) => void = () => {};
+			const promise = new Promise<Response>((done) => {
+				resolve = done;
+			});
+			return { promise, resolve };
+		}
+		async function settleLateResponse(resolve: () => void) {
+			await act(async () => {
+				resolve();
+				await new Promise((done) => setTimeout(done, 20));
+			});
+		}
+
+		// ① 名單 GET 尚未回應時重新選檔：舊 GET 晚到後不得顯示舊確認
+		cleanup();
+		const lateList = deferredResponse();
+		const listImportStatuses = [409, 200];
+		const listFetch = vi.fn<typeof fetch>();
+		listFetch.mockImplementation(async (input) => {
+			if (input === "/api/import") {
+				return listImportStatuses.shift() === 409
+					? jsonResponse(409, { error: "VERSION_CONFLICT" })
+					: jsonResponse(200, importedBody);
+			}
+			return lateList.promise;
+		});
+		vi.stubGlobal("fetch", listFetch);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), makeAppendBackupFile());
+		await waitFor(() => expect(callsTo(listFetch, "/api/matchmaker/players", "GET")).toHaveLength(1));
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
+		await settleLateResponse(() => lateList.resolve(jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")]))));
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
+		expect(screen.getByTestId("json-backup-import-message").textContent).toBe(IMPORTED_TEXT);
+
+		// ② 整份匯入 POST 尚未回應時重新選檔：舊 POST 晚到後不得顯示舊確認，也不得再讀名單
+		cleanup();
+		const lateImport = deferredResponse();
+		let importCalls = 0;
+		const importFetch = vi.fn<typeof fetch>();
+		importFetch.mockImplementation(async (input) => {
+			if (input === "/api/import") {
+				importCalls += 1;
+				return importCalls === 1 ? lateImport.promise : jsonResponse(200, importedBody);
+			}
+			return jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")]));
+		});
+		vi.stubGlobal("fetch", importFetch);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), makeAppendBackupFile());
+		await waitFor(() => expect(importCalls).toBe(1));
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
+		await settleLateResponse(() => lateImport.resolve(jsonResponse(409, { error: "VERSION_CONFLICT" })));
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(callsTo(importFetch, "/api/matchmaker/players", "GET")).toHaveLength(0);
+		expect(screen.getByTestId("json-backup-import-message").textContent).toBe(IMPORTED_TEXT);
+
+		// ③ 附加 POST 尚未回應時重新選檔：舊結果晚到後不得覆寫新狀態（失敗文案不出現）
+		cleanup();
+		const lateAppend = deferredResponse();
+		let thirdImportCalls = 0;
+		const appendFetch = vi.fn<typeof fetch>();
+		appendFetch.mockImplementation(async (input) => {
+			if (input === "/api/import") {
+				thirdImportCalls += 1;
+				return thirdImportCalls === 1 ? jsonResponse(409, { error: "VERSION_CONFLICT" }) : jsonResponse(200, importedBody);
+			}
+			if (input === "/api/matchmaker/players") return jsonResponse(200, cloudPlayersBody([makePlayer("c1", "甲")]));
+			return lateAppend.promise;
+		});
+		vi.stubGlobal("fetch", appendFetch);
+		mockRemoteSession("user-a");
+		render(<JsonBackupSection />);
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), makeAppendBackupFile());
+		await screen.findByTestId("json-backup-append-confirm");
+		await user.click(appendButton());
+		await waitFor(() => expect(callsTo(appendFetch, "/api/import/append", "POST")).toHaveLength(1));
+		await user.upload(screen.getByTestId("json-backup-cloud-import-input"), buildBackupFile());
+		expect((await screen.findByTestId("json-backup-import-message")).textContent).toBe(IMPORTED_TEXT);
+		await settleLateResponse(() => lateAppend.resolve(jsonResponse(500, { error: "X" })));
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.getByTestId("json-backup-import-message").textContent).toBe(IMPORTED_TEXT);
+		expect(snapshotKeys()).toEqual(before);
 	});
 
 	it("附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機", async () => {
@@ -491,6 +587,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await user.click(appendButton());
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(refresh).toHaveBeenCalledTimes(1);
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.queryByTestId("json-backup-import-message")).toBeNull();
 		expect(snapshotKeys()).toEqual(before);
 
@@ -499,6 +596,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await user.click(appendButton());
 		expect((await screen.findByRole("alert")).textContent).toBe(LOCAL_IMPORT_MESSAGES.tooLarge);
 		expect(refresh).toHaveBeenCalledTimes(1);
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.queryByTestId("json-backup-import-message")).toBeNull();
 		expect(snapshotKeys()).toEqual(before);
 
@@ -507,6 +605,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await user.click(appendButton());
 		expect((await screen.findByRole("alert")).textContent).toBe(LOCAL_IMPORT_MESSAGES.failed);
 		expect(refresh).toHaveBeenCalledTimes(1);
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.queryByTestId("json-backup-import-message")).toBeNull();
 		expect(snapshotKeys()).toEqual(before);
 
@@ -518,6 +617,7 @@ describe("JsonBackupSection 雲端附加流程", () => {
 		await user.click(appendButton());
 		expect((await screen.findByRole("alert")).textContent).toBe(REMOTE_TRANSFER_MESSAGES.unauthorized);
 		expect(callsTo(fetchMock, "/api/import/append", "POST")).toHaveLength(appendCallsBefore);
+		expect(screen.queryByTestId("json-backup-append-confirm")).toBeNull();
 		expect(screen.queryByTestId("json-backup-import-message")).toBeNull();
 		expect(snapshotKeys()).toEqual(before);
 	});
