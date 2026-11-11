@@ -103,6 +103,12 @@ const SAMPLES: Record<string, Sample> = {
 		path: "/api/import",
 		body: { version: 1, players: [makePlayer("imp-1")], currentRound: null, history: [], scoreboard: { current: null, matches: [] } },
 	},
+	// 附加端點對已有資料的帳號也會寫入（略過同名者以外的參賽者與歷史），守衛被放行時快照斷言能看出差異
+	"POST /api/import/append": {
+		method: "POST",
+		path: "/api/import/append",
+		body: { players: [makePlayer("append-1", { name: "附加甲" })], history: [] },
+	},
 	// reset 會清空整個使用者的資料，排在最後：守衛被整條拿掉時，前面的 PUT／score 快照斷言才能先獨立轉紅
 	"POST /api/matchmaker/reset": { method: "POST", path: "/api/matchmaker/reset" },
 };
@@ -236,7 +242,7 @@ describe("使用者資料請求的預期帳號守衛", () => {
 		const enumerated = listUserDataRouteKeys();
 
 		expect(enumerated).toEqual(Object.keys(SAMPLES).sort());
-		expect(enumerated).toHaveLength(15);
+		expect(enumerated).toHaveLength(16);
 		for (const [routeKey, sample] of Object.entries(SAMPLES)) {
 			expect(routeKey.startsWith(`${sample.method} `), `${routeKey} 的樣本方法`).toBe(true);
 		}
