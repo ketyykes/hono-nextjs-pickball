@@ -46,12 +46,17 @@
 
 Depends on: §1
 
-- [ ] 2.1 RED（TDD）：`packages/pickball-core/test/api/import.test.ts` 新增 it「AppendImportRequestSchema 拒絕空字串或重複的參賽者 id、重複的歷史 matchId 與兩段皆空」「AppendImportResponseSchema 只接受新增與略過筆數的固定形狀」；
+- [x] 2.1 RED（TDD）：`packages/pickball-core/test/api/import.test.ts` 新增 it「AppendImportRequestSchema 拒絕空字串或重複的參賽者 id、重複的歷史 matchId 與兩段皆空」「AppendImportResponseSchema 只接受新增與略過筆數的固定形狀」；
   `packages/pickball-core/test/api/import-limits.test.ts` 新增 it「serializeAppendSegments 同名只保留第一位參賽者，對照段含全部參賽者，歷史段與整份匯入的歷史段相同」「checkAppendLimits 三段各自恰為上限時通過，多一位元組或超過 500 位參賽者即不通過」。
   兩檔單檔 vitest 確認四個新 it 紅（匯出不存在）、既有 it 全綠並貼出輸出
-- [ ] 2.2 GREEN（TDD）：`packages/pickball-core/src/api/import.ts` 依 delta spec「本機備份附加到雲端的 API」與 design Decision 3、7、11 新增 `AppendImportRequestSchema`、`AppendImportResponseSchema`、`AppendImportRequest`／`AppendImportResponse` 型別、`serializeAppendSegments`（參賽者段、參賽者對照段、歷史段）、`checkAppendLimits`；
+  - RED commit `7e293e1`（`9e11b6d` 為後續修正測試夾具：補長位置改在無同名者的參賽者、`gender` 型別；不影響紅燈判定）。四個新 it 皆真紅：`AppendImportRequestSchema`／`AppendImportResponseSchema` 為 undefined（`Cannot read properties of undefined (reading 'safeParse')`）、`serializeAppendSegments`／`checkAppendLimits` `is not a function`；單檔 vitest 為 `Tests 4 failed | 9 passed (13)`，既有 9 個 it 全綠。
+  - 機械複驗：`git show 7e293e1^:` 的產品檔 `import.ts` 不含 `Append`、兩個測試檔不含任何 `Append`；RED commit 只改兩個測試檔。無 regression guard。
+- [x] 2.2 GREEN（TDD）：`packages/pickball-core/src/api/import.ts` 依 delta spec「本機備份附加到雲端的 API」與 design Decision 3、7、11 新增 `AppendImportRequestSchema`、`AppendImportResponseSchema`、`AppendImportRequest`／`AppendImportResponse` 型別、`serializeAppendSegments`（參賽者段、參賽者對照段、歷史段）、`checkAppendLimits`；
   不改既有匯出、不新增模組（`CORE_MODULES` 不變）。2.1 全綠、核心全部既有 it 全綠；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/packages/pickball-core typecheck` exit 0
-- [ ] 2.3 REFACTOR：歷史段與 `serializeImportSegments` 是否共用私有 helper（預期共用，確保逐字相同）；重複判定（參賽者 id、`matchId`）是否與既有 `LocalImportRequestSchema` 的寫法一致；無壞味道則註記 skipped
+  - GREEN commit `6fb035b`。核心全部 10 檔 31 it 全綠；`pnpm --dir …/packages/pickball-core typecheck` exit 0。參數形狀的對照段欄位名稱 spec 未指定，採 `AppendSegments.playerNames`（`{ players, playerNames, history }`），§3 後端以此名取用。
+- [x] 2.3 REFACTOR：歷史段與 `serializeImportSegments` 是否共用私有 helper（預期共用，確保逐字相同）；重複判定（參賽者 id、`matchId`）是否與既有 `LocalImportRequestSchema` 的寫法一致；無壞味道則註記 skipped
+  - REFACTOR commit `133f604`：抽出私有 `serializeHistorySegment`，整份匯入與附加共用（歷史段逐字相同）；重複判定（參賽者 id、`matchId`）的寫法與 `LocalImportRequestSchema` 一致，不另動。測試仍全綠、typecheck exit 0。
+  - mutation（單檔雙檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：① 參賽者段不去重 紅；② 同名保留最後一位 紅；③ 對照段改為去重後名單 紅；④ 500 位以去重後筆數判定 紅；⑤ 不判定對照段上限 紅；⑥ 三段改以加總判定 紅；⑦ 不拒絕兩段皆空 紅；⑧ 不拒絕重複 `matchId` 紅；對照組（去重 `Set` 改 `Map`）維持綠。
 - [ ] 2.4 Stage 1（sonnet）→ Stage 2（opus）審查 §2：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 3. 後端附加端點（hono-pickball）
