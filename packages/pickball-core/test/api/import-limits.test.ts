@@ -346,7 +346,7 @@ describe("本機資料匯入的共用參數形狀與上限判定", () => {
 
 /** 附加請求用的參賽者：名稱由呼叫端指定，才能做出同名情境。 */
 function makeNamedPlayer(id: string, name: string): AppendImportRequest["players"][number] {
-  return { ...makePlayer(id), name };
+  return { ...makePlayer(id), gender: "male", name };
 }
 
 /** 附加請求的基準：兩筆歷史、三位參賽者且其中兩位同名。 */
@@ -415,7 +415,8 @@ describe("本機備份附加到雲端的共用參數形狀與上限判定", () =
       const build = (pad: string): AppendImportRequest => {
         const request = structuredClone(base);
         if (segment === "players") {
-          request.players[0].name += pad;
+          // 補在沒有同名者的第二位：補長同名者的名稱會讓第三位不再被去重，段落多出一位參賽者
+          request.players[1].name += pad;
         } else if (segment === "playerNames") {
           // 對照段含全部參賽者，參賽者段只含每個名稱的第一位：補長與第一位同名者的 id，只有對照段變長
           request.players[2].id += pad;
