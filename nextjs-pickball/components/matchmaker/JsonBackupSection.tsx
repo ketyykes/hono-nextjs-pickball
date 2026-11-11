@@ -197,7 +197,7 @@ export function JsonBackupSection() {
 
 	let importPicker: ReactNode;
 	if (isRemote) {
-		// 雲端名單不能被備份檔整份覆蓋：改為「匯入到空的雲端」，拒絕規則與匯入本機資料相同
+		// 雲端資料不能被備份檔覆蓋：雲端為空時整份匯入，已有資料時改由使用者確認後只附加參賽者與歷史
 		importPicker = (
 			<>
 				<p className="w-full text-sm text-muted-foreground">{LOCAL_IMPORT_MESSAGES.jsonCloudImportHint}</p>
