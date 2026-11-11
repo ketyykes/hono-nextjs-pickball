@@ -144,8 +144,11 @@ B9 原定的「不合併」只在本入口改為附加，用於救回 session �
 - **GIVEN** 同上，`POST /api/import` 依序回 409、409、200，`GET /api/matchmaker/players` 回合法名單
 - **WHEN** 選檔後在附加確認按「取消」；再選一次同一份檔（409）讓附加確認出現，接著改選另一份備份檔且這次 `POST /api/import` 回 200
 - **THEN** 按下取消後附加確認消失，沒有 `role="alert"` 與 `json-backup-import-message`；改選檔後附加確認消失並顯示整份匯入的成功文案；三次選檔共三個 `POST /api/import`、兩個 `GET /api/matchmaker/players`（只在 409 之後），`POST /api/import/append` 從未送出；本機 key 皆未改變
-- **AND** 名單 GET、整份匯入 POST、附加 POST 尚未回應時重新選檔，晚到的舊結果皆被丟棄、不覆寫新狀態（選檔元素進行中不停用，三者皆可能發生）
-- **AND** 選檔開頭清除前次的成功文案與 alert：先以 200 顯示成功文案、再選檔得 409 時，附加確認旁沒有舊的成功訊息；失敗 alert 出現後再選檔，alert 消失
+- **AND**（以下四段各自重新 render、另設回應序列；選檔元素進行中不停用，晚到情境皆可能發生）晚到的舊結果皆被丟棄、不覆寫新狀態：
+  ① 名單 GET 晚到——`POST /api/import` 依序回 409、200，名單 GET 延後；第一次選檔（409）後名單尚未回應即改選另一份檔（200，顯示成功文案），之後名單才回應 → 附加確認不出現、成功文案仍在；
+  ② 整份匯入 POST 晚到——第一個 `POST /api/import` 延後、第二個回 200；第一次選檔未回應即改選另一份檔（顯示成功文案），之後第一個 POST 才以 409 回應 → 附加確認與 `role="alert"` 皆不出現、不讀取名單（`GET /api/matchmaker/players` 0 次）、成功文案仍在；
+  ③ 附加 POST 晚到——`POST /api/import` 依序回 409、200；附加確認出現後按「附加到雲端」，附加請求未回應即改選另一份檔（200，顯示成功文案），之後附加才以 500 回應 → 不出現 `role="alert"`、成功文案仍在、本機 key 皆未改變
+- **AND** 選檔開頭清除前次的成功文案與錯誤：`POST /api/import` 依序回 200、409、409——先選檔得 200 顯示成功文案，再選檔得 409 時附加確認出現且 `json-backup-import-message` 不存在；接著選一份不支援版本的檔（`parseBackup` 驗證失敗、不送請求）出現 `role="alert"`，再選檔得 409 時附加確認出現且 `role="alert"` 已消失
 - **驗收**：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx`，it 名稱「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
 
 #### Scenario: 登入資料工具：附加請求失敗的文案與 session 刷新

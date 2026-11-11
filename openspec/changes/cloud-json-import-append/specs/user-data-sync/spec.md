@@ -110,9 +110,9 @@ AppendImportRequestSchema = { players: PlayerWriteSchema[], history: MatchHistor
 - **WHEN** 附加參賽者 `b1`「甲」、`b2`「丙」、`b9`「丙」；歷史 `r1`（單打：teamA `[b1]`、teamB `[b2]`）與 `r2`（雙打：teamA `[b1, b9]`、teamB `[z1, b2]`，`z1` 不在備份名單）
 - **THEN** `appended.players` 為 `{ added: 1, skipped: 2 }`（新增 `b2`）；讀回的 `r1` teamA 為 `[c1]`、teamB 為 `[b2]`；`r2` teamA 為 `[c1, b2]`、teamB 為 `[z1, b2]`；
   每位球員的 `name`、`ratingBefore`、`ratingAfter` 與陣列順序不變，兩筆歷史除上述 id 外與請求深度相等（含 `doublesComposition`）
-- **AND** 再加入 `r3`（teamA `[z2, z3]`、teamB `[b1, b9]`）時，讀回的 `r3` teamB 為 `[c1, b2]`、teamA 不變（`[z2, z3]`）：對手方的 id 同樣改寫
+- **AND** 再加入 `r3`（teamA `[z2, z3]`、teamB `[b1, b9]`）時，讀回的 `r3` teamB 為 `[c1, b2]`、teamA 不變（`[z2, z3]`），且除 id 外與請求深度相等：對手方的 id 同樣改寫
 - **AND** 規則 ①（備份參賽者的 id 已在雲端名單時，歷史中的該 id 不變）：另一位使用者雲端有 `c1`「甲」、`c5`「甲」，附加參賽者 `c5`「甲」與引用 `c5`、`c1` 的歷史 → `players` `{ added: 0, skipped: 1 }`、`history` `{ added: 1, skipped: 0 }`，讀回的歷史 teamA 仍為 `c5`、teamB 為 `c1`，且與請求深度相等
-- **AND** 讀回的兩筆歷史中不再出現 `b1`、`b9`（`player-stats` 以球員 id 為統計鍵，故 `c1` 的出場會包含這兩場；統計頁的端到端證據見 `data-transfer`「登入資料工具：雲端已有資料時以 JSON 備份附加參賽者與歷史」）
+- **AND** 讀回的三筆歷史（`r1`～`r3`）中不再出現 `b1`、`b9`（`player-stats` 以球員 id 為統計鍵，故 `c1` 的出場會包含這三場；統計頁的端到端證據見 `data-transfer`「登入資料工具：雲端已有資料時以 JSON 備份附加參賽者與歷史」）
 - **驗收**：`hono-pickball/test/local-import-append.test.ts`，it 名稱「附加的歷史中因同名而略過的參賽者 id 改寫為雲端同名者的 id，其餘欄位不變」
 
 #### Scenario: 附加 API：附加的參賽者與歷史版本

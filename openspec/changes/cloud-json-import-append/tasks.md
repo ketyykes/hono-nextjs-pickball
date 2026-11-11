@@ -182,4 +182,7 @@ Depends on: §5
     W2 前端兩個 Scenario 未跟上 `654d8b9` 的 MUST → 補晚到結果丟棄、選檔開頭清除前次狀態、每輪失敗後收起確認。
     S1 「`checkAppendLimits` 前後端共用」與實作不符 → proposal／design／overview／test-plan 改為核心定義、後端使用，前端不預檢並於 Decision 7 補理由。
     S2 tasks 5.2、5.3 任務敘述被紀錄截斷 → 併回主行。
+  - verify 第二輪（opus，2026-11-12）：CRITICAL 0、WARNING 1、SUGGESTION 1；第一輪處置複核到位（W1 對照後端測試一致、W2「附加請求失敗」一致、S1、S2 到位），76 個錨點逐字存在。處置（coordinator，只動 delta spec）：
+    W-1「取消附加或重新選檔」新增的兩條 AND 與 GIVEN 的回應序列（409、409、200）矛盾 → 註明四段各自重新 render，逐段寫明回應序列與晚到對象（含 ② 不讀名單、清除段的 200／409／409 與不支援版本檔的驗證失敗 alert），逐行對照 `JsonBackupSection.test.tsx` 的四段 setup。
+    S-1「略過者 id 改寫」仍寫「兩筆歷史」→ 改為三筆（`r1`～`r3`），`r3` 補「除 id 外與請求深度相等」。
 - [ ] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）
