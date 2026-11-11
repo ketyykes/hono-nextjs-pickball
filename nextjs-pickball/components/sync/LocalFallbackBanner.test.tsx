@@ -25,12 +25,20 @@ describe("LocalFallbackBanner", () => {
 		});
 		const fallback = render(<LocalFallbackBanner />);
 		expect(screen.getByRole("status").textContent).toBe(LOCAL_FALLBACK_NOTICE);
+		// 層級須低於 ActionBar 專注模式的 z-40 與對話框的 z-50，且不可擋操作、列印時隱藏
+		const root = fallback.container.firstElementChild;
+		expect(root).not.toBeNull();
+		expect(root?.classList.contains("fixed")).toBe(true);
+		expect(root?.classList.contains("pointer-events-none")).toBe(true);
+		expect(root?.classList.contains("print:hidden")).toBe(true);
+		expect(root?.classList.contains("z-30")).toBe(true);
 		fallback.unmount();
 
 		const others: UseSessionResult[] = [
 			{ status: "loading", signedInHint: true, unavailable: true, hydrated: true, refresh },
 			{ status: "loading", signedInHint: true, hydrated: true, refresh },
 			{ status: "loading", hydrated: true, refresh },
+			{ status: "ready", authEnabled: false, user: null, hydrated: true, refresh },
 			{ status: "ready", authEnabled: true, user: null, hydrated: true, refresh },
 			{ status: "ready", authEnabled: true, user, hydrated: true, refresh },
 		];
