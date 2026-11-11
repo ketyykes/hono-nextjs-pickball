@@ -111,7 +111,10 @@ Depends on: §3
   - mutation（單檔雙檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：①～⑭ 全數轉紅（各 1 failed）：① `backupToAppendRequest` 帶 `currentRound`；② 409 分類為 `unauthorized`；③ 413 分類為 `failed`；④ 不以 `AppendImportResponseSchema` 驗證 200；⑤ 略過皆 0 仍回 `note`；⑥ 兩句連接改「，」；⑦ `APPEND_RULES` 調換前兩條；⑧ `jsonCloudImportHint` 改回舊文字；⑨ 預覽忽略 id 規則；⑩ 不做備份內同名去重；⑪ 先判定雲端再去重；⑫ 比對前轉小寫；⑬ `fetchAppendPreview` 401 分類為 `failed`；⑭ 不以 `PlayerListResponseSchema` 驗證名單。對照組 A（雲端名稱 `Set.has` 改 `some`）、B（`join` 改 `reduce` 串接）維持綠。
 - [x] 4.3 REFACTOR：`describeAppendOutcome` 與 `describeImportOutcome` 的錯誤分支是否值得共用（預期不抽：結果型別不同）；補充說明的組字是否以 if/else 表達、無巢狀三元；`previewAppendPlayers` 的去重與判定是否以具名步驟表達、註解寫明「必須與後端規則一致」的理由；無壞味道則註記 skipped
   - skipped：`describeAppendOutcome` 與 `describeImportOutcome` 結果型別不同，不抽共用；補充說明以 `skippedParts` 陣列加 if 組字、無三元；`previewAppendPlayers` 已是「先去重、再判定」兩個具名步驟，並以註解寫明必須與後端 `appendLocalBackup` 一致與順序的理由。無壞味道，未產生 `refactor:` commit。
-- [ ] 4.4 Stage 1（sonnet）→ Stage 2（opus）審查 §4：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+- [x] 4.4 Stage 1（sonnet）→ Stage 2（opus）審查 §4：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+  - Stage 1（sonnet）：PASS，無必修。六個錨點逐字相同；RED `255d18a` 只動兩個測試檔；`previewAppendPlayers` 與核心去重、後端兩個 NOT EXISTS 規則一致，fixture ①② 與後端 it 相同；mutation ①～⑬ 紅、對照 2 條綠。
+  - Stage 2（opus）：PASS，無必修。獨立 mutation 21 條＋對照 4 條；⑭ 確認 schema 驗證經 `fetchRemotePlayers` 鎖住；401 一律分類為 unauthorized（含 ACCOUNT_MISMATCH）。建議：① 名稱比對只鎖住大小寫，NFKC／移除中間空白的變異（⑫c）存活；② 備份內參賽者 id 重複時預覽與結果不一致。
+  - 處置：`51d3f4a`（前端預覽 it 補全形「Ａmy」與中間空白「A my」）、`5db7f75`（後端 Ann it 補「Ａnn」「A nn」），皆 regression guard，前後端正規化變異轉紅；spec／test-plan 同步、design Risks 記錄 ② 為接受的已知缺口（正常匯出不會出現）。
 
 ## 5. JSON 雲端匯入的附加流程（元件與 E2E）
 
