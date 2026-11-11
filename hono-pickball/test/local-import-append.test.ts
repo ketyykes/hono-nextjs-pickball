@@ -309,6 +309,13 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 		expect(ids).toContain("x1");
 		expect(ids).toContain("x3");
 		expect(ids).not.toContain("x2");
+
+		// 同名比對區分大小寫：雲端 Ann、附加 ann 視為不同人而新增
+		const caseCookie = await seedAndSignIn("append-samename-case@example.com");
+		await putPlayer(caseCookie, makePlayer("case-cloud", { name: "Ann" }));
+		const caseResult = await appendOk(caseCookie, { players: [makePlayer("case-new", { name: "ann" })], history: [] });
+		expect(caseResult.appended.players).toEqual({ added: 1, skipped: 0 });
+		expect(await listPlayerIds(caseCookie)).toEqual(["case-cloud", "case-new"]);
 	});
 
 	it("附加的歷史中因同名而略過的參賽者 id 改寫為雲端同名者的 id，其餘欄位不變", async () => {
@@ -431,6 +438,9 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 		const idA = await userIdOf("append-iso-a@example.com");
 		const idB = await userIdOf("append-iso-b@example.com");
 		await putPlayer(cookieA, makePlayer("s1", { name: "甲" }));
+		// A 的 sort_order 最大值（2）大於 B 的（0），使用全域最大值計算時 B 新增者的序號會不同
+		await putPlayer(cookieA, makePlayer("a-extra-1", { name: "A 另一位" }));
+		await putPlayer(cookieA, makePlayer("a-extra-2", { name: "A 再一位" }));
 		await seedHistory(idA, historyAt("h1", T1));
 		await putPlayer(cookieB, makePlayer("b-own", { name: "乙" }));
 		const aBefore = await snapshotOf([idA]);
@@ -445,6 +455,11 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 			history: { added: 1, skipped: 0 },
 		});
 		expect(await snapshotOf([idA])).toEqual(aBefore);
+		// B 新增者的 sort_order 只看 B 自己的最大值（0）加 1
+		const bSortOrders = new Map(
+			(await rowsOf("matchmaker_players", idB)).map((row) => [row.id as string, row.sort_order as number]),
+		);
+		expect(bSortOrders.get("s1")).toBe((bSortOrders.get("b-own") as number) + 1);
 
 		// 歷史球員 id 的對應也只看本人名單：A2 先建立同名「甲」a1（sort_order 最小、rowid 最早），
 		// B2 的雲端有「甲」cb2（id 刻意不與同檔其他 it 的雲端參賽者重複，否則錯誤的對應結果可能碰巧相同）；B2 的備份含 b1「甲」與 id 恰為 A2 名單中 a1 的「甲」
