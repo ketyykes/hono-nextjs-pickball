@@ -19,7 +19,7 @@ const SYNCED = '[data-sync-status="synced"]';
 const CONFLICT = '[data-sync-status="conflict"]';
 const LOAD_FAILED = '[data-sync-status="load-failed"]';
 const JSON_CLOUD_IMPORT_HINT_TEXT =
-	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
+	"登入時選擇的備份檔會匯入到雲端，不會寫入本機；雲端已有對戰分配機資料時，可確認後把備份中的參賽者與歷史附加到雲端，不會覆寫雲端既有的資料";
 
 test.use({ storageState: storageStatePath });
 test.skip(() => !existsSync(storageStatePath), AUTH_SKIP_REASON);

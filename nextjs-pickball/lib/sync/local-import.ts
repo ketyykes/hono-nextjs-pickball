@@ -1,14 +1,22 @@
-import { LocalImportResponseSchema, checkImportLimits } from "@pickball/core/api/import";
-import type { LocalImportRequest, LocalImportResponse } from "@pickball/core/api/import";
+import { AppendImportResponseSchema, LocalImportResponseSchema, checkImportLimits } from "@pickball/core/api/import";
+import type {
+	AppendImportRequest,
+	AppendImportResponse,
+	LocalImportRequest,
+	LocalImportResponse,
+} from "@pickball/core/api/import";
+import type { Player } from "@pickball/core/matchmaker/types";
 import type { Backup } from "@pickball/core/matchmaker/transfer-types";
 import type { MatchHistoryEntry } from "@pickball/core/matchmaker/history";
 import { readRoster } from "../matchmaker/storage";
 import { readHistory, readRound } from "../matchmaker/round-storage";
 import { readScoreboard } from "../scoreboard/storage";
 import { requestJson } from "./api-client";
+import { fetchRemotePlayers } from "./roster-api";
 
 // 路徑集中在這一處，元件不直接拼字串，避免各處路徑漂移。
 const IMPORT_PATH = "/api/import";
+const APPEND_PATH = "/api/import/append";
 
 export interface LocalImportSummary {
 	players: number;
@@ -129,4 +137,92 @@ export function backupToImportRequest(backup: Backup): LocalImportRequest {
  */
 export function hasImportableLocalData(): boolean {
 	return !buildLocalImportPayload().isEmpty;
+}
+
+export type AppendImportOutcome =
+	| { kind: "appended"; appended: AppendImportResponse["appended"] }
+	| { kind: "unauthorized" }
+	| { kind: "too-large" }
+	| { kind: "failed" };
+
+/** 附加只取參賽者與歷史；備份中的進行中回合不屬於附加，在這個唯一的轉換點丟棄。 */
+export function backupToAppendRequest(backup: Backup): AppendImportRequest {
+	return { players: backup.players, history: backup.history };
+}
+
+/**
+ * 送出附加請求。不自動重試，也不寫入或清除任何本機 key。
+ * 此端點不會回 409，因此 409 與其他非預期狀態一律視為失敗。
+ */
+export async function appendBackupToCloud(
+	expectedUserId: string,
+	request: AppendImportRequest,
+): Promise<AppendImportOutcome> {
+	const result = await requestJson("POST", APPEND_PATH, {
+		body: request,
+		schema: AppendImportResponseSchema,
+		expectedUserId,
+	});
+	if (result.kind === "ok") {
+		if (result.value === undefined) return { kind: "failed" };
+		return { kind: "appended", appended: result.value.appended };
+	}
+	if (result.kind === "unauthorized") return { kind: "unauthorized" };
+	if (result.kind === "rejected" && result.status === 413) return { kind: "too-large" };
+	return { kind: "failed" };
+}
+
+export interface AppendPlayersPreview {
+	/** 會新增到雲端的參賽者名稱（備份順序）。 */
+	added: string[];
+	/** 已在雲端、會被視為同一人而略過的參賽者名稱（備份中的名稱）。 */
+	matched: string[];
+}
+
+/**
+ * 預覽附加會新增與略過的參賽者。規則必須與後端 appendLocalBackup 一致，否則預覽會誤導使用者：
+ * ① 先依名稱去重（同名只留備份中的第一位，名稱完全相同才算同名，不做任何正規化）；
+ * ② 再對保留者判定：id 或名稱已在雲端者略過，其餘新增。
+ * 順序不可顛倒：同名第一位若因 id 已在雲端而略過，第二位也不會被新增。
+ */
+export function previewAppendPlayers(
+	backupPlayers: readonly Player[],
+	cloudPlayers: readonly Player[],
+): AppendPlayersPreview {
+	const seenNames = new Set<string>();
+	const uniquePlayers = backupPlayers.filter((player) => {
+		if (seenNames.has(player.name)) return false;
+		seenNames.add(player.name);
+		return true;
+	});
+
+	const cloudIds = new Set(cloudPlayers.map((player) => player.id));
+	const cloudNames = new Set(cloudPlayers.map((player) => player.name));
+	const added: string[] = [];
+	const matched: string[] = [];
+	for (const player of uniquePlayers) {
+		if (cloudIds.has(player.id) || cloudNames.has(player.name)) {
+			matched.push(player.name);
+		} else {
+			added.push(player.name);
+		}
+	}
+	return { added, matched };
+}
+
+export type AppendPreviewOutcome =
+	| { kind: "ready"; preview: AppendPlayersPreview }
+	| { kind: "unauthorized" }
+	| { kind: "failed" };
+
+/** 讀取雲端名單並算出附加預覽；只讀不寫，帳號由呼叫端給定。 */
+export async function fetchAppendPreview(
+	expectedUserId: string,
+	request: AppendImportRequest,
+): Promise<AppendPreviewOutcome> {
+	const result = await fetchRemotePlayers(expectedUserId);
+	if (result.kind === "unauthorized") return { kind: "unauthorized" };
+	if (result.kind !== "ok" || result.value === undefined) return { kind: "failed" };
+	const cloudPlayers = result.value.items.map((item) => item.data);
+	return { kind: "ready", preview: previewAppendPlayers(request.players, cloudPlayers) };
 }

@@ -25,7 +25,7 @@ const SYNCED = '[data-sync-status="synced"]';
 const HISTORY_CARDS = '[data-testid^="history-record-"][data-slot="card"]';
 
 const JSON_CLOUD_IMPORT_HINT_TEXT =
-	"登入時選擇的備份檔會匯入到雲端，只有雲端沒有任何對戰分配機資料時才會寫入；不會覆寫或合併雲端資料，也不會寫入本機";
+	"登入時選擇的備份檔會匯入到雲端，不會寫入本機；雲端已有對戰分配機資料時，可確認後把備份中的參賽者與歷史附加到雲端，不會覆寫雲端既有的資料";
 // 已廢止的「登入時停用 JSON 還原」說明，現行版本不得再出現
 const LEGACY_JSON_RESTORE_DISABLED_TEXT =
 	"登入時暫不支援從 JSON 備份還原，請登出後還原，或使用之後提供的匯入本機資料功能";
