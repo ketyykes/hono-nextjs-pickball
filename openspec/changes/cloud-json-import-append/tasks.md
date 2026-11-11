@@ -194,4 +194,4 @@ Depends on: §5
     S1 test-plan「只有一筆歷史、只有一位參賽者」與測試資料不符 → 改為「只有歷史（`players: []`）、只有參賽者（`history: []`）」。
     S2 design Decision 9 列了未使用的 `throwingDb` → 改為同檔自訂的 `batchCountingDb`。
     兩項皆為文件用語，無 critical／warning 殘留，結束 verify。
-- [ ] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）
+- [x] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）
