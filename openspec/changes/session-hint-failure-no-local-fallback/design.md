@@ -146,7 +146,7 @@ TypeScript 對 union 存取非共有欄位會報錯，實作可用 `?: never` �
 
 **Choice**：新 client 元件 `components/sync/LocalFallbackBanner.tsx`：以 `useSession()` 判斷，只有 `status === "loading"` 且 `localFallback === true` 時渲染
 `<div role="status">{LOCAL_FALLBACK_NOTICE}</div>`，其餘 `return null`。外觀：`fixed` 於視窗底部置中（例 `fixed inset-x-0 bottom-4 flex justify-center px-4`），
-`pointer-events-none`、`print:hidden`，`z-index` 低於 navbar（`z-[110]`）與計分回饋（`z-[120]`）、高於頁面內容；樣式比照 `SyncStatusNotice` 的卡片外觀。
+`pointer-events-none`、`print:hidden`，`z-index` 為 `z-30`：高於一般頁面內容，低於計分板專注模式操作列（`ActionBar` 的 `z-40`）與對話框遮罩（shadcn Dialog／AlertDialog 的 `z-50`），更低於 navbar（`z-[110]`）與計分回饋（`z-[120]`）——沿用 `ActionBar` 註解「浮動元素要低於 z-50 對話框」的慣例；樣式比照 `SyncStatusNotice` 的卡片外觀。
 `app/layout.tsx` 在 `<body>` 內、`SiteNavbar` 之後、`ViewTransition` 之外放 `<LocalFallbackBanner />`（不參與換頁動畫，換頁時常駐）。
 
 **Rationale**：
@@ -195,7 +195,7 @@ openspec validator 不允許 MODIFIED 刪除或改名既有 Scenario（archive �
 - [Risk] 本機備援期間若有東西呼叫 `refresh()` 且失敗，會回到阻擋畫面 → 目前沒有入口會呼叫（雲端 hook 未啟用、登入入口為佔位）；接受並記錄。
 - [Risk] `route.abort()` 或 500 在部分瀏覽器輸出 console 錯誤（`Failed to load resource`）→ `data-pending.spec.ts` 沒有 console 守衛，新 test 也 SHALL NOT 加；若既有含 console 守衛的 spec 受影響，依「E2E 失敗不得當雜訊」上報。
 - [Risk] 資料頁三區塊各有一顆按鈕 → 任一顆效果相同，可接受。
-- [Risk] 本機提示固定於底部，可能疊在計分板或頁面底部內容上 → `pointer-events-none` 不擋操作、只有一行；接受。
+- [Risk] 本機提示固定於底部，窄螢幕會折成兩行，可能疊在頁面底部內容與非專注模式計分板的最底列上 → `pointer-events-none` 不擋操作；層級 `z-30` 低於專注模式操作列（`z-40`）與對話框遮罩（`z-50`），不會蓋住計分操作列或浮在對話框之上；其餘遮蓋接受（verify 第一輪更正原本「只有一行」的前提）。
 - [Risk] 既有 E2E 依賴「session 失敗時退回本機」→ 已查 `tests/e2e/**` 的 `/api/session` 攔截：`navbar-account-entry.spec.ts` 以 200 fulfill、`data-pending.spec.ts` 以 hold 後 `continue()`，皆非失敗回應；訪客（無提示）仍 fail-closed。Mitigation：合併前全瀏覽器 gate。
 - [Risk] 本 change 在主 repo 進行，Stop hook 會擋主 worktree 的 tsc 紅燈；§2 的 RED（`mockResolvedValue(null)`、`chooseLocalFallback` 匯入）是型別紅燈 → RED 與其 GREEN MUST 在同一張派工單內完成。
 - [Risk] 單元測試之間的提示洩漏 → 既有 `beforeEach` 已有 `localStorage.clear()`；新 it 自帶清理。

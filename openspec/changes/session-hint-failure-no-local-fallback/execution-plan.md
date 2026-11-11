@@ -73,7 +73,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
   - `app/matchmaker/page.test.tsx` 因子模組在 happy-dom 無法載入，stub 兩輪後仍無法渲染。
   - E2E 在 webkit 系 project 同一條連續兩次結果不同，或既有 E2E 出現新失敗且原因不明。
   - 同一群組被同一 reviewer 連續退回 2 次。
-- **self-review checklist**：
+- **self-review checklist**（自查準則，不逐項勾選；實際結果見 tasks.md 各 task 紀錄）：
   - [ ] 每個 RED 的紅燈輸出已貼出（單檔 vitest、單檔 E2E）；先綠者已點名標 regression guard；改寫的三個既有 it 已標「改寫既有 it」。
   - [ ] it／test 名稱與 delta spec 驗收錨點逐字相同。
   - [ ] 只改寫了授權的三個既有 it。
@@ -86,7 +86,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
 - **default_model**: `sonnet`
 - **rationale**：對照 Scenario 與測試名稱、檢查是否越界，需要中等判斷力。
 - **required first action**：覆述收到的 spec／test-plan 片段標題；對不上回報 `NEEDS_CONTEXT`。
-- **review checklist**：
+- **review checklist**（審查準則，不逐項勾選；各次審查的實際結論見 tasks.md 3.15、4.3、5.12 的紀錄）：
   - [ ] 每個新增 Scenario 都有對應測試，名稱逐字相同；三個標題沿用的 Scenario 對應改寫後的 it。
   - [ ] RED 對應正確 Scenario，且為真紅（依 e 機械複驗）；regression guard 已誠實標註。
   - [ ] GREEN 只滿足 RED：只有兩個新文案、沒有新 hook、沒有改後端或 `/api/session` 契約、沒有自動重試、沒有改帳號入口與登入頁、沒有合併本機修改到雲端（scope creep）。
@@ -100,7 +100,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
 - **default_model**: `opus`
 - **rationale**：請求編號、計時器與 module 層級狀態的互動（丟棄時機、參考穩定、測試隔離）最需要最強模型。
 - **required first action**：同 Stage 1。
-- **review checklist**：
+- **review checklist**（審查準則，不逐項勾選；各次審查的實際結論見 tasks.md 3.15、4.3、5.12 的紀錄）：
   - [ ] 獨立 mutation（b～d），特別是 §2 ④ ⑥ ⑦ ⑧ ⑨、§3 ③ ⑤ ⑨ ⑪、§4 全部與對照組。
   - [ ] 兩個新快照為模組層級常數；`getSnapshot` 未變更時回傳同一參考；`resetSessionStoreForTests` 仍清除計時器與快取。
   - [ ] `SessionSnapshot` union 的窄化寫法全檔一致（`?: never` 或 `in` 擇一），沒有 `as` 硬轉。
@@ -115,7 +115,7 @@ m. 派出 subagent 之後不可結束回合；脈絡將盡就在派下一組**�
 - **default_model**: `opus`
 - **rationale**：需要一次看完三組 commit，確認無法確認與本機備援在 lib、hooks、元件三層的寫法一致、合併後範圍不越界。
 - **when**：所有 task 勾完後一次。
-- **review checklist**：
+- **review checklist**（審查準則，不逐項勾選；各次審查的實際結論見 tasks.md 3.15、4.3、5.12 的紀錄）：
   - [ ] `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff main --stat` ⊆ proposal Impact；主 spec 無任何改動。
   - [ ] C6、C7、C10 的 grep 結果與 test-plan 一致；沒有使用端漏處理 `unavailable`。
   - [ ] 指令驗收 C1～C10 皆有紀錄；前端測試數＝基線＋21、檔數＝基線＋2；五個 browser project 各＝基線＋2 且全綠；user-data＝基線。

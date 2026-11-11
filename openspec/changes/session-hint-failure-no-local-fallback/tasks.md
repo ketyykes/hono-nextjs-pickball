@@ -34,6 +34,11 @@
   以 python difflib 比對本 change 九個 MODIFIED Requirement（`auth` 三個、`user-data-sync` 三個、`player-roster`、`round-lifecycle`、`scoreboard` 各一個）與目前主 spec，除本 change 刻意增修外應無差異；
   **若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**、`DO_NOT_TRACK=1 openspec validate session-hint-failure-no-local-fallback --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   另以 Context7 查證並記錄：Playwright `route.fulfill({ status })`、`route.abort()`、`page.addInitScript`、`page.unrouteAll({ behavior: "ignoreErrors" })`；Next.js 16 的 page 模組只允許特定匯出（design Decision 9 不從 `page.tsx` 匯出 `mergeSyncStatus` 的根據）。與 design 假設不符時停止並回報
+  - Context7 查證（§1 Implementer 實查，2026-11-09；verify 第一輪指出原本漏記，補記於此）：
+    `route.fulfill({ status })` 的 status 預設 200、可指定任意狀態碼；`route.abort()` 的 errorCode 預設 `'failed'`；
+    `page.addInitScript` 在文件建立後、頁面任何 script 執行前評估，每次導航與子 frame 附加或導航都會執行（符合「提示在下一個文件載入前寫入」）；
+    `page.unrouteAll({ behavior: "ignoreErrors" })` 不等待進行中的 handler、之後的 handler 錯誤靜默吞掉，本機 playwright 1.60.0 的 `types.d.ts` 確認存在（v1.41 後）。
+    Next.js 16 page 模組的匯出限制：Context7 查不到明文；改查本機 `next/dist/build/webpack/plugins/next-types-plugin/index.js`，生成的型別檢查以 `checkFields<Diff<…>>` 與 `Omit<T, keyof Base>` 比對 `never`，只允許 `default`、`generateMetadata`、`generateStaticParams` 等指定欄位——佐證 design Decision 9 不從 `page.tsx` 匯出 `mergeSyncStatus`（推論自型別生成程式碼，非官方文件逐字明文）。
 
 ## 2. session client、store 與儲存模式（lib 層）
 
@@ -56,23 +61,23 @@ Depends on: §1
     ⑨ `getSnapshot` 對無法確認／本機備援每次回新物件，各自轉紅（Stage 2 更正：「`load()` 採用 `null` 的分支改建新物件」維持綠，但**不是**等價變異——`chooseLocalFallback` 以參考比對無法確認快照，請求失敗後按鈕會失效；單元層只涵蓋逾時路徑，改由 §3 必做變異 ⑫ 以 `data-pending.spec.ts` 的 500 那條 E2E 涵蓋）；⑩ 本機備援改回 pending 紅（regression guard 轉紅）；補充：無法確認改回 local 紅；⑪ pendingDataStatus 一律 pending 紅。
     對照組（須維持綠）：`"unavailable" in snapshot && snapshot.unavailable` 改寫維持綠；調換 resolveStorageMode 本機備援與提示判斷順序維持綠。
 - [x] 2.5 REFACTOR：store 中「採用一份結果」的分支（非 `null`／`null`＋提示／`null` 無提示）是否以 if/else 清楚表達、無巢狀三元；union 型別窄化寫法全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 是否值得共用判斷（預期不抽：一個回儲存模式、一個回顯示狀態）；無壞味道則註記 skipped
-
   - skipped：採用結果分支以 if/else 表達、無巢狀三元；union 以 `?: never` 補齊，全檔一致；`resolveStorageMode` 與 `pendingDataStatus` 不抽共用（一個回儲存模式、一個回顯示狀態）。
+
 ## 3. 顯示狀態、按鈕、選擇器、對戰頁與本機提示
 
 Depends on: §2
 
 - [x] 3.1 RED（TDD，E2E）：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts` 既有的訪客 describe 內新增 test「有上次登入提示而 session 請求失敗時先擋住畫面，按下先用這台裝置的資料後顯示本機名單與本機提示」「有上次登入提示而 session 請求網路中斷時顯示無法載入提示與按鈕」（寫法依 test-plan「E2E 共同要求」）。
-  - RED commit `1021096`。chromium 單檔 E2E：兩條新 test 紅（`main[data-sync-status="unavailable"]` 找不到），既有五條綠；regression guard：無。（首次嘗試因 heavy.py 排隊後 webServer 逾時 120s，非測試結果，重跑得上述結果。）
   雙鎖下 `--project=chromium` 跑該檔並貼出輸出：兩條新 test 紅、既有五條綠
+  - RED commit `1021096`。chromium 單檔 E2E：兩條新 test 紅（`main[data-sync-status="unavailable"]` 找不到），既有五條綠；regression guard：無。（首次嘗試因 heavy.py 排隊後 webServer 逾時 120s，非測試結果，重跑得上述結果。）
 - [x] 3.2 RED（TDD）：`nextjs-pickball/lib/sync/sync-status.test.ts` 新增 it「unavailable 取代內容，按鈕與本機提示文案為固定值」；`nextjs-pickball/components/sync/SyncStatusNotice.test.tsx` 新增 it「unavailable 顯示無法載入雲端資料與先用這台裝置的資料按鈕，按下後呼叫 chooseLocalFallback」。兩檔單檔 vitest 確認紅燈並貼出輸出
   - RED commit `1895de8`。sync-status：`isContentBlocked("unavailable")` 得 false；SyncStatusNotice：status 文字為空；皆真紅，regression guard：無。
 - [x] 3.3 GREEN（TDD）：`sync-status.ts` 的 `DataStatus` 加 `"unavailable"`、`isContentBlocked` 含它、新增兩個文案常數（design Decision 7）；`SyncStatusNotice` 依 design Decision 8 渲染 `unavailable`（加 `"use client"`）。
-  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。**coordinator 裁定：接受**——只改型別標註、行為不變，且不改則主 worktree 的 tsc 無法通過；不視為改寫既有 it（Stage 1 已核實只改標註）。
   為通過型別所需的最小改動：`hooks/useRoundStore.ts` 傳給雲端 hook 的名單狀態在 `unavailable` 時與 `pending` 同樣以 `loading` 傳入（design Decision 9）。3.2 全綠、兩檔既有 it 全綠；tsc exit 0
+  - GREEN commit `17ca0f4`（useRoundStore 的 `unavailable`→`loading` 對應併入 `2319c84`）。兩檔 6/6 綠。**注意**：既有 it「pending、loading、load-failed 取代內容…」的 `Record<DataStatus, boolean>` 型別標註會因 DataStatus 加值而 tsc 失敗，僅把該標註改為 `Record<Exclude<DataStatus, "unavailable">, boolean>`（名稱、斷言與其他 setup 不變），已在回報中請 coordinator 確認。**coordinator 裁定：接受**——只改型別標註、行為不變，且不改則主 worktree 的 tsc 無法通過；不視為改寫既有 it（Stage 1 已核實只改標註）。
 - [x] 3.4 RED（TDD）：`nextjs-pickball/hooks/useRosterStore.test.tsx` 新增三個 it——「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」「已登入使用中 session 轉為無法確認時不交出先前的雲端名單且操作不發請求」「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」。
-  - RED commit `6c6f9e6`。前兩個真紅（`pending`≠`unavailable`；殘留雲端名單 `[c1]`≠`[]`）；「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」寫入即綠，**regression guard**。
   單檔 vitest 貼出輸出：前兩個紅；第三個預期寫入即綠，點名標 regression guard
+  - RED commit `6c6f9e6`。前兩個真紅（`pending`≠`unavailable`；殘留雲端名單 `[c1]`≠`[]`）；「選擇先用這台裝置的資料後回傳本機名單且 syncStatus 為 local」寫入即綠，**regression guard**。
 - [x] 3.5 GREEN（TDD）：`useRosterStore` 等待中分支明確回傳空名單、`syncStatus` 為 `pendingDataStatus(session)`（design Decision 9）；更新「沿用未啟用的雲端 hook 結果，它從未啟用過」的註解。3.4 全綠、該檔既有 it 全綠；tsc exit 0
   - GREEN commit `0567708`。useRosterStore 19/19 綠。
 - [x] 3.6 RED（TDD）：`nextjs-pickball/hooks/useRoundStore.test.tsx` 新增 it「session 無法確認時 syncStatus 為 unavailable 且不回傳本機回合與歷史」。單檔 vitest 確認紅燈並貼出輸出
