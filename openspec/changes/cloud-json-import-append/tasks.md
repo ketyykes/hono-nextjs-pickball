@@ -120,16 +120,29 @@ Depends on: §3
 
 Depends on: §4
 
-- [ ] 5.1 RED（TDD，E2E；含 改寫既有 test ③）：`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端」（寫法依 test-plan「E2E 共同要求」與該列斷言，含預覽名單「新人丙」／「共同甲」與統計頁出場數），並依檔頭授權改寫 ③。
+- [x] 5.1 RED（TDD，E2E；含 改寫既有 test ③）：`nextjs-pickball/tests/e2e/user-data/local-import.spec.ts` 新增 test「登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端」（寫法依 test-plan「E2E 共同要求」與該列斷言，含預覽名單「新人丙」／「共同甲」與統計頁出場數），並依檔頭授權改寫 ③。
+  - RED commit `d270d04`（只改 `local-import.spec.ts`：新增 test「登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端」，並依授權 ③ 改寫既有 test「登入時以 JSON 備份匯入到空的雲端且不寫入本機」第二次選檔後的斷言；新增 `STATS_PAGE` 常數與 `buildHistoryEntryWithPlayers` helper，既有 helper 未動）。標註：新 test TDD 真紅；③ 改寫既有 test 真紅。
+  - 紅燈（雙鎖、`--project=user-data` 單檔）：`2 failed, 5 passed`。兩條紅皆為 `getByTestId('json-backup-append-confirm')` `toBeVisible` 逾時、element(s) not found（改寫的 ③ 在 :224，新 test 在 :285）；該檔其餘 5 個 test 全綠，`.dev.vars` 齊備未 skip。
+  - 機械複驗：`git show d270d04^:` 的 spec 不含新 test 名稱與 `json-backup-append-confirm`，且第 210 行為舊斷言 `getByText(CONFLICT_TEXT)).toBeVisible()`；RED commit 刪除的只有該行與其舊註解。無 regression guard。
   雙鎖下 `--project=user-data` 跑該檔並貼出輸出：新 test 與改寫的 ③ 紅（附加確認不存在）、該檔其餘 test 綠；`.dev.vars` 不齊備導致 skip 時停止並向 coordinator 索取
-- [ ] 5.2 RED（TDD）：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx` 新增 7 個 it——「雲端已有資料時顯示附加確認、預覽名單與四條說明，按下附加到雲端才以當下帳號送出附加請求」「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
+- [x] 5.2 RED（TDD）：`nextjs-pickball/components/matchmaker/JsonBackupSection.test.tsx` 新增 7 個 it——「雲端已有資料時顯示附加確認、預覽名單與四條說明，按下附加到雲端才以當下帳號送出附加請求」「附加確認按下取消或重新選檔時不送出附加請求並收起確認」
+  - RED commit `3fa9e1b`（只改 `JsonBackupSection.test.tsx`：新增 7 個 it 與附加流程的夾具 helper；既有 it 與既有 helper 未動，被替換的兩行僅為 `import` 行擴充）。tsc 為 exit 0（匯入的常數與函式 §4 已存在，非型別紅燈）。
+  - 紅燈（單檔 vitest）：`Tests 6 failed | 7 passed (13)`。前六個新 it 皆真紅：找不到 `json-backup-append-confirm`／`json-backup-append-no-new-players`，或現行 409 顯示 `cloudNotEmpty` 而非 `appendNothing`／`unauthorized`；既有 6 個 it 全綠。
+  - regression guard（寫入即綠）：「雲端沒有資料時照舊整份匯入且不顯示附加確認」。
+  - 機械複驗：`git show 3fa9e1b^:` 的測試檔不含任何新 it 名稱；產品檔 RED 前後未動。
   「附加請求未授權時刷新 session，資料過大與其他失敗顯示對應文案且不寫入本機」「備份沒有可附加的參賽者與歷史時顯示無可附加且不渲染附加按鈕」「附加確認在沒有會新增的參賽者時顯示提示且仍可附加歷史」
   「讀取雲端名單未授權時刷新 session，其他失敗顯示讀取失敗，兩者皆不顯示附加確認」「雲端沒有資料時照舊整份匯入且不顯示附加確認」。
   單檔 vitest 貼出輸出：前六個紅；最後一個預期寫入即綠，點名標 regression guard（與 5.3 同一張派工單）
-- [ ] 5.3 GREEN（TDD）：`components/matchmaker/JsonBackupSection.tsx` 的雲端分支依 delta spec「附加到雲端」與 design Decision 2、8、12 實作：409 後以選檔當下的 user id 呼叫 `fetchAppendPreview`、讀完才顯示附加確認（預覽兩份名單、名稱提醒、沒有新增者的提示；讀取 401 時 `refresh()`、其他失敗顯示 `appendPreviewFailed`，皆不顯示確認）、無可附加提示（不讀名單）、按下當下取 `useSession()` 的 user id、進行中停用兩顆按鈕、取消與重新選檔收起確認、`describeAppendOutcome` 顯示結果、401 時 `refresh()`；
+- [x] 5.3 GREEN（TDD）：`components/matchmaker/JsonBackupSection.tsx` 的雲端分支依 delta spec「附加到雲端」與 design Decision 2、8、12 實作：409 後以選檔當下的 user id 呼叫 `fetchAppendPreview`、讀完才顯示附加確認（預覽兩份名單、名稱提醒、沒有新增者的提示；讀取 401 時 `refresh()`、其他失敗顯示 `appendPreviewFailed`，皆不顯示確認）、無可附加提示（不讀名單）、按下當下取 `useSession()` 的 user id、進行中停用兩顆按鈕、取消與重新選檔收起確認、`describeAppendOutcome` 顯示結果、401 時 `refresh()`；
+  - GREEN commit `1834a60`（只動 `JsonBackupSection.tsx`）。單檔 13 個 it 全綠（含既有 6 個）；`local-import.test.ts`、`local-import-view.test.ts`、`LocalDataImportSection.test.tsx` 合計 35 tests 全綠；root `-r exec tsc --noEmit`、hono、core typecheck 皆 exit 0；改動的三個前端檔逐檔 ESLint 0 errors。雙鎖 `--project=user-data` 單檔 `local-import.spec.ts`：`7 passed`（5.1 兩條轉綠）。
+  - 實作：單一 `appendState`（`idle`／`confirm`／`appending`，後兩者共用 request 與 preview）；`selectionRef` 遞增計數，名單讀取、整份匯入與附加請求回來時若已不是同一次選檔即丟棄結果；按下附加時才取當下的 `userId`；結果以 `showImportView` 與整份匯入共用顯示。
   不寫本機、不重新載入。5.2 全綠、該檔既有 6 個 it 全綠；tsc exit 0；改動檔 ESLint 0 errors；雙鎖下 `--project=user-data` 跑 `local-import.spec.ts`，5.1 兩條轉綠、其餘綠
-- [ ] 5.4 REFACTOR：附加確認是否抽成同檔內的小元件（只有一處使用則不抽）；狀態（名單讀取中、確認中、附加請求進行中）是否以單一 state 表達、無互斥 boolean；重新選檔後才回應的名單讀取結果不覆寫新狀態；舊註解（「只有雲端沒有資料時才寫入」等）依新行為更新；無壞味道則註記 skipped
-- [ ] 5.5 驗收（E2E）：雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`，全數 passed、0 skipped，數量＝基線＋1；`--project=chromium` 跑 `tests/e2e/specs/` 中含 `JsonBackupSection` 或資料頁的 spec（以 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出），全綠
+- [x] 5.4 REFACTOR：附加確認是否抽成同檔內的小元件（只有一處使用則不抽）；狀態（名單讀取中、確認中、附加請求進行中）是否以單一 state 表達、無互斥 boolean；重新選檔後才回應的名單讀取結果不覆寫新狀態；舊註解（「只有雲端沒有資料時才寫入」等）依新行為更新；無壞味道則註記 skipped
+  - REFACTOR commit `5f912f1`：選檔處舊註解（「雲端名單不能被備份檔整份覆蓋…拒絕規則與匯入本機資料相同」）改為符合附加行為；附加確認只用一處故不抽小元件；狀態已是單一 `appendState`、無互斥 boolean；重新選檔後才回應的結果由 `selectionRef` 丟棄。ESLint 0 errors。
+  - 注意：test-plan 沒有「重新選檔後過期結果不覆寫」的 it（前端新 it 數固定為 7，C3 要求測試數＝基線＋13）；額外變異 X1（移除名單讀取後的過期檢查）、X2（移除附加請求後的）、X3（移除整份匯入後的）三條皆存活（13 passed），屬測試缺口，已誠實記錄，交 Stage 1／2 與 coordinator 裁定是否另補。
+- [x] 5.5 驗收（E2E）：雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`，全數 passed、0 skipped，數量＝基線＋1；`--project=chromium` 跑 `tests/e2e/specs/` 中含 `JsonBackupSection` 或資料頁的 spec（以 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出），全綠
+  - 雙鎖下 `--project=user-data` 跑全部 `tests/e2e/user-data/`：`49 passed`（基線 48＋1），0 skipped、0 failed；`--project=chromium` 跑 `grep -l "json-backup\|matchmaker/data" tests/e2e/specs` 列出的 `data-pending.spec.ts`、`matchmaker-data-transfer.spec.ts`：`22 passed`。E2E 前後 `lsof -i :3005 -i :8787` 與 `ps` 皆無殘留。
+  - mutation（單檔 vitest，每次三重落地檢查通過〔`count(old)==1`〔④ 為 2 處同改〕、`new != old`、`git diff --stat` 有輸出〕、還原後 `git status` 乾淨，輸出皆含 `Test Files`）：① 轉紅（6 failed）；② 紅（4）；③ 紅（1）；④ 紅（1）；⑤ 紅（1）；⑥ 紅（1）；⑦ 紅（1）；⑧ 紅（1）；⑨ 紅（3，regression guard 轉紅）；⑩ 附加成功後寫入本機 `matchmaker:roster:v1`：E2E 單檔（雙鎖）轉紅（`toEqual` 本機 key 不變斷言失敗）；⑪ 紅（1）；⑫ 紅（1）；⑬ 紅（1）；⑭ 紅（1）；⑮ 紅（1）。對照組 A（`selectionRef.current += 1` 改寫為 `++selectionRef.current`）、B（`added.length === 0` 改 `< 1`）維持綠。額外變異 X1～X3（過期結果檢查）存活，見 5.4。
 - [ ] 5.6 Stage 1（sonnet）→ Stage 2（opus）審查 §5：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
 
 ## 6. 文件、指令驗收與合併前流程
