@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MatchHistoryEntrySchema } from "../matchmaker/history";
+import { MatchHistoryEntrySchema, type MatchHistoryEntry } from "../matchmaker/history";
 import { BackupSchema } from "../matchmaker/transfer-types";
 import { MAX_PLAYERS_PER_IMPORT, PlayerWriteSchema } from "./players";
 import { MatchSlotSchema } from "./round";
@@ -99,6 +99,17 @@ export interface ImportSegments {
   current: string;
 }
 
+/** 歷史段的 json_each 參數；整份匯入與附加共用同一個函式，兩邊的歷史段才會逐字相同。 */
+function serializeHistorySegment(history: MatchHistoryEntry[]): string {
+  return JSON.stringify(
+    history.map((data) => ({
+      matchId: data.matchId,
+      playedAt: Date.parse(data.playedAt),
+      data,
+    })),
+  );
+}
+
 /**
  * 產生送進 D1 json_each 的五段 JSON。
  * 前後端都用這個函式量測與送出，量測的字串與寫入的字串才不會漂移。
@@ -110,13 +121,7 @@ export function serializeImportSegments(request: LocalImportRequest): ImportSegm
     ),
     round: JSON.stringify(request.currentRound === null ? [] : [{ data: request.currentRound }]),
     slots: JSON.stringify(request.scoreboard.matches.map((data) => ({ matchId: data.matchId, data }))),
-    history: JSON.stringify(
-      request.history.map((data) => ({
-        matchId: data.matchId,
-        playedAt: Date.parse(data.playedAt),
-        data,
-      })),
-    ),
+    history: serializeHistorySegment(request.history),
     current: JSON.stringify(
       request.scoreboard.current === null ? [] : [{ data: request.scoreboard.current }],
     ),
@@ -237,13 +242,7 @@ export function serializeAppendSegments(request: AppendImportRequest): AppendSeg
   return {
     players: JSON.stringify(uniquePlayers.map((data) => ({ id: data.id, data }))),
     playerNames: JSON.stringify(request.players.map((player) => ({ id: player.id, name: player.name }))),
-    history: JSON.stringify(
-      request.history.map((data) => ({
-        matchId: data.matchId,
-        playedAt: Date.parse(data.playedAt),
-        data,
-      })),
-    ),
+    history: serializeHistorySegment(request.history),
   };
 }
 
