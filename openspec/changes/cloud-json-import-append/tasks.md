@@ -28,14 +28,19 @@
 
 ## 1. 對齊與基線（不寫產品程式碼）
 
-- [ ] 1.1 確認分支 `change/cloud-json-import-append`、工作樹除本 change artifact 外乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
+- [x] 1.1 確認分支 `change/cloud-json-import-append`、工作樹除本 change artifact 外乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball db:migrate:local` 成功；
   雙鎖下跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck（test-plan C1）、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（errors／warnings 數）、
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --list`（六個 project 各自數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：確認 proposal Impact 列出的產品檔與測試檔自 `cad7de9` 後未被其他提交改動（`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat cad7de9 HEAD -- packages/pickball-core hono-pickball nextjs-pickball/{lib,components,tests}` 只含本 change 的提交）；
+- [x] 1.2 對齊 main：確認 proposal Impact 列出的產品檔與測試檔自 `cad7de9` 後未被其他提交改動（`git -C /Users/m2_24gb/Desktop/project/nextjs-pickball diff --stat cad7de9 HEAD -- packages/pickball-core hono-pickball nextjs-pickball/{lib,components,tests}` 只含本 change 的提交）；
   以 python difflib 比對本 change 四個 MODIFIED Requirement（`user-data-sync` 三個、`data-transfer` 一個）與目前主 spec，除本 change 刻意增修外應無差異；**若主 spec 已被其他 change 改動，以主 spec 為底重新套用本 change 的增修**，
   `DO_NOT_TRACK=1 openspec validate cloud-json-import-append --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions。
   另以 Context7 查證並把結果記在本 task 後方：drizzle（0.45.2）sqlite 的 `db.insert(t).select(sql\`…\`)` 能否搭配 `.onConflictDoNothing()` 與 `.returning()`、在 `db.batch()` 中帶 `.returning()` 的結果形狀；
   D1 對 `json_each`／`json_set`／`json_group_array`／`->>` 與 CTE 的支援（design Decision 4、11 的假設）。與 design 假設不符時停止並回報
+  - 1.1 結果記於 environment.md Verification（全綠、與上一個 change 的最終 gate 數字一致）。
+  - 1.2 對齊：`git diff --stat cad7de9 HEAD -- packages/pickball-core hono-pickball nextjs-pickball/{lib,components,tests} openspec/specs` 為空（`cad7de9..HEAD` 只有本 change artifact `081b9e4`）。以 python 逐行比對四個 MODIFIED Requirement 與主 spec：主 spec 中不在 delta 的行為 user-data-sync 三個各 2 行、data-transfer 5 行，全為本 change 刻意改寫（守衛路由數 15→16、批次寫入端點清單、版本下限的建立與重置條文、JSON 還原列與雲端語意段落），無誤刪；主 spec 未被其他 change 改動，不需重套。
+  - Context7 查證（coordinator）：
+    - drizzle（`/drizzle-team/drizzle-orm-docs`）：sqlite `insert().select(sql\`…\`)` 支援 SQL template 形式；搭配 upsert（`onConflictDoNothing`）時 SELECT 須帶 `WHERE`（文件明載解析歧義，`WHERE true` 即可）；`db.batch()` 中帶 `.returning()` 的陳述式回傳列陣列、其餘回 `D1Result`（v0.29.0 batch 範例的 tuple 型別）；v1 RC 修正了 `insert().select().returning()` 的 `.get()` 型別，`.all()` 形狀不受影響。與 design Decision 4 一致。
+    - D1（`/llmstxt/developers_cloudflare_d1_llms-full_txt`）：Query JSON 文件列出 `json_each(value, path)`、`json_set`、`json_group_array`、`->>`、`json_extract` 為支援函式；`batch()` 依序執行、任一失敗整批回滾，回傳與陳述式同序的 `D1Result`，`results` 為 RETURNING 列。CTE（`WITH`）文件未逐條列出，屬 SQLite 標準語法，propose 階段已於本機 D1 實測可用；正式 D1 無法於本機驗證（design Risks 已記）。`meta.changes` 欄位存在但未定義 ON CONFLICT 時的語意，維持 Decision 以 RETURNING 列數計數。與 design 假設相符，不停止。
 
 ## 2. 核心附加契約（`@pickball/core/api/import`）
 

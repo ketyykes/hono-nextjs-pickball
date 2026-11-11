@@ -28,7 +28,8 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**：待 §1.1 實跑後回填（雙鎖；記錄三個 workspace 的檔數／測試數、三段 typecheck、lint errors／warnings、`playwright test --list` 六個 project 各自數量、`pnpm install` 後 lockfile 是否零變動、`db:migrate:local` 結果）。
+- **Baseline tests**（§1.1 實跑，2026-11-12，HEAD `081b9e4`，雙鎖）：`pnpm install` exit 0、lockfile 零變動；`db:migrate:local` exit 0；全套 test exit 0——前端 119 檔／1184 tests、後端 27／223、核心 10／27；
+  三段 typecheck（root `pnpm typecheck`、後端、核心）皆 exit 0；lint exit 0（0 errors／3 warnings）；`playwright test --list` 共 883 tests／27 files：chromium、firefox、webkit、mobile-chrome、mobile-safari 各 167，user-data 48。
   參考值（上一個 change 合併前的最終 gate，HEAD `20e9f2a`）：前端 119 檔／1184 tests、後端 27／223、核心 10／27；三段 tsc exit 0；lint 0 errors／3 warnings；E2E chromium、firefox、mobile-chrome、webkit、mobile-safari 各 167，user-data 48。
 - **Initial commit hash**：`cad7de9`（`change/cloud-json-import-append` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
