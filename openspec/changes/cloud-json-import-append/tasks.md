@@ -186,4 +186,8 @@ Depends on: §5
   - verify 第二輪（opus，2026-11-12）：CRITICAL 0、WARNING 1、SUGGESTION 1；第一輪處置複核到位（W1 對照後端測試一致、W2「附加請求失敗」一致、S1、S2 到位），76 個錨點逐字存在。處置（coordinator，只動 delta spec）：
     W-1「取消附加或重新選檔」新增的兩條 AND 與 GIVEN 的回應序列（409、409、200）矛盾 → 註明四段各自重新 render，逐段寫明回應序列與晚到對象（含 ② 不讀名單、清除段的 200／409／409 與不支援版本檔的驗證失敗 alert），逐行對照 `JsonBackupSection.test.tsx` 的四段 setup。
     S-1「略過者 id 改寫」仍寫「兩筆歷史」→ 改為三筆（`r1`～`r3`），`r3` 補「除 id 外與請求深度相等」。
+  - verify 第三輪（opus，2026-11-12）：CRITICAL 0、WARNING 1、SUGGESTION 2；前兩輪處置複核到位，76 個錨點逐字存在。處置：
+    W1 E2E 雲端種子與備份同為 `buildPendingRound()`，「雲端回合 data 不變」無鑑別力 → `b61e976` 備份回合改為 `roundNumber: 2`（regression guard），雙鎖單檔 `--project=user-data` `local-import.spec.ts` 7 passed、0 skipped；只動 E2E 測試檔，產品碼仍與 gate（`2d5fd5c`）相同。
+    S1 test-plan 與 spec 用語未跟上第二輪處置 → `8363d3e` 同步（四段重新 render、`r3` 深度相等與三筆、E2E 回合區分）。
+    S2 Decision 9 的元件層 reload 斷言未落實 → 改以 E2E `expectNotReloaded` 為準，tasks 5.3 補註（`8363d3e`）。
 - [ ] 6.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/cloud-json-import-append`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定；部署順序先 `hono-pickball` 後 `nextjs-pickball`）
