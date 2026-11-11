@@ -184,15 +184,15 @@ hydration 完成後 React 依 client 快照重新 render，此時才反映提示
 #### Scenario: 無法確認之後晚到的回應仍照常採用
 
 - **GIVEN** localStorage 有上次登入提示；`fetchSession` 回傳一個由測試控制完成時機的 Promise；使用 fake timers
-- **WHEN** 訂閱後推進 10 秒（快照改為無法確認），再讓該請求回應已登入使用者
-- **THEN** 快照轉為 `{ status: "ready", authEnabled: true, user: <該使用者> }` 並通知訂閱者；提示仍在
+- **WHEN** 訂閱後推進 10 秒（快照改為無法確認），再讓該請求回應已登入使用者；另一輪中（重設 store）同樣逾時後，讓進行中的請求才回 `null`
+- **THEN** 快照轉為 `{ status: "ready", authEnabled: true, user: <該使用者> }` 並通知訂閱者；提示仍在；另一輪中快照維持同一個無法確認參考、提示仍在
 - **驗收**：`nextjs-pickball/lib/auth/session-store.test.ts`，it 名稱「無法確認之後才到達的 session 回應仍照常採用」
 
 #### Scenario: 選擇本機備援後丟棄進行中請求的結果
 
 - **GIVEN** localStorage 有上次登入提示；`fetchSession` 回傳一個由測試控制完成時機的 Promise；使用 fake timers；訂閱後推進 10 秒，快照為無法確認
-- **WHEN** 呼叫 `chooseLocalFallback()`，再讓先前的請求回應已登入使用者；之後把 `fetchSession` 改為回傳已登入使用者並呼叫 `refresh()`
-- **THEN** 呼叫後快照為 `{ status: "loading", localFallback: true }`、再讀一次為同一個參考、訂閱者被通知、提示仍在；先前請求的回應到達後快照不變；`refresh()` 完成後快照為已登入的 ready
+- **WHEN** 呼叫 `chooseLocalFallback()`，再讓先前的請求回應未登入（`{ authEnabled: true, user: null }`）；之後讓 `fetchSession` 回 `null` 並呼叫 `refresh()`；再把 `fetchSession` 改為回傳已登入使用者並呼叫 `refresh()`
+- **THEN** 呼叫後快照為 `{ status: "loading", localFallback: true }`、再讀一次為同一個參考、訂閱者被通知、提示仍在；先前請求的回應到達後快照不變**且提示仍在**（被丟棄的回應不清除提示）；`refresh()` 回 `null` 時快照回到無法確認、提示仍在；最後一次 `refresh()` 完成後快照為已登入的 ready
 - **驗收**：`nextjs-pickball/lib/auth/session-store.test.ts`，it 名稱「chooseLocalFallback 在無法確認時改為本機備援並丟棄進行中請求的結果」
 
 #### Scenario: 不是無法確認時選擇本機備援沒有效果

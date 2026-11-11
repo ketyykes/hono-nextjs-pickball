@@ -336,7 +336,7 @@ session 請求失敗或帶提示等待逾時 SHALL NOT 結束它（改為無法�
 
 - **GIVEN** `matchmaker:roster:v1` 有一位參賽者；mock `useSession` 為 `{ status: "loading", signedInHint: true, unavailable: true, hydrated: true }`
 - **WHEN** `useRosterStore()` mount 後呼叫 `addPlayer`
-- **THEN** `players` 為空陣列、`syncStatus` 為 `unavailable`；`matchmaker:roster:v1` 解析後仍只有原本那一位；沒有任何 `fetch`
+- **THEN** `players` 為空陣列、`droppedCount` 為 0、`syncStatus` 為 `unavailable`；`matchmaker:roster:v1` 解析後仍只有原本那一位；沒有任何 `fetch`
 - **驗收**：`nextjs-pickball/hooks/useRosterStore.test.tsx`，it 名稱「session 無法確認時 syncStatus 為 unavailable 且不回傳本機名單也不發請求」
 
 #### Scenario: 已登入使用中轉為無法確認時名單選擇器不交出先前的雲端名單
