@@ -148,7 +148,7 @@
 
 ### Decision 11：歷史球員 id 的改寫在後端同一條 SQL 內完成
 
-**Choice**：核心 `serializeAppendSegments` 多產生一段**參賽者對照段**（請求中全部參賽者、不去重的 `[{ id, name }]`）。歷史那條陳述式先以 CTE 建出 id 對應表——對照段中「id 不在本人雲端名單」的每一位，對應到本人雲端名單（此時已含第一條陳述式新增的列）中同名、`sort_order` 最小者的 id——
+**Choice**：核心 `serializeAppendSegments` 多產生一段**參賽者對照段**（請求中全部參賽者、不去重的 `[{ id, name }]`；§2 實作的欄位名為 `AppendSegments.playerNames`，與 `players`、`history` 兩段並列）。歷史那條陳述式先以 CTE 建出 id 對應表——對照段中「id 不在本人雲端名單」的每一位，對應到本人雲端名單（此時已含第一條陳述式新增的列）中同名、`sort_order` 最小者的 id——
 再以 `json_set(value, '$.teamA.players', (SELECT json_group_array(json_set(t.value, '$.id', coalesce(<對應 id>, t.value ->> '$.id'))) FROM (SELECT value FROM json_each(value, '$.teamA.players') ORDER BY key) t), '$.teamB.players', …)` 產生寫入的 `data`。
 規則全文見 delta spec「歷史中的球員 id 改寫」①②③。propose 階段已以 `wrangler d1 execute --local` 實跑此寫法的 SELECT 部分（2026-11-11；CTE 以 `VALUES` 代替名單表）：`b1`→`c1`、`b9`→`b2`、不在名單的 `z1` 不變，姓名、分數與順序保留。
 

@@ -185,6 +185,7 @@ export const AppendImportRequestSchema = z
     history: z.array(MatchHistoryEntrySchema),
   })
   .superRefine((data, ctx) => {
+    // 附加端點以 ON CONFLICT DO NOTHING 略過已存在的列；請求內重複若放行，會被當成「略過」悄悄吞掉而計數失真，所以在契約層拒絕。
     const playerIds = data.players.map((player) => player.id);
     if (new Set(playerIds).size !== playerIds.length) {
       ctx.addIssue({ code: "custom", message: "players 內的 id 不可重複", path: ["players"] });

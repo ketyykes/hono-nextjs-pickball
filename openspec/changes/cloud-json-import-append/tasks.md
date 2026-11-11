@@ -57,7 +57,10 @@ Depends on: §1
 - [x] 2.3 REFACTOR：歷史段與 `serializeImportSegments` 是否共用私有 helper（預期共用，確保逐字相同）；重複判定（參賽者 id、`matchId`）是否與既有 `LocalImportRequestSchema` 的寫法一致；無壞味道則註記 skipped
   - REFACTOR commit `133f604`：抽出私有 `serializeHistorySegment`，整份匯入與附加共用（歷史段逐字相同）；重複判定（參賽者 id、`matchId`）的寫法與 `LocalImportRequestSchema` 一致，不另動。測試仍全綠、typecheck exit 0。
   - mutation（單檔雙檔 vitest，三重落地檢查通過、每次還原後 `git status` 乾淨）：① 參賽者段不去重 紅；② 同名保留最後一位 紅；③ 對照段改為去重後名單 紅；④ 500 位以去重後筆數判定 紅；⑤ 不判定對照段上限 紅；⑥ 三段改以加總判定 紅；⑦ 不拒絕兩段皆空 紅；⑧ 不拒絕重複 `matchId` 紅；對照組（去重 `Set` 改 `Map`）維持綠。
-- [ ] 2.4 Stage 1（sonnet）→ Stage 2（opus）審查 §2：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+- [x] 2.4 Stage 1（sonnet）→ Stage 2（opus）審查 §2：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+  - Stage 1（sonnet）：PASS，無必修。複驗 RED `7e293e1`（`7e293e1^` 產品檔與測試檔皆不含 `Append`）、GREEN 只動 `src/api/import.ts`、`9e11b6d` 只修夾具不改斷言語意；mutation ①～⑧＋2 條額外皆紅、對照組綠。建議：回應 schema 只拿掉 `added` 的 `.int()` 或 `skipped` 的 `.nonnegative()` 會存活；`playerNames` 欄位名未寫進 design。
+  - Stage 2（opus）：PASS，無必修。獨立 mutation 20 條（①～⑧ 與 10 條額外）紅、兩條對照組綠，同樣僅上述兩條存活。建議同 Stage 1，另建議為附加請求的重複檢查補「為什麼」註解。
+  - 處置（coordinator）：既有新 it「AppendImportResponseSchema 只接受新增與略過筆數的固定形狀」補四欄位逐一 `-1`／`1.5` 斷言（regression guard），兩條原存活變異改為轉紅（各 1 failed）後還原；`AppendImportRequestSchema` 的 superRefine 補註解；design Decision 11 註明欄位名 `AppendSegments.playerNames`。核心 typecheck exit 0。
 
 ## 3. 後端附加端點（hono-pickball）
 
