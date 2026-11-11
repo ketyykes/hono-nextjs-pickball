@@ -20,6 +20,7 @@ const MATCHMAKER_PAGE = "/matchmaker";
 const PLAYERS_PAGE = "/matchmaker/players";
 const HISTORY_PAGE = "/matchmaker/history";
 const DATA_PAGE = "/matchmaker/data";
+const STATS_PAGE = "/matchmaker/stats";
 const SCOREBOARD_CURRENT_API = "/api/scoreboard/current";
 const SYNCED = '[data-sync-status="synced"]';
 const HISTORY_CARDS = '[data-testid^="history-record-"][data-slot="card"]';
@@ -77,6 +78,19 @@ function buildHistoryEntry(matchId: string, nameA: string, nameB: string) {
 		scoreA: 11,
 		scoreB: 4,
 		winner: "teamA" as const,
+	};
+}
+
+// 歷史的球員 id 由呼叫端指定：附加時歷史中的球員 id 會被改寫，測試需要控制備份與雲端各自的 id
+function buildHistoryEntryWithPlayers(
+	matchId: string,
+	playerA: { id: string; name: string },
+	playerB: { id: string; name: string },
+) {
+	return {
+		...buildHistoryEntry(matchId, playerA.name, playerB.name),
+		teamA: { rating: 3, players: [{ ...playerA, ratingBefore: 3, ratingAfter: 3.2 }] },
+		teamB: { rating: 3, players: [{ ...playerB, ratingBefore: 3, ratingAfter: 2.8 }] },
 	};
 }
 
@@ -205,9 +219,10 @@ test.describe("本機資料匯入雲端", () => {
 		await expectNotReloaded(page);
 		expect(await readLocalKeys(page)).toEqual(before);
 
-		// 雲端已有資料後再匯入同一份備份：與匯入本機資料相同，拒絕且不覆寫、不合併
+		// 雲端已有資料後再匯入同一份備份：改顯示附加確認而非拒絕文案；這裡不按附加，雲端與本機皆不變
 		await page.getByTestId("json-backup-cloud-import-input").setInputFiles(buildBackupFile());
-		await expect(page.getByText(CONFLICT_TEXT)).toBeVisible();
+		await expect(page.getByTestId("json-backup-append-confirm")).toBeVisible();
+		await expect(page.getByText(CONFLICT_TEXT)).toHaveCount(0);
 		await expect(page.getByTestId("json-backup-import-message")).toHaveCount(0);
 		await expectNotReloaded(page);
 		expect(await readLocalKeys(page)).toEqual(before);
@@ -222,6 +237,91 @@ test.describe("本機資料匯入雲端", () => {
 			(player) => player.name,
 		);
 		expect(localNames).toEqual(["不同的訪客"]);
+	});
+
+	test("登入時雲端已有資料時以 JSON 備份附加參賽者與歷史且不覆寫雲端", async ({ page }) => {
+		const headers = await expectedUserHeaders(page.request);
+		const cloudCommon = buildPlayer("lp1", "共同甲");
+		const cloudOther = buildPlayer("lp2", "雲端乙");
+		const seeded = await page.request.post("/api/import", {
+			headers,
+			data: {
+				version: 1,
+				players: [cloudCommon, cloudOther],
+				currentRound: buildPendingRound(),
+				history: [buildHistoryEntryWithPlayers("ch1", cloudCommon, cloudOther)],
+				scoreboard: { current: null, matches: [] },
+			},
+		});
+		expect(seeded.ok(), `種入雲端資料失敗：${seeded.status()}`).toBe(true);
+		const roundBefore = (await (await page.request.get("/api/matchmaker/round", { headers })).json()) as unknown;
+
+		// 備份的「共同甲」id 與雲端不同、rating 為 5；bh2 由備份的「共同甲」與「新人丙」對戰
+		const backupCommon = { ...buildPlayer("bp1", "共同甲"), rating: 5 };
+		const backupNew = buildPlayer("bp2", "新人丙");
+		const backup = {
+			version: 1,
+			players: [backupCommon, backupNew],
+			currentRound: buildPendingRound(),
+			history: [
+				buildHistoryEntryWithPlayers("ch1", backupCommon, backupNew),
+				buildHistoryEntryWithPlayers("bh2", backupCommon, backupNew),
+			],
+		};
+
+		await page.goto(DATA_PAGE);
+		// 雲端分支才有的說明，作為「session 已就緒、已切到雲端分支」的同步點
+		await expect(page.getByText(JSON_CLOUD_IMPORT_HINT_TEXT)).toBeVisible();
+		const before = await readLocalKeys(page);
+		await markNoReload(page);
+
+		await page.getByTestId("json-backup-cloud-import-input").setInputFiles({
+			name: "matchmaker-backup-append.json",
+			mimeType: "application/json",
+			buffer: Buffer.from(JSON.stringify(backup), "utf-8"),
+		});
+
+		const confirm = page.getByTestId("json-backup-append-confirm");
+		await expect(confirm).toBeVisible();
+		await expect(confirm).toContainText("2 位參賽者、2 筆歷史");
+		await expect(page.getByTestId("json-backup-append-rules").getByRole("listitem")).toHaveCount(4);
+		await expect(page.getByTestId("json-backup-append-new-players").getByRole("listitem")).toHaveText(["新人丙"]);
+		await expect(page.getByTestId("json-backup-append-matched-players").getByRole("listitem")).toHaveText([
+			"共同甲",
+		]);
+
+		await page.getByRole("button", { name: "附加到雲端", exact: true }).click();
+
+		await expect(page.getByTestId("json-backup-import-message")).toHaveText("已新增 1 位參賽者、1 筆歷史。");
+		await expect(page.getByTestId("json-backup-import-message-note")).toHaveText(
+			"略過同名或已在雲端的參賽者 1 位、略過已在雲端的歷史 1 筆。",
+		);
+		await expect(confirm).toHaveCount(0);
+		await expectNotReloaded(page);
+		expect(await readLocalKeys(page)).toEqual(before);
+
+		await page.goto(PLAYERS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.locator("p.truncate")).toHaveText(["共同甲", "雲端乙", "新人丙"]);
+		const playersResponse = await page.request.get("/api/matchmaker/players", { headers });
+		const { items } = (await playersResponse.json()) as {
+			items: { data: { id: string; name: string; rating: number } }[];
+		};
+		expect(items.map((item) => item.data.name)).toEqual(["共同甲", "雲端乙", "新人丙"]);
+		expect(items[0].data.rating).toBe(3);
+
+		await page.goto(HISTORY_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.locator(HISTORY_CARDS)).toHaveCount(2);
+
+		// 統計以球員 id 為鍵：附加的 bh2 已改寫到雲端「共同甲」身上，不會多出以備份 id 為鍵的列
+		await page.goto(STATS_PAGE);
+		await expect(page.locator(SYNCED)).toBeVisible();
+		await expect(page.getByTestId("player-stat-row-lp1").getByRole("cell").nth(3)).toHaveText("2");
+		await expect(page.getByTestId("player-stat-row-bp1")).toHaveCount(0);
+
+		const roundAfter = (await (await page.request.get("/api/matchmaker/round", { headers })).json()) as unknown;
+		expect(roundAfter).toEqual(roundBefore);
 	});
 
 	test("登入時以超過 500 位參賽者的 JSON 備份匯入雲端時顯示資料量超過上限且雲端不寫入", async ({ page }) => {
