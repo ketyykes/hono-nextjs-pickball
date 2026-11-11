@@ -154,7 +154,7 @@ Depends on: §4
   - 指令：C10 `grep -rn "fetchSession(" …/{app,components,hooks,lib} | grep -v "\.test\." | grep -v "export async function"`。結果：只有 `lib/auth/session-store.ts:88`，與預期一致。
 - [x] 5.12 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
   - Final Code Review（opus）：第一次 FAIL，唯一必修為 `nextjs-pickball/CLAUDE.md` 把 `pendingDataStatus` 寫在 `sync-status` 名下（實際在 `storage-mode.ts`）；建議兩項：`session-store.ts` 型別註解未提 `LocalFallbackBanner` 直接讀 `localFallback`、tasks 3.3 未記 coordinator 裁定。三項皆已修正（本 task 的 commit）。程式碼無必修；C6、C7、C8、C10 由 reviewer 重跑一致；範圍 ⊆ Impact、主 spec 無改動、新 it 21 個與 gate 計數一致。修正只涉及文件與註解，不需重跑 gate。
-- [ ] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
+- [x] 5.13 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
   - verify 第一輪（opus，2026-11-11）：CRITICAL 0、WARNING 1、SUGGESTION 7。處置：
     W1 §1.2 Context7 查證未記錄 → 補記於 1.2（`c8dfa4c`）。
     S1 本機提示 `z-[100]` 會蓋住計分板專注模式操作列（z-40）並浮在對話框遮罩（z-50）之上、窄螢幕兩行 → 規格／design／test-plan 改為 `z-30` 並更正風險敘述（`c8dfa4c`），程式 TDD 修正（`63abb06` RED、`2372c68` GREEN）。
@@ -199,4 +199,6 @@ Depends on: §4
     S1 第二輪另兩處補強斷言（逾時後才回 `null` 維持同一參考；名單無法確認時 `droppedCount` 為 0）未寫進 spec／test-plan → 同步。
   - verify 第四輪（opus，2026-11-11）：CRITICAL 0、WARNING 0、SUGGESTION 1；逐條核對 23 個新 Scenario 與 3 個改寫 Scenario 的 GIVEN／WHEN／THEN 與驗收 it 皆一致，130 個驗收錨點逐字存在。處置：
     S1 按鈕 `type="button"` 的斷言（`020dc49`）未寫進 Scenario THEN 與 test-plan → 同步（只動文件）。
+  - 最新產品程式碼的完整 gate（coordinator，HEAD `20e9f2a`，含第二輪全部程式修正；之後的 `f9f5735`、`78fe44c` 只動 openspec 文件，`git diff --stat 20e9f2a HEAD -- nextjs-pickball hono-pickball packages` 為空）：lint 0 errors／3 warnings；三段 tsc exit 0；前端 119 檔／1184、核心 10／27、後端 27／223；E2E chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55、user-data 48，全數 exit 0；build exit 0；porcelain 空。
+  - 結論：第四輪 CRITICAL／WARNING 皆 0，唯一 SUGGESTION 已處理；可封存。
 - [ ] 5.14 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/session-hint-failure-no-local-fallback`，合併後由 coordinator 執行 archive；**不 push**（push 即觸發正式站部署，由使用者決定）
