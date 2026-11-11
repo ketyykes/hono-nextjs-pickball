@@ -16,7 +16,7 @@ export interface SyncStatusNoticeProps {
 	className?: string;
 }
 
-const NOTICE_CLASS =
+export const NOTICE_CLASS =
 	"rounded-lg border border-border bg-card px-4 py-2 text-center text-sm font-medium text-foreground shadow-md";
 
 // 同步狀態提示：只有需要使用者注意的狀態才有文案；沒有文案（含本機模式）時

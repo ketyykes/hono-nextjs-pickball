@@ -1,6 +1,7 @@
 // components/sync/LocalFallbackBanner.tsx
 "use client";
 
+import { NOTICE_CLASS } from "@/components/sync/SyncStatusNotice";
 import { useSession } from "@/hooks/useSession";
 import { LOCAL_FALLBACK_NOTICE } from "@/lib/sync/sync-status";
 
@@ -16,10 +17,7 @@ export function LocalFallbackBanner() {
 
 	return (
 		<div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 print:hidden [.sb-focus_&]:bottom-16">
-			<div
-				role="status"
-				className="rounded-lg border border-border bg-card px-4 py-2 text-center text-sm font-medium text-foreground shadow-md"
-			>
+			<div role="status" className={NOTICE_CLASS}>
 				{LOCAL_FALLBACK_NOTICE}
 			</div>
 		</div>
