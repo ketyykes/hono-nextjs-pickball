@@ -89,7 +89,10 @@ Depends on: §2
 - [x] 3.4 REFACTOR：附加與整份匯入共用的 json_each 寫法（`selectFromJsonEach` 等）是否沿用而非複製；兩條 SQL 的略過條件與 id 對應 CTE 是否有註解說明「為什麼」（同一條陳述式看不到自己的插入、第二條看得到第一條）；無壞味道則註記 skipped
   - skipped：附加的兩條 SQL 的欄位抽取、過濾與改寫都與 `selectFromJsonEach` 不同（需 `NOT EXISTS`、窗函式、CTE、`json_set`），強行共用會讓 helper 多出一堆參數，故不抽、不複製；兩條 SQL 的「為什麼」（同條陳述式看不到自己的插入、第二條看得到第一條、`MATERIALIZED` 只算一次）已寫在函式註解與 CTE 註解。無壞味道，未產生 `refactor:` commit。
   - REFACTOR commit `3a30362`（Stage 2 建議）：參賽者 id 排除條件由 `json_extract(j.value, '$.data.id')` 統一為與插入欄位相同的 `'$.id'`；同檔、整份匯入與守衛測試 42 個全綠、typecheck exit 0；mutation ②、對照 B 於新寫法下重跑結果不變。
-- [ ] 3.5 Stage 1（sonnet）→ Stage 2（opus）審查 §3：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+- [x] 3.5 Stage 1（sonnet）→ Stage 2（opus）審查 §3：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選
+  - Implementer 首次交件 DONE_WITH_CONCERNS：⑨（只改寫 teamA）、⑪（對應表不排除已在雲端 id）存活 → coordinator 裁定擴充既有新 it「歷史 id 改寫」補 teamB 改寫與「id 已在雲端且與雲端另一位同名」情境（`272d56b`，regression guard），兩條轉紅。
+  - Stage 1（sonnet）：PASS，無必修。複驗 RED（`3cfde3e^` 產品檔下 12 failed | 3 passed）、15 個錨點逐字相同；建議：id_map 兩處子查詢拿掉 `user_id`（X、Y）存活，有跨使用者改寫風險 → 擴充既有新 it「B 的附加不受 A 的資料影響且不改動 A」（`ffa5911`、`27bfeb4`，首版 fixture 的 `c1` 與他 it 碰巧相同使 X 存活，改為 `cb2`），X、Y 轉紅。
+  - Stage 2（opus）：PASS，無必修。獨立 mutation 28 條＋對照 6 條；確認所有子查詢帶 `user_id`、id_map MATERIALIZED 只算一次、第二條陳述式可見第一條新增列、`json_group_array` 順序已由雙打陣列斷言鎖住、batch RETURNING 形狀與計數有鎖、無 `db.run`／`db.all`／`meta.changes`。建議：① 大小寫同名未鎖（Z9 存活）② sort_order 子查詢的 `user_id` 未鎖（Z2 存活，行為上等價）③ id 排除寫法 `$.data.id` 與插入欄位不一致。處置：`f4e2721`（regression guard：雲端 `Ann`／附加 `ann` 會新增；B 新增者 sort_order＝B 原最大值＋1），Z9、Z2 轉紅；`3a30362` refactor 統一為 `$.id`（三檔 42 tests 綠）；②b 為 `ON CONFLICT` 互為備援的等價變異，不處理。
 
 ## 4. 前端請求函式與文案（lib／view 層）
 
