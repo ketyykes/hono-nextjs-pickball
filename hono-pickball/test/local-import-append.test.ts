@@ -316,6 +316,16 @@ describe("POST /api/import/append 本機備份附加到雲端", () => {
 		const caseResult = await appendOk(caseCookie, { players: [makePlayer("case-new", { name: "ann" })], history: [] });
 		expect(caseResult.appended.players).toEqual({ added: 1, skipped: 0 });
 		expect(await listPlayerIds(caseCookie)).toEqual(["case-cloud", "case-new"]);
+
+		// 全形與中間空白同樣視為不同人而新增
+		const widthCookie = await seedAndSignIn("append-samename-width@example.com");
+		await putPlayer(widthCookie, makePlayer("width-cloud", { name: "Ann" }));
+		const widthResult = await appendOk(widthCookie, {
+			players: [makePlayer("width-full", { name: "Ａnn" }), makePlayer("width-space", { name: "A nn" })],
+			history: [],
+		});
+		expect(widthResult.appended.players).toEqual({ added: 2, skipped: 0 });
+		expect(await listPlayerIds(widthCookie)).toEqual(["width-cloud", "width-full", "width-space"]);
 	});
 
 	it("附加的歷史中因同名而略過的參賽者 id 改寫為雲端同名者的 id，其餘欄位不變", async () => {
