@@ -49,13 +49,20 @@ Depends on: §1
 ## 3. 指令驗收與合併前流程
 Depends on: §2
 
-- [ ] 3.1 驗收（指令）C1：三段 typecheck 皆 exit 0
-- [ ] 3.2 驗收（指令）C2：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖）0 errors、warning 不多於基線
-- [ ] 3.3 驗收（指令）C3：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖）三組皆綠；前端測試數與檔數＝基線
-- [ ] 3.4 驗收（指令）C4：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖）exit 0；建置後 `git status --porcelain` 為空
-- [ ] 3.5 驗收（指令）C6：產品碼、測試與兩個 workspace 範圍內不再出現舊文案（test-plan C6 的 grep 無輸出）
-- [ ] 3.6 驗收（指令）C7、C8、C9、C10：delta spec 無舊字串；`git diff main --stat` 範圍 ⊆ proposal Impact；既有測試僅授權那一行被改；`DO_NOT_TRACK=1 openspec validate local-fallback-export-reminder --strict` 通過
-- [ ] 3.7 驗收（指令）C5，全瀏覽器 gate（coordinator）：`/tmp/cgate-local-fallback-export-reminder.e2e` 由 coordinator 準備後執行 `/tmp/cgate2.sh local-fallback-export-reminder`；各 project 數量＝基線且 0 failed，結果寫在本 task 後方
+- [x] 3.1 驗收（指令）C1：三段 typecheck 皆 exit 0
+  - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：root、後端、核心三段 typecheck 皆 exit 0。
+- [x] 3.2 驗收（指令）C2：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（雙鎖）0 errors、warning 不多於基線
+  - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：0 errors／3 warnings（＝基線）。
+- [x] 3.3 驗收（指令）C3：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（雙鎖）三組皆綠；前端測試數與檔數＝基線
+  - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：前端 119／1197、後端 28／238、核心 10／31 全綠（＝基線；本 change 只改寫既有 it 的字面值）。
+- [x] 3.4 驗收（指令）C4：`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball build`（雙鎖）exit 0；建置後 `git status --porcelain` 為空
+  - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：build exit 0，建置後 porcelain 空。
+- [x] 3.5 驗收（指令）C6：產品碼、測試與兩個 workspace 範圍內不再出現舊文案（test-plan C6 的 grep 無輸出）
+  - 結果（coordinator）：C6 grep 無輸出（exit 1）。
+- [x] 3.6 驗收（指令）C7、C8、C9、C10：delta spec 無舊字串；`git diff main --stat` 範圍 ⊆ proposal Impact；既有測試僅授權那一行被改；`DO_NOT_TRACK=1 openspec validate local-fallback-export-reminder --strict` 通過
+  - 結果（coordinator）：C7 delta spec 無舊字串（exit 1）；C8 `git diff main --stat` 只有 `sync-status.ts`、`sync-status.test.ts`、`nextjs-pickball/CLAUDE.md` 與本 change artifact，主 spec／schemas 未動；C9 刪除行只有舊字面值一行；C10 validate 通過。
+- [x] 3.7 驗收（指令）C5，全瀏覽器 gate（coordinator）：`/tmp/cgate-local-fallback-export-reminder.e2e` 由 coordinator 準備後執行 `/tmp/cgate2.sh local-fallback-export-reminder`；各 project 數量＝基線且 0 failed，結果寫在本 task 後方
+  - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55（各＝基線 167、0 failed，skip 皆既有瀏覽器條件）；user-data 49 全 passed；porcelain 空。
 - [ ] 3.8 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 3.7）
 - [ ] 3.9 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
 - [ ] 3.10 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/local-fallback-export-reminder`，合併後由 coordinator 執行 archive（同步主 spec 後再確認 C7 的主 spec grep 無輸出）；**不 push**（push 即觸發正式站部署，由使用者決定）
