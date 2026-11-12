@@ -23,9 +23,10 @@
 - [ ] 1.1 確認分支 `change/local-fallback-export-reminder`、工作樹除本 change artifact 外乾淨；`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball install` 後 lockfile 零變動；
   雙鎖下跑 `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball test`（記錄三個 workspace 的檔數／測試數）、三段 typecheck（test-plan C1）、`pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball lint`（errors／warnings 數）、
   `pnpm --dir /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball exec playwright test --list`（各 project 數量）；回填 environment.md Verification 並 commit（`chore:`）
-- [ ] 1.2 對齊 main：以 python difflib 比對 delta spec 的 MODIFIED Requirement 與目前主 spec，除本 change 刻意改寫的文案與用途說明外應無差異（**若主 spec 已被其他 change 改動，以主 spec 為底重新套用**）；
+- [x] 1.2 對齊 main：以 python difflib 比對 delta spec 的 MODIFIED Requirement 與目前主 spec，除本 change 刻意改寫的文案與用途說明外應無差異（**若主 spec 已被其他 change 改動，以主 spec 為底重新套用**）；
   `grep -rn "重新整理頁面可再次連線雲端" /Users/m2_24gb/Desktop/project/nextjs-pickball/openspec/specs /Users/m2_24gb/Desktop/project/nextjs-pickball/nextjs-pickball /Users/m2_24gb/Desktop/project/nextjs-pickball/hono-pickball /Users/m2_24gb/Desktop/project/nextjs-pickball/packages --exclude-dir=node_modules --exclude-dir=.next` 只命中主 spec 四處、`sync-status.ts`、`sync-status.test.ts`、`nextjs-pickball/CLAUDE.md`，無其他漏網；
   `DO_NOT_TRACK=1 openspec validate local-fallback-export-reminder --strict` 通過後 commit（`docs(openspec):`）；差異記入 design.md Open Questions
+  - 結果（coordinator，2026-11-12）：difflib 比對 MODIFIED Requirement 與主 spec，差異只有四處文案替換與新增的三行用途說明；舊文案 grep 只命中主 spec、`sync-status.ts`、`sync-status.test.ts`、`nextjs-pickball/CLAUDE.md`；validate 通過。主 spec 未被其他 change 改動，Open Questions 無新增。
 
 ## 2. 本機備援提示加入先匯出備份的提醒
 Depends on: §1
