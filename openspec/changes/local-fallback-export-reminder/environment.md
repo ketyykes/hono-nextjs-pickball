@@ -25,8 +25,7 @@ python3 /Users/m2_24gb/Desktop/project/mini4wd/app/scripts/heavy.py --label next
 
 ## Verification
 
-- **Baseline tests**: 待 §1.1 實跑後回填（雙鎖；前端、後端、核心三組檔數／測試數、三段 typecheck、lint、`playwright test --list` 各 project 數量）。
-  參考值（上一個 change 的最終 gate，HEAD `2d5fd5c`）：前端 119 檔／1197 tests、後端 28／238、核心 10／31；三段 tsc exit 0；lint 0 errors／3 warnings；E2E chromium 與 firefox、mobile-chrome、webkit、mobile-safari 各 167，user-data 49。
+- **Baseline tests**（2026-11-12，HEAD `1cf45b5`，雙鎖）：install 後 lockfile 零變動；前端 119 檔／1197 tests、後端 28／238、核心 10／31 全綠；三段 typecheck exit 0；lint 0 errors／3 warnings；`playwright test --list` 共 884：chromium、firefox、webkit、mobile-chrome、mobile-safari 各 167，user-data 49。
 - **Initial commit hash**: `9113111`（`change/local-fallback-export-reminder` 分出時的 `main` HEAD）。
 - **Worktree path** (absolute): `/Users/m2_24gb/Desktop/project/nextjs-pickball`（主 repo，非 linked worktree）
 
