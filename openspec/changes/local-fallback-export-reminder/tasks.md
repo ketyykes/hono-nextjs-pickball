@@ -32,8 +32,9 @@
 ## 2. 本機備援提示加入先匯出備份的提醒
 Depends on: §1
 
-- [ ] 2.1 RED（TDD、改寫既有 it）：改寫 `nextjs-pickball/lib/sync/sync-status.test.ts` 的 it「unavailable 取代內容，按鈕與本機提示文案為固定值」，`LOCAL_FALLBACK_NOTICE` 的字面值改為
+- [x] 2.1 RED（TDD、改寫既有 it）：改寫 `nextjs-pickball/lib/sync/sync-status.test.ts` 的 it「unavailable 取代內容，按鈕與本機提示文案為固定值」，`LOCAL_FALLBACK_NOTICE` 的字面值改為
   「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」；單檔 vitest 看到該 it 紅燈（期望新文案、實際舊文案）並貼出輸出；commit（`test:`）
+  - 結果：單檔 vitest 紅燈，`Test Files 1 failed`、`Tests 1 failed | 3 passed (4)`；`AssertionError: expected '目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端' to be '目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料…'`（真紅燈，產品檔未動）。
 - [ ] 2.2 GREEN（TDD）：`nextjs-pickball/lib/sync/sync-status.ts` 的 `LOCAL_FALLBACK_NOTICE` 改為同一字面值（只改字串，更新該常數 JSDoc 提到提醒先匯出備份的用途）；單檔 vitest 綠；
   另跑 `components/sync/LocalFallbackBanner.test.tsx` 與 `components/sync/SyncStatusNotice.test.tsx` 單檔皆綠（回歸，經常數引用）；`tsc` exit 0；commit（`feat:`）
 - [ ] 2.3 REFACTOR：skipped（只改一個字串，無壞味道）
