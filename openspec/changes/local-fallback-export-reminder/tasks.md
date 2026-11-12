@@ -41,7 +41,10 @@ Depends on: §1
 - [x] 2.3 REFACTOR：skipped（只改一個字串，無壞味道）
 - [x] 2.4 設定層（文件）：`nextjs-pickball/CLAUDE.md` 儲存三態條目中「重新整理頁面可再次連線雲端」改為說明重新整理前須先到「資料」頁匯出 JSON 備份（重新整理並連上雲端後本機資料無匯出入口）、連線後再匯入雲端；commit（`docs:`）
   - 結果：`nextjs-pickball/CLAUDE.md` 該條目已改寫；`grep -rn "重新整理頁面可再次連線雲端"` 於 workspace 範圍（排除 node_modules、.next）無命中。
-- [ ] 2.5 Stage 1（sonnet）→ Stage 2（opus）審查：依 execution-plan 的 checklist，結論與處置寫在本 task 後方；Stage 2 須獨立 mutation（含 b 的四條與對照組）
+- [x] 2.5 Stage 1（sonnet）→ Stage 2（opus）審查：依 execution-plan 的 checklist，結論與處置寫在本 task 後方；Stage 2 須獨立 mutation（含 b 的四條與對照組）
+  - Stage 1（sonnet）：PASS，無必修。字面值在 delta spec 4 處、`sync-status.ts:31`、`sync-status.test.ts:70` 逐字一致；RED `67a5048` 只動測試與 tasks、產品檔仍為舊文案（真紅）；舊文案只剩主 spec（archive 時同步）；範圍 4 檔。
+  - Stage 2（opus）：PASS，無必修。獨立 mutation：舊文案、「資料」→「設定」、漏「匯出 JSON 備份，」、句序對調、漏句號 5 條皆轉紅；拆字串 `+`、模板字串 2 條對照組維持綠；每條三重落地、已還原。用語與導覽名「資料」、按鈕「匯出 JSON」「選擇備份檔匯入雲端…」一致。
+  - 建議處置（coordinator）：① 提示由約 2 行增為 3 行、底部遮擋範圍略增（不擋操作、不碰專注模式操作列）② 中文任意字間斷行 ③「再次連線」嚴格為「再次嘗試連線」（仍連不上會回到 unavailable、本機資料仍在，無資料風險）→ 三項皆記入 design Risks 為接受的取捨，文案維持使用者已看過的版本。
 
 ## 3. 指令驗收與合併前流程
 Depends on: §2
