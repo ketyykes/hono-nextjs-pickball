@@ -39,7 +39,8 @@ Depends on: §1
   另跑 `components/sync/LocalFallbackBanner.test.tsx` 與 `components/sync/SyncStatusNotice.test.tsx` 單檔皆綠（回歸，經常數引用）；`tsc` exit 0；commit（`feat:`）
   - 結果：`sync-status.test.ts` 4 passed；`LocalFallbackBanner.test.tsx` 1 passed；`SyncStatusNotice.test.tsx` 2 passed；`pnpm -r exec tsc --noEmit` exit 0。Implementer 自跑 mutation 7 次（單檔 sync-status.test.ts，三重落地檢查通過、每次還原）：舊文案、「資料」改「設定」、漏「匯出 JSON 備份」、順序對調、漏句號共 5 條皆轉紅；對照組（字串拆兩段以 `+` 串接、改模板字串）2 條維持綠；結束後 git status 僅剩預期變更。
 - [x] 2.3 REFACTOR：skipped（只改一個字串，無壞味道）
-- [ ] 2.4 設定層（文件）：`nextjs-pickball/CLAUDE.md` 儲存三態條目中「重新整理頁面可再次連線雲端」改為說明重新整理前須先到「資料」頁匯出 JSON 備份（重新整理並連上雲端後本機資料無匯出入口）、連線後再匯入雲端；commit（`docs:`）
+- [x] 2.4 設定層（文件）：`nextjs-pickball/CLAUDE.md` 儲存三態條目中「重新整理頁面可再次連線雲端」改為說明重新整理前須先到「資料」頁匯出 JSON 備份（重新整理並連上雲端後本機資料無匯出入口）、連線後再匯入雲端；commit（`docs:`）
+  - 結果：`nextjs-pickball/CLAUDE.md` 該條目已改寫；`grep -rn "重新整理頁面可再次連線雲端"` 於 workspace 範圍（排除 node_modules、.next）無命中。
 - [ ] 2.5 Stage 1（sonnet）→ Stage 2（opus）審查：依 execution-plan 的 checklist，結論與處置寫在本 task 後方；Stage 2 須獨立 mutation（含 b 的四條與對照組）
 
 ## 3. 指令驗收與合併前流程
