@@ -23,9 +23,12 @@ export const DATA_PENDING_MESSAGE = "正在載入資料…";
 /** 無法確認登入狀態時，讓使用者改用本機資料的按鈕文字。 */
 export const LOCAL_FALLBACK_ACTION_LABEL = "先用這台裝置的資料";
 
-/** 使用者選擇本機備援後常駐顯示的提示。 */
+/**
+ * 使用者選擇本機備援後常駐顯示的提示，同時提醒重新整理前先匯出 JSON 備份：
+ * 重新整理並連上雲端後，匯出的是雲端資料，本機資料就沒有匯出入口了。
+ */
 export const LOCAL_FALLBACK_NOTICE =
-	"目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端";
+	"目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端";
 
 /** 只有需要使用者注意的狀態才有文案；null 表示不顯示提示。 */
 const MESSAGES: Record<SyncStatus, string | null> = {

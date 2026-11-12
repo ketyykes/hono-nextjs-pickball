@@ -67,7 +67,7 @@ describe("無法確認的顯示狀態", () => {
 		expect(isContentBlocked("unavailable")).toBe(true);
 		expect(LOCAL_FALLBACK_ACTION_LABEL).toBe("先用這台裝置的資料");
 		expect(LOCAL_FALLBACK_NOTICE).toBe(
-			"目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端",
+			"目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端",
 		);
 		expect(syncStatusMessage("load-failed")).toBe("無法載入雲端資料，請重新整理頁面");
 	});
