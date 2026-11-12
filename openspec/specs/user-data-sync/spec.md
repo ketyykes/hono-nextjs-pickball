@@ -1227,8 +1227,11 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 **顯示狀態與文案**（`nextjs-pickball/lib/sync/sync-status.ts`）：
 
 - `unavailable` 是 `DataStatus` 的值（不是 `SyncStatus`：雲端 hook 不會回報它），`isContentBlocked("unavailable")` 為 true。
-- 同檔 SHALL 匯出 `LOCAL_FALLBACK_ACTION_LABEL`（「先用這台裝置的資料」）與 `LOCAL_FALLBACK_NOTICE`（「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」），是本 Requirement 唯一新增的兩個文案；
+- 同檔 SHALL 匯出 `LOCAL_FALLBACK_ACTION_LABEL`（「先用這台裝置的資料」）與 `LOCAL_FALLBACK_NOTICE`（「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」），是本 Requirement 唯一新增的兩個文案；
   無法確認時的提示文字 MUST 沿用既有 `syncStatusMessage("load-failed")`（「無法載入雲端資料，請重新整理頁面」），不另立文案。E2E MUST 匯入常數，不抄字面值。
+  `LOCAL_FALLBACK_NOTICE` 同時是備援期間的備份提醒：重新整理並連上雲端後，資料頁「匯出 JSON」匯出的是雲端資料、本機資料沒有任何匯出入口，且「匯入本機資料到雲端」在雲端已有資料時會被拒絕，
+  所以文案 MUST 提醒使用者在重新整理**之前**先到「資料」頁（導覽名稱，見 `lib/matchmaker/section-nav.ts`）匯出 JSON 備份，連線後再於同頁「JSON 完整備份」區塊選擇備份檔匯入雲端（雲端已有資料時走附加流程）。
+  本機備援期間儲存模式為 `"local"`，「匯出 JSON」匯出本機資料；提示只改文字，SHALL NOT 加連結或按鈕。
 - `SyncStatusNotice` 在 `unavailable` 時以既有 `role="status"` 外觀顯示上述 load-failed 文案，並在該 `role="status"` 元素**之外**渲染一顆 `<button type="button">`，文字為 `LOCAL_FALLBACK_ACTION_LABEL`，按下 MUST 呼叫 `chooseLocalFallback()`。
   按鈕 SHALL NOT 放在 `role="status"` 元素內（live region 內的互動元素會隨內容更新被重複朗讀）。其他狀態 SHALL NOT 渲染此按鈕。
 
@@ -1250,7 +1253,7 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 #### Scenario: 無法確認的顯示狀態取代內容且新文案為固定值
 
 - **WHEN** 呼叫 `isContentBlocked("unavailable")`，並讀取 `LOCAL_FALLBACK_ACTION_LABEL`、`LOCAL_FALLBACK_NOTICE` 與 `syncStatusMessage("load-failed")`
-- **THEN** `isContentBlocked` 為 true；兩個常數依序為「先用這台裝置的資料」與「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」；load-failed 文案仍為「無法載入雲端資料，請重新整理頁面」
+- **THEN** `isContentBlocked` 為 true；兩個常數依序為「先用這台裝置的資料」與「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」；load-failed 文案仍為「無法載入雲端資料，請重新整理頁面」
 - **驗收**：`nextjs-pickball/lib/sync/sync-status.test.ts`，it 名稱「unavailable 取代內容，按鈕與本機提示文案為固定值」
 
 #### Scenario: 同步提示在無法確認時顯示載入失敗文案與按鈕
@@ -1333,7 +1336,7 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 #### Scenario: 本機提示只在本機備援時出現
 
 - **WHEN** mock `useSession` 依序為本機備援快照、無法確認快照、`{ status: "loading", signedInHint: true }`、`{ status: "loading" }`、訪客的 ready、auth 停用的 ready、已登入的 ready，各自渲染 `LocalFallbackBanner`
-- **THEN** 只有本機備援時渲染 `role="status"`、文字為「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」，且最外層元素的 class 含 `fixed`、`pointer-events-none`、`print:hidden`、`z-30` 與 `[.sb-focus_&]:bottom-16`；其餘六種 `container` 皆為空
+- **THEN** 只有本機備援時渲染 `role="status"`、文字為「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」，且最外層元素的 class 含 `fixed`、`pointer-events-none`、`print:hidden`、`z-30` 與 `[.sb-focus_&]:bottom-16`；其餘六種 `container` 皆為空
 - **驗收**：`nextjs-pickball/components/sync/LocalFallbackBanner.test.tsx`，it 名稱「只在本機備援時顯示修改只存在這台裝置的提示，其餘快照不渲染」
 
 #### Scenario: 有上次登入提示而 session 請求失敗時先擋住畫面，選擇後改用本機名單
@@ -1341,7 +1344,7 @@ batch 本身拋出的其他錯誤（非整批守衛違規）MUST 照常回 500�
 - **GIVEN** 訪客、本機名單有一位參賽者；以 `addInitScript` 讓下一個文件載入前就寫入上次登入提示；`/api/session` 一律回 500
 - **WHEN** 開啟 `/matchmaker/players`，等到提示出現後按下「先用這台裝置的資料」
 - **THEN** 按下前 `main[data-sync-status="unavailable"]` 可見、`role="status"` 文字為「無法載入雲端資料，請重新整理頁面」、按鈕可見、該參賽者不存在、上次登入提示仍為 `"1"`；
-  按下後該參賽者可見、本機提示「目前連不上雲端，修改只會存在這台裝置；重新整理頁面可再次連線雲端」可見、`[data-sync-status]` 不存在、上次登入提示仍為 `"1"`
+  按下後該參賽者可見、本機提示「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」可見、`[data-sync-status]` 不存在、上次登入提示仍為 `"1"`
 - **驗收**：`nextjs-pickball/tests/e2e/specs/data-pending.spec.ts`，test 名稱「有上次登入提示而 session 請求失敗時先擋住畫面，按下先用這台裝置的資料後顯示本機名單與本機提示」
 
 #### Scenario: 有上次登入提示而 session 請求網路中斷時同樣先擋住畫面
