@@ -63,6 +63,9 @@ Depends on: §2
   - 結果（coordinator）：C7 delta spec 無舊字串（exit 1）；C8 `git diff main --stat` 只有 `sync-status.ts`、`sync-status.test.ts`、`nextjs-pickball/CLAUDE.md` 與本 change artifact，主 spec／schemas 未動；C9 刪除行只有舊字面值一行；C10 validate 通過。
 - [x] 3.7 驗收（指令）C5，全瀏覽器 gate（coordinator）：`/tmp/cgate-local-fallback-export-reminder.e2e` 由 coordinator 準備後執行 `/tmp/cgate2.sh local-fallback-export-reminder`；各 project 數量＝基線且 0 failed，結果寫在本 task 後方
   - 結果（gate，HEAD `33bff35`，雙鎖，2026-11-12）：chromium 167、firefox 154＋13 skip、mobile-chrome 164＋3、webkit 51＋5／48＋8／55、mobile-safari 51＋5／48＋8／55（各＝基線 167、0 failed，skip 皆既有瀏覽器條件）；user-data 49 全 passed；porcelain 空。
-- [ ] 3.8 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 3.7）
-- [ ] 3.9 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
-- [ ] 3.10 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/local-fallback-export-reminder`，合併後由 coordinator 執行 archive（同步主 spec 後再確認 C7 的主 spec grep 無輸出）；**不 push**（push 即觸發正式站部署，由使用者決定）
+- [x] 3.8 Final Code Review（opus，依 execution-plan）：結論與處置寫在本 task 後方；必修項處理並 commit 後才勾選（產品程式碼有改動時重跑 3.7）
+  - Final Code Review（opus）：PASS，無必修、無新建議。範圍 12 檔（產品／測試／文件 3 檔＋artifact）、主 spec／schemas 未動；自跑 C6～C10 與 tasks 3.5、3.6 一致；文案字樣與 `section-nav.ts:31`、`JsonBackupSection.tsx:206,236` 一致；`nextjs-pickball/CLAUDE.md:62` 與實作一致。
+- [x] 3.9 `/opsx:verify`：critical／warning／suggestion 全部逐項查證並處理（修正 commit 記在本 task 後方），直到報告全清才勾選
+  - verify 第一輪（opus，2026-11-12）：CRITICAL 0、WARNING 0、SUGGESTION 1；15 個 Scenario 錨點逐字存在且與測試一致，gate 後產品碼未變。處置（coordinator）：S1 proposal:13「兩份文件」、overview:18「兩處文件」與實際（一份測試＋一份文件）不符 → 改正。只動文件、無 critical／warning 殘留，結束 verify。
+- [x] 3.10 合併（coordinator）：在 `main` 執行 `git -C /Users/m2_24gb/Desktop/project/nextjs-pickball merge --no-ff change/local-fallback-export-reminder`，合併後由 coordinator 執行 archive（同步主 spec 後再確認 C7 的主 spec grep 無輸出）；**不 push**（push 即觸發正式站部署，由使用者決定）
+  - 合併 `--no-ff` 進 `main` 後 archive（coordinator）；未 push。

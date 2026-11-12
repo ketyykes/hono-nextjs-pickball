@@ -10,7 +10,7 @@
 - **只改一句文案**：`LOCAL_FALLBACK_NOTICE`（`nextjs-pickball/lib/sync/sync-status.ts`）改為
   「目前連不上雲端，修改只會存在這台裝置。重新整理會再次連線雲端，請先到「資料」頁匯出 JSON 備份，連線後再選擇備份檔匯入雲端」，提醒使用者先匯出備份、連線後再匯入。
 - 不加連結或按鈕：提示維持 `pointer-events-none`、固定在底部、不擋操作；`LocalFallbackBanner` 元件與樣式不改。
-- 同步改測試字面值與兩份文件的舊文案（`sync-status.test.ts`、`nextjs-pickball/CLAUDE.md`）；主 spec 的舊文案由 delta spec 更新。
+- 同步改測試字面值（`sync-status.test.ts`）與文件（`nextjs-pickball/CLAUDE.md`）的舊文案；主 spec 的舊文案由 delta spec 更新。
 
 ### 明確不做
 

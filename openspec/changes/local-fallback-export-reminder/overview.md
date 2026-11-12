@@ -15,7 +15,7 @@
 ## What Changes
 
 - `LOCAL_FALLBACK_NOTICE` 改為含備份提醒的新文案（63 字，原 32 字）。
-- 測試的字面值斷言與兩處文件、主 spec 舊文案同步更新；元件與樣式不改，不加連結或按鈕。
+- 測試的字面值斷言、一處文件（`nextjs-pickball/CLAUDE.md`）與主 spec 舊文案同步更新；元件與樣式不改，不加連結或按鈕。
 
 ```
 === Before ===
